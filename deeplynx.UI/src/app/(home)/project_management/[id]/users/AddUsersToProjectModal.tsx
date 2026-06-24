@@ -18,7 +18,7 @@ interface AddUsersToProjectModalProps {
   projectMembers: ProjectMemberResponseDto[];
   modalLoading?: boolean;
   onClose: () => void;
-  onAddInviteUser: (emailOrUserId: string | number, roleId?: number) => Promise<void>;
+  onAddInviteUser: (emailOrUserId: string | number, roleId?: number, isProjectAdmin?: boolean) => Promise<void>;
 }
 
 interface EmailError {
@@ -41,6 +41,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
   const [externalEmails, setExternalEmails] = useState<string[]>([]);
   const [selectedOrgUserIds, setSelectedOrgUserIds] = useState<number[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
+  const [isProjectAdmin, setIsProjectAdmin] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [emailErrors, setEmailErrors] = useState<EmailError[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -73,6 +74,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
       setExternalEmails([]);
       setSelectedOrgUserIds([]);
       setSelectedRoleId("");
+      setIsProjectAdmin(false);
       setEmailErrors([]);
       setSearchQuery("");
     }
@@ -132,10 +134,10 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
 
     const roleId = Number(selectedRoleId);
 
-    // Process org users first (pass userId and roleId)
+    // Process org users first (pass userId, roleId, and isProjectAdmin)
     for (const userId of selectedOrgUserIds) {
       try {
-        await onAddInviteUser(userId, roleId);
+        await onAddInviteUser(userId, roleId, isProjectAdmin);
       } catch (error: any) {
         const user = usersNotInProject.find((u) => u.id === userId);
         errors.push({
@@ -360,6 +362,27 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                       ))}
                     </ul>
                   </div>
+                </div>
+
+                {/* Project Admin Checkbox */}
+                <div className="form-control">
+                  <label className="label cursor-pointer justify-start gap-3">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-warning"
+                      checked={isProjectAdmin}
+                      onChange={(e) => setIsProjectAdmin(e.target.checked)}
+                      disabled={isProcessing}
+                    />
+                    <div className="flex flex-col">
+                      <span className="label-text font-medium">
+                        Project Admin
+                      </span>
+                      <span className="text-xs text-base-content/60">
+                        Grant project admin permissions to these users
+                      </span>
+                    </div>
+                  </label>
                 </div>
 
                 {/* Error Messages */}
