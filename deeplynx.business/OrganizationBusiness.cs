@@ -390,6 +390,10 @@ public class OrganizationBusiness : IOrganizationBusiness
         if (user == null || user.IsArchived)
             throw new KeyNotFoundException($"User with id {userId} not found");
 
+        // service users are restricted to project scope. Cannot be added only to an org
+        if (user.AccountType == AccountType.Service)
+            throw new InvalidOperationException("Service accounts must be added directly to a project");
+
         var organization = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId);
         if (organization == null || organization.IsArchived)
             throw new KeyNotFoundException($"Organization with id {organizationId} not found");
@@ -420,7 +424,14 @@ public class OrganizationBusiness : IOrganizationBusiness
     {
         // check if the user exists in the organization
         var existingOrgUser = await _context.OrganizationUsers
+            .Include(ou => ou.User)
             .FirstOrDefaultAsync(ou => ou.OrganizationId == organizationId && ou.UserId == userId);
+
+        if (existingOrgUser == null)
+            throw new KeyNotFoundException($"User with id {userId} not found in Org with id {organizationId}");
+
+        if (existingOrgUser.User.AccountType == AccountType.Service)
+            throw new InvalidOperationException("Only standard user accounts can be granted org admin status.");
 
         if (existingOrgUser == null)
             throw new KeyNotFoundException($"User with id {userId} not found in Org with id {organizationId}");
