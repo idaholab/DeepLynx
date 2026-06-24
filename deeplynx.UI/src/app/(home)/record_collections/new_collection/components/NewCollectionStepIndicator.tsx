@@ -15,7 +15,7 @@ type Props = {
 
 export default function NewCollectionStepIndicator({ steps }: Props) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-base-300 bg-base-200/30 p-4 text-sm md:flex-row md:items-center">
+    <div className="flex flex-col gap-3 text-sm md:flex-row md:items-center">
       {steps.map((step, index) => (
         <React.Fragment key={step.label}>
           <div

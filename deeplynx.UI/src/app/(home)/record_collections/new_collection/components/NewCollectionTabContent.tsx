@@ -10,7 +10,6 @@ import CollectionRecordSearchControls from "../../components/CollectionRecordSea
 import CollectionRecordSearchResultsTable from "../../components/CollectionRecordSearchResultsTable";
 import NewCollectionStepIndicator from "./NewCollectionStepIndicator";
 import SelectedRecordsPreviewPanel from "../../components/SelectedRecordsPreviewPanel";
-import SectionCard from "../../components/SectionCard";
 import { interpolateTemplate } from "@/app/lib/record_helpers";
 import type { NewCollectionTabController } from "../hooks/useNewCollectionWorkflow";
 
@@ -211,11 +210,8 @@ export default function NewCollectionTabContent({
     newCollectionDescription.trim().length > 0;
 
   return (
-    <div className="mt-4">
-      <SectionCard
-        title={t.translations.RECORD_COLLECTIONS_NEW}
-        subtitle={t.translations.RECORD_COLLECTIONS_CREATE_IN_ACTIVE_PROJECT}
-      >
+    <div className="card bg-base-100 shadow-xl">
+      <div className="card-body space-y-6">
         <NewCollectionStepIndicator
           steps={[
             {
@@ -769,9 +765,11 @@ export default function NewCollectionTabContent({
                 recordPageCount={newCollectionReviewPageCount}
                 recordPageSizeOptions={recordPageSizeOptions}
                 onRecordPageSizeChange={setRecordsPerPage}
+                recordsSectionBordered={false}
+                recordsSectionElevated={false}
               />
 
-              <div className="flex justify-end rounded-2xl border border-base-300 bg-base-100 p-4">
+              <div className="flex justify-end">
                 <div className="flex flex-wrap justify-end gap-2">
                   <button
                     type="button"
@@ -804,7 +802,7 @@ export default function NewCollectionTabContent({
             </>
           ) : null}
         </div>
-      </SectionCard>
+      </div>
     </div>
   );
 }

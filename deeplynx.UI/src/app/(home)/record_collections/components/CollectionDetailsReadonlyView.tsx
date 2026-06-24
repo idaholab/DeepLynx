@@ -65,6 +65,9 @@ type Props = {
   recordPageCount: number;
   recordPageSizeOptions?: number[];
   onRecordPageSizeChange?: (pageSize: number) => void;
+  recordsSectionBordered?: boolean;
+  recordsSectionElevated?: boolean;
+  recordsSectionClassName?: string;
 };
 
 export default function CollectionDetailsReadonlyView({
@@ -99,6 +102,9 @@ export default function CollectionDetailsReadonlyView({
   recordPageCount,
   recordPageSizeOptions,
   onRecordPageSizeChange,
+  recordsSectionBordered,
+  recordsSectionElevated,
+  recordsSectionClassName,
 }: Props) {
   const { t } = useLanguage();
   const collectionLabels = collection.labels ?? [];
@@ -107,12 +113,16 @@ export default function CollectionDetailsReadonlyView({
   return (
     <div className="space-y-4">
       {summaryPanel}
-      <SectionCard title={collection.name} action={primaryAction}>
-        <div className="space-y-5">
+      <SectionCard
+        title={collection.name}
+        action={primaryAction}
+        bodyClassName="gap-2"
+      >
+        <div className="space-y-4">
           <div className="max-w-5xl">
             <p
               ref={descriptionRef}
-              className={`whitespace-pre-wrap text-sm leading-6 text-base-content/75 ${descriptionExpanded ? "" : "line-clamp-10"}`}
+              className={`whitespace-pre-wrap text-sm leading-5 text-base-content/75 ${descriptionExpanded ? "" : "line-clamp-8"}`}
             >
               {collection.description ||
                 t.translations.RECORD_COLLECTIONS_NO_DESCRIPTION_PROVIDED}
@@ -237,6 +247,9 @@ export default function CollectionDetailsReadonlyView({
           { shown: filteredRecords.length, total: records.length },
         )}
         action={recordsSectionAction}
+        bordered={recordsSectionBordered}
+        elevated={recordsSectionElevated}
+        className={recordsSectionClassName}
       >
         <SearchInput
           placeholder={t.translations.RECORD_COLLECTIONS_SEARCH_IN_THIS_COLLECTION}
