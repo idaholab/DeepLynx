@@ -235,7 +235,10 @@ const SideMenu: React.FC<SideMenuProps> = ({
     const isExactMatch = selectedItem === targetPath;
     const isDynamicProject =
       targetPath === "/project/[id]" && /^\/project\/[^/]+$/.test(pathname);
-    const isSelected = isExactMatch || isDynamicProject;
+    const isRecordCollectionsRoute =
+      targetPath === "/record_collections" &&
+      pathname?.startsWith("/record_collections");
+    const isSelected = isExactMatch || isDynamicProject || isRecordCollectionsRoute;
 
     return [
       "flex items-center block py-2 px-4 rounded transition",
@@ -257,14 +260,12 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
   return (
     <div
-      className={`fixed top-20 bottom-0 left-0 lg:left-18 flex z-40 transition-transform duration-300 ${
-        mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      }`}
+      className={`fixed top-20 bottom-0 left-0 lg:left-18 flex z-40 transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        }`}
     >
       <aside
-        className={`h-full shadow-xl ${
-          isCollapsed ? "w-22" : "w-[18rem] sm:w-[20rem] lg:w-64"
-        } app-header-inverted brightness-120 text-neutral-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
+        className={`h-full shadow-xl ${isCollapsed ? "w-22" : "w-[18rem] sm:w-[20rem] lg:w-64"
+          } app-header-inverted brightness-120 text-neutral-content p-4 transition-all duration-300 flex flex-col overflow-y-auto`}
       >
         <div className="flex justify-end lg:hidden">
           <button
@@ -345,11 +346,10 @@ const SideMenu: React.FC<SideMenuProps> = ({
                     <li key={proj.id}>
                       <button
                         onClick={() => handleProjectClick(proj)}
-                        className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${
-                          isProjectActive(proj.id)
-                            ? "bg-info/30 text-neutral-content font-semibold"
-                            : "hover:bg-info/20 text-neutral-content"
-                        }`}
+                        className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${isProjectActive(proj.id)
+                          ? "bg-info/30 text-neutral-content font-semibold"
+                          : "hover:bg-info/20 text-neutral-content"
+                          }`}
                       >
                         <span className="truncate">{proj.name}</span>
                         {isProjectActive(proj.id) && (
@@ -395,6 +395,23 @@ const SideMenu: React.FC<SideMenuProps> = ({
               <ArrowUpTrayIcon className="size-6" />
               {!isCollapsed && (
                 <p className="ml-2">{t.translations.UPLOAD_CENTER}</p>
+              )}
+            </Link>
+          </li>
+
+          {/* Record Collections */}
+          <li className="mt-2">
+            <Link
+              href="/record_collections"
+              onClick={() => onMobileClose?.()}
+              className={getItemClass("/record_collections")}
+            >
+              <FolderIcon className="size-6" />
+              {!isCollapsed && (
+                <>
+                  <p className="ml-2">{t.translations.RECORD_COLLECTIONS}</p>
+                  <BetaBadge size="xs" className="ml-auto" />
+                </>
               )}
             </Link>
           </li>
