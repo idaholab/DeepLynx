@@ -259,7 +259,7 @@ public class ProjectController : ControllerBase
     [HttpGet("{projectId:long}/members", Name = "api_get_project_members")]
     [Auth("read", "project")]
     [Auth("read", "user")]
-    public async Task<ActionResult<ProjectMemberResponseDto>> GetProjectMembers(long organizationId, long projectId)
+    public async Task<ActionResult<IEnumerable<ProjectMemberResponseDto>>> GetProjectMembers(long organizationId, long projectId)
     {
         try
         {

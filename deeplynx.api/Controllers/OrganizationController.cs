@@ -303,10 +303,10 @@ public class OrganizationController : ControllerBase
     /// <param name="userName"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
-    [ProjectAdmin]
+    [ProjectAdmin(unscoped: true)] 
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
-        [FromQuery] string userEmail,
+        [FromQuery] string? userEmail,
         [FromQuery] long? userId)
     {
         try
