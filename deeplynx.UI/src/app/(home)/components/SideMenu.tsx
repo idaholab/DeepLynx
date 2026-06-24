@@ -409,7 +409,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
               <FolderIcon className="size-6" />
               {!isCollapsed && (
                 <>
-                  <p className="ml-2">Collections</p>
+                  <p className="ml-2">{t.translations.RECORD_COLLECTIONS}</p>
                   <BetaBadge size="xs" className="ml-auto" />
                 </>
               )}

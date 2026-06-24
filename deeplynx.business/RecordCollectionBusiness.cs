@@ -87,12 +87,6 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projectId, "read record");
 
-            if (dto.SensitivityLabelIds?.Any(id => !userAuthorizedLabels.Contains(id)) == true)
-            {
-                throw new UnauthorizedAccessException(
-                    "User is not authorized to filter by one or more sensitivity labels.");
-            }
-
             recordCollectionQuery = recordCollectionQuery.Where(c =>
                 c.Labels.Count == 0 ||
                 c.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
