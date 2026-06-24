@@ -1,41 +1,4 @@
-FROM postgres:18-alpine3.23 AS deeplynx-db
-
-# Set working directory
-WORKDIR /var/lib/postgresql/data
-
-# Configure INL certs and environment variables
-RUN apk --no-check-certificate add wget ca-certificates
-RUN wget -q -P /usr/local/share/ca-certificates/ http://certstore.inl.gov/pki/CAINLROOT_B64.crt
-RUN /usr/sbin/update-ca-certificates
-ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
-ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-ENV SSL_CERT_DIR=/etc/ssl/certs/
-
-## Below is config for hardening Postgres for production release
-
-# Update alpine package manager
-RUN apk update && apk upgrade
-
-# # Install build dependencies
-RUN apk add --virtual .build-deps \
-    git \
-    build-base \
-    postgresql18-dev \
-    clang19 \
-    llvm19 \
-    make
-
-# Install pgvector
-RUN git clone --branch v0.8.1 https://github.com/pgvector/pgvector.git /tmp/pgvector && \
-    cd /tmp/pgvector && \
-    make -j$(nproc) && \
-    make install && \
-    rm -rf /tmp/pgvector
-
-# Remove build dependencies to reduce image size
-RUN apk del .build-deps
+FROM pgvector/pgvector:0.8.3-pg18 AS deeplynx-db
 
 EXPOSE 5432
 
