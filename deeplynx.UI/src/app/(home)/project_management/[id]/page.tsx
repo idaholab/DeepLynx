@@ -62,10 +62,12 @@ export default async function ProjectManagementPage({ params }: Props) {
   let projectPermissions: PermissionResponseDto[] = [];
 
   if (!isNaN(organizationId) && !isNaN(projectId)) {
+    console.log(`[ProjectManagementPage] Loading project ${projectId} for org ${organizationId}`);
     try {
       project = await getProjectServer(organizationId, projectId, true);
+      console.log(`[ProjectManagementPage] Project loaded:`, project ? "SUCCESS" : "NULL");
     } catch (e) {
-      console.error("getProjectServer failed:", e);
+      console.error("[ProjectManagementPage] getProjectServer failed:", e);
     }
 
     try {

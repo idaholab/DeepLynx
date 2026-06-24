@@ -885,6 +885,7 @@ public partial class DeeplynxContext : DbContext
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.NormalizedContentHash).HasMaxLength(64);
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
 
@@ -1503,12 +1504,28 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Vector).HasColumnType("vector");
+            entity.Property(e => e.ChunkHash).HasMaxLength(64);
+            entity.Property(e => e.EmbeddingHash).HasMaxLength(64);
 
             entity.HasOne(d => d.Record)
                 .WithMany(p => p.Embeddings)
                 .HasForeignKey(d => d.RecordId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("embeddings_record_id_fkey");
+
+            // Add foreign key relationship to AiModelConfig.Id
+            entity.HasOne(e => e.AiModelConfig)
+                .WithMany() 
+                .HasForeignKey(e => e.EmbeddingModel) 
+                .HasPrincipalKey(a => a.Id) 
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("embeddings_embedding_model_fkey");
+
+            entity.HasIndex(e => e.EmbeddingModel)
+                .HasDatabaseName("idx_embeddings_embedding_model");
+
+            entity.HasIndex(e => new { e.ProjectId, e.EmbeddingModel })
+                .HasDatabaseName("idx_embeddings_project_model");
         });
 
         modelBuilder.Entity<OntologyVector>(entity =>
