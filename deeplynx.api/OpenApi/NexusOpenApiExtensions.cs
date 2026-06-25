@@ -70,6 +70,8 @@ internal static class NexusOpenApiExtensions
                     new() { Name = "Project", Description = "Project management" },
                     new() { Name = "User", Description = "User management" },
                     new() { Name = "Group", Description = "Group management" },
+                    new() { Name = "Service Accounts", Description = "Service account management" },
+                    new() { Name = "Test Accounts", Description = "Test account management (System Administrators)" },
                     new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
                     new() { Name = "Organization - AI Model Config", Description = "AI model configuration management" },
                     new() { Name = "Project - AI Model Config", Description = "AI model configuration management" },
@@ -116,7 +118,7 @@ internal static class NexusOpenApiExtensions
                     new JsonObject
                     {
                         ["name"] = "Administration",
-                        ["tags"] = new JsonArray { "Organization", "Project", "User", "Group" }
+                        ["tags"] = new JsonArray { "Organization", "Project", "User", "Group", "Service Accounts", "Test Accounts" }
                     },
                     new JsonObject
                     {

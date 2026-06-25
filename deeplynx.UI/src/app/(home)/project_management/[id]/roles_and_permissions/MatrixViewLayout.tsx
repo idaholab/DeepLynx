@@ -86,9 +86,9 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
 
   return (
     <div style={{ height: "calc(100vh - 28rem)" }}>
-      <div className="card bg-base-100 shadow-xl h-full flex flex-col overflow-hidden border-2 border-primary">
+      <div className="card h-full flex flex-col overflow-hidden border border-base-300/50 bg-base-100 shadow-sm">
         {/* Matrix Header / Controls */}
-        <div className="px-6 py-3 border-b border-base-300 flex items-center justify-between">
+        <div className="px-6 py-3 border-b border-base-300/50 flex items-center justify-between">
           <h3 className="text-sm font-semibold">
             {t.translations.PERMISSION_MATRIX}
           </h3>

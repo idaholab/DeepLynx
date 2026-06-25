@@ -88,17 +88,17 @@ public class ProjectBusiness : IProjectBusiness
             );
 
         return await projectQuery.Select(p => new ProjectResponseDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                Abbreviation = p.Abbreviation,
-                LastUpdatedAt = p.LastUpdatedAt,
-                LastUpdatedBy = p.LastUpdatedBy,
-                IsArchived = p.IsArchived,
-                OrganizationId = p.OrganizationId,
-                Banner = p.Banner  
-            })
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Description = p.Description,
+            Abbreviation = p.Abbreviation,
+            LastUpdatedAt = p.LastUpdatedAt,
+            LastUpdatedBy = p.LastUpdatedBy,
+            IsArchived = p.IsArchived,
+            OrganizationId = p.OrganizationId,
+            Banner = p.Banner
+        })
             .ToListAsync();
     }
 
@@ -238,7 +238,7 @@ public class ProjectBusiness : IProjectBusiness
                 .Include(r => r.Labels)
                 .Where(r => r.ProjectId == projectId)
                 .AnyAsync(r => !r.Labels.Any());
-        
+
             if (hasUnlabeledRecords)
                 throw new InvalidOperationException(
                     "Cannot require sensitivity labels: project contains records without labels. " +
@@ -253,7 +253,7 @@ public class ProjectBusiness : IProjectBusiness
         project.Abbreviation = dto.Abbreviation ?? project.Abbreviation;
         project.LastUpdatedBy = currentUserId;
         project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        project.Banner = dto.Banner; 
+        project.Banner = dto.Banner;
 
         _context.Projects.Update(project);
         await _context.SaveChangesAsync();
@@ -391,10 +391,10 @@ public class ProjectBusiness : IProjectBusiness
                     $"unable to archive project {projectId} or its downstream dependents: {exc}");
             }
         }
-        
+
         // Refresh the entity from the database to get updated values
         await _context.Entry(project).ReloadAsync();
-        
+
         var projectResponse = new ProjectResponseDto
         {
             Id = project.Id,
@@ -421,7 +421,7 @@ public class ProjectBusiness : IProjectBusiness
             // If cache exists, update the project in the list
             var projectIndex = cachedProjectList.FindIndex(p => p.Id == projectResponse.Id);
             if (projectIndex != -1) cachedProjectList[projectIndex] = projectResponse;
-    
+
             // Set the updated list back to the cache
             await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
         }
@@ -486,10 +486,10 @@ public class ProjectBusiness : IProjectBusiness
                 throw new DependencyDeletionException(
                     $"unable to unarchive project {projectId} or its downstream dependents: {exc}");
             }
-            
+
             // Refresh the entity from the database to get updated values
             await _context.Entry(project).ReloadAsync();
-        
+
             var projectResponse = new ProjectResponseDto
             {
                 Id = project.Id,
@@ -516,11 +516,11 @@ public class ProjectBusiness : IProjectBusiness
                 // If cache exists, update the project in the list
                 var projectIndex = cachedProjectList.FindIndex(p => p.Id == projectResponse.Id);
                 if (projectIndex != -1) cachedProjectList[projectIndex] = projectResponse;
-    
+
                 // Set the updated list back to the cache
                 await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
             }
-            
+
             // Log the unarchive event
             await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
             {
@@ -606,13 +606,14 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="roleId">(optional) Role which member will be added under</param>
     /// <param name="userId">(optional) ID of user to be added</param>
     /// <param name="groupId">(optional) ID of group to be added</param>
+    /// <param name="makeProjectAdmin">(optional) Make new member a project admin. Defaults to false</param>
+    /// <param name="allowServiceAccount">Bypass for service accounts to be added (only used internally)</param>
     /// <returns>True if user or group successfully added to project</returns>
     /// <returns>False if user or group already exists in project</returns>
     /// <exception cref="ArgumentException">Returned if none or both of userID/groupID supplied</exception>
-    /// <param name="isProjectAdmin">(optional) Whether the member is a project admin. Defaults to false</param>
     /// <exception cref="KeyNotFoundException">Returned if user, group, role or project not found</exception>
     public async Task<bool> AddMemberToProject(long projectId, long? roleId, long? userId,
-        long? groupId, bool isProjectAdmin = false)
+        long? groupId, bool makeProjectAdmin = false, bool allowServiceAccount = false)
     {
         // ensure one and only one of userID or groupID is supplied
         if (!userId.HasValue && !groupId.HasValue)
@@ -632,6 +633,10 @@ public class ProjectBusiness : IProjectBusiness
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (userId.HasValue && (user == null || user.IsArchived))
             throw new KeyNotFoundException($"User with id {userId} not found");
+        
+        // Service accounts cannot be invited to other projects. Limited to the project where they are created.
+        if (userId.HasValue && user.AccountType == AccountType.Service && !allowServiceAccount)
+            throw new InvalidOperationException("Service accounts cannot be added to a project directly. Use CreateAndAddServiceAccountToProject.");
 
         var group = await _context.Groups.FirstOrDefaultAsync(g => g.Id == groupId);
         if (groupId.HasValue && (group == null || group.IsArchived))
@@ -652,7 +657,7 @@ public class ProjectBusiness : IProjectBusiness
             RoleId = roleId,
             UserId = userId,
             GroupId = groupId,
-            IsProjectAdmin = isProjectAdmin
+            IsProjectAdmin = makeProjectAdmin
         };
 
         _context.ProjectMembers.Add(projMember);
@@ -763,6 +768,14 @@ public class ProjectBusiness : IProjectBusiness
             throw new ArgumentException("One of either User ID or Group ID must be provided");
         if (userId.HasValue && groupId.HasValue)
             throw new ArgumentException("Please provide only one of User ID or Group ID, not both");
+        
+        // Service Users should not exist without scope. Must Archive or Delete
+        if (userId.HasValue)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user?.AccountType == AccountType.Service)
+                throw new InvalidOperationException("Service accounts cannot be removed from a project. Archive or delete the account instead.");
+        }
 
         // Find the existing project member to update
         var existingProjectMember = await _context.ProjectMembers
@@ -874,7 +887,7 @@ public class ProjectBusiness : IProjectBusiness
         // ===============================
         // Add current user as admin to project
         // ===============================
-        await AddMemberToProject(projectId, null, currentUserId, null, isProjectAdmin: true);
+        await AddMemberToProject(projectId, null, currentUserId, null, makeProjectAdmin: true);
     }
 } 
 

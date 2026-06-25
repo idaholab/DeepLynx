@@ -77,7 +77,7 @@ export default function RecordCollectionsTab({
 
   if (isLoadingCollections) {
     return (
-      <div className="mt-4 card bg-base-100 shadow-lg">
+      <div className="card mt-4 border border-base-300/50 bg-base-100 shadow-sm">
         <div className="card-body">
           <div className="flex items-center gap-3">
             <span className="loading loading-spinner loading-md" />
@@ -98,7 +98,7 @@ export default function RecordCollectionsTab({
 
   if (collections.length === 0) {
     return (
-      <div className="mt-4 card bg-base-100 shadow-lg">
+      <div className="card mt-4 border border-base-300/50 bg-base-100 shadow-sm">
         <div className="card-body">
           <h3 className="card-title">{t.translations.RECORD_COLLECTIONS}</h3>
           <p className="opacity-80">
