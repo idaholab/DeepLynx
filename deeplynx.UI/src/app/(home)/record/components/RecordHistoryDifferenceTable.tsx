@@ -3,6 +3,11 @@ import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useLanguage } from "@/app/contexts/Language";
 import { CompareMode, FlatDifferenceRow } from "./RecordHistoryDifferenceUtils";
 
+interface ClassInfo {
+  name: string;
+  isArchived: boolean;
+}
+
 interface Props {
   compareMode: CompareMode;
   showOnlyChanges: boolean;
@@ -18,7 +23,10 @@ interface Props {
   onShowOnlyChangesChange: (checked: boolean) => void;
   onToggleExpand: (id: string) => void;
   onLoadMore: () => void;
+  classInfoMap: ClassInfoMap;
 }
+
+type ClassInfoMap = Record<number, ClassInfo>;
 
 export default function RecordHistoryDifferenceTable({
   compareMode,
@@ -35,8 +43,76 @@ export default function RecordHistoryDifferenceTable({
   onShowOnlyChangesChange,
   onToggleExpand,
   onLoadMore,
+  classInfoMap
 }: Props) {
   const { t } = useLanguage();
+
+  let currentClassName: string = "";
+  let compareClassName: string = "";
+
+  function normalizeCurrentClassNameWithArchivedLabel(
+    classIdStr: string | null | undefined,
+    classInfoMap: ClassInfoMap
+  ): number | null {
+    if (!classIdStr) {
+      currentClassName = t.translations.NO_CLASS;
+      return null;
+    }
+
+    const classId = Number(classIdStr);
+    if (Number.isNaN(classId)) {
+      currentClassName = t.translations.NO_CLASS;
+      return null;
+    }
+
+    const info = classInfoMap[classId];
+
+    if (!info) currentClassName = t.translations.NO_CLASS;
+
+    if (info.isArchived) {
+      currentClassName = `${info.name} (Archived)`;
+    } else {
+      currentClassName = info.name
+    }
+
+    return classId;
+  }
+
+  function normalizeCompareClassNameWithArchivedLabel(
+    classIdStr: string | null | undefined,
+    classInfoMap: ClassInfoMap
+  ): number | null {
+
+    if (!classIdStr) {
+      compareClassName = t.translations.NO_CLASS;
+      return null;
+    }
+    const classId = Number(classIdStr);
+    if (Number.isNaN(classId)) {
+      compareClassName = t.translations.NO_CLASS;
+      return null;
+    }
+
+    console.log("classId: ", classId);
+    console.log("classInfoMap: ", classInfoMap)
+    console.log("type of classid", typeof classId);
+
+    const info = classInfoMap[classId];
+    if (!info) {
+      compareClassName = t.translations.NO_CLASS;
+      return null;
+    }
+    console.log("info: ", info)
+
+
+    if (info.isArchived) {
+      compareClassName = `${info.name} (Archived)`;
+    } else {
+      compareClassName = info.name;
+    }
+
+    return classId;
+  }
 
   return (
     // Difference card: filters, loading states, and expandable difference tree table.
@@ -112,6 +188,37 @@ export default function RecordHistoryDifferenceTable({
                 visibleRows.map(({ node, depth }) => {
                   const hasChildren = node.children.length > 0;
                   const isExpanded = expandedRows.has(node.id);
+
+                  const isClassIdRow = node.field === "record.classId";
+                  const isClassNameRow = node.field === "record.className";
+
+                  let currentValue: number | string | null = null;
+                  let compareValue: number | string | null = null;
+
+                  if (isClassIdRow) {
+                    console.log("node.current", node.current)
+                    console.log("classInfoMap: ", classInfoMap)
+                    currentValue = normalizeCurrentClassNameWithArchivedLabel(node.current, classInfoMap)
+                  } else if (isClassNameRow) {
+                    console.log("current class name: ", currentClassName);
+                    currentValue = currentClassName;
+                  }
+                  else {
+                    currentValue = node.current ?? placeholderValue
+                  }
+
+                  if (isClassIdRow) {
+                    console.log("node.compare", node.compare)
+                    console.log("classInfoMap: ", classInfoMap)
+                    compareValue = normalizeCompareClassNameWithArchivedLabel(node.compare, classInfoMap)
+                  } else if (isClassNameRow) {
+                    console.log("compare class name: ", compareClassName);
+                    compareValue = compareClassName;
+                  }
+                  else {
+                    compareValue = node.current ?? placeholderValue
+                  }
+
                   return (
                     <tr
                       key={node.id}
@@ -144,7 +251,7 @@ export default function RecordHistoryDifferenceTable({
                                 {isExpanded
                                   ? t.translations.RECORD_HISTORY_EXPANDED
                                   : t.translations
-                                      .RECORD_HISTORY_COLLAPSED}{" "}
+                                    .RECORD_HISTORY_COLLAPSED}{" "}
                                 ({node.leafCount}{" "}
                                 {t.translations.RECORD_HISTORY_FIELDS})
                               </div>
@@ -163,7 +270,7 @@ export default function RecordHistoryDifferenceTable({
                           </span>
                         ) : (
                           <div className="whitespace-pre-wrap break-all text-xs">
-                            {node.current ?? placeholderValue}
+                            {currentValue?.toString() ?? "N/A"}
                           </div>
                         )}
                       </td>
@@ -178,7 +285,7 @@ export default function RecordHistoryDifferenceTable({
                           </span>
                         ) : (
                           <div className="whitespace-pre-wrap break-all text-xs">
-                            {node.compare ?? placeholderValue}
+                            {compareValue?.toString() ?? "N/A"}
                           </div>
                         )}
                       </td>
