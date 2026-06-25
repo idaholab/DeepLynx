@@ -250,6 +250,8 @@ Content-Type: application/x-www-form-urlencoded
 | `client_id` | Yes      | The OAuth application's Client ID              |
 | `scope`     | No       | Space-delimited scopes requested by the device |
 
+Set `OAUTH_DEVICE_VERIFICATION_URI` to the frontend verification page, for example `https://nexus.example.com/oauth/device/verify`. Nexus returns that URL as `verification_uri` so the user lands on the browser page instead of the backend API endpoint.
+
 ```bash
 curl -X POST https://nexus.example.com/api/v1/oauth/device/code \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -263,8 +265,8 @@ Successful response:
 {
   "device_code": "opaque-device-code",
   "user_code": "BCDF-GHJK",
-  "verification_uri": "https://nexus.example.com/api/v1/oauth/device/verify",
-  "verification_uri_complete": "https://nexus.example.com/api/v1/oauth/device/verify?user_code=BCDF-GHJK",
+  "verification_uri": "https://nexus.example.com/oauth/device/verify",
+  "verification_uri_complete": "https://nexus.example.com/oauth/device/verify?user_code=BCDF-GHJK",
   "expires_in": 900,
   "interval": 5
 }
@@ -272,7 +274,7 @@ Successful response:
 
 ### User Verification Endpoints
 
-The verification endpoints require an authenticated Nexus user.
+Users should visit `{frontendUrl}/oauth/device/verify` or the `verification_uri_complete` returned from the device code endpoint. The page requires an authenticated Nexus user and calls these backend verification endpoints.
 
 ```http
 GET {backendUrl}/api/v1/oauth/device/verify?user_code=BCDF-GHJK
