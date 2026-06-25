@@ -75,9 +75,9 @@ public class GroupBusiness : IGroupBusiness
 
         // Log create Group event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organizationId, 
-            null, 
+            currentUserId,
+            organizationId,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "create",
@@ -158,7 +158,7 @@ public class GroupBusiness : IGroupBusiness
 
         // Log update Group event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
+            currentUserId,
             group.OrganizationId,
             null,
             new CreateEventRequestDto
@@ -204,9 +204,9 @@ public class GroupBusiness : IGroupBusiness
 
         // Log archive Group event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            group.OrganizationId, 
-            null, 
+            currentUserId,
+            group.OrganizationId,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "archive",
@@ -238,12 +238,12 @@ public class GroupBusiness : IGroupBusiness
         group.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         group.LastUpdatedBy = currentUserId;
         await _context.SaveChangesAsync();
-        
+
         // Log unarchive Group event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            group.OrganizationId, 
-            null, 
+            currentUserId,
+            group.OrganizationId,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "unarchive",
@@ -278,17 +278,17 @@ public class GroupBusiness : IGroupBusiness
 
         // Log delete Group event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
+            currentUserId,
             group.OrganizationId,
             null,
             new CreateEventRequestDto
-        {
-            Operation = "delete",
-            EntityType = "group",
-            EntityId = groupId,
-            EntityName = groupName,
-            Properties = JsonSerializer.Serialize(new { groupName })
-        });
+            {
+                Operation = "delete",
+                EntityType = "group",
+                EntityId = groupId,
+                EntityName = groupName,
+                Properties = JsonSerializer.Serialize(new { groupName })
+            });
 
         return true;
     }
@@ -311,6 +311,11 @@ public class GroupBusiness : IGroupBusiness
         var user = _context.Users.FirstOrDefault(u => u.Id == userId);
         if (user == null || user.IsArchived)
             throw new KeyNotFoundException($"User with id {userId} not found");
+
+        // Service accounts are scoped to the project they are added to and never participate in
+        // groups, which span projects and carry their own project memberships.
+        if (user.AccountType == AccountType.Service)
+            throw new UnauthorizedAccessException("Service accounts cannot be added to a group.");
 
         group.Users.Add(user);
         await _context.SaveChangesAsync();

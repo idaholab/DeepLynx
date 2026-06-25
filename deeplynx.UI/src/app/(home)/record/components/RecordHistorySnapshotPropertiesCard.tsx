@@ -19,7 +19,7 @@ export default function RecordHistorySnapshotPropertiesCard({
 
   return (
     // Snapshot metadata card (selected or comparison side).
-    <div className="card bg-base-100 shadow-lg">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide opacity-70 mr-4">
           {title}

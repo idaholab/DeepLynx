@@ -61,7 +61,7 @@ export default function CollectionSortControl({
         </button>
 
         {collectionSortMenuOpen ? (
-          <div className="absolute right-0 z-20 mt-2 w-full rounded-xl border border-base-300 bg-base-100 p-1 shadow-lg">
+          <div className="absolute right-0 z-20 mt-2 w-full rounded-xl border border-base-300/50 bg-base-100 p-1 shadow-lg">
             <ul role="listbox" className="space-y-1">
               {options.map((option) => {
                 const isSelected = collectionSort === option;

@@ -902,7 +902,7 @@ export default function DataCatalogClient({
   return (
     <main className="min-h-screen bg-base-200/30">
       {/* ── Page header: title, project dropdown, search bar ──────────────── */}
-      <section className="border-b border-base-300 bg-base-100">
+      <section className="border-b border-base-300/50 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
@@ -1039,12 +1039,12 @@ export default function DataCatalogClient({
           {/* Record list */}
           <div className="min-w-0">
             { loading === true ? (
-              <div className="card border border-base-300 bg-base-100 shadow-sm p-1">
+              <div className="card border border-base-300/50 bg-base-100 shadow-sm p-1">
                 <ul className="list mt-0">
                   {times(5).map((i) => (
                     <li
                       key={i}
-                      className="border-b border-base-content/20 hover:bg-base-200/30 p-2 pl-0 rounded-sm"
+                      className="border-b border-base-200 hover:bg-base-200/30 p-2 pl-0 rounded-sm"
                     >
                       <div className="text-accent-content mb-1">
                         <Skeleton width="55%" />
@@ -1071,7 +1071,7 @@ export default function DataCatalogClient({
                 </ul>
               </div>
             ) : scopedRecords.length === 0 ? (
-              <div className="card border border-base-300 bg-base-100 shadow-sm">
+              <div className="card border border-base-300/50 bg-base-100 shadow-sm">
                 <div className="card-body items-center py-16 text-center">
                   <DocumentTextIcon className="size-12 text-base-content/30" />
                   <h2 className="card-title">
@@ -1083,7 +1083,7 @@ export default function DataCatalogClient({
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm">
+              <div className="divide-y divide-base-200 overflow-hidden rounded-box border border-base-300/50 bg-base-100 shadow-sm">
                 {currentRecords.map((record) => (
                   <RecordCard
                     key={`${record.projectId}-${record.id}`}

@@ -75,7 +75,7 @@ export default function ProjectDetailClient({
   return (
     <main className="min-h-screen bg-base-200/30">
       {/* Project Header */}
-      <section className="border-b border-base-300 bg-base-100">
+      <section className="border-b border-base-300/50 bg-base-100">
         <div
           className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8"
           data-tour="project-header"
@@ -131,7 +131,7 @@ export default function ProjectDetailClient({
         <div className="flex-1 lg:w-3/5 transition-opacity duration-300">
           {/* Data Catalog Card */}
           <div
-            className="card bg-base-200/30 border border-base-300/50 shadow-sm mb-6"
+            className="card bg-base-100 border border-base-300/50 shadow-sm mb-6"
             data-tour="data-catalog-card"
           >
             <div className="card-body">

@@ -18,6 +18,7 @@ import {
   Cog6ToothIcon,
   CommandLineIcon,
   GlobeAmericasIcon,
+  PlayIcon,
   QuestionMarkCircleIcon,
   UserCircleIcon,
   UserGroupIcon,
@@ -306,6 +307,11 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
               <li className="mt-5">
                 <Link href="/data_catalog/all_records">
                   <BookOpenIcon className="size-10" />
+                </Link>
+              </li>
+              <li className="mt-5">
+                <Link href="/run">
+                  <PlayIcon className="size-10" />
                 </Link>
               </li>
               <OrgAdminRoute>

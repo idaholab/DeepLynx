@@ -3,6 +3,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
+using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -30,6 +31,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private Mock<IRoleBusiness> _roleBusiness = null!;
     private UserBusiness _userBusiness = null!;
+    private Mock<ILogger<InvitationBusiness>> _mockInvitationLogger = null!;
     public long gid; // group ID
 
     public long oid; // organization ID
@@ -39,6 +41,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public long rid; // role ID
     public long uid; // existing user ID
     public long uid2; // existing user 2 ID
+    public long uidSa; // existing service account user ID
 
     public InvitationBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -47,7 +50,8 @@ public class InvitationBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-
+        
+        _mockInvitationLogger = new Mock<ILogger<InvitationBusiness>>();
         _recordBusiness = new Mock<IRecordBusiness>();
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
         _dataSourceBusiness = new Mock<IDataSourceBusiness>();
@@ -78,7 +82,8 @@ public class InvitationBusinessTests : IntegrationTestBase
             _notificationBusiness.Object,
             _projectBusiness,
             _organizationBusiness,
-            _userBusiness);
+            _userBusiness,
+            _mockInvitationLogger.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -100,10 +105,19 @@ public class InvitationBusinessTests : IntegrationTestBase
             Password = "test_password",
             IsArchived = false
         };
-        Context.Users.AddRange(user1, user2);
+        var serviceAccount = new User
+        {
+            Name = "Test Service Account",
+            Email = "service_test_account",
+            Username = "service_test_account",
+            AccountType = AccountType.Test,
+            IsArchived = false
+        };
+        Context.Users.AddRange(user1, user2, serviceAccount);
         await Context.SaveChangesAsync();
         uid = user1.Id;
         uid2 = user2.Id;
+        uidSa = serviceAccount.Id;
 
         // Create organizations
         var org1 = new Organization
@@ -471,7 +485,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     }
 
     #endregion
-
+    
     #region New User by Email - Transaction with Rollback
 
     [Fact]
@@ -603,6 +617,111 @@ public class InvitationBusinessTests : IntegrationTestBase
     }
 
     #endregion
+    
+    #region CreateAndAddServiceAccountToProject Tests
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_Succeeds_WithValidInputs()
+    {
+        // Act
+        var result = await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, "My Service Account", rid);
+
+        // Assert
+        Assert.True(result);
+
+        var serviceAccount = await Context.Users
+            .FirstOrDefaultAsync(u => u.Name == "My Service Account" && u.AccountType == AccountType.Service);
+        Assert.NotNull(serviceAccount);
+        Assert.StartsWith("service_", serviceAccount.Email);
+        Assert.StartsWith("service_", serviceAccount.Username);
+
+        var projectMember = await Context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.UserId == serviceAccount.Id && pm.ProjectId == pid);
+        Assert.NotNull(projectMember);
+        Assert.Equal(rid, projectMember.RoleId);
+    }
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_Succeeds_AsProjectAdmin()
+    {
+        // Act
+        var result = await _invitationBusiness.CreateAndAddServiceAccountToProject(
+            pid, "Admin Service Account", rid, makeProjectAdmin: true);
+
+        // Assert
+        Assert.True(result);
+
+        var serviceAccount = await Context.Users
+            .FirstOrDefaultAsync(u => u.Name == "Admin Service Account" && u.AccountType == AccountType.Service);
+        Assert.NotNull(serviceAccount);
+
+        var projectMember = await Context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.UserId == serviceAccount.Id && pm.ProjectId == pid);
+        Assert.NotNull(projectMember);
+        Assert.True(projectMember.IsProjectAdmin);
+    }
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_DoesNotAddToOrganization()
+    {
+        // Act
+        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, "Org-Less Service Account", rid);
+
+        // Assert — service accounts skip org membership entirely
+        var serviceAccount = await Context.Users
+            .FirstOrDefaultAsync(u => u.Name == "Org-Less Service Account" && u.AccountType == AccountType.Service);
+        Assert.NotNull(serviceAccount);
+
+        var inOrg = await Context.OrganizationUsers
+            .AnyAsync(ou => ou.UserId == serviceAccount.Id);
+        Assert.False(inOrg);
+    }
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_GeneratesUniqueIdentifiers_AcrossMultipleAccounts()
+    {
+        // Act
+        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, "Service Account A", rid);
+        await _invitationBusiness.CreateAndAddServiceAccountToProject(pid, "Service Account B", rid);
+
+        // Assert
+        var accounts = await Context.Users
+            .Where(u => u.AccountType == AccountType.Service && 
+                        (u.Name == "Service Account A" || u.Name == "Service Account B"))
+            .ToListAsync();
+
+        Assert.Equal(2, accounts.Count);
+        Assert.NotEqual(accounts[0].Email, accounts[1].Email);
+        Assert.NotEqual(accounts[0].Username, accounts[1].Username);
+    }
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_RollsBack_WhenProjectDoesNotExist()
+    {
+        var nonExistentProjectId = 99999L;
+        var userCountBefore = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _invitationBusiness.CreateAndAddServiceAccountToProject(nonExistentProjectId, "Orphan Service Account", rid));
+
+        var userCountAfter = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
+        Assert.Equal(userCountBefore, userCountAfter);
+    }
+
+    [Fact]
+    public async Task CreateAndAddServiceAccount_RollsBack_WhenRoleDoesNotExist()
+    {
+        var nonExistentRoleId = 99999L;
+        var userCountBefore = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _invitationBusiness.CreateAndAddServiceAccountToProject(pid, "Bad Role Service Account", nonExistentRoleId));
+
+        var userCountAfter = await Context.Users.CountAsync(u => u.AccountType == AccountType.Service);
+        Assert.Equal(userCountBefore, userCountAfter);
+    }
+
+    #endregion
 
     #region Group Tests
 
@@ -731,7 +850,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Act
         var result = await _invitationBusiness.InviteAndAddUserToHierarchy(
-            oid, pid, gid, rid, null, null);
+            oid, pid, gid, rid, userId: null, userEmail: null);
 
         // Assert - Should still succeed (best-effort)
         Assert.True(result);

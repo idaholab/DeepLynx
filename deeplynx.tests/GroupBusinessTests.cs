@@ -27,6 +27,7 @@ public class GroupBusinessTests : IntegrationTestBase
     public long oid; // organization ID
     public long uid; // user ID
     public long uid2; // second user ID (not in group)
+    public long uidSa; // service account user ID
 
     public GroupBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -72,10 +73,19 @@ public class GroupBusinessTests : IntegrationTestBase
             Email = "test2@test.com",
             IsArchived = false
         };
-        Context.Users.AddRange(testUser, testUser2);
+        var serviceAccount = new User
+        {
+            Name = "Test Service Account",
+            Email = "service_test_account",
+            Username = "service_test_account",
+            AccountType = AccountType.Service,
+            IsArchived = false
+        };
+        Context.Users.AddRange(testUser, testUser2, serviceAccount);
         await Context.SaveChangesAsync();
         uid = testUser.Id;
         uid2 = testUser2.Id;
+        uidSa = serviceAccount.Id;
 
         // create test groups
         var testGroup = new Group
@@ -620,6 +630,21 @@ public class GroupBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _groupBusiness.AddUserToGroup(99999, oid, gid));
 
         Assert.Contains("User with id 99999 not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task AddUser_Fails_IfUserIsServiceAccount()
+    {
+        // Act & Assert - service accounts are project-scoped and cannot join groups
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _groupBusiness.AddUserToGroup(uidSa, oid, gid));
+
+        Assert.Contains("Service accounts cannot be added to a group.", exception.Message);
+
+        // The service account should not have been added to the group
+        var group = await Context.Groups.Include(g => g.Users).FirstOrDefaultAsync(g => g.Id == gid);
+        Assert.NotNull(group);
+        Assert.DoesNotContain(group.Users, u => u.Id == uidSa);
     }
 
     #endregion

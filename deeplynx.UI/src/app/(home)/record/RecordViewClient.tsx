@@ -1165,7 +1165,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                         )}
                       </div>
                       {ontologyStatus && (
-                        <div className="rounded-lg border border-base-300 divide-y divide-base-300 text-sm">
+                        <div className="rounded-lg border border-base-300/50 divide-y divide-base-300/50 text-sm">
                           {ontologyStatus.class_count === 0 &&
                             ontologyStatus.relationship_count === 0 ? (
                             <p className="px-4 py-3 text-base-content/50 text-xs">
@@ -1265,7 +1265,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                           disabled={isTriggeringLatticeExtraction}
                           className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "discovery"
                             ? "border-primary bg-primary/5"
-                            : "border-base-300 hover:border-base-content/30"
+                            : "border-base-300/50 hover:border-base-content/30"
                             }`}
                         >
                           <p className="font-semibold text-sm">
@@ -1281,7 +1281,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                           disabled={isTriggeringLatticeExtraction}
                           className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "strict"
                             ? "border-primary bg-primary/5"
-                            : "border-base-300 hover:border-base-content/30"
+                            : "border-base-300/50 hover:border-base-content/30"
                             }`}
                         >
                           <p className="font-semibold text-sm">
@@ -1343,7 +1343,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   // ============= MAIN RENDER =============
   return (
     <main className="min-h-screen bg-base-200/30">
-      <section className="border-b border-base-300 bg-base-100">
+      <section className="border-b border-base-300/50 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">

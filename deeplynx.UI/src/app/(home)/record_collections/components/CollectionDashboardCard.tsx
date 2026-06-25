@@ -40,7 +40,7 @@ export default function CollectionDashboardCard({
     : collectionTags.slice(0, badgeDisplayLimit);
 
   return (
-    <div className="card border border-base-300 bg-base-100 text-left shadow-sm">
+    <div className="card border border-base-300/50 bg-base-100 text-left shadow-sm">
       <div className="card-body gap-4 p-5">
         <div className="space-y-2">
           <h3 className="card-title text-lg">{collection.name}</h3>
@@ -102,7 +102,7 @@ export default function CollectionDashboardCard({
           </div>
         ) : null}
 
-        <div className="grid gap-3 text-sm sm:grid-cols-4 sm:items-end">
+        <div className="grid gap-3 text-sm sm:grid-cols-[repeat(3,minmax(0,1fr))_auto] sm:items-start">
           <div>
             <p className="text-base-content/60">
               {t.translations.RECORD_COLLECTIONS_COLLECTION_ID}
@@ -125,7 +125,7 @@ export default function CollectionDashboardCard({
               {formatLocalDateTime(collection.lastUpdatedAt)}
             </p>
           </div>
-          <div className="card-actions justify-start sm:justify-end">
+          <div className="card-actions justify-start sm:justify-end sm:self-end">
             <Link href={detailsHref} className="btn btn-primary btn-sm">
               {t.translations.RECORD_COLLECTIONS_OPEN_DETAILS}
             </Link>

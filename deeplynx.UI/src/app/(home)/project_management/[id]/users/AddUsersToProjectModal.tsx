@@ -245,13 +245,13 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                       {t.translations.INVITE_EXTERNAL_USERS_VIA_EMAIL}
                     </span>
                   </label>
-                  <div className="border border-base-300 rounded-lg p-2 min-h-[120px] max-h-[300px] overflow-y-auto bg-base-100 focus-within:border-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-opacity-50">
+                  <div className="border border-base-300/50 rounded-lg p-2 min-h-[120px] max-h-[300px] overflow-y-auto bg-base-100 focus-within:border-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-opacity-50">
                     <div className="flex flex-wrap gap-2">
                       {/* External Emails as Pills */}
                       {externalEmails.map((email) => (
                         <div
                           key={`email-${email}`}
-                          className="badge badge-lg gap-2 bg-base-200 border-base-300 px-3 py-3"
+                          className="badge badge-lg gap-2 bg-base-200 border-base-300/50 px-3 py-3"
                         >
                           <span className="text-sm font-medium">{email}</span>
                           <button
@@ -295,7 +295,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                         ({selectedUsers.length} {t.translations.SELECTED})
                       </span>
                     </label>
-                    <div className="border border-base-300 rounded-lg p-2 max-h-[200px] overflow-y-auto bg-base-100">
+                    <div className="border border-base-300/50 rounded-lg p-2 max-h-[200px] overflow-y-auto bg-base-100">
                       <div className="flex flex-wrap gap-2">
                         {selectedUsers.map((user) => (
                           <div
@@ -343,7 +343,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                     </div>
                     <ul
                       tabIndex={0}
-                      className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto mt-1"
+                      className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300/50 max-h-60 overflow-y-auto mt-1"
                     >
                       {roles.map((role) => (
                         <li
@@ -429,7 +429,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                 </div>
 
                 {/* Users List */}
-                <div className="border border-base-300 rounded-lg p-3 h-[400px] overflow-y-auto bg-base-200">
+                <div className="border border-base-300/50 rounded-lg p-3 h-[400px] overflow-y-auto bg-base-200">
                   {filteredOrgUsers.length === 0 ? (
                     <div className="flex items-center justify-center h-full text-base-content/50 text-sm">
                       {searchQuery

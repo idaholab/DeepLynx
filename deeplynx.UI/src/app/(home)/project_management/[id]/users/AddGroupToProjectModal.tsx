@@ -128,7 +128,7 @@ const AddGroupToProjectModal: React.FC<AddGroupToProjectModalProps> = ({
                 </div>
                 <ul
                   tabIndex={0}
-                  className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto mt-1"
+                  className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300/50 max-h-60 overflow-y-auto mt-1"
                 >
                   {groupsNotInProject.length === 0 ? (
                     <li className="text-center text-base-content/50 text-sm p-4">
@@ -169,7 +169,7 @@ const AddGroupToProjectModal: React.FC<AddGroupToProjectModalProps> = ({
                 </div>
                 <ul
                   tabIndex={0}
-                  className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto mt-1"
+                  className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300/50 max-h-60 overflow-y-auto mt-1"
                 >
                   {roles.map((r) => (
                     <li
@@ -218,7 +218,7 @@ const AddGroupToProjectModal: React.FC<AddGroupToProjectModalProps> = ({
               </div>
             )}
 
-            <div className="border border-base-300 rounded-lg p-3 max-h-96 overflow-y-auto bg-base-200">
+            <div className="border border-base-300/50 rounded-lg p-3 max-h-96 overflow-y-auto bg-base-200">
               {!selectedGroupId ? (
                 <div className="flex items-center justify-center h-full min-h-[100px] text-base-content/50 text-sm">
                   {t.translations.SELECT_GROUP_TO_VIEW_MEMBERS}

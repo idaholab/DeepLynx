@@ -133,7 +133,7 @@ const StorageSettingsSection = ({
           availableStorages.map((storage) => (
             <div
               key={storage.id}
-              className={`card bg-base-200 border ${storage.isArchived ? "border-warning/30 opacity-60" : "border-base-300"}`}
+              className={`card border bg-base-100 shadow-sm ${storage.isArchived ? "border-warning/30 opacity-60" : "border-base-300/50"}`}
             >
               <div className="card-body p-4">
                 <div className="flex items-start justify-between">
@@ -216,7 +216,7 @@ const StorageSettingsSection = ({
       : t.translations.MANAGE_STORAGES_TAB;
 
   return (
-    <div className="card bg-base-100 border border-primary/40 shadow-sm">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body">
         <div className="flex justify-between">
           <div className="flex items-center gap-2 mb-4">

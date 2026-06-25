@@ -53,7 +53,7 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
 }) => {
   const { t } = useLanguage();
   return (
-    <div className="card bg-base-100 shadow-lg">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body">
         {/* Header + Controls */}
         <div className="flex items-start justify-between gap-4 mb-3">
@@ -164,7 +164,7 @@ const ProjectSecurityLabelsPanel: React.FC<Props> = ({
               {labelsError}
             </div>
           ) : filteredLabels.length === 0 ? (
-            <div className="py-6 text-center text-xs text-base-content/60 border border-dashed border-base-300 rounded-lg">
+            <div className="py-6 text-center text-xs text-base-content/60 border border-dashed border-base-300/50 rounded-lg">
               {labelSearch.trim()
                 ? t.translations.NO_SECURITY_LABELS_MATCH_SEARCH
                 : t.translations

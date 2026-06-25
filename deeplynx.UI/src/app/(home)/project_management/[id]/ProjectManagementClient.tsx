@@ -133,7 +133,7 @@ const ProjectManagementClient = ({
   return (
     <ProjectAdminRoute>
       <main className="min-h-screen bg-base-200/30">
-        <section className="border-b border-base-300 bg-base-100">
+        <section className="border-b border-base-300/50 bg-base-100">
           <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
