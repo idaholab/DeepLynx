@@ -6,7 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);1591</NoWarn>
-        <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
+        <OpenApiGenerateDocuments Condition="'$(GenerateOpenApi)' == 'true'">true</OpenApiGenerateDocuments>
         <OpenApiDocumentsDirectory>../artifacts/openapi</OpenApiDocumentsDirectory>
         <OpenApiGenerateDocumentsOptions>--document-name v1 --file-name nexus-v1 --openapi-version OpenApi3_1</OpenApiGenerateDocumentsOptions>
     </PropertyGroup>

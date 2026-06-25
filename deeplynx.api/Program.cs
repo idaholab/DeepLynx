@@ -22,6 +22,7 @@ using Log = Serilog.Log;
 
 var builder = WebApplication.CreateBuilder(args);
 var isOpenApiDocumentGeneration = OpenApiGenerationMode.IsActive();
+var isRuntimeStartup = !isOpenApiDocumentGeneration;
 
 builder.WebHost.ConfigureKestrel(options => { options.Limits.MaxRequestBodySize = 2L * 1024 * 1024 * 1024; });
 
@@ -40,7 +41,7 @@ var loggerConfiguration = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .WriteTo.Console();
 
-if (!isOpenApiDocumentGeneration)
+if (isRuntimeStartup)
 {
     loggerConfiguration.WriteTo.PostgreSQL(
         connectionString,
@@ -93,13 +94,13 @@ try
     // ----------------------------------
     // Authentication
     // ----------------------------------
-    var issuer = Environment.GetEnvironmentVariable("JWT_ISSUER");
-    var secret = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
-    var audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE");
-    var localDevelopment = Environment.GetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION");
-
-    if (!isOpenApiDocumentGeneration)
+    if (isRuntimeStartup)
     {
+        var issuer = Environment.GetEnvironmentVariable("JWT_ISSUER");
+        var secret = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
+        var audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE");
+        var localDevelopment = Environment.GetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION");
+
         if (string.IsNullOrWhiteSpace(issuer))
             throw new InvalidOperationException("JWT_ISSUER not configured");
         if (string.IsNullOrWhiteSpace(secret))
@@ -253,16 +254,13 @@ try
     builder.Services.AddNexusOpenApi();
 
     /* ╔════════════════════════════╗
-       ║      Check DB Version      ║
+       ║ Runtime Startup Checks     ║
        ╚════════════════════════════╝ */
-    if (!isOpenApiDocumentGeneration)
+    if (isRuntimeStartup)
+    {
         await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
-
-    /* ╔════════════════════════════╗
-       ║   Check Encryption Keys    ║
-       ╚════════════════════════════╝ */
-    if (!isOpenApiDocumentGeneration)
         EncryptionHelper.CheckEncryptionConfig();
+    }
 
     /* ╔════════════════════════════╗
        ║      App Configurations    ║
@@ -282,7 +280,7 @@ try
     /* ╔════════════════════════════╗
        ║      Apply Migrations      ║
        ╚════════════════════════════╝ */
-    if (!isOpenApiDocumentGeneration)
+    if (isRuntimeStartup)
     {
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
@@ -304,13 +302,17 @@ try
     app.UseRouting();
     app.UseExceptionHandler(); // Runs registered IExceptionHandlers; must precede middleware that may throw
     app.UseCors("AllowAll");
-    if (!isOpenApiDocumentGeneration)
+
+    if (isRuntimeStartup)
+    {
         app.UseAuthentication(); // Must be first
-    app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email
-    app.UseMiddleware<AuthMiddleware>(); // Third - sets OrganizationId
-    app.UseMiddleware<FeatureFlagMiddleware>();
-    app.UseMiddleware<SensitivityMiddleware>();
-    app.UseAuthorization(); // Fourth
+        app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email
+        app.UseMiddleware<AuthMiddleware>(); // Third - sets OrganizationId
+        app.UseMiddleware<FeatureFlagMiddleware>();
+        app.UseMiddleware<SensitivityMiddleware>();
+        app.UseAuthorization(); // Fourth
+    }
+
     app.MapControllers(); // Last
 
     //Health check endpoint
@@ -329,7 +331,7 @@ try
     // app.UseOpenApi();
     app.MapOpenApi();
 
-    if (!isOpenApiDocumentGeneration)
+    if (isRuntimeStartup)
     {
         var customcss = File.ReadAllText("moon.css");
         var hostedLink = Environment.GetEnvironmentVariable("HOSTED_LINK");
@@ -385,4 +387,3 @@ finally
 {
     Log.CloseAndFlush();
 }
-

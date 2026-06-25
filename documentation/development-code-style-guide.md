@@ -396,7 +396,7 @@ app.MapScalarApiReference(...);
 Nexus can also generate the OpenAPI artifact used by SDK tooling:
 
 ```bash
-NEXUS_OPENAPI_GENERATION=true dotnet build deeplynx.api/deeplynx.api.csproj -c Release
+dotnet build deeplynx.api/deeplynx.api.csproj -c Release /p:GenerateOpenApi=true
 ```
 
 The generated file is written to `artifacts/openapi/nexus-v1.json`. Python SDK generation,
