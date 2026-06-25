@@ -39,7 +39,7 @@ export default function RecordHistoryControls({
 
   return (
     // Version selection and compare mode controls.
-    <div className="card bg-base-100 shadow-lg">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body gap-4">
         {/* Top row: selectors, compare mode, and summary counters. */}
         <div className="flex flex-wrap items-end gap-4">

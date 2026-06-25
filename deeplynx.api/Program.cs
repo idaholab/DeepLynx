@@ -6,6 +6,7 @@ using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.ExceptionHandlers;
 using deeplynx.helpers.Hubs;
+using deeplynx.helpers.Json;
 using deeplynx.interfaces;
 using deeplynx.api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -129,6 +130,7 @@ try
         {
             options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             options.JsonSerializerOptions.MaxDepth = 64;
+            options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
         })
         .ConfigureApiBehaviorOptions(options =>
         {
@@ -143,6 +145,11 @@ try
                 };
             };
         });
+
+    builder.Services.ConfigureHttpJsonOptions(options =>
+    {
+        options.SerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
+    });
 
     /*
     ╔════════════════════════════╗
@@ -299,6 +306,8 @@ try
                 new() { Name = "Project", Description = "Project management" },
                 new() { Name = "User", Description = "User management" },
                 new() { Name = "Group", Description = "Group management" },
+                new() { Name = "Service Accounts", Description = "Service account management" },
+                new() { Name = "Test Accounts", Description = "Test account management (System Administrators)" },
 
                 // AI Services
                 new() { Name = "Lattice", Description = "Useful data views for DeepLynx Lattice use" },
@@ -380,7 +389,7 @@ try
                 new JsonObject
                 {
                     ["name"] = "Administration",
-                    ["tags"] = new JsonArray { "Organization", "Project", "User", "Group" }
+                    ["tags"] = new JsonArray { "Organization", "Project", "User", "Group", "Service Accounts", "Test Accounts" }
                 },
                 new JsonObject
                 {

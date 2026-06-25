@@ -110,7 +110,7 @@ const InviteProjectUserModal: React.FC<InviteProjectUserModalProps> = ({
                   </div>
                   <ul
                     tabIndex={0}
-                    className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto mt-1"
+                    className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300/50 max-h-60 overflow-y-auto mt-1"
                   >
                     {roles.map((role) => (
                       <li

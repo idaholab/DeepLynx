@@ -263,7 +263,7 @@ export default function NewFileUploadCard({
             <div
               role="radiogroup"
               aria-label={t.translations.RECORD_MODE_ARIA}
-              className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
+              className="inline-flex rounded-full border border-base-300/50 bg-base-200/50 p-1"
             >
               <button
                 type="button"
@@ -321,7 +321,7 @@ export default function NewFileUploadCard({
                 aditionalFilters={false}
               />
 
-              <div className="rounded-lg border border-base-300/70 max-h-40 overflow-y-auto">
+              <div className="rounded-lg border border-base-300/50 max-h-40 overflow-y-auto">
                 {isSearching ? (
                   <div className="p-3 text-sm text-base-content/70">
                     <span className="loading loading-spinner loading-xs mr-2"></span>
@@ -341,7 +341,7 @@ export default function NewFileUploadCard({
                         key={f.id}
                         type="button"
                         onClick={() => setTargetRecordId(String(f.id))}
-                        className={`w-full border-b border-base-300/60 px-3 py-2 text-left last:border-b-0 transition ${selected ? "bg-base-200/70" : "hover:bg-base-200/30"
+                        className={`w-full border-b border-base-300/50 px-3 py-2 text-left last:border-b-0 transition ${selected ? "bg-base-200/70" : "hover:bg-base-200/30"
                           }`}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -435,7 +435,7 @@ export default function NewFileUploadCard({
                 <span className="label-text block font-semibold">
                   {t.translations.METADATA_PREVIEW_TITLE}
                 </span>
-                <div className="h-31 max-h-36 overflow-x-hidden overflow-y-auto rounded-lg border border-base-300/60 bg-base-200/30 p-3">
+                <div className="h-31 max-h-36 overflow-x-hidden overflow-y-auto rounded-lg border border-base-300/50 bg-base-200/30 p-3">
                   {metadataPreviewError ? (
                     <p className="text-xs text-error">{metadataPreviewError}</p>
                   ) : metadataPreview ? (
@@ -525,7 +525,7 @@ export default function NewFileUploadCard({
                           {t.translations.LOADING_CLASSES}
                         </p>
                       ) : availableClasses.length > 0 ? (
-                        <ul className="divide-y divide-base-300/60">
+                        <ul className="divide-y divide-base-300/50">
                           {availableClasses.map((cls) => (
                             <li
                               key={cls.id}

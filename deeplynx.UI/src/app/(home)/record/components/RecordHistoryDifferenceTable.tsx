@@ -55,10 +55,10 @@ export default function RecordHistoryDifferenceTable({
 
   return (
     // Difference card: filters, loading states, and expandable difference tree table.
-    <div className="card bg-base-100 shadow-lg">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body p-0">
         {/* Header row with "show only changes" toggle. */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300/50">
           <div>
             <h3 className="font-semibold">
               {t.translations.RECORD_HISTORY_VERSION_DIFFERENCE}
@@ -225,7 +225,7 @@ export default function RecordHistoryDifferenceTable({
         </div>
         {/* Incremental rendering control for very large trees. */}
         {hasMoreRows && (
-          <div className="px-4 py-3 border-t border-base-300">
+          <div className="px-4 py-3 border-t border-base-300/50">
             <button
               type="button"
               className="btn btn-outline btn-sm"
