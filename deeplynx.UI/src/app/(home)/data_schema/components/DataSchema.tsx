@@ -55,7 +55,7 @@ function statusClass(isArchived: boolean) {
 
 function emptyState(message: string) {
   return (
-    <div className="rounded-lg border border-dashed border-base-300 bg-base-200/30 px-4 py-10 text-center text-sm text-base-content/60">
+    <div className="rounded-lg border border-dashed border-base-300/50 bg-base-200/30 px-4 py-10 text-center text-sm text-base-content/60">
       {message}
     </div>
   );
@@ -74,8 +74,8 @@ function ModalShell({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-base-300 bg-base-100 shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-base-300 px-6 py-5">
+      <div className="w-full max-w-2xl rounded-2xl border border-base-300/50 bg-base-100 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-base-300/50 px-6 py-5">
           <div>
             <h3 className="text-xl font-semibold text-base-content">{title}</h3>
             <p className="mt-1 text-sm text-base-content/65">{description}</p>
@@ -547,7 +547,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
   };
 
   const classesPanel = (
-    <div className="card border border-base-300 bg-base-100 shadow-sm">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body gap-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
@@ -581,7 +581,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
           )
         ) : (
           <div
-            className={`overflow-x-auto rounded-lg border border-base-300 ${
+            className={`overflow-x-auto rounded-lg border border-base-300/50 ${
               filteredClasses.length > 5 ? "max-h-[22rem] overflow-y-auto" : ""
             }`}
           >
@@ -629,7 +629,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
   );
 
   const relationshipsPanel = (
-    <div className="card border border-base-300 bg-base-100 shadow-sm">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body gap-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
@@ -666,7 +666,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
           )
         ) : (
           <div
-            className={`overflow-x-auto rounded-lg border border-base-300 ${
+            className={`overflow-x-auto rounded-lg border border-base-300/50 ${
               filteredRelationships.length > 5
                 ? "max-h-[22rem] overflow-y-auto"
                 : ""
@@ -722,7 +722,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
   );
 
   const classInspector = selectedClass ? (
-    <div className="card border border-base-300 bg-base-100 shadow-sm">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body gap-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -783,7 +783,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
         </label>
 
         <div className="grid gap-3">
-          <div className="rounded-lg border border-base-300 bg-base-200/50 p-3">
+          <div className="rounded-lg border border-base-300/50 bg-base-200/50 p-3">
             <div className="text-xs uppercase tracking-wide text-base-content/60">
               Last Updated
             </div>
@@ -824,7 +824,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
   );
 
   const relationshipInspector = selectedRelationship ? (
-    <div className="card border border-base-300 bg-base-100 shadow-sm">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body gap-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -936,7 +936,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
         </label>
 
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-base-300 bg-base-200/50 p-3">
+          <div className="rounded-lg border border-base-300/50 bg-base-200/50 p-3">
             <div className="text-xs uppercase tracking-wide text-base-content/60">
               Origin to Destination
             </div>
@@ -950,7 +950,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
                 "Unassigned"}
             </div>
           </div>
-          <div className="rounded-lg border border-base-300 bg-base-200/50 p-3">
+          <div className="rounded-lg border border-base-300/50 bg-base-200/50 p-3">
             <div className="text-xs uppercase tracking-wide text-base-content/60">
               Last Updated
             </div>
@@ -989,7 +989,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
   );
 
   const boardPanel = (
-    <div className="card border border-base-300 bg-base-100 shadow-sm">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body gap-4">
         <div>
           <h2 className="text-lg font-semibold text-base-content">
@@ -1015,7 +1015,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
                     className={`w-full rounded-xl border p-4 text-left transition ${
                       isSelected
                         ? "border-primary bg-primary/10"
-                        : "border-base-300 bg-base-100 hover:border-primary/40 hover:bg-base-200/40"
+                        : "border-base-300/50 bg-base-100 hover:border-primary/40 hover:bg-base-200/40"
                     }`}
                     onClick={() => focusRelationship(item.id)}
                   >
@@ -1113,7 +1113,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
 
   return (
     <main className="min-h-screen bg-base-200/30">
-      <section className="border-b border-base-300 bg-base-100">
+      <section className="border-b border-base-300/50 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
@@ -1194,7 +1194,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
 
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-base-300 px-6 py-4">
+          <div className="flex justify-end gap-3 border-t border-base-200 px-6 py-4">
             <button
               type="button"
               className="btn btn-ghost"
@@ -1325,7 +1325,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
               />
             </label>
 
-            <div className="rounded-xl border border-base-300 bg-base-200/40 p-4 text-sm text-base-content/70">
+            <div className="rounded-xl border border-base-300/50 bg-base-200/40 p-4 text-sm text-base-content/70">
               Preview:
               <span className="ml-2 font-medium text-base-content">
                 {(newRelationshipDraft.originId &&
@@ -1341,7 +1341,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-base-300 px-6 py-4">
+          <div className="flex justify-end gap-3 border-t border-base-200 px-6 py-4">
             <button
               type="button"
               className="btn btn-ghost"

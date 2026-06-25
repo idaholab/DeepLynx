@@ -10,7 +10,6 @@ import CollectionRecordSearchControls from "../../components/CollectionRecordSea
 import CollectionRecordSearchResultsTable from "../../components/CollectionRecordSearchResultsTable";
 import NewCollectionStepIndicator from "./NewCollectionStepIndicator";
 import SelectedRecordsPreviewPanel from "../../components/SelectedRecordsPreviewPanel";
-import SectionCard from "../../components/SectionCard";
 import { interpolateTemplate } from "@/app/lib/record_helpers";
 import type { NewCollectionTabController } from "../hooks/useNewCollectionWorkflow";
 
@@ -150,7 +149,7 @@ export default function NewCollectionTabContent({
     ? reviewTagItems
     : reviewTagItems.slice(0, 10);
   const reviewSummaryPanel = (
-    <div className="grid gap-4 rounded-2xl border border-base-300 bg-base-200/30 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 rounded-2xl border border-base-300/50 bg-base-100 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
       <div>
         <p className="text-base-content/60">
           {t.translations.RECORD_COLLECTIONS_COLLECTION_ID}
@@ -211,11 +210,8 @@ export default function NewCollectionTabContent({
     newCollectionDescription.trim().length > 0;
 
   return (
-    <div className="mt-4">
-      <SectionCard
-        title={t.translations.RECORD_COLLECTIONS_NEW}
-        subtitle={t.translations.RECORD_COLLECTIONS_CREATE_IN_ACTIVE_PROJECT}
-      >
+    <div className="card bg-base-100 shadow-xl">
+      <div className="card-body space-y-6">
         <NewCollectionStepIndicator
           steps={[
             {
@@ -252,7 +248,7 @@ export default function NewCollectionTabContent({
           {newCollectionStep === "Records" ? (
             <>
               <div className="space-y-4">
-                <div className="rounded-2xl border border-base-300 bg-base-200/30 p-4">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-4">
                   <CollectionRecordSearchControls
                     searchTerm={newCollectionRecordSearchTerm}
                     setSearchTerm={setNewCollectionRecordSearchTerm}
@@ -363,13 +359,7 @@ export default function NewCollectionTabContent({
                       />
                       {newCollectionRecordSearchResults.length >
                       recordsPerPage ? (
-                        <div className="flex flex-col gap-3 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                          <span className="text-base-content/70">
-                            {`${t.translations.SHOWING} ${(newCollectionRecordPage - 1) * recordsPerPage + 1}-${Math.min(
-                              newCollectionRecordPage * recordsPerPage,
-                              newCollectionRecordSearchResults.length,
-                            )} ${t.translations.OF} ${newCollectionRecordSearchResults.length}`}
-                          </span>
+                        <div className="px-4 py-3 text-sm">
                           <PaginationControls
                             currentPage={newCollectionRecordPage}
                             pageSize={recordsPerPage}
@@ -393,7 +383,7 @@ export default function NewCollectionTabContent({
               </div>
 
               <div className="flex h-full flex-col justify-between gap-4">
-                <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                   <h3 className="font-semibold text-base-content">
                     {t.translations.RECORD_COLLECTIONS_RECORD_SUMMARY}
                   </h3>
@@ -499,7 +489,7 @@ export default function NewCollectionTabContent({
           {newCollectionStep === "Metadata" ? (
             <>
               <div className="space-y-4">
-                <div className="rounded-2xl border border-base-300 bg-base-200/30 p-5">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                   <div className="space-y-4">
                     <label className="form-control w-full">
                       <div className="label">
@@ -540,7 +530,7 @@ export default function NewCollectionTabContent({
               </div>
 
               <div className="flex h-full flex-col justify-between gap-4">
-                <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                   <h3 className="font-semibold text-base-content">
                     {t.translations.RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS}
                   </h3>
@@ -594,7 +584,7 @@ export default function NewCollectionTabContent({
           {newCollectionStep === "Modify" ? (
             <>
               <div className="space-y-4">
-                <div className="rounded-2xl border border-base-300 bg-base-200/30 p-5">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                   <div className="space-y-4">
                     <label className="form-control w-full">
                       <div className="label">
@@ -629,7 +619,7 @@ export default function NewCollectionTabContent({
               </div>
 
               <div className="flex h-full flex-col justify-between gap-4">
-                <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
+                <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
                   <h3 className="font-semibold text-base-content">
                     {t.translations.RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS}
                   </h3>
@@ -775,9 +765,11 @@ export default function NewCollectionTabContent({
                 recordPageCount={newCollectionReviewPageCount}
                 recordPageSizeOptions={recordPageSizeOptions}
                 onRecordPageSizeChange={setRecordsPerPage}
+                recordsSectionBordered={false}
+                recordsSectionElevated={false}
               />
 
-              <div className="flex justify-end rounded-2xl border border-base-300 bg-base-100 p-4">
+              <div className="flex justify-end">
                 <div className="flex flex-wrap justify-end gap-2">
                   <button
                     type="button"
@@ -810,7 +802,7 @@ export default function NewCollectionTabContent({
             </>
           ) : null}
         </div>
-      </SectionCard>
+      </div>
     </div>
   );
 }
