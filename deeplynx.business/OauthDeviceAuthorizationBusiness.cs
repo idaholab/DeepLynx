@@ -169,15 +169,26 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
             throw new InvalidOperationException("invalid_grant");
         }
 
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var consumedRequestCount = await _context.OauthDeviceAuthorizationRequests
+            .Where(deviceRequest => deviceRequest.Id == request.Id)
+            .Where(deviceRequest => deviceRequest.Status == OauthDeviceAuthorizationStatus.Approved)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(deviceRequest => deviceRequest.Status, OauthDeviceAuthorizationStatus.Consumed)
+                .SetProperty(deviceRequest => deviceRequest.ConsumedAt, nowWithoutTz));
+
+        if (consumedRequestCount != 1)
+        {
+            throw new InvalidOperationException("invalid_grant");
+        }
+
         var tokenKeys = await _tokenBusiness.CreateApiKey(request.UserId.Value, clientId);
         var token = await _tokenBusiness.CreateToken(
             tokenKeys.apiKey,
             tokenKeys.apiSecret,
             AccessTokenExpirationMinutes);
         var refreshToken = await GenerateUniqueRefreshToken();
-
-        request.Status = OauthDeviceAuthorizationStatus.Consumed;
-        request.ConsumedAt = nowWithoutTz;
 
         _context.OauthRefreshTokens.Add(new OauthRefreshToken
         {
@@ -192,6 +203,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         await _context.SaveChangesAsync();
         await CleanupExpiredOrConsumedRequests();
+        await transaction.CommitAsync();
 
         return new OauthTokenGrantResponseDto
         {
