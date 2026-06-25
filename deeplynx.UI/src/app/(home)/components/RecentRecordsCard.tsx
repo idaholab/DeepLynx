@@ -14,137 +14,152 @@ interface Props {
     border?: boolean;
 }
 
+interface RecordViewProps {
+    record: QueryRecordViewResponseDto;
+    activeClassNames: Set<string>;
+}
+
 type RecentRecordSortValue = "nameAZ" | "nameZA" | "dateNew" | "dateOld";
 
 const RecentRecordsCard: React.FC<Props> = ({
     selectedProjects,
     border = true,
 }) => {
-const { t } = useLanguage();
+    const { t } = useLanguage();
 
-const sortOptions = useMemo<
-  {
-    value: RecentRecordSortValue;
-    label: string;
-  }[]
->(
-  () => [
-    {
-      value: "nameAZ",
-      label: t.translations.SORT_NAME_A_TO_Z,
-    },
-    {
-      value: "nameZA",
-      label: t.translations.SORT_NAME_Z_TO_A,
-    },
-    {
-      value: "dateNew",
-      label: t.translations.SORT_DATE_NEWEST,
-    },
-    {
-      value: "dateOld",
-      label: t.translations.SORT_DATE_OLDEST,
-    },
-  ],
-  [t],
-);
+    const sortOptions = useMemo<
+        {
+            value: RecentRecordSortValue;
+            label: string;
+        }[]
+    >(
+        () => [
+            {
+                value: "nameAZ",
+                label: t.translations.SORT_NAME_A_TO_Z,
+            },
+            {
+                value: "nameZA",
+                label: t.translations.SORT_NAME_Z_TO_A,
+            },
+            {
+                value: "dateNew",
+                label: t.translations.SORT_DATE_NEWEST,
+            },
+            {
+                value: "dateOld",
+                label: t.translations.SORT_DATE_OLDEST,
+            },
+        ],
+        [t],
+    );
 
-const {
-  records,
-  totalRecords,
-  totalPages,
-  sortBy,
-  setSortBy,
-  currentPage,
-  setCurrentPage,
-  pageSize,
-  setPageSize,
-  isLoading,
-  requestFailed,
-  fetchRecords,
-} = useRecordsPaginated(selectedProjects);
+    const {
+        records,
+        totalPages,
+        sortBy,
+        setSortBy,
+        currentPage,
+        setCurrentPage,
+        pageSize,
+        setPageSize,
+        isLoading,
+        requestFailed,
+        fetchRecords,
+    } = useRecordsPaginated(selectedProjects);
 
-const [classStatusMap, setClassStatusMap] = useState<Map<string, boolean>>(new Map());
+    const [activeClassNames, setActiveClassNames] = useState<Set<string>>(new Set());
 
-useEffect(() => {
-    if (!selectedProjects || selectedProjects.length === 0) {
-        setClassStatusMap(new Map());
-        return;
-    }
-
-    let cancelled = false;
-
-    const fetchClasses = async () => {
-        try {
-            const projectIds = selectedProjects.map((id) => Number(id));
-            const classesArrays = await Promise.all(
-                projectIds.map((projectId) => getAllClasses(projectId, false))
-            );
-
-            if (cancelled) return;
-
-            const allClasses = classesArrays.flat();
-            const statusMap = new Map(
-                allClasses.map((cls) => [cls.name, !cls.isArchived])
-            );
-            setClassStatusMap(statusMap);
-        } catch (error) {
-            console.error("Failed to fetch classes:", error);
-            if (!cancelled) setClassStatusMap(new Map());
+    useEffect(() => {
+        if (!selectedProjects || selectedProjects.length === 0) {
+            setActiveClassNames(new Set());
+            return;
         }
-    };
 
-    fetchClasses();
+        let cancelled = false;
 
-    return () => {
-        cancelled = true;
-    };
-}, [selectedProjects]);
+        const fetchActiveClasses = async () => {
+            try {
+                const projectIds = selectedProjects.map((id) => Number(id));
+                const classesArrays = await Promise.all(
+                    projectIds.map((projectId) => getAllClasses(projectId, true))
+                );
+                if (cancelled) return;
 
-if (isLoading) return <CatalogViewSkeleton />;
+                const allClasses = classesArrays.flat();
+                const classNamesSet = new Set(allClasses.map((cls) => cls.name));
+                setActiveClassNames(classNamesSet);
+            } catch (error) {
+                console.error("Failed to fetch active classes:", error);
+                if (!cancelled) setActiveClassNames(new Set());
+            }
+        };
 
-return (
-  <div
-    className={border ? "shadow-md shadow-base-content/10 rounded-xl" : ""}
-  >
-    {/* Header and sort controls */}
-    <div className="flex items-center justify-between p-4">
-      <h2 className="text-lg font-semibold text-base-content">
-        {t.translations.RECENTLY_ADDED_RECORDS}
-      </h2>
+        fetchActiveClasses();
 
-      <BasicSortSelect
-        value={sortBy}
-        options={sortOptions}
-        onChange={setSortBy}
-      />
-    </div>
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedProjects]);
 
-    <div className="divider m-0"></div>
+    if (isLoading) return <CatalogViewSkeleton />;
 
-    {/* Error state */}
-    {requestFailed && (
-      <div className="p-4 text-error flex items-center justify-between">
-        <span>{t.translations.FAILED_TO_LOAD_RECENT_RECORDS}</span>
-        <button className="btn btn-sm btn-outline" onClick={fetchRecords}>
-          {t.translations.RETRY}
-        </button>
-      </div>
-    )}
+    return (
+        <div
+            className={border ? "shadow-md shadow-base-content/10 rounded-xl" : ""}
+        >
+            {/* Header and sort controls */}
+            <div className="flex items-center justify-between p-4">
+                <h2 className="text-lg font-semibold text-base-content">
+                    {t.translations.RECENTLY_ADDED_RECORDS}
+                </h2>
 
-    {/* Paginated records list */}
-    <ul className="space-y-1 p-2">
-      {records.map((record) => (
-        <RecordView record={record} key={record.id} />
-      ))}
-    </ul>
+                <BasicSortSelect
+                    value={sortBy}
+                    options={sortOptions}
+                    onChange={setSortBy}
+                />
+            </div>
 
-    {/* Empty state */}
-    {!requestFailed && records.length === 0 && (
-      <div className="text-center py-8 text-base-content/60">
-        {t.translations.NO_RECENT_RECORDS}
-      </div>
-  );
+            <div className="divider m-0"></div>
+
+            {/* Error state */}
+            {requestFailed && (
+                <div className="p-4 text-error flex items-center justify-between">
+                    <span>{t.translations.FAILED_TO_LOAD_RECENT_RECORDS}</span>
+                    <button className="btn btn-sm btn-outline" onClick={fetchRecords}>
+                        {t.translations.RETRY}
+                    </button>
+                </div>
+            )}
+
+            {/* Paginated records list */}
+            <ul className="space-y-1 p-2">
+                {records.map((record) => (
+                    <RecordView
+                        key={record.id}
+                        record={record}
+                        activeClassNames={activeClassNames}
+                    />
+                ))}
+            </ul>
+
+            {/* Empty state */}
+            {!requestFailed && records.length === 0 && (
+                <div className="text-center py-8 text-base-content/60">
+                    {t.translations.NO_RECENT_RECORDS}
+                </div>
+            )}
+            {/* Shared pagination controls */}
+            <PaginationControls
+                currentPage={currentPage}
+                pageSize={pageSize}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+            />
+        </div>
+    );
 };
 
 interface BasicSortSelectProps {
@@ -157,8 +172,8 @@ interface BasicSortSelectProps {
 }
 
 /**
- * A select input for sorting values.
- */
+* A select input for sorting values.
+*/
 function BasicSortSelect({ value, options, onChange }: BasicSortSelectProps) {
     const { t } = useLanguage();
 
@@ -187,21 +202,20 @@ function BasicSortSelect({ value, options, onChange }: BasicSortSelectProps) {
 }
 
 /**
- * A view of a single record that redirects users to the record's page.
- */
-function RecordView({
-    record,
-    isActiveClass,
-}: {
-    record: QueryRecordViewResponseDto;
-    isActiveClass: boolean;
-}) {
+* A view of a single record that redirects users to the record's page.
+*/
+function RecordView({ record, activeClassNames }: RecordViewProps) {
     const { t } = useLanguage();
     const router = useRouter();
 
     const handleRecordClick = () => {
         router.push(`/record?recordId=${record.id}&projectId=${record.projectId}`);
     };
+
+    const normalizedClassName =
+        record.className && activeClassNames.has(record.className)
+            ? record.className
+            : t.translations.NO_CLASS;
 
     return (
         <li
@@ -216,27 +230,20 @@ function RecordView({
             <div className="text-sm text-base-content/60 flex flex-wrap gap-x-4 gap-y-1">
                 <span className="flex items-center gap-1">
                     <span>{t.translations.CLASS}: </span>
-                    <span className="badge badge-sm badge-secondary">
-                        {isActiveClass ? record.className : t.translations.NO_CLASS}
-                    </span>
+                    <span className="badge badge-sm badge-secondary">{normalizedClassName}</span>
                 </span>
 
                 <span>
-                    <span className="text-base-content/50">
-                        {t.translations.LAST_EDIT}:
-                    </span>{" "}
+                    <span className="text-base-content/50">{t.translations.LAST_EDIT}:</span>{" "}
                     {formatLocalDateTime(String(record.lastUpdatedAt))}
                 </span>
 
                 <span>
-                    <span className="text-base-content/50">
-                        {t.translations.DATA_SOURCE}:
-                    </span>{" "}
+                    <span className="text-base-content/50">{t.translations.DATA_SOURCE}:</span>{" "}
                     {record.dataSourceName}
                 </span>
             </div>
         </li>
     );
 }
-
 export default RecentRecordsCard;

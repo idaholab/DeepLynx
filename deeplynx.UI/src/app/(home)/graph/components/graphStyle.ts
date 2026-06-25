@@ -1,5 +1,3 @@
-import { useLanguage } from "@/app/contexts/Language";
-
 const COLOR_BLIND_SAFE = [
   "#0072B2",
   "#E69F00",

@@ -34,7 +34,6 @@ export function useFilteredNodes(
             await Promise.all(
                 uniqueClassIds.map(async (classId) => {
                     try {
-                        // getClass will throw if class is archived (hideArchived=true default)
                         await getClass(projectId, classId);
                     } catch {
                         archivedSet.add(classId);
