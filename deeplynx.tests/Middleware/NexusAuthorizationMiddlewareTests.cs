@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
@@ -85,6 +86,7 @@ namespace deeplynx.tests.Middleware
             Assert.True(user.IsSysAdmin);
             Assert.Equal("Local Developer", user.Name);
             Assert.Equal("local-dev", user.Username);
+            Assert.Equal(AccountType.Standard, user.AccountType);
             Assert.True(user.IsActive);
             Assert.False(user.IsArchived);
 
@@ -132,6 +134,7 @@ namespace deeplynx.tests.Middleware
             Assert.NotNull(user);
             Assert.True(user.IsSysAdmin);
             Assert.Equal(uid2, user.Id); // Same user
+            Assert.Equal(AccountType.Standard, user.AccountType);
 
             // Cleanup
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", null);
