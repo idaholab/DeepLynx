@@ -433,9 +433,6 @@ public class OrganizationBusiness : IOrganizationBusiness
         if (existingOrgUser.User.AccountType == AccountType.Service)
             throw new InvalidOperationException("Only standard user accounts can be granted org admin status.");
 
-        if (existingOrgUser == null)
-            throw new KeyNotFoundException($"User with id {userId} not found in Org with id {organizationId}");
-
         // set is admin and save to DB
         existingOrgUser.IsOrgAdmin = isAdmin;
         _context.OrganizationUsers.Update(existingOrgUser);
