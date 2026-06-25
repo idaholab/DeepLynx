@@ -366,8 +366,7 @@ jobs:
           ENCRYPTION_IV: ${{ vars.ENCRYPTION_IV }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           AIRFLOW_BASE_URL: ${{ vars.AIRFLOW_BASE_URL }}
-          AIRFLOW_USERNAME: ${{ vars.AIRFLOW_USERNAME }}
-          AIRFLOW_PASSWORD: ${{ secrets.AIRFLOW_PASSWORD }}
+          AIRFLOW_JWT: ${{ secrets.AIRFLOW_JWT }}
           LATTICE_MODEL: ${{ vars.LATTICE_MODEL }}
           NEXUS_API_URL: ${{ vars.NEXUS_API_URL }}
           HIDE_INSIGHT: ${{ vars.HIDE_INSIGHT }}

@@ -34,7 +34,7 @@ const ProjectUsersHeader: React.FC<ProjectUsersHeaderProps> = ({
   return (
     <>
       {/* Header */}
-      <div className="flex justify-between items-center mb-6 border-b border-base-300 pb-4">
+      <div className="flex justify-between items-center mb-6 border-b border-base-300/50 pb-4">
         <div>
           <h2 className="text-2xl font-bold">
             {t.translations.PROJECT_MEMBERS}

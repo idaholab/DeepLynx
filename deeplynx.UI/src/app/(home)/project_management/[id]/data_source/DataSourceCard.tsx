@@ -61,10 +61,7 @@ const DataSourceCard = ({
   const lastSync = source.lastSync;
 
   return (
-    <div
-      className={`card bg-base-100 shadow-xl border-l-4"
-        }`}
-    >
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body">
         {/* Header row */}
         <div className="flex justify-between items-center mb-4">

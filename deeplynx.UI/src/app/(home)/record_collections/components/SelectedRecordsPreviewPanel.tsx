@@ -42,7 +42,7 @@ export default function SelectedRecordsPreviewPanel({
   const { t } = useLanguage();
 
   return (
-    <div className="mt-2 rounded-2xl border border-base-300 bg-base-100 p-4">
+    <div className="mt-2 rounded-2xl border border-base-300/50 bg-base-100 p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h3 className="font-semibold text-base-content">{title}</h3>
@@ -62,7 +62,7 @@ export default function SelectedRecordsPreviewPanel({
         />
       </div>
 
-      <div className="mt-4 max-h-48 overflow-auto rounded-xl border border-base-300">
+      <div className="mt-4 max-h-48 overflow-auto rounded-xl border border-base-300/50">
         <table className="table table-sm">
           <thead>
             <tr>

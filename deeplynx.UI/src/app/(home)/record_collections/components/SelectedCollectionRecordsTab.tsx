@@ -59,7 +59,7 @@ export default function SelectedCollectionRecordsTab({
           </button>
         }
       >
-        <div className="rounded-2xl border border-base-300 bg-base-200/30 p-4">
+        <div className="rounded-2xl border border-base-300/50 bg-base-100 p-4">
           <CollectionRecordSearchControls
             searchTerm={recordSearchTerm}
             setSearchTerm={setRecordSearchTerm}
@@ -124,7 +124,7 @@ export default function SelectedCollectionRecordsTab({
           ) : null}
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-base-300">
+        <div className="overflow-x-auto rounded-2xl border border-base-300/50">
           <table className="table">
             <thead>
               <tr>

@@ -1553,6 +1553,20 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.RecordId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("embeddings_record_id_fkey");
+
+            // Add foreign key relationship to AiModelConfig.Id
+            entity.HasOne(e => e.AiModelConfig)
+                .WithMany() 
+                .HasForeignKey(e => e.EmbeddingModel) 
+                .HasPrincipalKey(a => a.Id) 
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("embeddings_embedding_model_fkey");
+
+            entity.HasIndex(e => e.EmbeddingModel)
+                .HasDatabaseName("idx_embeddings_embedding_model");
+
+            entity.HasIndex(e => new { e.ProjectId, e.EmbeddingModel })
+                .HasDatabaseName("idx_embeddings_project_model");
         });
 
         modelBuilder.Entity<OntologyVector>(entity =>
