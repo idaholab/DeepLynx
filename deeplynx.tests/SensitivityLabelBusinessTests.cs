@@ -27,7 +27,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     public long lid2; // archived label ID
     public long lid3;
     public long lid4;
-    public long lid5; 
+    public long lid5;
     public long lid6;
 
     public long oid; // organization ID
@@ -88,7 +88,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         {
             Name = "Org Admin",
             Email = "org_admin@example.com",
-            IsArchived = false  
+            IsArchived = false
         };
         var orgUser = new User
         {
@@ -166,27 +166,27 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         {
             Name = "Label 1",
             Description = "Label 1 for unit tests",
-            OrganizationId = oid, 
+            OrganizationId = oid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             IsArchived = false
-        }; 
-        
+        };
+
         var label2 = new SensitivityLabel
         {
             Name = "Label 2",
             Description = "Label 1 for unit tests",
-            OrganizationId = oid, 
+            OrganizationId = oid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             IsArchived = false
-        }; 
+        };
         var label3 = new SensitivityLabel
         {
             Name = "Label 3",
             Description = "Label 1 for unit tests",
-            OrganizationId = oid, 
+            OrganizationId = oid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             IsArchived = true
-        }; 
+        };
         var proj2Label = new SensitivityLabel
         {
             Name = "Test Label",
@@ -197,7 +197,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             IsArchived = false,
             OrganizationId = oid
         };
-        
+
         Context.SensitivityLabels.AddRange(testLabel, archivedLabel, label1, label2, label3, proj2Label);
         await Context.SaveChangesAsync();
         lid = testLabel.Id;
@@ -322,7 +322,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var permission1 = new Permission
         {
             Name = "Read Permission",
-            Action = "read record", 
+            Action = "read record",
             LabelId = lid,
             OrganizationId = oid,
             ProjectId = pid
@@ -365,7 +365,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var orgPermission = new Permission
         {
             Name = "Read Permission",
-            Action = "read record", 
+            Action = "read record",
             LabelId = orgLabelId,
             OrganizationId = oid
         };
@@ -416,7 +416,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var permission1 = new Permission
         {
             Name = "Read Permission",
-            Action = "read record", 
+            Action = "read record",
             LabelId = lid,
             OrganizationId = oid,
             ProjectId = pid
@@ -501,7 +501,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             Name = "Sys Admin",
             Email = "sys_admin@example.com",
             IsArchived = false,
-            IsSysAdmin = true  
+            IsSysAdmin = true
         };
         Context.Users.Add(sysAdmin);
         await Context.SaveChangesAsync();
@@ -535,7 +535,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.Equal("Test label for unit tests", result.Description);
         Assert.False(result.IsArchived);
     }
-    
+
     [Fact]
     public async Task GetSensitivityLabel_InheritOrganizationLabels()
     {
@@ -691,7 +691,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var writeRecordPermission = await Context.Permissions
             .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "write record");
         Assert.NotNull(writeRecordPermission);
-        
+
         var updateRecordPermission = await Context.Permissions
             .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "update record");
         Assert.NotNull(updateRecordPermission);
@@ -699,7 +699,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var deleteRecordPermission = await Context.Permissions
             .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "delete record");
         Assert.NotNull(deleteRecordPermission);
-        
+
         var downloadFilePermission = await Context.Permissions
             .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "download file");
         Assert.NotNull(downloadFilePermission);
@@ -707,7 +707,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var uploadFilePermission = await Context.Permissions
             .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "upload file");
         Assert.NotNull(uploadFilePermission);
-        
+
         var updateFilePermission = await Context.Permissions
             .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "update file");
         Assert.NotNull(updateFilePermission);
@@ -721,7 +721,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.Single(eventList);
 
         var actualEvent = eventList[0];
-        
+
         Assert.Equal(pid, actualEvent.ProjectId);
         Assert.Equal("create", actualEvent.Operation);
         Assert.Equal("sensitivity_label", actualEvent.EntityType);
@@ -807,7 +807,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.Contains("Permission to add records with label", writeRecordPermission.Description);
         Assert.Equal(result.Id, writeRecordPermission.LabelId);
         Assert.False(writeRecordPermission.IsDefault);
-        
+
         var updateRecordPermission = permissions.FirstOrDefault(p => p.Action == "update record");
         Assert.NotNull(updateRecordPermission);
         var deleteRecordPermission = permissions.FirstOrDefault(p => p.Action == "delete record");
@@ -823,7 +823,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region BulkCreateSensitivityLabels Tests
 
     [Fact]
@@ -1206,7 +1206,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // This test verifies that if something goes wrong, the transaction rolls back
         // Note: Actual implementation depends on your error handling
         // This is a conceptual test that would need to be adapted based on how errors are triggered
-        
+
         // Arrange
         var labels = new List<CreateSensitivityLabelRequestDto>
         {
@@ -1305,7 +1305,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.Equal("sensitivity_label", actualEvent.EntityType);
         Assert.Equal(result.Id, actualEvent.EntityId);
     }
-    
+
     [Fact]
     public async Task UpdateSensitivityLabel_Fails_IfOrganizationLabel()
     {
@@ -1422,7 +1422,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
-    
+
     [Fact]
     public async Task ArchiveSensitivityLabel_Fails_IfOrganizationLabel()
     {
@@ -1520,11 +1520,11 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
-    
+
     [Fact]
     public async Task UnarchiveSensitivityLabel_Fails_IfOrganizationLabel()
     {
-        
+
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -1596,7 +1596,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
-    
+
     [Fact]
     public async Task DeleteSensitivityLabel_Fails_IfOrganizationLabel()
     {
