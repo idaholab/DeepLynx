@@ -18,7 +18,7 @@ interface AddUsersToProjectModalProps {
   projectMembers: ProjectMemberResponseDto[];
   modalLoading?: boolean;
   onClose: () => void;
-  onAddInviteUser: (emailOrUserId: string | number, roleId?: number) => Promise<void>;
+  onAddInviteUser: (emailOrUserId: string | number, roleId?: number, isProjectAdmin?: boolean) => Promise<void>;
 }
 
 interface EmailError {
@@ -41,6 +41,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
   const [externalEmails, setExternalEmails] = useState<string[]>([]);
   const [selectedOrgUserIds, setSelectedOrgUserIds] = useState<number[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
+  const [isProjectAdmin, setIsProjectAdmin] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [emailErrors, setEmailErrors] = useState<EmailError[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -73,6 +74,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
       setExternalEmails([]);
       setSelectedOrgUserIds([]);
       setSelectedRoleId("");
+      setIsProjectAdmin(false);
       setEmailErrors([]);
       setSearchQuery("");
     }
@@ -132,10 +134,10 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
 
     const roleId = Number(selectedRoleId);
 
-    // Process org users first (pass userId and roleId)
+    // Process org users first (pass userId, roleId, and isProjectAdmin)
     for (const userId of selectedOrgUserIds) {
       try {
-        await onAddInviteUser(userId, roleId);
+        await onAddInviteUser(userId, roleId, isProjectAdmin);
       } catch (error: any) {
         const user = usersNotInProject.find((u) => u.id === userId);
         errors.push({
@@ -243,13 +245,13 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                       {t.translations.INVITE_EXTERNAL_USERS_VIA_EMAIL}
                     </span>
                   </label>
-                  <div className="border border-base-300 rounded-lg p-2 min-h-[120px] max-h-[300px] overflow-y-auto bg-base-100 focus-within:border-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-opacity-50">
+                  <div className="border border-base-300/50 rounded-lg p-2 min-h-[120px] max-h-[300px] overflow-y-auto bg-base-100 focus-within:border-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-opacity-50">
                     <div className="flex flex-wrap gap-2">
                       {/* External Emails as Pills */}
                       {externalEmails.map((email) => (
                         <div
                           key={`email-${email}`}
-                          className="badge badge-lg gap-2 bg-base-200 border-base-300 px-3 py-3"
+                          className="badge badge-lg gap-2 bg-base-200 border-base-300/50 px-3 py-3"
                         >
                           <span className="text-sm font-medium">{email}</span>
                           <button
@@ -293,7 +295,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                         ({selectedUsers.length} {t.translations.SELECTED})
                       </span>
                     </label>
-                    <div className="border border-base-300 rounded-lg p-2 max-h-[200px] overflow-y-auto bg-base-100">
+                    <div className="border border-base-300/50 rounded-lg p-2 max-h-[200px] overflow-y-auto bg-base-100">
                       <div className="flex flex-wrap gap-2">
                         {selectedUsers.map((user) => (
                           <div
@@ -341,7 +343,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                     </div>
                     <ul
                       tabIndex={0}
-                      className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto mt-1"
+                      className="dropdown-content menu bg-base-100 rounded-box z-[100] w-full p-2 shadow-lg border border-base-300/50 max-h-60 overflow-y-auto mt-1"
                     >
                       {roles.map((role) => (
                         <li
@@ -360,6 +362,27 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                       ))}
                     </ul>
                   </div>
+                </div>
+
+                {/* Project Admin Checkbox */}
+                <div className="form-control">
+                  <label className="label cursor-pointer justify-start gap-3">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-warning"
+                      checked={isProjectAdmin}
+                      onChange={(e) => setIsProjectAdmin(e.target.checked)}
+                      disabled={isProcessing}
+                    />
+                    <div className="flex flex-col">
+                      <span className="label-text font-medium">
+                        Project Admin
+                      </span>
+                      <span className="text-xs text-base-content/60">
+                        Grant project admin permissions to these users
+                      </span>
+                    </div>
+                  </label>
                 </div>
 
                 {/* Error Messages */}
@@ -406,7 +429,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                 </div>
 
                 {/* Users List */}
-                <div className="border border-base-300 rounded-lg p-3 h-[400px] overflow-y-auto bg-base-200">
+                <div className="border border-base-300/50 rounded-lg p-3 h-[400px] overflow-y-auto bg-base-200">
                   {filteredOrgUsers.length === 0 ? (
                     <div className="flex items-center justify-center h-full text-base-content/50 text-sm">
                       {searchQuery

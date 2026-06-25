@@ -14,6 +14,7 @@ import {
 } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
+import { ProjectAdminRoute } from "@/app/(home)/rbac/RBACComponents";
 import ProjectUsersTable from "./users/ProjectUsersTable";
 import ProjectRolesAndPermissions from "./roles_and_permissions/ProjectRolesAndPermissions";
 import DataSources from "./data_source/DataSourcesClient";
@@ -130,38 +131,40 @@ const ProjectManagementClient = ({
   ];
 
   return (
-    <main className="min-h-screen bg-base-200/30">
-      <section className="border-b border-base-300 bg-base-100">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-              {t.translations.PROJECT}
-            </p>
-            <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
-              {t.translations.PROJECT_MANAGEMENT}
-            </h1>
-            {(editingProject || sessionProject) && (
-              <p className="mt-3 max-w-3xl text-base-content/70">
-                {t.translations.MANAGING_SETTINGS_FOR_PROJECT}:{" "}
-                <span className="font-semibold">
-                  {editingProject?.name || sessionProject?.projectName}
-                </span>
+    <ProjectAdminRoute>
+      <main className="min-h-screen bg-base-200/30">
+        <section className="border-b border-base-300/50 bg-base-100">
+          <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.translations.PROJECT}
               </p>
-            )}
+              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+                {t.translations.PROJECT_MANAGEMENT}
+              </h1>
+              {(editingProject || sessionProject) && (
+                <p className="mt-3 max-w-3xl text-base-content/70">
+                  {t.translations.MANAGING_SETTINGS_FOR_PROJECT}:{" "}
+                  <span className="font-semibold">
+                    {editingProject?.name || sessionProject?.projectName}
+                  </span>
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Tabs */}
-      <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
-        <Tabs
-          tabs={tabData}
-          className="mx-0"
-          onTabChange={handleTabChange}
-          activeTab={activeTab}
-        />
-      </section>
-    </main>
+        {/* Tabs */}
+        <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+          <Tabs
+            tabs={tabData}
+            className="mx-0"
+            onTabChange={handleTabChange}
+            activeTab={activeTab}
+          />
+        </section>
+      </main>
+    </ProjectAdminRoute>
   );
 };
 

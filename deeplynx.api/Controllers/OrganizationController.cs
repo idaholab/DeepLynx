@@ -220,8 +220,6 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
     [OrgAdmin]
-    [Auth("update", "organization")]
-    [Auth("update", "user")]
     public async Task<ActionResult> AddUserToOrganization(
         long organizationId,
         [FromQuery] long userId,
@@ -305,13 +303,10 @@ public class OrganizationController : ControllerBase
     /// <param name="userName"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
-    [OrgAdmin] // skip permission checks for org admins
-    [Auth("write", "user")]
-    [Auth("update", "user")]
-    [Auth("update", "organization")]
+    [ProjectAdmin(unscoped: true)] 
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
-        [FromQuery] string userEmail,
+        [FromQuery] string? userEmail,
         [FromQuery] long? userId)
     {
         try

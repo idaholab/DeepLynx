@@ -7,4 +7,5 @@ public class ProjectMemberResponseDto
     public string Email { get; set; }
     public string? Role { get; set; }
     public long? RoleId { get; set; }
+    public bool IsProjectAdmin { get; set; }
 }
