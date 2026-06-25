@@ -8,6 +8,20 @@ import {
 } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
+function prepareCustomQueryRequest(
+    queryObj: CustomQueryRequestDto[],
+): CustomQueryRequestDto[] {
+    return queryObj.map((obj) => {
+        if (obj.jsonKey && obj.jsonValue) {
+            return {
+                ...obj,
+                json: JSON.stringify({ [obj.jsonKey]: obj.jsonValue }),
+            };
+        }
+        return { ...obj };
+    });
+}
+
 /**
  * Full text search for records
  * @param organizationId - The ID of the organization
@@ -51,14 +65,7 @@ export async function queryBuilder(
     textSearch?: string | null,
 ): Promise<QueryRecordViewResponseDto[]> {
     try {
-        // Building json string format from key/value input
-        for (const obj of queryObj) {
-            if (obj.jsonKey && obj.jsonValue) {
-                const json = `{"${obj.jsonKey}": "${obj.jsonValue}"}`;
-                obj.json = json;
-            }
-        }
-
+        const requestBody = prepareCustomQueryRequest(queryObj);
         const projectIdsQuery = projectIds
             .map((id) => `projectIds=${id}`)
             .join("&");
@@ -68,12 +75,51 @@ export async function queryBuilder(
 
         const res = await api.post(
             `/organizations/${organizationId}/query/records/advanced?${projectIdsQuery}${textSearchParam}`,
-            queryObj,
+            requestBody,
             { headers: { "Content-Type": "application/json" } },
         );
         return res.data;
     } catch (error) {
         console.error("Error building query:", error);
+        throw error;
+    }
+}
+
+/**
+ * Build a custom query for records with server-side pagination.
+ * @param organizationId - The ID of the organization
+ * @param queryObj - Array of custom query request DTOs
+ * @param projectIds - Array of project IDs to search across
+ * @param pageNumber - Page number to fetch
+ * @param pageSize - Number of records per page
+ * @param textSearch - Optional full text search phrase
+ * @returns Promise with paginated QueryRecordViewResponseDto
+ */
+export async function queryBuilderPaginated(
+    organizationId: number,
+    queryObj: CustomQueryRequestDto[],
+    projectIds: number[],
+    pageNumber: number,
+    pageSize: number,
+    textSearch?: string | null,
+): Promise<PaginatedResponse<QueryRecordViewResponseDto>> {
+    try {
+        const params = new URLSearchParams();
+        projectIds.forEach((id) => params.append("projectIds", String(id)));
+        params.append("pageNumber", String(pageNumber ?? 1));
+        params.append("pageSize", String(pageSize ?? 25));
+        if (textSearch) params.append("textSearch", textSearch);
+
+        const res = await api.post<
+            PaginatedResponse<QueryRecordViewResponseDto>
+        >(
+            `/organizations/${organizationId}/query/records/advanced/paginated?${params.toString()}`,
+            prepareCustomQueryRequest(queryObj),
+            { headers: { "Content-Type": "application/json" } },
+        );
+        return res.data;
+    } catch (error) {
+        console.error("Error building paginated query:", error);
         throw error;
     }
 }

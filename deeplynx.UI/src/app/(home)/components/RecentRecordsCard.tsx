@@ -20,141 +20,131 @@ const RecentRecordsCard: React.FC<Props> = ({
     selectedProjects,
     border = true,
 }) => {
-    const { t } = useLanguage();
+const { t } = useLanguage();
 
-    const sortOptions = useMemo(
-        () => [
-            {
-                value: "nameAZ",
-                label: t.translations.SORT_NAME_A_TO_Z,
-            },
-            {
-                value: "nameZA",
-                label: t.translations.SORT_NAME_Z_TO_A,
-            },
-            {
-                value: "dateNew",
-                label: t.translations.SORT_DATE_NEWEST,
-            },
-            {
-                value: "dateOld",
-                label: t.translations.SORT_DATE_OLDEST,
-            },
-        ],
-        [t],
-    );
+const sortOptions = useMemo<
+  {
+    value: RecentRecordSortValue;
+    label: string;
+  }[]
+>(
+  () => [
+    {
+      value: "nameAZ",
+      label: t.translations.SORT_NAME_A_TO_Z,
+    },
+    {
+      value: "nameZA",
+      label: t.translations.SORT_NAME_Z_TO_A,
+    },
+    {
+      value: "dateNew",
+      label: t.translations.SORT_DATE_NEWEST,
+    },
+    {
+      value: "dateOld",
+      label: t.translations.SORT_DATE_OLDEST,
+    },
+  ],
+  [t],
+);
 
-    const {
-        records,
-        totalRecords,
-        totalPages,
-        sortBy,
-        setSortBy,
-        currentPage,
-        setCurrentPage,
-        pageSize,
-        setPageSize,
-        isLoading,
-        requestFailed,
-        fetchRecords,
-    } = useRecordsPaginated(selectedProjects);
+const {
+  records,
+  totalRecords,
+  totalPages,
+  sortBy,
+  setSortBy,
+  currentPage,
+  setCurrentPage,
+  pageSize,
+  setPageSize,
+  isLoading,
+  requestFailed,
+  fetchRecords,
+} = useRecordsPaginated(selectedProjects);
 
-    const [classStatusMap, setClassStatusMap] = useState<Map<string, boolean>>(new Map());
+const [classStatusMap, setClassStatusMap] = useState<Map<string, boolean>>(new Map());
 
-    useEffect(() => {
-        if (!selectedProjects || selectedProjects.length === 0) {
-            setClassStatusMap(new Map());
-            return;
+useEffect(() => {
+    if (!selectedProjects || selectedProjects.length === 0) {
+        setClassStatusMap(new Map());
+        return;
+    }
+
+    let cancelled = false;
+
+    const fetchClasses = async () => {
+        try {
+            const projectIds = selectedProjects.map((id) => Number(id));
+            const classesArrays = await Promise.all(
+                projectIds.map((projectId) => getAllClasses(projectId, false))
+            );
+
+            if (cancelled) return;
+
+            const allClasses = classesArrays.flat();
+            const statusMap = new Map(
+                allClasses.map((cls) => [cls.name, !cls.isArchived])
+            );
+            setClassStatusMap(statusMap);
+        } catch (error) {
+            console.error("Failed to fetch classes:", error);
+            if (!cancelled) setClassStatusMap(new Map());
         }
+    };
 
-        let cancelled = false;
+    fetchClasses();
 
-        const fetchClasses = async () => {
-            try {
-                const projectIds = selectedProjects.map((id) => Number(id));
-                const classesArrays = await Promise.all(
-                    projectIds.map((projectId) => getAllClasses(projectId, false)) // Fetch all classes, including archived ones
-                );
+    return () => {
+        cancelled = true;
+    };
+}, [selectedProjects]);
 
-                if (cancelled) return;
+if (isLoading) return <CatalogViewSkeleton />;
 
-                const allClasses = classesArrays.flat();
-                const statusMap = new Map(
-                    allClasses.map((cls) => [cls.name, !cls.isArchived]) // Map class name to its "active" status
-                );
-                setClassStatusMap(statusMap);
-            } catch (error) {
-                console.error("Failed to fetch classes:", error);
-                if (!cancelled) setClassStatusMap(new Map());
-            }
-        };
+return (
+  <div
+    className={border ? "shadow-md shadow-base-content/10 rounded-xl" : ""}
+  >
+    {/* Header and sort controls */}
+    <div className="flex items-center justify-between p-4">
+      <h2 className="text-lg font-semibold text-base-content">
+        {t.translations.RECENTLY_ADDED_RECORDS}
+      </h2>
 
-        fetchClasses();
+      <BasicSortSelect
+        value={sortBy}
+        options={sortOptions}
+        onChange={setSortBy}
+      />
+    </div>
 
-        return () => {
-            cancelled = true;
-        };
-    }, [selectedProjects]);
+    <div className="divider m-0"></div>
 
-    if (isLoading && records.length === 0) return <CatalogViewSkeleton />;
+    {/* Error state */}
+    {requestFailed && (
+      <div className="p-4 text-error flex items-center justify-between">
+        <span>{t.translations.FAILED_TO_LOAD_RECENT_RECORDS}</span>
+        <button className="btn btn-sm btn-outline" onClick={fetchRecords}>
+          {t.translations.RETRY}
+        </button>
+      </div>
+    )}
 
-    return (
-        <div
-            className={border ? "shadow-md shadow-base-content/10 rounded-xl" : ""}
-        >
-            {/* Header and sort controls */}
-            <div className="flex items-center justify-between p-4">
-                <h2 className="text-lg font-semibold text-base-content">
-                    {t.translations.RECENTLY_ADDED_RECORDS}
-                </h2>
+    {/* Paginated records list */}
+    <ul className="space-y-1 p-2">
+      {records.map((record) => (
+        <RecordView record={record} key={record.id} />
+      ))}
+    </ul>
 
-                <BasicSortSelect
-                    value={sortBy}
-                    options={sortOptions}
-                    onChange={setSortBy}
-                />
-            </div>
-
-            <div className="divider m-0"></div>
-
-            {/* Error state */}
-            {requestFailed && (
-                <div className="p-4 text-error flex items-center justify-between">
-                    <span>{t.translations.FAILED_TO_LOAD_RECENT_RECORDS}</span>
-                    <button className="btn btn-sm btn-outline" onClick={fetchRecords}>
-                        {t.translations.RETRY}
-                    </button>
-                </div>
-            )}
-
-            {/* Paginated records list */}
-            <ul className="space-y-1 p-2">
-                {records.map((record) => (
-                    <RecordView
-                        record={record}
-                        key={record.id}
-                        isActiveClass={record.className ? classStatusMap.get(record.className) ?? false : false}
-                    />
-                ))}
-            </ul>
-
-            {/* Empty state */}
-            {!requestFailed && records.length === 0 && (
-                <div className="text-center py-8 text-base-content/60">
-                    {t.translations.NO_RECENT_RECORDS}
-                </div>
-            )}
-
-            {/* Shared pagination controls */}
-            <PaginationControls
-                currentPage={currentPage}
-                pageSize={pageSize}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={setPageSize}
-            />
-        </div>
-    );
+    {/* Empty state */}
+    {!requestFailed && records.length === 0 && (
+      <div className="text-center py-8 text-base-content/60">
+        {t.translations.NO_RECENT_RECORDS}
+      </div>
+  );
 };
 
 interface BasicSortSelectProps {

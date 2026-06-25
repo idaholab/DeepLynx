@@ -233,6 +233,46 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         return new StagingIds(sc1.Id, sc2.Id, sr1.Id, sr2.Id, srel.Id, se.Id);
     }
 
+    /// <summary>
+    ///     Seeds a minimal staging set (one class + one record) with configurable
+    ///     SourceRecordId and Attributes on the record, for originId injection tests.
+    /// </summary>
+    private async Task<(long ClassId, long RecordId)> SeedRecordForOriginIdAsync(
+        long exId,
+        long? sourceRecordId,
+        string? attributes)
+    {
+        var sc = new ExtractionClass
+        {
+            ExtractionId = exId,
+            Name = "OriginId Test Class",
+            OrganizationId = oid,
+            ProjectId = pid,
+            ValidationStatus = ExtractionValidationStatus.InvalidSchema
+        };
+        _latticeCtx.ExtractionClasses.Add(sc);
+        await _latticeCtx.SaveChangesAsync();
+
+        var sr = new ExtractionRecord
+        {
+            ExtractionId = exId,
+            ExtractionClassId = sc.Id,
+            Name = "OriginId Test Record",
+            OrganizationId = oid,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            ValidationStatus = ExtractionValidationStatus.InvalidSchema,
+            Frequency = 1,
+            LlmScore = 0.9,
+            SourceRecordId = sourceRecordId,
+            Attributes = attributes
+        };
+        _latticeCtx.ExtractionRecords.Add(sr);
+        await _latticeCtx.SaveChangesAsync();
+
+        return (sc.Id, sr.Id);
+    }
+
     // Promotes every staged item of an extraction — the "approve all" equivalent under the
     // selection-based promote API.
     private async Task<ExtractionResponseDto> PromoteAllAsync(long exId)
@@ -1231,6 +1271,169 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         _mockInsight.Verify(
             i => i.QueueInsightEmbedStrings(uid, oid, pid, null),
             Times.Once);
+    }
+
+    #endregion
+
+    // =========================================================================
+    // OriginId Provenance Tests
+    // =========================================================================
+
+    #region OriginId Provenance Tests
+
+    [Fact]
+    public async Task PromoteRecords_InjectsOriginId_WhenSourceRecordIdIsSet()
+    {
+        var (classId, recId) = await SeedRecordForOriginIdAsync(
+            completeExtractionId,
+            sourceRecordId: 42L,
+            attributes: """{"manufacturer":"Boeing"}""");
+
+        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+            new PromoteExtractionRequestDto { ClassIds = [classId], RecordIds = [recId] });
+
+        _latticeCtx.ChangeTracker.Clear();
+        var promoted = _latticeCtx.ExtractionRecords.Find(recId);
+        Assert.NotNull(promoted!.PromotedId);
+
+        Context.ChangeTracker.Clear();
+        var dlRecord = await Context.Records.FindAsync(promoted.PromotedId!.Value);
+        Assert.NotNull(dlRecord);
+
+        var props = System.Text.Json.Nodes.JsonNode.Parse(dlRecord!.Properties)!.AsObject();
+        Assert.Equal(42L, props["originId"]!.GetValue<long>());
+        Assert.Equal("Boeing", props["manufacturer"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task PromoteRecords_CreatesOriginIdOnly_WhenAttributesIsNull()
+    {
+        var (classId, recId) = await SeedRecordForOriginIdAsync(
+            completeExtractionId,
+            sourceRecordId: 99L,
+            attributes: null);
+
+        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+            new PromoteExtractionRequestDto { ClassIds = [classId], RecordIds = [recId] });
+
+        _latticeCtx.ChangeTracker.Clear();
+        var promoted = _latticeCtx.ExtractionRecords.Find(recId);
+
+        Context.ChangeTracker.Clear();
+        var dlRecord = await Context.Records.FindAsync(promoted!.PromotedId!.Value);
+
+        var props = System.Text.Json.Nodes.JsonNode.Parse(dlRecord!.Properties)!.AsObject();
+        Assert.Single(props);
+        Assert.Equal(99L, props["originId"]!.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task PromoteRecords_NoOriginId_WhenSourceRecordIdIsNull()
+    {
+        var (classId, recId) = await SeedRecordForOriginIdAsync(
+            completeExtractionId,
+            sourceRecordId: null,
+            attributes: """{"role":"transport"}""");
+
+        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+            new PromoteExtractionRequestDto { ClassIds = [classId], RecordIds = [recId] });
+
+        _latticeCtx.ChangeTracker.Clear();
+        var promoted = _latticeCtx.ExtractionRecords.Find(recId);
+
+        Context.ChangeTracker.Clear();
+        var dlRecord = await Context.Records.FindAsync(promoted!.PromotedId!.Value);
+
+        var props = System.Text.Json.Nodes.JsonNode.Parse(dlRecord!.Properties)!.AsObject();
+        Assert.False(props.ContainsKey("originId"));
+        Assert.Equal("transport", props["role"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task PromoteRecords_OverwritesLlmOriginId_WithSourceRecordId()
+    {
+        var (classId, recId) = await SeedRecordForOriginIdAsync(
+            completeExtractionId,
+            sourceRecordId: 777L,
+            attributes: """{"originId":12345,"color":"red"}""");
+
+        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+            new PromoteExtractionRequestDto { ClassIds = [classId], RecordIds = [recId] });
+
+        _latticeCtx.ChangeTracker.Clear();
+        var promoted = _latticeCtx.ExtractionRecords.Find(recId);
+
+        Context.ChangeTracker.Clear();
+        var dlRecord = await Context.Records.FindAsync(promoted!.PromotedId!.Value);
+
+        var props = System.Text.Json.Nodes.JsonNode.Parse(dlRecord!.Properties)!.AsObject();
+        Assert.Equal(777L, props["originId"]!.GetValue<long>());
+        Assert.Equal("red", props["color"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task PromoteRecords_DoesNotModifyProperties_WhenExistingKgRecordLinked()
+    {
+        var sc = new ExtractionClass
+        {
+            ExtractionId = completeExtractionId,
+            Name = "Military Organization",
+            OrganizationId = oid,
+            ProjectId = pid,
+            ValidationStatus = ExtractionValidationStatus.Valid,
+            OntologyClassId = cid1
+        };
+        _latticeCtx.ExtractionClasses.Add(sc);
+        await _latticeCtx.SaveChangesAsync();
+
+        var sr = new ExtractionRecord
+        {
+            ExtractionId = completeExtractionId,
+            ExtractionClassId = sc.Id,
+            Name = "Test Record",
+            OrganizationId = oid,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            ValidationStatus = ExtractionValidationStatus.Valid,
+            DeeplynxRecordId = recordId,
+            SourceRecordId = 42L,
+            Frequency = 1,
+            LlmScore = 0.9
+        };
+        _latticeCtx.ExtractionRecords.Add(sr);
+        await _latticeCtx.SaveChangesAsync();
+
+        // Capture properties before promotion
+        Context.ChangeTracker.Clear();
+        var before = (await Context.Records.FindAsync(recordId))!.Properties;
+
+        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+            new PromoteExtractionRequestDto { ClassIds = [sc.Id], RecordIds = [sr.Id] });
+
+        // The existing KG record's Properties must be untouched
+        Context.ChangeTracker.Clear();
+        var after = (await Context.Records.FindAsync(recordId))!.Properties;
+        Assert.Equal(before, after);
+    }
+
+    [Fact]
+    public async Task PromoteRecords_EmptyJsonProperties_WhenBothSourceRecordIdAndAttributesNull()
+    {
+        var (classId, recId) = await SeedRecordForOriginIdAsync(
+            completeExtractionId,
+            sourceRecordId: null,
+            attributes: null);
+
+        await _business.PromoteExtraction(uid, oid, pid, completeExtractionId,
+            new PromoteExtractionRequestDto { ClassIds = [classId], RecordIds = [recId] });
+
+        _latticeCtx.ChangeTracker.Clear();
+        var promoted = _latticeCtx.ExtractionRecords.Find(recId);
+
+        Context.ChangeTracker.Clear();
+        var dlRecord = await Context.Records.FindAsync(promoted!.PromotedId!.Value);
+
+        Assert.Equal("{}", dlRecord!.Properties);
     }
 
     #endregion
