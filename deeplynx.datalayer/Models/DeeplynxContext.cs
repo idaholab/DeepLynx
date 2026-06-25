@@ -74,6 +74,7 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<UserModelToken> UserModelTokens { get; set; }
 
     public virtual DbSet<Embedding> Embeddings { get; set; }
+    public virtual DbSet<EmbeddingLogs> EmbeddingLogs { get; set; }
 
     public virtual DbSet<OntologyVector> OntologyVectors { get; set; }
 
@@ -1512,6 +1513,46 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.RecordId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("embeddings_record_id_fkey");
+        });
+
+        modelBuilder.Entity<EmbeddingLogs>(entity =>
+        {
+            entity.ToTable("embeddings_logs", schema: "dl_vector");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .IsRequired();
+
+            entity.Property(e => e.JobId)
+                .HasColumnName("job_id")
+                .IsRequired();
+
+            entity.Property(e => e.Stage)
+                .HasColumnName("stage")
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasConversion<string>()
+                .IsRequired();
+
+            entity.Property(e => e.Worker)
+                .HasColumnName("worker")
+                .IsRequired();
+
+            entity.Property(e => e.Progress)
+                .HasColumnName("progress")
+                .IsRequired();
+
+            entity.Property(e => e.Error)
+                .HasColumnName("error")
+                .IsRequired();
+
+            entity.Property(e => e.Timestamp)
+                .HasColumnName("timestamp")
+                .IsRequired();
         });
 
         modelBuilder.Entity<OntologyVector>(entity =>
