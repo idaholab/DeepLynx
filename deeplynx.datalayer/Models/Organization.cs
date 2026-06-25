@@ -101,4 +101,7 @@ public partial class Organization
 
     [InverseProperty("Organization")]
     public virtual ICollection<AiModelConfig> AiModelConfigs { get; set; } = new List<AiModelConfig>();
+
+    [InverseProperty("Organization")]
+    public virtual ICollection<ProvenanceRecord> ProvenanceRecords { get; set; } = new List<ProvenanceRecord>();
 }

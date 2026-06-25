@@ -143,6 +143,10 @@ namespace deeplynx.datalayer.Migrations.Lattice
                         .HasColumnType("boolean")
                         .HasColumnName("rejected");
 
+                    b.Property<long?>("SourceRecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_record_id");
+
                     b.Property<double>("StatisticalFrequency")
                         .HasColumnType("double precision")
                         .HasColumnName("statistical_frequency");
@@ -237,6 +241,10 @@ namespace deeplynx.datalayer.Migrations.Lattice
                     b.Property<bool>("Rejected")
                         .HasColumnType("boolean")
                         .HasColumnName("rejected");
+
+                    b.Property<long?>("SourceRecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_record_id");
 
                     b.Property<double>("StatisticalFrequency")
                         .HasColumnType("double precision")

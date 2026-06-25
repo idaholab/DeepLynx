@@ -3,25 +3,46 @@
 import { useLanguage } from "@/app/contexts/Language";
 import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, TagIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { QueryRecordViewResponseDto, TagResponseDto } from "../types/responseDTOs";
 
 interface ListViewProps {
     data: QueryRecordViewResponseDto[];
     activeSearchTerms?: string[];
     selectedProjects?: number[];
+    currentPage?: number;
+    pageSize?: number;
+    totalCount?: number;
+    totalPages?: number;
+    isLoading?: boolean;
+    onPageChange?: (page: number) => void;
 }
 
-const RECORDS_PER_PAGE = 10;
+const DEFAULT_RECORDS_PER_PAGE = 10;
 
 const RecordSearchList: React.FC<ListViewProps> = ({
     data,
     activeSearchTerms = [],
     selectedProjects,
+    currentPage,
+    pageSize,
+    totalCount,
+    totalPages,
+    isLoading = false,
+    onPageChange,
 }) => {
     const { t } = useLanguage();
-    const [currentPage, setCurrentPage] = useState(1);
+    const [localCurrentPage, setLocalCurrentPage] = useState(1);
     const router = useRouter();
+
+    const isServerPaginated =
+        typeof currentPage === "number" && typeof onPageChange === "function";
+    const activePage = currentPage ?? localCurrentPage;
+    const activePageSize = pageSize ?? DEFAULT_RECORDS_PER_PAGE;
+
+    useEffect(() => {
+        if (!isServerPaginated) setLocalCurrentPage(1);
+    }, [data, isServerPaginated]);
 
     const getHighlightedCell = (text: unknown, queries: string[]) => {
         const safeText = String(text);
@@ -91,12 +112,25 @@ const RecordSearchList: React.FC<ListViewProps> = ({
                 selectedProjects.includes(Number(record.projectId))
         );
 
-    const totalPages = Math.ceil(filteredRecords.length / RECORDS_PER_PAGE);
-    const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
-    const paginatedRecords = filteredRecords.slice(
-        startIndex,
-        startIndex + RECORDS_PER_PAGE
+    const totalRecords = totalCount ?? filteredRecords.length;
+    const resolvedTotalPages = Math.max(
+        1,
+        totalPages ?? Math.ceil(totalRecords / activePageSize),
     );
+    const startIndex = (activePage - 1) * activePageSize;
+    const endIndex = Math.min(startIndex + activePageSize, totalRecords);
+    const paginatedRecords = isServerPaginated
+        ? filteredRecords
+        : filteredRecords.slice(startIndex, startIndex + activePageSize);
+
+    const handlePageChange = (page: number) => {
+        const nextPage = Math.min(Math.max(1, page), resolvedTotalPages);
+        if (isServerPaginated) {
+            onPageChange?.(nextPage);
+            return;
+        }
+        setLocalCurrentPage(nextPage);
+    };
 
     return (
         <div className="w-full">
@@ -106,14 +140,14 @@ const RecordSearchList: React.FC<ListViewProps> = ({
                     <div>
                         <h3 className="font-bold text-lg">Search Results</h3>
                         <p className="text-sm text-base-content/60">
-                            Found {filteredRecords.length} record{filteredRecords.length !== 1 ? 's' : ''}
+                            Found {totalRecords} record{totalRecords !== 1 ? "s" : ""}
                         </p>
                     </div>
 
                     {/* Pagination Info */}
-                    {totalPages > 1 && (
+                    {resolvedTotalPages > 1 && (
                         <div className="text-sm text-base-content/60">
-                            Showing {startIndex + 1}-{Math.min(startIndex + RECORDS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length}
+                            Showing {totalRecords === 0 ? 0 : startIndex + 1}-{endIndex} of {totalRecords}
                         </div>
                     )}
                 </div>
@@ -123,8 +157,12 @@ const RecordSearchList: React.FC<ListViewProps> = ({
             <div className="bg-base-100 rounded-b-xl overflow-hidden">
                 {paginatedRecords.length === 0 ? (
                     <div className="text-center py-16 text-base-content/60">
-                        <p className="text-lg font-medium mb-2">No records found</p>
-                        <p className="text-sm">Try adjusting your search criteria</p>
+                        <p className="text-lg font-medium mb-2">
+                            {isLoading ? "Loading records..." : "No records found"}
+                        </p>
+                        {!isLoading && (
+                            <p className="text-sm">Try adjusting your search criteria</p>
+                        )}
                     </div>
                 ) : (
                     <div className="divide-y divide-base-300">
@@ -218,18 +256,18 @@ const RecordSearchList: React.FC<ListViewProps> = ({
                 )}
 
                 {/* Pagination Controls */}
-                {totalPages > 1 && (
+                {resolvedTotalPages > 1 && (
                     <div className="bg-base-200 border-t-2 border-base-300 px-6 py-4">
                         <div className="flex items-center justify-between">
                             <div className="text-sm text-base-content/60">
-                                Page {currentPage} of {totalPages}
+                                Page {activePage} of {resolvedTotalPages}
                             </div>
 
                             <div className="flex gap-2">
                                 <button
                                     className="btn btn-sm btn-ghost"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage((prev) => prev - 1)}
+                                    disabled={isLoading || activePage === 1}
+                                    onClick={() => handlePageChange(activePage - 1)}
                                 >
                                     <ChevronLeftIcon className="w-5 h-5" />
                                     Previous
@@ -237,26 +275,27 @@ const RecordSearchList: React.FC<ListViewProps> = ({
 
                                 {/* Page Numbers */}
                                 <div className="flex gap-1">
-                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    {Array.from({ length: Math.min(5, resolvedTotalPages) }, (_, i) => {
                                         let pageNum;
-                                        if (totalPages <= 5) {
+                                        if (resolvedTotalPages <= 5) {
                                             pageNum = i + 1;
-                                        } else if (currentPage <= 3) {
+                                        } else if (activePage <= 3) {
                                             pageNum = i + 1;
-                                        } else if (currentPage >= totalPages - 2) {
-                                            pageNum = totalPages - 4 + i;
+                                        } else if (activePage >= resolvedTotalPages - 2) {
+                                            pageNum = resolvedTotalPages - 4 + i;
                                         } else {
-                                            pageNum = currentPage - 2 + i;
+                                            pageNum = activePage - 2 + i;
                                         }
 
                                         return (
                                             <button
                                                 key={pageNum}
-                                                className={`btn btn-sm ${currentPage === pageNum
+                                                className={`btn btn-sm ${activePage === pageNum
                                                     ? "btn-primary"
                                                     : "btn-ghost"
                                                     }`}
-                                                onClick={() => setCurrentPage(pageNum)}
+                                                disabled={isLoading}
+                                                onClick={() => handlePageChange(pageNum)}
                                             >
                                                 {pageNum}
                                             </button>
@@ -266,8 +305,8 @@ const RecordSearchList: React.FC<ListViewProps> = ({
 
                                 <button
                                     className="btn btn-sm btn-ghost"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage((prev) => prev + 1)}
+                                    disabled={isLoading || activePage === resolvedTotalPages}
+                                    onClick={() => handlePageChange(activePage + 1)}
                                 >
                                     Next
                                     <ChevronRightIcon className="w-5 h-5" />

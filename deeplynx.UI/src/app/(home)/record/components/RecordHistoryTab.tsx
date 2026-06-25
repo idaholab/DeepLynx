@@ -453,7 +453,7 @@ export default function RecordHistoryTab({
   if (isLoadingHistory) {
     // Initial loading state.
     return (
-      <div className="mt-4 card bg-base-100 shadow-lg">
+      <div className="card mt-4 border border-base-300/50 bg-base-100 shadow-sm">
         <div className="card-body">
           <div className="flex items-center gap-3">
             <span className="loading loading-spinner loading-md" />
@@ -476,7 +476,7 @@ export default function RecordHistoryTab({
   if (history.length === 0) {
     // Empty history state.
     return (
-      <div className="mt-4 card bg-base-100 shadow-lg">
+      <div className="card mt-4 border border-base-300/50 bg-base-100 shadow-sm">
         <div className="card-body">
           <h3 className="card-title">{t.translations.RECORD_HISTORY}</h3>
           <p className="opacity-80">

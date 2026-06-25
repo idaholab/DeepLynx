@@ -55,7 +55,7 @@ const formatBytes = (bytes: unknown): string => {
 };
 
 const OVERVIEW_CARD_CLASS =
-  "card bg-base-200/30 border border-base-300/50 shadow-sm hover:shadow-md transition-all";
+  "card border border-base-300/50 bg-base-100 shadow-sm hover:shadow-md transition-all";
 
 const OrganizationOverviewCard = () => {
   const { t } = useLanguage();
