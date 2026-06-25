@@ -123,13 +123,13 @@ const ProjectSettingsLeftColumn = ({
   onArchiveProject,
   t,
 }: ProjectLogoSectionProps) => (
-  <div className="card self-start bg-base-100 border border-primary/40 shadow-sm">
+  <div className="card self-start border border-base-300/50 bg-base-100 shadow-sm">
     <div className="card-body">
       <h3 className="card-title text-lg mb-4">{t.translations.PROJECT_LOGO}</h3>
 
       <div className="flex items-start gap-6 mb-6">
         <div className="avatar">
-          <div className="w-32 h-32 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border-2 border-base-300">
+          <div className="w-32 h-32 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border-2 border-base-300/50">
             {logoPreview ? (
               <Image
                 src={logoPreview}
@@ -220,7 +220,7 @@ const ProjectSettingsLeftColumn = ({
       </div>
 
       {/* Main Project Settings */}
-      <div className="border-t border-base-300 pt-6 pb-6">
+      <div className="border-t border-base-300/50 pt-6 pb-6">
         <h3 className="card-title text-lg mb-4">
           {t.translations.MAIN_PROJECT_SETTINGS} 
         </h3>
@@ -229,7 +229,7 @@ const ProjectSettingsLeftColumn = ({
         </div>
       </div>
 
-      <div className="border-t border-base-300 pt-6">
+      <div className="border-t border-base-300/50 pt-6">
         <ArchiveDelete
           actionType="archive"
           itemType="Project"

@@ -20,6 +20,8 @@ type CollectionRecordLike = {
   name?: string | null;
   classId?: string | number | null;
   className?: string | null;
+  dataSourceId?: string | number | null;
+  dataSourceName?: string | null;
   projectId?: number | null;
   lastUpdatedAt?: string | null;
 };
@@ -63,6 +65,9 @@ type Props = {
   recordPageCount: number;
   recordPageSizeOptions?: number[];
   onRecordPageSizeChange?: (pageSize: number) => void;
+  recordsSectionBordered?: boolean;
+  recordsSectionElevated?: boolean;
+  recordsSectionClassName?: string;
 };
 
 export default function CollectionDetailsReadonlyView({
@@ -97,6 +102,9 @@ export default function CollectionDetailsReadonlyView({
   recordPageCount,
   recordPageSizeOptions,
   onRecordPageSizeChange,
+  recordsSectionBordered,
+  recordsSectionElevated,
+  recordsSectionClassName,
 }: Props) {
   const { t } = useLanguage();
   const collectionLabels = collection.labels ?? [];
@@ -105,12 +113,16 @@ export default function CollectionDetailsReadonlyView({
   return (
     <div className="space-y-4">
       {summaryPanel}
-      <SectionCard title={collection.name} action={primaryAction}>
-        <div className="space-y-5">
+      <SectionCard
+        title={collection.name}
+        action={primaryAction}
+        bodyClassName="gap-2"
+      >
+        <div className="space-y-4">
           <div className="max-w-5xl">
             <p
               ref={descriptionRef}
-              className={`whitespace-pre-wrap text-sm leading-6 text-base-content/75 ${descriptionExpanded ? "" : "line-clamp-10"}`}
+              className={`whitespace-pre-wrap text-sm leading-5 text-base-content/75 ${descriptionExpanded ? "" : "line-clamp-8"}`}
             >
               {collection.description ||
                 t.translations.RECORD_COLLECTIONS_NO_DESCRIPTION_PROVIDED}
@@ -193,7 +205,7 @@ export default function CollectionDetailsReadonlyView({
           </div>
 
           {showProperties ? (
-            <div className="rounded-2xl border border-base-300 bg-base-100 p-5">
+            <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
               <h3 className="font-semibold text-base-content">
                 {t.translations.RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES}
               </h3>
@@ -235,6 +247,9 @@ export default function CollectionDetailsReadonlyView({
           { shown: filteredRecords.length, total: records.length },
         )}
         action={recordsSectionAction}
+        bordered={recordsSectionBordered}
+        elevated={recordsSectionElevated}
+        className={recordsSectionClassName}
       >
         <SearchInput
           placeholder={t.translations.RECORD_COLLECTIONS_SEARCH_IN_THIS_COLLECTION}
@@ -242,7 +257,7 @@ export default function CollectionDetailsReadonlyView({
           onChange={(event) => setRecordSearchTerm(event.target.value)}
         />
 
-        <div className="overflow-x-auto rounded-2xl border border-base-300">
+        <div className="overflow-x-auto rounded-2xl border border-base-300/50">
           <table className="table">
             <thead>
               <tr>
@@ -276,11 +291,15 @@ export default function CollectionDetailsReadonlyView({
                       )}
                     </td>
                     <td>
-                      {record.classId ??
-                        record.className ??
+                      {record.className ??
+                        record.classId ??
                         t.translations.RECORD_COLLECTIONS_UNCLASSIFIED}
                     </td>
-                    <td>{record.projectId ?? projectId}</td>
+                    <td>
+                      {record.dataSourceName ??
+                        record.dataSourceId ??
+                        t.translations.UNKNOWN}
+                    </td>
                     <td>
                       {record.lastUpdatedAt
                         ? formatLocalDateTime(record.lastUpdatedAt)
