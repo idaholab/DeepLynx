@@ -39,7 +39,7 @@ export default function CollectionRecordSearchResultsTable({
 
   return (
     <div
-      className={`mt-4 overflow-auto rounded-xl border border-base-300 bg-base-100 ${maxHeightClassName}`}
+      className={`mt-4 overflow-auto rounded-xl border border-base-300/50 bg-base-100 ${maxHeightClassName}`}
     >
       <table className={`table table-sm ${pinnedHeader ? "table-pin-rows" : ""}`}>
         <thead className={pinnedHeader ? "bg-base-100" : undefined}>

@@ -263,8 +263,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
     return (
       <React.Fragment key={index}>
-        <div className={`grid grid-cols-12 border-b border-base-300`}>
-          <div className="col-span-4 p-3 font-medium text-base-content text-sm bg-base-200 border-r border-base-300 flex items-center relative">
+        <div className={`grid grid-cols-12 border-b border-base-300/50`}>
+          <div className="col-span-4 p-3 font-medium text-base-content text-sm bg-base-200 border-r border-base-300/50 flex items-center relative">
             {/* Tree branch visualization */}
             {depth > 0 && (
               <div className="absolute left-0 top-0 bottom-0 flex">
@@ -414,7 +414,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
   return (
     <div className={`${className}`}>
-      <div className="card bg-base-100 shadow-md p-2">
+      <div className="card border border-base-300/50 bg-base-100 p-2 shadow-sm">
         {title && (
           <div className="flex justify-between items-center m-4">
             <h2 className="text-xl font-bold text-base-content">{title}</h2>
@@ -506,7 +506,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         )}
 
         <div className="card-body p-4">
-          <div className="border border-base-300 rounded-lg overflow-hidden bg-base-100">
+          <div className="border border-base-300/50 rounded-lg overflow-hidden bg-base-100">
             {rows.map((row, index) =>
               renderRow(row, index, 0, index === rows.length - 1, []),
             )}
