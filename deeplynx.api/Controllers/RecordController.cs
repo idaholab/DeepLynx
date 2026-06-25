@@ -47,6 +47,7 @@ public class RecordController : ControllerBase
     ///     be removed
     /// </param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
     /// <returns>A list of records based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_records")]
     [Auth("read", "record")]
@@ -56,7 +57,8 @@ public class RecordController : ControllerBase
         long projectId,
         [FromQuery] long? dataSourceId = null,
         [FromQuery] string? fileType = null,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] bool isInsightEligible = false)
     {
         try
         {
@@ -65,12 +67,68 @@ public class RecordController : ControllerBase
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var records =
-                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType, isSysAdmin, isOrgAdmin, isProjectAdmin);
+                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType,
+                    isSysAdmin, isOrgAdmin, isProjectAdmin, isInsightEligible);
             return Ok(records);
         }
         catch (Exception exc)
         {
             var message = $"An error occurred while listing all records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get All Records Paginated
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
+    /// <param name="fileType">
+    ///     (Optional) File extension to filter by (e.g., pdf, png, jpg) - leading dot is optional and will
+    ///     be removed
+    /// </param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
+    /// <param name="paginatedDto">Pagination details</param>
+    /// <returns>A paginated list of records based on the applied filters.</returns>
+    [HttpGet("paginated", Name = "api_get_all_records_paginated")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetAllRecordsPaginated(
+        long organizationId,
+        long projectId,
+        [FromQuery] long? dataSourceId = null,
+        [FromQuery] string? fileType = null,
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] bool isInsightEligible = false,
+        [FromQuery] PaginatedRequestDto? paginatedDto = null)
+    {
+        try
+        {
+            paginatedDto ??= new PaginatedRequestDto();
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _recordBusiness.GetAllRecordsPaginated(
+                currentUserId,
+                organizationId,
+                projectId,
+                dataSourceId,
+                hideArchived,
+                fileType,
+                paginatedDto,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin,
+                isInsightEligible);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while listing paginated records: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

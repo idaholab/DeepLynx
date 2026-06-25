@@ -60,7 +60,8 @@ const EMPTY_FILTERS: SavedSearchFilterRequest = {
 };
 
 const WIDGET_CARD_CLASS =
-  "card bg-base-200/30 border border-base-300/50 shadow-sm hover:shadow-md transition-all flex flex-col overflow-hidden";
+  "card bg-base-100 border border-base-300/50 shadow-sm hover:shadow-md transition-all flex flex-col overflow-hidden";
+const EMBEDDED_WIDGET_CLASS = "flex flex-col overflow-hidden";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -83,7 +84,7 @@ function FilterPill({ filter }: { filter: SearchConditionDto }) {
   const isKV = filter.operator === "KEY_VALUE";
 
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] bg-base-200 text-base-content/80 border border-base-300 px-2 py-0.5 rounded whitespace-nowrap font-medium">
+    <span className="inline-flex items-center gap-1 text-[11px] bg-base-200 text-base-content/80 border border-base-300/50 px-2 py-0.5 rounded whitespace-nowrap font-medium">
       <span className="text-base-content/60">{filter.filter}</span>
       <span className="text-base-content/40 font-normal">
         {operatorLabel(filter.operator)}
@@ -109,7 +110,7 @@ function QueryBreakdown({ query }: { query: SavedSearchesResponseDto }) {
           <span className="text-[10px] font-bold tracking-wide bg-secondary/10 text-secondary border border-secondary/30 px-1.5 py-0.5 rounded">
             TEXT
           </span>
-          <span className="text-[11px] bg-base-200 text-base-content/80 border border-base-300 px-2 py-0.5 rounded italic">
+          <span className="text-[11px] bg-base-200 text-base-content/80 border border-base-300/50 px-2 py-0.5 rounded italic">
             "{query.query.textSearch}"
           </span>
         </div>
@@ -146,7 +147,7 @@ function FilterPanel({
   ) => setLocal((prev) => ({ ...prev, [key]: val }));
 
   return (
-    <div className="absolute top-[calc(100% px)] right-0 z-50 bg-base-100 border border-base-300 rounded-xl shadow-xl w-72 p-4">
+    <div className="absolute top-[calc(100% px)] right-0 z-50 bg-base-100 border border-base-300/50 rounded-xl shadow-xl w-72 p-4">
       <div className="flex justify-between items-center mb-3">
         <span className="text-sm font-semibold text-base-content">
           Filter Searches
@@ -217,7 +218,7 @@ function FilterPanel({
         </div>
       </div>
 
-      <div className="flex gap-2 mt-4 pt-3 border-t border-base-300">
+      <div className="flex gap-2 mt-4 pt-3 border-t border-base-300/50">
         <button
           onClick={() => {
             setLocal(EMPTY_FILTERS);
@@ -284,7 +285,7 @@ function DeleteConfirmModal({
         onClick={onCancel}
       />
       {/* Modal */}
-      <div className="relative bg-base-100 border border-base-300 rounded-xl shadow-2xl w-full max-w-sm mx-4 p-5">
+      <div className="relative bg-base-100 border border-base-300/50 rounded-xl shadow-2xl w-full max-w-sm mx-4 p-5">
         <div className="flex items-start gap-3 mb-4">
           <div className="w-9 h-9 rounded-lg bg-error/10 flex items-center justify-center shrink-0 mt-0.5">
             <TrashIcon className="w-4.5 h-4.5 text-error" />
@@ -342,6 +343,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
 
   const isOrg = scope === "org";
   const isCatalog = scope === "catalog"
+  const isProject = scope === "project";
 
   // Data state
   const [savedSearches, setSavedSearches] = useState<SavedSearchesResponseDto[]>([]);
@@ -507,7 +509,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
         />
       )}
 
-      <div className={WIDGET_CARD_CLASS}>
+      <div className={isProject ? EMBEDDED_WIDGET_CLASS : WIDGET_CARD_CLASS}>
         <div className="card-body flex flex-col min-h-0">
           {/* Header */}
           <div className="flex justify-between items-start mb-1">
@@ -541,7 +543,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                   className={`btn btn-sm gap-1.5 h-full ${
                     activeFilterCount > 0
                       ? "btn-primary btn-outline"
-                      : "btn-ghost border border-base-300"
+                      : "btn-ghost border border-base-300/50"
                   }`}
                 >
                   <FunnelIcon className=" w-3.5 h-3.5" />
@@ -753,7 +755,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                     {/* Expanded query breakdown */}
                     {isExpanded && s && (
                       <div
-                        className="px-4 pb-4 pt-1 pl-[3.75rem] border-t border-dashed border-base-300/60"
+                        className="px-4 pb-4 pt-1 pl-[3.75rem] border-t border-dashed border-base-300/50"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <p className="text-[11px] font-semibold text-base-content/30 uppercase tracking-wider mb-2">

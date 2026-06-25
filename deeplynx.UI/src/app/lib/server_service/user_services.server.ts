@@ -1,6 +1,9 @@
 // src/app/lib/user_services.server.ts
 import "server-only";
-import { UserResponseDto } from "../../(home)/types/responseDTOs";
+import {
+  UserAdminInfoDto,
+  UserResponseDto,
+} from "../../(home)/types/responseDTOs";
 import { apiFetch, asJson } from "./api.server";
 
 
@@ -17,6 +20,23 @@ export async function getAllUsersServer(projectId?: number, organizationId?: num
   const qs = new URLSearchParams(params);
   const res = await apiFetch(`users?${qs.toString()}`);
   return asJson<UserResponseDto[]>(res);
+}
+
+export async function getCurrentUserServer(
+  organizationId?: number,
+  projectId?: number,
+): Promise<UserAdminInfoDto> {
+  const params: Record<string, string> = {};
+  if (organizationId !== undefined) {
+    params.organizationId = String(organizationId);
+  }
+  if (projectId !== undefined) {
+    params.projectId = String(projectId);
+  }
+  const query = new URLSearchParams(params).toString();
+  const suffix = query ? `?${query}` : "";
+  const res = await apiFetch(`users/current${suffix}`);
+  return asJson<UserAdminInfoDto>(res);
 }
 
 export async function getLocalDevUserServer(): Promise<UserResponseDto> {

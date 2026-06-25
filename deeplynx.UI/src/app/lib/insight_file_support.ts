@@ -3,6 +3,10 @@ export const INSIGHT_SUPPORTED_FILE_TYPES = new Set([
   "txt",
   "html",
   "htm",
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
 ]);
 
 export function normalizeInsightFileType(

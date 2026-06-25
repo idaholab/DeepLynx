@@ -25,6 +25,7 @@ public class MetadataBusinessTests : IntegrationTestBase
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private MetadataBusiness _metadataBusiness = null!;
     private EdgeBusiness _mockEdgeBusiness = null!;
+    private UserBusiness _userBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
@@ -56,8 +57,9 @@ public class MetadataBusinessTests : IntegrationTestBase
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
 
         // Build leaf dependencies first
+        _userBusiness = new UserBusiness(Context);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
         _sensitivityLabelService = new SensitivityLabelService(Context);
 

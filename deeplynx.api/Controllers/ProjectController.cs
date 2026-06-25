@@ -121,7 +121,7 @@ public class ProjectController : ControllerBase
     /// <param name="dto">A data transfer object with details on the new project to be created.</param>
     /// <returns>The new project which was just created.</returns>
     [HttpPost(Name = "api_create_a_project")]
-    [Auth("write", "project")]
+    [OrgMember]
     public async Task<ActionResult<ProjectResponseDto>> CreateProject(
         long organizationId,
         [FromBody] CreateProjectRequestDto dto)
@@ -148,7 +148,7 @@ public class ProjectController : ControllerBase
     /// <param name="dto">A data transfer object with details on the project to be updated.</param>
     /// <returns>The project which was just updated.</returns>
     [HttpPut("{projectId:long}", Name = "api_update_a_project")]
-    [Auth("update", "project")]
+    [ProjectAdmin]
     public async Task<ActionResult<ProjectResponseDto>> UpdateProject(
         long organizationId,
         long projectId,
@@ -175,7 +175,7 @@ public class ProjectController : ControllerBase
     /// <param name="projectId">ID of the project to delete.</param>
     /// <returns>Boolean true on successful deletion.</returns>
     [HttpDelete("{projectId:long}", Name = "api_delete_a_project")]
-    [Auth("write", "project")]
+    [ProjectAdmin]
     public async Task<IActionResult> DeleteProject(long organizationId, long projectId)
     {
         try
@@ -200,7 +200,7 @@ public class ProjectController : ControllerBase
     /// <param name="archive">True to archive the project, false to unarchive it.</param>
     /// <returns>A message stating the project was successfully archived or unarchived.</returns>
     [HttpPatch("{projectId:long}", Name = "api_archive_project")]
-    [Auth("update", "project", true)]
+    [ProjectAdmin(includeArchived: true)]
     public async Task<IActionResult> ArchiveProject(
         long organizationId,
         long projectId,
@@ -234,7 +234,7 @@ public class ProjectController : ControllerBase
     /// <param name="projectId">ID of the project to display stats about.</param>
     /// <returns>Project stats</returns>
     [HttpGet("{projectId:long}/stats", Name = "api_get_a_projects_stats")]
-    [Auth("read", "project")]
+    [ProjectAdmin]
     public async Task<ActionResult<ProjectStatResponseDto>> ProjectStats(long organizationId, long projectId)
     {
         try
@@ -259,7 +259,7 @@ public class ProjectController : ControllerBase
     [HttpGet("{projectId:long}/members", Name = "api_get_project_members")]
     [Auth("read", "project")]
     [Auth("read", "user")]
-    public async Task<ActionResult<ProjectMemberResponseDto>> GetProjectMembers(long organizationId, long projectId)
+    public async Task<ActionResult<IEnumerable<ProjectMemberResponseDto>>> GetProjectMembers(long organizationId, long projectId)
     {
         try
         {
@@ -282,17 +282,18 @@ public class ProjectController : ControllerBase
     /// <param name="roleId">(Optional) ID of member role</param>
     /// <param name="userId">ID of user if user is member</param>
     /// <param name="groupId">ID of group if group is member</param>
+    /// <param name="isProjectAdmin">Whether the member is a project admin. Defaults to false</param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/members", Name = "api_add_member_to_project")]
-    [Auth("update", "project")]
-    [Auth("update", "user")]
+    [ProjectAdmin]
     public async Task<ActionResult> AddMemberToProject(
         long organizationId, long projectId,
-        [FromQuery] long? roleId, [FromQuery] long? userId, [FromQuery] long? groupId)
+        [FromQuery] long? roleId, [FromQuery] long? userId, [FromQuery] long? groupId,
+        [FromQuery] bool isProjectAdmin = false)
     {
         try
         {
-            await _projectBusiness.AddMemberToProject(projectId, roleId, userId, groupId);
+            await _projectBusiness.AddMemberToProject(projectId, roleId, userId, groupId, isProjectAdmin);
             return Ok(new { message = $"Added member {userId ?? groupId} to project {projectId}" });
         }
         catch (Exception exc)
@@ -311,22 +312,52 @@ public class ProjectController : ControllerBase
     /// <param name="roleId">ID of role</param>
     /// <param name="userId">ID of user if user is member</param>
     /// <param name="groupId">ID of group if group is member</param>
+    /// <param name="isProjectAdmin">(optional) project admin status to set; left unchanged when omitted</param>
     /// <returns></returns>
     [HttpPut("{projectId:long}/members", Name = "api_update_project_member_role")]
-    [Auth("update", "project")]
-    [Auth("update", "user")]
+    [ProjectAdmin]
     public async Task<ActionResult> UpdateProjectMemberRole(
         long organizationId, long projectId,
-        [FromQuery] long roleId, [FromQuery] long? userId, [FromQuery] long? groupId)
+        [FromQuery] long roleId, [FromQuery] long? userId, [FromQuery] long? groupId,
+        [FromQuery] bool? isProjectAdmin = null)
     {
         try
         {
-            await _projectBusiness.UpdateProjectMemberRole(projectId, roleId, userId, groupId);
+            await _projectBusiness.UpdateProjectMemberRole(projectId, roleId, userId, groupId, isProjectAdmin);
             return Ok(new { message = $"Updated member role in project {projectId}" });
         }
         catch (Exception exc)
         {
             var message = $"An error occurred while updating member role in project {projectId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Set Project Admin Status for a Project Member
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">ID of project</param>
+    /// <param name="userId">ID of user if user is member</param>
+    /// <param name="groupId">ID of group if group is member</param>
+    /// <param name="isAdmin">Project admin status to set the member to</param>
+    /// <returns></returns>
+    [HttpPut("{projectId:long}/admin", Name = "api_update_project_member_admin_status")]
+    [ProjectAdmin]
+    public async Task<ActionResult> SetProjectAdminStatus(
+        long organizationId, long projectId,
+        [FromQuery] long? userId, [FromQuery] long? groupId, [FromQuery] bool isAdmin)
+    {
+        try
+        {
+            await _projectBusiness.SetProjectAdminStatus(projectId, userId, groupId, isAdmin);
+            return Ok(new { message = $"Adjusted admin status for member {userId ?? groupId} in project {projectId}" });
+        }
+        catch (Exception exc)
+        {
+            var message =
+                $"An error occurred while setting admin status for member {userId ?? groupId} in project {projectId}: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -341,8 +372,7 @@ public class ProjectController : ControllerBase
     /// <param name="groupId">ID of the group if group is member</param>
     /// <returns></returns>
     [HttpDelete("{projectId:long}/members", Name = "api_remove_member_from_project")]
-    [Auth("update", "project")]
-    [Auth("update", "user")]
+    [ProjectAdmin]
     public async Task<ActionResult> RemoveMemberFromProject(
         long organizationId,
         long projectId,
@@ -368,12 +398,12 @@ public class ProjectController : ControllerBase
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="userEmail"></param>
+    /// <param name="userId"></param>
+    /// <param name="groupId"></param>
     /// <param name="roleId"></param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
-    [Auth("write", "user")]
-    [Auth("update", "user")]
-    [Auth("update", "project")]
+    [ProjectAdmin]
     public async Task<ActionResult> InviteUserToProject(
         long organizationId,
         long projectId,
@@ -395,6 +425,39 @@ public class ProjectController : ControllerBase
         {
             var message =
                 $"An error occurred while adding user with email {userEmail} to organization {organizationId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    /// Create and add service account to project
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="roleId"></param>
+    /// <param name="name"></param>
+    /// <param name="makeProjectAdmin"></param>
+    /// <returns></returns>
+    [Tags("Service Accounts")]
+    [ProjectAdmin]
+    [HttpPost("{projectId:long}/invite/serviceAccount", Name = "api_add_service_account")]
+    public async Task<ActionResult> CreateAndAddServiceAccountToProject(
+        long organizationId,
+        long projectId,
+        [FromQuery] string name,
+        [FromQuery] long? roleId,
+        [FromQuery] bool makeProjectAdmin = false)
+    {
+        try
+        {
+            await _invitationBusiness.CreateAndAddServiceAccountToProject(projectId, name, roleId, makeProjectAdmin);
+            return Ok(new { message = $"Created service account {name} and added to project {projectId}" });
+        }
+        catch (Exception exc)
+        {
+            var message =
+                $"An error occurred while creating and adding service account to project";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

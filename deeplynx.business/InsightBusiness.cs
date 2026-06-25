@@ -15,7 +15,8 @@ public class InsightBusiness : IInsightBusiness
     /// </summary>
     public static readonly IReadOnlySet<string> SupportedFileTypes = new HashSet<string>
     {
-        "pdf", "txt", "html", "htm"
+        "pdf", "txt", "html", "htm",
+        "png", "jpg", "jpeg", "webp"
     };
 
     private readonly DeeplynxContext _context;

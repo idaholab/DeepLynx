@@ -55,6 +55,10 @@ public partial class Record
     [Column("file_size")]
     public long? FileSize { get; set; }
 
+    [StringLength(64)]
+    [Column("normalized_content_hash")]
+    public string? NormalizedContentHash { get; set; }
+
     [Column("embedded")]
     public bool Embedded { get; set; }
 
@@ -106,4 +110,7 @@ public partial class Record
 
     [InverseProperty("Record")]
     public virtual ICollection<Embedding> Embeddings { get; set; } = new List<Embedding>();
+
+    [InverseProperty("Record")]
+    public virtual ICollection<ProvenanceRecord> ProvenanceRecords { get; set; } = new List<ProvenanceRecord>();
 }

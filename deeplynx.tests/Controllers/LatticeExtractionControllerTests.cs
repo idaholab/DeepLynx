@@ -510,13 +510,14 @@ public class LatticeExtractionControllerTests : IDisposable
     #region PromoteExtraction Tests
 
     [Fact]
-    public async Task PromoteExtraction_Approve_Returns200_WithResult()
+    public async Task PromoteExtraction_Returns200_WithResult()
     {
+        var request = new PromoteExtractionRequestDto { ClassIds = [1L], RecordIds = [2L] };
         var expected = new ExtractionResponseDto { Id = 7, ClassCount = 2, RecordCount = 2, EdgeCount = 1 };
-        _mockBusiness.Setup(b => b.PromoteExtraction(UserId, OrgId, ProjectId, 7L, true))
+        _mockBusiness.Setup(b => b.PromoteExtraction(UserId, OrgId, ProjectId, 7L, request))
                      .ReturnsAsync(expected);
 
-        var result = await _controller.PromoteExtraction(OrgId, ProjectId, 7L, true) as OkObjectResult;
+        var result = await _controller.PromoteExtraction(OrgId, ProjectId, 7L, request) as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -524,12 +525,13 @@ public class LatticeExtractionControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task PromoteExtraction_Reject_Returns200()
+    public async Task RejectExtraction_Returns200()
     {
-        _mockBusiness.Setup(b => b.PromoteExtraction(UserId, OrgId, ProjectId, 7L, false))
+        var request = new RejectExtractionRequestDto { RejectAllRemaining = true };
+        _mockBusiness.Setup(b => b.RejectExtraction(7L, request))
                      .ReturnsAsync(new ExtractionResponseDto { Id = 7 });
 
-        var result = await _controller.PromoteExtraction(OrgId, ProjectId, 7L, false) as OkObjectResult;
+        var result = await _controller.RejectExtraction(OrgId, ProjectId, 7L, request) as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -539,10 +541,13 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task PromoteExtraction_Returns400_OnInvalidOperationException()
     {
         _mockBusiness.Setup(b => b.PromoteExtraction(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<PromoteExtractionRequestDto>()))
                      .ThrowsAsync(new InvalidOperationException("Cannot promote — status is running."));
 
-        var result = await _controller.PromoteExtraction(OrgId, ProjectId, 7L, true) as BadRequestObjectResult;
+        var result =
+            await _controller.PromoteExtraction(OrgId, ProjectId, 7L, new PromoteExtractionRequestDto()) as
+                BadRequestObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(400, result.StatusCode);
@@ -553,10 +558,12 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task PromoteExtraction_Returns500_OnUnexpectedException()
     {
         _mockBusiness.Setup(b => b.PromoteExtraction(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<PromoteExtractionRequestDto>()))
                      .ThrowsAsync(new Exception("db error"));
 
-        var result = await _controller.PromoteExtraction(OrgId, ProjectId, 7L, true) as ObjectResult;
+        var result =
+            await _controller.PromoteExtraction(OrgId, ProjectId, 7L, new PromoteExtractionRequestDto()) as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -567,12 +574,13 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task PromoteExtraction_PassesCurrentUserIdToBusinessLayer()
     {
         UserContextStorage.UserId = 42L;
-        _mockBusiness.Setup(b => b.PromoteExtraction(42L, OrgId, ProjectId, 7L, true))
+        var request = new PromoteExtractionRequestDto();
+        _mockBusiness.Setup(b => b.PromoteExtraction(42L, OrgId, ProjectId, 7L, request))
                      .ReturnsAsync(new ExtractionResponseDto { Id = 7 });
 
-        await _controller.PromoteExtraction(OrgId, ProjectId, 7L, true);
+        await _controller.PromoteExtraction(OrgId, ProjectId, 7L, request);
 
-        _mockBusiness.Verify(b => b.PromoteExtraction(42L, OrgId, ProjectId, 7L, true), Times.Once);
+        _mockBusiness.Verify(b => b.PromoteExtraction(42L, OrgId, ProjectId, 7L, request), Times.Once);
     }
 
     #endregion

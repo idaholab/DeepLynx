@@ -33,6 +33,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<HistoricalRecord> HistoricalRecords { get; set; }
 
+    public virtual DbSet<ProvenanceRecord> ProvenanceRecords { get; set; }
+
     public virtual DbSet<OauthApplication> OauthApplications { get; set; }
 
     public virtual DbSet<OauthDeviceAuthorizationRequest> OauthDeviceAuthorizationRequests { get; set; }
@@ -52,7 +54,7 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<Project> Projects { get; set; }
 
     public virtual DbSet<ProjectMember> ProjectMembers { get; set; }
-    
+
     public virtual DbSet<QueryRecord> QueryRecords { get; set; }
 
     public virtual DbSet<Record> Records { get; set; }
@@ -121,6 +123,9 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.ApplicationId)
                 .HasDatabaseName("idx_api_keys_application_id");
 
+            entity.HasIndex(e => e.CreatedBy)
+                .HasDatabaseName("idx_api_keys_created_by");
+
             entity.HasOne(d => d.User).WithMany(p => p.ApiKeys)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("api_keys_user_id_fkey");
@@ -129,6 +134,11 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.ApplicationId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("api_keys_application_id_fkey");
+
+            entity.HasOne(d => d.CreatedByUser).WithMany(p => p.CreatedApiKeys)
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName("api_keys_created_by_fkey");
         });
 
         modelBuilder.Entity<Class>(entity =>
@@ -508,6 +518,45 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.Project)
                 .WithMany(p => p.HistoricalRecords)
                 .HasConstraintName("historical_records_project_id_fkey");
+        });
+
+        modelBuilder.Entity<ProvenanceRecord>(entity => {
+            entity.HasKey(e => e.Id).HasName("provenance_records_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_provenance_records_id");
+
+            entity.HasIndex(e => e.RecordId)
+                .HasDatabaseName("idx_provenance_records_record_id");
+
+            entity.HasIndex(e => e.ProjectId)
+                .HasDatabaseName("idx_provenance_records_project_id");
+
+            entity.HasIndex(e => e.OrganizationId)
+                .HasDatabaseName("idx_provenance_records_organization_id");
+
+            entity.HasIndex(e => e.ContentHash)
+                .HasDatabaseName("idx_provenance_records_content_hash");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.ContentHash).HasMaxLength(64);
+            entity.Property(e => e.SignedPayloadHash).HasMaxLength(64);
+
+            entity.HasOne(d => d.Record).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.RecordId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_record_id_fkey");
+
+            entity.HasOne(d => d.Project).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_project_id_fkey");
+
+            entity.HasOne(d => d.Organization).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_organization_id_fkey");
         });
 
         modelBuilder.Entity<OauthApplication>(entity =>
@@ -958,6 +1007,7 @@ public partial class DeeplynxContext : DbContext
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.NormalizedContentHash).HasMaxLength(64);
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
 
@@ -1455,6 +1505,10 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.SsoId)
                 .HasDatabaseName("idx_users_sso_id");
 
+            entity.HasIndex(e => e.Username)
+                .HasDatabaseName("idx_users_username")
+                .IsUnique();
+
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
@@ -1462,6 +1516,8 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.IsSysAdmin).HasDefaultValue(false);
 
             entity.Property(e => e.IsActive).HasDefaultValue(false);
+
+            entity.Property(e => e.AccountType).HasDefaultValue("standard");
         });
 
         modelBuilder.Entity<SavedSearch>(entity =>
@@ -1570,12 +1626,28 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Vector).HasColumnType("vector");
+            entity.Property(e => e.ChunkHash).HasMaxLength(64);
+            entity.Property(e => e.EmbeddingHash).HasMaxLength(64);
 
             entity.HasOne(d => d.Record)
                 .WithMany(p => p.Embeddings)
                 .HasForeignKey(d => d.RecordId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("embeddings_record_id_fkey");
+
+            // Add foreign key relationship to AiModelConfig.Id
+            entity.HasOne(e => e.AiModelConfig)
+                .WithMany() 
+                .HasForeignKey(e => e.EmbeddingModel) 
+                .HasPrincipalKey(a => a.Id) 
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("embeddings_embedding_model_fkey");
+
+            entity.HasIndex(e => e.EmbeddingModel)
+                .HasDatabaseName("idx_embeddings_embedding_model");
+
+            entity.HasIndex(e => new { e.ProjectId, e.EmbeddingModel })
+                .HasDatabaseName("idx_embeddings_project_model");
         });
 
         modelBuilder.Entity<OntologyVector>(entity =>

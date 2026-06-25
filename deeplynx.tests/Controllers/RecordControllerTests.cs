@@ -91,7 +91,7 @@ public class RecordControllerTests : IDisposable
         _mockBusiness.Setup(b => b.GetAllRecords(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<long?>(), It.IsAny<bool>(), It.IsAny<string?>(),
-                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ReturnsAsync([]);
 
         var result = (await _controller.GetAllRecords(OrgId, ProjectId, null, null, true)).Result as OkObjectResult;
@@ -107,7 +107,7 @@ public class RecordControllerTests : IDisposable
         _mockBusiness.Setup(b => b.GetAllRecords(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<long?>(), It.IsAny<bool>(), It.IsAny<string?>(),
-                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         var result = (await _controller.GetAllRecords(OrgId, ProjectId, null, null, true)).Result as ObjectResult;
@@ -128,6 +128,61 @@ public class RecordControllerTests : IDisposable
 
         _mockBusiness.Verify(b => b.GetAllRecords(
             UserId, OrgId, ProjectId, DataSourceId, false, "pdf", true, false, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllRecordsPaginated_Returns200_WithPaginatedResponse()
+    {
+        var paginatedDto = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+        var expected = new PaginatedResponse<RecordResponseDto>
+        {
+            Items = new List<RecordResponseDto> { new() { Id = 1, Name = "Record 1" } },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 1
+        };
+
+        _mockBusiness.Setup(b => b.GetAllRecordsPaginated(
+                         UserId, OrgId, ProjectId, null, true, null, paginatedDto, false, false, false, false))
+                     .ReturnsAsync(expected);
+
+        var result = (await _controller.GetAllRecordsPaginated(
+            OrgId, ProjectId, null, null, true, false, paginatedDto)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Same(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetAllRecordsPaginated_PassesFiltersAndAdminFlagsToBusinessLayer()
+    {
+        UserContextStorage.IsSysAdmin = true;
+        var paginatedDto = new PaginatedRequestDto { PageNumber = 2, PageSize = 10 };
+        _mockBusiness.Setup(b => b.GetAllRecordsPaginated(
+                         UserId, OrgId, ProjectId, DataSourceId, false, "pdf", paginatedDto, true, false, false, true))
+                     .ReturnsAsync(new PaginatedResponse<RecordResponseDto>());
+
+        await _controller.GetAllRecordsPaginated(
+            OrgId, ProjectId, DataSourceId, "pdf", hideArchived: false, isInsightEligible: true, paginatedDto);
+
+        _mockBusiness.Verify(b => b.GetAllRecordsPaginated(
+            UserId, OrgId, ProjectId, DataSourceId, false, "pdf", paginatedDto, true, false, false, true), Times.Once);
+    }
+
+    [Fact]
+    public void GetAllRecordsPaginated_HasPaginatedHttpGetAndReadRecordAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(RecordController.GetAllRecordsPaginated),
+            "organizationId",
+            "projectId",
+            "paginatedDto");
+
+        var httpGet = Assert.Single(method.GetCustomAttributesData(), attribute =>
+            attribute.AttributeType.Name == "HttpGetAttribute");
+        Assert.Equal("paginated", httpGet.ConstructorArguments[0].Value);
+        AssertHasAuthAttribute(method, "read", "record");
     }
 
     [Fact]

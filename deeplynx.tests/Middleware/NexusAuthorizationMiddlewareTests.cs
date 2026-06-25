@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
@@ -85,6 +86,7 @@ namespace deeplynx.tests.Middleware
             Assert.True(user.IsSysAdmin);
             Assert.Equal("Local Developer", user.Name);
             Assert.Equal("local-dev", user.Username);
+            Assert.Equal(AccountType.Standard, user.AccountType);
             Assert.True(user.IsActive);
             Assert.False(user.IsArchived);
 
@@ -132,6 +134,7 @@ namespace deeplynx.tests.Middleware
             Assert.NotNull(user);
             Assert.True(user.IsSysAdmin);
             Assert.Equal(uid2, user.Id); // Same user
+            Assert.Equal(AccountType.Standard, user.AccountType);
 
             // Cleanup
             Environment.SetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION", null);
@@ -1225,7 +1228,7 @@ namespace deeplynx.tests.Middleware
                 new Claim("sub", "sub@test.com"),
                 new Claim("name", "name@test.com"),
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
@@ -1252,7 +1255,7 @@ namespace deeplynx.tests.Middleware
                 new Claim("sub", "sub@test.com"),
                 new Claim("name", "name@test.com"),
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
@@ -1278,7 +1281,7 @@ namespace deeplynx.tests.Middleware
                 new Claim("sub", "sub@test.com"),
                 new Claim("name", "name@test.com"),
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
@@ -1303,7 +1306,7 @@ namespace deeplynx.tests.Middleware
                 new Claim("sub", "sub@test.com"),
                 new Claim("name", "name@test.com"),
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
@@ -1327,7 +1330,7 @@ namespace deeplynx.tests.Middleware
             {
                 new Claim("name", "name@test.com"),
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);
@@ -1350,7 +1353,7 @@ namespace deeplynx.tests.Middleware
             var claims = new[]
             {
                 new Claim("uid", "test-sso-id"),
-                new Claim("preferred_username", "testuser")
+                new Claim("preferred_username", "fallback-test-user")
             };
             var identity = new ClaimsIdentity(claims, "Test");
             var principal = new ClaimsPrincipal(identity);

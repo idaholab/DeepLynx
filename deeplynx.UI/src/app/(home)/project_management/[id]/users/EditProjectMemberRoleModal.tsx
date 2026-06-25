@@ -13,7 +13,9 @@ interface EditProjectMemberRoleModalProps {
   roles: RoleResponseDto[];
   loading: boolean;
   selectedRoleId: string;
+  isProjectAdmin: boolean;
   onChangeRole: (value: string) => void;
+  onChangeIsProjectAdmin: (value: boolean) => void;
   onCancel: () => void;
   onSave: () => void;
 }
@@ -23,7 +25,9 @@ const EditProjectMemberRoleModal: React.FC<EditProjectMemberRoleModalProps> = ({
   roles,
   loading,
   selectedRoleId,
+  isProjectAdmin,
   onChangeRole,
+  onChangeIsProjectAdmin,
   onCancel,
   onSave,
 }) => {
@@ -56,6 +60,27 @@ const EditProjectMemberRoleModal: React.FC<EditProjectMemberRoleModalProps> = ({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Project Admin Checkbox */}
+        <div className="form-control mt-4">
+          <label className="label cursor-pointer justify-start gap-3">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-warning"
+              checked={isProjectAdmin}
+              onChange={(e) => onChangeIsProjectAdmin(e.target.checked)}
+              disabled={loading}
+            />
+            <div className="flex flex-col">
+              <span className="label-text font-medium">
+                Project Admin
+              </span>
+              <span className="text-xs text-base-content/60">
+                Grant project admin permissions
+              </span>
+            </div>
+          </label>
         </div>
 
         <div className="modal-action">

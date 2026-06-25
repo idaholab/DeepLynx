@@ -433,7 +433,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   const hasStartedConversation = messages.length > 1 || isResponding;
   const visibleMessages = hasStartedConversation ? messages.slice(1) : [];
   return (
-    <div className="card bg-base-100 shadow-md mt-4 p-2">
+    <div className="card mt-4 border border-base-300/50 bg-base-100 p-2 shadow-sm">
       <div className="flex items-center justify-between gap-3 px-4 py-1">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
@@ -523,7 +523,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
           className={`card-body p-4 pt-2 ${isExpanded ? "h-[34rem]" : "h-[24rem]"}`}
         >
           <div className="h-full min-h-0">
-            <div className="flex h-full min-h-0 flex-col rounded-box border border-base-300 bg-base-100">
+            <div className="flex h-full min-h-0 flex-col rounded-box border border-base-300/50 bg-base-100">
               <div className="flex-1 min-h-0 overflow-y-auto bg-base-200/30 p-3">
                 {!hasStartedConversation ? (
                   <div className="flex h-full items-center justify-center">
@@ -553,7 +553,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
                           className={`chat-bubble whitespace-pre-wrap ${
                             message.role === "user"
                               ? "bg-primary text-primary-content"
-                              : "border border-base-300/60 bg-base-100 text-base-content"
+                              : "border border-base-300/50 bg-base-100 text-base-content"
                           }`}
                         >
                           {message.content || (
@@ -567,7 +567,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
                 )}
               </div>
 
-              <div className="border-t border-base-300 p-3">
+              <div className="border-t border-base-300/50 p-3">
                 <form
                   className="flex flex-col gap-2 lg:flex-row lg:items-center"
                   onSubmit={(e) => {

@@ -70,6 +70,9 @@ public class UserContextMiddleware
                                 UserContextStorage.IsOrgAdmin =
                                     await adminService.OrgAdminCheck(user.Id, organizationId.Value);
 
+                                UserContextStorage.IsOrgMember =
+                                    await adminService.OrgMemberCheck(user.Id, organizationId.Value);
+
                                 var projectIds = ExtractProjectIds(context);
                                 if (projectIds.Any())
                                     UserContextStorage.IsProjectAdmin = await adminService.ProjectAdminCheck(
@@ -106,6 +109,7 @@ public class UserContextMiddleware
             UserContextStorage.UserId = 0;
             UserContextStorage.IsSysAdmin = false;
             UserContextStorage.IsOrgAdmin = false;
+            UserContextStorage.IsOrgMember = false;
             UserContextStorage.IsProjectAdmin = false;
         }
     }

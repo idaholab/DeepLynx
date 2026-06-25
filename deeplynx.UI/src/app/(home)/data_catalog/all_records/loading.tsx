@@ -104,7 +104,7 @@ function ListViewSkeleton() {
         {times(rows).map((i) => (
           <li
             key={i}
-            className="py-4 border-b border-base-content/20 hover:bg-base-200/30 p-3"
+            className="py-4 border-b border-base-200 hover:bg-base-200/30 p-3"
           >
             <div className="font-bold mb-1">
               <Skeleton width="60%" />
@@ -156,7 +156,7 @@ function CatalogViewSkeleton() {
             {times(rows).map((i) => (
               <li
                 key={i}
-                className="border-b border-base-content/20 hover:bg-base-200/30 p-2 pl-0 rounded-sm"
+                className="border-b border-base-200 hover:bg-base-200/30 p-2 pl-0 rounded-sm"
               >
                 <div className="text-accent-content mb-1">
                   <Skeleton width="55%" />

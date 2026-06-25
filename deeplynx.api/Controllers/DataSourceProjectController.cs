@@ -120,7 +120,7 @@ public class DataSourceProjectController : ControllerBase
     /// <param name="dto">The data transfer object containing data source details</param>
     /// <returns>The created data source</returns>
     [HttpPost(Name = "api_create_a_data_source_for_project")]
-    [Auth("write", "data_source")]
+    [ProjectAdmin]
     public async Task<ActionResult<DataSourceResponseDto>> CreateDataSource(
         long projectId,
         [FromBody] CreateDataSourceRequestDto dto)
@@ -148,7 +148,7 @@ public class DataSourceProjectController : ControllerBase
     /// <param name="dto">The data transfer object containing updated data source details</param>
     /// <returns>The newly updated data source</returns>
     [HttpPut("{dataSourceId:long}", Name = "api_update_a_data_source_for_project")]
-    [Auth("update", "data_source")]
+    [ProjectAdmin]
     public async Task<ActionResult<DataSourceResponseDto>> UpdateDataSource(
         long projectId,
         long dataSourceId,
@@ -177,7 +177,7 @@ public class DataSourceProjectController : ControllerBase
     /// <param name="dataSourceId">The ID of the data source to delete</param>
     /// <returns>A message stating the data source was successfully deleted.</returns>
     [HttpDelete("{dataSourceId:long}", Name = "api_delete_a_data_source_for_project")]
-    [Auth("write", "data_source")]
+    [ProjectAdmin]
     public async Task<IActionResult> DeleteDataSource(
         long projectId,
         long dataSourceId)
@@ -204,7 +204,7 @@ public class DataSourceProjectController : ControllerBase
     /// <param name="archive">True to archive the data source, false to unarchive it.</param>
     /// <returns>A message stating the data source was successfully archived or unarchived.</returns>
     [HttpPatch("{dataSourceId:long}", Name = "api_archive_data_source_for_project")]
-    [Auth("update", "data_source")]
+    [ProjectAdmin]
     public async Task<IActionResult> ArchiveDataSource(
         long projectId,
         long dataSourceId,
