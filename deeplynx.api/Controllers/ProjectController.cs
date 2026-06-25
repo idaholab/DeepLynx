@@ -447,11 +447,11 @@ public class ProjectController : ControllerBase
         long projectId,
         [FromQuery] string name,
         [FromQuery] long? roleId,
-        [FromQuery] bool? makeProjectAdmin)
+        [FromQuery] bool makeProjectAdmin = false)
     {
         try
         {
-            await _invitationBusiness.CreateAndAddServiceAccountToProject(projectId, name, roleId, makeProjectAdmin: false);
+            await _invitationBusiness.CreateAndAddServiceAccountToProject(projectId, name, roleId, makeProjectAdmin);
             return Ok(new { message = $"Created service account {name} and added to project {projectId}" });
         }
         catch (Exception exc)

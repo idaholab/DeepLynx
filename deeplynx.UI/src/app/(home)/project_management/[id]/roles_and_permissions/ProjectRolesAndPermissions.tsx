@@ -624,7 +624,7 @@ const ProjectRolesAndPermissions = ({
   return (
     <div className="p-6 mx-auto">
       {/* Header */}
-      <div className="mb-6 border-b border-base-300 pb-4">
+      <div className="mb-6 border-b border-base-300/50 pb-4">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold">
             {t.translations.PROJECT_ROLES_AND_PERMISSIONS}
