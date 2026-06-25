@@ -84,26 +84,20 @@ export default function RecordHistoryDifferenceTable({
   ): number | null {
 
     if (!classIdStr) {
-      compareClassName = t.translations.NO_CLASS;
+      compareClassName = "N/A";
       return null;
     }
     const classId = Number(classIdStr);
     if (Number.isNaN(classId)) {
-      compareClassName = t.translations.NO_CLASS;
+      compareClassName = "N/A";
       return null;
     }
-
-    console.log("classId: ", classId);
-    console.log("classInfoMap: ", classInfoMap)
-    console.log("type of classid", typeof classId);
 
     const info = classInfoMap[classId];
     if (!info) {
-      compareClassName = t.translations.NO_CLASS;
+      compareClassName = "N/A";
       return null;
     }
-    console.log("info: ", info)
-
 
     if (info.isArchived) {
       compareClassName = `${info.name} (Archived)`;
@@ -196,11 +190,8 @@ export default function RecordHistoryDifferenceTable({
                   let compareValue: number | string | null = null;
 
                   if (isClassIdRow) {
-                    console.log("node.current", node.current)
-                    console.log("classInfoMap: ", classInfoMap)
-                    currentValue = normalizeCurrentClassNameWithArchivedLabel(node.current, classInfoMap)
+                    currentValue = normalizeCurrentClassNameWithArchivedLabel(node.current, classInfoMap) ?? "N/A"
                   } else if (isClassNameRow) {
-                    console.log("current class name: ", currentClassName);
                     currentValue = currentClassName;
                   }
                   else {
@@ -208,15 +199,12 @@ export default function RecordHistoryDifferenceTable({
                   }
 
                   if (isClassIdRow) {
-                    console.log("node.compare", node.compare)
-                    console.log("classInfoMap: ", classInfoMap)
-                    compareValue = normalizeCompareClassNameWithArchivedLabel(node.compare, classInfoMap)
+                    compareValue = normalizeCompareClassNameWithArchivedLabel(node.compare, classInfoMap) ?? "N/A"
                   } else if (isClassNameRow) {
-                    console.log("compare class name: ", compareClassName);
                     compareValue = compareClassName;
                   }
                   else {
-                    compareValue = node.current ?? placeholderValue
+                    compareValue = node.compare ?? placeholderValue
                   }
 
                   return (
