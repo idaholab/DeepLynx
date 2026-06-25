@@ -49,7 +49,7 @@ interface ProjectStatCardProps {
 
 function ProjectStatCard({ title, value, Icon }: ProjectStatCardProps) {
   return (
-    <div className="rounded-lg border border-base-300/30 bg-base-200 p-3">
+    <div className="rounded-lg border border-base-300/50 bg-base-100 p-3 shadow-sm">
       <div className="flex items-center gap-3">
         <Icon className="size-8 text-secondary" />
         <div>

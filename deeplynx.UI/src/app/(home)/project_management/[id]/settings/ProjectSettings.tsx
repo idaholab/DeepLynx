@@ -490,7 +490,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     <div className="p-6">
       <div className="mx-auto space-y-6">
         {/* Page Header */}
-        <div className="border-b border-base-300 pb-4">
+        <div className="border-b border-base-300/50 pb-4">
           <h2 className="text-2xl font-bold text-base-content">
             {t.translations.PROJECT_SETTINGS}
           </h2>
