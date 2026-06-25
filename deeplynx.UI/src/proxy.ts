@@ -78,7 +78,13 @@ export async function proxy(request: NextRequest) {
   }
   
   if (!session) {
-    return NextResponse.redirect(new URL("/login/signin", request.url));
+    const signInUrl = new URL("/login/signin", request.url);
+
+    if (pathname.startsWith("/oauth/device/verify")) {
+      signInUrl.searchParams.set("returnUrl", `${pathname}${request.nextUrl.search}`);
+    }
+
+    return NextResponse.redirect(signInUrl);
   }
   
   if (session.error) {
@@ -101,6 +107,11 @@ export async function proxy(request: NextRequest) {
   // Allow access to select-org page regardless of org session
   // Users should be able to view and switch organizations at any time
   if (pathname.startsWith("/select-org")) {
+    return NextResponse.next();
+  }
+
+  // Allow access to device verification without requiring org selection
+  if (pathname.startsWith("/oauth/device/verify")) {
     return NextResponse.next();
   }
 
