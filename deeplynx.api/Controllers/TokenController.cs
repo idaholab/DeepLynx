@@ -35,6 +35,14 @@ public class TokenController : ControllerBase
         _logger = logger;
     }
 
+    public TokenController(
+        IEventBusiness eventBusiness,
+        ITokenBusiness tokenBusiness,
+        ILogger<TokenController> logger)
+        : this(eventBusiness, tokenBusiness, null!, logger)
+    {
+    }
+
     /// <summary>
     ///     Create JWT Token
     /// </summary>
