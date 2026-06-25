@@ -38,8 +38,8 @@ export default function FilterSidebar({
 
   return (
     <aside>
-      <div className="rounded-box border border-base-300 bg-base-100 shadow-sm">
-        <div className="flex items-center justify-between border-b border-base-300 px-4 py-3">
+      <div className="rounded-box border border-base-300/50 bg-base-100 shadow-sm">
+        <div className="flex items-center justify-between border-b border-base-200 px-4 py-3">
           <div className="flex items-center gap-2 font-semibold">
             <FunnelIcon className="size-4 text-primary" />
             {t.translations.FILTER_BY}
@@ -56,7 +56,7 @@ export default function FilterSidebar({
           ) : null}
         </div>
 
-        <div className="divide-y divide-base-300">
+        <div className="divide-y divide-base-200">
           <div className="collapse collapse-arrow rounded-none">
             <input type="checkbox" defaultChecked />
             <div className="collapse-title min-h-0 px-4 py-3 text-sm font-semibold">

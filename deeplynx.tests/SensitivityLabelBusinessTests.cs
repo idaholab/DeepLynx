@@ -225,7 +225,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Add Users to Project / Org
         var orgMember = new OrganizationUser { OrganizationId = oid, UserId = uid3, IsOrgAdmin = true };
         var orgMember2 = new OrganizationUser { OrganizationId = oid, UserId = uid4 };
-        var projectMember = new ProjectMember { ProjectId = pid, UserId = uid, RoleId = rid1 };
+        var projectMember = new ProjectMember { ProjectId = pid, UserId = uid, RoleId = rid1, IsProjectAdmin = true };
         var projectMember2 = new ProjectMember { ProjectId = pid2, UserId = uid, RoleId = rid3 };
         var projectMember3 = new ProjectMember { ProjectId = pid, UserId = uid2, RoleId = rid2 };
         var projectMember4 = new ProjectMember { ProjectId = pid2, UserId = uid2, RoleId = rid3 };

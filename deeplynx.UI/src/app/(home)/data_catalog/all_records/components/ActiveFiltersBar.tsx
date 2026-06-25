@@ -32,7 +32,7 @@ export default function ActiveFiltersBar({ activeFilters, onRemoveFilter }: Prop
   if (activeFilters.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-box border border-base-300 bg-base-100 px-3 py-2 text-sm shadow-sm">
+    <div className="flex flex-wrap items-center gap-2 rounded-box border border-base-300/50 bg-base-100 px-3 py-2 text-sm shadow-sm">
       <span className="font-medium text-base-content/70">
         {t.translations.SEARCH_TERMS}
       </span>

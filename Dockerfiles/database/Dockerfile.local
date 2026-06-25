@@ -23,8 +23,8 @@ RUN apk add --virtual .build-deps \
     git \
     build-base \
     postgresql18-dev \
-    clang19 \
-    llvm19 \
+    clang \
+    llvm \
     make
 
 # Install pgvector

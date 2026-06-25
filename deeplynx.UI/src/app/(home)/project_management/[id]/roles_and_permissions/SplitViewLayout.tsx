@@ -210,7 +210,10 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
         ) : (
           <div className="space-y-4">
             {categories.map((category) => (
-              <div key={category.id} className="card bg-base-200/25">
+              <div
+                key={category.id}
+                className="card border border-base-300/50 bg-base-100 shadow-sm"
+              >
                 <div className="card-body p-4">
                   <h4 className="card-title text-sm mb-3">{category.label}</h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -291,9 +294,9 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
     <div className="flex gap-6" style={{ height: "calc(100vh - 28rem)" }}>
       {/* Left Sidebar - Role List */}
       <div className="w-80 flex-shrink-0">
-        <div className="card bg-base-100 shadow-xl h-full flex flex-col border-2 border-primary">
+        <div className="card h-full flex flex-col border border-base-300/50 bg-base-100 shadow-sm">
           <div className="card-body p-0 flex flex-col h-full">
-            <div className="px-4 py-3 border-base-300 flex-shrink-0">
+            <div className="px-4 py-3 border-base-300/50 flex-shrink-0">
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="card-title text-base">
@@ -320,7 +323,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                   key={role.id}
                   onClick={() => onRoleSelection(role.id)}
                   disabled={isEditingPermissions}
-                  className={`w-full px-4 py-3 text-left border-b border-base-300 transition-colors ${
+                  className={`w-full px-4 py-3 text-left border-b border-base-300/50 transition-colors ${
                     selectedRoleId === role.id
                       ? "bg-primary/10 border-l-4 border-l-primary"
                       : ""
@@ -374,11 +377,11 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
       </div>
 
       {/* Right Panel - Role Details & Permissions */}
-      <div className="flex-1 card bg-base-100 shadow-xl flex flex-col overflow-hidden border-2 border-primary">
+      <div className="card flex-1 flex flex-col overflow-hidden border border-base-300/50 bg-base-100 shadow-sm">
         {currentRole ? (
           <>
             {/* Role Header */}
-            <div className="px-6 py-4 border-base-300 flex-shrink-0">
+            <div className="px-6 py-4 border-base-300/50 flex-shrink-0">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-3">
