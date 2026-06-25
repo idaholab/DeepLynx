@@ -15,14 +15,14 @@ type Props = {
 
 export default function NewCollectionStepIndicator({ steps }: Props) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-base-300 bg-base-200/30 p-4 text-sm md:flex-row md:items-center">
+    <div className="flex flex-col gap-3 text-sm md:flex-row md:items-center">
       {steps.map((step, index) => (
         <React.Fragment key={step.label}>
           <div
             className={`flex-1 rounded-xl border px-4 py-3 ${
               step.active
                 ? "border-primary bg-primary/10 text-base-content"
-                : "border-base-300 bg-base-100 text-base-content/70"
+                : "border-base-300/50 bg-base-100 text-base-content/70"
             }`}
           >
             <p className="text-xs font-semibold uppercase">{step.label}</p>

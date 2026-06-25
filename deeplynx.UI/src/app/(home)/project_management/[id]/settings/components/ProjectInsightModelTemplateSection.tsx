@@ -497,7 +497,7 @@ export default function ProjectInsightModelTemplateSection({
     return (
       <div
         key={roleKey}
-        className="rounded-box border border-base-300 bg-base-100 p-4"
+        className="rounded-box border border-base-300/50 bg-base-100 p-4"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -597,10 +597,10 @@ export default function ProjectInsightModelTemplateSection({
           orderedProjectModelConfigs.map((modelConfig) => (
             <div
               key={modelConfig.id}
-              className={`card bg-base-200 border ${
+              className={`card border bg-base-100 shadow-sm ${
                 modelConfig.isArchived
                   ? "border-warning/30 opacity-60"
-                  : "border-base-300"
+                  : "border-base-300/50"
               }`}
             >
               <div className="card-body p-4">
@@ -686,8 +686,8 @@ export default function ProjectInsightModelTemplateSection({
       </div>
 
       {isModelEditorVisible ? (
-        <div className="rounded-box border border-base-300 bg-base-100">
-          <div className="border-b border-base-300 px-5 py-4">
+        <div className="rounded-box border border-base-300/50 bg-base-100">
+          <div className="border-b border-base-300/50 px-5 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h4 className="text-lg font-semibold text-base-content">
@@ -793,7 +793,7 @@ export default function ProjectInsightModelTemplateSection({
               />
             </label>
 
-            <label className="form-control rounded-box border border-base-300 p-4">
+            <label className="form-control rounded-box border border-base-300/50 p-4">
               <span className="label cursor-pointer justify-start gap-3">
                 <input
                   type="checkbox"
@@ -822,7 +822,7 @@ export default function ProjectInsightModelTemplateSection({
             </div>
           ) : null}
 
-          <div className="border-t border-base-300 px-5 py-4">
+          <div className="border-t border-base-300/50 px-5 py-4">
             <div className="flex justify-end gap-3">
               <button
                 type="button"
@@ -894,7 +894,7 @@ export default function ProjectInsightModelTemplateSection({
   }
 
   return (
-    <div className="card bg-base-100 border border-primary/40 shadow-sm">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body">
         <div className="flex justify-between gap-3">
           <div className="flex items-center gap-2 mb-4">
