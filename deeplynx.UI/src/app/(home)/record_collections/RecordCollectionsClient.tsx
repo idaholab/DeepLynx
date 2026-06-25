@@ -42,23 +42,27 @@ export default function RecordCollectionsClient({
   });
 
   return (
-    <div className="min-h-screen bg-base-200/30 px-4 py-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-              {t.translations.RECORD_COLLECTIONS}
-            </p>
-            <h1 className="mt-2 text-3xl font-bold text-base-content">
-              {t.translations.RECORD_COLLECTIONS_COLLECTION_DASHBOARD}
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-base-content/70">
-              {t.translations.RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING}
-            </p>
+    <main className="min-h-screen bg-base-200/30">
+      <section className="border-b border-base-300/50 bg-base-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.translations.RECORD_COLLECTIONS}
+              </p>
+              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+                {t.translations.RECORD_COLLECTIONS_COLLECTION_DASHBOARD}
+              </h1>
+              <p className="mt-3 max-w-3xl text-base-content/70">
+                {t.translations.RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING}
+              </p>
+            </div>
           </div>
         </div>
+      </section>
 
-        <div className="mt-4 space-y-6">
+      <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+        <div className="space-y-6">
           <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
             <div className="lg:sticky lg:top-4">
               <FilterSidebar {...filterSidebar} />
@@ -71,7 +75,7 @@ export default function RecordCollectionsClient({
               }
               action={
                 <div className="flex flex-wrap items-center justify-end gap-3">
-                  <div className="rounded-lg border border-base-300 bg-base-200/50 px-3 py-2 text-sm">
+                  <div className="rounded-lg border border-base-300/50 bg-base-100 px-3 py-2 text-sm">
                     <span className="text-base-content/70">
                       {t.translations.RECORD_COLLECTIONS_TOTAL_COLLECTIONS}{" "}
                     </span>
@@ -128,7 +132,7 @@ export default function RecordCollectionsClient({
                 })}
 
                 {!collectionCards.items.length ? (
-                  <div className="rounded-xl border border-dashed border-base-300 bg-base-100/60 px-4 py-8 text-center text-sm text-base-content/70">
+                  <div className="rounded-xl border border-dashed border-base-300/50 bg-base-100 px-4 py-8 text-center text-sm text-base-content/70">
                     {summary.isLoading
                       ? t.translations.LOADING
                       : t.translations
@@ -138,7 +142,7 @@ export default function RecordCollectionsClient({
               </div>
 
               {pagination.totalItems > pagination.pageSize ? (
-                <div className="flex flex-col gap-3 border-t border-base-300 pt-4">
+                <div className="flex flex-col gap-3 border-t border-base-200 pt-4">
                   <span className="text-sm text-base-content/70">
                     {`${t.translations.SHOWING} ${pagination.startIndex + 1}-${Math.min(
                       pagination.startIndex + pagination.pageSize,
@@ -158,7 +162,7 @@ export default function RecordCollectionsClient({
             </SectionCard>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
