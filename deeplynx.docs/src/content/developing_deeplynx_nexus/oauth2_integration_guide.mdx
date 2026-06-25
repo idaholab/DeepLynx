@@ -225,6 +225,132 @@ def get_nexus_api(token, endpoint):
 
 </Steps>
 
+## Device Authorization Grant
+
+Use the OAuth 2.0 Device Authorization Grant for headless or input-constrained clients that cannot open a browser, such as Bridge, edge agents, or command-line tools. The device requests a code, shows the user a short `user_code`, and polls Nexus until an authenticated user approves or denies the request from another browser-capable device.
+
+### Flow Summary
+
+1. The device requests a `device_code` and `user_code` from Nexus.
+2. The device shows the `user_code` and `verification_uri` to the user.
+3. The user signs in to Nexus, enters the `user_code`, and approves or denies the request.
+4. The device polls the token endpoint using the `device_code`.
+5. When approved, Nexus returns an access token and refresh token.
+6. Later, the device can use the refresh token to silently get a new access token.
+
+### Device Code Endpoint
+
+```http
+POST {backendUrl}/api/v1/oauth/device/code
+Content-Type: application/x-www-form-urlencoded
+```
+
+| Field       | Required | Description                                    |
+| ----------- | -------- | ---------------------------------------------- |
+| `client_id` | Yes      | The OAuth application's Client ID              |
+| `scope`     | No       | Space-delimited scopes requested by the device |
+
+```bash
+curl -X POST https://nexus.example.com/api/v1/oauth/device/code \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=stored_client_id_123" \
+  -d "scope=read write"
+```
+
+Successful response:
+
+```json
+{
+  "device_code": "opaque-device-code",
+  "user_code": "BCDF-GHJK",
+  "verification_uri": "https://nexus.example.com/api/v1/oauth/device/verify",
+  "verification_uri_complete": "https://nexus.example.com/api/v1/oauth/device/verify?user_code=BCDF-GHJK",
+  "expires_in": 900,
+  "interval": 5
+}
+```
+
+### User Verification Endpoints
+
+The verification endpoints require an authenticated Nexus user.
+
+```http
+GET {backendUrl}/api/v1/oauth/device/verify?user_code=BCDF-GHJK
+```
+
+```http
+POST {backendUrl}/api/v1/oauth/device/verify
+Content-Type: application/json
+```
+
+```json
+{
+  "user_code": "BCDF-GHJK",
+  "approve": true
+}
+```
+
+Set `approve` to `false` when the user denies the device request.
+
+### Device Token Polling
+
+```http
+POST {backendUrl}/api/v1/oauth/token
+Content-Type: application/x-www-form-urlencoded
+```
+
+| Field         | Required | Description                                       |
+| ------------- | -------- | ------------------------------------------------- |
+| `grant_type`  | Yes      | `urn:ietf:params:oauth:grant-type:device_code`    |
+| `device_code` | Yes      | The `device_code` returned by the device endpoint |
+| `client_id`   | Yes      | The OAuth application's Client ID                 |
+
+```bash
+curl -X POST https://nexus.example.com/api/v1/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=urn:ietf:params:oauth:grant-type:device_code" \
+  -d "device_code=opaque-device-code" \
+  -d "client_id=stored_client_id_123"
+```
+
+Polling errors include `authorization_pending`, `slow_down`, `expired_token`, `access_denied`, and `invalid_grant`.
+
+Successful response:
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "opaque-refresh-token",
+  "token_type": "Bearer",
+  "expires_in": 28800
+}
+```
+
+### Refresh Token Grant
+
+Use the refresh token when the device needs a new access token without repeating the device authorization flow.
+
+```http
+POST {backendUrl}/api/v1/oauth/token
+Content-Type: application/x-www-form-urlencoded
+```
+
+| Field           | Required | Description                       |
+| --------------- | -------- | --------------------------------- |
+| `grant_type`    | Yes      | `refresh_token`                   |
+| `refresh_token` | Yes      | The refresh token from Nexus      |
+| `client_id`     | Yes      | The OAuth application's Client ID |
+
+```bash
+curl -X POST https://nexus.example.com/api/v1/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token" \
+  -d "refresh_token=opaque-refresh-token" \
+  -d "client_id=stored_client_id_123"
+```
+
+Store the refresh token securely. Treat it like a password because it can be exchanged for new access tokens until it expires.
+
 ## Complete Example Implementation
 
 Here's a minimal Flask application demonstrating the complete Oauth flow:
