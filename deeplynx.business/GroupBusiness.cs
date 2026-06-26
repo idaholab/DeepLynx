@@ -377,6 +377,7 @@ public class GroupBusiness : IGroupBusiness
                 Id = u.Id,
                 Name = u.Name,
                 Email = u.Email,
+                AccountType = u.AccountType,
                 IsSysAdmin = u.IsSysAdmin,
                 IsArchived = u.IsArchived,
                 IsActive = u.IsActive
