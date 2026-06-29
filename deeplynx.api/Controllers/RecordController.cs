@@ -137,6 +137,9 @@ public class RecordController : ControllerBase
     /// <summary>
     ///     Paginated full text records search
     /// </summary>
+    /// <remarks>
+    ///     Embedding must be one of: any, embedded, pending
+    /// </remarks>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the records belongs</param>
     /// <param name="search">Search parameters</param>
