@@ -229,7 +229,7 @@ public class RecordBusiness : IRecordBusiness
         {authorizationFilter}
         {tagFilter}
         {searchFilter}
-        ORDER BY r.id, r.last_updated_at DESC";
+        ORDER BY r.last_updated_at DESC, r.id";
 
         // ============================== PARAMETERS ==============================
 
