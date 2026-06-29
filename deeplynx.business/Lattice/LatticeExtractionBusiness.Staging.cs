@@ -68,7 +68,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 malformedCount,
                 extractionId);
 
-        var maxFrequency = validRecords.Max(r => r.Frequency);
+        var maxFrequency = validRecords.Any()
+            ? validRecords.Max(r => r.Frequency)
+            : 0;
 
         // Batch KG lookup — inherit canonical name if the instance already exists in the graph
         var recordNames = validRecords.Select(r => r.Name.Trim()).ToList();
@@ -76,7 +78,12 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Where(r => r.ProjectId == projectId && recordNames.Contains(r.Name))
             .Select(r => new { r.Id, r.Name })
             .ToListAsync();
-        var nameToKg = kgMatches.ToDictionary(r => r.Name, r => r, StringComparer.OrdinalIgnoreCase);
+        var nameToKg = kgMatches
+            .GroupBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(x => x.Id).First(),
+                StringComparer.OrdinalIgnoreCase);
 
         var extractionRecords = new List<ExtractionRecord>();
         var stagedRecordNames = new List<string>();
