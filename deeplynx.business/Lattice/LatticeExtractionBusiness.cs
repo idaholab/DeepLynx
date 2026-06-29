@@ -601,20 +601,20 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Distinct()
             .ToListAsync();
 
-        var embeddedClassCount = Math.Min(embeddedClassIds.Count, RequiredOntologyClassCount);
-        var embeddedRelationshipCount = Math.Min(embeddedRelationshipIds.Count, RequiredOntologyRelationshipCount);
+        var embeddedClassCount = embeddedClassIds.Count;
+        var embeddedRelationshipCount = embeddedRelationshipIds.Count;
 
         return new EmbeddingStatusResponseDto
         {
-            ClassCount = RequiredOntologyClassCount,
+            ClassCount = classIds.Count,
             EmbeddedClassCount = embeddedClassCount,
-            RelationshipCount = RequiredOntologyRelationshipCount,
+            RelationshipCount = relationshipIds.Count,
             EmbeddedRelationshipCount = embeddedRelationshipCount,
             OntologyReady =
                 classIds.Count >= RequiredOntologyClassCount &&
                 relationshipIds.Count >= RequiredOntologyRelationshipCount &&
-                embeddedClassCount >= RequiredOntologyClassCount &&
-                embeddedRelationshipCount >= RequiredOntologyRelationshipCount
+                embeddedClassCount >= classIds.Count &&
+                embeddedRelationshipCount >= relationshipIds.Count
         };
     }
 
