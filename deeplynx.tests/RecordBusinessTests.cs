@@ -4701,7 +4701,7 @@ public class RecordBusinessTests : IntegrationTestBase
         UserQuery = null,
         ClassIds = [],
         TagIds = [],
-        Embedding = EmbeddedRequestDto.Any,
+        Embedding = "any",
         HideArchived = false,
         IsInsightEligible = false
     };
@@ -4859,7 +4859,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         var search = DefaultSearch();
-        search.Embedding = EmbeddedRequestDto.Embedded;
+        search.Embedding = "embedded";
 
         // Act
         var result = await _recordBusiness.SearchPaginated(
@@ -4886,7 +4886,7 @@ public class RecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         var search = DefaultSearch();
-        search.Embedding = EmbeddedRequestDto.NotEmbedded;
+        search.Embedding = "pending";
 
         // Act
         var result = await _recordBusiness.SearchPaginated(

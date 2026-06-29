@@ -171,9 +171,8 @@ public class RecordBusiness : IRecordBusiness
 
         var embeddedFilter = search.Embedding switch
         {
-            EmbeddedRequestDto.Any => "",
-            EmbeddedRequestDto.Embedded => "AND r.embedded = true",
-            EmbeddedRequestDto.NotEmbedded => "AND r.embedded = false",
+            "embedded" => "AND r.embedded = true",
+            "pending" => "AND r.embedded = false",
             _ => "", // Assume any
         };
 
