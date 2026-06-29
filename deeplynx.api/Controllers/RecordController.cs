@@ -144,7 +144,6 @@ public class RecordController : ControllerBase
     /// <returns>Paginated list of record response dtos from the query view that match provided query parameters</returns>
     [HttpGet("search/paginated", Name = "api_record_search_paginated")]
     [Auth("read", "record")]
-    [Sensitivity("read record")]
     public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> SearchPaginated(
         long organizationId,
         long projectId,
