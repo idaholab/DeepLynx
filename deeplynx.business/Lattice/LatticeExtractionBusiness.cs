@@ -1,16 +1,25 @@
 using System.Collections.Concurrent;
+using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Text.Json.Nodes;
 
 namespace deeplynx.business;
 
 public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 {
+    private const string FailureStageTrigger = "trigger";
+    private const string FailureStageInsightRequest = "insight_request";
+    private const string FailureStageInsightProcessing = "insight_processing";
+    private const string FailureStageCallback = "callback";
+    private const string FailureStageValidation = "validation";
+    private const string FailureStageStaging = "staging";
+    private const int RequiredOntologyClassCount = 2;
+    private const int RequiredOntologyRelationshipCount = 1;
     private static readonly ConcurrentDictionary<string, string> _promptTemplateCache = new();
+    private static readonly string[] DefaultOntologyClassNames = { "File", "Report", "Timeseries" };
 
     private readonly DeeplynxContext _context;
     private readonly IInsightBusiness _insightBusiness;
@@ -29,16 +38,6 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _logger = logger;
     }
 
-    private const string FailureStageTrigger = "trigger";
-    private const string FailureStageInsightRequest = "insight_request";
-    private const string FailureStageInsightProcessing = "insight_processing";
-    private const string FailureStageCallback = "callback";
-    private const string FailureStageValidation = "validation";
-    private const string FailureStageStaging = "staging";
-    private const int RequiredOntologyClassCount = 2;
-    private const int RequiredOntologyRelationshipCount = 1;
-    private static readonly string[] DefaultOntologyClassNames = { "File", "Report", "Timeseries" };
-    
     /// <summary>
     ///     Creates a Pending Extraction record, builds ontology context via similarity search,
     ///     and fires the trigger request to Insight.
@@ -152,13 +151,11 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         catch (Exception ex)
         {
             if (extraction.Status != ExtractionStatus.Failed)
-            {
                 await MarkExtractionFailedWithStage(
                     extraction,
                     FailureStageTrigger,
                     ex.Message,
                     ex);
-            }
 
             throw;
         }
@@ -187,7 +184,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
         EnsureExtractionInProject(extraction, projectId);
-        
+
         var failureStage = FailureStageCallback;
         try
         {
@@ -212,11 +209,15 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             await using var transaction = await _latticeContext.Database.BeginTransactionAsync();
             try
             {
-                var classes = await StageClasses(extraction.Id, allClassTypes, classSimilarities, organizationId, projectId);
-                var records = await StageRecords(extraction.Id, dedupedRecords, classSimilarities, ontologyPatterns, classes, organizationId, projectId, dataSourceId);
-                var relationships = await StageRelationships(extraction.Id, dedupedEdges, classSimilarities, relSimilarities, ontologyPatterns, classes, organizationId, projectId, mode);
-                var edgeCount = await StageEdges(extraction.Id, dedupedEdges, relSimilarities, ontologyPatterns, records, relationships, organizationId, projectId, dataSourceId);
-                
+                var classes = await StageClasses(extraction.Id, allClassTypes, classSimilarities, organizationId,
+                    projectId);
+                var records = await StageRecords(extraction.Id, dedupedRecords, classSimilarities, ontologyPatterns,
+                    classes, organizationId, projectId, dataSourceId);
+                var relationships = await StageRelationships(extraction.Id, dedupedEdges, classSimilarities,
+                    relSimilarities, ontologyPatterns, classes, organizationId, projectId, mode);
+                var edgeCount = await StageEdges(extraction.Id, dedupedEdges, relSimilarities, ontologyPatterns,
+                    records, relationships, organizationId, projectId, dataSourceId);
+
                 await transaction.CommitAsync();
 
                 extraction.Status = ExtractionStatus.Complete;
@@ -227,7 +228,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 catch (Exception ex)
                 {
                     // Lattice data is committed — log and continue rather than leaving status stuck as Running
-                    _logger.LogError(ex, "Extraction {ExtractionId} staged successfully but status update to Complete failed", extractionId);
+                    _logger.LogError(ex,
+                        "Extraction {ExtractionId} staged successfully but status update to Complete failed",
+                        extractionId);
                 }
 
                 return new ExtractionResponseDto
@@ -254,7 +257,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         catch (Exception ex) when (extraction.Status != ExtractionStatus.Failed)
         {
             await MarkExtractionFailedWithStage(
-                 extraction,
+                extraction,
                 failureStage,
                 ex.Message,
                 ex);
@@ -280,26 +283,6 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         EnsureExtractionInProject(extraction, projectId);
 
         await MarkExtractionFailed(extraction, errorMessage);
-    }
-
-    private async Task MarkExtractionFailed(Extraction extraction, string? errorMessage = null)
-    {
-        var failureMessage = string.IsNullOrWhiteSpace(errorMessage)
-            ? "Insight reported that extraction failed, but did not include a failure message."
-            : errorMessage.Trim();
-        var failureStage = failureMessage.Contains("could not be parsed", StringComparison.OrdinalIgnoreCase)
-            ? FailureStageCallback
-            : FailureStageInsightProcessing;
-
-        extraction.Status = ExtractionStatus.Failed;
-        SetExtractionFailureProperties(extraction, failureStage, failureMessage);
-        await _context.SaveChangesAsync();
-
-        _logger.LogError(
-            "Lattice extraction {ExtractionId} failed asynchronously at stage {FailureStage}. Message: {ErrorMessage}",
-            extraction.Id,
-            failureStage,
-            failureMessage);
     }
 
     /// <summary>
@@ -380,10 +363,281 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 FailureMessage = GetExtractionFailureMessage(e.Properties)
             })
             .ToList();
-        
+
         return await ProjectTotals(finalExtraction);
     }
-    
+
+    /// <summary>
+    ///     Return extraction staging for a project
+    /// </summary>
+    /// <param name="extractionId">The ID of the extraction</param>
+    public async Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId)
+    {
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+
+        return await GetExtractionStaging(extraction);
+    }
+
+    /// <summary>
+    ///     Return extraction staging for a project
+    /// </summary>
+    /// <param name="extractionId">The ID of the extraction</param>
+    /// <param name="organizationId">The ID of the organization</param>
+    /// <param name="projectId">The ID of the project</param>
+    public async Task<ExtractionStagingResponseDto> GetExtractionStaging(
+        long extractionId,
+        long organizationId,
+        long projectId)
+    {
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+        EnsureExtractionInProject(extraction, projectId);
+
+        return await GetExtractionStaging(extraction);
+    }
+
+    /// <summary>
+    ///     Promotes a user-selected subset of an extraction's staged items into the deeplynx schema.
+    ///     Selection is by explicit item ids and/or bulk approval of a validation status
+    ///     (<c>valid</c> / <c>novel_discovery</c>); the two are unioned. Items not selected are left
+    ///     staged for a later round. Promotion runs in dependency order
+    ///     (classes → records → relationships → edges) and is strict: a selected item whose dependency
+    ///     (class/record/relationship) is neither selected nor already promoted is rejected with an
+    ///     error rather than silently skipped. The extraction flips to
+    ///     <see cref="ExtractionStatus.Promoted" /> once every staged item is resolved, otherwise
+    ///     <see cref="ExtractionStatus.PartiallyPromoted" />.
+    /// </summary>
+    public async Task<ExtractionResponseDto> PromoteExtraction(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long extractionId,
+        PromoteExtractionRequestDto request)
+    {
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+
+        EnsureExtractionInProject(extraction, projectId);
+
+        if (extraction.Status != ExtractionStatus.Complete &&
+            extraction.Status != ExtractionStatus.PartiallyPromoted)
+            throw new InvalidOperationException(
+                $"Extraction {extractionId} cannot be promoted — status is '{extraction.Status}', " +
+                $"expected '{ExtractionStatus.Complete}' or '{ExtractionStatus.PartiallyPromoted}'.");
+
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
+        var stagingClasses = await _latticeContext.ExtractionClasses
+            .Where(c => c.ExtractionId == extractionId)
+            .ToListAsync();
+        var stagingRecords = await _latticeContext.ExtractionRecords
+            .Where(r => r.ExtractionId == extractionId)
+            .ToListAsync();
+        var stagingRelationships = await _latticeContext.ExtractionRelationships
+            .Where(r => r.ExtractionId == extractionId)
+            .ToListAsync();
+        var stagingEdges = await _latticeContext.ExtractionEdges
+            .Where(e => e.ExtractionId == extractionId)
+            .ToListAsync();
+
+        var allowedBulkStatuses = new[]
+            { ExtractionValidationStatus.Valid, ExtractionValidationStatus.NovelDiscovery };
+        if (request.ApproveByStatus != null)
+            foreach (var status in request.ApproveByStatus)
+                if (!allowedBulkStatuses.Contains(status))
+                    throw new InvalidOperationException(
+                        $"Validation status '{status}' cannot be bulk-approved. Only " +
+                        $"'{ExtractionValidationStatus.Valid}' and '{ExtractionValidationStatus.NovelDiscovery}' are allowed.");
+
+        var selectedClassIds = request.ClassIds.ToHashSet();
+        var selectedRecordIds = request.RecordIds.ToHashSet();
+        var selectedRelIds = request.RelationshipIds.ToHashSet();
+        var selectedEdgeIds = request.EdgeIds.ToHashSet();
+
+        ExpandBulkSelections(request.ApproveByStatus,
+            stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
+            selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
+
+        if (selectedClassIds.Count == 0 && selectedRecordIds.Count == 0 &&
+            selectedRelIds.Count == 0 && selectedEdgeIds.Count == 0)
+            throw new InvalidOperationException("No staged items were selected for promotion.");
+
+        ValidateRejectedNotSelected(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
+            selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
+
+        ValidateDependencies(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
+            selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
+
+        var classesPromotedBefore = stagingClasses.Where(c => c.PromotedId.HasValue).Select(c => c.Id).ToHashSet();
+        var recordsPromotedBefore = stagingRecords.Where(r => r.PromotedId.HasValue).Select(r => r.Id).ToHashSet();
+        var relsPromotedBefore = stagingRelationships.Where(r => r.PromotedId.HasValue).Select(r => r.Id).ToHashSet();
+        var edgesPromotedBefore = stagingEdges.Where(e => e.PromotedId.HasValue).Select(e => e.Id).ToHashSet();
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var classIdMap = await PromoteClasses(stagingClasses, selectedClassIds, organizationId, projectId,
+                extractionId, currentUserId, now);
+            var relIdMap = await PromoteRelationships(stagingRelationships, selectedRelIds, classIdMap, organizationId,
+                projectId, extractionId, currentUserId, now);
+            var recordIdMap = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
+                projectId, extractionId, currentUserId, now);
+            await PromoteEdges(stagingEdges, selectedEdgeIds, recordIdMap.RecordIdMap, relIdMap, organizationId,
+                projectId,
+                extractionId, currentUserId, now);
+
+            await transaction.CommitAsync();
+            extraction.Status = ComputeExtractionStatus(
+                stagingClasses, stagingRecords, stagingRelationships, stagingEdges, extraction.Status);
+            await _context.SaveChangesAsync();
+
+            return new ExtractionResponseDto
+            {
+                Id = extractionId,
+                CreatedBy = extraction.CreatedBy,
+                ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue && !classesPromotedBefore.Contains(c.Id)),
+                RecordCount = stagingRecords.Count(r => r.PromotedId.HasValue && !recordsPromotedBefore.Contains(r.Id)),
+                RelationshipCount =
+                    stagingRelationships.Count(r => r.PromotedId.HasValue && !relsPromotedBefore.Contains(r.Id)),
+                EdgeCount = stagingEdges.Count(e => e.PromotedId.HasValue && !edgesPromotedBefore.Contains(e.Id))
+            };
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    /// <summary>
+    ///     Rejects a user-selected subset of an extraction's staged items (by explicit id and/or by
+    ///     validation status), or — when <see cref="RejectExtractionRequestDto.RejectAllRemaining" /> is set
+    ///     — every still-pending item. Rejection is strict and mirrors promotion: rejecting an item whose
+    ///     pending dependents (records/relationships/edges that rely on it) are not also in the selection
+    ///     fails with an error listing them. Rejected items are flagged in the staging tables, never
+    ///     promoted, and no deeplynx rows are written. Items already promoted in a prior round are
+    ///     untouched. The extraction's status is recomputed from the resulting state.
+    /// </summary>
+    public async Task<ExtractionResponseDto> RejectExtraction(long extractionId, RejectExtractionRequestDto request)
+    {
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+
+        if (extraction.Status != ExtractionStatus.Complete &&
+            extraction.Status != ExtractionStatus.PartiallyPromoted)
+            throw new InvalidOperationException(
+                $"Extraction {extractionId} cannot be rejected — status is '{extraction.Status}', " +
+                $"expected '{ExtractionStatus.Complete}' or '{ExtractionStatus.PartiallyPromoted}'.");
+
+        var stagingClasses = await _latticeContext.ExtractionClasses
+            .Where(c => c.ExtractionId == extractionId).ToListAsync();
+        var stagingRecords = await _latticeContext.ExtractionRecords
+            .Where(r => r.ExtractionId == extractionId).ToListAsync();
+        var stagingRelationships = await _latticeContext.ExtractionRelationships
+            .Where(r => r.ExtractionId == extractionId).ToListAsync();
+        var stagingEdges = await _latticeContext.ExtractionEdges
+            .Where(e => e.ExtractionId == extractionId).ToListAsync();
+
+        var (rejectClassIds, rejectRecordIds, rejectRelIds, rejectEdgeIds) =
+            ResolveRejectionIds(request, stagingClasses, stagingRecords, stagingRelationships, stagingEdges);
+
+        if (!request.RejectAllRemaining)
+            ValidateRejectionClosure(stagingRecords, stagingRelationships, stagingEdges,
+                rejectClassIds, rejectRecordIds, rejectRelIds, rejectEdgeIds);
+        foreach (var c in stagingClasses.Where(c => rejectClassIds.Contains(c.Id))) c.Rejected = true;
+        foreach (var r in stagingRecords.Where(r => rejectRecordIds.Contains(r.Id))) r.Rejected = true;
+        foreach (var r in stagingRelationships.Where(r => rejectRelIds.Contains(r.Id))) r.Rejected = true;
+        foreach (var e in stagingEdges.Where(e => rejectEdgeIds.Contains(e.Id))) e.Rejected = true;
+        await _latticeContext.SaveChangesAsync();
+
+        extraction.Status = ComputeExtractionStatus(
+            stagingClasses, stagingRecords, stagingRelationships, stagingEdges, extraction.Status);
+        await _context.SaveChangesAsync();
+        return new ExtractionResponseDto
+        {
+            Id = extractionId,
+            CreatedBy = extraction.CreatedBy,
+            ClassCount = rejectClassIds.Count,
+            RecordCount = rejectRecordIds.Count,
+            RelationshipCount = rejectRelIds.Count,
+            EdgeCount = rejectEdgeIds.Count
+        };
+    }
+
+    public async Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId)
+    {
+        var projectExists = await _context.Projects.AnyAsync(p => p.Id == projectId);
+        if (!projectExists)
+            return new EmbeddingStatusResponseDto
+            {
+                ClassCount = 0,
+                EmbeddedClassCount = 0,
+                RelationshipCount = 0,
+                EmbeddedRelationshipCount = 0,
+                OntologyReady = false
+            };
+
+        var classIds = await _context.Classes
+            .Where(c =>
+                c.ProjectId == projectId &&
+                !c.IsArchived &&
+                !DefaultOntologyClassNames.Contains(c.Name))
+            .Select(c => c.Id)
+            .ToListAsync();
+        var relationshipIds = await _context.Relationships
+            .Where(r => r.ProjectId == projectId && !r.IsArchived)
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        var embeddedClassIds = await _context.OntologyVectors
+            .Where(ov => ov.ClassId != null && classIds.Contains(ov.ClassId.Value))
+            .Select(ov => ov.ClassId!.Value)
+            .Distinct()
+            .ToListAsync();
+        var embeddedRelationshipIds = await _context.OntologyVectors
+            .Where(ov => ov.RelationshipId != null && relationshipIds.Contains(ov.RelationshipId.Value))
+            .Select(ov => ov.RelationshipId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        var embeddedClassCount = Math.Min(embeddedClassIds.Count, RequiredOntologyClassCount);
+        var embeddedRelationshipCount = Math.Min(embeddedRelationshipIds.Count, RequiredOntologyRelationshipCount);
+
+        return new EmbeddingStatusResponseDto
+        {
+            ClassCount = RequiredOntologyClassCount,
+            EmbeddedClassCount = embeddedClassCount,
+            RelationshipCount = RequiredOntologyRelationshipCount,
+            EmbeddedRelationshipCount = embeddedRelationshipCount,
+            OntologyReady =
+                classIds.Count >= RequiredOntologyClassCount &&
+                relationshipIds.Count >= RequiredOntologyRelationshipCount &&
+                embeddedClassCount >= RequiredOntologyClassCount &&
+                embeddedRelationshipCount >= RequiredOntologyRelationshipCount
+        };
+    }
+
+    private async Task MarkExtractionFailed(Extraction extraction, string? errorMessage = null)
+    {
+        var failureMessage = string.IsNullOrWhiteSpace(errorMessage)
+            ? "Insight reported that extraction failed, but did not include a failure message."
+            : errorMessage.Trim();
+        var failureStage = failureMessage.Contains("could not be parsed", StringComparison.OrdinalIgnoreCase)
+            ? FailureStageCallback
+            : FailureStageInsightProcessing;
+
+        extraction.Status = ExtractionStatus.Failed;
+        SetExtractionFailureProperties(extraction, failureStage, failureMessage);
+        await _context.SaveChangesAsync();
+
+        _logger.LogError(
+            "Lattice extraction {ExtractionId} failed asynchronously at stage {FailureStage}. Message: {ErrorMessage}",
+            extraction.Id,
+            failureStage,
+            failureMessage);
+    }
+
     // Accumulate totals/resolved counts per extraction item.
     private async Task<List<ExtractionListItemDto>> ProjectTotals(List<ExtractionListItemDto> extractions)
     {
@@ -399,7 +653,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 resolved[row.ExtractionId] += row.Resolved;
             }
         }
-        
+
         Accumulate((await _latticeContext.ExtractionClasses
             .Where(c => ids.Contains(c.ExtractionId))
             .GroupBy(c => c.ExtractionId)
@@ -441,36 +695,6 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         }
 
         return extractions;
-    }
-
-    /// <summary>
-    ///     Return extraction staging for a project
-    /// </summary>
-    /// <param name="extractionId">The ID of the extraction</param>
-    public async Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId)
-    {
-        var extraction = await _context.Extractions.FindAsync(extractionId)
-                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-
-        return await GetExtractionStaging(extraction);
-    }
-    
-    /// <summary>
-    ///     Return extraction staging for a project
-    /// </summary>
-    /// <param name="extractionId">The ID of the extraction</param>
-    /// <param name="organizationId">The ID of the organization</param>
-    /// <param name="projectId">The ID of the project</param>
-    public async Task<ExtractionStagingResponseDto> GetExtractionStaging(
-        long extractionId,
-        long organizationId,
-        long projectId)
-    {
-        var extraction = await _context.Extractions.FindAsync(extractionId)
-                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-        EnsureExtractionInProject(extraction, projectId);
-
-        return await GetExtractionStaging(extraction);
     }
 
     /// <summary>
@@ -566,170 +790,6 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         };
     }
 
-    /// <summary>
-    ///     Promotes a user-selected subset of an extraction's staged items into the deeplynx schema.
-    ///     Selection is by explicit item ids and/or bulk approval of a validation status
-    ///     (<c>valid</c> / <c>novel_discovery</c>); the two are unioned. Items not selected are left
-    ///     staged for a later round. Promotion runs in dependency order
-    ///     (classes → records → relationships → edges) and is strict: a selected item whose dependency
-    ///     (class/record/relationship) is neither selected nor already promoted is rejected with an
-    ///     error rather than silently skipped. The extraction flips to
-    ///     <see cref="ExtractionStatus.Promoted" /> once every staged item is resolved, otherwise
-    ///     <see cref="ExtractionStatus.PartiallyPromoted" />.
-    /// </summary>
-    public async Task<ExtractionResponseDto> PromoteExtraction(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long extractionId,
-        PromoteExtractionRequestDto request)
-    {
-        var extraction = await _context.Extractions.FindAsync(extractionId)
-                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-        
-        EnsureExtractionInProject(extraction, projectId);
-
-        if (extraction.Status != ExtractionStatus.Complete &&
-            extraction.Status != ExtractionStatus.PartiallyPromoted)
-            throw new InvalidOperationException(   $"Extraction {extractionId} cannot be promoted — status is '{extraction.Status}', " +
-                                                   $"expected '{ExtractionStatus.Complete}' or '{ExtractionStatus.PartiallyPromoted}'.");
-        
-        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        
-        var stagingClasses = await _latticeContext.ExtractionClasses
-            .Where(c => c.ExtractionId == extractionId)
-            .ToListAsync();
-        var stagingRecords = await _latticeContext.ExtractionRecords
-            .Where(r => r.ExtractionId == extractionId)
-            .ToListAsync();
-        var stagingRelationships = await _latticeContext.ExtractionRelationships
-            .Where(r => r.ExtractionId == extractionId)
-            .ToListAsync();
-        var stagingEdges = await _latticeContext.ExtractionEdges
-            .Where(e => e.ExtractionId == extractionId)
-            .ToListAsync();
-        
-        var allowedBulkStatuses = new[]
-            { ExtractionValidationStatus.Valid, ExtractionValidationStatus.NovelDiscovery };
-        foreach (var status in request.ApproveByStatus)
-            if (!allowedBulkStatuses.Contains(status))
-                throw new InvalidOperationException(
-                    $"Validation status '{status}' cannot be bulk-approved. Only " +
-                    $"'{ExtractionValidationStatus.Valid}' and '{ExtractionValidationStatus.NovelDiscovery}' are allowed.");
-
-        var selectedClassIds = request.ClassIds.ToHashSet();
-        var selectedRecordIds = request.RecordIds.ToHashSet();
-        var selectedRelIds = request.RelationshipIds.ToHashSet();
-        var selectedEdgeIds = request.EdgeIds.ToHashSet();
-
-        ExpandBulkSelections(request.ApproveByStatus,
-            stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
-            selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
-
-        if (selectedClassIds.Count == 0 && selectedRecordIds.Count == 0 &&
-            selectedRelIds.Count == 0 && selectedEdgeIds.Count == 0)
-            throw new InvalidOperationException("No staged items were selected for promotion.");
-
-        ValidateRejectedNotSelected(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
-            selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
-
-        ValidateDependencies(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
-            selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
-
-        var classesPromotedBefore = stagingClasses.Where(c => c.PromotedId.HasValue).Select(c => c.Id).ToHashSet();
-        var recordsPromotedBefore = stagingRecords.Where(r => r.PromotedId.HasValue).Select(r => r.Id).ToHashSet();
-        var relsPromotedBefore = stagingRelationships.Where(r => r.PromotedId.HasValue).Select(r => r.Id).ToHashSet();
-        var edgesPromotedBefore = stagingEdges.Where(e => e.PromotedId.HasValue).Select(e => e.Id).ToHashSet();
-        
-        await using var transaction = await _context.Database.BeginTransactionAsync();
-        try
-        {
-            var classIdMap = await PromoteClasses(stagingClasses, selectedClassIds, organizationId, projectId,
-                extractionId, currentUserId, now);
-            var relIdMap = await PromoteRelationships(stagingRelationships, selectedRelIds, classIdMap, organizationId,
-                projectId, extractionId, currentUserId, now);
-            var recordIdMap = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
-                projectId, extractionId, currentUserId, now);
-            await PromoteEdges(stagingEdges, selectedEdgeIds, recordIdMap.RecordIdMap, relIdMap, organizationId, projectId,
-                extractionId, currentUserId, now);
-
-            await transaction.CommitAsync();
-            extraction.Status = ComputeExtractionStatus(
-                stagingClasses, stagingRecords, stagingRelationships, stagingEdges, extraction.Status);
-            await _context.SaveChangesAsync();
-
-            return new ExtractionResponseDto
-            {
-                Id = extractionId,
-                CreatedBy = extraction.CreatedBy,
-                ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue && !classesPromotedBefore.Contains(c.Id)),
-                RecordCount = stagingRecords.Count(r => r.PromotedId.HasValue && !recordsPromotedBefore.Contains(r.Id)),
-                RelationshipCount =   stagingRelationships.Count(r => r.PromotedId.HasValue && !relsPromotedBefore.Contains(r.Id)),
-                EdgeCount = stagingEdges.Count(e => e.PromotedId.HasValue && !edgesPromotedBefore.Contains(e.Id))
-            };
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-    }
-
-    /// <summary>
-    ///     Rejects a user-selected subset of an extraction's staged items (by explicit id and/or by
-    ///     validation status), or — when <see cref="RejectExtractionRequestDto.RejectAllRemaining" /> is set
-    ///     — every still-pending item. Rejection is strict and mirrors promotion: rejecting an item whose
-    ///     pending dependents (records/relationships/edges that rely on it) are not also in the selection
-    ///     fails with an error listing them. Rejected items are flagged in the staging tables, never
-    ///     promoted, and no deeplynx rows are written. Items already promoted in a prior round are
-    ///     untouched. The extraction's status is recomputed from the resulting state.
-    /// </summary>
-    public async Task<ExtractionResponseDto> RejectExtraction(long extractionId, RejectExtractionRequestDto request)
-    {
-        var extraction = await _context.Extractions.FindAsync(extractionId)
-                         ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-        
-        if (extraction.Status != ExtractionStatus.Complete &&
-            extraction.Status != ExtractionStatus.PartiallyPromoted)
-            throw new InvalidOperationException(
-                $"Extraction {extractionId} cannot be rejected — status is '{extraction.Status}', " +
-                $"expected '{ExtractionStatus.Complete}' or '{ExtractionStatus.PartiallyPromoted}'.");
-        
-        var stagingClasses = await _latticeContext.ExtractionClasses
-            .Where(c => c.ExtractionId == extractionId).ToListAsync();
-        var stagingRecords = await _latticeContext.ExtractionRecords
-            .Where(r => r.ExtractionId == extractionId).ToListAsync();
-        var stagingRelationships = await _latticeContext.ExtractionRelationships
-            .Where(r => r.ExtractionId == extractionId).ToListAsync();
-        var stagingEdges = await _latticeContext.ExtractionEdges
-            .Where(e => e.ExtractionId == extractionId).ToListAsync();
-        
-        var (rejectClassIds, rejectRecordIds, rejectRelIds, rejectEdgeIds) =
-            ResolveRejectionIds(request, stagingClasses, stagingRecords, stagingRelationships, stagingEdges);
-
-        if (!request.RejectAllRemaining)
-            ValidateRejectionClosure(stagingRecords, stagingRelationships, stagingEdges,
-                rejectClassIds, rejectRecordIds, rejectRelIds, rejectEdgeIds);
-        foreach (var c in stagingClasses.Where(c => rejectClassIds.Contains(c.Id))) c.Rejected = true;
-        foreach (var r in stagingRecords.Where(r => rejectRecordIds.Contains(r.Id))) r.Rejected = true;
-        foreach (var r in stagingRelationships.Where(r => rejectRelIds.Contains(r.Id))) r.Rejected = true;
-        foreach (var e in stagingEdges.Where(e => rejectEdgeIds.Contains(e.Id))) e.Rejected = true;
-        await _latticeContext.SaveChangesAsync();
-        
-        extraction.Status = ComputeExtractionStatus(
-            stagingClasses, stagingRecords, stagingRelationships, stagingEdges, extraction.Status);
-        await _context.SaveChangesAsync();
-        return new ExtractionResponseDto
-        {
-            Id = extractionId,
-            CreatedBy = extraction.CreatedBy,
-            ClassCount = rejectClassIds.Count,
-            RecordCount = rejectRecordIds.Count,
-            RelationshipCount = rejectRelIds.Count,
-            EdgeCount = rejectEdgeIds.Count
-        };
-    }
-    
 
     /// <summary>
     ///     Derives an extraction's status from its staged items. An item is "settled" when it has been
@@ -851,61 +911,6 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             "Please retry the extraction in a few minutes.");
     }
 
-    public async Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId)
-    {
-        var projectExists = await _context.Projects.AnyAsync(p => p.Id == projectId);
-        if (!projectExists)
-        {
-            return new EmbeddingStatusResponseDto
-            {
-                ClassCount = 0,
-                EmbeddedClassCount = 0,
-                RelationshipCount = 0,
-                EmbeddedRelationshipCount = 0,
-                OntologyReady = false
-            };
-        }
-
-        var classIds = await _context.Classes
-            .Where(c =>
-                c.ProjectId == projectId &&
-                !c.IsArchived &&
-                !DefaultOntologyClassNames.Contains(c.Name))
-            .Select(c => c.Id)
-            .ToListAsync();
-        var relationshipIds = await _context.Relationships
-            .Where(r => r.ProjectId == projectId && !r.IsArchived)
-            .Select(r => r.Id)
-            .ToListAsync();
-
-        var embeddedClassIds = await _context.OntologyVectors
-            .Where(ov => ov.ClassId != null && classIds.Contains(ov.ClassId.Value))
-            .Select(ov => ov.ClassId!.Value)
-            .Distinct()
-            .ToListAsync();
-        var embeddedRelationshipIds = await _context.OntologyVectors
-            .Where(ov => ov.RelationshipId != null && relationshipIds.Contains(ov.RelationshipId.Value))
-            .Select(ov => ov.RelationshipId!.Value)
-            .Distinct()
-            .ToListAsync();
-
-        var embeddedClassCount = Math.Min(embeddedClassIds.Count, RequiredOntologyClassCount);
-        var embeddedRelationshipCount = Math.Min(embeddedRelationshipIds.Count, RequiredOntologyRelationshipCount);
-
-        return new EmbeddingStatusResponseDto
-        {
-            ClassCount = RequiredOntologyClassCount,
-            EmbeddedClassCount = embeddedClassCount,
-            RelationshipCount = RequiredOntologyRelationshipCount,
-            EmbeddedRelationshipCount = embeddedRelationshipCount,
-            OntologyReady =
-                classIds.Count >= RequiredOntologyClassCount &&
-                relationshipIds.Count >= RequiredOntologyRelationshipCount &&
-                embeddedClassCount >= RequiredOntologyClassCount &&
-                embeddedRelationshipCount >= RequiredOntologyRelationshipCount
-        };
-    }
-
     /// <summary>
     ///     Throws if the project has fewer than 2 non-default classes or no relationships — the minimum needed for
     ///     extraction.
@@ -923,11 +928,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         if (currentClassCount < RequiredOntologyClassCount ||
             currentRelationshipCount < RequiredOntologyRelationshipCount)
-        {
             throw new InvalidOperationException(
                 $"Project {projectId} does not have sufficient ontology defined. " +
                 "At least 2 non-default classes and 1 relationship are required.");
-        }
     }
 
     /// <summary>
@@ -988,7 +991,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         return template;
     }
-    
+
     /// <summary>
     ///     Parses the serialized extraction properties JSON into a mutable JSON object.
     ///     Returns an empty object when the input is null, empty, whitespace, invalid JSON,
@@ -996,7 +999,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     /// </summary>
     /// <param name="properties">Serialized extraction properties JSON.</param>
     /// <returns>
-    ///     A mutable <see cref="JsonObject"/> containing the parsed extraction properties,
+    ///     A mutable <see cref="JsonObject" /> containing the parsed extraction properties,
     ///     or an empty object when no valid properties are available.
     /// </returns>
     private static JsonObject GetExtractionProperties(string? properties)
@@ -1092,21 +1095,17 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         await _context.SaveChangesAsync();
 
         if (exception != null)
-        {
             _logger.LogError(
                 exception,
                 "Lattice extraction {ExtractionId} failed at stage {FailureStage}: {FailureMessage}",
                 extraction.Id,
                 stage,
                 message);
-        }
         else
-        {
             _logger.LogError(
                 "Lattice extraction {ExtractionId} failed at stage {FailureStage}: {FailureMessage}",
                 extraction.Id,
                 stage,
                 message);
-        }
     }
 }
