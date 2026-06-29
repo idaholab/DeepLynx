@@ -99,6 +99,49 @@ public class QueryController : ControllerBase
     }
 
     /// <summary>
+    ///     Build a Paginated Query for Records
+    /// </summary>
+    /// <param name="organizationId">The organization to which the records/projects belong</param>
+    /// <param name="filterArray">Array of QueryComponent dtos</param>
+    /// <param name="textSearch">Full text search phrase</param>
+    /// <param name="projectIds">Project IDs in the organization to search across</param>
+    /// <param name="paginatedDto">Pagination details</param>
+    /// <returns>Paginated record response DTOs from the query_record view</returns>
+    [HttpPost("records/advanced/paginated", Name = "api_query_builder_records_paginated")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> QueryBuilderPaginated(
+        long organizationId, [FromQuery] string? textSearch, [FromQuery] long[] projectIds,
+        [FromQuery] PaginatedRequestDto paginatedDto,
+        [FromBody] CustomQueryDtos.CustomQueryRequestDto[] filterArray)
+    {
+        try
+        {
+            paginatedDto ??= new PaginatedRequestDto();
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.QueryBuilderPaginated(
+                currentUserId,
+                filterArray,
+                organizationId,
+                projectIds,
+                paginatedDto,
+                textSearch,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while searching for paginated records.: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Get Recent Records
     /// </summary>
     /// <param name="organizationId"> Organization Id of projects</param>
