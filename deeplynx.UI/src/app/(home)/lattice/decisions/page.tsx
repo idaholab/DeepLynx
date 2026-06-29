@@ -33,8 +33,7 @@ import { isInsightHidden } from "@/app/lib/feature_flags";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
-const POLLING_INTERVAL_MS = 3000;
-const TERMINAL_STATUSES = ["complete", "failed", "promoted", "rejected"];
+const NOT_RUNNING_STATUSES = ["complete", "failed", "promoted", "rejected", "partially_promoted"];
 
 function validationBadgeClass(status: string | null) {
   if (status === "valid") return "badge-success";
@@ -92,6 +91,39 @@ function parseNestedRows(
   });
 }
 
+function DecisionButtons({
+  isApproved,
+  isRejected,
+  onToggle,
+}: {
+  isApproved: boolean;
+  isRejected: boolean;
+  onToggle: (action: "approve" | "reject") => void;
+}) {
+  return (
+    <div className="join flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className={`btn join-item btn-xs ${isApproved ? "btn-success" : "btn-outline btn-success"
+          }`}
+        onClick={() => onToggle("approve")}
+      >
+        <CheckCircleIcon className="size-4" />
+        Approve
+      </button>
+      <button
+        type="button"
+        className={`btn join-item btn-xs ${isRejected ? "btn-error" : "btn-outline btn-error"
+          }`}
+        onClick={() => onToggle("reject")}
+      >
+        <XCircleIcon className="size-4" />
+        Reject
+      </button>
+    </div>
+  );
+}
+
 function RecordCard({ record, isApproved, isRejected, onToggle, locked }:
   {
     record: StagedRecordDTO; isApproved: boolean;
@@ -133,28 +165,11 @@ function RecordCard({ record, isApproved, isRejected, onToggle, locked }:
               {t.translations.LATTICE_FREQUENCY}: {record.frequency}
             </span>
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
-            <label className="flex flex-col items-center gap-0.5 text-xs text-success cursor-pointer">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-success checkbox-sm"
-                checked={isApproved}
-                disabled={locked}
-                onChange={() => onToggle("approve")}
-              />
-              Approve
-            </label>
-            <label className="flex flex-col items-center gap-0.5 text-xs text-error cursor-pointer">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-error checkbox-sm"
-                checked={isRejected}
-                disabled={locked}
-                onChange={() => onToggle("reject")}
-              />
-              Reject
-            </label>
-          </div>
+          <DecisionButtons
+            isApproved={isApproved}
+            isRejected={isRejected}
+            onToggle={onToggle}
+          />
         </div>
         {expanded ? (
           <ChevronUpIcon className="size-5 flex-shrink-0" />
@@ -188,28 +203,17 @@ function ClassCard({ cls, isApproved, isRejected, onToggle, locked }:
       <div className="flex items-center justify-between gap-2">
 
         <p className="font-semibold">{cls.name}</p>
-        <div className="flex items-center gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
-          <label className="flex flex-col items-center gap-0.5 text-xs text-success cursor-pointer">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-success checkbox-sm"
-              checked={isApproved}
-              disabled={locked}
-              onChange={() => onToggle("approve")}
-            />
-            Approve
-          </label>
-          <label className="flex flex-col items-center gap-0.5 text-xs text-error cursor-pointer">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-error checkbox-sm"
-              checked={isRejected}
-              disabled={locked}
-              onChange={() => onToggle("reject")}
-            />
-            Reject
-          </label>
-        </div>
+        {cls.ontology_class_id ? (
+          <span className="badge badge-info badge-outline">
+            Already in project
+          </span>
+        ) : (
+          <DecisionButtons
+            isApproved={isApproved}
+            isRejected={isRejected}
+            onToggle={onToggle}
+          />
+        )}
         {cls.validation_status && (
           <span
             className={`badge ${validationBadgeClass(cls.validation_status)}`}
@@ -244,28 +248,11 @@ function EdgeCard({ edge, isApproved,
           {edge.origin_record_name ?? "?"} → {edge.relationship_name ?? "?"} →{" "}
           {edge.destination_record_name ?? "?"}
         </p>
-        <div className="flex items-center gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
-          <label className="flex flex-col items-center gap-0.5 text-xs text-success cursor-pointer">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-success checkbox-sm"
-              checked={isApproved}
-              disabled={locked}
-              onChange={() => onToggle("approve")}
-            />
-            Approve
-          </label>
-          <label className="flex flex-col items-center gap-0.5 text-xs text-error cursor-pointer">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-error checkbox-sm"
-              checked={isRejected}
-              disabled={locked}
-              onChange={() => onToggle("reject")}
-            />
-            Reject
-          </label>
-        </div>
+        <DecisionButtons
+          isApproved={isApproved}
+          isRejected={isRejected}
+          onToggle={onToggle}
+        />
         {edge.validation_status && (
           <span
             className={`badge ${validationBadgeClass(edge.validation_status)}`}
@@ -301,28 +288,11 @@ function RelationshipCard({ rel, isApproved,
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold">{rel.name}</p>
-        <div className="flex items-center gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
-          <label className="flex flex-col items-center gap-0.5 text-xs text-success cursor-pointer">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-success checkbox-sm"
-              checked={isApproved}
-              disabled={locked}
-              onChange={() => onToggle("approve")}
-            />
-            Approve
-          </label>
-          <label className="flex flex-col items-center gap-0.5 text-xs text-error cursor-pointer">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-error checkbox-sm"
-              checked={isRejected}
-              disabled={locked}
-              onChange={() => onToggle("reject")}
-            />
-            Reject
-          </label>
-        </div>
+        <DecisionButtons
+          isApproved={isApproved}
+          isRejected={isRejected}
+          onToggle={onToggle}
+        />
         {rel.validation_status && (
           <span
             className={`badge ${validationBadgeClass(rel.validation_status)}`}
@@ -380,7 +350,6 @@ function ExtractionDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState(false);
   const [activeTab, setActiveTab] = useState<DetailTab>("records");
-  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { t } = useLanguage();
 
   type ItemType = "records" | "classes" | "edges" | "relationships";
@@ -401,10 +370,6 @@ function ExtractionDetailPanel({
       );
       setStaging(data);
       setError(null);
-
-      if (!TERMINAL_STATUSES.includes(data.status)) {
-        pollingRef.current = setTimeout(fetchStaging, POLLING_INTERVAL_MS);
-      }
     } catch {
       setError(t.translations.LATTICE_FAILED_LOAD_EXTRACTION);
     } finally {
@@ -441,9 +406,6 @@ function ExtractionDetailPanel({
     setApproved({ records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set() });
     setRejected({ records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set() });
     void fetchStaging();
-    return () => {
-      if (pollingRef.current) clearTimeout(pollingRef.current);
-    };
   }, [fetchStaging]);
 
   const handleSave = async () => {
@@ -501,8 +463,10 @@ function ExtractionDetailPanel({
     );
   }
 
-  const isRunning = !TERMINAL_STATUSES.includes(staging.status);
-  const canDecide = staging.status === "complete";
+  const isRunning = !NOT_RUNNING_STATUSES.includes(staging.status);
+  const canDecide =
+    staging.status === "complete" ||
+    staging.status === "partially_promoted";
   const tabs: DetailTab[] = ["records", "classes", "edges", "relationships"];
 
   const tabLabels: Record<DetailTab, string> = {
@@ -511,6 +475,29 @@ function ExtractionDetailPanel({
     edges: t.translations.LATTICE_EDGES,
     relationships: t.translations.RELATIONSHIPS,
   };
+
+  const visibleRecords = staging.records.filter(
+    (record) => !record.promoted_id && !record.rejected,
+  );
+
+  const visibleClasses = staging.classes.filter(
+    (cls) => !cls.promoted_id && !cls.rejected,
+  );
+
+  const visibleEdges = staging.edges.filter(
+    (edge) => !edge.promoted_id && !edge.rejected,
+  );
+
+  const visibleRelationships = staging.relationships.filter(
+    (rel) => !rel.promoted_id && !rel.rejected,
+  );
+
+
+  const hasPendingDecisions = (
+    ["records", "classes", "edges", "relationships"] as ItemType[]
+  ).some(
+    (type) => approved[type].size > 0 || rejected[type].size > 0,
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -542,7 +529,7 @@ function ExtractionDetailPanel({
               </span>
             )}
           </div>
-          {canDecide && (
+          {/* {canDecide && (
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -571,7 +558,7 @@ function ExtractionDetailPanel({
                 {t.translations.LATTICE_REJECT_ALL}
               </button>
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Row 2: description on left, note on right */}
@@ -592,10 +579,10 @@ function ExtractionDetailPanel({
               type="button"
               className="btn btn-primary btn-sm"
               onClick={handleSave}
-              disabled={isPromoting}
+              disabled={isPromoting || !hasPendingDecisions}
             >
               {isPromoting ? <span className="loading loading-spinner loading-xs" /> : null}
-              {t.translations.LATTICE_APPROVE_ALL /* swap for a "Save" translation key */}
+              Save
             </button>
           )}
         </div>
@@ -651,10 +638,10 @@ function ExtractionDetailPanel({
 
         <div className="mt-4 space-y-3">
           {activeTab === "records" &&
-            (staging.records.length === 0 ? (
+            (visibleRecords.length === 0 ? (
               <EmptyState message={t.translations.LATTICE_NO_RECORDS_STAGED} />
             ) : (
-              staging.records.map((record) => (
+              visibleRecords.map((record) => (
                 <RecordCard key={record.id} record={record} isApproved={approved.records.has(record.id)}
                   isRejected={rejected.records.has(record.id)}
                   locked={!!record.promoted_id || record.rejected}
@@ -663,20 +650,20 @@ function ExtractionDetailPanel({
             ))}
 
           {activeTab === "classes" &&
-            (staging.classes.length === 0 ? (
+            (visibleClasses.length === 0 ? (
               <EmptyState message={t.translations.LATTICE_NO_CLASSES_STAGED} />
             ) : (
-              staging.classes.map((cls) => <ClassCard key={cls.id} cls={cls} isApproved={approved.classes.has(cls.id)}
+              visibleClasses.map((cls) => <ClassCard key={cls.id} cls={cls} isApproved={approved.classes.has(cls.id)}
                 isRejected={rejected.classes.has(cls.id)}
                 locked={!!cls.promoted_id || cls.rejected}
                 onToggle={(action) => toggleItem("classes", cls.id, action)} />)
             ))}
 
           {activeTab === "edges" &&
-            (staging.edges.length === 0 ? (
+            (visibleEdges.length === 0 ? (
               <EmptyState message={t.translations.LATTICE_NO_EDGES_STAGED} />
             ) : (
-              staging.edges.map((edge) => (
+              visibleEdges.map((edge) => (
                 <EdgeCard key={edge.id} edge={edge} isApproved={approved.edges.has(edge.id)}
                   isRejected={rejected.edges.has(edge.id)}
                   locked={!!edge.promoted_id || edge.rejected}
@@ -685,12 +672,12 @@ function ExtractionDetailPanel({
             ))}
 
           {activeTab === "relationships" &&
-            (staging.relationships.length === 0 ? (
+            (visibleRelationships.length === 0 ? (
               <EmptyState
                 message={t.translations.LATTICE_NO_RELATIONSHIPS_STAGED}
               />
             ) : (
-              staging.relationships.map((rel) => (
+              visibleRelationships.map((rel) => (
                 <RelationshipCard key={rel.id} rel={rel} isApproved={approved.relationships.has(rel.id)}
                   isRejected={rejected.relationships.has(rel.id)}
                   locked={!!rel.promoted_id || rel.rejected}
