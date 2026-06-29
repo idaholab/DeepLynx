@@ -288,11 +288,22 @@ function RelationshipCard({ rel, isApproved,
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold">{rel.name}</p>
-        <DecisionButtons
-          isApproved={isApproved}
-          isRejected={isRejected}
-          onToggle={onToggle}
-        />
+        {rel.ontology_relationship_id ? (
+          <span className="badge badge-info badge-outline">
+            Already in project
+          </span>
+        ) : (
+          <DecisionButtons
+            isApproved={isApproved}
+            isRejected={isRejected}
+            onToggle={onToggle}
+          />
+        )}
+        {rel.ontology_relationship_id && (
+          <p className="mt-2 text-xs text-base-content/60">
+            Existing relationship ID: {rel.ontology_relationship_id}
+          </p>
+        )}
         {rel.validation_status && (
           <span
             className={`badge ${validationBadgeClass(rel.validation_status)}`}
@@ -361,6 +372,54 @@ function ExtractionDetailPanel({
     records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set(),
   });
 
+  const approveByStatus = (status: string) => {
+    setApproved((prev) => ({
+      records: new Set([
+        ...prev.records,
+        ...visibleRecords
+          .filter((record) => record.validation_status === status)
+          .map((record) => record.id),
+      ]),
+      classes: new Set([
+        ...prev.classes,
+        ...visibleClasses
+          .filter((cls) => !cls.ontology_class_id && cls.validation_status === status)
+          .map((cls) => cls.id),
+      ]),
+      edges: new Set([
+        ...prev.edges,
+        ...visibleEdges
+          .filter((edge) => edge.validation_status === status)
+          .map((edge) => edge.id),
+      ]),
+      relationships: new Set([
+        ...prev.relationships,
+        ...visibleRelationships
+          .filter(
+            (rel) =>
+              !rel.ontology_relationship_id &&
+              rel.validation_status === status
+          )
+          .map((rel) => rel.id),
+      ]),
+    }));
+
+    setRejected((prev) => ({
+      records: new Set([...prev.records].filter(
+        (id) => !visibleRecords.some((record) => record.id === id && record.validation_status === status),
+      )),
+      classes: new Set([...prev.classes].filter(
+        (id) => !visibleClasses.some((cls) => cls.id === id && cls.validation_status === status),
+      )),
+      edges: new Set([...prev.edges].filter(
+        (id) => !visibleEdges.some((edge) => edge.id === id && edge.validation_status === status),
+      )),
+      relationships: new Set([...prev.relationships].filter(
+        (id) => !visibleRelationships.some((rel) => rel.id === id && rel.validation_status === status),
+      )),
+    }));
+  };
+
   const fetchStaging = useCallback(async () => {
     try {
       const data = await getExtractionStaging(
@@ -408,6 +467,16 @@ function ExtractionDetailPanel({
     void fetchStaging();
   }, [fetchStaging]);
 
+  useEffect(() => {
+    if (!staging || staging.status !== "running") return;
+
+    const timeoutId = window.setTimeout(() => {
+      void fetchStaging();
+    }, 3000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [staging?.status, fetchStaging]);
+
   const handleSave = async () => {
     if (!staging) return;
     try {
@@ -436,6 +505,7 @@ function ExtractionDetailPanel({
         });
       }
       toast.success(t.translations.LATTICE_EXTRACTION_APPROVED_TOAST);
+
       await fetchStaging();
       onStatusChange?.();
     } catch {
@@ -529,36 +599,6 @@ function ExtractionDetailPanel({
               </span>
             )}
           </div>
-          {/* {canDecide && (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="btn btn-success btn-sm"
-                onClick={() => handleSave()}
-                disabled={isPromoting}
-              >
-                {isPromoting ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <CheckCircleIcon className="size-4" />
-                )}
-                save
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-error btn-sm"
-                onClick={() => handleSave()}
-                disabled={isPromoting}
-              >
-                {isPromoting ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <XCircleIcon className="size-4" />
-                )}
-                {t.translations.LATTICE_REJECT_ALL}
-              </button>
-            </div>
-          )} */}
         </div>
 
         {/* Row 2: description on left, note on right */}
@@ -575,15 +615,27 @@ function ExtractionDetailPanel({
                     : `${t.translations.LATTICE_EXTRACTION_BEEN} ${statusLabel(staging.status, t.translations)}.`}
           </p>
           {canDecide && (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={handleSave}
-              disabled={isPromoting || !hasPendingDecisions}
-            >
-              {isPromoting ? <span className="loading loading-spinner loading-xs" /> : null}
-              Save
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn btn-outline btn-success btn-sm"
+                onClick={() => approveByStatus("valid")}
+                disabled={isPromoting}
+              >
+                <CheckCircleIcon className="size-4" />
+                Approve valid
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={handleSave}
+                disabled={isPromoting || !hasPendingDecisions}
+              >
+                {isPromoting ? <span className="loading loading-spinner loading-xs" /> : null}
+                Save
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -791,14 +843,6 @@ export default function LatticeDecisionsPage() {
               {t.translations.LATTICE_INVALID_SCHEMA_DESCRIPTION}{" "}
               {t.translations.LATTICE_APPROVE_PROMOTES_ALL}
             </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="badge badge-warning badge-sm">
-                {t.translations.LATTICE_COMING_SOON}
-              </span>
-              <span className="text-sm text-base-content/70">
-                {t.translations.LATTICE_COMING_SOON_TEXT}
-              </span>
-            </div>
           </div>
         </div>
       </section>

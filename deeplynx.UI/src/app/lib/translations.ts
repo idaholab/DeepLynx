@@ -756,7 +756,7 @@ export const translations = {
       LATTICE_EXTRACTION_RUNNING:
         "Extraction is in progress. This page will update automatically.",
       LATTICE_EXTRACTION_REVIEW:
-        "Review the staged items below, then approve or reject the entire extraction.",
+        "Review the staged items below. Approve or reject each item, then click Save to apply your decisions. You can also use Approve by Status to quickly approve groups of items. Existing schema items are shown for reference and do not require a decision. An extraction is complete once all remaining staged items have been reviewed.",
       LATTICE_EXTRACTION_FAILED_MSG:
         "This extraction failed to complete. This can happen when the LLM response has an unexpected structure — please try triggering a new extraction.",
       LATTICE_EXTRACTION_REJECTED_MSG: "This extraction was rejected.",
@@ -2616,7 +2616,7 @@ export const translations = {
       LATTICE_EXTRACTION_RUNNING:
         "La extracción está en progreso. Esta página se actualizará automáticamente.",
       LATTICE_EXTRACTION_REVIEW:
-        "Revisa los elementos preparados a continuación, luego aprueba o rechaza la extracción completa.",
+        "Revise los elementos preparados a continuación. Apruebe o rechace cada elemento y, después, haga clic en Guardar para aplicar sus decisiones. También puede usar Aprobar por estado para aprobar rápidamente grupos de elementos. Los elementos que ya existen en el esquema se muestran solo como referencia y no requieren una decisión. Una extracción se considera completa cuando se han revisado todos los elementos pendientes.",
       LATTICE_EXTRACTION_FAILED_MSG:
         "Esta extracción no pudo completarse. Esto puede ocurrir cuando la respuesta del LLM tiene una estructura inesperada — intenta activar una nueva extracción.",
       LATTICE_EXTRACTION_REJECTED_MSG: "Esta extracción fue rechazada.",
