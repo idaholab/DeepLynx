@@ -36,6 +36,10 @@ interface UsersListTableProps {
   onUnarchive?: (userId: number) => void;
 }
 
+const ACTIONS_COLUMN_CLASS =
+  "sticky right-0 z-20 border-l border-base-300/50 bg-base-100 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]";
+const ACTION_BUTTON_CLASS = "btn btn-ghost btn-sm px-1";
+
 const UsersListTable: React.FC<UsersListTableProps> = ({
   tableData,
   scope,
@@ -66,7 +70,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
 
   return (
     <div className="overflow-x-auto">
-      <table className="table">
+      <table className="table min-w-full">
         <thead>
           <tr>
             <th>{t.translations.USER}</th>
@@ -74,7 +78,9 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
             <th>{t.translations.USERNAME}</th>
             <th>{t.translations.STATUS}</th>
             <th>{t.translations.LAST_LOGIN}</th>
-            <th>{isArchivedTab ? t.translations.UNARCHIVE_USER : t.translations.ACTIONS}</th>
+            <th className={`${ACTIONS_COLUMN_CLASS} z-30 text-left`}>
+              {isArchivedTab ? t.translations.UNARCHIVE_USER : t.translations.ACTIONS}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -159,20 +165,20 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                   </td>
 
                   {/* Actions Column */}
-                  <td>
-                    <div className="flex gap-2">
+                  <td className={ACTIONS_COLUMN_CLASS}>
+                    <div className="flex justify-start whitespace-nowrap">
                       {row.isPending ? (
                         <>
                           <button
-                            className="btn btn-ghost btn-sm gap-1"
+                            className={ACTION_BUTTON_CLASS}
                             onClick={() => onResendInvite(row.email)}
                             disabled={loading}
                             title={t.translations.RESEND_INVITATION}
                           >
-                            <ArrowPathIcon className="w-4 h-4" />
+                            <ArrowPathIcon className="size-5" />
                           </button>
                           <button
-                            className="btn btn-ghost btn-sm text-error"
+                            className={`${ACTION_BUTTON_CLASS} text-error`}
                             onClick={() =>
                               onOpenConfirm({
                                 isOpen: true,
@@ -184,27 +190,27 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                             disabled={loading}
                             title={t.translations.CANCEL_INVITATION}
                           >
-                            <XMarkIcon className="w-4 h-4" />
+                            <XMarkIcon className="size-5" />
                           </button>
                         </>
                       ) : (
                         <>
                           {!isArchivedTab && (
                             <button
-                              className="btn btn-ghost btn-sm"
+                              className={ACTION_BUTTON_CLASS}
                               title={t.translations.EDIT_USER}
                               onClick={() =>
                                 onEditUser(row.id, row.name, !!row.isOrgAdmin, !!row.isSysAdmin)
                               }
                               disabled={loading}
                             >
-                              <PencilIcon className="size-6" />
+                              <PencilIcon className="size-5" />
                             </button>
                           )}
 
                           {scope === "org" && (
                             <button
-                              className="btn btn-ghost btn-sm text-error"
+                              className={`${ACTION_BUTTON_CLASS} text-error`}
                               title={t.translations.REMOVE_FROM_ORGANIZATION}
                               onClick={() =>
                                 onOpenConfirm({
@@ -216,23 +222,23 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                               }
                               disabled={loading || row.isSysAdmin}
                             >
-                              <TrashIcon className="size-6" />
+                              <TrashIcon className="size-5" />
                             </button>
                           )}
 
                           {scope === "site" && (
                             isArchivedTab ? (
                               <button
-                                className="btn btn-ghost btn-sm text-success"
+                                className={`${ACTION_BUTTON_CLASS} text-success`}
                                 title="Unarchive User"
                                 onClick={() => onUnarchive?.(row.id)}
                                 disabled={loading}
                               >
-                                <ArrowPathIcon className="w-4 h-4" />
+                                <ArrowPathIcon className="size-5" />
                               </button>
                             ) : (
                               <button
-                                className="btn btn-ghost btn-sm text-error"
+                                className={`${ACTION_BUTTON_CLASS} text-error`}
                                 title={t.translations.ARCHIVE_USER_ACTION}
                                 onClick={() =>
                                   onOpenConfirm({
@@ -244,7 +250,7 @@ const UsersListTable: React.FC<UsersListTableProps> = ({
                                 }
                                 disabled={loading || row.isSysAdmin}
                               >
-                                <TrashIcon className="size-6" />
+                                <TrashIcon className="size-5" />
                               </button>
                             )
                           )}

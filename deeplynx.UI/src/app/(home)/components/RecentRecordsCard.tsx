@@ -63,7 +63,7 @@ const RecentRecordsCard: React.FC<Props> = ({
     fetchRecords,
   } = useRecordsPaginated(selectedProjects);
 
-  if (isLoading && records.length === 0) return <CatalogViewSkeleton />;
+  if (isLoading) return <CatalogViewSkeleton />;
 
   return (
     <div

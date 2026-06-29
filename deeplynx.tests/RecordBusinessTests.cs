@@ -510,6 +510,34 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal("pdf", correctFileTypeResponse.First().FileType);
     }
 
+    [Fact]
+    public async Task GetAllRecordsPaginated_ReturnsRequestedPageAndTotalCount()
+    {
+        var page1 = await _recordBusiness.GetAllRecordsPaginated(
+            uid,
+            organizationId,
+            pid,
+            null,
+            true,
+            null,
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 2 });
+        var page2 = await _recordBusiness.GetAllRecordsPaginated(
+            uid,
+            organizationId,
+            pid,
+            null,
+            true,
+            null,
+            new PaginatedRequestDto { PageNumber = 2, PageSize = 2 });
+
+        Assert.Equal(4, page1.TotalCount);
+        Assert.Equal(1, page1.PageNumber);
+        Assert.Equal(2, page1.PageSize);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Empty(page1.Items.Select(r => r.Id).Intersect(page2.Items.Select(r => r.Id)));
+    }
+
     #endregion
 
     #region GetRecordsByTags Tests

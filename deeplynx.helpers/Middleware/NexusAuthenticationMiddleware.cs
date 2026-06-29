@@ -554,6 +554,7 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                     Email = email,
                     Username = "local-dev",
                     SsoId = ssoId,
+                    AccountType = deeplynx.models.AccountType.Standard,
                     LastLogin = now,
                     IsActive = true,
                     IsArchived = false,
@@ -577,6 +578,12 @@ public class NexusAuthenticationMiddleware : JwtBearerHandler
                     existingUser.IsArchived = false;
                     userChanged = true;
                     Log.Information($"Existing user {email} promoted to sys admin for local development");
+                }
+
+                if (string.IsNullOrWhiteSpace(existingUser.AccountType))
+                {
+                    existingUser.AccountType = deeplynx.models.AccountType.Standard;
+                    userChanged = true;
                 }
 
                 if (ShouldUpdateLastLogin(existingUser.LastLogin, now))

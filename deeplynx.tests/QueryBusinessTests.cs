@@ -3316,6 +3316,30 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.Contains(records, r => r.Name == "Crosshair");
     }
 
+    [Fact]
+    public async Task QueryBuilderPaginated_ReturnsRequestedPageAndTotalCount()
+    {
+        var page1 = await _queryBusiness.QueryBuilderPaginated(
+            uid,
+            [],
+            organizationId,
+            [pid],
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 2 });
+        var page2 = await _queryBusiness.QueryBuilderPaginated(
+            uid,
+            [],
+            organizationId,
+            [pid],
+            new PaginatedRequestDto { PageNumber = 2, PageSize = 2 });
+
+        Assert.Equal(5, page1.TotalCount);
+        Assert.Equal(1, page1.PageNumber);
+        Assert.Equal(2, page1.PageSize);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Empty(page1.Items.Select(r => r.Id).Intersect(page2.Items.Select(r => r.Id)));
+    }
+
     #endregion
 
     #region GetRecordsPaginated Tests

@@ -62,6 +62,9 @@ public class ExtractionEdge
     [Column("rejected")]
     public bool Rejected { get; set; }
 
+    [Column("source_record_id")]
+    public long? SourceRecordId { get; set; }
+
     public virtual ExtractionRelationship? ExtractionRelationship { get; set; }
     public virtual ExtractionRecord? OriginRecord { get; set; }
     public virtual ExtractionRecord? DestinationRecord { get; set; }

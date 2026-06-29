@@ -26,6 +26,7 @@ EXTRACTION RULES (DISCOVERY MODE - Balanced Precision/Discovery):
    - Use descriptive relationship names (e.g., "supports", "coordinates_with", "supervises")
 6. Each relationship MUST include subject_type and object_type
 7. Every class in a relationship MUST also appear in the classes array
+8. Each extracted class and relationship MUST include the record_id of the source chunk it was extracted from
 
 ATTRIBUTE EXTRACTION RULES:
 1. Attributes MUST be explicitly stated in the document text.
@@ -45,21 +46,25 @@ DISCOVERY GUIDELINES:
 
 DOCUMENT TEXT:
 
+Each text chunk below is tagged with a [record_id: N] marker identifying its source document.
+You MUST include the corresponding record_id on every extracted class and relationship.
+If an entity appears across multiple chunks, use the record_id of the chunk where it is most clearly defined.
+
 {text}
 
 Return ONLY valid JSON (no markdown, no explanations):
 
 {
     "classes": [
-        {"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing"}},
-        {"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "attributes": {"role": "command and control", "location": "operations center"}}
+        {"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "record_id": 1, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing"}},
+        {"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "record_id": 1, "attributes": {"role": "command and control", "location": "operations center"}}
     ],
     "relationships": [
         {"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-        "relationship_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90},
+        "relationship_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90, "record_id": 1},
         {"subject": "Tactical Operations Center", "subject_type": "CommandControlFacility",
-        "relationship_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75}
+        "relationship_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75, "record_id": 1}
     ]
 }
 
-IMPORTANT: Balance ontology compliance with discovery. Extract comprehensively across all domains while preferring standard types when applicable.
+IMPORTANT: Balance ontology compliance with discovery. Extract comprehensively across all domains while preferring standard types when applicable. Every item MUST include the record_id from its source chunk.

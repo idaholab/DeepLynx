@@ -131,6 +131,61 @@ public class RecordControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetAllRecordsPaginated_Returns200_WithPaginatedResponse()
+    {
+        var paginatedDto = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+        var expected = new PaginatedResponse<RecordResponseDto>
+        {
+            Items = new List<RecordResponseDto> { new() { Id = 1, Name = "Record 1" } },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 1
+        };
+
+        _mockBusiness.Setup(b => b.GetAllRecordsPaginated(
+                         UserId, OrgId, ProjectId, null, true, null, paginatedDto, false, false, false, false))
+                     .ReturnsAsync(expected);
+
+        var result = (await _controller.GetAllRecordsPaginated(
+            OrgId, ProjectId, null, null, true, false, paginatedDto)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Same(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetAllRecordsPaginated_PassesFiltersAndAdminFlagsToBusinessLayer()
+    {
+        UserContextStorage.IsSysAdmin = true;
+        var paginatedDto = new PaginatedRequestDto { PageNumber = 2, PageSize = 10 };
+        _mockBusiness.Setup(b => b.GetAllRecordsPaginated(
+                         UserId, OrgId, ProjectId, DataSourceId, false, "pdf", paginatedDto, true, false, false, true))
+                     .ReturnsAsync(new PaginatedResponse<RecordResponseDto>());
+
+        await _controller.GetAllRecordsPaginated(
+            OrgId, ProjectId, DataSourceId, "pdf", hideArchived: false, isInsightEligible: true, paginatedDto);
+
+        _mockBusiness.Verify(b => b.GetAllRecordsPaginated(
+            UserId, OrgId, ProjectId, DataSourceId, false, "pdf", paginatedDto, true, false, false, true), Times.Once);
+    }
+
+    [Fact]
+    public void GetAllRecordsPaginated_HasPaginatedHttpGetAndReadRecordAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(RecordController.GetAllRecordsPaginated),
+            "organizationId",
+            "projectId",
+            "paginatedDto");
+
+        var httpGet = Assert.Single(method.GetCustomAttributesData(), attribute =>
+            attribute.AttributeType.Name == "HttpGetAttribute");
+        Assert.Equal("paginated", httpGet.ConstructorArguments[0].Value);
+        AssertHasAuthAttribute(method, "read", "record");
+    }
+
+    [Fact]
     public void GetAllRecords_HasHttpGetAndReadRecordAuthorization()
     {
         var method = GetControllerMethod(

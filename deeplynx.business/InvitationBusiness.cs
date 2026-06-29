@@ -43,11 +43,9 @@ public class InvitationBusiness : IInvitationBusiness
     /// <param name="roleId"></param>
     /// <param name="userId"></param>
     /// <param name="userEmail"></param>
-    /// <param name="callerIsAdmin">
-    /// </param>
     /// <returns></returns>
     public async Task<bool> InviteAndAddUserToHierarchy(long organizationId, long? projectId, long? groupId,
-        long? roleId, long? userId, string? userEmail, bool callerIsAdmin = false)
+        long? roleId, long? userId, string? userEmail)
     {
         var suppliedCount = (groupId.HasValue ? 1 : 0) +
                             (userId.HasValue ? 1 : 0) +
@@ -79,7 +77,7 @@ public class InvitationBusiness : IInvitationBusiness
 
             if (user.AccountType == AccountType.Service)
             {
-                throw new UnauthorizedAccessException("Cannot add user: Service accounts are prohibited, standard user accounts only");
+                throw new UnauthorizedAccessException("Cannot add user: Service accounts are prohibited.");
             }
 
             var wasAdded = await AddUserToHierarchyWithoutEmail(organizationId, projectId, roleId, user);

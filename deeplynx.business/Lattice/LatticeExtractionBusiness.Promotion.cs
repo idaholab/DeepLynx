@@ -3,6 +3,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Text.Json.Nodes;
 
 namespace deeplynx.business;
 
@@ -225,12 +226,12 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long organizationId, long projectId, long extractionId,
         long currentUserId, DateTime now)
     {
-         
+
         var pendingIds = stagingClasses
             .Where(c => c.PromotedId.HasValue && c.OntologyClassId == null)
             .Select(c => c.PromotedId!.Value)
             .ToList();
-        
+
         if (pendingIds.Count > 0)
         {
             var validIds = (await _context.Classes
@@ -241,7 +242,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                          c.PromotedId.HasValue && !validIds.Contains(c.PromotedId!.Value)))
                 sc.PromotedId = null;
         }
-        
+
         var namesToCreate = stagingClasses
             .Where(c => (c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
                          c.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
@@ -257,7 +258,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 .ToListAsync())
             .ToDictionary(c => c.Name, c => c.Id, StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        
+
         var toProcess = stagingClasses.Where(c =>
             selectedClassIds.Contains(c.Id) &&
             (c.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
@@ -296,13 +297,16 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         }
 
         await _latticeContext.SaveChangesAsync();
-        
+
         return stagingClasses.ToDictionary(c => c.Id, c => c.OntologyClassId ?? c.PromotedId);
     }
 
     /// <summary>
     ///     Promotes extraction records into deeplynx.records.
     ///     Records already matched to a KG entity (deeplynx_record_id set) are linked rather than re-created.
+    ///     When SourceRecordId is available, it is injected into the promoted record's Properties JSONB
+    ///     as "originId" for provenance tracking. This value is authoritative and overwrites any
+    ///     LLM-produced "originId" key.
     ///     Returns a map of ExtractionRecord.Id → deeplynx Record id, and the count of newly created records.
     /// </summary>
     private async Task<(Dictionary<long, long> RecordIdMap, int NewRecordCount)> PromoteRecords(
@@ -325,12 +329,27 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             var newRecords = toCreate.Select(sr =>
             {
                 classIdMap.TryGetValue(sr.ExtractionClassId, out var resolvedClassId);
+
+                // Inject originId into Properties for provenance tracking.
+                // Parse the LLM-produced attributes into a mutable object, set originId
+                // (overwriting any LLM-produced value — ours is authoritative), then serialize back.
+                var sProperties = sr.Attributes;
+                if (sr.SourceRecordId.HasValue)
+                {
+                    var jsonObj = string.IsNullOrWhiteSpace(sProperties)
+                        ? new JsonObject()
+                        : JsonNode.Parse(sProperties)?.AsObject() ?? new JsonObject();
+                    jsonObj["originId"] = sr.SourceRecordId.Value;
+                    sProperties = jsonObj.ToJsonString();
+                }
+                sProperties ??= "{}";
+
                 return (sr, new Record
                 {
                     Name = sr.Name,
                     OriginalId = Guid.NewGuid().ToString(),
                     Description = string.Empty,
-                    Properties = sr.Attributes ?? "{}",
+                    Properties = sProperties,
                     ClassId = resolvedClassId,
                     DataSourceId = sr.DataSourceId,
                     ProjectId = projectId,
@@ -376,7 +395,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Where(r => r.PromotedId.HasValue && r.OntologyRelationshipId == null)
             .Select(r => r.PromotedId!.Value)
             .ToList();
-        
+
         if (pendingRelIds.Count > 0)
         {
             var validRelIds = (await _context.Relationships
@@ -387,7 +406,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                          r.PromotedId.HasValue && !validRelIds.Contains(r.PromotedId!.Value)))
                 sr.PromotedId = null;
         }
-        
+
         var relNamesToCreate = stagingRelationships
             .Where(r => (r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
                          r.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&

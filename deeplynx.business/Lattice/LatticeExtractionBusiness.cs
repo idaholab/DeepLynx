@@ -38,7 +38,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     private const int RequiredOntologyClassCount = 2;
     private const int RequiredOntologyRelationshipCount = 1;
     private static readonly string[] DefaultOntologyClassNames = { "File", "Report", "Timeseries" };
-    
+
     /// <summary>
     ///     Creates a Pending Extraction record, builds ontology context via similarity search,
     ///     and fires the trigger request to Insight.
@@ -187,7 +187,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
         EnsureExtractionInProject(extraction, projectId);
-        
+
         var failureStage = FailureStageCallback;
         try
         {
@@ -216,7 +216,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 var records = await StageRecords(extraction.Id, dedupedRecords, classSimilarities, ontologyPatterns, classes, organizationId, projectId, dataSourceId);
                 var relationships = await StageRelationships(extraction.Id, dedupedEdges, classSimilarities, relSimilarities, ontologyPatterns, classes, organizationId, projectId, mode);
                 var edgeCount = await StageEdges(extraction.Id, dedupedEdges, relSimilarities, ontologyPatterns, records, relationships, organizationId, projectId, dataSourceId);
-                
+
                 await transaction.CommitAsync();
 
                 extraction.Status = ExtractionStatus.Complete;
@@ -380,10 +380,10 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 FailureMessage = GetExtractionFailureMessage(e.Properties)
             })
             .ToList();
-        
+
         return await ProjectTotals(finalExtraction);
     }
-    
+
     // Accumulate totals/resolved counts per extraction item.
     private async Task<List<ExtractionListItemDto>> ProjectTotals(List<ExtractionListItemDto> extractions)
     {
@@ -399,7 +399,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 resolved[row.ExtractionId] += row.Resolved;
             }
         }
-        
+
         Accumulate((await _latticeContext.ExtractionClasses
             .Where(c => ids.Contains(c.ExtractionId))
             .GroupBy(c => c.ExtractionId)
@@ -454,7 +454,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         return await GetExtractionStaging(extraction);
     }
-    
+
     /// <summary>
     ///     Return extraction staging for a project
     /// </summary>
@@ -533,7 +533,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 Frequency = r.Frequency,
                 DeeplynxRecordId = r.DeeplynxRecordId,
                 PromotedId = r.PromotedId,
-                Rejected = r.Rejected
+                Rejected = r.Rejected,
+                SourceRecordId = r.SourceRecordId
             }).ToList(),
             Relationships = relationships.Select(r => new StagedRelationshipDto
             {
@@ -561,7 +562,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 EnsembleScore = e.EnsembleScore,
                 Frequency = e.Frequency,
                 PromotedId = e.PromotedId,
-                Rejected = e.Rejected
+                Rejected = e.Rejected,
+                SourceRecordId = e.SourceRecordId
             }).ToList()
         };
     }
@@ -586,16 +588,16 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-        
+
         EnsureExtractionInProject(extraction, projectId);
 
         if (extraction.Status != ExtractionStatus.Complete &&
             extraction.Status != ExtractionStatus.PartiallyPromoted)
-            throw new InvalidOperationException(   $"Extraction {extractionId} cannot be promoted — status is '{extraction.Status}', " +
+            throw new InvalidOperationException($"Extraction {extractionId} cannot be promoted — status is '{extraction.Status}', " +
                                                    $"expected '{ExtractionStatus.Complete}' or '{ExtractionStatus.PartiallyPromoted}'.");
-        
+
         var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        
+
         var stagingClasses = await _latticeContext.ExtractionClasses
             .Where(c => c.ExtractionId == extractionId)
             .ToListAsync();
@@ -608,7 +610,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var stagingEdges = await _latticeContext.ExtractionEdges
             .Where(e => e.ExtractionId == extractionId)
             .ToListAsync();
-        
+
         var allowedBulkStatuses = new[]
             { ExtractionValidationStatus.Valid, ExtractionValidationStatus.NovelDiscovery };
         foreach (var status in request.ApproveByStatus)
@@ -640,7 +642,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var recordsPromotedBefore = stagingRecords.Where(r => r.PromotedId.HasValue).Select(r => r.Id).ToHashSet();
         var relsPromotedBefore = stagingRelationships.Where(r => r.PromotedId.HasValue).Select(r => r.Id).ToHashSet();
         var edgesPromotedBefore = stagingEdges.Where(e => e.PromotedId.HasValue).Select(e => e.Id).ToHashSet();
-        
+
         await using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
@@ -664,7 +666,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 CreatedBy = extraction.CreatedBy,
                 ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue && !classesPromotedBefore.Contains(c.Id)),
                 RecordCount = stagingRecords.Count(r => r.PromotedId.HasValue && !recordsPromotedBefore.Contains(r.Id)),
-                RelationshipCount =   stagingRelationships.Count(r => r.PromotedId.HasValue && !relsPromotedBefore.Contains(r.Id)),
+                RelationshipCount = stagingRelationships.Count(r => r.PromotedId.HasValue && !relsPromotedBefore.Contains(r.Id)),
                 EdgeCount = stagingEdges.Count(e => e.PromotedId.HasValue && !edgesPromotedBefore.Contains(e.Id))
             };
         }
@@ -688,13 +690,13 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var extraction = await _context.Extractions.FindAsync(extractionId)
                          ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
-        
+
         if (extraction.Status != ExtractionStatus.Complete &&
             extraction.Status != ExtractionStatus.PartiallyPromoted)
             throw new InvalidOperationException(
                 $"Extraction {extractionId} cannot be rejected — status is '{extraction.Status}', " +
                 $"expected '{ExtractionStatus.Complete}' or '{ExtractionStatus.PartiallyPromoted}'.");
-        
+
         var stagingClasses = await _latticeContext.ExtractionClasses
             .Where(c => c.ExtractionId == extractionId).ToListAsync();
         var stagingRecords = await _latticeContext.ExtractionRecords
@@ -703,7 +705,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Where(r => r.ExtractionId == extractionId).ToListAsync();
         var stagingEdges = await _latticeContext.ExtractionEdges
             .Where(e => e.ExtractionId == extractionId).ToListAsync();
-        
+
         var (rejectClassIds, rejectRecordIds, rejectRelIds, rejectEdgeIds) =
             ResolveRejectionIds(request, stagingClasses, stagingRecords, stagingRelationships, stagingEdges);
 
@@ -715,7 +717,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         foreach (var r in stagingRelationships.Where(r => rejectRelIds.Contains(r.Id))) r.Rejected = true;
         foreach (var e in stagingEdges.Where(e => rejectEdgeIds.Contains(e.Id))) e.Rejected = true;
         await _latticeContext.SaveChangesAsync();
-        
+
         extraction.Status = ComputeExtractionStatus(
             stagingClasses, stagingRecords, stagingRelationships, stagingEdges, extraction.Status);
         await _context.SaveChangesAsync();
@@ -729,7 +731,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             EdgeCount = rejectEdgeIds.Count
         };
     }
-    
+
 
     /// <summary>
     ///     Derives an extraction's status from its staged items. An item is "settled" when it has been
@@ -949,13 +951,12 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Select(r =>
                 $"({r.RelationshipPattern!.OriginClassName}) -{r.RelationshipPattern.RelationshipName}-> ({r.RelationshipPattern.DestinationClassName})");
 
+        // Tag each text chunk with its source record_id
         var textChunks = results
             .Where(r => !string.IsNullOrEmpty(r.TextChunk))
             .DistinctBy(r => r.TextChunk)
-            .Select(r => r.TextChunk!);
+            .Select(r => $"[record_id: {recordId}]\n{r.TextChunk!}");
 
-        //TODO: context_block is graph context, 2 hops from record node
-        //TODO: {truncation} is for document text chunk truncation, necessary only if it exceeds a certain character limit. Plus the "...truncated" message to the LLM
         var values = new Dictionary<string, string>
         {
             ["class_list"] = string.Join("\n", classes),
@@ -966,6 +967,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var templateName = mode == ExtractionMode.Strict ? "lattice_strict.md" : "lattice_discovery.md";
         return LoadPrompt(templateName, values);
     }
+
 
     /// <summary>
     ///     Loads an embedded prompt template by file name (e.g., "lattice_strict.md") and substitutes
@@ -988,7 +990,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         return template;
     }
-    
+
     /// <summary>
     ///     Parses the serialized extraction properties JSON into a mutable JSON object.
     ///     Returns an empty object when the input is null, empty, whitespace, invalid JSON,

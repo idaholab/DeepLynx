@@ -8,12 +8,12 @@ namespace deeplynx.business;
 
 public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 {
-  private async Task<Dictionary<string, long>> StageClasses(
-        long extractionId,
-        IEnumerable<string> allClassTypes,
-        Dictionary<string, SimilarityResult?> classSimilarities,
-        long organizationId,
-        long projectId)
+    private async Task<Dictionary<string, long>> StageClasses(
+          long extractionId,
+          IEnumerable<string> allClassTypes,
+          Dictionary<string, SimilarityResult?> classSimilarities,
+          long organizationId,
+          long projectId)
     {
         var uniqueClassTypes = allClassTypes
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -70,7 +70,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 malformedCount,
                 extractionId);
         }
-        
+
         var maxFrequency = validRecords.Max(r => r.Frequency);
 
         // Batch KG lookup — inherit canonical name if the instance already exists in the graph
@@ -123,6 +123,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 ProjectId = projectId,
                 DataSourceId = dataSourceId,
                 DeeplynxRecordId = kgRecord?.Id,
+                SourceRecordId = record.RecordId,
                 ValidationStatus = classMatch != null
                     ? ExtractionValidationStatus.Valid
                     : ExtractionValidationStatus.InvalidSchema,
@@ -137,7 +138,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             stagedRecordNames.Add(recordName);
             stagedRecordClasses.Add(classType);
         }
-        
+
         _latticeContext.ExtractionRecords.AddRange(extractionRecords);
         await _latticeContext.SaveChangesAsync();
 
@@ -145,7 +146,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Zip(stagedRecordClasses, (name, cls) => (name, cls))
             .Zip(extractionRecords, (nc, rec) => (nc.name, nc.cls, rec.Id))
             .ToDictionary(
-                x => MakeRecordKey(x.cls, x.name), 
+                x => MakeRecordKey(x.cls, x.name),
                 x => x.Id);
 
         return nameToId;
@@ -237,7 +238,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             }
 
             patternKeys.Add(RelationshipPatternKey(subjectType, relationshipType, objectType));
-            
+
             extractionRelationships.Add(new ExtractionRelationship
             {
                 ExtractionId = extractionId,
@@ -290,7 +291,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             var patternKey = RelationshipPatternKey(edge.SubjectType, edge.RelationshipType, edge.ObjectType);
             relationshipKeyToId.TryGetValue(patternKey, out var relId);
             relValidationById.TryGetValue(relId, out var validationStatus);
-            
+
             var embeddingPlausibility = relMatch?.Score ?? 0.0;
             var statFreq = maxFrequency > 0 ? (double)edge.Frequency / maxFrequency : 0.0;
             var structuralConsistency = validationStatus == ExtractionValidationStatus.Valid ? 1.0 : 0.0;
@@ -304,6 +305,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 OrganizationId = organizationId,
                 ProjectId = projectId,
                 DataSourceId = dataSourceId,
+                SourceRecordId = edge.RecordId,
                 ValidationStatus = validationStatus,
                 Frequency = edge.Frequency,
                 LlmScore = edge.Confidence,
@@ -320,10 +322,10 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         return extractionEdges.Count;
     }
-    
+
     private static string MakeRecordKey(string classType, string name) =>
         $"{classType.Trim().ToLowerInvariant()}::{name.Trim().ToLowerInvariant()}";
-    
+
     /// <summary>
     ///     Builds a stable key that uniquely identifies a relationship pattern by combining
     ///     the subject type, relationship type, and object type.
