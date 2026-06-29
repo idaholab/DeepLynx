@@ -5,10 +5,10 @@ import SearchInput from "@/app/(home)/components/SearchInput";
 import { useLanguage } from "@/app/contexts/Language";
 import Link from "next/link";
 import React from "react";
-import { formatLocalDateTime } from "@/app/lib/date_time";
 import { MetadataRow } from "./recordCollections.types";
 import SectionCard from "./SectionCard";
 import { interpolateTemplate } from "@/app/lib/record_helpers";
+import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 
 type NamedItem = {
   id: number | string;
@@ -58,6 +58,8 @@ type Props = {
   recordSearchTerm: string;
   setRecordSearchTerm: React.Dispatch<React.SetStateAction<string>>;
   projectId: number;
+  classNameById?: Record<number, string>;
+  dataSourceNameById?: Record<number, string>;
   recordsSectionAction?: React.ReactNode;
   recordsPerPage: number;
   recordPage: number;
@@ -95,6 +97,8 @@ export default function CollectionDetailsReadonlyView({
   recordSearchTerm,
   setRecordSearchTerm,
   projectId,
+  classNameById = {},
+  dataSourceNameById = {},
   recordsSectionAction,
   recordsPerPage,
   recordPage,
@@ -257,68 +261,58 @@ export default function CollectionDetailsReadonlyView({
           onChange={(event) => setRecordSearchTerm(event.target.value)}
         />
 
-        <div className="overflow-x-auto rounded-2xl border border-base-300/50">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{t.translations.RECORD}</th>
-                <th>{t.translations.RECORD_COLLECTIONS_CLASS}</th>
-                <th>{t.translations.PROJECT}</th>
-                <th>{t.translations.RECORD_COLLECTIONS_UPDATED}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recordsLoading ? (
-                <tr>
-                  <td colSpan={4}>
-                    <span className="loading loading-spinner loading-sm" />
-                  </td>
-                </tr>
-              ) : visibleRecords.length ? (
-                visibleRecords.map((record) => (
-                  <tr key={record.id ?? record.name}>
-                    <td className="font-medium">
-                      {record.id ? (
-                        <Link
-                          href={`/record?recordId=${record.id}&projectId=${record.projectId ?? projectId}`}
-                          className="link text-base-content hover:text-base-content/80"
-                        >
-                          {record.name ??
-                            t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD}
-                        </Link>
-                      ) : (
-                        record.name ?? t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD
-                      )}
-                    </td>
-                    <td>
-                      {record.className ??
-                        record.classId ??
-                        t.translations.RECORD_COLLECTIONS_UNCLASSIFIED}
-                    </td>
-                    <td>
-                      {record.dataSourceName ??
-                        record.dataSourceId ??
-                        t.translations.UNKNOWN}
-                    </td>
-                    <td>
-                      {record.lastUpdatedAt
-                        ? formatLocalDateTime(record.lastUpdatedAt)
-                        : t.translations.RECORD_COLLECTIONS_NOT_UPDATED}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4}>
-                    {records.length
-                      ? t.translations.RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH
-                      : t.translations.RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {recordsLoading ? (
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-base-300/50 bg-base-100 p-4 text-sm text-base-content/70">
+            <span className="loading loading-spinner loading-sm" />
+            {t.translations.LOADING}
+          </div>
+        ) : (
+          <CollectionRecordSearchResultsTable
+            rows={visibleRecords.map((record) => {
+              const classDisplayName =
+                record.className ??
+                (typeof record.classId === "number"
+                  ? classNameById[record.classId]
+                  : undefined) ??
+                record.classId ??
+                t.translations.RECORD_COLLECTIONS_UNCLASSIFIED;
+              const sourceDisplayName =
+                record.dataSourceName ??
+                (typeof record.dataSourceId === "number"
+                  ? dataSourceNameById[record.dataSourceId]
+                  : undefined) ??
+                record.dataSourceId ??
+                t.translations.UNKNOWN;
+              const recordName =
+                record.name ?? t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD;
+
+              return {
+                key: record.id ?? record.name,
+                name: record.id ? (
+                  <Link
+                    href={`/record?recordId=${record.id}&projectId=${record.projectId ?? projectId}`}
+                    className="link text-base-content hover:text-base-content/80"
+                  >
+                    {recordName}
+                  </Link>
+                ) : (
+                  recordName
+                ),
+                className: classDisplayName,
+                sourceName: sourceDisplayName,
+                updatedAt: record.lastUpdatedAt,
+              };
+            })}
+            emptyMessage={
+              records.length
+                ? t.translations.RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH
+                : t.translations
+                    .RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED
+            }
+            maxHeightClassName="max-h-fit"
+            pinnedHeader={false}
+          />
+        )}
 
         {filteredRecords.length > recordsPerPage ? (
           <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">

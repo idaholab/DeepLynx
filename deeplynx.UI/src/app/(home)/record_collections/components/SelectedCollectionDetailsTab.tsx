@@ -2,6 +2,10 @@
 
 import { useLanguage } from "@/app/contexts/Language";
 import { formatLocalDateTime } from "@/app/lib/date_time";
+import {
+  ArchiveBoxIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
 import React from "react";
 import CollectionEntitySelector from "./CollectionEntitySelector";
 import CollectionDetailsReadonlyView from "./CollectionDetailsReadonlyView";
@@ -13,12 +17,15 @@ import type { CollectionDetailsController } from "../[collectionId]/hooks/useCol
 
 type Props = {
   controller: CollectionDetailsController["detailsController"];
+  onArchiveSuccess?: () => void;
 };
 
 export default function SelectedCollectionDetailsTab({
+  onArchiveSuccess,
   controller: {
     readonlyView: {
       selectedCollection,
+      archiving: readonlyArchiving,
       selectedDescriptionRef,
       selectedDescriptionExpanded,
       selectedDescriptionExpandable,
@@ -47,11 +54,13 @@ export default function SelectedCollectionDetailsTab({
       collectionDetailRecordPageCount,
       projectId,
       onOpenSelectedCollectionEdit,
+      onArchiveSelectedCollection: onArchiveSelectedCollectionFromReadonly,
     },
     editView: {
       editableSelectedCollection,
       isEditingSelectedCollection,
       saving,
+      archiving: editArchiving,
       setSelectedCollectionDraft,
       setSelectedCollectionPropertiesEditorOpen,
       selectedCollectionLabelSearchTerm,
@@ -76,13 +85,22 @@ export default function SelectedCollectionDetailsTab({
       setRecordSearchTerm,
       recordSearchLoading,
       onSearchRecords,
+      onBrowseRecords,
+      onShowCurrentCollectionRecords,
+      selectedRecordIds,
+      onToggleSelectedRecord,
+      onAddSelectedRecords,
       editRecordResults,
+      isShowingRecordSearchResults,
+      classNameById,
+      dataSourceNameById,
       collectionRecordIds,
       recordMutationStatusById,
       onRemoveCollectionRecord,
       onAddCollectionRecord,
       onCancelSelectedCollectionEdit,
       onSaveSelectedDetails,
+      onArchiveSelectedCollection: onArchiveSelectedCollectionFromEdit,
     },
   },
 }: Props) {
@@ -90,6 +108,11 @@ export default function SelectedCollectionDetailsTab({
   const [confirmRemoveRecordId, setConfirmRemoveRecordId] = React.useState<
     number | null
   >(null);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = React.useState(false);
+  const archiving = readonlyArchiving || editArchiving;
+  const onArchiveSelectedCollection =
+    onArchiveSelectedCollectionFromReadonly ??
+    onArchiveSelectedCollectionFromEdit;
 
   const handleConfirmRemoveRecord = React.useCallback(
     async (recordId: number) => {
@@ -99,6 +122,30 @@ export default function SelectedCollectionDetailsTab({
       );
     },
     [onRemoveCollectionRecord],
+  );
+
+  const handleConfirmArchive = React.useCallback(async () => {
+    const didArchive = await onArchiveSelectedCollection();
+    if (didArchive) {
+      setArchiveConfirmOpen(false);
+      onArchiveSuccess?.();
+    }
+  }, [onArchiveSelectedCollection, onArchiveSuccess]);
+
+  const archiveAction = (
+    <button
+      type="button"
+      className="btn btn-outline btn-error btn-sm"
+      disabled={saving || archiving}
+      onClick={() => setArchiveConfirmOpen(true)}
+    >
+      {archiving ? (
+        <span className="loading loading-spinner loading-xs" />
+      ) : (
+        <ArchiveBoxIcon className="size-4" />
+      )}
+      {t.translations.ARCHIVE}
+    </button>
   );
 
   return (
@@ -149,13 +196,17 @@ export default function SelectedCollectionDetailsTab({
             properties: selectedCollection.properties,
           }}
           primaryAction={
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={onOpenSelectedCollectionEdit}
-            >
-              {t.translations.RECORD_COLLECTIONS_EDIT_COLLECTION}
-            </button>
+            <div className="flex flex-wrap justify-end gap-2">
+              {archiveAction}
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={archiving}
+                onClick={onOpenSelectedCollectionEdit}
+              >
+                {t.translations.RECORD_COLLECTIONS_EDIT_COLLECTION}
+              </button>
+            </div>
           }
           descriptionRef={selectedDescriptionRef}
           descriptionExpanded={selectedDescriptionExpanded}
@@ -177,6 +228,8 @@ export default function SelectedCollectionDetailsTab({
           recordSearchTerm={collectionDetailRecordSearchTerm}
           setRecordSearchTerm={setCollectionDetailRecordSearchTerm}
           projectId={projectId}
+          classNameById={classNameById}
+          dataSourceNameById={dataSourceNameById}
           recordsSectionAction={
             <button
               type="button"
@@ -199,10 +252,11 @@ export default function SelectedCollectionDetailsTab({
           }
           action={
             <div className="flex flex-wrap justify-end gap-2">
+              {archiveAction}
               <button
                 type="button"
                 className="btn btn-outline btn-sm"
-                disabled={saving}
+                disabled={saving || archiving}
                 onClick={() => void onCancelSelectedCollectionEdit()}
               >
                 {t.translations.CANCEL}
@@ -210,7 +264,7 @@ export default function SelectedCollectionDetailsTab({
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
-                disabled={saving}
+                disabled={saving || archiving}
                 onClick={onSaveSelectedDetails}
               >
                 {saving ? (
@@ -384,7 +438,7 @@ export default function SelectedCollectionDetailsTab({
             </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-base-300/50 bg-base-100 p-5">
+          <div className="mt-6">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h3 className="font-semibold text-base-content">
@@ -402,7 +456,7 @@ export default function SelectedCollectionDetailsTab({
               </span>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-base-300/50 bg-base-100 p-4">
+            <div className="mt-4">
               <CollectionRecordSearchControls
                 searchTerm={recordSearchTerm}
                 setSearchTerm={setRecordSearchTerm}
@@ -411,6 +465,32 @@ export default function SelectedCollectionDetailsTab({
                 }
                 searchLoading={recordSearchLoading}
                 onSearch={onSearchRecords}
+                action={
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      disabled={recordSearchLoading}
+                      onClick={
+                        isShowingRecordSearchResults
+                          ? onShowCurrentCollectionRecords
+                          : onBrowseRecords
+                      }
+                    >
+                      {isShowingRecordSearchResults
+                        ? t.translations.RECORD_COLLECTIONS_SHOW_CURRENT_RECORDS
+                        : t.translations.RECORD_COLLECTIONS_BROWSE_RECORDS}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={saving || selectedRecordIds.length === 0}
+                      onClick={onAddSelectedRecords}
+                    >
+                      {t.translations.RECORD_COLLECTIONS_ADD_SELECTED}
+                    </button>
+                  </div>
+                }
               />
 
               <CollectionRecordSearchResultsTable
@@ -429,20 +509,43 @@ export default function SelectedCollectionDetailsTab({
                   const showRemoveConfirmation =
                     typeof recordId === "number" &&
                     confirmRemoveRecordId === recordId;
+                  const classDisplayName =
+                    record.className ??
+                    (typeof record.classId === "number"
+                      ? classNameById[record.classId]
+                      : undefined) ??
+                    record.classId ??
+                    t.translations.RECORD_COLLECTIONS_UNCLASSIFIED;
+                  const sourceDisplayName =
+                    record.dataSourceName ??
+                    (typeof record.dataSourceId === "number"
+                      ? dataSourceNameById[record.dataSourceId]
+                      : undefined) ??
+                    record.dataSourceId ??
+                    t.translations.UNKNOWN;
 
                   return {
                     key: record.id ?? record.name ?? "record",
+                    leadingCell:
+                      isShowingRecordSearchResults && !isAssigned ? (
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={
+                            typeof recordId === "number" &&
+                            selectedRecordIds.includes(recordId)
+                          }
+                          disabled={recordId === null || isAdding}
+                          onChange={() => {
+                            if (typeof recordId === "number") {
+                              onToggleSelectedRecord(recordId);
+                            }
+                          }}
+                        />
+                      ) : undefined,
                     name: record.name,
-                    className:
-                      ("className" in record
-                        ? record.className
-                        : record.classId) ??
-                      t.translations.RECORD_COLLECTIONS_UNCLASSIFIED,
-                    sourceName:
-                      ("dataSourceName" in record
-                        ? record.dataSourceName
-                        : record.dataSourceId) ??
-                      t.translations.UNKNOWN,
+                    className: classDisplayName,
+                    sourceName: sourceDisplayName,
                     updatedAt: record.lastUpdatedAt,
                     actionCell: (
                       <div className="flex min-w-[16rem] justify-end">
@@ -532,6 +635,59 @@ export default function SelectedCollectionDetailsTab({
           </div>
         </SectionCard>
       )}
+      {archiveConfirmOpen ? (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-md">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-error/10 p-2 text-error">
+                <ExclamationTriangleIcon className="size-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-base-content">
+                  {t.translations.RECORD_COLLECTIONS_ARCHIVE_COLLECTION}
+                </h3>
+                <p className="mt-2 text-sm text-base-content/70">
+                  {t.translations.RECORD_COLLECTIONS_ARCHIVE_CONFIRM.replace(
+                    "{name}",
+                    selectedCollection.name,
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="modal-action">
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={archiving}
+                onClick={() => setArchiveConfirmOpen(false)}
+              >
+                {t.translations.CANCEL}
+              </button>
+              <button
+                type="button"
+                className="btn btn-error btn-sm"
+                disabled={archiving}
+                onClick={() => void handleConfirmArchive()}
+              >
+                {archiving ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <ArchiveBoxIcon className="size-4" />
+                )}
+                {t.translations.ARCHIVE}
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="modal-backdrop"
+            disabled={archiving}
+            onClick={() => setArchiveConfirmOpen(false)}
+          >
+            close
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

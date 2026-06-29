@@ -73,7 +73,10 @@ export default function CollectionDetailsClient({
       <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
         <div className="space-y-4">
           {workspace.tab === "Details" ? (
-            <SelectedCollectionDetailsTab controller={detailsController} />
+            <SelectedCollectionDetailsTab
+              controller={detailsController}
+              onArchiveSuccess={() => router.push(backHref)}
+            />
           ) : (
             <SelectedCollectionRecordsTab controller={recordsController} />
           )}
