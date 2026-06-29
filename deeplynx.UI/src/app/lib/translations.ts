@@ -696,6 +696,7 @@ export const translations = {
         "Automatically extract records, classes, relationships, and edges from this document. Results are staged for review before anything is added to the knowledge graph or data schema.",
       LATTICE_HOW_IT_WORKS: "How it works",
       LATTICE_STEP_EMBED: "Queue this document for AI embedding using Insight",
+      LATTICE_STEP_ONTOLOGY: "Before running a Lattice extraction, add at least 2 classes and 1 relationship to your project's ontology. Once the minimum ontology is in place, you can start an extraction.",
       LATTICE_STEP_MODE: "Choose an extraction mode",
       LATTICE_STEP_TRIGGER:
         "Trigger extraction — results are staged for review",
@@ -2552,6 +2553,7 @@ export const translations = {
       LATTICE_HOW_IT_WORKS: "Cómo funciona",
       LATTICE_STEP_EMBED:
         "Poner este documento en cola para incrustación con IA",
+      LATTICE_STEP_ONTOLOGY: "Antes de ejecutar una extracción de Lattice, agregue al menos 2 clases y 1 relación a la ontología de su proyecto. Una vez que la ontología mínima esté configurada, podrá iniciar una extracción.",
       LATTICE_STEP_MODE: "Elegir un modo de extracción",
       LATTICE_STEP_TRIGGER:
         "Activar extracción — los resultados se preparan para revisión",
