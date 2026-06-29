@@ -16,6 +16,7 @@ import {
   getExtractionStaging,
   listExtractions,
   promoteExtraction,
+  rejectExtraction
 } from "@/app/lib/client_service/lattice_services.client";
 import {
   ExtractionListItemDTO,
@@ -91,7 +92,13 @@ function parseNestedRows(
   });
 }
 
-function RecordCard({ record }: { record: StagedRecordDTO }) {
+function RecordCard({ record, isApproved, isRejected, onToggle, locked }:
+  {
+    record: StagedRecordDTO; isApproved: boolean;
+    isRejected: boolean;
+    onToggle: (action: "approve" | "reject") => void;
+    locked: boolean;
+  }) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const attrs = parseAttributes(record.attributes);
@@ -126,6 +133,28 @@ function RecordCard({ record }: { record: StagedRecordDTO }) {
               {t.translations.LATTICE_FREQUENCY}: {record.frequency}
             </span>
           </div>
+          <div className="flex items-center gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
+            <label className="flex flex-col items-center gap-0.5 text-xs text-success cursor-pointer">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-success checkbox-sm"
+                checked={isApproved}
+                disabled={locked}
+                onChange={() => onToggle("approve")}
+              />
+              Approve
+            </label>
+            <label className="flex flex-col items-center gap-0.5 text-xs text-error cursor-pointer">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-error checkbox-sm"
+                checked={isRejected}
+                disabled={locked}
+                onChange={() => onToggle("reject")}
+              />
+              Reject
+            </label>
+          </div>
         </div>
         {expanded ? (
           <ChevronUpIcon className="size-5 flex-shrink-0" />
@@ -146,12 +175,41 @@ function RecordCard({ record }: { record: StagedRecordDTO }) {
   );
 }
 
-function ClassCard({ cls }: { cls: StagedClassDTO }) {
+function ClassCard({ cls, isApproved, isRejected, onToggle, locked }:
+  {
+    cls: StagedClassDTO; isApproved: boolean;
+    isRejected: boolean;
+    onToggle: (action: "approve" | "reject") => void;
+    locked: boolean;
+  }) {
   const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
       <div className="flex items-center justify-between gap-2">
+
         <p className="font-semibold">{cls.name}</p>
+        <div className="flex items-center gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
+          <label className="flex flex-col items-center gap-0.5 text-xs text-success cursor-pointer">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-success checkbox-sm"
+              checked={isApproved}
+              disabled={locked}
+              onChange={() => onToggle("approve")}
+            />
+            Approve
+          </label>
+          <label className="flex flex-col items-center gap-0.5 text-xs text-error cursor-pointer">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-error checkbox-sm"
+              checked={isRejected}
+              disabled={locked}
+              onChange={() => onToggle("reject")}
+            />
+            Reject
+          </label>
+        </div>
         {cls.validation_status && (
           <span
             className={`badge ${validationBadgeClass(cls.validation_status)}`}
@@ -169,7 +227,15 @@ function ClassCard({ cls }: { cls: StagedClassDTO }) {
   );
 }
 
-function EdgeCard({ edge }: { edge: StagedEdgeDTO }) {
+function EdgeCard({ edge, isApproved,
+  isRejected,
+  onToggle,
+  locked, }: {
+    edge: StagedEdgeDTO; isApproved: boolean;
+    isRejected: boolean;
+    onToggle: (action: "approve" | "reject") => void;
+    locked: boolean;
+  }) {
   const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
@@ -178,6 +244,28 @@ function EdgeCard({ edge }: { edge: StagedEdgeDTO }) {
           {edge.origin_record_name ?? "?"} → {edge.relationship_name ?? "?"} →{" "}
           {edge.destination_record_name ?? "?"}
         </p>
+        <div className="flex items-center gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
+          <label className="flex flex-col items-center gap-0.5 text-xs text-success cursor-pointer">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-success checkbox-sm"
+              checked={isApproved}
+              disabled={locked}
+              onChange={() => onToggle("approve")}
+            />
+            Approve
+          </label>
+          <label className="flex flex-col items-center gap-0.5 text-xs text-error cursor-pointer">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-error checkbox-sm"
+              checked={isRejected}
+              disabled={locked}
+              onChange={() => onToggle("reject")}
+            />
+            Reject
+          </label>
+        </div>
         {edge.validation_status && (
           <span
             className={`badge ${validationBadgeClass(edge.validation_status)}`}
@@ -199,12 +287,42 @@ function EdgeCard({ edge }: { edge: StagedEdgeDTO }) {
   );
 }
 
-function RelationshipCard({ rel }: { rel: StagedRelationshipDTO }) {
+function RelationshipCard({ rel, isApproved,
+  isRejected,
+  onToggle,
+  locked, }: {
+    rel: StagedRelationshipDTO; isApproved: boolean;
+    isRejected: boolean;
+    onToggle: (action: "approve" | "reject") => void;
+    locked: boolean;
+  }) {
   const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold">{rel.name}</p>
+        <div className="flex items-center gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
+          <label className="flex flex-col items-center gap-0.5 text-xs text-success cursor-pointer">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-success checkbox-sm"
+              checked={isApproved}
+              disabled={locked}
+              onChange={() => onToggle("approve")}
+            />
+            Approve
+          </label>
+          <label className="flex flex-col items-center gap-0.5 text-xs text-error cursor-pointer">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-error checkbox-sm"
+              checked={isRejected}
+              disabled={locked}
+              onChange={() => onToggle("reject")}
+            />
+            Reject
+          </label>
+        </div>
         {rel.validation_status && (
           <span
             className={`badge ${validationBadgeClass(rel.validation_status)}`}
@@ -265,6 +383,15 @@ function ExtractionDetailPanel({
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { t } = useLanguage();
 
+  type ItemType = "records" | "classes" | "edges" | "relationships";
+
+  const [approved, setApproved] = useState<Record<ItemType, Set<number>>>({
+    records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set(),
+  });
+  const [rejected, setRejected] = useState<Record<ItemType, Set<number>>>({
+    records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set(),
+  });
+
   const fetchStaging = useCallback(async () => {
     try {
       const data = await getExtractionStaging(
@@ -290,27 +417,63 @@ function ExtractionDetailPanel({
     t.translations.LATTICE_FAILED_LOAD_EXTRACTION,
   ]);
 
+  const toggleItem = (type: ItemType, id: number, action: "approve" | "reject") => {
+    const setter = action === "approve" ? setApproved : setRejected;
+    const otherSetter = action === "approve" ? setRejected : setApproved;
+    setter(prev => {
+      const next = new Set(prev[type]);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return { ...prev, [type]: next };
+    });
+    // Uncheck the opposite column if checking this one
+    otherSetter(prev => {
+      const next = new Set(prev[type]);
+      next.delete(id);
+      return { ...prev, [type]: next };
+    });
+  }; ``
+
   useEffect(() => {
     setIsLoading(true);
     setStaging(null);
     setError(null);
     setActiveTab("records");
+    setApproved({ records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set() });
+    setRejected({ records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set() });
     void fetchStaging();
     return () => {
       if (pollingRef.current) clearTimeout(pollingRef.current);
     };
   }, [fetchStaging]);
 
-  const handlePromote = async (approve: boolean) => {
+  const handleSave = async () => {
     if (!staging) return;
     try {
       setIsPromoting(true);
-      await promoteExtraction(organizationId, projectId, extractionId, approve);
-      toast.success(
-        approve
-          ? t.translations.LATTICE_EXTRACTION_APPROVED_TOAST
-          : t.translations.LATTICE_EXTRACTION_REJECTED_TOAST,
-      );
+      const hasApprovals = (["records", "classes", "edges", "relationships"] as ItemType[])
+        .some(t => approved[t].size > 0);
+      const hasRejections = (["records", "classes", "edges", "relationships"] as ItemType[])
+        .some(t => rejected[t].size > 0);
+
+      if (hasApprovals) {
+        await promoteExtraction(organizationId, projectId, extractionId, {
+          record_ids: [...approved.records],
+          class_ids: [...approved.classes],
+          edge_ids: [...approved.edges],
+          relationship_ids: [...approved.relationships]
+        });
+      }
+      if (hasRejections) {
+        await rejectExtraction(organizationId, projectId, extractionId, {
+          record_ids: [...rejected.records],
+          class_ids: [...rejected.classes],
+          edge_ids: [...rejected.edges],
+          relationship_ids: [...rejected.relationships],
+          reject_by_status: null,
+          reject_all_remaining: null
+        });
+      }
+      toast.success(t.translations.LATTICE_EXTRACTION_APPROVED_TOAST);
       await fetchStaging();
       onStatusChange?.();
     } catch {
@@ -384,7 +547,7 @@ function ExtractionDetailPanel({
               <button
                 type="button"
                 className="btn btn-success btn-sm"
-                onClick={() => handlePromote(true)}
+                onClick={() => handleSave()}
                 disabled={isPromoting}
               >
                 {isPromoting ? (
@@ -392,12 +555,12 @@ function ExtractionDetailPanel({
                 ) : (
                   <CheckCircleIcon className="size-4" />
                 )}
-                {t.translations.LATTICE_APPROVE_ALL}
+                save
               </button>
               <button
                 type="button"
                 className="btn btn-outline btn-error btn-sm"
-                onClick={() => handlePromote(false)}
+                onClick={() => handleSave()}
                 disabled={isPromoting}
               >
                 {isPromoting ? (
@@ -425,13 +588,15 @@ function ExtractionDetailPanel({
                     : `${t.translations.LATTICE_EXTRACTION_BEEN} ${statusLabel(staging.status, t.translations)}.`}
           </p>
           {canDecide && (
-            <p className="text-xs text-base-content/50 text-right max-w-[220px]">
-              {t.translations.LATTICE_APPROVE_NOTE_PREFIX}{" "}
-              <span className="font-medium text-error/70">
-                {t.translations.LATTICE_INVALID_SCHEMA_ITEMS}
-              </span>{" "}
-              {t.translations.LATTICE_ITEMS_SUFFIX}
-            </p>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handleSave}
+              disabled={isPromoting}
+            >
+              {isPromoting ? <span className="loading loading-spinner loading-xs" /> : null}
+              {t.translations.LATTICE_APPROVE_ALL /* swap for a "Save" translation key */}
+            </button>
           )}
         </div>
       </div>
@@ -490,7 +655,10 @@ function ExtractionDetailPanel({
               <EmptyState message={t.translations.LATTICE_NO_RECORDS_STAGED} />
             ) : (
               staging.records.map((record) => (
-                <RecordCard key={record.id} record={record} />
+                <RecordCard key={record.id} record={record} isApproved={approved.records.has(record.id)}
+                  isRejected={rejected.records.has(record.id)}
+                  locked={!!record.promoted_id || record.rejected}
+                  onToggle={(action) => toggleItem("records", record.id, action)} />
               ))
             ))}
 
@@ -498,7 +666,10 @@ function ExtractionDetailPanel({
             (staging.classes.length === 0 ? (
               <EmptyState message={t.translations.LATTICE_NO_CLASSES_STAGED} />
             ) : (
-              staging.classes.map((cls) => <ClassCard key={cls.id} cls={cls} />)
+              staging.classes.map((cls) => <ClassCard key={cls.id} cls={cls} isApproved={approved.classes.has(cls.id)}
+                isRejected={rejected.classes.has(cls.id)}
+                locked={!!cls.promoted_id || cls.rejected}
+                onToggle={(action) => toggleItem("classes", cls.id, action)} />)
             ))}
 
           {activeTab === "edges" &&
@@ -506,7 +677,10 @@ function ExtractionDetailPanel({
               <EmptyState message={t.translations.LATTICE_NO_EDGES_STAGED} />
             ) : (
               staging.edges.map((edge) => (
-                <EdgeCard key={edge.id} edge={edge} />
+                <EdgeCard key={edge.id} edge={edge} isApproved={approved.edges.has(edge.id)}
+                  isRejected={rejected.edges.has(edge.id)}
+                  locked={!!edge.promoted_id || edge.rejected}
+                  onToggle={(action) => toggleItem("edges", edge.id, action)} />
               ))
             ))}
 
@@ -517,7 +691,10 @@ function ExtractionDetailPanel({
               />
             ) : (
               staging.relationships.map((rel) => (
-                <RelationshipCard key={rel.id} rel={rel} />
+                <RelationshipCard key={rel.id} rel={rel} isApproved={approved.relationships.has(rel.id)}
+                  isRejected={rejected.relationships.has(rel.id)}
+                  locked={!!rel.promoted_id || rel.rejected}
+                  onToggle={(action) => toggleItem("relationships", rel.id, action)} />
               ))
             ))}
         </div>
@@ -665,11 +842,10 @@ export default function LatticeDecisionsPage() {
                   <li key={item.id}>
                     <button
                       type="button"
-                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-base-200/60 ${
-                        selectedId === item.id
-                          ? "bg-base-200/80 font-semibold"
-                          : ""
-                      }`}
+                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-base-200/60 ${selectedId === item.id
+                        ? "bg-base-200/80 font-semibold"
+                        : ""
+                        }`}
                       onClick={() => handleSelect(item.id)}
                     >
                       <div className="min-w-0">
@@ -711,11 +887,10 @@ export default function LatticeDecisionsPage() {
                         </div>
                       </div>
                       <ArrowRightIcon
-                        className={`size-4 flex-shrink-0 transition ${
-                          selectedId === item.id
-                            ? "text-primary"
-                            : "text-base-content/30"
-                        }`}
+                        className={`size-4 flex-shrink-0 transition ${selectedId === item.id
+                          ? "text-primary"
+                          : "text-base-content/30"
+                          }`}
                       />
                     </button>
                   </li>
