@@ -4719,6 +4719,19 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task SearchPaginated_NoFilters_ReturnsRecordsWithinProject()
+    {
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, 99999L, DefaultSearch(), DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
     public async Task SearchPaginated_HideArchivedTrue_ExcludesArchivedRecords()
     {
         // Arrange
