@@ -142,39 +142,46 @@ function RecordCard({ record, isApproved, isRejected, onToggle, locked }:
         className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 text-left"
         onClick={() => setExpanded((prev) => !prev)}
       >
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-lg font-semibold">{record.name}</p>
-            {record.class_name && (
-              <span className="badge badge-outline">{record.class_name}</span>
-            )}
-            {record.validation_status && (
-              <span
-                className={`badge ${validationBadgeClass(record.validation_status)}`}
-              >
-                {record.validation_status}
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-lg font-semibold break-words">{record.name}</p>
+
+              {record.class_name && (
+                <span className="badge badge-outline">{record.class_name}</span>
+              )}
+
+              {record.validation_status && (
+                <span className={`badge ${validationBadgeClass(record.validation_status)}`}>
+                  {record.validation_status}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/60">
+              <span className="rounded-full bg-base-200 px-3 py-1">
+                {t.translations.LATTICE_SCORE}: {(record.ensemble_score * 100).toFixed(0)}%
               </span>
-            )}
+
+              <span className="rounded-full bg-base-200 px-3 py-1">
+                {t.translations.LATTICE_FREQUENCY}: {record.frequency}
+              </span>
+            </div>
           </div>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/60">
-            <span className="rounded-full bg-base-200 px-3 py-1">
-              {t.translations.LATTICE_SCORE}:{" "}
-              {(record.ensemble_score * 100).toFixed(0)}%
-            </span>
-            <span className="rounded-full bg-base-200 px-3 py-1">
-              {t.translations.LATTICE_FREQUENCY}: {record.frequency}
-            </span>
+
+          <div className="flex justify-end sm:ml-4 shrink-0">
+            <DecisionButtons
+              isApproved={isApproved}
+              isRejected={isRejected}
+              onToggle={onToggle}
+            />
           </div>
-          <DecisionButtons
-            isApproved={isApproved}
-            isRejected={isRejected}
-            onToggle={onToggle}
-          />
         </div>
+
         {expanded ? (
-          <ChevronUpIcon className="size-5 flex-shrink-0" />
+          <ChevronUpIcon className="size-5 shrink-0" />
         ) : (
-          <ChevronDownIcon className="size-5 flex-shrink-0" />
+          <ChevronDownIcon className="size-5 shrink-0" />
         )}
       </button>
 
@@ -200,33 +207,39 @@ function ClassCard({ cls, isApproved, isRejected, onToggle, locked }:
   const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold break-words">{cls.name}</p>
 
-        <p className="font-semibold">{cls.name}</p>
-        {cls.ontology_class_id ? (
-          <span className="badge badge-info badge-outline">
-            Already in project
-          </span>
-        ) : (
-          <DecisionButtons
-            isApproved={isApproved}
-            isRejected={isRejected}
-            onToggle={onToggle}
-          />
-        )}
-        {cls.validation_status && (
-          <span
-            className={`badge ${validationBadgeClass(cls.validation_status)}`}
-          >
-            {cls.validation_status}
-          </span>
-        )}
+            {cls.validation_status && (
+              <span className={`badge ${validationBadgeClass(cls.validation_status)}`}>
+                {cls.validation_status}
+              </span>
+            )}
+          </div>
+
+          {cls.ontology_class_id && (
+            <p className="mt-2 text-xs text-base-content/60">
+              {t.translations.LATTICE_EXISTING_CLASS_ID} {cls.ontology_class_id}
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end sm:ml-4 shrink-0">
+          {cls.ontology_class_id ? (
+            <span className="badge badge-info badge-outline">
+              Already in project
+            </span>
+          ) : (
+            <DecisionButtons
+              isApproved={isApproved}
+              isRejected={isRejected}
+              onToggle={onToggle}
+            />
+          )}
+        </div>
       </div>
-      {cls.ontology_class_id && (
-        <p className="mt-2 text-xs text-base-content/60">
-          {t.translations.LATTICE_EXISTING_CLASS_ID} {cls.ontology_class_id}
-        </p>
-      )}
     </div>
   );
 }
@@ -243,32 +256,39 @@ function EdgeCard({ edge, isApproved,
   const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-semibold">
-          {edge.origin_record_name ?? "?"} → {edge.relationship_name ?? "?"} →{" "}
-          {edge.destination_record_name ?? "?"}
-        </p>
-        <DecisionButtons
-          isApproved={isApproved}
-          isRejected={isRejected}
-          onToggle={onToggle}
-        />
-        {edge.validation_status && (
-          <span
-            className={`badge ${validationBadgeClass(edge.validation_status)}`}
-          >
-            {edge.validation_status}
-          </span>
-        )}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/60">
-        <span className="rounded-full bg-base-200 px-3 py-1">
-          {t.translations.LATTICE_SCORE}:{" "}
-          {(edge.ensemble_score * 100).toFixed(0)}%
-        </span>
-        <span className="rounded-full bg-base-200 px-3 py-1">
-          {t.translations.LATTICE_FREQUENCY}: {edge.frequency}
-        </span>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold break-words">
+              {edge.origin_record_name ?? "?"} → {edge.relationship_name ?? "?"} →{" "}
+              {edge.destination_record_name ?? "?"}
+            </p>
+
+            {edge.validation_status && (
+              <span className={`badge ${validationBadgeClass(edge.validation_status)}`}>
+                {edge.validation_status}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-base-content/60">
+            <span className="rounded-full bg-base-200 px-3 py-1">
+              {t.translations.LATTICE_SCORE}: {(edge.ensemble_score * 100).toFixed(0)}%
+            </span>
+
+            <span className="rounded-full bg-base-200 px-3 py-1">
+              {t.translations.LATTICE_FREQUENCY}: {edge.frequency}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex justify-end sm:ml-4 shrink-0">
+          <DecisionButtons
+            isApproved={isApproved}
+            isRejected={isRejected}
+            onToggle={onToggle}
+          />
+        </div>
       </div>
     </div>
   );
@@ -286,59 +306,63 @@ function RelationshipCard({ rel, isApproved,
   const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-semibold">{rel.name}</p>
-        {rel.ontology_relationship_id ? (
-          <span className="badge badge-info badge-outline">
-            Already in project
-          </span>
-        ) : (
-          <DecisionButtons
-            isApproved={isApproved}
-            isRejected={isRejected}
-            onToggle={onToggle}
-          />
-        )}
-        {rel.ontology_relationship_id && (
-          <p className="mt-2 text-xs text-base-content/60">
-            Existing relationship ID: {rel.ontology_relationship_id}
-          </p>
-        )}
-        {rel.validation_status && (
-          <span
-            className={`badge ${validationBadgeClass(rel.validation_status)}`}
-          >
-            {rel.validation_status}
-          </span>
-        )}
-      </div>
-      {(rel.origin_class_name || rel.destination_class_name) && (
-        <div className="mt-3 flex items-center gap-2 text-xs">
-          <div>
-            <p
-              className="text-base-content/40 uppercase tracking-wide"
-              style={{ fontSize: "0.625rem" }}
-            >
-              {t.translations.LATTICE_ORIGIN}
-            </p>
-            <p className="mt-0.5 font-medium text-base-content/70">
-              {rel.origin_class_name ?? "?"}
-            </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold break-words">{rel.name}</p>
+
+            {rel.validation_status && (
+              <span className={`badge ${validationBadgeClass(rel.validation_status)}`}>
+                {rel.validation_status}
+              </span>
+            )}
           </div>
-          <span className="mt-3 text-base-content/30">→</span>
-          <div>
-            <p
-              className="text-base-content/40 uppercase tracking-wide"
-              style={{ fontSize: "0.625rem" }}
-            >
-              {t.translations.LATTICE_DESTINATION}
+
+          {rel.ontology_relationship_id && (
+            <p className="mt-2 text-xs text-base-content/60">
+              Existing relationship ID: {rel.ontology_relationship_id}
             </p>
-            <p className="mt-0.5 font-medium text-base-content/70">
-              {rel.destination_class_name ?? "?"}
-            </p>
-          </div>
+          )}
+
+          {(rel.origin_class_name || rel.destination_class_name) && (
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <div>
+                <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>
+                  {t.translations.LATTICE_ORIGIN}
+                </p>
+                <p className="mt-0.5 font-medium text-base-content/70">
+                  {rel.origin_class_name ?? "?"}
+                </p>
+              </div>
+
+              <span className="mt-3 text-base-content/30">→</span>
+
+              <div>
+                <p className="text-base-content/40 uppercase tracking-wide" style={{ fontSize: "0.625rem" }}>
+                  {t.translations.LATTICE_DESTINATION}
+                </p>
+                <p className="mt-0.5 font-medium text-base-content/70">
+                  {rel.destination_class_name ?? "?"}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+
+        <div className="flex justify-end sm:ml-4 shrink-0">
+          {rel.ontology_relationship_id ? (
+            <span className="badge badge-info badge-outline">
+              Already in project
+            </span>
+          ) : (
+            <DecisionButtons
+              isApproved={isApproved}
+              isRejected={isRejected}
+              onToggle={onToggle}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -455,7 +479,7 @@ function ExtractionDetailPanel({
       next.delete(id);
       return { ...prev, [type]: next };
     });
-  }; ``
+  };
 
   useEffect(() => {
     setIsLoading(true);
@@ -500,16 +524,27 @@ function ExtractionDetailPanel({
           class_ids: [...rejected.classes],
           edge_ids: [...rejected.edges],
           relationship_ids: [...rejected.relationships],
-          reject_by_status: null,
-          reject_all_remaining: null
+          reject_by_status: [],
+          reject_all_remaining: false,
         });
       }
       toast.success(t.translations.LATTICE_EXTRACTION_APPROVED_TOAST);
 
       await fetchStaging();
       onStatusChange?.();
-    } catch {
-      toast.error(t.translations.LATTICE_PROCESS_FAILED);
+    } catch (error: any) {
+      const data = error?.response?.data;
+
+      const apiMessage =
+        data?.message ??
+        data?.detail ??
+        data?.title ??
+        (Array.isArray(data?.errors) ? data.errors.join("\n") : undefined) ??
+        (typeof data === "string" ? data : undefined) ??
+        error?.message ??
+        t.translations.LATTICE_PROCESS_FAILED;
+
+      toast.error(apiMessage);
     } finally {
       setIsPromoting(false);
     }
@@ -537,7 +572,7 @@ function ExtractionDetailPanel({
   const canDecide =
     staging.status === "complete" ||
     staging.status === "partially_promoted";
-  const tabs: DetailTab[] = ["records", "classes", "edges", "relationships"];
+  const tabs: DetailTab[] = ["classes", "relationships", "records", "edges"];
 
   const tabLabels: Record<DetailTab, string> = {
     records: t.translations.RECORDS,
@@ -562,6 +597,18 @@ function ExtractionDetailPanel({
     (rel) => !rel.promoted_id && !rel.rejected,
   );
 
+  const countByStatus = (status: string) =>
+    visibleRecords.filter((r) => r.validation_status === status).length +
+    visibleClasses.filter(
+      (c) => !c.ontology_class_id && c.validation_status === status,
+    ).length +
+    visibleEdges.filter((e) => e.validation_status === status).length +
+    visibleRelationships.filter(
+      (r) => !r.ontology_relationship_id && r.validation_status === status,
+    ).length;
+
+  const validCount = countByStatus("valid");
+  const novelDiscoveryCount = countByStatus("novel_discovery");
 
   const hasPendingDecisions = (
     ["records", "classes", "edges", "relationships"] as ItemType[]
@@ -620,10 +667,20 @@ function ExtractionDetailPanel({
                 type="button"
                 className="btn btn-outline btn-success btn-sm"
                 onClick={() => approveByStatus("valid")}
-                disabled={isPromoting}
+                disabled={isPromoting || validCount === 0}
               >
                 <CheckCircleIcon className="size-4" />
-                Approve valid
+                Approve valid ({validCount})
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-outline btn-warning btn-sm"
+                onClick={() => approveByStatus("novel_discovery")}
+                disabled={isPromoting || novelDiscoveryCount === 0}
+              >
+                <CheckCircleIcon className="size-4" />
+                Approve novel discoveries ({novelDiscoveryCount})
               </button>
 
               <button
