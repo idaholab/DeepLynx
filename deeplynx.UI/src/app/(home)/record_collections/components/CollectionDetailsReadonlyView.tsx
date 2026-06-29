@@ -268,7 +268,7 @@ export default function CollectionDetailsReadonlyView({
           </div>
         ) : (
           <CollectionRecordSearchResultsTable
-            rows={visibleRecords.map((record) => {
+            rows={visibleRecords.map((record, index) => {
               const classDisplayName =
                 record.className ??
                 (typeof record.classId === "number"
@@ -287,7 +287,7 @@ export default function CollectionDetailsReadonlyView({
                 record.name ?? t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD;
 
               return {
-                key: record.id ?? record.name,
+                key: record.id ?? record.name ?? `${collection.id}-${index}`,
                 name: record.id ? (
                   <Link
                     href={`/record?recordId=${record.id}&projectId=${record.projectId ?? projectId}`}
