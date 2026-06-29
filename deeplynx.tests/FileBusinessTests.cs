@@ -4665,6 +4665,774 @@ public class FileBusinessTests : IntegrationTestBase
                 It.IsAny<ObjectStorageConfigDto>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task UploadPart_MetadataNoClassInformation_ReturnsDefault()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part";
+        const long uploadOffset = 0;
+        const long expectedNewOffset = 12;
+        const long uploadLength = expectedNewOffset;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello world!"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)
+            ))
+            .ReturnsAsync("test-file.txt");
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            currentUserId,
+            uploadBody,
+            metadata: metadata);
+
+        // Assert
+        Assert.Equal(expectedNewOffset, result);
+
+        innerFileBusiness.Verify(
+            x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+            Times.Once);
+
+        var createdRecord = Context.Records
+            .SingleOrDefault(r =>
+                r.Name == metadata.Name &&
+                r.Description == metadata.Description &&
+                r.OriginalId == metadata.OriginalId);
+
+        Assert.NotNull(createdRecord);
+        Assert.Equal(fileClass.Id, createdRecord.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadPart_MetadataOnlyClassId_ReturnsCorrectClass()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part";
+        const long uploadOffset = 0;
+        const long expectedNewOffset = 12;
+        const long uploadLength = expectedNewOffset;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello world!"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)
+            ))
+            .ReturnsAsync("test-file.txt");
+
+        var fileClass = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = fileClass.Id
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            currentUserId,
+            uploadBody,
+            metadata: metadata);
+
+        // Assert
+        Assert.Equal(expectedNewOffset, result);
+
+        innerFileBusiness.Verify(
+            x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+            Times.Once);
+
+        var createdRecord = Context.Records
+            .SingleOrDefault(r =>
+                r.Name == metadata.Name &&
+                r.Description == metadata.Description &&
+                r.OriginalId == metadata.OriginalId);
+
+        Assert.NotNull(createdRecord);
+        Assert.Equal(fileClass.Id, createdRecord.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadPart_MetadataOnlyClassName_ReturnsCorrectClass()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part";
+        const long uploadOffset = 0;
+        const long expectedNewOffset = 12;
+        const long uploadLength = expectedNewOffset;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello world!"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)
+            ))
+            .ReturnsAsync("test-file.txt");
+
+        var fileClass = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = fileClass.Name
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            currentUserId,
+            uploadBody,
+            metadata: metadata);
+
+        // Assert
+        Assert.Equal(expectedNewOffset, result);
+
+        innerFileBusiness.Verify(
+            x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+            Times.Once);
+
+        var createdRecord = Context.Records
+            .SingleOrDefault(r =>
+                r.Name == metadata.Name &&
+                r.Description == metadata.Description &&
+                r.OriginalId == metadata.OriginalId);
+
+        Assert.NotNull(createdRecord);
+        Assert.Equal(fileClass.Id, createdRecord.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadPart_MetadataClassInformation_ReturnsCorrectClass()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part";
+        const long uploadOffset = 0;
+        const long expectedNewOffset = 12;
+        const long uploadLength = expectedNewOffset;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello world!"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)
+            ))
+            .ReturnsAsync("test-file.txt");
+
+        var fileClass = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = fileClass.Name,
+            ClassId = fileClass.Id
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            currentUserId,
+            uploadBody,
+            metadata: metadata);
+
+        // Assert
+        Assert.Equal(expectedNewOffset, result);
+
+        innerFileBusiness.Verify(
+            x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+            Times.Once);
+
+        var createdRecord = Context.Records
+            .SingleOrDefault(r =>
+                r.Name == metadata.Name &&
+                r.Description == metadata.Description &&
+                r.OriginalId == metadata.OriginalId);
+
+        Assert.NotNull(createdRecord);
+        Assert.Equal(fileClass.Id, createdRecord.ClassId);
+    }
+
+    [Fact]
+    public async Task UploadPart_MetadataMismatchingClassInformation_ThrowsArgumentException()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part";
+        const long uploadOffset = 0;
+        const long expectedNewOffset = 12;
+        const long uploadLength = expectedNewOffset;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello world!"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)
+            ))
+            .ReturnsAsync("test-file.txt");
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+        var fileClass2 = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = fileClass.Name,
+            ClassId = fileClass2.Id
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            currentUserId,
+            uploadBody,
+            metadata: metadata));
+    }
+
+    [Fact]
+    public async Task UploadPart_MetadataInvalidClassId_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part";
+        const long uploadOffset = 0;
+        const long expectedNewOffset = 12;
+        const long uploadLength = expectedNewOffset;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello world!"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)
+            ))
+            .ReturnsAsync("test-file.txt");
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = 4
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            currentUserId,
+            uploadBody,
+            metadata: metadata));
+    }
+
+    [Fact]
+    public async Task UploadPart_MetadataInvalidClassIdAndName_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part";
+        const long uploadOffset = 0;
+        const long expectedNewOffset = 12;
+        const long uploadLength = expectedNewOffset;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello world!"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)
+            ))
+            .ReturnsAsync("test-file.txt");
+
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassId = 4,
+            ClassName = fileClass.Name
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            currentUserId,
+            uploadBody,
+            metadata: metadata));
+    }
+
+    [Fact]
+    public async Task UploadPart_MetadataInvalidClassName_CreatesNewClass()
+    {
+        // Arrange
+        const string uploadId = "test-upload-part";
+        const long uploadOffset = 0;
+        const long expectedNewOffset = 12;
+        const long uploadLength = expectedNewOffset;
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello world!"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)
+            ))
+            .ReturnsAsync("test-file.txt");
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Override Name",
+            Description = "Override Description",
+            Properties = new JsonObject(),
+            OriginalId = "override-original-id",
+            ClassName = "Bob",
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            currentUserId,
+            uploadBody,
+            metadata: metadata);
+
+        // Assert
+        var fileClass = Context.Classes.First(c => c.Name == "Bob" && c.ProjectId == pid);
+        Assert.Equal(expectedNewOffset, result);
+
+        innerFileBusiness.Verify(
+            x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory),
+                uploadBody),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
+            Times.Once);
+
+        innerFileBusiness.Verify(
+            x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+            Times.Once);
+
+        var createdRecord = Context.Records
+            .SingleOrDefault(r =>
+                r.Name == metadata.Name &&
+                r.Description == metadata.Description &&
+                r.OriginalId == metadata.OriginalId);
+
+        Assert.NotNull(createdRecord);
+        Assert.Equal(fileClass.Id, createdRecord.ClassId);
+    }
     #endregion
 
 }
