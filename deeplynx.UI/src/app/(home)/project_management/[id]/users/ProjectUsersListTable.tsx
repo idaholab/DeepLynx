@@ -23,6 +23,10 @@ interface ProjectUsersListTableProps {
   }) => void;
 }
 
+const ACTIONS_COLUMN_CLASS =
+  "sticky right-0 z-20 w-20 min-w-20 border-l border-base-300/50 bg-base-100 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]";
+const ACTION_BUTTON_CLASS = "btn btn-ghost btn-sm px-1";
+
 const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
   tableData,
   loading,
@@ -32,13 +36,15 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
 }) => {
   return (
     <div className="overflow-x-auto">
-      <table className="table">
+      <table className="table min-w-full">
         <thead>
           <tr>
             <th>Member</th>
             <th>Type</th>
             <th>Email</th>
-            <th>Actions</th>
+            <th className={`${ACTIONS_COLUMN_CLASS} z-30 text-left`}>
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -70,32 +76,28 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
 
                 <td className="capitalize">{row.memberType}</td>
                 <td className="text-base-content/70">{row.email || "—"}</td>
-                <td>
-                  <div className="flex gap-2 items-center">
+                <td className={ACTIONS_COLUMN_CLASS}>
+                  <div className="flex items-center justify-start gap-0.5 whitespace-nowrap">
                     {row.memberType === "group" ? (
                         <button
-                          className="btn btn-ghost btn-xs"
+                          className={ACTION_BUTTON_CLASS}
                           disabled={loading}    
                           onClick={() => onViewGroupMembers(row)}
                           title={"View group members"}
                         >
-                          <UserGroupIcon className="size-6" />
+                          <UserGroupIcon className="size-5" />
                         </button>
-                    ) : (
-                        <div className="btn btn-ghost btn-xs invisible">
-                          <UserGroupIcon className="size-6" />
-                        </div>
-                    )}
+                    ) : null}
                     <button
-                      className="btn btn-ghost btn-xs"
+                      className={ACTION_BUTTON_CLASS}
                       disabled={loading}
                       onClick={() => onEditRole(row)}
                       title="Edit role"
                     >
-                      <PencilIcon className="size-6" />
+                      <PencilIcon className="size-5" />
                     </button>
                     <button
-                      className="btn btn-ghost btn-xs text-error"
+                      className={`${ACTION_BUTTON_CLASS} text-error`}
                       disabled={loading}
                       onClick={() =>
                         onOpenRemoveModal({
@@ -106,7 +108,7 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
                       }
                       title="Remove from project"
                     >
-                      <TrashIcon className="size-6 text-error" />
+                      <TrashIcon className="size-5 text-error" />
                     </button>
                   </div>
                 </td>
