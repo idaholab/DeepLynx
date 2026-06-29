@@ -3,7 +3,6 @@
 import { useLanguage } from "@/app/contexts/Language";
 import Link from "next/link";
 import React from "react";
-import { formatLocalDateTime } from "@/app/lib/date_time";
 import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
 import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
@@ -21,6 +20,8 @@ export default function SelectedCollectionRecordsTab({
       projectId,
       collectionRecords,
       recordsLoading,
+      classNameById,
+      dataSourceNameById,
     },
     search: {
       recordSearchTerm,
@@ -82,31 +83,46 @@ export default function SelectedCollectionRecordsTab({
 
           {recordSearchResults.length ? (
             <CollectionRecordSearchResultsTable
-              rows={addableRecordResults.map((record) => ({
-                key: record.id ?? record.name,
-                leadingCell: (
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-sm"
-                    checked={
-                      typeof record.id === "number" &&
-                      selectedRecordIds.includes(record.id)
-                    }
-                    disabled={typeof record.id !== "number"}
-                    onChange={() => {
-                      if (typeof record.id === "number") {
-                        onToggleSelectedRecord(record.id);
-                      }
-                    }}
-                  />
-                ),
-                name: record.name,
-                className:
+              rows={addableRecordResults.map((record) => {
+                const classDisplayName =
                   record.className ??
-                  t.translations.RECORD_COLLECTIONS_UNCLASSIFIED,
-                sourceName: record.dataSourceName ?? t.translations.UNKNOWN,
-                updatedAt: record.lastUpdatedAt,
-              }))}
+                  (typeof record.classId === "number"
+                    ? classNameById[record.classId]
+                    : undefined) ??
+                  record.classId ??
+                  t.translations.RECORD_COLLECTIONS_UNCLASSIFIED;
+                const sourceDisplayName =
+                  record.dataSourceName ??
+                  (typeof record.dataSourceId === "number"
+                    ? dataSourceNameById[record.dataSourceId]
+                    : undefined) ??
+                  record.dataSourceId ??
+                  t.translations.UNKNOWN;
+
+                return {
+                  key: record.id ?? record.name,
+                  leadingCell: (
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm"
+                      checked={
+                        typeof record.id === "number" &&
+                        selectedRecordIds.includes(record.id)
+                      }
+                      disabled={typeof record.id !== "number"}
+                      onChange={() => {
+                        if (typeof record.id === "number") {
+                          onToggleSelectedRecord(record.id);
+                        }
+                      }}
+                    />
+                  ),
+                  name: record.name,
+                  className: classDisplayName,
+                  sourceName: sourceDisplayName,
+                  updatedAt: record.lastUpdatedAt,
+                };
+              })}
               emptyMessage={
                 t.translations
                   .RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION
@@ -124,65 +140,55 @@ export default function SelectedCollectionRecordsTab({
           ) : null}
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-base-300/50">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{t.translations.RECORD}</th>
-                <th>{t.translations.RECORD_COLLECTIONS_CLASS}</th>
-                <th>{t.translations.PROJECT}</th>
-                <th>{t.translations.RECORD_COLLECTIONS_UPDATED}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recordsLoading ? (
-                <tr>
-                  <td colSpan={4}>
-                    <span className="loading loading-spinner loading-sm" />
-                  </td>
-                </tr>
-              ) : collectionRecords.length ? (
-                collectionRecords.map((record) => (
-                  <tr key={record.id ?? record.name}>
-                    <td className="font-medium">
-                      {record.id ? (
-                        <Link
-                          href={`/record?recordId=${record.id}&projectId=${record.projectId ?? projectId}`}
-                          className="link text-base-content hover:text-base-content/80"
-                        >
-                          {record.name ??
-                            t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD}
-                        </Link>
-                      ) : (
-                        (record.name ??
-                        t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD)
-                      )}
-                    </td>
-                    <td>
-                      {record.classId ??
-                        t.translations.RECORD_COLLECTIONS_UNCLASSIFIED}
-                    </td>
-                    <td>{record.projectId ?? projectId}</td>
-                    <td>
-                      {record.lastUpdatedAt
-                        ? formatLocalDateTime(record.lastUpdatedAt)
-                        : t.translations.RECORD_COLLECTIONS_NOT_UPDATED}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4}>
-                    {
-                      t.translations
-                        .RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED
-                    }
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {recordsLoading ? (
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-base-300/50 bg-base-100 p-4 text-sm text-base-content/70">
+            <span className="loading loading-spinner loading-sm" />
+            {t.translations.LOADING}
+          </div>
+        ) : (
+          <CollectionRecordSearchResultsTable
+            rows={collectionRecords.map((record) => {
+              const classDisplayName =
+                record.className ??
+                (typeof record.classId === "number"
+                  ? classNameById[record.classId]
+                  : undefined) ??
+                record.classId ??
+                t.translations.RECORD_COLLECTIONS_UNCLASSIFIED;
+              const sourceDisplayName =
+                record.dataSourceName ??
+                (typeof record.dataSourceId === "number"
+                  ? dataSourceNameById[record.dataSourceId]
+                  : undefined) ??
+                record.dataSourceId ??
+                t.translations.UNKNOWN;
+              const recordName =
+                record.name ?? t.translations.RECORD_COLLECTIONS_UNNAMED_RECORD;
+
+              return {
+                key: record.id ?? record.name,
+                name: record.id ? (
+                  <Link
+                    href={`/record?recordId=${record.id}&projectId=${record.projectId ?? projectId}`}
+                    className="link text-base-content hover:text-base-content/80"
+                  >
+                    {recordName}
+                  </Link>
+                ) : (
+                  recordName
+                ),
+                className: classDisplayName,
+                sourceName: sourceDisplayName,
+                updatedAt: record.lastUpdatedAt,
+              };
+            })}
+            emptyMessage={
+              t.translations.RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED
+            }
+            maxHeightClassName="max-h-fit"
+            pinnedHeader={false}
+          />
+        )}
       </SectionCard>
     </div>
   );

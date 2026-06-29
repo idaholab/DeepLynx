@@ -1237,6 +1237,10 @@ export const translations = {
       RECORD_COLLECTIONS_ALL: "All Collections",
       RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION:
         "All matching records are already in this collection.",
+      RECORD_COLLECTIONS_ARCHIVE_COLLECTION: "Archive collection",
+      RECORD_COLLECTIONS_ARCHIVE_CONFIRM:
+        'Archive "{name}"? This removes it from active collections.',
+      RECORD_COLLECTIONS_ARCHIVE_SUCCESS: "Record collection archived",
       RECORD_COLLECTIONS_ARE_YOU_SURE: "Are you sure?",
       RECORD_COLLECTIONS_ASSIGNED_COUNT: "{count} assigned",
       RECORD_COLLECTIONS_ASSIGNED_RECORDS_SHOWN:
@@ -1245,6 +1249,7 @@ export const translations = {
       RECORD_COLLECTIONS_BACK_TO_DETAILS: "Back to details",
       RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING:
         "Browse collections, create new collections, and modify existing collections.",
+      RECORD_COLLECTIONS_BROWSE_RECORDS: "Browse records",
       RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT:
         "Browse, search, and modify record collections for this project.",
       RECORD_COLLECTIONS_CLASS: "Class",
@@ -1262,6 +1267,7 @@ export const translations = {
       RECORD_COLLECTIONS_FAILED_CREATE_LABEL:
         "Failed to create sensitivity label",
       RECORD_COLLECTIONS_FAILED_CREATE_TAG: "Failed to create tag",
+      RECORD_COLLECTIONS_FAILED_ARCHIVE: "Failed to archive record collection",
       RECORD_COLLECTIONS_FAILED_LOAD_COLLECTIONS:
         "Failed to load record collections",
       RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS:
@@ -1354,6 +1360,7 @@ export const translations = {
       RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT: "{count} records selected",
       RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
         "{shown} of {total} records shown",
+      RECORD_COLLECTIONS_SHOW_CURRENT_RECORDS: "Show current list",
       RECORD_COLLECTIONS_SHOW_MORE: "Show more",
       RECORD_COLLECTIONS_SOURCE: "Source",
       RECORD_COLLECTIONS_SORT_ALPHABETICAL_ASC: "Alphabetical (A to Z)",
@@ -3117,6 +3124,10 @@ export const translations = {
       RECORD_COLLECTIONS_ALL: "Todas las colecciones",
       RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION:
         "Todos los registros coincidentes ya están en esta colección.",
+      RECORD_COLLECTIONS_ARCHIVE_COLLECTION: "Archivar colección",
+      RECORD_COLLECTIONS_ARCHIVE_CONFIRM:
+        '¿Archivar "{name}"? Esto la elimina de las colecciones activas.',
+      RECORD_COLLECTIONS_ARCHIVE_SUCCESS: "Colección de registros archivada",
       RECORD_COLLECTIONS_ARE_YOU_SURE: "¿Estás seguro?",
       RECORD_COLLECTIONS_ASSIGNED_COUNT: "{count} asignados",
       RECORD_COLLECTIONS_ASSIGNED_RECORDS_SHOWN:
@@ -3125,6 +3136,7 @@ export const translations = {
       RECORD_COLLECTIONS_BACK_TO_DETAILS: "Volver a los detalles",
       RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING:
         "Explora colecciones, crea nuevas colecciones y modifica las existentes.",
+      RECORD_COLLECTIONS_BROWSE_RECORDS: "Explorar registros",
       RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT:
         "Explora, busca y modifica colecciones de registros para este proyecto.",
       RECORD_COLLECTIONS_CLASS: "Clase",
@@ -3144,6 +3156,8 @@ export const translations = {
       RECORD_COLLECTIONS_FAILED_CREATE_LABEL:
         "No se pudo crear la etiqueta de sensibilidad",
       RECORD_COLLECTIONS_FAILED_CREATE_TAG: "No se pudo crear la etiqueta",
+      RECORD_COLLECTIONS_FAILED_ARCHIVE:
+        "No se pudo archivar la colección de registros",
       RECORD_COLLECTIONS_FAILED_LOAD_COLLECTIONS:
         "No se pudieron cargar las colecciones de registros",
       RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS:
@@ -3248,6 +3262,7 @@ export const translations = {
         "{count} registros seleccionados",
       RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
         "Se muestran {shown} de {total} registros",
+      RECORD_COLLECTIONS_SHOW_CURRENT_RECORDS: "Mostrar lista actual",
       RECORD_COLLECTIONS_SHOW_MORE: "Mostrar más",
       RECORD_COLLECTIONS_SOURCE: "Fuente",
       RECORD_COLLECTIONS_SORT_ALPHABETICAL_ASC: "Alfabético (A a Z)",
