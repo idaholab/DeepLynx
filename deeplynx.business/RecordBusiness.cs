@@ -222,6 +222,7 @@ public class RecordBusiness : IRecordBusiness
         INNER JOIN deeplynx.projects p       ON p.id  = r.project_id
         LEFT  JOIN deeplynx.classes c        ON c.id  = r.class_id
         WHERE r.organization_id = @organization_id
+        AND r.project_id = @project_id
         {classFilter}
         {embeddedFilter}
         {hideArchivedFilter}
@@ -234,7 +235,8 @@ public class RecordBusiness : IRecordBusiness
 
         var parameters = new List<NpgsqlParameter>
         {
-            new("organization_id", organizationId)
+            new("organization_id", organizationId),
+            new("project_id", projectId),
         };
 
         if (!string.IsNullOrWhiteSpace(search.UserQuery))
