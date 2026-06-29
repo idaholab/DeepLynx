@@ -452,6 +452,35 @@ function ExtractionDetailPanel({
         extractionId,
       );
       setStaging(data);
+      setApproved((prev) => ({
+        records: new Set([...prev.records].filter((id) =>
+          data.records.some((r) => r.id === id && !r.promoted_id && !r.rejected),
+        )),
+        classes: new Set([...prev.classes].filter((id) =>
+          data.classes.some((c) => c.id === id && !c.promoted_id && !c.rejected && !c.ontology_class_id),
+        )),
+        edges: new Set([...prev.edges].filter((id) =>
+          data.edges.some((e) => e.id === id && !e.promoted_id && !e.rejected),
+        )),
+        relationships: new Set([...prev.relationships].filter((id) =>
+          data.relationships.some((r) => r.id === id && !r.promoted_id && !r.rejected && !r.ontology_relationship_id),
+        )),
+      }));
+
+      setRejected((prev) => ({
+        records: new Set([...prev.records].filter((id) =>
+          data.records.some((r) => r.id === id && !r.promoted_id && !r.rejected),
+        )),
+        classes: new Set([...prev.classes].filter((id) =>
+          data.classes.some((c) => c.id === id && !c.promoted_id && !c.rejected && !c.ontology_class_id),
+        )),
+        edges: new Set([...prev.edges].filter((id) =>
+          data.edges.some((e) => e.id === id && !e.promoted_id && !e.rejected),
+        )),
+        relationships: new Set([...prev.relationships].filter((id) =>
+          data.relationships.some((r) => r.id === id && !r.promoted_id && !r.rejected && !r.ontology_relationship_id),
+        )),
+      }));
       setError(null);
     } catch {
       setError(t.translations.LATTICE_FAILED_LOAD_EXTRACTION);
@@ -517,6 +546,7 @@ function ExtractionDetailPanel({
           edge_ids: [...approved.edges],
           relationship_ids: [...approved.relationships]
         });
+        await fetchStaging();
       }
       if (hasRejections) {
         await rejectExtraction(organizationId, projectId, extractionId, {
@@ -527,11 +557,14 @@ function ExtractionDetailPanel({
           reject_by_status: [],
           reject_all_remaining: false,
         });
+        await fetchStaging();
       }
       toast.success(t.translations.LATTICE_EXTRACTION_APPROVED_TOAST);
 
       await fetchStaging();
       onStatusChange?.();
+      setApproved({ records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set() });
+      setRejected({ records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set() });
     } catch (error: any) {
       const data = error?.response?.data;
 

@@ -741,7 +741,7 @@ export const translations = {
       LATTICE_INVALID_SCHEMA_DESCRIPTION:
         "items could not be reconciled with the schema.",
       LATTICE_APPROVE_PROMOTES_ALL:
-        "Approving an extraction promotes all staged items into the knowledge graph and data schema, regardless of validation status.",
+        "You can approve or reject staged items into the knowledge graph and data schema, regardless of validation status.",
       LATTICE_COMING_SOON: "Coming Soon",
       LATTICE_COMING_SOON_TEXT:
         "Individual item approval and bulk approval for different statuses",
