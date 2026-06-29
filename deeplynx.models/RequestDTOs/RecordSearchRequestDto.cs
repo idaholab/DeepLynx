@@ -26,8 +26,8 @@ public class RecordSearchRequestDto
     /// <summary>
     /// The Insight embedded status of the record
     /// </summary>
-    [AllowedValues("", "any", "embedded", "pending")]
-    public string Embedding { get; set; } = "";
+    [AllowedValues("any", "embedded", "pending", null)]
+    public string? Embedding { get; set; } = null;
     /// <summary>
     /// Whether to hide archived record
     /// </summary>
