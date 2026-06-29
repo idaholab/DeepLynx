@@ -135,6 +135,42 @@ public class RecordController : ControllerBase
     }
 
     /// <summary>
+    ///     Paginated full text records search
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belongs</param>
+    /// <param name="search">Search parameters</param>
+    /// <param name="paginated">Pagination parameters</param>
+    /// <returns>Paginated list of record response dtos from the query view that match provided query parameters</returns>
+    [HttpGet("search/paginated", Name = "api_record_search_paginated")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> SearchPaginated(
+        long organizationId,
+        long projectId,
+        [FromQuery] RecordSearchRequestDto search,
+        [FromQuery] PaginatedRequestDto paginated)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records =
+                await _recordBusiness.SearchPaginated(currentUserId, organizationId, projectId, search, paginated,
+                    isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while searching paginated records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Get Records by Tags
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
