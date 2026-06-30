@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useLanguage } from "@/app/contexts/Language";
 import {
     getDeviceAuthorizationRequest,
     setDeviceAuthorizationDecision,
@@ -23,7 +24,7 @@ function normalizeUserCode(value: string) {
     return value.trim().toUpperCase();
 }
 
-function getErrorMessage(error: unknown) {
+function getErrorMessage(error: unknown, fallbackMessage: string) {
     const apiError = error as ApiError;
     const data = apiError.response?.data;
 
@@ -31,7 +32,7 @@ function getErrorMessage(error: unknown) {
         return data;
     }
 
-    return data?.error_description || data?.message || data?.error || apiError.message || "Unable to complete request.";
+    return data?.error_description || data?.message || data?.error || apiError.message || fallbackMessage;
 }
 
 function formatDate(value: string) {
@@ -45,6 +46,7 @@ function formatDate(value: string) {
 }
 
 function DeviceVerificationContent() {
+    const { t } = useLanguage();
     const searchParams = useSearchParams();
     const codeFromUrl = searchParams.get("user_code") || "";
     const [userCode, setUserCode] = useState(codeFromUrl);
@@ -57,7 +59,7 @@ function DeviceVerificationContent() {
 
     async function lookupRequest(code = normalizedUserCode) {
         if (!code) {
-            setError("Enter a device code.");
+            setError(t.translations.OAUTH_DEVICE_ENTER_CODE);
             return;
         }
 
@@ -70,7 +72,7 @@ function DeviceVerificationContent() {
             setUserCode(response.user_code);
         } catch (lookupError) {
             setDeviceRequest(null);
-            setError(getErrorMessage(lookupError));
+            setError(getErrorMessage(lookupError, t.translations.OAUTH_DEVICE_UNABLE_TO_COMPLETE));
         } finally {
             setLoading(false);
         }
@@ -84,7 +86,7 @@ function DeviceVerificationContent() {
             const response = await setDeviceAuthorizationDecision(normalizedUserCode, approve);
             setDeviceRequest(response);
         } catch (decisionError) {
-            setError(getErrorMessage(decisionError));
+            setError(getErrorMessage(decisionError, t.translations.OAUTH_DEVICE_UNABLE_TO_COMPLETE));
         } finally {
             setDecisionLoading(null);
         }
@@ -102,8 +104,8 @@ function DeviceVerificationContent() {
         <main className="min-h-screen bg-gray-50 px-4 py-12 text-gray-900">
             <section className="mx-auto max-w-xl rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
                 <div className="mb-6">
-                    <p className="text-sm font-semibold uppercase text-gray-500">Nexus</p>
-                    <h1 className="mt-2 text-2xl font-semibold">Device authorization</h1>
+                    <p className="text-sm font-semibold uppercase text-gray-500">{t.translations.OAUTH_DEVICE_BRAND}</p>
+                    <h1 className="mt-2 text-2xl font-semibold">{t.translations.OAUTH_DEVICE_TITLE}</h1>
                 </div>
 
                 <form
@@ -114,7 +116,7 @@ function DeviceVerificationContent() {
                     }}
                 >
                     <label className="block text-sm font-medium text-gray-700" htmlFor="user_code">
-                        Device code
+                        {t.translations.OAUTH_DEVICE_CODE}
                     </label>
                     <div className="flex flex-col gap-3 sm:flex-row">
                         <input
@@ -134,7 +136,7 @@ function DeviceVerificationContent() {
                             className="min-h-11 rounded-md bg-gray-800 px-5 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
                             disabled={loading}
                         >
-                            {loading ? "Checking" : "Continue"}
+                            {loading ? t.translations.OAUTH_DEVICE_CHECKING : t.translations.OAUTH_DEVICE_CONTINUE}
                         </button>
                     </div>
                 </form>
@@ -149,24 +151,24 @@ function DeviceVerificationContent() {
                     <div className="mt-6 space-y-5 border-t border-gray-200 pt-5">
                         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                             <div>
-                                <dt className="font-medium text-gray-500">Application</dt>
+                                <dt className="font-medium text-gray-500">{t.translations.OAUTH_DEVICE_APPLICATION}</dt>
                                 <dd className="mt-1 text-gray-900">{deviceRequest.application_name}</dd>
                             </div>
                             <div>
-                                <dt className="font-medium text-gray-500">Client ID</dt>
+                                <dt className="font-medium text-gray-500">{t.translations.OAUTH_DEVICE_CLIENT_ID}</dt>
                                 <dd className="mt-1 break-all text-gray-900">{deviceRequest.client_id}</dd>
                             </div>
                             <div>
-                                <dt className="font-medium text-gray-500">Status</dt>
+                                <dt className="font-medium text-gray-500">{t.translations.OAUTH_DEVICE_STATUS}</dt>
                                 <dd className="mt-1 capitalize text-gray-900">{deviceRequest.status}</dd>
                             </div>
                             <div>
-                                <dt className="font-medium text-gray-500">Expires</dt>
+                                <dt className="font-medium text-gray-500">{t.translations.OAUTH_DEVICE_EXPIRES}</dt>
                                 <dd className="mt-1 text-gray-900">{formatDate(deviceRequest.expires_at)}</dd>
                             </div>
                             {deviceRequest.scope && (
                                 <div className="sm:col-span-2">
-                                    <dt className="font-medium text-gray-500">Scope</dt>
+                                    <dt className="font-medium text-gray-500">{t.translations.OAUTH_DEVICE_SCOPE}</dt>
                                     <dd className="mt-1 break-words text-gray-900">{deviceRequest.scope}</dd>
                                 </div>
                             )}
@@ -179,7 +181,7 @@ function DeviceVerificationContent() {
                                 disabled={!canDecide || decisionLoading !== null}
                                 onClick={() => void submitDecision(true)}
                             >
-                                {decisionLoading === "approve" ? "Approving" : "Approve"}
+                                {decisionLoading === "approve" ? t.translations.OAUTH_DEVICE_APPROVING : t.translations.OAUTH_DEVICE_APPROVE}
                             </button>
                             <button
                                 type="button"
@@ -187,7 +189,7 @@ function DeviceVerificationContent() {
                                 disabled={!canDecide || decisionLoading !== null}
                                 onClick={() => void submitDecision(false)}
                             >
-                                {decisionLoading === "deny" ? "Denying" : "Deny"}
+                                {decisionLoading === "deny" ? t.translations.OAUTH_DEVICE_DENYING : t.translations.OAUTH_DEVICE_DENY}
                             </button>
                         </div>
                     </div>
