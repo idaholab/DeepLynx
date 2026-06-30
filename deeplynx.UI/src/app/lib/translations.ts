@@ -696,6 +696,7 @@ export const translations = {
         "Automatically extract records, classes, relationships, and edges from this document. Results are staged for review before anything is added to the knowledge graph or data schema.",
       LATTICE_HOW_IT_WORKS: "How it works",
       LATTICE_STEP_EMBED: "Queue this document for AI embedding using Insight",
+      LATTICE_STEP_ONTOLOGY: "Before running a Lattice extraction, add at least 2 classes and 1 relationship to your project's ontology. Once the minimum ontology is in place, you can start an extraction.",
       LATTICE_STEP_MODE: "Choose an extraction mode",
       LATTICE_STEP_TRIGGER:
         "Trigger extraction — results are staged for review",
@@ -740,7 +741,7 @@ export const translations = {
       LATTICE_INVALID_SCHEMA_DESCRIPTION:
         "items could not be reconciled with the schema.",
       LATTICE_APPROVE_PROMOTES_ALL:
-        "Approving an extraction promotes all staged items into the knowledge graph and data schema, regardless of validation status.",
+        "You can approve or reject staged items into the knowledge graph and data schema, regardless of validation status.",
       LATTICE_COMING_SOON: "Coming Soon",
       LATTICE_COMING_SOON_TEXT:
         "Individual item approval and bulk approval for different statuses",
@@ -756,7 +757,7 @@ export const translations = {
       LATTICE_EXTRACTION_RUNNING:
         "Extraction is in progress. This page will update automatically.",
       LATTICE_EXTRACTION_REVIEW:
-        "Review the staged items below, then approve or reject the entire extraction.",
+        "Review the staged items below. Approve or reject each item, then click Save to apply your decisions. You can also use Approve by Status to quickly approve groups of items. Existing schema items are shown for reference and do not require a decision. An extraction is complete once all remaining staged items have been reviewed.",
       LATTICE_EXTRACTION_FAILED_MSG:
         "This extraction failed to complete. This can happen when the LLM response has an unexpected structure — please try triggering a new extraction.",
       LATTICE_EXTRACTION_REJECTED_MSG: "This extraction was rejected.",
@@ -2559,6 +2560,7 @@ export const translations = {
       LATTICE_HOW_IT_WORKS: "Cómo funciona",
       LATTICE_STEP_EMBED:
         "Poner este documento en cola para incrustación con IA",
+      LATTICE_STEP_ONTOLOGY: "Antes de ejecutar una extracción de Lattice, agregue al menos 2 clases y 1 relación a la ontología de su proyecto. Una vez que la ontología mínima esté configurada, podrá iniciar una extracción.",
       LATTICE_STEP_MODE: "Elegir un modo de extracción",
       LATTICE_STEP_TRIGGER:
         "Activar extracción — los resultados se preparan para revisión",
@@ -2623,7 +2625,7 @@ export const translations = {
       LATTICE_EXTRACTION_RUNNING:
         "La extracción está en progreso. Esta página se actualizará automáticamente.",
       LATTICE_EXTRACTION_REVIEW:
-        "Revisa los elementos preparados a continuación, luego aprueba o rechaza la extracción completa.",
+        "Revise los elementos preparados a continuación. Apruebe o rechace cada elemento y, después, haga clic en Guardar para aplicar sus decisiones. También puede usar Aprobar por estado para aprobar rápidamente grupos de elementos. Los elementos que ya existen en el esquema se muestran solo como referencia y no requieren una decisión. Una extracción se considera completa cuando se han revisado todos los elementos pendientes.",
       LATTICE_EXTRACTION_FAILED_MSG:
         "Esta extracción no pudo completarse. Esto puede ocurrir cuando la respuesta del LLM tiene una estructura inesperada — intenta activar una nueva extracción.",
       LATTICE_EXTRACTION_REJECTED_MSG: "Esta extracción fue rechazada.",
