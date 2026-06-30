@@ -38,16 +38,6 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _logger = logger;
     }
 
-    private const string FailureStageTrigger = "trigger";
-    private const string FailureStageInsightRequest = "insight_request";
-    private const string FailureStageInsightProcessing = "insight_processing";
-    private const string FailureStageCallback = "callback";
-    private const string FailureStageValidation = "validation";
-    private const string FailureStageStaging = "staging";
-    private const int RequiredOntologyClassCount = 2;
-    private const int RequiredOntologyRelationshipCount = 1;
-    private static readonly string[] DefaultOntologyClassNames = { "File", "Report", "Timeseries" };
-
     /// <summary>
     ///     Creates a Pending Extraction record, builds ontology context via similarity search,
     ///     and fires the trigger request to Insight.
