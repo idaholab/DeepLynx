@@ -31,7 +31,8 @@ namespace deeplynx.tests.Controllers;
 public class OauthDeviceAuthorizationHttpFlowTests : IntegrationTestBase
 {
     private const string DeviceCodeGrantType = "urn:ietf:params:oauth:grant-type:device_code";
-    private const string VerificationUri = "https://nexus.example.com/oauth/device/verify";
+    private const string HostedLink = "https://nexus.example.com";
+    private const string VerificationUri = HostedLink + "/oauth/device/verify";
 
     private HttpClient _httpClient = null!;
     private WebApplication _app = null!;
@@ -59,7 +60,7 @@ public class OauthDeviceAuthorizationHttpFlowTests : IntegrationTestBase
             await _app.DisposeAsync();
         }
 
-        Environment.SetEnvironmentVariable("OAUTH_DEVICE_VERIFICATION_URI", null);
+        Environment.SetEnvironmentVariable("HOSTED_LINK", null);
         UserContextStorage.UserId = 0;
         UserContextStorage.Email = string.Empty;
 
@@ -210,7 +211,7 @@ public class OauthDeviceAuthorizationHttpFlowTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         Environment.SetEnvironmentVariable("JWT_SECRET_KEY", "test-jwt-secret-key-min-32-chars");
-        Environment.SetEnvironmentVariable("OAUTH_DEVICE_VERIFICATION_URI", VerificationUri);
+        Environment.SetEnvironmentVariable("HOSTED_LINK", HostedLink);
     }
 
     private async Task StartTestNexusAsync()

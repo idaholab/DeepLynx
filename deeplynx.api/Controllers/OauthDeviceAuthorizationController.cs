@@ -12,16 +12,13 @@ namespace deeplynx.api.Controllers;
 public class OauthDeviceAuthorizationController : ControllerBase
 {
     private readonly IOauthDeviceAuthorizationBusiness _oauthDeviceAuthorizationBusiness;
-    private readonly IConfiguration _configuration;
     private readonly ILogger<OauthDeviceAuthorizationController> _logger;
 
     public OauthDeviceAuthorizationController(
         IOauthDeviceAuthorizationBusiness oauthDeviceAuthorizationBusiness,
-        IConfiguration configuration,
         ILogger<OauthDeviceAuthorizationController> logger)
     {
         _oauthDeviceAuthorizationBusiness = oauthDeviceAuthorizationBusiness;
-        _configuration = configuration;
         _logger = logger;
     }
 
@@ -184,15 +181,8 @@ public class OauthDeviceAuthorizationController : ControllerBase
 
     private string BuildVerificationUri()
     {
-        var configuredVerificationUri = _configuration["OAUTH_DEVICE_VERIFICATION_URI"];
+        var hostedLink = Environment.GetEnvironmentVariable("HOSTED_LINK")?.TrimEnd('/');
 
-        if (!string.IsNullOrWhiteSpace(configuredVerificationUri))
-        {
-            return configuredVerificationUri.Trim();
-        }
-
-        var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : string.Empty;
-
-        return $"{Request.Scheme}://{Request.Host}{pathBase}/oauth/device/verify";
+        return $"{hostedLink}/oauth/device/verify";
     }
 }
