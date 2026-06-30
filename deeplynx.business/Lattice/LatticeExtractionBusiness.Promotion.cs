@@ -313,6 +313,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     /// <summary>
     ///     Promotes extraction records into deeplynx.records.
     ///     Records already matched to a KG entity (deeplynx_record_id set) are linked rather than re-created.
+    ///     When SourceRecordId is available, it is injected into the promoted record's Properties JSONB
+    ///     as "originId" for provenance tracking. This value is authoritative and overwrites any
+    ///     LLM-produced "originId" key.
     ///     Returns a map of ExtractionRecord.Id → deeplynx Record id, and the count of newly created records.
     /// </summary>
     private async Task<(Dictionary<long, long> RecordIdMap, int NewRecordCount)> PromoteRecords(
@@ -335,12 +338,27 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             var newRecords = toCreate.Select(sr =>
             {
                 classIdMap.TryGetValue(sr.ExtractionClassId, out var resolvedClassId);
+
+                // Inject originId into Properties for provenance tracking.
+                // Parse the LLM-produced attributes into a mutable object, set originId
+                // (overwriting any LLM-produced value — ours is authoritative), then serialize back.
+                var sProperties = sr.Attributes;
+                if (sr.SourceRecordId.HasValue)
+                {
+                    var jsonObj = string.IsNullOrWhiteSpace(sProperties)
+                        ? new JsonObject()
+                        : JsonNode.Parse(sProperties)?.AsObject() ?? new JsonObject();
+                    jsonObj["originId"] = sr.SourceRecordId.Value;
+                    sProperties = jsonObj.ToJsonString();
+                }
+                sProperties ??= "{}";
+
                 return (sr, new Record
                 {
                     Name = sr.Name,
                     OriginalId = Guid.NewGuid().ToString(),
                     Description = string.Empty,
-                    Properties = sr.Attributes ?? "{}",
+                    Properties = sProperties,
                     ClassId = resolvedClassId,
                     DataSourceId = sr.DataSourceId,
                     ProjectId = projectId,

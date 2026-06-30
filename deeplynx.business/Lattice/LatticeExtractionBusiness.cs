@@ -38,6 +38,16 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _logger = logger;
     }
 
+    private const string FailureStageTrigger = "trigger";
+    private const string FailureStageInsightRequest = "insight_request";
+    private const string FailureStageInsightProcessing = "insight_processing";
+    private const string FailureStageCallback = "callback";
+    private const string FailureStageValidation = "validation";
+    private const string FailureStageStaging = "staging";
+    private const int RequiredOntologyClassCount = 2;
+    private const int RequiredOntologyRelationshipCount = 1;
+    private static readonly string[] DefaultOntologyClassNames = { "File", "Report", "Timeseries" };
+
     /// <summary>
     ///     Creates a Pending Extraction record, builds ontology context via similarity search,
     ///     and fires the trigger request to Insight.
@@ -209,14 +219,10 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             await using var transaction = await _latticeContext.Database.BeginTransactionAsync();
             try
             {
-                var classes = await StageClasses(extraction.Id, allClassTypes, classSimilarities, organizationId,
-                    projectId);
-                var records = await StageRecords(extraction.Id, dedupedRecords, classSimilarities, ontologyPatterns,
-                    classes, organizationId, projectId, dataSourceId);
-                var relationships = await StageRelationships(extraction.Id, dedupedEdges, classSimilarities,
-                    relSimilarities, ontologyPatterns, classes, organizationId, projectId, mode);
-                var edgeCount = await StageEdges(extraction.Id, dedupedEdges, relSimilarities, ontologyPatterns,
-                    records, relationships, organizationId, projectId, dataSourceId);
+                var classes = await StageClasses(extraction.Id, allClassTypes, classSimilarities, organizationId, projectId);
+                var records = await StageRecords(extraction.Id, dedupedRecords, classSimilarities, ontologyPatterns, classes, organizationId, projectId, dataSourceId);
+                var relationships = await StageRelationships(extraction.Id, dedupedEdges, classSimilarities, relSimilarities, ontologyPatterns, classes, organizationId, projectId, mode);
+                var edgeCount = await StageEdges(extraction.Id, dedupedEdges, relSimilarities, ontologyPatterns, records, relationships, organizationId, projectId, dataSourceId);
 
                 await transaction.CommitAsync();
 
@@ -364,6 +370,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             })
             .ToList();
 
+
         return await ProjectTotals(finalExtraction);
     }
 
@@ -498,8 +505,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 CreatedBy = extraction.CreatedBy,
                 ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue && !classesPromotedBefore.Contains(c.Id)),
                 RecordCount = stagingRecords.Count(r => r.PromotedId.HasValue && !recordsPromotedBefore.Contains(r.Id)),
-                RelationshipCount =
-                    stagingRelationships.Count(r => r.PromotedId.HasValue && !relsPromotedBefore.Contains(r.Id)),
+                RelationshipCount = stagingRelationships.Count(r => r.PromotedId.HasValue && !relsPromotedBefore.Contains(r.Id)),
                 EdgeCount = stagingEdges.Count(e => e.PromotedId.HasValue && !edgesPromotedBefore.Contains(e.Id))
             };
         }
@@ -952,13 +958,12 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Select(r =>
                 $"({r.RelationshipPattern!.OriginClassName}) -{r.RelationshipPattern.RelationshipName}-> ({r.RelationshipPattern.DestinationClassName})");
 
+        // Tag each text chunk with its source record_id
         var textChunks = results
             .Where(r => !string.IsNullOrEmpty(r.TextChunk))
             .DistinctBy(r => r.TextChunk)
-            .Select(r => r.TextChunk!);
+            .Select(r => $"[record_id: {recordId}]\n{r.TextChunk!}");
 
-        //TODO: context_block is graph context, 2 hops from record node
-        //TODO: {truncation} is for document text chunk truncation, necessary only if it exceeds a certain character limit. Plus the "...truncated" message to the LLM
         var values = new Dictionary<string, string>
         {
             ["class_list"] = string.Join("\n", classes),
@@ -969,6 +974,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var templateName = mode == ExtractionMode.Strict ? "lattice_strict.md" : "lattice_discovery.md";
         return LoadPrompt(templateName, values);
     }
+
 
     /// <summary>
     ///     Loads an embedded prompt template by file name (e.g., "lattice_strict.md") and substitutes

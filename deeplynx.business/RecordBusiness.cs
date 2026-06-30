@@ -132,6 +132,256 @@ public class RecordBusiness : IRecordBusiness
         }).ToList();
     }
 
+
+    /// <summary>
+    ///     Paginated full text records search
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belongs</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="search">Search parameters</param>
+    /// <param name="paginated">Pagination parameters</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>Paginated list of record response dtos from the query view that match provided query parameters</returns>
+    public async Task<PaginatedResponse<RecordResponseDto>> SearchPaginated(
+        long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search, PaginatedRequestDto paginated,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        // ============================== QUERIES ==============================
+
+        var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
+        AND (
+            NOT EXISTS (
+                SELECT 1
+                FROM deeplynx.record_labels rl
+                WHERE rl.record_id = r.id
+            )
+            OR
+            NOT EXISTS (
+                SELECT 1
+                FROM deeplynx.record_labels rl2
+                WHERE rl2.record_id = r.id
+                AND rl2.label_id != ALL(@authorized_label_ids)
+            )
+        )" : "";
+
+        var hideArchivedFilter = search.HideArchived ? "AND r.is_archived = false" : "";
+
+        var embeddedFilter = search.Embedding switch
+        {
+            "embedded" => "AND r.embedded = true",
+            "pending" => "AND r.embedded = false",
+            _ => "", // Assume any
+        };
+
+        var tagFilter = search.TagIds.Length > 0 ? @"
+        AND (
+            SELECT COUNT(*)
+            FROM deeplynx.record_tags rt
+            WHERE rt.record_id = r.id
+            AND rt.tag_id = ANY(@required_tag_ids)
+        ) = @required_count" : "";
+
+        var classFilter = search.ClassIds.Length > 0 ? @"
+            AND r.class_id IS NOT NULL
+            AND r.class_id = ANY(@class_ids)" : "";
+
+        var searchFilter = !string.IsNullOrWhiteSpace(search.UserQuery) ? @"
+        AND (
+            to_tsvector('english',
+                coalesce(r.name, '')             || ' ' ||
+                coalesce(r.description, '')      || ' ' ||
+                coalesce(c.name, '')             || ' ' ||
+                coalesce(r.uri, '')              || ' ' ||
+                coalesce(r.original_id, '')      || ' ' ||
+                coalesce(ds.name, '')            || ' ' ||
+                coalesce(p.name, '')             || ' ' ||
+                coalesce(r.properties::text, '')
+            ) @@ to_tsquery('english', @processed_query)
+            OR r.name          ILIKE '%' || @original_query || '%'
+            OR r.description   ILIKE '%' || @original_query || '%'
+            OR r.original_id   ILIKE '%' || @original_query || '%'
+            OR ds.name         ILIKE '%' || @original_query || '%'
+            OR p.name          ILIKE '%' || @original_query || '%'
+            OR c.name          ILIKE '%' || @original_query || '%'
+            OR r.file_type     ILIKE '%' || @original_query || '%'
+            OR r.id::text      ILIKE '%' || @original_query || '%'
+        )" : "";
+
+        var sql = $@"
+        SELECT
+            r.*,
+            ds.name         AS data_source_name,
+            p.name          AS project_name,
+            c.name          AS class_name
+        FROM deeplynx.records r
+        INNER JOIN deeplynx.data_sources ds  ON ds.id = r.data_source_id
+        INNER JOIN deeplynx.projects p       ON p.id  = r.project_id
+        LEFT  JOIN deeplynx.classes c        ON c.id  = r.class_id
+        WHERE r.organization_id = @organization_id
+        AND r.project_id = @project_id
+        {classFilter}
+        {embeddedFilter}
+        {hideArchivedFilter}
+        {authorizationFilter}
+        {tagFilter}
+        {searchFilter}
+        ORDER BY r.last_updated_at DESC, r.id";
+
+        // ============================== PARAMETERS ==============================
+
+        var parameters = new List<NpgsqlParameter>
+        {
+            new("organization_id", organizationId),
+            new("project_id", projectId),
+        };
+
+        if (!string.IsNullOrWhiteSpace(search.UserQuery))
+        {
+            var processedQuery = string.Join(" & ",
+                search.UserQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(word => word.Trim() + ":*"));
+            parameters.Add(new("processed_query", processedQuery));
+            parameters.Add(new("original_query", search.UserQuery));
+        }
+
+        if (search.ClassIds.Length > 0)
+            parameters.Add(new("class_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = search.ClassIds });
+
+        if (search.TagIds.Length > 0)
+        {
+            parameters.Add(new("required_tag_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+            { Value = search.TagIds });
+            parameters.Add(new("required_count", search.TagIds.Length));
+        }
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, [projectId], "read record");
+
+            parameters.Add(new("authorized_label_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+            { Value = authorizedLabelIds.ToArray() });
+        }
+
+        var records = _context.Records.FromSqlRaw(sql, parameters.ToArray());
+
+        // ============================== RETURN ==============================
+
+        if (search.IsInsightEligible) records = records.WhereInsightEligible();
+
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return await Paginator.Paginate(paginated, records, r => RecordToResponse(r, isUriAuthorized(r)));
+    }
+
+    private static RecordResponseDto RecordToResponse(Record r, bool exposeUri)
+    {
+        return new RecordResponseDto
+        {
+            Id = r.Id,
+            Description = r.Description,
+            Uri = exposeUri ? r.Uri : null,
+            Properties = r.Properties,
+            OriginalId = r.OriginalId,
+            Name = r.Name,
+            ClassId = r.ClassId,
+            DataSourceId = r.DataSourceId,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            LastUpdatedBy = r.LastUpdatedBy,
+            LastUpdatedAt = r.LastUpdatedAt,
+            IsArchived = r.IsArchived,
+            FileType = r.FileType,
+            FileSize = r.FileSize,
+            Tags = [.. r.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            })],
+            Labels = [.. r.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            })]
+        };
+    }
+
+    /// <summary>
+    ///     Retrieves a paginated page of records for a specific project and datasource.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="fileType">File extension to filter by (e.g., pdf, png, jpg)</param>
+    /// <param name="paginated">Pagination details</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
+    /// <returns>A paginated list of records based on the applied filters.</returns>
+    public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
+        long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
+        string? fileType, PaginatedRequestDto paginated, bool isSysAdmin = false, bool isOrgAdmin = false,
+        bool isProjectAdmin = false, bool isInsightEligible = false)
+    {
+        var recordQuery = _context.Records
+            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
+
+        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (isInsightEligible) recordQuery = recordQuery.WhereInsightEligible();
+
+        if (dataSourceId.HasValue) recordQuery = recordQuery.Where(r => r.DataSourceId == dataSourceId);
+
+        if (!string.IsNullOrWhiteSpace(fileType))
+        {
+            var formattedFileType = fileType.TrimStart('.').ToLower();
+            recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
+        }
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
+        }
+
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        var totalCount = await recordQuery.CountAsync();
+        var records = await recordQuery
+            .OrderBy(r => r.Id)
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .Skip((paginated.PageNumber - 1) * paginated.PageSize)
+            .Take(paginated.PageSize)
+            .ToListAsync();
+
+        return new PaginatedResponse<RecordResponseDto>
+        {
+            Items = records.Select(r => RecordToResponse(r, isUriAuthorized)).ToList(),
+            PageNumber = paginated.PageNumber,
+            PageSize = paginated.PageSize,
+            TotalCount = totalCount
+        };
+    }
+
     /// <summary>
     ///     Get all records that contain all given tags
     /// </summary>
@@ -1832,6 +2082,40 @@ public class RecordBusiness : IRecordBusiness
         return true;
     }
 
+    private static RecordResponseDto RecordToResponse(Record record, Func<Record, bool> isUriAuthorized)
+    {
+        return new RecordResponseDto
+        {
+            Id = record.Id,
+            Description = record.Description,
+            Uri = isUriAuthorized(record)
+                ? record.Uri
+                : null,
+            Properties = record.Properties,
+            OriginalId = record.OriginalId,
+            ObjectStorageId = record.ObjectStorageId,
+            Name = record.Name,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedBy = record.LastUpdatedBy,
+            LastUpdatedAt = record.LastUpdatedAt,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize,
+            Tags = record.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = record.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        };
+    }
     /// <summary>
     ///     Map an NPGSQL data reader to a return DTO usually during high scale read operations
     /// </summary>

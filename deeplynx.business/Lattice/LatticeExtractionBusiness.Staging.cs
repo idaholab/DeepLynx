@@ -127,6 +127,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 ProjectId = projectId,
                 DataSourceId = dataSourceId,
                 DeeplynxRecordId = kgRecord?.Id,
+                SourceRecordId = record.RecordId,
                 ValidationStatus = classMatch != null
                     ? ExtractionValidationStatus.Valid
                     : ExtractionValidationStatus.InvalidSchema,
@@ -310,6 +311,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 OrganizationId = organizationId,
                 ProjectId = projectId,
                 DataSourceId = dataSourceId,
+                SourceRecordId = edge.RecordId,
                 ValidationStatus = validationStatus,
                 Frequency = edge.Frequency,
                 LlmScore = edge.Confidence,

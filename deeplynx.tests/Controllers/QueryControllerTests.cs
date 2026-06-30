@@ -312,6 +312,99 @@ public class QueryControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task QueryBuilderPaginated_Returns200_WithPaginatedResponse()
+    {
+        var request = Array.Empty<CustomQueryDtos.CustomQueryRequestDto>();
+        var paginatedDto = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = new List<QueryRecordViewResponseDto>(),
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 0
+        };
+
+        _mockQueryBusiness
+            .Setup(b => b.QueryBuilderPaginated(
+                UserId,
+                request,
+                OrgId,
+                ProjectList,
+                paginatedDto,
+                Query,
+                false,
+                false,
+                false))
+            .ReturnsAsync(expected);
+
+        var actionResult = await _QueryController.QueryBuilderPaginated(
+            OrgId,
+            Query,
+            ProjectList,
+            paginatedDto,
+            request);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(200, result.StatusCode);
+        Assert.Same(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_PassesToBusinessLayer()
+    {
+        var request = Array.Empty<CustomQueryDtos.CustomQueryRequestDto>();
+        var paginatedDto = new PaginatedRequestDto { PageNumber = 2, PageSize = 10 };
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>();
+
+        _mockQueryBusiness
+            .Setup(b => b.QueryBuilderPaginated(
+                UserId,
+                request,
+                OrgId,
+                ProjectList,
+                paginatedDto,
+                Query,
+                false,
+                false,
+                false))
+            .ReturnsAsync(expected);
+
+        await _QueryController.QueryBuilderPaginated(
+            OrgId,
+            Query,
+            ProjectList,
+            paginatedDto,
+            request);
+
+        _mockQueryBusiness.Verify(
+            b => b.QueryBuilderPaginated(
+                UserId,
+                request,
+                OrgId,
+                ProjectList,
+                paginatedDto,
+                Query,
+                false,
+                false,
+                false),
+            Times.Once);
+    }
+
+    [Fact]
+    public void QueryBuilderPaginated_HasAdvancedPaginatedHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(QueryController.QueryBuilderPaginated),
+            "filterArray",
+            "paginatedDto");
+
+        var httpPost = Assert.Single(method.GetCustomAttributesData(), attribute =>
+            attribute.AttributeType.Name == "HttpPostAttribute");
+        Assert.Equal("records/advanced/paginated", httpPost.ConstructorArguments[0].Value);
+    }
+
+    [Fact]
     public void QueryBuilder_HasHttpPost()
     {
         var method = GetControllerMethod(

@@ -14,6 +14,7 @@ public class InsightExtractedClassDto
     [JsonPropertyName("class")] public string Class { get; set; } = null!;
     [JsonPropertyName("class_type")] public string ClassType { get; set; } = null!;
     [JsonPropertyName("confidence")] public double Confidence { get; set; }
+    [JsonPropertyName("record_id")] public long? RecordId { get; set; }
     [JsonPropertyName("attributes")] public JsonObject? Attributes { get; set; }
 }
 
@@ -25,4 +26,6 @@ public class InsightExtractedRelationshipDto
     [JsonPropertyName("object")] public string Object { get; set; } = null!;
     [JsonPropertyName("object_type")] public string ObjectType { get; set; } = null!;
     [JsonPropertyName("confidence")] public double Confidence { get; set; }
+    [JsonPropertyName("record_id")] public long? RecordId { get; set; }
 }
+

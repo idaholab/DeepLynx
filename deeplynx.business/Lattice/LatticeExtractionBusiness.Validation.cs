@@ -23,7 +23,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                     first.ClassType.Trim(),
                     g.Average(c => c.Confidence == 0 ? DefaultConfidence : c.Confidence),
                     MergeAttributes(g.Select(c => c.Attributes)),
-                    g.Count());
+                    g.Count(),
+                    first.RecordId);
             })
             .ToList();
 
@@ -43,7 +44,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                     first.Object.Trim(),
                     first.ObjectType.Trim(),
                     g.Average(r => r.Confidence == 0 ? DefaultConfidence : r.Confidence),
-                    g.Count());
+                    g.Count(),
+                    first.RecordId);
             })
             .ToList();
 
