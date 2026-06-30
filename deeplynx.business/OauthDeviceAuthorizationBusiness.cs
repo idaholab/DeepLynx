@@ -19,7 +19,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
     private const int RefreshTokenBytes = 64;
     private const int RefreshTokenExpirationDays = 30;
     private const int SlowDownIntervalSeconds = 5;
-    private const string UserCodeAlphabet = "BCDFGHJKLMNPQRSTVWXZ";
+    private const string UserCodeAlphabet = "23456789BCDFGHJKLMNPQRSTVWXZ";
 
     private readonly DeeplynxContext _context;
     private readonly ILogger<OauthDeviceAuthorizationBusiness> _logger;
@@ -62,7 +62,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         var nowWithoutTz = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         var expiresAt = nowWithoutTz.AddSeconds(ExpiresInSeconds);
-        var deviceCode = await GenerateUniqueDeviceCode();
+        var deviceCode = GenerateDeviceCode();
         var userCode = await GenerateUniqueUserCode();
         var normalizedScope = string.IsNullOrWhiteSpace(scope) ? null : scope.Trim();
 
@@ -188,7 +188,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
             tokenKeys.apiKey,
             tokenKeys.apiSecret,
             AccessTokenExpirationMinutes);
-        var refreshToken = await GenerateUniqueRefreshToken();
+        var refreshToken = GenerateRefreshToken();
 
         _context.OauthRefreshTokens.Add(new OauthRefreshToken
         {
@@ -412,24 +412,6 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
         };
     }
 
-    private async Task<string> GenerateUniqueDeviceCode()
-    {
-        for (var attempt = 0; attempt < 10; attempt++)
-        {
-            var deviceCode = GenerateDeviceCode();
-            var deviceCodeHash = HashCode(deviceCode);
-            var exists = await _context.OauthDeviceAuthorizationRequests
-                .AnyAsync(request => request.DeviceCodeHash == deviceCodeHash);
-
-            if (!exists)
-            {
-                return deviceCode;
-            }
-        }
-
-        throw new InvalidOperationException("Unable to generate a unique device code");
-    }
-
     private async Task<string> GenerateUniqueUserCode()
     {
         for (var attempt = 0; attempt < 10; attempt++)
@@ -448,27 +430,14 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
         throw new InvalidOperationException("Unable to generate a unique user code");
     }
 
-    private async Task<string> GenerateUniqueRefreshToken()
-    {
-        for (var attempt = 0; attempt < 10; attempt++)
-        {
-            var refreshToken = KeyGenerator.GenerateKeyBase64(RefreshTokenBytes);
-            var refreshTokenHash = HashCode(refreshToken);
-            var exists = await _context.OauthRefreshTokens
-                .AnyAsync(token => token.TokenHash == refreshTokenHash);
-
-            if (!exists)
-            {
-                return refreshToken;
-            }
-        }
-
-        throw new InvalidOperationException("Unable to generate a unique refresh token");
-    }
-
     private string GenerateDeviceCode()
     {
         return KeyGenerator.GenerateKeyBase64(DeviceCodeBytes);
+    }
+
+    private string GenerateRefreshToken()
+    {
+        return KeyGenerator.GenerateKeyBase64(RefreshTokenBytes);
     }
 
     private string GenerateUserCode()
