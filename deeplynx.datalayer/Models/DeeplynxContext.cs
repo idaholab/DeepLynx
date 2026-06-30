@@ -15,6 +15,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<Action> Actions { get; set; }
 
+    public virtual DbSet<AiModelConfig> AiModelConfigs { get; set; }
+
     public virtual DbSet<ApiKey> ApiKeys { get; set; }
 
     public virtual DbSet<Class> Classes { get; set; }
@@ -24,6 +26,10 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<Edge> Edges { get; set; }
 
     public virtual DbSet<Event> Events { get; set; }
+
+    public virtual DbSet<Embedding> Embeddings { get; set; }
+
+    public virtual DbSet<EmbeddingLogs> EmbeddingLogs { get; set; }
 
     public virtual DbSet<Extraction> Extractions { get; set; }
 
@@ -40,6 +46,8 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<OauthToken> OauthTokens { get; set; }
 
     public virtual DbSet<ObjectStorage> ObjectStorages { get; set; }
+
+    public virtual DbSet<OntologyVector> OntologyVectors { get; set; }
 
     public virtual DbSet<Organization> Organizations { get; set; }
 
@@ -61,25 +69,17 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<Role> Roles { get; set; }
 
+    public virtual DbSet<SavedSearch> SavedSearches { get; set; }
+
     public virtual DbSet<SensitivityLabel> SensitivityLabels { get; set; }
 
     public virtual DbSet<Subscription> Subscriptions { get; set; }
 
     public virtual DbSet<Tag> Tags { get; set; }
 
-    public virtual DbSet<User> Users { get; set; }
-
-    public virtual DbSet<SavedSearch> SavedSearches { get; set; }
-
-    public virtual DbSet<AiModelConfig> AiModelConfigs { get; set; }
-
     public virtual DbSet<UserModelToken> UserModelTokens { get; set; }
 
-    public virtual DbSet<Embedding> Embeddings { get; set; }
-    public virtual DbSet<EmbeddingLogs> EmbeddingLogs { get; set; }
-
-    public virtual DbSet<OntologyVector> OntologyVectors { get; set; }
-
+    public virtual DbSet<User> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -517,7 +517,8 @@ public partial class DeeplynxContext : DbContext
                 .HasConstraintName("historical_records_project_id_fkey");
         });
 
-        modelBuilder.Entity<ProvenanceRecord>(entity => {
+        modelBuilder.Entity<ProvenanceRecord>(entity =>
+        {
             entity.HasKey(e => e.Id).HasName("provenance_records_pkey");
 
             entity.HasIndex(e => e.Id)
@@ -532,13 +533,14 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.OrganizationId)
                 .HasDatabaseName("idx_provenance_records_organization_id");
 
-            entity.HasIndex(e => e.ContentHash)
-                .HasDatabaseName("idx_provenance_records_content_hash");
+            entity.HasIndex(e => e.FileContentHash)
+                .HasDatabaseName("idx_provenance_records_file_content_hash");
+
+            entity.HasIndex(e => e.HistoricalRecordId)
+                .HasDatabaseName("idx_provenance_records_historical_record_id");
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-            entity.Property(e => e.ContentHash).HasMaxLength(64);
-            entity.Property(e => e.SignedPayloadHash).HasMaxLength(64);
 
             entity.HasOne(d => d.Record).WithMany(p => p.ProvenanceRecords)
                 .HasForeignKey(d => d.RecordId)
@@ -554,6 +556,11 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("provenance_records_organization_id_fkey");
+
+            entity.HasOne(d => d.HistoricalRecord).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.HistoricalRecordId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_historical_record_id_fkey");
         });
 
         modelBuilder.Entity<OauthApplication>(entity =>
@@ -927,7 +934,6 @@ public partial class DeeplynxContext : DbContext
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-            entity.Property(e => e.NormalizedContentHash).HasMaxLength(64);
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
 
@@ -1546,8 +1552,6 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Vector).HasColumnType("vector");
-            entity.Property(e => e.ChunkHash).HasMaxLength(64);
-            entity.Property(e => e.EmbeddingHash).HasMaxLength(64);
 
             entity.HasOne(d => d.Record)
                 .WithMany(p => p.Embeddings)
@@ -1557,9 +1561,9 @@ public partial class DeeplynxContext : DbContext
 
             // Add foreign key relationship to AiModelConfig.Id
             entity.HasOne(e => e.AiModelConfig)
-                .WithMany() 
-                .HasForeignKey(e => e.EmbeddingModel) 
-                .HasPrincipalKey(a => a.Id) 
+                .WithMany()
+                .HasForeignKey(e => e.EmbeddingModel)
+                .HasPrincipalKey(a => a.Id)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("embeddings_embedding_model_fkey");
 
