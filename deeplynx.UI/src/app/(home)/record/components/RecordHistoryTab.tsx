@@ -14,6 +14,7 @@ import {
   getHistoricalRecord,
   getRecordHistory,
 } from "@/app/lib/client_service/historical_record_services.client";
+import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 import { formatRecordHistoryDate } from "./RecordHistoryDate";
 import RecordHistoryControls from "./RecordHistoryControls";
 import RecordHistoryDifferenceTable from "./RecordHistoryDifferenceTable";
