@@ -46,7 +46,6 @@ export const getUniqueClasses = (
       nodes.map((node): [string, { key: string; label: string }] => {
         const key = node.classId != null ? String(node.classId) : "No Class";
         const label = node.className && node.className.trim() !== "" ? node.className : "No Class";
-        console.log("className: ", node.className);
         return [key, { key, label }];
       }),
     ).values(),

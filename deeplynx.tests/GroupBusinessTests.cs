@@ -171,6 +171,19 @@ public class GroupBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetGroupMembers_ReturnsAccountType()
+    {
+        // Act
+        var result = await _groupBusiness.GetGroupMembers(oid, gid);
+        var members = result.ToList();
+
+        // Assert
+        var member = Assert.Single(members);
+        Assert.Equal(uid, member.Id);
+        Assert.Equal(AccountType.Standard, member.AccountType);
+    }
+
+    [Fact]
     public async Task GetGroup_Fails_IfNotFound()
     {
         // Act & Assert

@@ -8,7 +8,7 @@ import React, {
   useTransition,
 } from "react";
 import toast from "react-hot-toast";
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import { ClassResponseDto, HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import {
   getHistoricalRecord,
@@ -27,6 +27,7 @@ import {
   normalizeRecord,
 } from "./RecordHistoryDifferenceUtils";
 import RecordHistorySnapshotPropertiesCard from "./RecordHistorySnapshotPropertiesCard";
+import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 
 interface Props {
   organizationId: number;
@@ -66,7 +67,24 @@ export default function RecordHistoryTab({
   const [maxRenderedRows, setMaxRenderedRows] = useState(300);
   const [isUiPending, startUiTransition] = useTransition();
   const [activeClassNames, setActiveClassNames] = useState<Set<string>>(new Set());
+  const [classes, setClasses] = useState<ClassResponseDto[]>([]);
   const [_, setAreClassesLoading] = useState(true);
+
+  interface ClassInfo {
+    name: string;
+    isArchived: boolean;
+  }
+
+  type ClassInfoMap = Record<number, ClassInfo>;
+
+  const classInfoMap: ClassInfoMap = useMemo(() => {
+    const map: ClassInfoMap = {};
+    classes.forEach((cls) => {
+      map[cls.id] = { name: cls.name, isArchived: cls.isArchived };
+    });
+    console.log("map: ", map);
+    return map;
+  }, [classes]);
 
 
   // Runtime caches + debounce timers for high-frequency interactions.
@@ -165,33 +183,35 @@ export default function RecordHistoryTab({
 
   useEffect(() => {
     if (!projectId) {
+      setClasses([]);
       setActiveClassNames(new Set());
-      setAreClassesLoading(false);
       return;
     }
 
     let cancelled = false;
 
-    const fetchActiveClasses = async () => {
+    const loadClasses = async () => {
       try {
-        setAreClassesLoading(true);
-        const classes = await getAllClasses(projectId, true);
+        const classData = await getAllClasses(projectId, false);
         if (cancelled) return;
-        const names = new Set(classes.map((cls) => cls.name));
+
+        setClasses(classData);
+        const names = new Set(classData.map((cls) => cls.name));
         setActiveClassNames(names);
       } catch (error) {
-        console.error("Failed to fetch active classes", error);
-        if (!cancelled) setActiveClassNames(new Set());
-      } finally {
-        if (!cancelled) setAreClassesLoading(false);
+        console.error("Failed to load classes in RecordHistoryTab:", error);
+        if (!cancelled) {
+          setClasses([]);
+          setActiveClassNames(new Set());
+        }
       }
     };
 
-    fetchActiveClasses();
+    loadClasses();
 
     return () => {
-      cancelled = true
-    }
+      cancelled = true;
+    };
   }, [projectId]);
 
   useEffect(() => {
@@ -603,7 +623,7 @@ export default function RecordHistoryTab({
         }
         onToggleExpand={toggleExpand}
         onLoadMore={() => setMaxRenderedRows((prev) => prev + 300)}
-        activeClassNames={activeClassNames}
+        classInfoMap={classInfoMap}
       />
     </div>
   );

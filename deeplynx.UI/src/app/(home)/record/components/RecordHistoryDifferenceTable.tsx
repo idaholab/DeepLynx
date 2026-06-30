@@ -3,6 +3,11 @@ import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useLanguage } from "@/app/contexts/Language";
 import { CompareMode, FlatDifferenceRow } from "./RecordHistoryDifferenceUtils";
 
+interface ClassInfo {
+  name: string;
+  isArchived: boolean;
+}
+
 interface Props {
   compareMode: CompareMode;
   showOnlyChanges: boolean;
@@ -18,8 +23,10 @@ interface Props {
   onShowOnlyChangesChange: (checked: boolean) => void;
   onToggleExpand: (id: string) => void;
   onLoadMore: () => void;
-  activeClassNames: Set<string>;
+  classInfoMap: ClassInfoMap;
 }
+
+type ClassInfoMap = Record<number, ClassInfo>;
 
 export default function RecordHistoryDifferenceTable({
   compareMode,
@@ -36,21 +43,69 @@ export default function RecordHistoryDifferenceTable({
   onShowOnlyChangesChange,
   onToggleExpand,
   onLoadMore,
-  activeClassNames
+  classInfoMap
 }: Props) {
   const { t } = useLanguage();
 
-  function normalizeClassNameWithArchivedLabel(
-    className: string | undefined | null,
-    activeClassNames: Set<string>
-  ): string {
-    if (!className) return t.translations.NO_CLASS;
+  let currentClassName: string = "";
+  let compareClassName: string = "";
 
-    if (!activeClassNames.has(className.trim())) {
-      return `${className} (Archived)`;
+  function normalizeCurrentClassNameWithArchivedLabel(
+    classIdStr: string | null | undefined,
+    classInfoMap: ClassInfoMap
+  ): number | null {
+    if (!classIdStr) {
+      currentClassName = t.translations.NO_CLASS;
+      return null;
     }
 
-    return className;
+    const classId = Number(classIdStr);
+    if (Number.isNaN(classId)) {
+      currentClassName = t.translations.NO_CLASS;
+      return null;
+    }
+
+    const info = classInfoMap[classId];
+
+    if (!info) currentClassName = t.translations.NO_CLASS;
+
+    if (info.isArchived) {
+      currentClassName = `${info.name} (Archived)`;
+    } else {
+      currentClassName = info.name
+    }
+
+    return classId;
+  }
+
+  function normalizeCompareClassNameWithArchivedLabel(
+    classIdStr: string | null | undefined,
+    classInfoMap: ClassInfoMap
+  ): number | null {
+
+    if (!classIdStr) {
+      compareClassName = "N/A";
+      return null;
+    }
+    const classId = Number(classIdStr);
+    if (Number.isNaN(classId)) {
+      compareClassName = "N/A";
+      return null;
+    }
+
+    const info = classInfoMap[classId];
+    if (!info) {
+      compareClassName = "N/A";
+      return null;
+    }
+
+    if (info.isArchived) {
+      compareClassName = `${info.name} (Archived)`;
+    } else {
+      compareClassName = info.name;
+    }
+
+    return classId;
   }
 
   return (
@@ -128,15 +183,29 @@ export default function RecordHistoryDifferenceTable({
                   const hasChildren = node.children.length > 0;
                   const isExpanded = expandedRows.has(node.id);
 
+                  const isClassIdRow = node.field === "record.classId";
                   const isClassNameRow = node.field === "record.className";
 
-                  const currentValue = isClassNameRow
-                    ? normalizeClassNameWithArchivedLabel(node.current, activeClassNames)
-                    : node.current ?? placeholderValue;
+                  let currentValue: number | string | null = null;
+                  let compareValue: number | string | null = null;
 
-                  const compareValue = isClassNameRow
-                    ? normalizeClassNameWithArchivedLabel(node.compare, activeClassNames)
-                    : node.compare ?? placeholderValue;
+                  if (isClassIdRow) {
+                    currentValue = normalizeCurrentClassNameWithArchivedLabel(node.current, classInfoMap) ?? "N/A"
+                  } else if (isClassNameRow) {
+                    currentValue = currentClassName;
+                  }
+                  else {
+                    currentValue = node.current ?? placeholderValue
+                  }
+
+                  if (isClassIdRow) {
+                    compareValue = normalizeCompareClassNameWithArchivedLabel(node.compare, classInfoMap) ?? "N/A"
+                  } else if (isClassNameRow) {
+                    compareValue = compareClassName;
+                  }
+                  else {
+                    compareValue = node.compare ?? placeholderValue
+                  }
 
                   return (
                     <tr key={node.id} className={node.changed ? "bg-warning/10" : ""}>
@@ -166,8 +235,10 @@ export default function RecordHistoryDifferenceTable({
                               <div className="text-xs opacity-70">
                                 {isExpanded
                                   ? t.translations.RECORD_HISTORY_EXPANDED
-                                  : t.translations.RECORD_HISTORY_COLLAPSED}{" "}
-                                ({node.leafCount} {t.translations.RECORD_HISTORY_FIELDS})
+                                  : t.translations
+                                    .RECORD_HISTORY_COLLAPSED}{" "}
+                                ({node.leafCount}{" "}
+                                {t.translations.RECORD_HISTORY_FIELDS})
                               </div>
                             )}
                           </div>
@@ -184,7 +255,7 @@ export default function RecordHistoryDifferenceTable({
                           </span>
                         ) : (
                           <div className="whitespace-pre-wrap break-all text-xs">
-                            {currentValue}
+                            {currentValue?.toString() ?? "N/A"}
                           </div>
                         )}
                       </td>
@@ -199,7 +270,7 @@ export default function RecordHistoryDifferenceTable({
                           </span>
                         ) : (
                           <div className="whitespace-pre-wrap break-all text-xs">
-                            {compareValue}
+                            {compareValue?.toString() ?? "N/A"}
                           </div>
                         )}
                       </td>

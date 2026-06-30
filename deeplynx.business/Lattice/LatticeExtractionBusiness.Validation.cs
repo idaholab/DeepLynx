@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -8,13 +7,13 @@ namespace deeplynx.business;
 
 public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 {
-   
     private const double DefaultConfidence = 0.9;
     private const double SimilarityThreshold = 0.8;
 
     private (List<DedupedRecord> Records, List<DedupedEdge> Edges) Deduplicate(InsightExtractionCallbackDto dto)
     {
         var records = dto.Classes
+            .Where(c => !string.IsNullOrWhiteSpace(c.Class) && !string.IsNullOrWhiteSpace(c.ClassType))
             .GroupBy(c => (c.Class.Trim().ToLowerInvariant(), c.ClassType.Trim().ToLowerInvariant()))
             .Select(g =>
             {
@@ -30,6 +29,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .ToList();
 
         var edges = dto.Relationships
+            .Where(r => !string.IsNullOrWhiteSpace(r.Subject) && !string.IsNullOrWhiteSpace(r.RelationshipType))
             .GroupBy(r => (
                 r.Subject.Trim().ToLowerInvariant(),
                 r.RelationshipType.Trim().ToLowerInvariant(),
@@ -73,8 +73,10 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             {
                 var score = TrigramSimilarity(classType, ontClass.Name);
                 if (score >= SimilarityThreshold && (best == null || score > best.Score))
-                    best = new SimilarityResult { OntologyEntityId = ontClass.Id, OntologyEntityName = ontClass.Name, Score = score };
+                    best = new SimilarityResult
+                        { OntologyEntityId = ontClass.Id, OntologyEntityName = ontClass.Name, Score = score };
             }
+
             result[classType] = best;
         }
 
@@ -99,8 +101,10 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             {
                 var score = TrigramSimilarity(relType, ontRel.Name);
                 if (score >= SimilarityThreshold && (best == null || score > best.Score))
-                    best = new SimilarityResult { OntologyEntityId = ontRel.Id, OntologyEntityName = ontRel.Name, Score = score };
+                    best = new SimilarityResult
+                        { OntologyEntityId = ontRel.Id, OntologyEntityName = ontRel.Name, Score = score };
             }
+
             result[relType] = best;
         }
 
@@ -133,7 +137,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         double embeddingPlausibility,
         double statisticalFrequency,
         double structuralConsistency)
-        => (llmScore * 0.4) + (embeddingPlausibility * 0.3) + (statisticalFrequency * 0.2) + (structuralConsistency * 0.1);
+    {
+        return llmScore * 0.4 + embeddingPlausibility * 0.3 + statisticalFrequency * 0.2 + structuralConsistency * 0.1;
+    }
 
     private static double TrigramSimilarity(string s1, string s2)
     {
@@ -162,6 +168,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             foreach (var (key, value) in attrs!)
                 merged[key] = value?.DeepClone();
         }
+
         return merged;
     }
 }
