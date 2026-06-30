@@ -41,8 +41,8 @@ export default function ManageTagsCard({
     );
 
     return (
-        <div className="rounded-box border border-base-300 bg-base-100 shadow-sm">
-            <div className="flex items-center justify-between border-b border-base-300 px-4 py-3">
+        <div className="rounded-box border border-base-300/50 bg-base-100 shadow-sm">
+            <div className="flex items-center justify-between border-b border-base-200 px-4 py-3">
                 <div className="text-sm font-semibold">Manage tags</div>
                 
                 <span className="text-xs text-base-content/60">

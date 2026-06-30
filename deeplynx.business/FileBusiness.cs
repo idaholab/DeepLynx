@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 using deeplynx.helpers.Cache;
+using System.Runtime.CompilerServices;
 
 namespace deeplynx.business;
 
@@ -61,7 +62,7 @@ public class FileBusiness
 
         _recommendedChunkSize = chunkSize;
     }
-    
+
     /// <summary>
     ///     Upload a File
     /// </summary>
@@ -144,6 +145,8 @@ public class FileBusiness
             recordClass,
             () => file.OpenReadStream());
 
+        var resolvedClass = await GetResolvedClass(organizationId, projectId, currentUserId, metadata, recordClass);
+
         var recordRequest = new CreateRecordRequestDto
         {
             Properties = properties,
@@ -151,8 +154,8 @@ public class FileBusiness
             ObjectStorageId = objectStorage.Id,
             Description = metadata?.Description ?? file.FileName,
             OriginalId = metadata?.OriginalId ?? guid.ToString(),
-            ClassId = metadata?.ClassId ?? recordClass.Id,
-            ClassName = metadata?.ClassName ?? recordClass.Name,
+            ClassId = resolvedClass.Id,
+            ClassName = resolvedClass.Name,
             FileType = fileType,
             Uri = uri,
             FileSize = fileSize
@@ -237,7 +240,7 @@ public class FileBusiness
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
-        
+
         return updatedRecord;
     }
 
@@ -248,11 +251,14 @@ public class FileBusiness
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="isSysAdmin">Bool of whether or not the user is a system admin</param>
+    /// <param name="isOrgAdmin">Bool of whether or not the user is an organization admin</param>
+    /// <param name="isProjectAdmin">Bool of whether or not the user is a project admin</param>
     /// <returns>The file stream for download</returns>
     public async Task<FileStreamResult> DownloadFile(long currentUserId, long organizationId, long projectId,
-        long recordId)
+        long recordId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true, isSysAdmin, isOrgAdmin, isProjectAdmin);
 
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
 
@@ -303,9 +309,9 @@ public class FileBusiness
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
         await fileBusiness.DeleteFile(record, objectStorage.Config);
-        
+
         var deleted = await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
-        
+
         await InvalidateProjectStorageSizeCache(projectId);
 
         return deleted;
@@ -446,6 +452,8 @@ public class FileBusiness
             fileClass,
             objectStorage.Type == "filesystem" ? () => File.OpenRead(uri) : null);
 
+        var resolvedClass = await GetResolvedClass(organizationId, projectId, currentUserId, metadata, fileClass);
+
         var recordRequest = new CreateRecordRequestDto
         {
             Properties = properties,
@@ -454,8 +462,8 @@ public class FileBusiness
             Description = metadata?.Description ?? $"File uploaded via chunked upload (session: {request.UploadId})",
             OriginalId = metadata?.OriginalId ?? guid.ToString(),
             Uri = uri,
-            ClassId = metadata?.ClassId ?? fileClass.Id,
-            ClassName = metadata?.ClassName ?? fileClass.Name,
+            ClassId = resolvedClass.Id,
+            ClassName = resolvedClass.Name,
             FileType = fileExtension,
             FileSize = fileSize
         };
@@ -519,29 +527,29 @@ public class FileBusiness
     {
         if (organizationId == null && projectId == null)
             throw new InvalidOperationException("At least one of organization or project must be specified.");
-        
+
         if (batchSize <= 0)
             throw new ArgumentException("batchSize must be greater than zero.");
-        
+
         if (maxBatches <= 0)
             throw new ArgumentException("maxBatches must be greater than zero.");
-        
+
         var response = new BackfillFileSizesResponseDto();
 
         for (var batchNumber = 0; batchNumber < maxBatches; batchNumber++)
         {
             var toBackfill = _context.Records
                 .Where(r => r.Uri != null && r.FileSize == null && !r.IsArchived);
-            
+
             if (organizationId.HasValue)
                 toBackfill = toBackfill.Where(r => r.OrganizationId == organizationId.Value);
-            
+
             if (projectId.HasValue)
                 toBackfill = toBackfill.Where(r => r.ProjectId == projectId.Value);
-            
+
             if (afterRecordId.HasValue)
                 toBackfill = toBackfill.Where(r => r.Id > afterRecordId.Value);
-            
+
             var records = await toBackfill
                 .OrderBy(r => r.Id)
                 .Take(batchSize)
@@ -549,7 +557,7 @@ public class FileBusiness
 
             if (records.Count == 0)
                 break;
-            
+
             response.Processed += records.Count;
             response.LastRecordId = records.Max(r => r.Id);
 
@@ -557,16 +565,16 @@ public class FileBusiness
                 .Where(r => r.ObjectStorageId != null)
                 .GroupBy(r => r.ObjectStorageId!.Value)
                 .ToList();
-            
+
             var legacyFilesystemRecords = records
                 .Where(r => r.ObjectStorageId == null)
                 .ToList();
-            
+
             foreach (var storageGroup in recordsByStorage)
             {
                 var objectStorageId = storageGroup.Key;
                 ObjectStorageDecryptedDto objectStorage;
-                
+
                 try
                 {
                     objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
@@ -574,7 +582,7 @@ public class FileBusiness
                 catch (Exception ex)
                 {
                     response.Failed += storageGroup.Count();
-                    
+
                     _logger.LogWarning(
                         ex,
                         "Object storage {ObjectStorageId} not found or archived while backfilling file sizes",
@@ -635,7 +643,7 @@ public class FileBusiness
                     catch (Exception ex)
                     {
                         response.Failed++;
-                        
+
                         _logger.LogWarning(
                             ex,
                             "Failed to backfill size for record {RecordId}, project {ProjectId}, object storage {ObjectStorageId}, uri {Uri} while individual calls",
@@ -671,7 +679,7 @@ public class FileBusiness
                 catch (Exception ex)
                 {
                     response.Failed++;
-                    
+
                     _logger.LogWarning(
                         ex,
                         "Failed to backfill legacy filesystem size for record {RecordId}, project {ProjectId}, uri {Uri}",
@@ -699,7 +707,7 @@ public class FileBusiness
             if (records.Count < batchSize)
                 break;
         }
-        
+
         return response;
     }
 
@@ -805,6 +813,7 @@ public class FileBusiness
                 objectStorage.Type == "filesystem" ? () => File.OpenRead(uri) : null);
             var recordName = metadata?.Name ?? Path.GetFileName(fileName);
             if (recordName.Length > 100) recordName = recordName[..100];
+            var resolvedClass = await GetResolvedClass(organizationId, projectId, currentUserId, metadata, fileClass);
             var recordRequest = new CreateRecordRequestDto
             {
                 Properties = properties,
@@ -813,8 +822,8 @@ public class FileBusiness
                 Description = metadata?.Description ?? $"File uploaded via chunked upload (session: {uploadId})",
                 OriginalId = metadata?.OriginalId ?? guid.ToString(),
                 Uri = uri,
-                ClassId = metadata?.ClassId ?? fileClass.Id,
-                ClassName = metadata?.ClassName ?? fileClass.Name,
+                ClassId = resolvedClass.Id,
+                ClassName = resolvedClass.Name,
                 FileType = fileExtension,
                 FileSize = fileSize
             };
@@ -846,7 +855,7 @@ public class FileBusiness
         await CacheService.Instance.DeleteAsync(
             CacheKeys.ProjectStorageSize(projectId));
     }
-    
+
     private async Task<long> ResolveDataSourceId(long organizationId, long projectId, long? dataSourceId)
     {
         if (dataSourceId.HasValue)
@@ -922,5 +931,36 @@ public class FileBusiness
         }
 
         return false;
+    }
+    
+    private async Task<ClassResponseDto> GetResolvedClass(long organizationId, long projectId, long currentUserId, CreateRecordFileUploadRequestDto? metadata, ClassResponseDto recordClass)
+    {
+        var providedClassId = metadata?.ClassId;
+        var providedClassName = metadata?.ClassName;
+        ClassResponseDto? resolvedClass = null;
+
+        // If Class Id was provided
+        if (providedClassId.HasValue)
+        {
+            resolvedClass = await _classBusiness.GetClass(organizationId, projectId, providedClassId.Value, true);
+            if (resolvedClass is null) {
+                throw new ArgumentException($"Class ID {providedClassId} does not exist in this project.");
+            } 
+            if (!string.IsNullOrWhiteSpace(providedClassName) && resolvedClass.Name != providedClassName) {
+                // Class Name was provided and doesn't match the Class Name from the Id
+                throw new ArgumentException($"Class Name {providedClassName} does not match Class Id {providedClassId}. Expected {resolvedClass.Name}");
+            }
+        } 
+        // No Class Id provided, Class Name was provided
+        else if (!string.IsNullOrWhiteSpace(providedClassName)) 
+        {
+            resolvedClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, providedClassName);
+        }
+        // No Class Id or Name provided, set to default File or TimeSeries
+        else
+        {
+            resolvedClass = recordClass;
+        }
+        return resolvedClass;
     }
 }

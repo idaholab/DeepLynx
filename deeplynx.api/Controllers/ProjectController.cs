@@ -398,6 +398,8 @@ public class ProjectController : ControllerBase
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="userEmail"></param>
+    /// <param name="userId"></param>
+    /// <param name="groupId"></param>
     /// <param name="roleId"></param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
@@ -423,6 +425,39 @@ public class ProjectController : ControllerBase
         {
             var message =
                 $"An error occurred while adding user with email {userEmail} to organization {organizationId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    /// Create and add service account to project
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="roleId"></param>
+    /// <param name="name"></param>
+    /// <param name="makeProjectAdmin"></param>
+    /// <returns></returns>
+    [Tags("Service Accounts")]
+    [ProjectAdmin]
+    [HttpPost("{projectId:long}/invite/serviceAccount", Name = "api_add_service_account")]
+    public async Task<ActionResult> CreateAndAddServiceAccountToProject(
+        long organizationId,
+        long projectId,
+        [FromQuery] string name,
+        [FromQuery] long? roleId,
+        [FromQuery] bool makeProjectAdmin = false)
+    {
+        try
+        {
+            await _invitationBusiness.CreateAndAddServiceAccountToProject(projectId, name, roleId, makeProjectAdmin);
+            return Ok(new { message = $"Created service account {name} and added to project {projectId}" });
+        }
+        catch (Exception exc)
+        {
+            var message =
+                $"An error occurred while creating and adding service account to project";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

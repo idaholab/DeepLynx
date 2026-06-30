@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { QueryBuilderQuery } from "@/app/(home)/types/types";
+import { CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { translations } from "@/app/lib/translations";
 import {
@@ -19,7 +20,7 @@ import {
   BookmarkIcon,
 } from "@heroicons/react/24/outline";
 import SaveSearchModal from "@/app/(home)/components/SaveSearchModal";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { DatePicker } from "@/app/(home)/components/DatePicker";
 import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 import {
@@ -31,10 +32,9 @@ import {
 import { getAllClassesOrg } from "@/app/lib/client_service/class_services.client";
 import { getAllDataSourcesOrg } from "@/app/lib/client_service/data_source_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
-import { fullTextSearch, queryBuilder } from "@/app/lib/client_service/query_services.client";
+import { queryBuilderPaginated } from "@/app/lib/client_service/query_services.client";
 import {
   getSavedSearchById,
-  executeSavedSearch,
   saveSearch,
 } from "@/app/lib/client_service/saved_search_services.client";
 import RecordSearchList from "@/app/(home)/components/RecordSearchList";
@@ -78,6 +78,20 @@ const emptyRow = (): QueryBuilderQuery => ({
   },
 });
 
+const QUERY_RESULTS_PAGE_SIZE = 10;
+
+type QueryResultsCriteria = {
+  queryDtos: CustomQueryRequestDto[];
+  projectIds: number[];
+  textSearch?: string | null;
+};
+
+const initialResultsPagination = () => ({
+  pageNumber: 1,
+  pageSize: QUERY_RESULTS_PAGE_SIZE,
+  totalCount: 0,
+  totalPages: 1,
+});
 // ============================================================================
 // Sub-Components
 // ============================================================================
@@ -692,7 +706,10 @@ export default function QueryBuilderClient({
   // ---- State ----------------------------------------------------------------
   const [projects] = useState(initialProjects);
   const [selectedProjects, setSelectedProjects] = useState<string[]>(initialSelectedProjects);
-  const [records, setQueriedRecords] = useState<QueryRecordViewResponseDto[] | null>();
+  const [records, setQueriedRecords] = useState<QueryRecordViewResponseDto[] | null>(null);
+  const [resultsPagination, setResultsPagination] = useState(initialResultsPagination);
+  const [submittedCriteria, setSubmittedCriteria] = useState<QueryResultsCriteria | null>(null);
+  const [isSearchingRecords, setIsSearchingRecords] = useState(false);
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
   const [showFilters, setShowFilters] = useState(true);
   const [rows, setRows] = useState<QueryBuilderQuery[]>([emptyRow()]);
@@ -724,6 +741,15 @@ export default function QueryBuilderClient({
     return String(selectedProjects[0]);
   }, [projects, selectedProjects]);
 
+  const selectedProjectIds = useMemo(
+    () =>
+      selectedProjects.length === 0 ||
+      selectedProjects.includes("ALL") ||
+      selectedProjects.length === projects.length
+        ? projects.map((p) => Number(p.id))
+        : selectedProjects.map(Number).filter(Number.isFinite),
+    [projects, selectedProjects]
+  );
   const activeFilterCount = useMemo(
     () => rows.filter((r) => r.query.filter !== "").length,
     [rows]
@@ -767,10 +793,17 @@ export default function QueryBuilderClient({
             : initialSelectedProjects.map(Number);
 
         const savedSearch = await getSavedSearchById(savedSearchId);
+        const savedSearchText = savedSearch.query?.textSearch ?? "";
+        const savedSearchFilters: CustomQueryRequestDto[] =
+          savedSearch.query?.filter?.map((condition) => ({
+            connector: condition.connector ?? "",
+            filter: condition.filter ?? "",
+            operator: condition.operator ?? "",
+            value: condition.value ?? "",
+            json: condition.json,
+          })) ?? [];
 
-        if (savedSearch.query?.textSearch) {
-          setSearchTerm(savedSearch.query.textSearch);
-        }
+        setSearchTerm(savedSearchText);
 
         if (savedSearch.query?.filter && savedSearch.query.filter.length > 0) {
           const populatedRows: QueryBuilderQuery[] = savedSearch.query.filter.map(
@@ -803,8 +836,11 @@ export default function QueryBuilderClient({
           setShowFilters(true);
         }
 
-        const data = await executeSavedSearch(savedSearchId, organizationId, projectIds);
-        setQueriedRecords(data);
+        await fetchResultsPage(1, {
+          queryDtos: savedSearchFilters,
+          projectIds,
+          textSearch: savedSearchText,
+        });
       } catch (error) {
         console.error("Failed to execute saved search:", error);
       } finally {
@@ -826,9 +862,10 @@ export default function QueryBuilderClient({
   const reset = () => {
     setRows([emptyRow()]);
     setQueriedRecords(null);
+    setResultsPagination(initialResultsPagination());
+    setSubmittedCriteria(null);
     setSearchTerm("");
   };
-
   const hasValidQueries = (): boolean =>
     rows.map((r) => r.query).some(
       (q) =>
@@ -839,30 +876,48 @@ export default function QueryBuilderClient({
         q.jsonValue !== ""
     );
 
+  const fetchResultsPage = useCallback(
+    async (pageNumber: number, criteriaOverride?: QueryResultsCriteria) => {
+      const criteria = criteriaOverride ?? submittedCriteria;
+      if (!criteria) return;
+
+      setIsSearchingRecords(true);
+      try {
+        const result = await queryBuilderPaginated(
+          organizationId,
+          criteria.queryDtos,
+          criteria.projectIds,
+          pageNumber,
+          QUERY_RESULTS_PAGE_SIZE,
+          criteria.textSearch,
+        );
+
+        setQueriedRecords(result.items);
+        setResultsPagination({
+          pageNumber: result.pageNumber,
+          pageSize: result.pageSize,
+          totalCount: result.totalCount,
+          totalPages: Math.max(1, result.totalPages),
+        });
+        setSubmittedCriteria(criteria);
+      } catch (error) {
+        console.error("Failed to fetch query results", error);
+      } finally {
+        setIsSearchingRecords(false);
+      }
+    },
+    [organizationId, submittedCriteria]
+  );
   // ---- Handlers -------------------------------------------------------------
   const handleSubmit = async () => {
-  try {
-    const queryDtos = rows.map((r) => r.query);
-    
-    const projectIds =
-      selectedProjects.length === 0 ||
-      selectedProjects.includes("ALL") ||
-      selectedProjects.length === projects.length
-        ? projects.map((p) => Number(p.id))
-        : selectedProjects.map(Number);
+    const queryDtos = hasValidQueries() ? rows.map((r) => r.query) : [];
 
-    if (hasValidQueries()) {
-      const data = await queryBuilder(organizationId, queryDtos, projectIds, searchTerm);
-      if (data) setQueriedRecords(data);
-    } else {
-      const data = await fullTextSearch(organizationId, searchTerm, projectIds);
-      if (data) setQueriedRecords(data);
-    }
-    } catch (error) {
-      console.error("Failed to send query", error);
-    }
+    await fetchResultsPage(1, {
+      queryDtos,
+      projectIds: selectedProjectIds,
+      textSearch: searchTerm,
+    });
   };
-
   const handleFieldChange = async (field: string) => {
     const projectIds = selectedProjects.map(Number);
     if (field === "class_name") {
@@ -1044,8 +1099,21 @@ export default function QueryBuilderClient({
           </div>
 
           {/* Results */}
-          {records && records.length > 0 ? (
-            <RecordSearchList data={records} />
+          {isSearchingRecords && !records ? (
+            <div className="flex items-center justify-center gap-3 rounded-lg bg-base-100 py-6 text-sm text-base-content/70">
+              <span className="loading loading-spinner loading-xs" />
+              Loading records...
+            </div>
+          ) : records && records.length > 0 ? (
+            <RecordSearchList
+              data={records}
+              currentPage={resultsPagination.pageNumber}
+              pageSize={resultsPagination.pageSize}
+              totalCount={resultsPagination.totalCount}
+              totalPages={resultsPagination.totalPages}
+              isLoading={isSearchingRecords}
+              onPageChange={fetchResultsPage}
+            />
           ) : (
             records && <EmptyResultsState />
           )}
