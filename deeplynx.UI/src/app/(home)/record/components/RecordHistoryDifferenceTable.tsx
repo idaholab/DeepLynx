@@ -179,7 +179,7 @@ export default function RecordHistoryDifferenceTable({
                   </td>
                 </tr>
               ) : (
-                visibleRows.map(({ node, depth }) => {
+                visibleRows.map(({ node, depth }, _) => {
                   const hasChildren = node.children.length > 0;
                   const isExpanded = expandedRows.has(node.id);
 
@@ -208,10 +208,7 @@ export default function RecordHistoryDifferenceTable({
                   }
 
                   return (
-                    <tr
-                      key={node.id}
-                      className={node.changed ? "bg-warning/10" : ""}
-                    >
+                    <tr key={node.id} className={node.changed ? "bg-warning/10" : ""}>
                       <td className="align-top">
                         <div
                           className="flex items-start gap-2"

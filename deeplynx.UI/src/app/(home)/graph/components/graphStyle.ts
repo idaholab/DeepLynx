@@ -39,7 +39,7 @@ export const getSizeForDepth = (depth: number) => {
 };
 
 export const getUniqueClasses = (
-  nodes: Array<{ classId?: number | null; className?: string | null }>,
+  nodes: Array<{ classId?: number | null; className?: string | null }>
 ) =>
   Array.from(
     new Map<string, { key: string; label: string }>(
@@ -54,13 +54,13 @@ export const getUniqueClasses = (
 export const buildClassColorMap = (
   nodes: Array<{ classId?: number | null; className?: string | null }>,
 ) => {
-  const entries = getUniqueClasses(nodes);
+
+  const classEntries = getUniqueClasses(nodes);
 
   const map = new Map<string, string>();
 
-  entries.forEach((entry, index) => {
-    const baseColor =
-      COLOR_BLIND_SAFE[index % COLOR_BLIND_SAFE.length];
+  classEntries.forEach((entry, index) => {
+    const baseColor = COLOR_BLIND_SAFE[index % COLOR_BLIND_SAFE.length];
     const cycle = Math.floor(index / COLOR_BLIND_SAFE.length);
     const variantFactor = cycle === 0 ? 1 : Math.max(0.72, 1 - cycle * 0.12);
 
