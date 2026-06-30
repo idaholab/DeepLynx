@@ -448,15 +448,29 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       return;
     }
 
+    if (record.classId === null) {
+      setRecordClass(null);
+      return;
+    }
+
     let cancelled = false;
+
+    const timeout = (ms: number) =>
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), ms),
+      );
 
     const fetchClass = async () => {
       try {
-        const data = await getClass(projectId, Number(record.classId), true);
-        if (!cancelled) setRecordClass(data);
+        const data = await Promise.race([
+          getClass(projectId, Number(record.classId), true),
+          timeout(5000),
+        ]);
+        if (!cancelled) setRecordClass(data as ClassResponseDto);
       } catch (error) {
-        console.error("Error fetching class:", error);
-        if (!cancelled) setRecordClass(null);
+        if (cancelled) return;
+        console.error("Error fetching class or fetch timeout:", error);
+        setRecordClass(null);
       }
     };
 
@@ -466,6 +480,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       cancelled = true;
     };
   }, [record?.classId, projectId]);
+
 
   useEffect(() => {
     const fetchTags = async () => {
@@ -1181,7 +1196,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                         )}
                       </div>
                       {ontologyStatus && (
+
                         <div className="rounded-lg border border-base-300/50 divide-y divide-base-300/50 text-sm">
+
                           {ontologyStatus.class_count === 0 &&
                             ontologyStatus.relationship_count === 0 ? (
                             <p className="px-4 py-3 text-base-content/50 text-xs">
@@ -1281,7 +1298,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                           disabled={isTriggeringLatticeExtraction}
                           className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "discovery"
                             ? "border-primary bg-primary/5"
+
                             : "border-base-300/50 hover:border-base-content/30"
+
                             }`}
                         >
                           <p className="font-semibold text-sm">
@@ -1297,7 +1316,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                           disabled={isTriggeringLatticeExtraction}
                           className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "strict"
                             ? "border-primary bg-primary/5"
+
                             : "border-base-300/50 hover:border-base-content/30"
+
                             }`}
                         >
                           <p className="font-semibold text-sm">
@@ -1372,7 +1393,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               {record.classId ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <span className="badge badge-primary h-auto min-h-6 whitespace-normal break-words px-3 py-1 text-center leading-tight">
-                    {recordClass?.name || <div className="loading size-3" />}
+                    {recordClass?.name ?? t.translations.NO_CLASS}
                   </span>
                   <button
                     onClick={() => setIsClassModalOpen(true)}
