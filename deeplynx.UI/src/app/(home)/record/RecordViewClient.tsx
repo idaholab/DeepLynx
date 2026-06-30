@@ -936,6 +936,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     isRecordInsightEmbedded &&
     (latticeMode === "discovery" || ontologyReady);
 
+  const latticeSteps = [
+    { text: t.translations.LATTICE_STEP_EMBED },
+    {
+      text: t.translations.LATTICE_STEP_ONTOLOGY,
+      href: "/data_schema",
+    },
+    { text: t.translations.LATTICE_STEP_MODE },
+    { text: t.translations.LATTICE_STEP_TRIGGER },
+    { text: t.translations.LATTICE_STEP_DECIDE },
+  ];
+
   const tabs = [
     {
       label: t.translations.RECORD_INFORMATION,
@@ -1102,12 +1113,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                     {t.translations.LATTICE_HOW_IT_WORKS}
                   </p>
                   <ol className="space-y-3">
-                    {[
-                      t.translations.LATTICE_STEP_EMBED,
-                      t.translations.LATTICE_STEP_MODE,
-                      t.translations.LATTICE_STEP_TRIGGER,
-                      t.translations.LATTICE_STEP_DECIDE,
-                    ].map((step, i) => (
+                    {latticeSteps.map((step, i) => (
                       <li
                         key={i}
                         className="flex gap-3 text-sm text-base-content/70"
@@ -1115,7 +1121,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                         <span className="size-5 rounded-full bg-base-300 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                           {i + 1}
                         </span>
-                        {step}
+
+                        {step.href ? (
+                          <Link
+                            href={step.href}
+                            className="text-primary hover:underline"
+                          >
+                            {step.text}
+                          </Link>
+                        ) : (
+                          step.text
+                        )}
                       </li>
                     ))}
                   </ol>
