@@ -20,6 +20,7 @@ export interface DifferenceTreeNode {
   children: DifferenceTreeNode[];
   leafCount: number;
   isLeaf: boolean;
+  field?: string;
 }
 
 // Render-friendly flattened tree row with indentation depth.
@@ -207,10 +208,13 @@ export function buildDifferenceTree(rows: DifferenceRow[]): DifferenceTreeNode[]
       }
 
       if (index === segments.length - 1 && currentNode) {
-        currentNode.current = row.current;
-        currentNode.compare = row.compare;
-        currentNode.changed = row.changed;
-        currentNode.isLeaf = true;
+        Object.assign(currentNode, {
+          current: row.current,
+          compare: row.compare,
+          changed: row.changed,
+          isLeaf: true,
+          field: row.field,
+        });
       }
     });
   });

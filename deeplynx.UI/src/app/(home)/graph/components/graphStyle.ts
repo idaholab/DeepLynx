@@ -39,32 +39,28 @@ export const getSizeForDepth = (depth: number) => {
 };
 
 export const getUniqueClasses = (
-  nodes: Array<{ classId?: number | null; className?: string | null }>,
+  nodes: Array<{ classId?: number | null; className?: string | null }>
 ) =>
   Array.from(
-    new Map(
-      nodes
-        .filter((node) => node.classId != null || node.className)
-        .map((node) => [
-          String(node.classId ?? node.className),
-          {
-            key: String(node.classId ?? node.className),
-            label: node.className ?? "Unknown",
-          },
-        ]),
+    new Map<string, { key: string; label: string }>(
+      nodes.map((node): [string, { key: string; label: string }] => {
+        const key = node.classId != null ? String(node.classId) : "No Class";
+        const label = node.className && node.className.trim() !== "" ? node.className : "No Class";
+        return [key, { key, label }];
+      }),
     ).values(),
   ).sort((left, right) => left.label.localeCompare(right.label));
 
 export const buildClassColorMap = (
   nodes: Array<{ classId?: number | null; className?: string | null }>,
 ) => {
-  const entries = getUniqueClasses(nodes);
+
+  const classEntries = getUniqueClasses(nodes);
 
   const map = new Map<string, string>();
 
-  entries.forEach((entry, index) => {
-    const baseColor =
-      COLOR_BLIND_SAFE[index % COLOR_BLIND_SAFE.length];
+  classEntries.forEach((entry, index) => {
+    const baseColor = COLOR_BLIND_SAFE[index % COLOR_BLIND_SAFE.length];
     const cycle = Math.floor(index / COLOR_BLIND_SAFE.length);
     const variantFactor = cycle === 0 ? 1 : Math.max(0.72, 1 - cycle * 0.12);
 

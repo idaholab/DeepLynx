@@ -809,7 +809,11 @@ export function useCollectionDetails({
           ),
         );
       } else if (!didRefreshFail) {
-        showToast("success", t.translations.RECORD_COLLECTIONS_UPDATE_SUCCESS);
+        showToast(
+          "success",
+          t.translations.RECORD_COLLECTIONS_UPDATE_SUCCESS,
+          recordMutationToastPosition,
+        );
       }
     } catch (error) {
       console.error("Failed to update record collection:", error);
