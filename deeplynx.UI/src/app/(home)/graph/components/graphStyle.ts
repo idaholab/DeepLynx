@@ -42,16 +42,12 @@ export const getUniqueClasses = (
   nodes: Array<{ classId?: number | null; className?: string | null }>,
 ) =>
   Array.from(
-    new Map(
-      nodes
-        .filter((node) => node.classId != null || node.className)
-        .map((node) => [
-          String(node.classId ?? node.className),
-          {
-            key: String(node.classId ?? node.className),
-            label: node.className ?? "Unknown",
-          },
-        ]),
+    new Map<string, { key: string; label: string }>(
+      nodes.map((node): [string, { key: string; label: string }] => {
+        const key = node.classId != null ? String(node.classId) : "No Class";
+        const label = node.className && node.className.trim() !== "" ? node.className : "No Class";
+        return [key, { key, label }];
+      }),
     ).values(),
   ).sort((left, right) => left.label.localeCompare(right.label));
 
