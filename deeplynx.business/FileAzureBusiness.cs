@@ -1,3 +1,6 @@
+using System.IO.Compression;
+using System.IO.Pipelines;
+using System.Threading.Channels;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
@@ -161,6 +164,124 @@ public class FileAzureBusiness : IFileBusiness
         {
             FileDownloadName = record.Name,
             EnableRangeProcessing = true
+        };
+    }
+    
+    /// <summary>
+    /// Download an Appended File
+    /// </summary>
+    /// <param name="record"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task<FileStreamResult> DownloadAppendedFile(
+    RecordResponseDto record,
+    ObjectStorageConfigDto objectStorageConfig,
+    CancellationToken cancellationToken = default)
+    {
+        if (objectStorageConfig.AzureObjectConfig == null)
+            throw new ArgumentException("Azure configuration is null");
+
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString,
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        if (!await container.ExistsAsync(cancellationToken))
+            throw new InvalidOperationException("Azure Object Storage container does not exist");
+
+        var prefix = record.Uri;
+        var pipe = new Pipe();
+
+        _ = Task.Run(async () =>
+        {
+            Exception? error = null;
+            try
+            {
+                await using var pipeStream = pipe.Writer.AsStream(leaveOpen: true);
+                using var archive = new ZipArchive(pipeStream, ZipArchiveMode.Create, leaveOpen: true);
+
+                // Bounded channel between the concurrent downloader and the sequential zip writer.
+                // Capacity of 128 means up to 128 blobs can be downloaded and waiting before the
+                // producer pauses — prevents unbounded memory growth if downloads outpace writes.
+                var channel = Channel.CreateBounded<(string EntryName, byte[] Content)>(
+                    new BoundedChannelOptions(128)
+                    {
+                        FullMode = BoundedChannelFullMode.Wait, // producer waits when channel is full
+                        SingleReader = true,                    // only the consumer reads
+                        SingleWriter = false                    // multiple download tasks write
+                    });
+
+                // Producer: enumerate blobs lazily and download them concurrently.
+                // MaxDegreeOfParallelism = 32 means 32 simultaneous Azure round trips.
+                // For tiny files the bottleneck is per-request latency, not bandwidth,
+                // so more concurrency directly translates to faster throughput.
+                var producer = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Parallel.ForEachAsync(
+                            container.GetBlobsAsync(prefix: prefix, cancellationToken: cancellationToken),
+                            new ParallelOptions
+                            {
+                                MaxDegreeOfParallelism = 32,
+                                CancellationToken = cancellationToken
+                            },
+                            async (blobItem, ct) =>
+                            {
+                                var entryName = blobItem.Name[prefix.Length..];
+                                if (string.IsNullOrEmpty(entryName)) return;
+
+                                // DownloadContentAsync buffers the blob — fine here since
+                                // files are 33 bytes. Use DownloadStreamingAsync for large files.
+                                var blobClient = container.GetBlobClient(blobItem.Name);
+                                var download = await blobClient.DownloadContentAsync(ct);
+                                var content = download.Value.Content.ToArray();
+
+                                await channel.Writer.WriteAsync((entryName, content), ct);
+                            });
+
+                        // Signal consumer that no more blobs are coming
+                        channel.Writer.Complete();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Propagate the error to the consumer so it doesn't wait forever
+                        channel.Writer.Complete(ex);
+                        throw;
+                    }
+                }, cancellationToken);
+
+                // Consumer: write blobs to the zip archive one at a time.
+                // ZipArchive is not thread-safe — sequential writes are required.
+                var consumer = Task.Run(async () =>
+                {
+                    await foreach (var (entryName, content) in channel.Reader.ReadAllAsync(cancellationToken))
+                    {
+                        var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
+                        await using var entryStream = entry.Open();
+                        await entryStream.WriteAsync(content, cancellationToken);
+                    }
+                }, cancellationToken);
+
+                // Wait for both to finish — if either throws, the exception surfaces here
+                await Task.WhenAll(producer, consumer);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+            finally
+            {
+                await pipe.Writer.CompleteAsync(error);
+            }
+        }, cancellationToken);
+
+        return new FileStreamResult(pipe.Reader.AsStream(), "application/zip")
+        {
+            FileDownloadName = $"appended_file.zip",
+            EnableRangeProcessing = false
         };
     }
 
@@ -894,5 +1015,81 @@ public class FileAzureBusiness : IFileBusiness
         }
 
         return fileName;
+    }
+}
+
+/// <summary>
+///     A semaphore that gates access by byte budget rather than slot count.
+///     Allows concurrent acquires as long as total bytes in flight stays under the budget.
+///     If a single acquire exceeds the budget but nothing is in flight, it proceeds anyway
+///     to prevent deadlock when one part is larger than the entire budget.
+/// </summary>
+internal sealed class WeightedSemaphore
+{
+    private readonly long _maxBytes;
+    private long _currentBytes;
+    private readonly object _lock = new();
+    private readonly Queue<(long Bytes, TaskCompletionSource Tcs)> _waiters = new();
+
+    public WeightedSemaphore(long maxBytes) => _maxBytes = maxBytes;
+
+    public Task AcquireAsync(long bytes, CancellationToken ct)
+    {
+        lock (_lock)
+        {
+            // Grant immediately if under budget or nothing else is in flight
+            if (_currentBytes == 0 || _currentBytes + bytes <= _maxBytes)
+            {
+                _currentBytes += bytes;
+                return Task.CompletedTask;
+            }
+
+            // Budget exhausted — queue a waiter and return its task
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _waiters.Enqueue((bytes, tcs));
+
+            // If the caller cancels, abandon the waiter without adjusting budget
+            // (budget was never granted to it)
+            ct.Register(() => tcs.TrySetCanceled(ct));
+
+            return tcs.Task;
+        }
+    }
+
+    public void Release(long bytes)
+    {
+        lock (_lock)
+        {
+            _currentBytes = Math.Max(0, _currentBytes - bytes);
+            TryGrantWaiters();
+        }
+    }
+
+    private void TryGrantWaiters()
+    {
+        while (_waiters.Count > 0)
+        {
+            var waiter = _waiters.Peek();
+
+            // Discard waiters cancelled while waiting — no budget adjustment needed
+            // since they never received budget in the first place
+            if (waiter.Tcs.Task.IsCanceled)
+            {
+                _waiters.Dequeue();
+                continue;
+            }
+
+            if (_currentBytes == 0 || _currentBytes + waiter.Bytes <= _maxBytes)
+            {
+                _waiters.Dequeue();
+                _currentBytes += waiter.Bytes;
+                waiter.Tcs.TrySetResult();
+                // Keep trying — freed budget may accommodate additional waiters
+            }
+            else
+            {
+                break; // Next waiter needs more than available budget
+            }
+        }
     }
 }

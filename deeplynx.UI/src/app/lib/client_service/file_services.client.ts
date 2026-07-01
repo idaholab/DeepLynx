@@ -37,7 +37,7 @@ function sanitizeFilename(name: string): string {
  * Check if storage type uses pre-signed URL download method
  */
 export const isPresignedUrlStorage = (storageType: string): boolean => {
-  return storageType === 'azure_object' || storageType === 'aws_s3';
+  return storageType === 'aws_s3';
 };
 
 

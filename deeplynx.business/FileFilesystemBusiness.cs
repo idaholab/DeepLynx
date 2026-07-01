@@ -1,3 +1,6 @@
+using System.IO.Compression;
+using System.IO.Pipelines;
+using System.Threading.Channels;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
@@ -145,6 +148,136 @@ public class FileFilesystemBusiness : IFileBusiness
         {
             FileDownloadName = fileName,
             EnableRangeProcessing = true
+        };
+    }
+    
+    /// <summary>
+    ///     Streams a record's append folder as a zip file directly to the client.
+    ///     Uses concurrent file reads to overlap I/O wait time across files — this matters
+    ///     most when the mounted path is an Azure File Share (SMB-backed network storage)
+    ///     rather than a genuinely local disk, since each read then has real network
+    ///     round-trip latency worth hiding via concurrency.
+    /// </summary>
+    /// <param name="record"></param>
+    /// <param name="objectStorageConfig"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    /// <exception cref="DirectoryNotFoundException"></exception>
+    public async Task<FileStreamResult> DownloadAppendedFile(
+        RecordResponseDto record,
+        ObjectStorageConfigDto objectStorageConfig,
+        CancellationToken cancellationToken = default)
+    {
+        if (objectStorageConfig.MountPath == null)
+            throw new InvalidOperationException("File system mount path not set in object storage");
+
+        // Use record.Uri directly — it already points to the exact append folder
+        // and always ends in a separator, as set by AppendToFilesystemAsync on first append.
+        var folderPath = record.Uri;
+
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+            throw new DirectoryNotFoundException($"Folder not found: {folderPath}");
+
+        var pipe = new Pipe();
+
+        _ = Task.Run(async () =>
+        {
+            Exception? error = null;
+            try
+            {
+                await using var pipeStream = pipe.Writer.AsStream(leaveOpen: true);
+                using var archive = new ZipArchive(pipeStream, ZipArchiveMode.Create, leaveOpen: true);
+
+                // Bounded channel between concurrent file readers and the sequential zip writer.
+                // Capacity of 128 caps how many files' content can sit in memory waiting
+                // to be written — prevents unbounded growth if reads outpace zip writes.
+                var channel = Channel.CreateBounded<(string EntryName, byte[] Content)>(
+                    new BoundedChannelOptions(128)
+                    {
+                        FullMode = BoundedChannelFullMode.Wait,
+                        SingleReader = true,
+                        SingleWriter = false
+                    });
+
+                // Producer: enumerate files lazily, read them concurrently.
+                // MaxDegreeOfParallelism = 32 overlaps network latency across files — this
+                // matters more on an Azure File Share mount than on local disk, since local
+                // disk reads can suffer seek contention under high concurrency while network
+                // storage benefits from having many requests in flight at once.
+                var producer = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Parallel.ForEachAsync(
+                            Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories),
+                            new ParallelOptions
+                            {
+                                MaxDegreeOfParallelism = 32,
+                                CancellationToken = cancellationToken
+                            },
+                            async (filePath, ct) =>
+                            {
+                                var entryName = Path.GetRelativePath(folderPath, filePath).Replace('\\', '/');
+
+                                // Larger buffer (256KB) reduces round trips over SMB compared
+                                // to a smaller buffer tuned for pure local-disk reads.
+                                await using var fileStream = new FileStream(
+                                    filePath,
+                                    FileMode.Open,
+                                    FileAccess.Read,
+                                    FileShare.Read,
+                                    bufferSize: 262144,
+                                    useAsync: true);
+
+                                using var ms = new MemoryStream();
+                                await fileStream.CopyToAsync(ms, ct);
+
+                                await channel.Writer.WriteAsync((entryName, ms.ToArray()), ct);
+                            });
+
+                        // Signal consumer that no more files are coming
+                        channel.Writer.Complete();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Propagate the error to the consumer so it doesn't wait forever
+                        channel.Writer.Complete(ex);
+                        throw;
+                    }
+                }, cancellationToken);
+
+                // Consumer: write files to the zip archive one at a time.
+                // ZipArchive is not thread-safe — sequential writes are required.
+                var consumer = Task.Run(async () =>
+                {
+                    await foreach (var (entryName, content) in channel.Reader.ReadAllAsync(cancellationToken))
+                    {
+                        var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
+                        await using var entryStream = entry.Open();
+                        await entryStream.WriteAsync(content, cancellationToken);
+                    }
+                }, cancellationToken);
+
+                // Wait for both to finish — if either throws, the exception surfaces here
+                await Task.WhenAll(producer, consumer);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+            finally
+            {
+                // Sole completion point — passes null on success, exception on failure
+                // so the reader throws and ASP.NET Core closes the connection cleanly.
+                await pipe.Writer.CompleteAsync(error);
+            }
+        }, cancellationToken);
+
+        return new FileStreamResult(pipe.Reader.AsStream(), "application/zip")
+        {
+            FileDownloadName = $"appended_file.zip",
+            EnableRangeProcessing = false
         };
     }
 

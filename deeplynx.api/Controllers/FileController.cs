@@ -123,6 +123,41 @@ public class FileController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="cancellationToken">The ID of the record that contains file information</param>
+    /// <returns>The file stream for download</returns>
+    [HttpGet("{recordId:long}", Name = "api_download_appended_file")]
+    [Auth("read", "file")]
+    [Sensitivity("download file")]
+    public async Task<IActionResult> DownloadAppendedFile(
+        long organizationId,
+        long projectId,
+        long recordId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var fileStreamResult = await _fileBusiness.DownloadAppendedFile(currentUserId, organizationId, projectId, recordId, isSysAdmin, isOrgAdmin, isProjectAdmin, cancellationToken);
+            return fileStreamResult;
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while downloading file in record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
+    ///     Download a File
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="cancellationToken">The ID of the record that contains file information</param>
     /// <returns>The file stream for download</returns>
     [HttpGet("{recordId:long}", Name = "api_download_file")]
     [Auth("read", "file")]
