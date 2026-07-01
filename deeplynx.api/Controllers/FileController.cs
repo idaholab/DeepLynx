@@ -118,14 +118,14 @@ public class FileController : ControllerBase
     }
 
     /// <summary>
-    ///     Download a File
+    ///     Download Appended File
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
     /// <param name="cancellationToken">The ID of the record that contains file information</param>
     /// <returns>The file stream for download</returns>
-    [HttpGet("{recordId:long}", Name = "api_download_appended_file")]
+    [HttpGet("{recordId:long}/appended", Name = "api_download_appended_file")]
     [Auth("read", "file")]
     [Sensitivity("download file")]
     public async Task<IActionResult> DownloadAppendedFile(

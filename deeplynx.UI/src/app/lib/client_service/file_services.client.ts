@@ -37,7 +37,7 @@ function sanitizeFilename(name: string): string {
  * Check if storage type uses pre-signed URL download method
  */
 export const isPresignedUrlStorage = (storageType: string): boolean => {
-  return storageType === 'aws_s3';
+  return storageType === 'azure_object' || storageType === 'aws_s3';
 };
 
 
@@ -173,6 +173,58 @@ const downloadViaBlob = async (
   }
 };
 
+const downloadAppendedFile = async (
+  organizationId: number,
+  projectId: number,
+  recordId: number,
+  recordName?: string | null,
+  onProgress?: (progress: { loaded: number; total: number; percentage: number; }) => void,
+  abortController?: AbortController
+): Promise<void> => {
+  let url: string | null = null;
+  try {
+    const res = await api.get(
+      `/organizations/${organizationId}/projects/${projectId}/files/${recordId}/appended`,
+      {
+        responseType: 'blob',
+        signal: abortController?.signal,
+        onDownloadProgress: (progressEvent) => {
+          const loaded = progressEvent.loaded;
+          const total = 0;
+          const percentage = 0;
+
+          if (onProgress) {
+            onProgress({ loaded, total, percentage });
+          }
+        },
+      }
+    );
+
+    const blob = res.data as Blob;
+
+    let filename =
+      parseFilenameFromCD(res.headers['content-disposition']) ||
+      recordName?.trim() ||
+      'folder.zip';
+
+    if (!filename.toLowerCase().endsWith('.zip')) {
+      filename += '.zip';
+    }
+
+    filename = sanitizeFilename(filename);
+
+    url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+  }
+};
+
 
 /**
  * Update a file
@@ -252,19 +304,13 @@ export const downloadFile = async (
       true // hideArchived
     );
 
-    // Step 3: Route to appropriate download method based on storage type
-    if (isPresignedUrlStorage(objectStorage.type)) {
-      // Use pre-signed URL method (no progress tracking)
-      await downloadViaPresignedUrl(
-        organizationId,
-        projectId,
-        recordId,
-        recordName,
-        abortController
-      );
-    } else {
-      // Use blob download method (with progress tracking)
-      await downloadViaBlob(
+    console.log("uri: ", record.uri);
+
+    // Determine if folder or file by Uri trailing slash or extension
+    const isFolder = record.uri?.endsWith('/');
+
+    if (isFolder) {
+      await downloadAppendedFile(
         organizationId,
         projectId,
         recordId,
@@ -272,6 +318,25 @@ export const downloadFile = async (
         onProgress,
         abortController
       );
+    } else {
+      if (isPresignedUrlStorage(objectStorage.type)) {
+        await downloadViaPresignedUrl(
+          organizationId,
+          projectId,
+          recordId,
+          recordName,
+          abortController
+        );
+      } else {
+        await downloadViaBlob(
+          organizationId,
+          projectId,
+          recordId,
+          recordName,
+          onProgress,
+          abortController
+        );
+      }
     }
   } catch (err: unknown) {
     // Check if it's a cancellation (user aborted)

@@ -152,132 +152,95 @@ public class FileFilesystemBusiness : IFileBusiness
     }
     
     /// <summary>
-    ///     Streams a record's append folder as a zip file directly to the client.
-    ///     Uses concurrent file reads to overlap I/O wait time across files — this matters
-    ///     most when the mounted path is an Azure File Share (SMB-backed network storage)
-    ///     rather than a genuinely local disk, since each read then has real network
-    ///     round-trip latency worth hiding via concurrency.
+    /// Downloads a file from Azure Object Storage
     /// </summary>
     /// <param name="record"></param>
     /// <param name="objectStorageConfig"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    /// <exception cref="InvalidOperationException"></exception>
-    /// <exception cref="DirectoryNotFoundException"></exception>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
     public async Task<FileStreamResult> DownloadAppendedFile(
         RecordResponseDto record,
         ObjectStorageConfigDto objectStorageConfig,
         CancellationToken cancellationToken = default)
     {
-        if (objectStorageConfig.MountPath == null)
-            throw new InvalidOperationException("File system mount path not set in object storage");
+        if (record.Uri == null)
+            throw new ArgumentException("Record Uri is null");
+        if (string.IsNullOrWhiteSpace(objectStorageConfig?.MountPath))
+            throw new ArgumentException("Mounted path configuration is missing");
 
-        // Use record.Uri directly — it already points to the exact append folder
-        // and always ends in a separator, as set by AppendToFilesystemAsync on first append.
-        var folderPath = record.Uri;
+        var uriSegments = record.Uri
+            .Trim('/')
+            .Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.ToLowerInvariant())
+            .ToList();
 
-        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
-            throw new DirectoryNotFoundException($"Folder not found: {folderPath}");
+        int orgIndex = uriSegments.FindIndex(s => s.StartsWith("org"));
+        int projectIndex = uriSegments.FindIndex(s => s.StartsWith("project"));
+        int datasourceIndex = uriSegments.FindIndex(s => s.StartsWith("datasource"));
 
-        var pipe = new Pipe();
+        if (orgIndex == -1 || projectIndex == -1 || datasourceIndex == -1 ||
+            !(orgIndex < projectIndex && projectIndex < datasourceIndex))
+        {
+            throw new ArgumentException("Record URI must contain 'org_x', 'project_x', and 'datasource_x' segments in correct order.");
+        }
+
+        if (uriSegments.Count <= datasourceIndex + 1)
+        {
+            throw new ArgumentException("Record URI must specify a folder inside the datasource directory.");
+        }
+
+        int ExtractNumberSuffix(string segment, string prefix)
+        {
+            if (!segment.StartsWith(prefix))
+                throw new ArgumentException($"Expected segment starting with '{prefix}' but got '{segment}'.");
+
+            var suffix = segment.Substring(prefix.Length);
+            if (!int.TryParse(suffix, out int number))
+                throw new ArgumentException($"Segment '{segment}' does not contain a valid numeric suffix.");
+
+            return number;
+        }
+
+        int orgNum = ExtractNumberSuffix(uriSegments[orgIndex], "org_");
+        int projectNum = ExtractNumberSuffix(uriSegments[projectIndex], "project_");
+        int datasourceNum = ExtractNumberSuffix(uriSegments[datasourceIndex], "datasource_");
+
+        if (orgNum != record.OrganizationId)
+            throw new ArgumentException($"Organization ID in URI ({orgNum}) does not match record.OrganizationId ({record.OrganizationId}).");
+
+        if (projectNum != record.ProjectId)
+            throw new ArgumentException($"Project ID in URI ({projectNum}) does not match record.ProjectId ({record.ProjectId}).");
+
+        if (datasourceNum != record.DataSourceId)
+            throw new ArgumentException($"Datasource ID in URI ({datasourceNum}) does not match record.DatasourceId ({record.DataSourceId}).");
+
+        var fullPath = record.Uri.StartsWith("/")
+            ? record.Uri
+            : "/" + record.Uri;
+
+        if (!Directory.Exists(fullPath))
+            throw new DirectoryNotFoundException($"Directory '{fullPath}' not found.");
+
+        var pipeStream = new Pipe();
 
         _ = Task.Run(async () =>
         {
-            Exception? error = null;
             try
             {
-                await using var pipeStream = pipe.Writer.AsStream(leaveOpen: true);
-                using var archive = new ZipArchive(pipeStream, ZipArchiveMode.Create, leaveOpen: true);
-
-                // Bounded channel between concurrent file readers and the sequential zip writer.
-                // Capacity of 128 caps how many files' content can sit in memory waiting
-                // to be written — prevents unbounded growth if reads outpace zip writes.
-                var channel = Channel.CreateBounded<(string EntryName, byte[] Content)>(
-                    new BoundedChannelOptions(128)
-                    {
-                        FullMode = BoundedChannelFullMode.Wait,
-                        SingleReader = true,
-                        SingleWriter = false
-                    });
-
-                // Producer: enumerate files lazily, read them concurrently.
-                // MaxDegreeOfParallelism = 32 overlaps network latency across files — this
-                // matters more on an Azure File Share mount than on local disk, since local
-                // disk reads can suffer seek contention under high concurrency while network
-                // storage benefits from having many requests in flight at once.
-                var producer = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await Parallel.ForEachAsync(
-                            Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories),
-                            new ParallelOptions
-                            {
-                                MaxDegreeOfParallelism = 32,
-                                CancellationToken = cancellationToken
-                            },
-                            async (filePath, ct) =>
-                            {
-                                var entryName = Path.GetRelativePath(folderPath, filePath).Replace('\\', '/');
-
-                                // Larger buffer (256KB) reduces round trips over SMB compared
-                                // to a smaller buffer tuned for pure local-disk reads.
-                                await using var fileStream = new FileStream(
-                                    filePath,
-                                    FileMode.Open,
-                                    FileAccess.Read,
-                                    FileShare.Read,
-                                    bufferSize: 262144,
-                                    useAsync: true);
-
-                                using var ms = new MemoryStream();
-                                await fileStream.CopyToAsync(ms, ct);
-
-                                await channel.Writer.WriteAsync((entryName, ms.ToArray()), ct);
-                            });
-
-                        // Signal consumer that no more files are coming
-                        channel.Writer.Complete();
-                    }
-                    catch (Exception ex)
-                    {
-                        // Propagate the error to the consumer so it doesn't wait forever
-                        channel.Writer.Complete(ex);
-                        throw;
-                    }
-                }, cancellationToken);
-
-                // Consumer: write files to the zip archive one at a time.
-                // ZipArchive is not thread-safe — sequential writes are required.
-                var consumer = Task.Run(async () =>
-                {
-                    await foreach (var (entryName, content) in channel.Reader.ReadAllAsync(cancellationToken))
-                    {
-                        var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
-                        await using var entryStream = entry.Open();
-                        await entryStream.WriteAsync(content, cancellationToken);
-                    }
-                }, cancellationToken);
-
-                // Wait for both to finish — if either throws, the exception surfaces here
-                await Task.WhenAll(producer, consumer);
-            }
-            catch (Exception ex)
-            {
-                error = ex;
+                await using var zipArchive = new ZipArchive(pipeStream.Writer.AsStream(), ZipArchiveMode.Create, leaveOpen: true);
+                await AddDirectoryToZipFromLocalPathAsync(fullPath, zipArchive, "", cancellationToken);
             }
             finally
             {
-                // Sole completion point — passes null on success, exception on failure
-                // so the reader throws and ASP.NET Core closes the connection cleanly.
-                await pipe.Writer.CompleteAsync(error);
+                await pipeStream.Writer.CompleteAsync();
             }
         }, cancellationToken);
 
-        return new FileStreamResult(pipe.Reader.AsStream(), "application/zip")
+        return new FileStreamResult(pipeStream.Reader.AsStream(), "application/zip")
         {
-            FileDownloadName = $"appended_file.zip",
-            EnableRangeProcessing = false
+            FileDownloadName = $"{record.Name}.zip"
         };
     }
 
@@ -802,6 +765,28 @@ public class FileFilesystemBusiness : IFileBusiness
 
         var meta = JsonConvert.DeserializeObject<dynamic>(await File.ReadAllTextAsync(metaPath));
         return (string)meta.FileName;
+    }
+    
+    private async Task AddDirectoryToZipFromLocalPathAsync(
+        string directoryPath,
+        ZipArchive zipArchive,
+        string currentFolderInZip,
+        CancellationToken cancellationToken)
+    {
+        var directoryInfo = new DirectoryInfo(directoryPath);
+        var files = directoryInfo.GetFiles();
+
+        foreach (var fileInfo in files)
+        {
+            var entryName = Path.Combine(currentFolderInZip, fileInfo.Name).Replace('\\', '/');
+            var zipEntry = zipArchive.CreateEntry(entryName, CompressionLevel.Fastest);
+
+            await using var entryStream = zipEntry.Open();
+            await using var fileStream = fileInfo.OpenRead();
+
+            await fileStream.CopyToAsync(entryStream, cancellationToken);
+
+        }
     }
 
 }
