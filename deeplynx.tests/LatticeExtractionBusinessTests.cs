@@ -23,6 +23,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     private Mock<IInsightBusiness> _mockInsight = null!;
     private Mock<HttpMessageHandler> _mockHandler = null!;
     private InsightServiceClient _client = null!;
+    private Mock<IProvenanceBusiness> _mockProvenance = null!;
     private Mock<ILogger<LatticeExtractionBusiness>> _mockLogger = null!;
 
     private const long NotFoundId = 99_999L;
@@ -57,10 +58,11 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         Environment.SetEnvironmentVariable("INSIGHT_FASTAPI_URL", "http://localhost:5000");
         _client = new InsightServiceClient(new HttpClient(_mockHandler.Object));
         _mockLogger = new Mock<ILogger<LatticeExtractionBusiness>>();
+        _mockProvenance = new Mock<IProvenanceBusiness>();
 
         _business = new LatticeExtractionBusiness(
             Context, _latticeCtx,
-            _mockInsight.Object, _client, _mockLogger.Object);
+            _mockInsight.Object, _client, _mockProvenance.Object, _mockLogger.Object);
     }
 
     public override async Task DisposeAsync()

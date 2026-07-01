@@ -77,7 +77,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     private OlapBusiness _olapBusiness = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
-
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private long _organizationId;
     private long _projectId;
     private RecordBusiness _recordBusiness = null!;
@@ -118,6 +119,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
         _mockServiceScopeFactory = new Mock<IServiceScopeFactory>();
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
 
         // Set up service scope factory mock
         var mockScope = new Mock<IServiceScope>();
@@ -139,8 +142,15 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object);
 
         // Wire up the real filesystem implementation via the factory mock
         var realFileFilesystemBusiness =
@@ -171,6 +181,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _insightBusiness.Object,
             _olapBusiness,
             _objectStorageBusiness,
+            _provenanceBusiness.Object,
             NullLogger<FileBusiness>.Instance
         );
     }

@@ -24,17 +24,19 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     private readonly DeeplynxContext _context;
     private readonly IInsightBusiness _insightBusiness;
     private readonly InsightServiceClient _insightServiceClient;
+    private readonly IProvenanceBusiness _provenanceBusiness;
     private readonly LatticeContext _latticeContext;
     private readonly ILogger<LatticeExtractionBusiness> _logger;
 
     public LatticeExtractionBusiness(DeeplynxContext context, LatticeContext latticeContext,
         IInsightBusiness insightBusiness, InsightServiceClient insightServiceClient,
-        ILogger<LatticeExtractionBusiness> logger)
+        IProvenanceBusiness provenanceBusiness, ILogger<LatticeExtractionBusiness> logger)
     {
         _context = context;
         _latticeContext = latticeContext;
         _insightBusiness = insightBusiness;
         _insightServiceClient = insightServiceClient;
+        _provenanceBusiness = provenanceBusiness;
         _logger = logger;
     }
 
@@ -897,6 +899,9 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             var embeddingConfig = await _insightBusiness.ResolveModelConfig(
                 currentUserId, organizationId, projectId, null, "embedding");
             _insightBusiness.TriggerEmbedding(projectId, recordId, record.Uri!, vlmConfig, embeddingConfig);
+
+            if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "embedding_requested", currentUserId, embeddingConfig.Id))
+                _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", recordId);
         }
 
         if (!ontologyEmbedded)

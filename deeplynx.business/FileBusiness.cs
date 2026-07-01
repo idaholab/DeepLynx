@@ -25,6 +25,7 @@ public class FileBusiness
     private readonly IRecordBusiness _recordBusiness;
     private readonly IOlapBusiness _olapBusiness;
     private readonly IInsightBusiness _insightBusiness;
+    private readonly IProvenanceBusiness _provenanceBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly ILogger<FileBusiness> _logger;
 
@@ -41,6 +42,7 @@ public class FileBusiness
         IInsightBusiness insightBusiness,
         IOlapBusiness olapBusiness,
         IObjectStorageBusiness objectStorageBusiness,
+        IProvenanceBusiness provenanceBusiness,
         ILogger<FileBusiness> logger)
     {
         _context = context;
@@ -51,6 +53,7 @@ public class FileBusiness
         _insightBusiness = insightBusiness;
         _olapBusiness = olapBusiness;
         _objectStorageBusiness = objectStorageBusiness;
+        _provenanceBusiness = provenanceBusiness;
         _logger = logger;
 
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
@@ -171,6 +174,9 @@ public class FileBusiness
 
             _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
                             createdRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt);
+
+            if (!await _provenanceBusiness.CreateProvenanceRecord(createdRecord.Id, "embedding_requested", currentUserId, embeddingModelConfig.Id))
+                _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", createdRecord.Id);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -237,6 +243,9 @@ public class FileBusiness
                 await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
             _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
+
+            if (!await _provenanceBusiness.CreateProvenanceRecord(record.Id, "embedding_requested", currentUserId, embeddingModelConfig.Id))
+                _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", record.Id);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -478,6 +487,9 @@ public class FileBusiness
 
             _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
                 createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+
+            if (!await _provenanceBusiness.CreateProvenanceRecord(createdRecord.Id, "embedding_requested", currentUserId, embeddingModelConfig.Id))
+                _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", createdRecord.Id);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -840,6 +852,9 @@ public class FileBusiness
 
                 _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
                     createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+
+                if (!await _provenanceBusiness.CreateProvenanceRecord(createdRecord.Id, "embedding_requested", currentUserId, embeddingModelConfig.Id))
+                    _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", createdRecord.Id);
             }
         }
 
@@ -932,7 +947,7 @@ public class FileBusiness
 
         return false;
     }
-    
+
     private async Task<ClassResponseDto> GetResolvedClass(long organizationId, long projectId, long currentUserId, CreateRecordFileUploadRequestDto? metadata, ClassResponseDto recordClass)
     {
         var providedClassId = metadata?.ClassId;
@@ -943,16 +958,18 @@ public class FileBusiness
         if (providedClassId.HasValue)
         {
             resolvedClass = await _classBusiness.GetClass(organizationId, projectId, providedClassId.Value, true);
-            if (resolvedClass is null) {
+            if (resolvedClass is null)
+            {
                 throw new ArgumentException($"Class ID {providedClassId} does not exist in this project.");
-            } 
-            if (!string.IsNullOrWhiteSpace(providedClassName) && resolvedClass.Name != providedClassName) {
+            }
+            if (!string.IsNullOrWhiteSpace(providedClassName) && resolvedClass.Name != providedClassName)
+            {
                 // Class Name was provided and doesn't match the Class Name from the Id
                 throw new ArgumentException($"Class Name {providedClassName} does not match Class Id {providedClassId}. Expected {resolvedClass.Name}");
             }
-        } 
+        }
         // No Class Id provided, Class Name was provided
-        else if (!string.IsNullOrWhiteSpace(providedClassName)) 
+        else if (!string.IsNullOrWhiteSpace(providedClassName))
         {
             resolvedClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, providedClassName);
         }
