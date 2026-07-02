@@ -141,6 +141,9 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
           // Only process progress for blob downloads (non-presigned URL)
           if (isFolderRef.current) {
             setFolderDownloadProgress(progressInfo.loaded)
+            setDownloadProgress(1)
+            setBytesDownloaded({ loaded: 1, total: 1 })
+
           }
           else if (!usePresignedUrl) {
             const now = Date.now();
@@ -431,10 +434,12 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
   // Show progress bar only for blob downloads (non-presigned URL)
 
+  console.log(!isPresignedUrl, downloadProgress, bytesDownloaded, folderDownloadProgress);
+
   const showProgressBar =
     !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null && folderDownloadProgress !== null;
 
-
+  console.log("show progress bar: " + showProgressBar);
   return (
     <div className={`${className}`}>
       <div className="card border border-base-300/50 bg-base-100 p-2 shadow-sm">
@@ -456,7 +461,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
               {download && (
                 <div className="flex items-center gap-3">
                   {/* Status indicator - show during preparation or for presigned URL downloads */}
-                  {downloading && (preparingDownload || isPresignedUrl) && !showProgressBar && (
+                  {downloading && (preparingDownload || isPresignedUrl) && !showProgressBar && !isFolder && (
                     <div className="flex items-center gap-2 min-w-[200px]">
                       <div className="loading loading-spinner loading-sm text-primary"></div>
                       <span className="text-sm text-base-content">
