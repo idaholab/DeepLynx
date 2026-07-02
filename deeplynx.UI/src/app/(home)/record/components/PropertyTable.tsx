@@ -434,12 +434,10 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
   // Show progress bar only for blob downloads (non-presigned URL)
 
-  console.log(!isPresignedUrl, downloadProgress, bytesDownloaded, folderDownloadProgress);
 
   const showProgressBar =
     !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null && folderDownloadProgress !== null;
 
-  console.log("show progress bar: " + showProgressBar);
   return (
     <div className={`${className}`}>
       <div className="card border border-base-300/50 bg-base-100 p-2 shadow-sm">
