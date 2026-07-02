@@ -2,14 +2,14 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
-using System.IO.Compression;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
-using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using System.IO.Pipelines;
-using System.Threading.Channels;
+using ICSharpCode.SharpZipLib.Tar;
+using ICSharpCode.SharpZipLib.GZip;
+using System.Text;
 
 namespace deeplynx.business;
 
@@ -274,66 +274,32 @@ public class FileFilesystemBusiness : IFileBusiness
             try
             {
                 await using var pipeStream = pipe.Writer.AsStream(leaveOpen: true);
-                using var archive = new ZipArchive(pipeStream, ZipArchiveMode.Create, leaveOpen: true);
 
-                // Create bounded channel for producer-consumer coordination
-                var channel = Channel.CreateBounded<(string EntryName, byte[] Content)>(
-                    new BoundedChannelOptions(128)
-                    {
-                        FullMode = BoundedChannelFullMode.Wait,
-                        SingleReader = true,
-                        SingleWriter = false
-                    });
+                using var gzipStream = new GZipOutputStream(pipeStream);
+                gzipStream.IsStreamOwner = false;
 
-                // Producer: Concurrently read files and push to channel
-                var producer = Task.Run(async () =>
+                using var tarOutputStream = new TarOutputStream(gzipStream, Encoding.UTF8);
+                tarOutputStream.IsStreamOwner = false;
+
+                foreach (var filePath in Directory.EnumerateFiles(fullPath, "*", SearchOption.AllDirectories))
                 {
-                    try
-                    {
-                        await Parallel.ForEachAsync(
-                            Directory.EnumerateFiles(fullPath, "*", SearchOption.AllDirectories),
-                            new ParallelOptions { MaxDegreeOfParallelism = 32, CancellationToken = cancellationToken },
-                            async (filePath, ct) =>
-                            {
-                                var entryName = Path.GetRelativePath(fullPath, filePath).Replace('\\', '/');
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                                await using var fileStream = new FileStream(
-                                    filePath,
-                                    FileMode.Open,
-                                    FileAccess.Read,
-                                    FileShare.Read,
-                                    bufferSize: 262_144,
-                                    useAsync: true);
+                    var relativePath = Path.GetRelativePath(fullPath, filePath).Replace('\\', '/');
 
-                                using var ms = new MemoryStream();
-                                await fileStream.CopyToAsync(ms, ct);
+                    var entry = TarEntry.CreateEntryFromFile(filePath);
+                    entry.Name = relativePath;
 
-                                // Push file content to channel
-                                await channel.Writer.WriteAsync((entryName, ms.ToArray()), ct);
-                            });
+                    tarOutputStream.PutNextEntry(entry);
 
-                        channel.Writer.Complete();
-                    }
-                    catch (Exception ex)
-                    {
-                        channel.Writer.Complete(ex);
-                        throw;
-                    }
-                }, cancellationToken);
+                    await using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 81920, useAsync: true);
+                    await fileStream.CopyToAsync(tarOutputStream, cancellationToken);
 
-                // Consumer: Sequentially read from channel and write to ZipArchive
-                var consumer = Task.Run(async () =>
-                {
-                    await foreach (var (entryName, content) in channel.Reader.ReadAllAsync(cancellationToken))
-                    {
-                        var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
-                        await using var entryStream = entry.Open();
-                        await entryStream.WriteAsync(content, cancellationToken);
-                    }
-                }, cancellationToken);
+                    tarOutputStream.CloseEntry();
+                }
 
-                // Await both producer and consumer
-                await Task.WhenAll(producer, consumer);
+                tarOutputStream.Finish();
+                await gzipStream.FlushAsync(cancellationToken);
             }
             catch (Exception ex)
             {
@@ -345,9 +311,9 @@ public class FileFilesystemBusiness : IFileBusiness
             }
         }, cancellationToken);
 
-        return new FileStreamResult(pipe.Reader.AsStream(), "application/zip")
+        return new FileStreamResult(pipe.Reader.AsStream(), "application/gzip")
         {
-            FileDownloadName = "appended_file.zip",
+            FileDownloadName = "appended_file.tar.gz",
             EnableRangeProcessing = false
         };
     }
