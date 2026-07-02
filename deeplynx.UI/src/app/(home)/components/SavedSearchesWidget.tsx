@@ -68,11 +68,10 @@ function ConnectorBadge({ connector }: { connector: string }) {
   const isOr = connector === "OR";
   return (
     <span
-      className={`text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded border ${
-        isOr
-          ? "bg-warning/10 text-warning border-warning/30"
-          : "bg-info/10 text-info border-info/30"
-      }`}
+      className={`text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded border ${isOr
+        ? "bg-warning/10 text-warning border-warning/30"
+        : "bg-info/10 text-info border-info/30"
+        }`}
     >
       {connector}
     </span>
@@ -139,6 +138,7 @@ function FilterPanel({
   onChange: (f: SavedSearchFilterRequest) => void;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const [local, setLocal] = useState<SavedSearchFilterRequest>(filters);
   const set = <K extends keyof SavedSearchFilterRequest>(
     key: K,
@@ -149,7 +149,7 @@ function FilterPanel({
     <div className="absolute top-[calc(100% px)] right-0 z-50 bg-base-100 border border-base-300 rounded-xl shadow-xl w-72 p-4">
       <div className="flex justify-between items-center mb-3">
         <span className="text-sm font-semibold text-base-content">
-          Filter Searches
+          {t.translations.FILTER_SEARCHES}
         </span>
         <button onClick={onClose} className="btn btn-ghost btn-xs btn-circle">
           <XMarkIcon className="w-3.5 h-3.5" />
@@ -160,12 +160,12 @@ function FilterPanel({
         {/* TextSearch */}
         <div>
           <label className="text-[11px] font-semibold text-base-content/50 uppercase tracking-wide block mb-1">
-            Text Search Term
+            {t.translations.TEXT_SEARCH_TERM}
           </label>
           <input
             value={local.textSearch ?? ""}
             onChange={(e) => set("textSearch", e.target.value)}
-            placeholder="Contains text search..."
+            placeholder={t.translations.CONTAINS_TEXT_SEARCH}
             className="input input-sm input-bordered w-full bg-base-200"
           />
         </div>
@@ -173,11 +173,11 @@ function FilterPanel({
         {/* Date range */}
         <div>
           <label className="text-[11px] font-semibold text-base-content/50 uppercase tracking-wide block mb-1">
-            Last Updated
+            {t.translations.LAST_UPDATED}
           </label>
           <div className="flex gap-2 items-center">
             <div className="flex-1">
-              <p className="text-[11px] text-base-content/40 mb-1">After</p>
+              <p className="text-[11px] text-base-content/40 mb-1">{t.translations.AFTER}</p>
               <input
                 type="date"
                 value={
@@ -196,7 +196,7 @@ function FilterPanel({
             </div>
             <span className="text-base-content/20 mt-4">—</span>
             <div className="flex-1">
-              <p className="text-[11px] text-base-content/40 mb-1">Before</p>
+              <p className="text-[11px] text-base-content/40 mb-1">{t.translations.BEFORE}</p>
               <input
                 type="date"
                 value={
@@ -225,7 +225,7 @@ function FilterPanel({
           }}
           className="btn btn-ghost btn-sm flex-1"
         >
-          Clear
+          {t.translations.CLEAR}
         </button>
         <button
           onClick={() => {
@@ -234,7 +234,7 @@ function FilterPanel({
           }}
           className="btn btn-primary btn-sm flex-1"
         >
-          Apply
+          {t.translations.APPLY}
         </button>
       </div>
     </div>
@@ -276,6 +276,8 @@ function DeleteConfirmModal({
   onCancel: () => void;
   isDeleting: boolean;
 }) {
+  const { t } = useLanguage();
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
@@ -291,13 +293,13 @@ function DeleteConfirmModal({
           </div>
           <div>
             <h3 className="text-sm font-semibold text-base-content">
-              Delete saved search?
+              {t.translations.DELETE_SAVED_SEARCH}
             </h3>
             <p className="text-xs text-base-content/50 mt-1">
               <span className="font-medium text-base-content/70">
                 "{searchName}"
               </span>{" "}
-              will be permanently removed. This cannot be undone.
+              {t.translations.DELETE_SAVED_SEARCH_WARNING}
             </p>
           </div>
         </div>
@@ -307,7 +309,7 @@ function DeleteConfirmModal({
             disabled={isDeleting}
             className="btn btn-ghost btn-sm"
           >
-            Cancel
+            {t.translations.CANCEL}
           </button>
           <button
             onClick={onConfirm}
@@ -317,12 +319,12 @@ function DeleteConfirmModal({
             {isDeleting ? (
               <>
                 <span className="loading loading-spinner loading-xs" />
-                Deleting…
+                {t.translations.DELETING}
               </>
             ) : (
               <>
                 <TrashIcon className="w-3.5 h-3.5" />
-                Delete
+                {t.translations.DELETE}
               </>
             )}
           </button>
@@ -389,7 +391,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
       setSavedSearches(data.items);
       setTotalCount(data.totalCount);
     } catch {
-      setError("Failed to load saved searches.");
+      setError(t.translations.FAILED_TO_LOAD_SAVED_SEARCHES);
     } finally {
       setLoading(false);
     }
@@ -476,7 +478,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
       if (expanded === deleteTarget.id) setExpanded(null);
       setDeleteTarget(null);
     } catch {
-      setDeleteError("Failed to delete. Please try again.");
+      setDeleteError(t.translations.FAILED_TO_DELETE_PLEASE_TRY_AGAIN);
     } finally {
       setDeleting(false);
     }
@@ -512,11 +514,11 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
           {/* Header */}
           <div className="flex justify-between items-start mb-1">
             <h2 className="text-xl font-semibold text-base-content">
-              Saved Searches
+              {t.translations.SAVED_SEARCHES}
             </h2>
             {!isCatalog && (
               <Link className="btn btn-secondary btn-sm" href="/data_catalog/query_builder">
-                Visit
+                {t.translations.VISIT}
               </Link>
             )}
           </div>
@@ -531,21 +533,20 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                   type="text"
                   value={textQuery}
                   onChange={(e) => setTextQuery(e.target.value)}
-                  placeholder="Find saved searches by name..."
+                  placeholder={t.translations.FIND_SAVED_SEARCHES_BY_NAME}
                   className="grow bg-transparent outline-none text-sm"
                 />
               </label>
               <div ref={filterRef} className="relative ml-1">
                 <button
                   onClick={() => setFilterOpen((o) => !o)}
-                  className={`btn btn-sm gap-1.5 h-full ${
-                    activeFilterCount > 0
-                      ? "btn-primary btn-outline"
-                      : "btn-ghost border border-base-300"
-                  }`}
+                  className={`btn btn-sm gap-1.5 h-full ${activeFilterCount > 0
+                    ? "btn-primary btn-outline"
+                    : "btn-ghost border border-base-300"
+                    }`}
                 >
                   <FunnelIcon className=" w-3.5 h-3.5" />
-                  Filters
+                  {t.translations.FILTERS}
                   {activeFilterCount > 0 && (
                     <span className="badge badge-primary badge-sm text-[10px] px-1.5">
                       {activeFilterCount}
@@ -623,7 +624,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                 className="ml-auto btn btn-ghost btn-xs"
                 onClick={() => setDeleteError(null)}
               >
-                Dismiss
+                {t.translations.DONE}
               </button>
             </div>
           )}
@@ -645,7 +646,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                   onClick={() => fetchSearches(pageNumber)}
                   className="btn btn-ghost btn-xs mt-2"
                 >
-                  Retry
+                  {t.translations.RETRY}
                 </button>
               </div>
             )}
@@ -655,10 +656,10 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
               <div className="bg-base-100 p-10 text-center">
                 <MagnifyingGlassIcon className="w-8 h-8 mx-auto mb-2 text-secondary" />
                 <p className="text-sm font-medium text-base-content/50">
-                  No saved searches found
+                  {t.translations.NO_SAVED_SEARCHES_FOUND}
                 </p>
                 <p className="text-xs text-base-content/30 mt-1">
-                  Try adjusting your filters or search term
+                  {t.translations.TRY_ADJUSTING_YOUR_FILTERS_OR_SEARCH_TERM}
                 </p>
               </div>
             )}
@@ -676,9 +677,8 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                   <div
                     key={s.id}
                     onClick={() => setExpanded(isExpanded ? null : s.id)}
-                    className={`bg-base-100 cursor-pointer transition-colors ${
-                      !isLast ? "border-b border-base-300/50" : ""
-                    }`}
+                    className={`bg-base-100 cursor-pointer transition-colors ${!isLast ? "border-b border-base-300/50" : ""
+                      }`}
                   >
                     <div className="flex items-center gap-3 px-4 py-3.5">
                       {/* Icon */}
@@ -700,13 +700,13 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                             <>
                               <span className="text-base-content/20">·</span>
                               <span className="text-xs text-base-content/40">
-                                text search
+                                {t.translations.TEXT_SEARCH}
                               </span>
                             </>
                           )}
                           <span className="text-base-content/20">·</span>
                           <span className="text-xs text-base-content/40">
-                            updated{" "}
+                            {t.translations.UPDATED}{" "}
                             {formatDistanceToNow(new Date(s.lastUpdatedAt), {
                               addSuffix: true,
                             })}
@@ -718,34 +718,32 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={(e) => handleRun(s, e)}
-                          className={`btn btn-xs gap-1 ${
-                            isDone
-                              ? "btn-success btn-outline"
-                              : isRunning
-                                ? "btn-ghost btn-disabled"
-                                : "btn-secondary"
-                          }`}
+                          className={`btn btn-xs gap-1 ${isDone
+                            ? "btn-success btn-outline"
+                            : isRunning
+                              ? "btn-ghost btn-disabled"
+                              : "btn-secondary"
+                            }`}
                         >
                           {isDone ? (
                             <>
-                              <CheckIcon className="w-3 h-3" /> Done
+                              <CheckIcon className="w-3 h-3" /> {t.translations.DONE}
                             </>
                           ) : isRunning ? (
                             <>
                               <span className="loading loading-spinner loading-xs" />{" "}
-                              Running
+                              {t.translations.RUNNING}
                             </>
                           ) : (
                             <>
-                              <PlayIcon className="w-3 h-3" /> Run
+                              <PlayIcon className="w-3 h-3" /> {t.translations.RUN}
                             </>
                           )}
                         </button>
 
                         <ChevronDownIcon
-                          className={`w-6 h-6 text-base-content/30 transition-transform hover:text-base-300 ${
-                            isExpanded ? "rotate-180" : ""
-                          }`}
+                          className={`w-6 h-6 text-base-content/30 transition-transform hover:text-base-300 ${isExpanded ? "rotate-180" : ""
+                            }`}
                         />
                       </div>
                     </div>
@@ -757,7 +755,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                         onClick={(e) => e.stopPropagation()}
                       >
                         <p className="text-[11px] font-semibold text-base-content/30 uppercase tracking-wider mb-2">
-                          Query Breakdown
+                          {t.translations.QUERY_BREAKDOWN}
                         </p>
                         <QueryBreakdown query={s} />
                         <div className="flex justify-end">
@@ -766,7 +764,7 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
                             className="flex text-xs transition-colors gap-1.5 hover:text-error hover:underline cursor-pointer"
                           >
                             <TrashIcon className="w-3.5 h-3.5" />
-                            Delete Search
+                            {t.translations.DELETE_SAVED_SEARCH}
                           </button>
                         </div>
                       </div>
@@ -778,21 +776,21 @@ export default function SavedSearchesWidget({ scope, projects = [] }: Props) {
 
         </div>
         {/* Footer */}
-          {!loading && !error && (
-            <div className="p-4">
-                <PaginationControls
-                currentPage={pageNumber}
-                pageSize={pageSize}
-                totalPages={totalPages}
-                pageSizeOptions={[5, 10, 25]}
-                onPageChange={setPageNumber}
-                onPageSizeChange={(size) => {
-                  setPageSize(size);
-                  setPageNumber(1);
-                }}
-                />
-            </div>
-          )} 
+        {!loading && !error && (
+          <div className="p-4">
+            <PaginationControls
+              currentPage={pageNumber}
+              pageSize={pageSize}
+              totalPages={totalPages}
+              pageSizeOptions={[5, 10, 25]}
+              onPageChange={setPageNumber}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPageNumber(1);
+              }}
+            />
+          </div>
+        )}
       </div>
     </>
   );

@@ -7,12 +7,12 @@ export const formatLocalDateTime = (dateString: string): string => {
   const normalized = toUtcIsoIfNaive(dateString);
   const date = new Date(normalized);
 
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString("es-ES", {
     month: "long",
     day: "numeric",
     year: "numeric",
     hour: "numeric",
-    minute: "numeric",
+    minute: "2-digit",
     hour12: true,
     timeZoneName: "short",
   });

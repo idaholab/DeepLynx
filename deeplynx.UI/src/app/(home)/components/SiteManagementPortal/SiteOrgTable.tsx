@@ -128,7 +128,10 @@ const SiteOrganizationManagement = ({
     },
     {
       header: t.translations.DESCRIPTION,
-      data: "description" as keyof OrganizationResponseDto,
+      cell: (row) =>
+        row.description === "Default Organization"
+          ? t.translations.ORGANIZATION_DEFAULT
+          : row.description,
     },
     {
       header: "",
@@ -183,11 +186,10 @@ const SiteOrganizationManagement = ({
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold">Organization Management</h1>
+          <h1 className="text-2xl font-bold">{t.translations.ORGANIZATION_MANAGEMENT}</h1>
         </div>
         <p className="text-base-content/70">
-          Manage organizations and assign administrators to control access and
-          oversee projects within each organizational unit.
+          {t.translations.ORGANIZATION_MANAGEMENT_DESCRIPTION}
         </p>
       </div>
       <div className="flex justify-end p-4 mr-4">

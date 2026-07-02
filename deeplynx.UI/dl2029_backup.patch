@@ -1,0 +1,1840 @@
+diff --git a/Dockerfiles/database/Dockerfile.local b/Dockerfiles/database/Dockerfile.local
+index 877340e5..b6edcf0b 100644
+--- a/Dockerfiles/database/Dockerfile.local
++++ b/Dockerfiles/database/Dockerfile.local
+@@ -22,9 +22,9 @@ RUN apk update && apk upgrade
+ RUN apk add --virtual .build-deps \
+     git \
+     build-base \
+-    postgresql18-dev \
+-    clang19 \
+-    llvm19 \
++    postgresql-dev \
++    clang \
++    llvm \
+     make
+ 
+ # Install pgvector
+diff --git a/deeplynx.UI/src/app/(home)/components/AddRecordModal.tsx b/deeplynx.UI/src/app/(home)/components/AddRecordModal.tsx
+index affb49a8..f23dee0e 100644
+--- a/deeplynx.UI/src/app/(home)/components/AddRecordModal.tsx
++++ b/deeplynx.UI/src/app/(home)/components/AddRecordModal.tsx
+@@ -414,7 +414,7 @@ const AddRecordModal: React.FC<Props> = ({
+             <span className={`text-xs float-right mt-1 ${description.length >= 250 ? "text-error" :
+               description.length >= 240 ? "text-warning" :
+                 "text-base-content"
+-            }`}>
++              }`}>
+               {description.length}/250
+             </span>
+           </div>
+@@ -439,8 +439,8 @@ const AddRecordModal: React.FC<Props> = ({
+               <button
+                 type="button"
+                 className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "ids"
+-                    ? "bg-base-100 font-semibold border-b-2 border-primary"
+-                    : "text-base-content/70"
++                  ? "bg-base-100 font-semibold border-b-2 border-primary"
++                  : "text-base-content/70"
+                   }`}
+                 onClick={() => setOptionalTab("ids")}
+               >
+@@ -449,22 +449,22 @@ const AddRecordModal: React.FC<Props> = ({
+               <button
+                 type="button"
+                 className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "meta"
+-                    ? "bg-base-100 font-semibold border-b-2 border-primary"
+-                    : "text-base-content/70"
++                  ? "bg-base-100 font-semibold border-b-2 border-primary"
++                  : "text-base-content/70"
+                   }`}
+                 onClick={() => setOptionalTab("meta")}
+               >
+-                Metadata
++                {t.translations.METADATA}
+               </button>
+               <button
+                 type="button"
+                 className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "tags"
+-                    ? "bg-base-100 font-semibold border-b-2 border-primary"
+-                    : "text-base-content/70"
++                  ? "bg-base-100 font-semibold border-b-2 border-primary"
++                  : "text-base-content/70"
+                   }`}
+                 onClick={() => setOptionalTab("tags")}
+               >
+-                Tags &amp; Labels
++                {t.translations.TAGS_AND_SECURITY_LABELS}
+               </button>
+             </div>
+ 
+@@ -476,7 +476,7 @@ const AddRecordModal: React.FC<Props> = ({
+                     type="number"
+                     inputMode="numeric"
+                     className="input input-bordered w-full"
+-                    placeholder="object_storage_id"
++                    placeholder={t.translations.OBJECT_STORAGE_ID_PLACEHOLDER}
+                     value={objectStorageId}
+                     onChange={(e) => setObjectStorageId(e.target.value)}
+                   />
+@@ -485,7 +485,7 @@ const AddRecordModal: React.FC<Props> = ({
+                     type="number"
+                     inputMode="numeric"
+                     className="input input-bordered w-full"
+-                    placeholder="class_id"
++                    placeholder={t.translations.CLASS_ID_PLACEHOLDER}
+                     value={classId ?? ""}
+                     onChange={(e) =>
+                       setClassId(
+@@ -503,7 +503,7 @@ const AddRecordModal: React.FC<Props> = ({
+                   <input
+                     type="text"
+                     className="input input-bordered w-full"
+-                    placeholder="uri"
++                    placeholder={t.translations.URI_PLACEHOLDER}
+                     value={uri}
+                     onChange={(e) => setUri(e.target.value)}
+                   />
+@@ -511,7 +511,7 @@ const AddRecordModal: React.FC<Props> = ({
+                   <input
+                     type="text"
+                     className="input input-bordered w-full"
+-                    placeholder="class_name"
++                    placeholder={t.translations.CLASS_NAME_PLACEHOLDER}
+                     value={classNameOpt}
+                     onChange={(e) => setClassNameOpt(e.target.value)}
+                   />
+@@ -523,7 +523,7 @@ const AddRecordModal: React.FC<Props> = ({
+                   <input
+                     type="text"
+                     className="input input-bordered w-full"
+-                    placeholder="tags (comma-separated)"
++                    placeholder={t.translations.TAGS_COMMA_SEPARATED}
+                     value={tagsText}
+                     onChange={(e) => setTagsText(e.target.value)}
+                   />
+@@ -531,7 +531,7 @@ const AddRecordModal: React.FC<Props> = ({
+                   <input
+                     type="text"
+                     className="input input-bordered w-full"
+-                    placeholder="sensitivity_labels (comma-separated)"
++                    placeholder={t.translations.SENSITIVITY_LABELS_COMMA_SEPARATED}
+                     value={labelsText}
+                     onChange={(e) => setLabelsText(e.target.value)}
+                   />
+diff --git a/deeplynx.UI/src/app/(home)/components/LayoutShell.tsx b/deeplynx.UI/src/app/(home)/components/LayoutShell.tsx
+index cb3e2f46..98ad09ba 100644
+--- a/deeplynx.UI/src/app/(home)/components/LayoutShell.tsx
++++ b/deeplynx.UI/src/app/(home)/components/LayoutShell.tsx
+@@ -229,11 +229,10 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
+                     <li key={org.id} className="w-full">
+                       <a
+                         onClick={() => handleOrganizationSwitch(org)}
+-                        className={`flex items-center gap-2 w-full max-w-full ${
+-                          organization?.organizationId === org.id
+-                            ? "active bg-info/60"
+-                            : ""
+-                        }`}
++                        className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
++                          ? "active bg-info/60"
++                          : ""
++                          }`}
+                       >
+                         <div className="min-w-0 flex-1 overflow-hidden">
+                           <div className=" font-medium truncate">
+@@ -241,7 +240,9 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
+                           </div>
+                           {org.description && (
+                             <div className="text-xs opacity-70 truncate">
+-                              {org.description}
++                              {org.description === "Default Organization"
++                                ? t.translations.ORGANIZATION_DEFAULT
++                                : org.description}
+                             </div>
+                           )}
+                         </div>
+@@ -288,9 +289,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
+         )}
+         {/* Side Menu */}
+         <div
+-          className={`fixed top-20 bottom-0 hidden lg:flex ${
+-            isUserDropdownOpen ? "z-[70]" : "z-[55]"
+-          }`}
++          className={`fixed top-20 bottom-0 hidden lg:flex ${isUserDropdownOpen ? "z-[70]" : "z-[55]"
++            }`}
+         >
+           <aside
+             className={
+@@ -440,9 +440,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
+           onMobileClose={() => setIsMobileNavOpen(false)}
+         />
+         <main
+-          className={`transition-all duration-300 min-w-[750px] flex-1 w-full mt-20 ml-0 ${
+-            isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
+-          }`}
++          className={`transition-all duration-300 min-w-[750px] flex-1 w-full mt-20 ml-0 ${isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
++            }`}
+         >
+           {/* Organization Banner */}
+           <div className="sticky top-25 z-20">
+diff --git a/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/MatrixViewLayout.tsx b/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/MatrixViewLayout.tsx
+index f0da195a..b7491aa2 100644
+--- a/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/MatrixViewLayout.tsx
++++ b/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/MatrixViewLayout.tsx
+@@ -35,6 +35,334 @@ interface MatrixViewLayoutProps {
+   isProjectRole: (role: RoleResponseDto) => boolean;
+   getRoleSource: (role: RoleResponseDto) => string;
+ }
++const getTranslatedPermissionName = (
++  name: string,
++  t: ReturnType<typeof useLanguage>["t"],
++) => {
++  switch (name) {
++    case "Read Project":
++      return t.translations.READ_PROJECT;
++    case "Write Project":
++      return t.translations.WRITE_PROJECT;
++    case "Update Projects":
++      return t.translations.UPDATE_PROJECTS;
++
++    case "Read Object Storage":
++      return t.translations.READ_OBJECT_STORAGE;
++    case "Write Object Storage":
++      return t.translations.WRITE_OBJECT_STORAGE;
++    case "Update Object Storages":
++      return t.translations.UPDATE_OBJECT_STORAGES;
++
++    case "Read Data Source":
++      return t.translations.READ_DATA_SOURCE;
++    case "Write Data Source":
++      return t.translations.WRITE_DATA_SOURCE;
++    case "Update Data Sources":
++      return t.translations.UPDATE_DATA_SOURCES;
++
++    case "Read Record":
++      return t.translations.READ_RECORD;
++    case "Write Record":
++      return t.translations.WRITE_RECORD;
++    case "Update Records":
++      return t.translations.UPDATE_RECORDS;
++
++    case "Read Edge":
++      return t.translations.READ_EDGE;
++    case "Write Edge":
++      return t.translations.WRITE_EDGE;
++    case "Update Edges":
++      return t.translations.UPDATE_EDGES;
++
++    case "Read File":
++      return t.translations.READ_FILE;
++    case "Write File":
++      return t.translations.WRITE_FILE;
++    case "Update Files":
++      return t.translations.UPDATE_FILES;
++
++    case "Read Tag":
++      return t.translations.READ_TAG;
++    case "Write Tag":
++      return t.translations.WRITE_TAG;
++    case "Update Tags":
++      return t.translations.UPDATE_TAGS;
++
++    case "Read Class":
++      return t.translations.READ_CLASS;
++    case "Write Class":
++      return t.translations.WRITE_CLASS;
++    case "Update Classes":
++      return t.translations.UPDATE_CLASSES;
++
++    case "Read Relationship":
++      return t.translations.READ_RELATIONSHIP;
++    case "Write Relationship":
++      return t.translations.WRITE_RELATIONSHIP;
++    case "Update Relationships":
++      return t.translations.UPDATE_RELATIONSHIPS;
++
++    case "Read User":
++      return t.translations.READ_USER;
++    case "Write User":
++      return t.translations.WRITE_USER;
++    case "Update Users":
++      return t.translations.UPDATE_USERS;
++
++    case "Read Group":
++      return t.translations.READ_GROUP;
++    case "Write Group":
++      return t.translations.WRITE_GROUP;
++    case "Update Groups":
++      return t.translations.UPDATE_GROUPS;
++
++    case "Read Organization":
++      return t.translations.READ_ORGANIZATION;
++    case "Write Organization":
++      return t.translations.WRITE_ORGANIZATION;
++    case "Update Organizations":
++      return t.translations.UPDATE_ORGANIZATIONS;
++
++    case "Read Role":
++      return t.translations.READ_ROLE;
++    case "Write Role":
++      return t.translations.WRITE_ROLE;
++    case "Update Roles":
++      return t.translations.UPDATE_ROLES;
++
++    case "Read Permission":
++      return t.translations.READ_PERMISSION;
++    case "Write Permission":
++      return t.translations.WRITE_PERMISSION;
++    case "Update Permissions":
++      return t.translations.UPDATE_PERMISSIONS;
++
++    case "Read Sensitivity Label":
++      return t.translations.READ_SENSITIVITY_LABEL;
++    case "Write Sensitivity Label":
++      return t.translations.WRITE_SENSITIVITY_LABEL;
++    case "Update Sensitivity Labels":
++      return t.translations.UPDATE_SENSITIVITY_LABELS;
++
++    case "Read Insight":
++      return t.translations.READ_INSIGHT;
++    case "Write Insight":
++      return t.translations.WRITE_INSIGHT;
++
++    case "Read Record Collection":
++      return t.translations.READ_RECORD_COLLECTION;
++    case "Write Record Collection":
++      return t.translations.WRITE_RECORD_COLLECTION;
++    case "Update Record Collection":
++      return t.translations.UPDATE_RECORD_COLLECTION;
++
++    default:
++      return name;
++  }
++};
++
++const getTranslatedCategoryName = (
++  label: string,
++  t: ReturnType<typeof useLanguage>["t"],
++) => {
++  switch (label) {
++    case "class":
++      return t.translations.CLASS;
++    case "data_source":
++      return t.translations.DATA_SOURCE;
++    case "edge":
++      return t.translations.EDGE;
++    case "file":
++      return t.translations.FILE;
++    case "group":
++      return t.translations.GROUP;
++    case "insight":
++      return t.translations.INSIGHT;
++    case "object_storage":
++      return t.translations.OBJECT_STORAGE;
++    case "organization":
++      return t.translations.ORGANIZATION;
++    case "permission":
++      return t.translations.PERMISSION;
++    case "project":
++      return t.translations.PROJECT;
++    case "record":
++      return t.translations.RECORD;
++    case "record_collection":
++      return t.translations.RECORD_COLLECTION;
++    case "relationship":
++      return t.translations.RELATIONSHIP;
++    case "role":
++      return t.translations.ROLE;
++    case "sensitivity_label":
++      return t.translations.SENSITIVITY_LABEL;
++    case "tag":
++      return t.translations.TAG;
++    case "user":
++      return t.translations.USER;
++    default:
++      return label;
++  }
++};
++
++const getTranslatedAction = (
++  action: string,
++  t: ReturnType<typeof useLanguage>["t"],
++) => {
++  switch (action) {
++    case "read":
++      return t.translations.READ;
++
++    case "write":
++      return t.translations.WRITE;
++
++    case "update":
++      return t.translations.UPDATE;
++
++    default:
++      return action;
++  }
++};
++const getTranslatedPermissionDescription = (
++  description: string,
++  t: ReturnType<typeof useLanguage>["t"],
++) => {
++  switch (description) {
++    case "Permission to embed files in Insight":
++      return t.translations.PERMISSION_TO_EMBED_FILES_IN_INSIGHT;
++
++    case "Permission to modify classes":
++      return t.translations.PERMISSION_TO_MODIFY_CLASSES;
++
++    case "Permission to modify data sources":
++      return t.translations.PERMISSION_TO_MODIFY_DATA_SOURCES;
++
++    case "Permission to modify files":
++      return t.translations.PERMISSION_TO_MODIFY_FILES;
++
++    case "Permission to modify groups":
++      return t.translations.PERMISSION_TO_MODIFY_GROUPS;
++
++    case "Permission to modify object storage":
++      return t.translations.PERMISSION_TO_MODIFY_OBJECT_STORAGE;
++
++    case "Permission to modify organization information":
++      return t.translations.PERMISSION_TO_MODIFY_ORGANIZATION_INFORMATION;
++
++    case "Permission to modify permissions":
++      return t.translations.PERMISSION_TO_MODIFY_PERMISSIONS;
++
++    case "Permission to modify project information":
++      return t.translations.PERMISSION_TO_MODIFY_PROJECT_INFORMATION;
++
++    case "Permission to modify records":
++      return t.translations.PERMISSION_TO_MODIFY_RECORDS;
++
++    case "Permission to modify relationships":
++      return t.translations.PERMISSION_TO_MODIFY_RELATIONSHIPS;
++
++    case "Permission to modify roles":
++      return t.translations.PERMISSION_TO_MODIFY_ROLES;
++
++    case "Permission to modify tags":
++      return t.translations.PERMISSION_TO_MODIFY_TAGS;
++
++    case "Permission to modify user information":
++      return t.translations.PERMISSION_TO_MODIFY_USER_INFORMATION;
++
++    case "Permission to read a record collection":
++      return t.translations.PERMISSION_TO_READ_A_RECORD_COLLECTION;
++
++    case "Permission to read classes":
++      return t.translations.PERMISSION_TO_READ_CLASSES;
++
++    case "Permission to read data sources":
++      return t.translations.PERMISSION_TO_READ_DATA_SOURCES;
++
++    case "Permission to read files":
++      return t.translations.PERMISSION_TO_READ_FILES;
++
++    case "Permission to read groups":
++      return t.translations.PERMISSION_TO_READ_GROUPS;
++
++    case "Permission to read object storage":
++      return t.translations.PERMISSION_TO_READ_OBJECT_STORAGE;
++
++    case "Permission to read organization information":
++      return t.translations.PERMISSION_TO_READ_ORGANIZATION_INFORMATION;
++
++    case "Permission to read permissions":
++      return t.translations.PERMISSION_TO_READ_PERMISSIONS;
++
++    case "Permission to read project information":
++      return t.translations.PERMISSION_TO_READ_PROJECT_INFORMATION;
++
++    case "Permission to read records":
++      return t.translations.PERMISSION_TO_READ_RECORDS;
++
++    case "Permission to read relationships":
++      return t.translations.PERMISSION_TO_READ_RELATIONSHIPS;
++
++    case "Permission to read roles":
++      return t.translations.PERMISSION_TO_READ_ROLES;
++
++    case "Permission to read tags":
++      return t.translations.PERMISSION_TO_READ_TAGS;
++
++    case "Permission to read user information":
++      return t.translations.PERMISSION_TO_READ_USER_INFORMATION;
++
++    case "Permission to update a record collection":
++      return t.translations.PERMISSION_TO_UPDATE_A_RECORD_COLLECTION;
++
++    case "Permission to update project data":
++      return t.translations.PERMISSION_TO_UPDATE_PROJECT_DATA;
++
++    case "Permission to modify sensitivity labels":
++      return t.translations.PERMISSION_TO_MODIFY_SENSITIVITY_LABELS;
++
++    case "Permission to read sensitivity labels":
++      return t.translations.PERMISSION_TO_READ_SENSITIVITY_LABELS;
++
++    case "Permission to update data sources":
++      return t.translations.PERMISSION_TO_UPDATE_DATA_SOURCES;
++
++    case "Permission to update edges":
++      return t.translations.PERMISSION_TO_UPDATE_EDGES;
++
++    case "Permission to update groups":
++      return t.translations.PERMISSION_TO_UPDATE_GROUPS;
++
++    case "Permission to update roles":
++      return t.translations.PERMISSION_TO_UPDATE_ROLES;
++
++    case "Permission to update sensitivity labels":
++      return t.translations.PERMISSION_TO_UPDATE_SENSITIVITY_LABELS;
++
++    case "Permission to update tags":
++      return t.translations.PERMISSION_TO_UPDATE_TAGS;
++
++    default:
++      return description;
++  }
++};
++
++const getTranslatedRoleSource = (
++  source: string,
++  t: ReturnType<typeof useLanguage>["t"],
++) => {
++  switch (source) {
++    case "System":
++      return "Sistema";
++    case "Organization":
++      return t.translations.ORGANIZATION;
++    case "Project":
++      return t.translations.PROJECT;
++    default:
++      return source;
++  }
++};
+ 
+ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
+   roles,
+@@ -79,10 +407,10 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
+   const editMatrixDisabledReason = !hasEditableRoles
+     ? t.translations.MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES
+     : rolesLocked
+-    ? t.translations.ROLES_ARE_LOCKED
+-    : isLoadingPermissions
+-    ? t.translations.PERMISSIONS_STILL_LOADING
+-    : "";
++      ? t.translations.ROLES_ARE_LOCKED
++      : isLoadingPermissions
++        ? t.translations.PERMISSIONS_STILL_LOADING
++        : "";
+ 
+   return (
+     <div style={{ height: "calc(100vh - 28rem)" }}>
+@@ -156,15 +484,19 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
+                     const editTitle = isStd
+                       ? t.translations.STANDARD_ROLES_CANNOT_BE_EDITED
+                       : isOrg
+-                      ? t.translations.ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL
+-                      : t.translations.EDIT_ROLE;
++                        ? t.translations.ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL
++                        : t.translations.EDIT_ROLE;
+ 
+                     return (
+                       <th key={role.id} className="text-center">
+                         <div className="flex flex-col items-center gap-1">
+                           <div className="flex items-center gap-2">
+                             <ShieldCheckIcon className="w-4 h-4 text-primary" />
+-                            <span className="font-medium">{role.name}</span>
++                            <span className="font-medium">{role.name === "Admin"
++                              ? t.translations.ADMIN
++                              : role.name === "User"
++                                ? t.translations.USER
++                                : role.name}</span>
+                             {isStd && (
+                               <div className="badge badge-info badge-xs">
+                                 {t.translations.STD}
+@@ -194,11 +526,15 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
+                           </div>
+                           {role.description && (
+                             <span className="text-xs text-base-content/60 font-normal">
+-                              {role.description}
++                              {role.description === "Administrator role with full permissions"
++                                ? t.translations.ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS
++                                : role.description === "User role with limited permissions"
++                                  ? t.translations.USER_ROLE_WITH_LIMITED_PERMISSIONS
++                                  : role.description}
+                             </span>
+                           )}
+                           <span className="text-xs text-base-content/50 font-normal">
+-                            {getRoleSource(role)}
++                            {getTranslatedRoleSource(getRoleSource(role), t)}
+                           </span>
+                         </div>
+                       </th>
+@@ -215,7 +551,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
+                         colSpan={roles.length + 1}
+                         className="font-semibold text-sm sticky left-0"
+                       >
+-                        {category.label}
++                        {getTranslatedCategoryName(category.label, t)}
+                       </td>
+                     </tr>
+ 
+@@ -225,15 +561,15 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
+                         <td className="sticky left-0 z-10 bg-base-100">
+                           <div className="flex flex-col">
+                             <span className="font-medium text-sm">
+-                              {perm.name}
++                              {getTranslatedPermissionName(perm.name, t)}
+                             </span>
+                             {perm.description && (
+                               <span className="text-xs text-base-content/60">
+-                                {perm.description}
++                                {getTranslatedPermissionDescription(perm.description, t)}
+                               </span>
+                             )}
+                             <span className="text-xs text-base-content/50 mt-1">
+-                              {t.translations.ACTION} {perm.action}
++                              {t.translations.ACTION} {getTranslatedAction(perm.action, t)}
+                             </span>
+                           </div>
+                         </td>
+@@ -257,46 +593,42 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
+                                     );
+                                   }
+                                 }}
+-                                className={`inline-block ${
+-                                  isEditingMatrix && editable
+-                                    ? "cursor-pointer hover:scale-110 transition-transform"
+-                                    : "cursor-default"
+-                                } ${
+-                                  isInherited && isEditingMatrix
++                                className={`inline-block ${isEditingMatrix && editable
++                                  ? "cursor-pointer hover:scale-110 transition-transform"
++                                  : "cursor-default"
++                                  } ${isInherited && isEditingMatrix
+                                     ? "opacity-60 ring-2 ring-warning rounded-lg p-1"
+                                     : ""
+-                                }`}
++                                  }`}
+                                 title={
+                                   isStandardRole(role) && isEditingMatrix
+                                     ? t.translations.STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
+                                     : isOrganizationRole(role) && isEditingMatrix
+-                                    ? t.translations.ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL
+-                                    : isEditingMatrix
+-                                    ? t.translations.CLICK_TO_TOGGLE
+-                                    : hasPermission
+-                                    ? t.translations.HAS_PERMISSION
+-                                    : t.translations.NO_PERMISSION
++                                      ? t.translations.ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL
++                                      : isEditingMatrix
++                                        ? t.translations.CLICK_TO_TOGGLE
++                                        : hasPermission
++                                          ? t.translations.HAS_PERMISSION
++                                          : t.translations.NO_PERMISSION
+                                 }
+                               >
+                                 {hasPermission ? (
+                                   <CheckIcon
+-                                    className={`size-8 mx-auto ${
+-                                      isEditingMatrix && editable
+-                                        ? "text-success hover:text-success/70"
+-                                        : isInherited && isEditingMatrix
++                                    className={`size-8 mx-auto ${isEditingMatrix && editable
++                                      ? "text-success hover:text-success/70"
++                                      : isInherited && isEditingMatrix
+                                         ? "text-warning"
+                                         : "text-success"
+-                                    }`}
++                                      }`}
+                                   />
+                                 ) : (
+                                   <XMarkIcon
+-                                    className={`size-8 mx-auto ${
+-                                      isEditingMatrix && editable
+-                                        ? "text-base-300 hover:text-success/50"
+-                                        : isInherited && isEditingMatrix
++                                    className={`size-8 mx-auto ${isEditingMatrix && editable
++                                      ? "text-base-300 hover:text-success/50"
++                                      : isInherited && isEditingMatrix
+                                         ? "text-warning/50"
+                                         : "text-base-300"
+-                                    }`}
++                                      }`}
+                                   />
+                                 )}
+                               </div>
+diff --git a/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/ProjectRolesAndPermissions.tsx b/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/ProjectRolesAndPermissions.tsx
+index 41aeeb93..346ec5f2 100644
+--- a/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/ProjectRolesAndPermissions.tsx
++++ b/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/ProjectRolesAndPermissions.tsx
+@@ -661,17 +661,15 @@ const ProjectRolesAndPermissions = ({
+         <div className="btn-group">
+           <button
+             onClick={() => setActiveLayout("split-view")}
+-            className={`btn border-2 border-primary mr-3 ${
+-              activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
+-            }`}
++            className={`btn border-2 border-primary mr-3 ${activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
++              }`}
+           >
+             {t.translations.SPLIT_VIEW}
+           </button>
+           <button
+             onClick={() => setActiveLayout("matrix")}
+-            className={`btn border-2 border-primary ${
+-              activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
+-            }`}
++            className={`btn border-2 border-primary ${activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
++              }`}
+           >
+             {t.translations.MATRIX_VIEW}
+           </button>
+diff --git a/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/SplitViewLayout.tsx b/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/SplitViewLayout.tsx
+index fc8458ef..0f8a429f 100644
+--- a/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/SplitViewLayout.tsx
++++ b/deeplynx.UI/src/app/(home)/project_management/[id]/roles_and_permissions/SplitViewLayout.tsx
+@@ -130,6 +130,130 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
+     }));
+   }, [splitPermissionCategories.withLabelId]);
+ 
++  const getTranslatedPermissionName = (name: string) => {
++    switch (name) {
++      case "Read Project":
++        return t.translations.READ_PROJECT;
++      case "Write Project":
++        return t.translations.WRITE_PROJECT;
++      case "Update Projects":
++        return t.translations.UPDATE_PROJECTS;
++
++      case "Read Object Storage":
++        return t.translations.READ_OBJECT_STORAGE;
++      case "Write Object Storage":
++        return t.translations.WRITE_OBJECT_STORAGE;
++      case "Update Object Storages":
++        return t.translations.UPDATE_OBJECT_STORAGES;
++
++      case "Read Data Source":
++        return t.translations.READ_DATA_SOURCE;
++      case "Write Data Source":
++        return t.translations.WRITE_DATA_SOURCE;
++      case "Update Data Sources":
++        return t.translations.UPDATE_DATA_SOURCES;
++
++      case "Read Record":
++        return t.translations.READ_RECORD;
++      case "Write Record":
++        return t.translations.WRITE_RECORD;
++      case "Update Records":
++        return t.translations.UPDATE_RECORDS;
++
++      case "Read Edge":
++        return t.translations.READ_EDGE;
++      case "Write Edge":
++        return t.translations.WRITE_EDGE;
++      case "Update Edges":
++        return t.translations.UPDATE_EDGES;
++
++      case "Read File":
++        return t.translations.READ_FILE;
++      case "Write File":
++        return t.translations.WRITE_FILE;
++      case "Update Files":
++        return t.translations.UPDATE_FILES;
++
++      case "Read Tag":
++        return t.translations.READ_TAG;
++      case "Write Tag":
++        return t.translations.WRITE_TAG;
++      case "Update Tags":
++        return t.translations.UPDATE_TAGS;
++
++      case "Read Class":
++        return t.translations.READ_CLASS;
++      case "Write Class":
++        return t.translations.WRITE_CLASS;
++      case "Update Classes":
++        return t.translations.UPDATE_CLASSES;
++
++      case "Read Relationship":
++        return t.translations.READ_RELATIONSHIP;
++      case "Write Relationship":
++        return t.translations.WRITE_RELATIONSHIP;
++      case "Update Relationships":
++        return t.translations.UPDATE_RELATIONSHIPS;
++
++      case "Read User":
++        return t.translations.READ_USER;
++      case "Write User":
++        return t.translations.WRITE_USER;
++      case "Update Users":
++        return t.translations.UPDATE_USERS;
++
++      case "Read Group":
++        return t.translations.READ_GROUP;
++      case "Write Group":
++        return t.translations.WRITE_GROUP;
++      case "Update Groups":
++        return t.translations.UPDATE_GROUPS;
++
++      case "Read Organization":
++        return t.translations.READ_ORGANIZATION;
++      case "Write Organization":
++        return t.translations.WRITE_ORGANIZATION;
++      case "Update Organizations":
++        return t.translations.UPDATE_ORGANIZATIONS;
++
++      case "Read Role":
++        return t.translations.READ_ROLE;
++      case "Write Role":
++        return t.translations.WRITE_ROLE;
++      case "Update Roles":
++        return t.translations.UPDATE_ROLES;
++
++      case "Read Permission":
++        return t.translations.READ_PERMISSION;
++      case "Write Permission":
++        return t.translations.WRITE_PERMISSION;
++      case "Update Permissions":
++        return t.translations.UPDATE_PERMISSIONS;
++
++      case "Read Sensitivity Label":
++        return t.translations.READ_SENSITIVITY_LABEL;
++      case "Write Sensitivity Label":
++        return t.translations.WRITE_SENSITIVITY_LABEL;
++      case "Update Sensitivity Labels":
++        return t.translations.UPDATE_SENSITIVITY_LABELS;
++
++      case "Read Insight":
++        return t.translations.READ_INSIGHT;
++      case "Write Insight":
++        return t.translations.WRITE_INSIGHT;
++
++      case "Read Record Collection":
++        return t.translations.READ_RECORD_COLLECTION;
++      case "Write Record Collection":
++        return t.translations.WRITE_RECORD_COLLECTION;
++      case "Update Record Collection":
++        return t.translations.UPDATE_RECORD_COLLECTION;
++
++      default:
++        return name;
++    }
++  };
++
+   const renderPermissionsContent = (
+     categories: PermissionCategory[],
+     displayMode: "permission-name" | "permission-action" = "permission-name",
+@@ -222,11 +346,10 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
+                       return (
+                         <label
+                           key={perm.id}
+-                          className={`label justify-start gap-2 ${
+-                            isEditingPermissions
+-                              ? "cursor-pointer"
+-                              : "cursor-default"
+-                          }`}
++                          className={`label justify-start gap-2 ${isEditingPermissions
++                            ? "cursor-pointer"
++                            : "cursor-default"
++                            }`}
+                           title={
+                             displayMode === "permission-action"
+                               ? perm.description || perm.action || perm.name
+@@ -243,7 +366,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
+                           <span className="label-text">
+                             {displayMode === "permission-action"
+                               ? perm.action
+-                              : perm.name}
++                              : getTranslatedPermissionName(perm.name)}
+                           </span>
+                         </label>
+                       );
+@@ -320,26 +443,29 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
+                   key={role.id}
+                   onClick={() => onRoleSelection(role.id)}
+                   disabled={isEditingPermissions}
+-                  className={`w-full px-4 py-3 text-left border-b border-base-300 transition-colors ${
+-                    selectedRoleId === role.id
+-                      ? "bg-primary/10 border-l-4 border-l-primary"
+-                      : ""
+-                  } ${
+-                    isEditingPermissions
++                  className={`w-full px-4 py-3 text-left border-b border-base-300 transition-colors ${selectedRoleId === role.id
++                    ? "bg-primary/10 border-l-4 border-l-primary"
++                    : ""
++                    } ${isEditingPermissions
+                       ? "opacity-50 cursor-not-allowed"
+                       : "hover:bg-base-200 cursor-pointer"
+-                  }`}
++                    }`}
+                 >
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-2">
+                       <ShieldCheckIcon
+-                        className={`w-4 h-4 ${
+-                          selectedRoleId === role.id
+-                            ? "text-primary"
+-                            : "text-base-content/40"
+-                        }`}
++                        className={`w-4 h-4 ${selectedRoleId === role.id
++                          ? "text-primary"
++                          : "text-base-content/40"
++                          }`}
+                       />
+-                      <span className="font-medium text-sm">{role.name}</span>
++                      <span className="font-medium text-sm">
++                        {role.name === "Admin"
++                          ? t.translations.ADMIN
++                          : role.name === "User"
++                            ? t.translations.USER
++                            : role.name}
++                      </span>
+                     </div>
+                     {isStandardRole(role) && (
+                       <div className="badge badge-info badge-sm">
+@@ -360,7 +486,11 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
+                   </div>
+                   {role.description && (
+                     <p className="text-xs text-base-content/60 mt-1 ml-6 truncate">
+-                      {role.description}
++                      {role.description === "Administrator role with full permissions"
++                        ? t.translations.ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS
++                        : role.description === "User role with limited permissions"
++                          ? t.translations.USER_ROLE_WITH_LIMITED_PERMISSIONS
++                          : role.description}
+                     </p>
+                   )}
+                   <p className="text-xs text-base-content/50 mt-1 ml-6">
+@@ -382,7 +512,13 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
+               <div className="flex items-start justify-between">
+                 <div>
+                   <div className="flex items-center gap-3">
+-                    <h2 className="card-title">{currentRole.name}</h2>
++                    <h2 className="card-title">
++                      {currentRole.name === "Admin"
++                        ? t.translations.ADMIN
++                        : currentRole.name === "User"
++                          ? t.translations.USER
++                          : currentRole.name}
++                    </h2>
+                     {isStandardRole(currentRole) && (
+                       <div className="badge badge-info">
+                         {t.translations.STANDARD_ROLE}
+@@ -402,7 +538,11 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
+                   </div>
+                   {currentRole.description && (
+                     <p className="text-sm text-base-content/70 mt-1">
+-                      {currentRole.description}
++                      {currentRole.description === "Administrator role with full permissions"
++                        ? t.translations.ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS
++                        : currentRole.description === "User role with limited permissions"
++                          ? t.translations.USER_ROLE_WITH_LIMITED_PERMISSIONS
++                          : currentRole.description}
+                     </p>
+                   )}
+                   <p className="text-xs text-base-content/60 mt-2">
+diff --git a/deeplynx.UI/src/app/(home)/project_management/[id]/settings/components/ProjectSettingsLeftColumn.tsx b/deeplynx.UI/src/app/(home)/project_management/[id]/settings/components/ProjectSettingsLeftColumn.tsx
+index a0e61e72..af90e088 100644
+--- a/deeplynx.UI/src/app/(home)/project_management/[id]/settings/components/ProjectSettingsLeftColumn.tsx
++++ b/deeplynx.UI/src/app/(home)/project_management/[id]/settings/components/ProjectSettingsLeftColumn.tsx
+@@ -30,11 +30,11 @@ interface ProjectLogoSectionProps {
+ interface informationTableProps {
+   organization: OrganizationSession | null;
+   project: ProjectResponseDto | null;
+-  t: { translations: Record<string, string> }; 
++  t: { translations: Record<string, string> };
+   setProject: React.Dispatch<React.SetStateAction<ProjectResponseDto | null>>;
+ }
+ 
+-function projectInformationTable({ organization, project, t, setProject }: informationTableProps) {  
++function projectInformationTable({ organization, project, t, setProject }: informationTableProps) {
+   const handleUpdateProject = useCallback(
+     async (field: string, value: string, successMessage: string) => {
+       if (!organization?.organizationId) return;
+@@ -71,19 +71,19 @@ function projectInformationTable({ organization, project, t, setProject }: infor
+       t.translations.FAILED_TO_UPDATE,
+     ],
+   );
+-  
++
+   const projectInfoRows = useMemo(() => {
+     if (!project) return [];
+     return [
+       { key: t.translations.PROJECT_ID, value: project.id },
+-      { 
++      {
+         key: t.translations.PROJECT_NAME,
+-        value: project.name, 
+-        editable: true, 
+-        onEdit: (value: string) => 
++        value: project.name,
++        editable: true,
++        onEdit: (value: string) =>
+           handleUpdateProject(
+-            "name", 
+-            value, 
++            "name",
++            value,
+             t.translations.PROJECT_NAME_UPDATED),
+         maxCharacters: 50,
+       },
+@@ -91,12 +91,12 @@ function projectInformationTable({ organization, project, t, setProject }: infor
+         key: t.translations.PROJECT_DESCRIPTION,
+         value: project.description,
+         editable: true,
+-        onEdit: (value: string) => 
++        onEdit: (value: string) =>
+           handleUpdateProject(
+-            "description", 
+-            value, 
++            "description",
++            value,
+             t.translations.PROJECT_DESCRIPTION_UPDATED),
+-          maxCharacters: 250,
++        maxCharacters: 250,
+       },
+       {
+         key: t.translations.LAST_UPDATED_AT,
+@@ -105,7 +105,7 @@ function projectInformationTable({ organization, project, t, setProject }: infor
+     ];
+   }, [project, handleUpdateProject, t.translations])
+   return (
+-    <ProjectSettingsTable projectRows={ projectInfoRows }/>
++    <ProjectSettingsTable projectRows={projectInfoRows} />
+   );
+ }
+ 
+@@ -164,7 +164,7 @@ const ProjectSettingsLeftColumn = ({
+ 
+           <div className="flex flex-wrap gap-2">
+             <label className="btn btn-sm btn-primary">
+-              {logoFile ? "Change Logo" : "Select Logo"}
++              {logoFile ? t.translations.CHANGE_LOGO : t.translations.SELECT_LOGO}
+               <input
+                 type="file"
+                 accept=".png,.jpg,.jpeg,.svg,.webp"
+@@ -222,10 +222,10 @@ const ProjectSettingsLeftColumn = ({
+       {/* Main Project Settings */}
+       <div className="border-t border-base-300 pt-6 pb-6">
+         <h3 className="card-title text-lg mb-4">
+-          {t.translations.MAIN_PROJECT_SETTINGS} 
++          {t.translations.MAIN_PROJECT_SETTINGS}
+         </h3>
+         <div>
+-          {projectInformationTable({organization, project, t, setProject})}
++          {projectInformationTable({ organization, project, t, setProject })}
+         </div>
+       </div>
+ 
+@@ -237,8 +237,8 @@ const ProjectSettingsLeftColumn = ({
+           onConfirm={onArchiveProject}
+         />
+       </div>
+-    </div> 
+-    
++    </div>
++
+   </div>
+ );
+ 
+diff --git a/deeplynx.UI/src/app/(home)/project_management/[id]/users/ProjectUsersListTable.tsx b/deeplynx.UI/src/app/(home)/project_management/[id]/users/ProjectUsersListTable.tsx
+index 05b2a10e..292dfac3 100644
+--- a/deeplynx.UI/src/app/(home)/project_management/[id]/users/ProjectUsersListTable.tsx
++++ b/deeplynx.UI/src/app/(home)/project_management/[id]/users/ProjectUsersListTable.tsx
+@@ -6,6 +6,7 @@ import {
+   ProjectMemberTableRow,
+   MemberType,
+ } from "../../types/projectUsersTypes";
++import { useLanguage } from "@/app/contexts/Language";
+ 
+ /* -------------------------------------------------------------------------- */
+ /*                          Users & Groups Data Table                         */
+@@ -30,15 +31,16 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
+   onViewGroupMembers,
+   onOpenRemoveModal,
+ }) => {
++  const { t } = useLanguage();
+   return (
+     <div className="overflow-x-auto">
+       <table className="table">
+         <thead>
+           <tr>
+-            <th>Member</th>
+-            <th>Type</th>
+-            <th>Email</th>
+-            <th>Actions</th>
++            <th>{t.translations.MEMBER}</th>
++            <th>{t.translations.TYPE}</th>
++            <th>{t.translations.EMAIL}</th>
++            <th>{t.translations.ACTIONS}</th>
+           </tr>
+         </thead>
+         <tbody>
+@@ -68,23 +70,27 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
+                   )}
+                 </td>
+ 
+-                <td className="capitalize">{row.memberType}</td>
++                <td className="capitalize">
++                  {row.memberType === "user"
++                    ? t.translations.USER
++                    : t.translations.GROUP}
++                </td>
+                 <td className="text-base-content/70">{row.email || "—"}</td>
+                 <td>
+                   <div className="flex gap-2 items-center">
+                     {row.memberType === "group" ? (
+-                        <button
+-                          className="btn btn-ghost btn-xs"
+-                          disabled={loading}    
+-                          onClick={() => onViewGroupMembers(row)}
+-                          title={"View group members"}
+-                        >
+-                          <UserGroupIcon className="size-6" />
+-                        </button>
++                      <button
++                        className="btn btn-ghost btn-xs"
++                        disabled={loading}
++                        onClick={() => onViewGroupMembers(row)}
++                        title={"View group members"}
++                      >
++                        <UserGroupIcon className="size-6" />
++                      </button>
+                     ) : (
+-                        <div className="btn btn-ghost btn-xs invisible">
+-                          <UserGroupIcon className="size-6" />
+-                        </div>
++                      <div className="btn btn-ghost btn-xs invisible">
++                        <UserGroupIcon className="size-6" />
++                      </div>
+                     )}
+                     <button
+                       className="btn btn-ghost btn-xs"
+diff --git a/deeplynx.UI/src/app/(home)/settings/SettingsPageClient.tsx b/deeplynx.UI/src/app/(home)/settings/SettingsPageClient.tsx
+index b1f9f1d1..4161f040 100755
+--- a/deeplynx.UI/src/app/(home)/settings/SettingsPageClient.tsx
++++ b/deeplynx.UI/src/app/(home)/settings/SettingsPageClient.tsx
+@@ -37,12 +37,10 @@ const SettingsPageClient = () => {
+       const secretStr = "Secret: " + res.apiSecret;
+       setUserKeys((prev) => [res.apiKey, ...prev]);
+       toast.success(
+-        (t) => (
++        (toastInstance) => (
+           <ToastInfoModal
+-            title={
+-              "API Keypair created successfully! Keep these somewhere safe:"
+-            }
+-            toastId={t.id}
++            title={t.translations.API_KEYPAIR_CREATED_SUCCESS}
++            toastId={toastInstance.id}
+             infoDisplay={[keyStr, secretStr]}
+           />
+         ),
+@@ -55,7 +53,7 @@ const SettingsPageClient = () => {
+       );
+     } catch (error) {
+       console.error("Error creating keypair:", error);
+-      toast.error("API Keypair creation failed.");
++      toast.error(t.translations.API_KEYPAIR_CREATION_FAILED);
+     } finally {
+       setCreating(false);
+     }
+@@ -66,10 +64,10 @@ const SettingsPageClient = () => {
+       setDeleting(true);
+       const res = await deleteApiKey(key);
+       setUserKeys((prev) => prev.filter((x) => x !== key));
+-      toast.success("API Keypair deleted successfully!");
++      toast.success(t.translations.API_KEYPAIR_DELETED_SUCCESS);
+     } catch (error) {
+       console.error("Error deleteing keypair:", error);
+-      toast.error("API Keypair deletion failed.");
++      toast.error(t.translations.API_KEYPAIR_DELETION_FAILED);
+     } finally {
+       setDeleting(false);
+     }
+@@ -150,7 +148,7 @@ const SettingsPageClient = () => {
+                       {t.translations.DARK_MODE ?? "Dark Mode"}
+                     </span>
+                     <span className="text-xs text-base-content/60">
+-                      Toggle between light and dark themes
++                      {t.translations.DARK_MODE_DESCRIPTION}
+                     </span>
+                   </div>
+                   <ThemeToggle />
+@@ -162,7 +160,7 @@ const SettingsPageClient = () => {
+                       {t.translations.LANGUAGE ?? "Language"}
+                     </span>
+                     <span className="text-xs text-base-content/60">
+-                      Choose your preferred language
++                      {t.translations.LANGUAGE_DESCRIPTION}
+                     </span>
+                   </div>
+                   <select
+@@ -187,7 +185,7 @@ const SettingsPageClient = () => {
+                     {t.translations.API_KEYPAIRS ?? "API Keypairs"}
+                   </h2>
+                   <p className="text-sm text-base-content/60 mt-1">
+-                    Manage your API authentication keys
++                    {t.translations.API_KEYS_DESCRIPTION}
+                   </p>
+                 </div>
+                 <button
+@@ -197,7 +195,7 @@ const SettingsPageClient = () => {
+                   disabled={creating}
+                 >
+                   <PlusIcon className="size-5" />
+-                  <span>{creating ? "Generating…" : "Generate New"}</span>
++                  <span>{creating ? "Generating..." : t.translations.GENERATE_NEW}</span>
+                 </button>
+               </div>
+ 
+@@ -234,10 +232,10 @@ const SettingsPageClient = () => {
+                         <PlusIcon className="size-8 text-base-content/40" />
+                       </div>
+                       <p className="text-base-content/60">
+-                        No API keypairs configured
++                        {t.translations.NO_API_KEYS_CONFIGURED}
+                       </p>
+                       <p className="text-sm text-base-content/40 mt-1">
+-                        Generate your first keypair to get started
++                        {t.translations.GENERATE_FIRST_KEYPAIR}
+                       </p>
+                     </div>
+                   )}
+diff --git a/deeplynx.UI/src/app/(home)/upload_center/components/BulkUploadSection.tsx b/deeplynx.UI/src/app/(home)/upload_center/components/BulkUploadSection.tsx
+index d011393c..7cb20836 100644
+--- a/deeplynx.UI/src/app/(home)/upload_center/components/BulkUploadSection.tsx
++++ b/deeplynx.UI/src/app/(home)/upload_center/components/BulkUploadSection.tsx
+@@ -157,21 +157,38 @@ export default function BulkUploadSection(props: BulkUploadSectionProps) {
+               <span className="label-text font-semibold">
+                 {t.translations.STEP_2_UPLOAD_YOUR_CSV}
+               </span>
+-              <input
+-                type="file"
+-                accept=".csv"
+-                onChange={(e) => {
+-                  const file = e.target.files?.[0];
+-                  if (file) handleCsvUpload(file);
+-                }}
+-                className="file-input file-input-bordered file-input-primary w-full max-w-xs"
+-                disabled={
+-                  props.isParsing ||
+-                  props.isValidating ||
+-                  !props.projectId ||
+-                  !props.dataSourceId
+-                }
+-              />
++              <div className="flex items-center">
++                <label
++                  className={`btn btn-primary rounded-r-none ${props.isParsing ||
++                    props.isValidating ||
++                    !props.projectId ||
++                    !props.dataSourceId
++                    ? "btn-disabled"
++                    : ""
++                    }`}
++                >
++                  {t.translations.CHOOSE_FILE}
++                  <input
++                    type="file"
++                    accept=".csv"
++                    onChange={(e) => {
++                      const file = e.target.files?.[0];
++                      if (file) handleCsvUpload(file);
++                    }}
++                    className="hidden"
++                    disabled={
++                      props.isParsing ||
++                      props.isValidating ||
++                      !props.projectId ||
++                      !props.dataSourceId
++                    }
++                  />
++                </label>
++
++                <div className="input input-bordered input-primary rounded-l-none w-48">
++                  {props.csvFile?.name ?? t.translations.NO_FILE_CHOSEN}
++                </div>
++              </div>
+             </label>
+             {props.csvFile && (
+               <div className="mt-2 text-sm text-base-content/70 flex items-center gap-2">
+diff --git a/deeplynx.UI/src/app/lib/translations.ts b/deeplynx.UI/src/app/lib/translations.ts
+index 54a78010..a37e7b73 100755
+--- a/deeplynx.UI/src/app/lib/translations.ts
++++ b/deeplynx.UI/src/app/lib/translations.ts
+@@ -30,6 +30,7 @@ export const translations = {
+       ADD_GROUP_TO_PROJECT: "Add Group to Project",
+       ADD_GROUP_TO_PROJECT_DESCRIPTION:
+         "Select an existing group and assign a role. A role is required to add them to the project.",
++      ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS: "Administrator role with full permissions",
+       ADD_GROUPS: "Add Groups",
+       ADD_NEW_MEMBER: "Add New Member",
+       ADD_NEW_PROPERTY: "Add New Property",
+@@ -61,6 +62,12 @@ export const translations = {
+       API_ID_TOOLTIP_DESCRIPTION:
+         "Use these IDs when using the API scoped to your current organization and project.",
+       API_KEYPAIRS: "API Keys",
++      API_KEYPAIR_CREATED_SUCCESS:
++        "API Keypair created successfully! Keep these somewhere safe:",
++      API_KEYPAIR_CREATION_FAILED: "API Keypair creation failed.",
++      API_KEYPAIR_DELETED_SUCCESS: "API Keypair deleted successfully!",
++      API_KEYPAIR_DELETION_FAILED: "API Keypair deletion failed.",
++      API_KEYS_DESCRIPTION: "Manage your API authentication keys",
+       APP_OWNER_EMAIL: "App Owner Email",
+       APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME:
+         "Appears next to the organization name in the header. Recommended: PNG, 256×256, transparent background.",
+@@ -143,6 +150,7 @@ export const translations = {
+       CHOOSE_A_TYPE: "Choose a Type",
+       CHOOSE_FILE_OPTIONAL: "Choose file (optional)",
+       CHOOSE_OPTION: "Choose option",
++      CHOOSE_FILE: "Choose File",
+       CHUNKS: "chunks",
+       CHUNKS_LEFT: "chunks left",
+       CLASS: "Class",
+@@ -156,7 +164,9 @@ export const translations = {
+         "Class ID must be a number, not a string.",
+       CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION:
+         "Verify that the class ID exists in the selected project.",
++      CLASS_ID_PLACEHOLDER: "class_id",
+       CLASS_NAME: "Class Name",
++      CLASS_NAME_PLACEHOLDER: "class_name",
+       CLASS_NAME_REQUIRED: "Class Name *",
+       CLASS_NAME_UPDATED: "Class name updated",
+       CLASS_UPDATED_SUCCESSFULLY: "Class updated successfully!",
+@@ -231,6 +241,7 @@ export const translations = {
+       CURRENT_DEFAULT_SUFFIX: " (Current Default)",
+       CUSTOMIZE: "Customize",
+       DARK_MODE: "Dark Mode",
++      DARK_MODE_DESCRIPTION: "Toggle between light and dark themes",
+       DATA_CATALOG: "Data Catalog",
+       DATA_CATALOG_ID: "ID",
+       DATA_CATALOG_OVERVIEW: "Data Catalog Overview",
+@@ -383,6 +394,7 @@ export const translations = {
+       FAILED_TO_UPDATE_STORAGE: "Failed to update storage",
+       FAILED_TO_UPDATE_TAGS: "Failed to update tags",
+       FAILED_TO_UPLOAD_LOGO: "Failed to upload logo",
++      FILE: "File",
+       FILE_A_BUG: "File A Bug",
+       FILE_CARD_TITLE: "File {index}: {name}",
+       FILE_COUNT: "File Count",
+@@ -405,6 +417,8 @@ export const translations = {
+       FROM_: "From",
+       GENERAL: "General",
+       GENERATED_NEW_REPORT: "generated a new report",
++      GENERATE_FIRST_KEYPAIR: "Generate your first keypair to get started",
++      GENERATE_NEW: "Generate New",
+       GRAPH: "Graph",
+       GRAPH_CALCULATING_LAYOUT: "Calculating graph layout...",
+       GRAPH_CONNECTED_RECORD: "Connected Record",
+@@ -658,6 +672,7 @@ export const translations = {
+         "Labels are locked at the organization level. Cannot create or edit project labels.",
+       LABELS_LOWER: "labels",
+       LANGUAGE: "Language",
++      LANGUAGE_DESCRIPTION: "Choose your preferred language",
+       LAUNCH: "Launch",
+       LAST_EDIT: "Last Edited",
+       LAST_LOGIN: "Last Login",
+@@ -840,6 +855,7 @@ export const translations = {
+       MATRIX_VIEW: "Matrix View",
+       MAX_DATA_POINTS: "Max data points",
+       MEMBER: "Member",
++      METADATA: "Metadata",
+       MEMBER_ADDED_TO_PROJECT: "Member added to project",
+       MEMBER_MANAGEMENT: "Member Management",
+       MEMBER_REMOVED_FROM_PROJECT: "Member removed from project",
+@@ -904,6 +920,7 @@ export const translations = {
+       NEXUS_DEFAULT: "Nexus Default",
+       NO: "No",
+       NO_AVAILABLE_USERS: "No available users",
++      NO_API_KEYS_CONFIGURED: "No API keypairs configured",
+       NO_CHANGES_TO_SAVE: "No Changes to save",
+       NO_CLASS: "No class",
+       NO_CLASSES_AVAILABLE: "No classes available.",
+@@ -911,6 +928,7 @@ export const translations = {
+       NO_FILE_SELECTED: "No file selected",
+       NO_FILES_AVAILABLE: "No files available.",
+       NO_FILES_FOUND: "No files found.",
++      NO_FILE_CHOSEN: "No file chosen",
+       NO_FILES_SELECTED_YET: "No files selected yet.",
+       NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD:
+         "No historical versions were found for this record.",
+@@ -969,6 +987,7 @@ export const translations = {
+       NOT_CONNECTED: "Not Connected",
+       NOT_FOUND: "Not Found",
+       OAUTH_APPLICATION: "OAuth Application",
++      OBJECT_STORAGE_ID_PLACEHOLDER: "object_storage_id",
+       OBJECT_STORAGE: "Object Storage",
+       OBJECT_STORAGE_ID: "Object Storage ID",
+       OBJECT_STORAGE_ID_MUST_BE_AN_INTEGER:
+@@ -1060,6 +1079,44 @@ export const translations = {
+         "Contact your project administrator to request the necessary permissions.",
+       PERMISSIONS: "Permissions",
+       PERMISSIONS_STILL_LOADING: "Permissions are still loading.",
++      PERMISSION_TO_EMBED_FILES_IN_INSIGHT: "Permission to embed files in Insight",
++      PERMISSION_TO_MODIFY_CLASSES: "Permission to modify classes",
++      PERMISSION_TO_MODIFY_DATA_SOURCES: "Permission to modify data sources",
++      PERMISSION_TO_MODIFY_FILES: "Permission to modify files",
++      PERMISSION_TO_MODIFY_GROUPS: "Permission to modify groups",
++      PERMISSION_TO_MODIFY_OBJECT_STORAGE: "Permission to modify object storage",
++      PERMISSION_TO_MODIFY_ORGANIZATION_INFORMATION: "Permission to modify organization information",
++      PERMISSION_TO_MODIFY_PERMISSIONS: "Permission to modify permissions",
++      PERMISSION_TO_MODIFY_PROJECT_INFORMATION: "Permission to modify project information",
++      PERMISSION_TO_MODIFY_RECORDS: "Permission to modify records",
++      PERMISSION_TO_MODIFY_RELATIONSHIPS: "Permission to modify relationships",
++      PERMISSION_TO_MODIFY_ROLES: "Permission to modify roles",
++      PERMISSION_TO_MODIFY_TAGS: "Permission to modify tags",
++      PERMISSION_TO_MODIFY_USER_INFORMATION: "Permission to modify user information",
++      PERMISSION_TO_READ_A_RECORD_COLLECTION: "Permission to read a record collection",
++      PERMISSION_TO_READ_CLASSES: "Permission to read classes",
++      PERMISSION_TO_READ_DATA_SOURCES: "Permission to read data sources",
++      PERMISSION_TO_READ_FILES: "Permission to read files",
++      PERMISSION_TO_READ_GROUPS: "Permission to read groups",
++      PERMISSION_TO_READ_OBJECT_STORAGE: "Permission to read object storage",
++      PERMISSION_TO_READ_ORGANIZATION_INFORMATION: "Permission to read organization information",
++      PERMISSION_TO_READ_PERMISSIONS: "Permission to read permissions",
++      PERMISSION_TO_READ_PROJECT_INFORMATION: "Permission to read project information",
++      PERMISSION_TO_READ_RECORDS: "Permission to read records",
++      PERMISSION_TO_READ_RELATIONSHIPS: "Permission to read relationships",
++      PERMISSION_TO_READ_ROLES: "Permission to read roles",
++      PERMISSION_TO_READ_TAGS: "Permission to read tags",
++      PERMISSION_TO_READ_USER_INFORMATION: "Permission to read user information",
++      PERMISSION_TO_UPDATE_A_RECORD_COLLECTION: "Permission to update a record collection",
++      PERMISSION_TO_UPDATE_PROJECT_DATA: "Permission to update project data",
++      PERMISSION_TO_MODIFY_SENSITIVITY_LABELS: "Permission to modify sensitivity labels",
++      PERMISSION_TO_READ_SENSITIVITY_LABELS: "Permission to read sensitivity labels",
++      PERMISSION_TO_UPDATE_DATA_SOURCES: "Permission to update data sources",
++      PERMISSION_TO_UPDATE_EDGES: "Permission to update edges",
++      PERMISSION_TO_UPDATE_GROUPS: "Permission to update groups",
++      PERMISSION_TO_UPDATE_ROLES: "Permission to update roles",
++      PERMISSION_TO_UPDATE_SENSITIVITY_LABELS: "Permission to update sensitivity labels",
++      PERMISSION_TO_UPDATE_TAGS: "Permission to update tags",
+       PERSON: "person",
+       PIV_CAC_CARD_SIGN_IN: "Sign in with PIV/CAC Card",
+       PLEASE_ENTER_CLASS_NAME: "Please enter a class name",
+@@ -1219,6 +1276,7 @@ export const translations = {
+       PROPERTIES_UPDATED_SUCCESSFULLY: "Properties updated successfully!",
+       PROPERTY_KEY_PLACEHOLDER: "Property key (e.g., contract_number)",
+       QUERY_BUILDER: "Query Builder",
++      READ: "read",
+       READY: "Ready",
+       RECENT_ACTIVITY: "Recent Activity",
+       RECENTLY_ADDED_RECORDS: "Recently Added Records",
+@@ -1228,6 +1286,7 @@ export const translations = {
+       RECORD_: "Record ",
+       RECORD_CREATED_SUCCESSFULLY: "Record created successfully!",
+       RECORD_COUNT: "Record Count",
++      RECORD_COLLECTION: "Record Collection",
+       RECORD_DESCRIPTION: "Record Description",
+       RECORD_FILE_UPDATED_SUCCESSFULLY: "Record file updated successfully.",
+       RECORD_HISTORY: "Record History",
+@@ -1298,6 +1357,23 @@ export const translations = {
+       RETRY: "Retry",
+       RETRY_FAILED_INVITATIONS: "Retry failed invitations",
+       RETURN_TO_ROLES: "Return to Roles",
++      READ_CLASS: "Read Class",
++      READ_DATA_SOURCE: "Read Data Source",
++      READ_EDGE: "Read Edge",
++      READ_FILE: "Read File",
++      READ_GROUP: "Read Group",
++      READ_INSIGHT: "Read Insight",
++      READ_OBJECT_STORAGE: "Read Object Storage",
++      READ_ORGANIZATION: "Read Organization",
++      READ_PERMISSION: "Read Permission",
++      READ_PROJECT: "Read Project",
++      READ_RECORD: "Read Record",
++      READ_RECORD_COLLECTION: "Read Record Collection",
++      READ_RELATIONSHIP: "Read Relationship",
++      READ_ROLE: "Read Role",
++      READ_SENSITIVITY_LABEL: "Read Sensitivity Label",
++      READ_TAG: "Read Tag",
++      READ_USER: "Read User",
+       ROLE: "Role",
+       ROLE_ARCHIVE: "This role will be archived!",
+       ROLE_DELETED: "Deleting this role will:",
+@@ -1379,10 +1455,12 @@ export const translations = {
+       SELECTED_RECORD: "Selected record:",
+       SELECTED_RECORDS: "Selected Records",
+       SELECT_LOGO: "Select Logo",
++      SENSITIVITY_LABELS_COMMA_SEPARATED: "sensitivity_labels (comma-separated)",
+       SEND_INVITATION: "Send Invitation",
+       SEND_INVITATIONS: "Send invitation(s)",
+       SENSITIVITY_LABEL_REMOVED: "Sensitivity label removed",
+       SENSITIVITY_LABELS: "Sensitivity Labels",
++      SENSITIVITY_LABEL: "Sensitivity Label",
+       SERVER_REJECTED_UPLOAD_FIX_ISSUES:
+         "The server rejected the upload. Please fix the following issues:",
+       SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON:
+@@ -1463,6 +1541,7 @@ export const translations = {
+       BIDIRECTIONAL: "Bidirectional",
+       DEPTH: "Depth",
+       TAGS_ARE_LOCKED: "Tags are locked",
++      TAGS_COMMA_SEPARATED: "tags (comma-separated)",
+       TAGS_LOCKED_AT_ORG_LEVEL: "Tags are locked at the organization level",
+       TAGS_LOCKED_AT_ORG_LEVEL_SHORT: "Tags are locked at the org level",
+       TAGS_LOCKED_BY_ORGANIZATION: "Tags are locked by the organization",
+@@ -1499,6 +1578,7 @@ export const translations = {
+       TOTAL: "Total",
+       TOTAL_MEMBERS: "Total Members",
+       TRENDS: "Trends",
++      TYPE: "Type",
+       TROUBLE_LOGGING_IN: "Trouble Logging in?",
+       UNABLE_TO_LOAD_USERS: "Unable to load users",
+       UNABLE_TO_LOAD_USERS_OR_GROUPS: "Unable to load users or groups",
+@@ -1517,6 +1597,22 @@ export const translations = {
+       UPDATE_ROLE: "Update Role",
+       UPDATED_BY: "Updated by:",
+       UPDATING: "Updating",
++      UPDATE_CLASSES: "Update Classes",
++      UPDATE_DATA_SOURCES: "Update Data Sources",
++      UPDATE_EDGES: "Update Edges",
++      UPDATE_FILES: "Update Files",
++      UPDATE_GROUPS: "Update Groups",
++      UPDATE_OBJECT_STORAGES: "Update Object Storages",
++      UPDATE_ORGANIZATIONS: "Update Organizations",
++      UPDATE_PERMISSIONS: "Update Permissions",
++      UPDATE_PROJECTS: "Update Projects",
++      UPDATE_RECORD_COLLECTION: "Update Record Collection",
++      UPDATE_RECORDS: "Update Records",
++      UPDATE_RELATIONSHIPS: "Update Relationships",
++      UPDATE_ROLES: "Update Roles",
++      UPDATE_SENSITIVITY_LABELS: "Update Sensitivity Labels",
++      UPDATE_TAGS: "Update Tags",
++      UPDATE_USERS: "Update Users",
+       UPLOAD: "Upload",
+       UPLOAD_BATCH_SUCCESS: "Uploaded {success} file(s)",
+       UPLOAD_BATCH_SUCCESS_WITH_FAILURES:
+@@ -1543,6 +1639,7 @@ export const translations = {
+       UPLOADING_PERCENT_PREFIX: "Uploading",
+       UPLOADING_RECORDS: "Uploading Records...",
+       URI: "Uri",
++      URI_PLACEHOLDER: "uri",
+       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
+         "Used as the default when creating new data sources for projects.",
+       USE_SELECTOR_TO_ADD_LABELS: "Use the selector above to add labels.",
+@@ -1555,6 +1652,7 @@ export const translations = {
+       USER_ARCHIVED_SUCCESSFULLY: "User archived successfully.",
+       USER_MANAGEMENT: "User Management",
+       USER_REMOVED_FROM_ORG: "User removed from organization",
++      USER_ROLE_WITH_LIMITED_PERMISSIONS: "User role with limited permissions",
+       USER_SETTINGS: "User Settings",
+       USER_UPDATED_SUCCESSFULLY: "User updated successfully.",
+       USER_WITH_ACTIVE_ACCESS: "Users with active access",
+@@ -1594,6 +1692,24 @@ export const translations = {
+       WHEN_TAGS_ARE: "When tags are",
+       WIDGET: "Widget",
+       WIKI: "Wiki",
++      WRITE: "write",
++      WRITE_CLASS: "Write Class",
++      WRITE_DATA_SOURCE: "Write Data Source",
++      WRITE_EDGE: "Write Edge",
++      WRITE_FILE: "Write File",
++      WRITE_GROUP: "Write Group",
++      WRITE_INSIGHT: "Write Insight",
++      WRITE_OBJECT_STORAGE: "Write Object Storage",
++      WRITE_ORGANIZATION: "Write Organization",
++      WRITE_PERMISSION: "Write Permission",
++      WRITE_PROJECT: "Write Project",
++      WRITE_RECORD: "Write Record",
++      WRITE_RECORD_COLLECTION: "Write Record Collection",
++      WRITE_RELATIONSHIP: "Write Relationship",
++      WRITE_ROLE: "Write Role",
++      WRITE_SENSITIVITY_LABEL: "Write Sensitivity Label",
++      WRITE_TAG: "Write Tag",
++      WRITE_USER: "Write User",
+       X_AXIS: "X Axis",
+       Y_AXES_MULTIPLE: "Y Axes (Multiple)",
+       YES: "Yes",
+@@ -1661,6 +1777,7 @@ export const translations = {
+         "Configuraciones adicionales próximamente",
+       ADMIN: "Admin",
+       ADMIN_OVERVIEW: "Resumen de administración",
++      ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS: "Rol de administrador con permisos completos",
+       ALIAS: "Alias:",
+       ALL: "Todos",
+       ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED:
+@@ -1675,6 +1792,12 @@ export const translations = {
+       API_ID_TOOLTIP_DESCRIPTION:
+         "Usa estos identificadores al usar la API en el ámbito de tu organización y proyecto actuales.",
+       API_KEYPAIRS: "Claves API",
++      API_KEYPAIR_CREATED_SUCCESS:
++        "¡Par de claves API creado correctamente! Guárdalas en un lugar seguro:",
++      API_KEYPAIR_CREATION_FAILED: "La creación del par de claves API falló.",
++      API_KEYPAIR_DELETED_SUCCESS: "¡Par de claves API eliminado correctamente!",
++      API_KEYPAIR_DELETION_FAILED: "La eliminación del par de claves API falló.",
++      API_KEYS_DESCRIPTION: "Administra tus claves de autenticación API",
+       APP_OWNER_EMAIL: "Correo del propietario de la aplicación",
+       APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME:
+         "Aparece junto al nombre de la organización en el encabezado. Recomendado: PNG, 256×256, fondo transparente.",
+@@ -1761,13 +1884,15 @@ export const translations = {
+       CHOOSE_A_TYPE: "Elige un tipo",
+       CHOOSE_FILE_OPTIONAL: "Elegir archivo (opcional)",
+       CHOOSE_OPTION: "Elige opción",
++      CHOOSE_FILE: "Elegir archivo",
+       CHUNKS: "fragmentos",
+       CHUNKS_LEFT: "fragmentos restantes",
+-      CLASS: "Clase: ",
++      CLASS: "Clase",
+       CLASS_CREATED_AND_APPLIED: "Clase creada y aplicada!",
+       CLASS_ID: "ID de clase",
+-      CLASS_ID_DOES_NOT_EXIST_IN_PROJECT:
+-        "El ID de clase {id} no existe en este proyecto",
++      CLASS_ID_PLACEHOLDER: "id_de_clase",
++      CLASS_ID_DOES_NOT_EXIST_IN_PROJECT: "El ID de clase {id} no existe en este proyecto",
++      CLASS_NAME_PLACEHOLDER: "nombre_de_clase",
+       CLASS_ID_MUST_BE_GREATER_THAN_ZERO: "El ID de clase debe ser mayor que 0",
+       CLASS_ID_MUST_BE_INTEGER: "El ID de clase debe ser un entero",
+       CLASS_ID_MUST_BE_NUMBER_NOT_STRING:
+@@ -1851,6 +1976,7 @@ export const translations = {
+       CURRENT_DEFAULT_SUFFIX: " (Predeterminado actual)",
+       CUSTOMIZE: "Personalizar",
+       DARK_MODE: "Modo oscuro",
++      DARK_MODE_DESCRIPTION: "Cambiar entre temas claros y oscuros",
+       DATA_CATALOG: "Catálogo de datos",
+       DATA_CATALOG_ID: "ID",
+       DATA_CATALOG_OVERVIEW: "Resumen del catálogo de datos",
+@@ -2035,11 +2161,14 @@ export const translations = {
+       FILTER: "Filtro",
+       FILTER_BY: "Filtrar por",
+       FILTERED_BY: "Filtrado por: ",
++      FILE: "Archivo",
+       FOUND: "Encontrados",
+       FROM: "de",
+       FROM_: "Desde",
+       GENERAL: "General",
+       GENERATED_NEW_REPORT: "generó un nuevo reporte",
++      GENERATE_FIRST_KEYPAIR: "Genera tu primer par de claves para comenzar",
++      GENERATE_NEW: "Generar nueva",
+       GRAPH: "Grafo",
+       GRAPH_CALCULATING_LAYOUT: "Calculando el diseño del grafo...",
+       GRAPH_CONNECTED_RECORD: "Registro conectado",
+@@ -2312,6 +2441,7 @@ export const translations = {
+         "Las etiquetas están bloqueadas a nivel de organización. No se pueden crear ni editar etiquetas del proyecto.",
+       LABELS_LOWER: "etiquetas",
+       LANGUAGE: "Idioma",
++      LANGUAGE_DESCRIPTION: "Elige tu idioma preferido",
+       LAUNCH: "Iniciar",
+       LAST_EDIT: "Última edición",
+       LAST_LOGIN: "Último inicio de sesión",
+@@ -2504,6 +2634,7 @@ export const translations = {
+       MATRIX_VIEW: "Vista de matriz",
+       MAX_DATA_POINTS: "Puntos de datos máximos",
+       MEMBER: "Miembro",
++      METADATA: "Metadatos",
+       MEMBER_ADDED_TO_PROJECT: "Miembro agregado al proyecto",
+       MEMBER_MANAGEMENT: "Gestión de miembros",
+       MEMBER_REMOVED_FROM_PROJECT: "Miembro eliminado del proyecto",
+@@ -2568,6 +2699,7 @@ export const translations = {
+       NEXUS_DEFAULT: "Nexus predeterminado",
+       NO: "No",
+       NO_AVAILABLE_USERS: "No hay usuarios disponibles",
++      NO_API_KEYS_CONFIGURED: "No hay pares de claves API configurados",
+       NO_CHANGES_TO_SAVE: "No hay cambios para guardar",
+       NO_CLASS: "Sin clase",
+       NO_CLASSES_AVAILABLE: "No hay clases disponibles.",
+@@ -2575,6 +2707,7 @@ export const translations = {
+       NO_FILE_SELECTED: "No se ha seleccionado ningún archivo",
+       NO_FILES_AVAILABLE: "No hay archivos disponibles.",
+       NO_FILES_FOUND: "No se encontraron archivos.",
++      NO_FILE_CHOSEN: "Ningún archivo seleccionado",
+       NO_FILES_SELECTED_YET: "Aún no se han seleccionado archivos.",
+       NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD:
+         "No se encontraron versiones históricas para este registro.",
+@@ -2638,6 +2771,7 @@ export const translations = {
+       NOT_CONNECTED: "No conectado",
+       NOT_FOUND: "No encontrado",
+       OAUTH_APPLICATION: "Aplicación OAuth",
++      OBJECT_STORAGE_ID_PLACEHOLDER: "id_de_almacenamiento_de_objetos",
+       OBJECT_STORAGE: "Almacenamiento de objetos",
+       OBJECT_STORAGE_ID: "ID del almacenamiento de objetos",
+       OBJECT_STORAGE_ID_MUST_BE_AN_INTEGER:
+@@ -2732,6 +2866,44 @@ export const translations = {
+         "Póngase en contacto con el administrador del proyecto para solicitar los permisos necesarios.",
+       PERMISSIONS: "Permisos",
+       PERMISSIONS_STILL_LOADING: "Los permisos aún se están cargando.",
++      PERMISSION_TO_EMBED_FILES_IN_INSIGHT: "Permiso para incrustar archivos en Insight",
++      PERMISSION_TO_MODIFY_CLASSES: "Permiso para modificar clases",
++      PERMISSION_TO_MODIFY_DATA_SOURCES: "Permiso para modificar fuentes de datos",
++      PERMISSION_TO_MODIFY_FILES: "Permiso para modificar archivos",
++      PERMISSION_TO_MODIFY_GROUPS: "Permiso para modificar grupos",
++      PERMISSION_TO_MODIFY_OBJECT_STORAGE: "Permiso para modificar almacenamiento de objetos",
++      PERMISSION_TO_MODIFY_ORGANIZATION_INFORMATION: "Permiso para modificar información de la organización",
++      PERMISSION_TO_MODIFY_PERMISSIONS: "Permiso para modificar permisos",
++      PERMISSION_TO_MODIFY_PROJECT_INFORMATION: "Permiso para modificar información del proyecto",
++      PERMISSION_TO_MODIFY_RECORDS: "Permiso para modificar registros",
++      PERMISSION_TO_MODIFY_RELATIONSHIPS: "Permiso para modificar relaciones",
++      PERMISSION_TO_MODIFY_ROLES: "Permiso para modificar roles",
++      PERMISSION_TO_MODIFY_TAGS: "Permiso para modificar etiquetas",
++      PERMISSION_TO_MODIFY_USER_INFORMATION: "Permiso para modificar información del usuario",
++      PERMISSION_TO_READ_A_RECORD_COLLECTION: "Permiso para leer una colección de registros",
++      PERMISSION_TO_READ_CLASSES: "Permiso para leer clases",
++      PERMISSION_TO_READ_DATA_SOURCES: "Permiso para leer fuentes de datos",
++      PERMISSION_TO_READ_FILES: "Permiso para leer archivos",
++      PERMISSION_TO_READ_GROUPS: "Permiso para leer grupos",
++      PERMISSION_TO_READ_OBJECT_STORAGE: "Permiso para leer almacenamiento de objetos",
++      PERMISSION_TO_READ_ORGANIZATION_INFORMATION: "Permiso para leer información de la organización",
++      PERMISSION_TO_READ_PERMISSIONS: "Permiso para leer permisos",
++      PERMISSION_TO_READ_PROJECT_INFORMATION: "Permiso para leer información del proyecto",
++      PERMISSION_TO_READ_RECORDS: "Permiso para leer registros",
++      PERMISSION_TO_READ_RELATIONSHIPS: "Permiso para leer relaciones",
++      PERMISSION_TO_READ_ROLES: "Permiso para leer roles",
++      PERMISSION_TO_READ_TAGS: "Permiso para leer etiquetas",
++      PERMISSION_TO_READ_USER_INFORMATION: "Permiso para leer información del usuario",
++      PERMISSION_TO_UPDATE_A_RECORD_COLLECTION: "Permiso para actualizar una colección de registros",
++      PERMISSION_TO_UPDATE_PROJECT_DATA: "Permiso para actualizar los datos del proyecto",
++      PERMISSION_TO_MODIFY_SENSITIVITY_LABELS: "Permiso para modificar etiquetas de sensibilidad",
++      PERMISSION_TO_READ_SENSITIVITY_LABELS: "Permiso para leer etiquetas de sensibilidad",
++      PERMISSION_TO_UPDATE_DATA_SOURCES: "Permiso para actualizar fuentes de datos",
++      PERMISSION_TO_UPDATE_EDGES: "Permiso para actualizar aristas",
++      PERMISSION_TO_UPDATE_GROUPS: "Permiso para actualizar grupos",
++      PERMISSION_TO_UPDATE_ROLES: "Permiso para actualizar roles",
++      PERMISSION_TO_UPDATE_SENSITIVITY_LABELS: "Permiso para actualizar etiquetas de sensibilidad",
++      PERMISSION_TO_UPDATE_TAGS: "Permiso para actualizar etiquetas",
+       PERSON: "persona",
+       PIV_CAC_CARD_SIGN_IN: "Iniciar sesión con tarjeta PIV/CAC",
+       PLEASE_ENTER_CLASS_NAME: "Por favor ingresa el nombre de la clase",
+@@ -2746,7 +2918,7 @@ export const translations = {
+       PLEASE_SELECT_A_ROLE: "Por favor, selecciona un rol",
+       PLEASE_SELECT_A_ROLE_FOR_MEMBER:
+         "Por favor, selecciona un rol para este miembro",
+-      PLEASE_SELECT_A_ROLE_FOR_THIS_MEMEBER:
++      PLEASE_SELECT_A_ROLE_FOR_THIS_MEMBER:
+         "Por favor, selecciona un rol para este miembro",
+       PLEASE_SELECT_A_STORAGE_LOCATION:
+         "Por favor, selecciona una ubicación de almacenamiento",
+@@ -2901,6 +3073,7 @@ export const translations = {
+       PROPERTY_KEY_PLACEHOLDER: "Clave de propiedad (ej., numero_contrato)",
+       QUERY_BUILDER: "Constructor de consultas",
+       READY: "Listo",
++      READ: "leer",
+       RECENT_ACTIVITY: "Actividad reciente",
+       RECENTLY_ADDED_RECORDS: "Registros añadidos recientemente",
+       RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND:
+@@ -2957,6 +3130,7 @@ export const translations = {
+       RECORD_NAME: "Nombre de Registro",
+       RECORD_NAME_UPDATED: "Nombre del registro actualizado",
+       RECORDS: "Registros",
++      RECORD_COLLECTION: "Colección de registros",
+       RECORD_PREVIEW_WITH_TOTAL: "Vista previa de registros ({total} en total)",
+       RECORDS_HAVE_ERRORS: "los registros tienen errores",
+       RECORDS_VALIDATED_SUCCESSFULLY: "¡registros validados correctamente!",
+@@ -2981,6 +3155,23 @@ export const translations = {
+       RETRY: "Reintentar",
+       RETRY_FAILED_INVITATIONS: "Reintentar invitaciones fallidas",
+       RETURN_TO_ROLES: "Regresar a los roles",
++      READ_CLASS: "Leer clase",
++      READ_DATA_SOURCE: "Leer fuente de datos",
++      READ_EDGE: "Leer arista",
++      READ_FILE: "Leer archivo",
++      READ_GROUP: "Leer grupo",
++      READ_INSIGHT: "Leer Insight",
++      READ_OBJECT_STORAGE: "Leer almacenamiento de objetos",
++      READ_ORGANIZATION: "Leer organización",
++      READ_PERMISSION: "Leer permiso",
++      READ_PROJECT: "Leer proyecto",
++      READ_RECORD: "Leer registro",
++      READ_RECORD_COLLECTION: "Leer colección de registros",
++      READ_RELATIONSHIP: "Leer relación",
++      READ_ROLE: "Leer rol",
++      READ_SENSITIVITY_LABEL: "Leer etiqueta de sensibilidad",
++      READ_TAG: "Leer etiqueta",
++      READ_USER: "Leer usuario",
+       ROLE: "Rol",
+       ROLE_ARCHIVE: "Este rol será archivado",
+       ROLE_DELETED: "Al eliminar este rol se: ",
+@@ -3071,10 +3262,12 @@ export const translations = {
+       SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON:
+         "La configuración del servicio estará disponible en una versión futura",
+       SET_AS_DEFAULT_STORAGE: "Establecer como almacenamiento predeterminado",
++      SENSITIVITY_LABEL: "Etiqueta de sensibilidad",
+       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
+         "Establecer la ubicación predeterminada del almacenamiento de objetos no montado para esta organización.",
+       STORAGE_SIZE: "Tamaño de almacenamiento",
+       SET_UP: "Configuración",
++      SENSITIVITY_LABELS_COMMA_SEPARATED: "etiquetas de sensibilidad (separadas por comas)",
+       SETTINGS: "Configuración",
+       SHOW: "Mostrar",
+       SHOW_ALL_WITH_COUNT: "Mostrar todo ({count})",
+@@ -3147,6 +3340,7 @@ export const translations = {
+       TAG_NAME_PLACEHOLDER: "p. ej., PII, QA, Archivo",
+       TAGS: "Etiquetas:",
+       TAGS_AND_SECURITY_LABELS: "Tags y etiquetas de sensitividad",
++      TAGS_COMMA_SEPARATED: "etiquetas (separadas por comas)",
+       BIDIRECTIONAL: "Bidireccional",
+       DEPTH: "Profundidad",
+       TAGS_ARE_LOCKED: "Las etiquetas están bloqueadas",
+@@ -3190,6 +3384,7 @@ export const translations = {
+       TOTAL_MEMBERS: "Total de miembros",
+       TRENDS: "Tendencias",
+       TROUBLE_LOGGING_IN: "¿Problemas para iniciar sesión?",
++      TYPE: "Tipo",
+       UNABLE_TO_LOAD_USERS: "No se pudieron cargar los usuarios",
+       UNABLE_TO_LOAD_USERS_OR_GROUPS:
+         "No se pudieron cargar los usuarios o los grupos",
+@@ -3209,6 +3404,22 @@ export const translations = {
+       UPDATE_ROLE: "Actualizar Rol",
+       UPDATED_BY: "Actualizado por:",
+       UPDATING: "Actualizando...",
++      UPDATE_CLASSES: "Actualizar clases",
++      UPDATE_DATA_SOURCES: "Actualizar fuentes de datos",
++      UPDATE_EDGES: "Actualizar aristas",
++      UPDATE_FILES: "Actualizar archivos",
++      UPDATE_GROUPS: "Actualizar grupos",
++      UPDATE_OBJECT_STORAGES: "Actualizar almacenamientos de objetos",
++      UPDATE_ORGANIZATIONS: "Actualizar organizaciones",
++      UPDATE_PERMISSIONS: "Actualizar permisos",
++      UPDATE_PROJECTS: "Actualizar proyectos",
++      UPDATE_RECORD_COLLECTION: "Actualizar colección de registros",
++      UPDATE_RECORDS: "Actualizar registros",
++      UPDATE_RELATIONSHIPS: "Actualizar relaciones",
++      UPDATE_ROLES: "Actualizar roles",
++      UPDATE_SENSITIVITY_LABELS: "Actualizar etiquetas de sensibilidad",
++      UPDATE_TAGS: "Actualizar etiquetas",
++      UPDATE_USERS: "Actualizar usuarios",
+       UPLOAD: "Cargar",
+       UPLOAD_BATCH_SUCCESS: "Se cargaron {success} archivo(s)",
+       UPLOAD_BATCH_SUCCESS_WITH_FAILURES:
+@@ -3236,6 +3447,7 @@ export const translations = {
+       UPLOADING_PERCENT_PREFIX: "Subiendo",
+       UPLOADING_RECORDS: "Subiendo registros...",
+       URI: "Uri",
++      URI_PLACEHOLDER: "uri",
+       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
+         "Se usa como valor predeterminado al crear nuevas fuentes de datos para los proyectos.",
+       USE_SELECTOR_TO_ADD_LABELS:
+@@ -3250,6 +3462,7 @@ export const translations = {
+       USER_ARCHIVED_SUCCESSFULLY: "Usuario archivado correctamente.",
+       USER_MANAGEMENT: "Gestión de usuarios",
+       USER_REMOVED_FROM_ORG: "Usuario eliminado de la organización",
++      USER_ROLE_WITH_LIMITED_PERMISSIONS: "Rol de usuario con permisos limitados",
+       USER_SETTINGS: "Configuración de usuario",
+       USER_UPDATED_SUCCESSFULLY: "Usuario actualizado correctamente.",
+       USER_WITH_ACTIVE_ACCESS: "Usuarios con acceso activo",
+@@ -3289,6 +3502,24 @@ export const translations = {
+       WHEN_TAGS_ARE: "Cuando las etiquetas están",
+       WIDGET: "Widget",
+       WIKI: "Wiki",
++      WRITE: "escribir",
++      WRITE_CLASS: "Escribir clase",
++      WRITE_DATA_SOURCE: "Escribir fuente de datos",
++      WRITE_EDGE: "Escribir arista",
++      WRITE_FILE: "Escribir archivo",
++      WRITE_GROUP: "Escribir grupo",
++      WRITE_INSIGHT: "Escribir Insight",
++      WRITE_OBJECT_STORAGE: "Escribir almacenamiento de objetos",
++      WRITE_ORGANIZATION: "Escribir organización",
++      WRITE_PERMISSION: "Escribir permiso",
++      WRITE_PROJECT: "Escribir proyecto",
++      WRITE_RECORD: "Escribir registro",
++      WRITE_RECORD_COLLECTION: "Escribir colección de registros",
++      WRITE_RELATIONSHIP: "Escribir relación",
++      WRITE_ROLE: "Escribir rol",
++      WRITE_SENSITIVITY_LABEL: "Escribir etiqueta de sensibilidad",
++      WRITE_TAG: "Escribir etiqueta",
++      WRITE_USER: "Escribir usuario",
+       X_AXIS: "Eje X",
+       Y_AXES_MULTIPLE: "Ejes Y (Múltiples)",
+       YES: "Sí",

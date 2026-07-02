@@ -12,6 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 
+import { useLanguage } from "@/app/contexts/Language";
 import DetailsEditor from "./DetailsEditor";
 import {
   ExtendedDataSource,
@@ -54,6 +55,7 @@ const DataSourceCard = ({
   onDetailsSaved,
   setError,
 }: CardProps) => {
+  const { t } = useLanguage();
   const hasId = source.id != null;
   const idNum = typeof source.id === "number" ? source.id : undefined;
   const apiKey = source.apiKey;
@@ -72,10 +74,14 @@ const DataSourceCard = ({
             <div className="flex items-center gap-3 mb-2">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-bold">{source.name}</h3>
+                  <h3 className="text-xl font-bold">
+                    {source.name === "Default Data Source"
+                      ? t.translations.DEFAULT_DATA_SOURCE
+                      : source.name}
+                  </h3>
                   {isDefault}
                   {source.isArchived && (
-                    <div className="badge badge-warning">Archived</div>
+                    <div className="badge badge-warning">{t.translations.ARCHIVED_BADGE}</div>
                   )}
                 </div>
                 <div className="flex gap-2 items-center mt-1">
@@ -93,7 +99,7 @@ const DataSourceCard = ({
             {source.baseuri && (
               <div className="bg-base-200 rounded-lg p-3 mb-3">
                 <div className="text-xs text-base-content/60 mb-1">
-                  Connection
+                  {t.translations.CONNECTIONS}
                 </div>
                 <code className="text-xs">{source.baseuri}</code>
               </div>
@@ -102,13 +108,13 @@ const DataSourceCard = ({
             {/* Stats Row */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-3">
               <div className="bg-base-200 rounded-lg p-2 text-center">
-                <div className="text-xs text-base-content/60">Records</div>
+                <div className="text-xs text-base-content/60">{t.translations.RECORDS}</div>
                 <div className="text-lg font-bold text-primary">
                   {formatRecordCount(recordCount)}
                 </div>
               </div>
               <div className="bg-base-200 rounded-lg p-2 text-center">
-                <div className="text-xs text-base-content/60">Health</div>
+                <div className="text-xs text-base-content/60">{t.translations.HEALTH}</div>
                 <div
                   className={`text-lg font-bold ${Number.isFinite(health)
                     ? health > 80
@@ -123,11 +129,11 @@ const DataSourceCard = ({
                 </div>
               </div>
               <div className="bg-base-200 rounded-lg p-2 text-center">
-                <div className="text-xs text-base-content/60">Last Sync</div>
+                <div className="text-xs text-base-content/60">{t.translations.LAST_SYNC}</div>
                 <div className="text-sm font-semibold">{lastSync ?? "—"}</div>
               </div>
               <div className="bg-base-200 rounded-lg p-2 text-center">
-                <div className="text-xs text-base-content/60">Last Updated</div>
+                <div className="text-xs text-base-content/60">{t.translations.LAST_UPDATED}</div>
                 <div className="text-sm font-semibold">
                   {source.lastUpdatedAt
                     ? new Date(source.lastUpdatedAt).toLocaleString()
@@ -145,7 +151,7 @@ const DataSourceCard = ({
               disabled={!hasId}
             >
               <PencilIcon className="w-4 h-4" />
-              Details
+              {t.translations.DETAILS}
             </button>
             <button
               className="btn btn-ghost btn-sm gap-2"
@@ -155,12 +161,12 @@ const DataSourceCard = ({
               {source.isArchived ? (
                 <>
                   <ArrowPathIcon className="w-4 h-4" />
-                  Unarchive
+                  {t.translations.UNARCHIVE}
                 </>
               ) : (
                 <>
                   <TrashIcon className="w-4 h-4" />
-                  Archive
+                  {t.translations.ARCHIVE}
                 </>
               )}
             </button>

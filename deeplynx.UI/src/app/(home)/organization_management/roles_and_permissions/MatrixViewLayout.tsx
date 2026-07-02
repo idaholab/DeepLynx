@@ -50,6 +50,17 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   isStandardRole,
 }) => {
   const { t } = useLanguage();
+  const translatePermission = (text?: string | null) => {
+    if (!text) return "";
+
+    const key = text
+      .toUpperCase()
+      .replaceAll(" ", "_")
+      .replaceAll("/", "_")
+      .replaceAll("-", "_");
+
+    return t.translations[key as keyof typeof t.translations] ?? text;
+  };
   const hasNonStandardRoles = roles.some((role) => !isStandardRole(role));
   const matrixPermissionCategories = React.useMemo(() => {
     // Matrix view intentionally excludes sensitivity-label permissions.
@@ -64,10 +75,10 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   const editMatrixDisabledReason = !hasNonStandardRoles
     ? t.translations.MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES
     : rolesLocked
-    ? t.translations.ROLES_ARE_LOCKED
-    : isLoadingPermissions
-    ? t.translations.PERMISSIONS_STILL_LOADING
-    : "";
+      ? t.translations.ROLES_ARE_LOCKED
+      : isLoadingPermissions
+        ? t.translations.PERMISSIONS_STILL_LOADING
+        : "";
 
   return (
     <div style={{ height: "calc(100vh - 28rem)" }}>
@@ -139,8 +150,8 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                     const editTitle = !hasNonStandardRoles
                       ? t.translations.ONLY_STANDARD_ROLES_NO_CUSTOM_TO_EDIT
                       : standard
-                      ? t.translations.STANDARD_ROLES_CANNOT_BE_EDITED
-                      : t.translations.EDIT_ROLE;
+                        ? t.translations.STANDARD_ROLES_CANNOT_BE_EDITED
+                        : t.translations.EDIT_ROLE;
 
                     return (
                       <th key={role.id} className="text-center">
@@ -166,7 +177,11 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                           </div>
                           {role.description && (
                             <span className="text-xs text-base-content/60 font-normal">
-                              {role.description}
+                              {role.description === "Administrator role with full permissions"
+                                ? t.translations.ADMIN_ROLE_FULL_PERMISSIONS
+                                : role.description === "User role with limited permissions"
+                                  ? t.translations.USER_ROLE_LIMITED_PERMISSIONS
+                                  : role.description}
                             </span>
                           )}
                         </div>
@@ -184,7 +199,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                         colSpan={roles.length + 1}
                         className="font-semibold text-sm sticky left-0"
                       >
-                        {category.label}
+                        {translatePermission(category.label)}
                       </td>
                     </tr>
 
@@ -194,15 +209,15 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                         <td className="sticky left-0 z-10 bg-base-100">
                           <div className="flex flex-col">
                             <span className="font-medium text-sm">
-                              {perm.name}
+                              {translatePermission(perm.name)}
                             </span>
                             {perm.description && (
                               <span className="text-xs text-base-content/60">
-                                {perm.description}
+                                {translatePermission(perm.description)}
                               </span>
                             )}
                             <span className="text-xs text-base-content/50 mt-1">
-                              {t.translations.ACTION} {perm.action}
+                              {t.translations.ACTION} {translatePermission(perm.action)}
                             </span>
                           </div>
                         </td>
@@ -225,44 +240,40 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                                     );
                                   }
                                 }}
-                                className={`inline-block ${
-                                  isEditingMatrix && !standard
-                                    ? "cursor-pointer hover:scale-110 transition-transform"
-                                    : "cursor-default"
-                                } ${
-                                  standard && isEditingMatrix
+                                className={`inline-block ${isEditingMatrix && !standard
+                                  ? "cursor-pointer hover:scale-110 transition-transform"
+                                  : "cursor-default"
+                                  } ${standard && isEditingMatrix
                                     ? "opacity-60 ring-2 ring-warning rounded-lg p-1"
                                     : ""
-                                }`}
+                                  }`}
                                 title={
                                   standard && isEditingMatrix
                                     ? t.translations.STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
                                     : isEditingMatrix
-                                    ? t.translations.CLICK_TO_TOGGLE
-                                    : hasPermission
-                                    ? t.translations.HAS_PERMISSION
-                                    : t.translations.NO_PERMISSION
+                                      ? t.translations.CLICK_TO_TOGGLE
+                                      : hasPermission
+                                        ? t.translations.HAS_PERMISSION
+                                        : t.translations.NO_PERMISSION
                                 }
                               >
                                 {hasPermission ? (
                                   <CheckIcon
-                                    className={`size-8 mx-auto ${
-                                      isEditingMatrix && !standard
-                                        ? "text-success hover:text-success/70"
-                                        : standard && isEditingMatrix
+                                    className={`size-8 mx-auto ${isEditingMatrix && !standard
+                                      ? "text-success hover:text-success/70"
+                                      : standard && isEditingMatrix
                                         ? "text-warning"
                                         : "text-success"
-                                    }`}
+                                      }`}
                                   />
                                 ) : (
                                   <XMarkIcon
-                                    className={`size-8 mx-auto ${
-                                      isEditingMatrix && !standard
-                                        ? "text-base-300 hover:text-success/50"
-                                        : standard && isEditingMatrix
+                                    className={`size-8 mx-auto ${isEditingMatrix && !standard
+                                      ? "text-base-300 hover:text-success/50"
+                                      : standard && isEditingMatrix
                                         ? "text-warning/50"
                                         : "text-base-300"
-                                    }`}
+                                      }`}
                                   />
                                 )}
                               </div>
@@ -278,7 +289,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 };
 

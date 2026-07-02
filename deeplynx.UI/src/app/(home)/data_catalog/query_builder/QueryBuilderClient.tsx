@@ -3,7 +3,6 @@
 import { useRouter, usePathname } from "next/navigation";
 import { QueryBuilderQuery } from "@/app/(home)/types/types";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
-import { translations } from "@/app/lib/translations";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -118,7 +117,7 @@ function SearchBar({
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onSearch()}
-          placeholder="Search across all records..."
+          placeholder={t.translations.SEARCH_ACROSS_ALL_RECORDS}
           className="input input-bordered w-full pl-12 pr-4 bg-base-100 text-base-content placeholder:text-base-content/40 focus:outline-primary"
         />
       </div>
@@ -127,11 +126,10 @@ function SearchBar({
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleFilters}
-            className={`btn btn-sm gap-2 ${
-              showFilters
-                ? "btn-primary"
-                : "btn-ghost border border-base-content/20 hover:border-base-content/40"
-            }`}
+            className={`btn btn-sm gap-2 ${showFilters
+              ? "btn-primary"
+              : "btn-ghost border border-base-content/20 hover:border-base-content/40"
+              }`}
           >
             <FunnelIcon className="w-4 h-4" />
             {t.translations.ADDITIONAL_FILTERS}
@@ -146,7 +144,7 @@ function SearchBar({
               className="text-xs gap-1 flex hover:underline"
             >
               <XMarkIcon className="w-4 h-4" />
-              Clear all filters
+              {t.translations.CLEAR_ALL_FILTERS}
             </button>
           )}
         </div>
@@ -158,7 +156,7 @@ function SearchBar({
             className="btn btn-sm btn-ghost border border-base-content/20 hover:border-base-content/40 gap-2"
           >
             <BookmarkIcon className="w-4 h-4" />
-            Save Search
+            {t.translations.SAVE_SEARCH}
           </button>
 
           <button
@@ -185,9 +183,9 @@ interface FilterRowProps {
   row: QueryBuilderQuery;
   index: number;
   showConnector: boolean;
-  connectors: string[];
+  connectors: { value: string; label: string }[];
   filters: { name: string; value: string }[];
-  operators: string[];
+  operators: { value: string; label: string }[];
   classes: ClassResponseDto[];
   datasources: DataSourceResponseDto[];
   tags: TagResponseDto[];
@@ -229,16 +227,10 @@ function FilterRow({
   };
 
   const getFilteredOperators = () => {
-    if (row.query.filter === "properties") return ["KEY_VALUE"];
-    if (row.query.filter === "last_updated_at") return ["<", ">", "="];
-    if (
-      ["class_name", "original_id", "data_source_name", "tags"].includes(
-        row.query.filter
-      )
-    ) {
-      return operators.filter(
-        (op) => op !== "<" && op !== ">" && op !== "KEY_VALUE"
-      );
+    if (row.query.filter === "properties") return operators.filter((op) => op.value === "KEY_VALUE");
+    if (row.query.filter === "last_updated_at") return operators.filter((op) => ["<", ">", "="].includes(op.value));
+    if (["class_name", "original_id", "data_source_name", "tags"].includes(row.query.filter)) {
+      return operators.filter((op) => op.value !== "<" && op.value !== ">" && op.value !== "KEY_VALUE");
     }
     return operators;
   };
@@ -248,7 +240,7 @@ function FilterRow({
   const { t } = useLanguage();
 
   const handleEnterSearch = (
-      e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     if (e.key === "Enter" && !e.nativeEvent.isComposing) {
       e.preventDefault();
@@ -275,8 +267,8 @@ function FilterRow({
                   {t.translations.CONNECTOR}
                 </option>
                 {connectors.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
                   </option>
                 ))}
               </select>
@@ -329,8 +321,8 @@ function FilterRow({
                   {t.translations.OPERATOR}
                 </option>
                 {getFilteredOperators().map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
                   </option>
                 ))}
               </select>
@@ -393,14 +385,14 @@ function ValueInput({
   const { t } = useLanguage();
 
   const handleEnterSearch = (
-      e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     if (e.key === "Enter" && !e.nativeEvent.isComposing) {
       e.preventDefault();
       onSearch();
     }
   };
-  
+
   if (row.query.filter === "last_updated_at") {
     return (
       <div className="col-span-5">
@@ -420,7 +412,7 @@ function ValueInput({
       <div className="col-span-5 grid grid-cols-2 gap-2">
         <input
           type="text"
-          placeholder="Key"
+          placeholder={t.translations.KEY}
           value={row.query.jsonKey ?? ""}
           onChange={(e) =>
             onUpdate(row.id, { query: { ...row.query, jsonKey: e.target.value } })
@@ -430,7 +422,7 @@ function ValueInput({
         />
         <input
           type="text"
-          placeholder="Value"
+          placeholder={t.translations.VALUE}
           value={row.query.jsonValue ?? ""}
           onChange={(e) =>
             onUpdate(row.id, {
@@ -577,7 +569,7 @@ function EmptyResultsState() {
             {t.translations.NO_RECORDS}
           </h4>
           <p className="text-sm text-base-content/50 max-w-md mx-auto">
-            Try adjusting your search terms or filters
+            {t.translations.TRY_ADJUSTING_YOUR_SEARCH_TERMS_OR_FILTERS}
           </p>
         </div>
       </div>
@@ -686,8 +678,40 @@ export default function QueryBuilderClient({
   organizationId,
   savedSearchId,
 }: Props) {
-  const locale = "en";
-  const t = translations[locale].translations;
+  const { t } = useLanguage();
+
+  const translatedConnectors = connectors.map((c) => ({
+    value: c,
+    label: c === "AND" ? t.translations.AND : c === "OR" ? t.translations.OR : c,
+  }));
+
+  const translatedFilters = filters.map((f) => ({
+    ...f,
+    name:
+      f.value === "class_name"
+        ? t.translations.CLASS
+        : f.value === "tags"
+          ? t.translations.TAG
+          : f.value === "original_id"
+            ? t.translations.ORIGINAL_ID
+            : f.value === "last_updated_at"
+              ? t.translations.TIME_RANGE
+              : f.value === "data_source_name"
+                ? t.translations.DATA_SOURCE
+                : f.value === "properties"
+                  ? t.translations.PROPERTIES
+                  : f.name,
+  }));
+
+  const translatedOperators = operators.map((o) => ({
+    value: o,
+    label:
+      o === "LIKE"
+        ? t.translations.LIKE
+        : o === "KEY_VALUE"
+          ? t.translations.KEY_VALUE
+          : o,
+  }));
 
   // ---- State ----------------------------------------------------------------
   const [projects] = useState(initialProjects);
@@ -841,23 +865,23 @@ export default function QueryBuilderClient({
 
   // ---- Handlers -------------------------------------------------------------
   const handleSubmit = async () => {
-  try {
-    const queryDtos = rows.map((r) => r.query);
-    
-    const projectIds =
-      selectedProjects.length === 0 ||
-      selectedProjects.includes("ALL") ||
-      selectedProjects.length === projects.length
-        ? projects.map((p) => Number(p.id))
-        : selectedProjects.map(Number);
+    try {
+      const queryDtos = rows.map((r) => r.query);
 
-    if (hasValidQueries()) {
-      const data = await queryBuilder(organizationId, queryDtos, projectIds, searchTerm);
-      if (data) setQueriedRecords(data);
-    } else {
-      const data = await fullTextSearch(organizationId, searchTerm, projectIds);
-      if (data) setQueriedRecords(data);
-    }
+      const projectIds =
+        selectedProjects.length === 0 ||
+          selectedProjects.includes("ALL") ||
+          selectedProjects.length === projects.length
+          ? projects.map((p) => Number(p.id))
+          : selectedProjects.map(Number);
+
+      if (hasValidQueries()) {
+        const data = await queryBuilder(organizationId, queryDtos, projectIds, searchTerm);
+        if (data) setQueriedRecords(data);
+      } else {
+        const data = await fullTextSearch(organizationId, searchTerm, projectIds);
+        if (data) setQueriedRecords(data);
+      }
     } catch (error) {
       console.error("Failed to send query", error);
     }
@@ -887,22 +911,22 @@ export default function QueryBuilderClient({
   };
 
   const handleSaveSearch = async () => {
-  if (!saveAlias.trim()) return;
-  try {
-    setIsSaving(true);
-    const queryDtos = rows
-      .filter((r) => r.query.filter !== "")
-      .map((r) => r.query);
-    await saveSearch(queryDtos, searchTerm || undefined, saveAlias.trim());
-    setSaveModalOpen(false);
-    setSaveAlias("");
-    setSavedSearchesKey((k) => k + 1); // 👈 add this
-  } catch (error) {
-    console.error("Failed to save search:", error);
-  } finally {
-    setIsSaving(false);
-  }
-};
+    if (!saveAlias.trim()) return;
+    try {
+      setIsSaving(true);
+      const queryDtos = rows
+        .filter((r) => r.query.filter !== "")
+        .map((r) => r.query);
+      await saveSearch(queryDtos, searchTerm || undefined, saveAlias.trim());
+      setSaveModalOpen(false);
+      setSaveAlias("");
+      setSavedSearchesKey((k) => k + 1); // 👈 add this
+    } catch (error) {
+      console.error("Failed to save search:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // ---- Render ---------------------------------------------------------------
   return (
@@ -913,10 +937,10 @@ export default function QueryBuilderClient({
           <div className="space-y-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-                {t.DATA_CATALOG}
+                {t.translations.DATA_CATALOG}
               </p>
               <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
-                {t.SEARCH_RECORDS}
+                {t.translations.SEARCH_RECORDS}
               </h1>
             </div>
             <ProjectDropdown
@@ -948,23 +972,23 @@ export default function QueryBuilderClient({
               <div className="flex items-center gap-2">
                 <BookmarkIcon className="w-4 h-4" />
                 <span className="font-semibold tracking-wide text-xs uppercase">
-                  Saved Searches
+                  {t.translations.SAVED_SEARCHES}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-base-content/40 text-xs">
-                <span>{savedSearchesOpen ? "Hide" : "Show"}</span>
+                <span>
+                  {savedSearchesOpen ? t.translations.HIDE : t.translations.SHOW}
+                </span>
                 <ChevronDownIcon
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    savedSearchesOpen ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${savedSearchesOpen ? "rotate-180" : ""
+                    }`}
                 />
               </div>
             </button>
 
             <div
-              className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                savedSearchesOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
-              }`}
+              className={`transition-all duration-300 ease-in-out overflow-hidden ${savedSearchesOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
+                }`}
             >
               <div className="px-6 py-4 border border-t-0 border-base-content/10 rounded-b-lg bg-base-100 h-full">
                 <SavedSearchesWidget key={savedSearchesKey} scope="catalog" projects={[]} />
@@ -976,7 +1000,7 @@ export default function QueryBuilderClient({
           {isLoadingSavedSearch && (
             <div className="flex items-center justify-center gap-3 py-3 rounded-lg bg-primary/10 text-primary text-sm font-medium mb-4">
               <span className="loading loading-spinner loading-xs" />
-              Running saved search…
+              {t.translations.RUNNING_SAVED_SEARCH}
             </div>
           )}
 
@@ -999,10 +1023,10 @@ export default function QueryBuilderClient({
               <div className="rounded-b-lg border border-t-0 border-base-content/10 bg-base-200 p-6 mt-0">
                 <div className="mb-4">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-base-content mb-1">
-                    {t.SELECT_FILTERS}
+                    {t.translations.SELECT_FILTERS}
                   </h3>
                   <p className="text-xs text-base-content/50">
-                    Build complex queries by combining multiple conditions
+                    {t.translations.BUILD_COMPLEX_QUERIES_BY_COMBINING_MULTIPLE_CONDITIONS}
                   </p>
                 </div>
 
@@ -1013,9 +1037,9 @@ export default function QueryBuilderClient({
                       row={row}
                       index={idx}
                       showConnector={idx > 0}
-                      connectors={connectors}
-                      filters={filters}
-                      operators={operators}
+                      connectors={translatedConnectors}
+                      filters={translatedFilters}
+                      operators={translatedOperators}
                       classes={classes}
                       datasources={datasources}
                       tags={tags}
@@ -1036,7 +1060,7 @@ export default function QueryBuilderClient({
                     className="btn btn-sm btn-ghost border border-base-content/20 hover:border-base-content/40 gap-2"
                   >
                     <PlusIcon className="w-4 h-4" />
-                    {t.FILTER}
+                    {t.translations.FILTER}
                   </button>
                 </div>
               </div>

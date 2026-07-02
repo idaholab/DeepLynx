@@ -145,7 +145,9 @@ export default function ProjectResourceSelectors({
           </option>
           {dataSources.map((d) => (
             <option key={d.id} value={String(d.id)}>
-              {d.name}
+              {d.name === "Default Data Source"
+                ? t.translations.DEFAULT_DATA_SOURCE
+                : d.name}
             </option>
           ))}
         </select>
@@ -182,7 +184,9 @@ export default function ProjectResourceSelectors({
           </option>
           {objectStorage.map((object) => (
             <option key={object.id} value={String(object.id)}>
-              {object.name}
+              {object.name === "Instance Default"
+                ? t.translations.INSTANCE_DEFAULT
+                : object.name}
             </option>
           ))}
         </select>

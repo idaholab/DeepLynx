@@ -27,6 +27,7 @@ import DeleteRoleModal from "./DeleteRoleModal";
 import EditRoleModal from "./EditRoleModal";
 import MatrixViewLayout from "./MatrixViewLayout";
 import SplitViewLayout from "./SplitViewLayout";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -51,6 +52,7 @@ const RolesAndPermissions = ({
   initialRoles,
   initialPermissions,
 }: RolesAndPermissionsProps) => {
+  const { t } = useLanguage();
   /* ------------------------------------------------------------------------ */
   /*                               Core State                                */
   /* ------------------------------------------------------------------------ */
@@ -541,7 +543,7 @@ const RolesAndPermissions = ({
       {/* Page Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold">Roles & Permissions</h1>
+          <h1 className="text-2xl font-bold">{t.translations.ROLES_AND_PERMISSIONS}</h1>
           {/* Locking Roles (currently disabled) */}
           {/* <button
             onClick={() => setRolesLocked(!rolesLocked)}
@@ -551,8 +553,7 @@ const RolesAndPermissions = ({
           </button> */}
         </div>
         <p className="text-base-content/70">
-          Define and manage organization-level roles and permissions. These
-          settings will propagate to all projects.
+          {t.translations.DEFINE_AND_MANAGE_ORGANIZATION_LEVEL_ROLES_AND_PERMISSIONS}
         </p>
       </div>
 
@@ -572,24 +573,22 @@ const RolesAndPermissions = ({
       {/* Layout Selector */}
       <div className="mb-6">
         <label className="label">
-          <span className="label-text font-medium">View Layout:</span>
+          <span className="label-text font-medium">{t.translations.VIEW_LAYOUT}:</span>
         </label>
         <div className="btn-group">
           <button
             onClick={() => setActiveLayout("split-view")}
-            className={`btn border-2 border-primary mr-3 ${
-              activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
-            }`}
+            className={`btn border-2 border-primary mr-3 ${activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
+              }`}
           >
-            Split View
+            {t.translations.SPLIT_VIEW}
           </button>
           <button
             onClick={() => setActiveLayout("matrix")}
-            className={`btn border-2 border-primary ${
-              activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
-            }`}
+            className={`btn border-2 border-primary ${activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
+              }`}
           >
-            Matrix View
+            {t.translations.MATRIX_VIEW}
           </button>
         </div>
       </div>

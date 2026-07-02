@@ -661,17 +661,15 @@ const ProjectRolesAndPermissions = ({
         <div className="btn-group">
           <button
             onClick={() => setActiveLayout("split-view")}
-            className={`btn border-2 border-primary mr-3 ${
-              activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
-            }`}
+            className={`btn border-2 border-primary mr-3 ${activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
+              }`}
           >
             {t.translations.SPLIT_VIEW}
           </button>
           <button
             onClick={() => setActiveLayout("matrix")}
-            className={`btn border-2 border-primary ${
-              activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
-            }`}
+            className={`btn border-2 border-primary ${activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
+              }`}
           >
             {t.translations.MATRIX_VIEW}
           </button>

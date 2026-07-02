@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useLanguage } from "@/app/contexts/Language";
 
 type ActionType = "archive" | "delete";
 
@@ -17,9 +18,17 @@ const ArchiveDelete: React.FC<ArchiveDeleteProps> = ({
 }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { t } = useLanguage();
 
   const isArchive = actionType === "archive";
-  const capitalizedAction = actionType === "archive" ? "Archive" : "Delete";
+  const translatedAction = isArchive
+    ? t.translations.ARCHIVE
+    : t.translations.DELETE;
+
+  const translatedItemType =
+    itemType === "Project"
+      ? t.translations.PROJECT
+      : itemType;
 
   const handleConfirm = async () => {
     setIsLoading(true);
@@ -36,9 +45,8 @@ const ArchiveDelete: React.FC<ArchiveDeleteProps> = ({
   return (
     <div>
       <div
-        className={`border ${
-          isArchive ? "border-orange-200 bg-orange-600/5" : "border-red-200 bg-red-600/5"
-        } rounded-lg p-4 max-w-2xl`}
+        className={`border ${isArchive ? "border-orange-200 bg-orange-600/5" : "border-red-200 bg-red-600/5"
+          } rounded-lg p-4 max-w-2xl`}
       >
         <div className="flex items-center gap-2">
           <svg
@@ -59,21 +67,20 @@ const ArchiveDelete: React.FC<ArchiveDeleteProps> = ({
             />
           </svg>
           <h3 className="font-semibold text-base-content">
-            {capitalizedAction} {itemType}
+            {translatedAction} {translatedItemType}
           </h3>
         </div>
         <p className="text-sm text-base-content mt-1">
           {isArchive
-            ? `Archive this ${itemType.toLowerCase()} to remove it from your active ${itemType.toLowerCase()}s. Archived ${itemType.toLowerCase()}s can be restored later.`
-            : `Permanently delete this ${itemType.toLowerCase()}. This action cannot be undone.`}
+            ? t.translations.ARCHIVE_PROJECT_DESCRIPTION
+            : t.translations.DELETE_PROJECT_DESCRIPTION}
         </p>
         <button
           onClick={() => setShowConfirm(true)}
-          className={`px-4 py-2 mt-4 border ${
-            isArchive ? "border-orange-600 text-orange-600 hover:bg-orange-600" : "border-red-600 text-red-600 hover:bg-red-600"
-          } text-xs font-medium rounded-lg hover:text-white transition-colors whitespace-nowrap`}
+          className={`px-4 py-2 mt-4 border ${isArchive ? "border-orange-600 text-orange-600 hover:bg-orange-600" : "border-red-600 text-red-600 hover:bg-red-600"
+            } text-xs font-medium rounded-lg hover:text-white transition-colors whitespace-nowrap`}
         >
-          {capitalizedAction} {itemType}: {itemName}
+          {translatedAction} {translatedItemType}: {itemName}
         </button>
       </div>
 
@@ -82,9 +89,8 @@ const ArchiveDelete: React.FC<ArchiveDeleteProps> = ({
           <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
             <div className="flex items-start gap-3">
               <div
-                className={`${
-                  isArchive ? "bg-orange-100" : "bg-red-100"
-                } rounded-full p-2 shrink-0`}
+                className={`${isArchive ? "bg-orange-100" : "bg-red-100"
+                  } rounded-full p-2 shrink-0`}
               >
                 <svg
                   className={`w-6 h-6 ${isArchive ? "text-orange-600" : "text-red-600"}`}
@@ -102,12 +108,12 @@ const ArchiveDelete: React.FC<ArchiveDeleteProps> = ({
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-black">
-                  {capitalizedAction} {itemType}
+                  {translatedAction} {translatedItemType}
                 </h3>
                 <p className="text-sm text-black mt-2">
                   {isArchive
-                    ? `Are you sure you want to archive this ${itemType.toLowerCase()}? You'll be able to restore it later from your archived ${itemType.toLowerCase()}s.`
-                    : `Are you sure you want to delete this ${itemType.toLowerCase()}? This action cannot be undone and all data will be permanently lost.`}
+                    ? t.translations.ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE_THIS_PROJECT_RESTORE_LATER
+                    : t.translations.ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_PROJECT}
                 </p>
               </div>
             </div>
@@ -118,16 +124,15 @@ const ArchiveDelete: React.FC<ArchiveDeleteProps> = ({
                 disabled={isLoading}
                 className="px-4 py-2 text-black border border-base-300 rounded-lg font-medium hover:bg-base-200/70 hover:border-base-200/50 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Cancel
+                {t.translations.CANCEL}
               </button>
               <button
                 onClick={handleConfirm}
                 disabled={isLoading}
-                className={`px-4 py-2 ${
-                  isArchive ? "bg-orange-600 hover:bg-orange-700" : "bg-red-600 hover:bg-red-700"
-                } text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`px-4 py-2 ${isArchive ? "bg-orange-600 hover:bg-orange-700" : "bg-red-600 hover:bg-red-700"
+                  } text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {isLoading ? `${capitalizedAction}ing...` : `${capitalizedAction} ${itemType}`}
+                {isLoading ? t.translations.ARCHIVING : `${translatedAction} ${translatedItemType}`}
               </button>
             </div>
           </div>

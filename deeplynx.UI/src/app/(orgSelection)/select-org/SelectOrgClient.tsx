@@ -215,7 +215,9 @@ const SelectOrgClient = ({ session }: Props) => {
                           </h3>
                           {org.description && (
                             <p className="text-xs text-base-content/50 mt-1">
-                              {org.description}
+                              {org.description === "Default Organization"
+                                ? t.translations.ORGANIZATION_DEFAULT
+                                : org.description}
                             </p>
                           )}
                           <p className="text-sm text-base-content/70 mt-1">

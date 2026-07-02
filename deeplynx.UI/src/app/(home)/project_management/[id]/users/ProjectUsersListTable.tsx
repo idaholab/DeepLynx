@@ -6,6 +6,7 @@ import {
   ProjectMemberTableRow,
   MemberType,
 } from "../../types/projectUsersTypes";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                          Users & Groups Data Table                         */
@@ -30,15 +31,16 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
   onViewGroupMembers,
   onOpenRemoveModal,
 }) => {
+  const { t } = useLanguage();
   return (
     <div className="overflow-x-auto">
       <table className="table">
         <thead>
           <tr>
-            <th>Member</th>
-            <th>Type</th>
-            <th>Email</th>
-            <th>Actions</th>
+            <th>{t.translations.MEMBER}</th>
+            <th>{t.translations.TYPE}</th>
+            <th>{t.translations.EMAIL}</th>
+            <th>{t.translations.ACTIONS}</th>
           </tr>
         </thead>
         <tbody>
@@ -68,23 +70,27 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
                   )}
                 </td>
 
-                <td className="capitalize">{row.memberType}</td>
+                <td className="capitalize">
+                  {row.memberType === "user"
+                    ? t.translations.USER
+                    : t.translations.GROUP}
+                </td>
                 <td className="text-base-content/70">{row.email || "—"}</td>
                 <td>
                   <div className="flex gap-2 items-center">
                     {row.memberType === "group" ? (
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          disabled={loading}    
-                          onClick={() => onViewGroupMembers(row)}
-                          title={"View group members"}
-                        >
-                          <UserGroupIcon className="size-6" />
-                        </button>
+                      <button
+                        className="btn btn-ghost btn-xs"
+                        disabled={loading}
+                        onClick={() => onViewGroupMembers(row)}
+                        title={"View group members"}
+                      >
+                        <UserGroupIcon className="size-6" />
+                      </button>
                     ) : (
-                        <div className="btn btn-ghost btn-xs invisible">
-                          <UserGroupIcon className="size-6" />
-                        </div>
+                      <div className="btn btn-ghost btn-xs invisible">
+                        <UserGroupIcon className="size-6" />
+                      </div>
                     )}
                     <button
                       className="btn btn-ghost btn-xs"
