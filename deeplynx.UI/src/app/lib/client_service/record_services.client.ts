@@ -2,7 +2,7 @@
 "use client";
 
 import { CreateRecordRequestDto, UpdateRecordRequestDto} from "@/app/(home)/types/requestDTOs";
-import { HistoricalRecordResponseDto, RecordResponseDto, RelatedRecordsResponseDto } from "@/app/(home)/types/responseDTOs";
+import { HistoricalRecordResponseDto, PaginatedResponse, RecordResponseDto, RelatedRecordsResponseDto } from "@/app/(home)/types/responseDTOs";
 import { GraphResponse, RecordTagLinkDto } from "@/app/(home)/types/types";
 import api from "./api";
 
@@ -35,6 +35,56 @@ export async function getAllRecords(
   }
 }
 
+type GetAllRecordsPaginatedOptions = {
+  dataSourceId?: number;
+  fileType?: string;
+  hideArchived?: boolean;
+  isInsightEligible?: boolean;
+  pageNumber?: number;
+  pageSize?: number;
+};
+
+/**
+ * Get a paginated page of records for a project
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param options - Optional filters and pagination details
+ * @returns Promise with paginated RecordResponseDto
+ */
+export async function getAllRecordsPaginated(
+  organizationId: number,
+  projectId: number,
+  options: GetAllRecordsPaginatedOptions = {}
+): Promise<PaginatedResponse<RecordResponseDto>> {
+  const {
+    dataSourceId,
+    fileType,
+    hideArchived = true,
+    isInsightEligible = false,
+    pageNumber = 1,
+    pageSize = 25,
+  } = options;
+
+  try {
+    const res = await api.get<PaginatedResponse<RecordResponseDto>>(
+      `/organizations/${organizationId}/projects/${projectId}/records/paginated`,
+      {
+        params: {
+          dataSourceId,
+          fileType,
+          hideArchived,
+          isInsightEligible,
+          pageNumber,
+          pageSize,
+        },
+      }
+    );
+    return res.data;
+  } catch (error) {
+    console.error("Error getting paginated records:", error);
+    throw error;
+  }
+}
 /**
  * Get records by tags
  * @param organizationId - The ID of the organization

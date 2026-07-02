@@ -2,9 +2,7 @@
 
 import { getAllGroupsServer } from "@/app/lib/server_service/group_services.server";
 import { getAllProjectsServer } from "@/app/lib/server_service/projects_services.server";
-import {
-  getAllOrgRolesServer,
-} from "@/app/lib/server_service/role_services.server";
+import { getAllOrgRolesServer } from "@/app/lib/server_service/role_services.server";
 import { getAllUsersServer } from "@/app/lib/server_service/user_services.server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -14,10 +12,13 @@ import {
   PermissionResponseDto,
   ProjectResponseDto,
   RoleResponseDto,
+  SensitivityLabelsDto,
   UserResponseDto,
 } from "../types/responseDTOs";
 import OrganizationManagmentClient from "./OrganizationManagementClient";
 import { getAllOrgPermissionsServer } from "@/app/lib/server_service/permissions_services.server";
+import { requireOrgAdminServer } from "@/app/lib/server_service/rbac_guards.server";
+import { getAllSensitivityLabelsOrg } from "@/app/lib/client_service/sensitivity_labels_services.client";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,8 @@ const OrganizationManagementPage = async ({
     redirect("/select-org");
   }
 
+  await requireOrgAdminServer(organizationId as number);
+
   // Fetch projects filtered by organization
   let projects: ProjectResponseDto[] = [];
   try {
@@ -69,14 +72,16 @@ const OrganizationManagementPage = async ({
     console.error("getAllGroups failed:", error);
   }
 
-  // Fetch roles and permissions in parallel
+  // Fetch roles, permissions, and labels in parallel
   let roles: RoleResponseDto[] = [];
   let permissions: PermissionResponseDto[] = [];
+  let labels: SensitivityLabelsDto[] = [];
 
   try {
     // First, fetch roles for the organization
     roles = await getAllOrgRolesServer(Number(organizationId));
     permissions = await getAllOrgPermissionsServer(Number(organizationId), true);
+    labels = await getAllSensitivityLabelsOrg(Number(organizationId));
   } catch (error) {
     console.error("Failed to fetch roles or permissions:", error);
   }
@@ -104,6 +109,7 @@ const OrganizationManagementPage = async ({
       initialRoles={roles}
       initialSelectedProject={initialSelectedProject}
       initialPermissions={permissions}
+      initialLabels={labels}
     />
   );
 };

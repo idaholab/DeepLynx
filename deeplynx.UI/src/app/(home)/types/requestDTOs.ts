@@ -8,6 +8,28 @@ export type CustomQueryRequestDto = {
   jsonValue?: string;
 };
 
+export type CreateRecordCollectionRequestDto = {
+  name: string;
+  description: string;
+  properties: Record<string, unknown>;
+  tags?: string[];
+};
+
+export type RecordCollectionQueryRequestDto = {
+  search?: string;
+  sensitivityLabelIds?: number[];
+  tagIds?: number[];
+  sort?: string;
+  pageNumber?: number;
+  pageSize?: number;
+};
+
+export type UpdateRecordCollectionRequestDto = {
+  name?: string;
+  description?: string;
+  properties?: Record<string, unknown>;
+};
+
 export type RelatedRecordsRequestDto = {
   recordId?: number;
   isOrigin?: boolean;
@@ -322,3 +344,13 @@ export interface SavedSearchFilterRequest {
   pageNumber?: number;
   pageSize?: number;
 }
+
+export type TriggerDagRunRequestDto = {
+  dag_run_id?: string | null;
+  logical_date?: string | null;
+  data_interval_start?: string | null;
+  data_interval_end?: string | null;
+  run_after?: string | null;
+  conf?: Record<string, unknown> | null;
+  note?: string | null;
+};

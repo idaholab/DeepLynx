@@ -451,7 +451,8 @@ public class UserBusinessTests : IntegrationTestBase
             DataSourceId = dsid4,
             ClassId = cid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            Uri = "localhost:8090/record6", OrganizationId = oid
+            Uri = "localhost:8090/record6",
+            OrganizationId = oid
         };
 
         Context.Records.AddRange(record1, record2, record3, record4, record5, record6, archivedRecord);
@@ -716,20 +717,23 @@ public class UserBusinessTests : IntegrationTestBase
         {
             ProjectId = directAdminPid,
             UserId = adminUid,
-            RoleId = dapAdminRole.Id
+            RoleId = dapAdminRole.Id,
+            IsProjectAdmin = true
         };
         var directMember2 = new ProjectMember
         {
             ProjectId = directAdminPid,
             UserId = nonAdminUid,
-            RoleId = dapAdminRole.Id
+            RoleId = dapAdminRole.Id,
+            IsProjectAdmin = true
         };
         // Make group a project admin in groupAdminProject
         var groupMember = new ProjectMember
         {
             ProjectId = groupAdminPid,
             GroupId = adminGroupId,
-            RoleId = gapAdminRole.Id
+            RoleId = gapAdminRole.Id,
+            IsProjectAdmin = true
         };
         // Make users non-admin members of regularProject
         var regularMember1 = new ProjectMember
@@ -743,7 +747,7 @@ public class UserBusinessTests : IntegrationTestBase
             UserId = nonAdminUid
         };
         Context.ProjectMembers.AddRange(
-            directMember1, directMember2, groupMember, 
+            directMember1, directMember2, groupMember,
             regularMember1, regularMember2);
         await Context.SaveChangesAsync();
     }
@@ -771,10 +775,10 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.Equal("New User", result.Name);
         Assert.Equal("newuser@test.com", result.Email);
         Assert.Equal("newuser", result.Username);
+        Assert.Equal("standard", result.AccountType);
         Assert.True(result.IsActive);
         Assert.False(result.IsArchived);
 
-        // Verify it was actually saved to DB
         var savedUser = await Context.Users.FindAsync(result.Id);
         Assert.NotNull(savedUser);
         Assert.Equal("New User", savedUser.Name);
@@ -788,7 +792,8 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "Minimal User",
-            Email = "minimal@test.com"
+            Email = "minimal@test.com",
+            Username = "minimal",
         };
 
         // Act
@@ -799,6 +804,7 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.True(result.Id > 0);
         Assert.Equal("Minimal User", result.Name);
         Assert.Equal("minimal@test.com", result.Email);
+        Assert.Equal("standard", result.AccountType);
         Assert.False(result.IsActive);
         Assert.False(result.IsArchived);
     }
@@ -810,14 +816,208 @@ public class UserBusinessTests : IntegrationTestBase
         var dto = new CreateUserRequestDto
         {
             Name = "Duplicate Email User",
-            Email = "user1@test.com" // User 1 already has this email
+            Email = "user1@test.com", // User 1 already has this email
+            Username = "user1@test.com"
         };
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
             () => _userBusiness.CreateUser(dto));
 
-        Assert.Contains("User with email already exists", exception.Message);
+        Assert.Contains("A user with that email already exists.", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_IfEmailMissing_ForHumanAccount()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "No Email User",
+            Username = "user1@test.com"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _userBusiness.CreateUser(dto));
+
+        Assert.Contains("Email is required for standard accounts.", exception.InnerException?.Message ?? exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateUser_Fails_IfEmailMissing_ForStandardAccount()
+    {
+        // Arrange — null IsServiceAccount should be treated as human, so email is still required
+        var dto = new CreateUserRequestDto
+        {
+            Name = "No Email User"
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _userBusiness.CreateUser(dto));
+
+        Assert.Contains("Email is required for standard accounts.", exception.InnerException?.Message ?? exception.Message);
+    }
+
+    #endregion
+    
+    #region CreateTestAccount Tests
+
+    [Fact]
+    public async Task CreateTestAccount_Succeeds_WithValidName()
+    {
+        // Act
+        var result = await _userBusiness.CreateTestAccount("Test Account 1");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Id > 0);
+        Assert.Equal("Test Account 1", result.Name);
+        Assert.Equal("test", result.AccountType.ToString().ToLower());
+        Assert.False(result.IsActive);
+        Assert.False(result.IsArchived);
+
+        // Verify email/username are auto-generated with "test_" prefix
+        var savedUser = await Context.Users.FindAsync(result.Id);
+        Assert.NotNull(savedUser);
+        Assert.StartsWith("test_", savedUser.Email);
+        Assert.StartsWith("test_", savedUser.Username);
+    }
+
+    [Fact]
+    public async Task CreateTestAccount_Fails_WithEmptyName()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _userBusiness.CreateTestAccount(""));
+
+        Assert.Contains("Name is required", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateTestAccount_GeneratesUniqueIdentifiers()
+    {
+        // Act
+        var result1 = await _userBusiness.CreateTestAccount("Test Account A");
+        var result2 = await _userBusiness.CreateTestAccount("Test Account B");
+
+        // Assert — identifiers must not collide
+        Assert.NotEqual(result1.Email, result2.Email);
+        Assert.NotEqual(result1.Username, result2.Username);
+    }
+
+    #endregion
+
+    #region GetUserBySsoId Tests
+
+    [Fact]
+    public async Task GetUserBySsoId_ReturnsUser_WhenSsoIdExists()
+    {
+        // Arrange
+        var ssoId = $"okta|{Guid.NewGuid()}";
+        var user = new User
+        {
+            Name = "SSO User",
+            Email = "ssouser@test.com",
+            Username = "ssouser",
+            SsoId = ssoId,
+            IsActive = true
+        };
+        Context.Users.Add(user);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userBusiness.GetUserBySsoId(ssoId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(user.Id, result.Id);
+        Assert.Equal("ssouser@test.com", result.Email);
+    }
+
+    [Fact]
+    public async Task GetUserBySsoId_ReturnsNull_WhenSsoIdNotFound()
+    {
+        // Act
+        var result = await _userBusiness.GetUserBySsoId("nonexistent|sso-id");
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    // Note: GetUserBySsoId does not filter out archived users — worth verifying
+    // that behavior is intentional or flagging it for a fix.
+    [Fact]
+    public async Task GetUserBySsoId_ReturnsArchivedUser()
+    {
+        // Arrange
+        var ssoId = $"okta|{Guid.NewGuid()}";
+        var archivedUser = new User
+        {
+            Name = "Archived SSO User",
+            Email = "archivedsso@test.com",
+            Username = "archivedsso",
+            SsoId = ssoId,
+            IsArchived = true
+        };
+        Context.Users.Add(archivedUser);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userBusiness.GetUserBySsoId(ssoId);
+
+        // Assert — documents current behavior; update if archival filtering is added
+        Assert.NotNull(result);
+        Assert.True(result.IsArchived);
+    }
+
+    #endregion
+
+    #region GetUserByEmail Tests
+
+    [Fact]
+    public async Task GetUserByEmail_ReturnsUser_WhenEmailExists()
+    {
+        // Act
+        var result = await _userBusiness.GetUserByEmail("user1@test.com");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(uid1, result.Id);
+        Assert.Equal("User 1", result.Name);
+        Assert.Equal(AccountType.Standard, result.AccountType);
+    }
+
+    [Fact]
+    public async Task GetUserByEmail_IsCaseInsensitive()
+    {
+        // Act
+        var result = await _userBusiness.GetUserByEmail("USER1@TEST.COM");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(uid1, result.Id);
+    }
+
+    [Fact]
+    public async Task GetUserByEmail_ReturnsNull_WhenEmailNotFound()
+    {
+        // Act
+        var result = await _userBusiness.GetUserByEmail("nobody@nowhere.com");
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetUserByEmail_ReturnsNull_WhenUserIsArchived()
+    {
+        // Act — uid2 is the seeded archived user
+        var result = await _userBusiness.GetUserByEmail("user2@test.com");
+
+        // Assert
+        Assert.Null(result);
     }
 
     #endregion
@@ -1009,8 +1209,8 @@ public class UserBusinessTests : IntegrationTestBase
         var users = result.ToList();
 
         // Assert
-        Assert.Equal(10, users.Count); 
-        Assert.Contains(users, u => u.Id == uid2); 
+        Assert.Equal(10, users.Count);
+        Assert.Contains(users, u => u.Id == uid2);
         Assert.DoesNotContain(users, u => u.Id == uid3);
     }
 
@@ -1024,8 +1224,87 @@ public class UserBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(9, users.Count);
         Assert.All(users, u => Assert.False(u.IsArchived));
-        Assert.DoesNotContain(users, u => u.Id == uid2); 
-        Assert.DoesNotContain(users, u => u.Id == uid3); 
+        Assert.DoesNotContain(users, u => u.Id == uid2);
+        Assert.DoesNotContain(users, u => u.Id == uid3);
+    }
+
+    [Fact]
+    public async Task GetAllUsers_ExcludesServiceAccounts_ByDefault()
+    {
+        // Arrange
+        var serviceAccountId = await CreateServiceAccount();
+
+        // Act
+        var result = await _userBusiness.GetAllUsers(null, null);
+        var users = result.ToList();
+
+        // Assert
+        Assert.DoesNotContain(users, u => u.Id == serviceAccountId);
+        Assert.All(users, u => Assert.Equal(AccountType.Standard, u.AccountType));
+    }
+
+    [Fact]
+    public async Task GetAllUsers_IncludeServiceAccounts_ReturnsServiceAccounts()
+    {
+        // Arrange
+        var serviceAccountId = await CreateServiceAccount();
+
+        // Act
+        var result = await _userBusiness.GetAllUsers(null, null, includeServiceAccounts: true);
+        var users = result.ToList();
+
+        // Assert
+        Assert.Contains(users, u => u.Id == serviceAccountId && (u.AccountType == AccountType.Service));
+    }
+
+    [Fact]
+    public async Task GetActiveUserCounts_ExcludesServiceAccounts_ByDefault()
+    {
+        // Arrange
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        await CreateServiceAccount(isActive: true, lastLogin: now.AddHours(-1));
+
+        // Act
+        var withoutServiceAccounts = await _userBusiness.GetActiveUserCounts(null, null);
+        var withServiceAccounts = await _userBusiness.GetActiveUserCounts(null, null, includeServiceAccounts: true);
+
+        // Assert
+        Assert.Equal(withoutServiceAccounts.ActiveLast24Hours + 1, withServiceAccounts.ActiveLast24Hours);
+        Assert.Equal(withoutServiceAccounts.ActiveLast7Days + 1, withServiceAccounts.ActiveLast7Days);
+        Assert.Equal(withoutServiceAccounts.ActiveLast30Days + 1, withServiceAccounts.ActiveLast30Days);
+    }
+
+    [Fact]
+    public async Task GetActiveUsers_ExcludesServiceAccounts_ByDefault()
+    {
+        // Arrange
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        var serviceAccountId = await CreateServiceAccount(isActive: true, lastLogin: now.AddHours(-1));
+
+        // Act
+        var defaultActivity = await _userBusiness.GetActiveUsers(null, null);
+        var withServiceAccounts = await _userBusiness.GetActiveUsers(null, null, includeServiceAccounts: true);
+
+        // Assert
+        Assert.DoesNotContain(defaultActivity.Users, u => u.Id == serviceAccountId);
+        Assert.Contains(withServiceAccounts.Users, u => u.Id == serviceAccountId && (u.AccountType == AccountType.Service));
+    }
+
+    private async Task<long> CreateServiceAccount(bool isActive = false, DateTime? lastLogin = null)
+    {
+        var serviceAccount = new User
+        {
+            Name = "Service Account",
+            Email = $"service_{Guid.NewGuid()}",
+            Username = $"service_{Guid.NewGuid()}",
+            AccountType = AccountType.Service,
+            IsActive = isActive,
+            LastLogin = lastLogin
+        };
+
+        Context.Users.Add(serviceAccount);
+        await Context.SaveChangesAsync();
+        return serviceAccount.Id;
     }
 
     #endregion
@@ -1043,6 +1322,7 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.Equal(uid1, result.Id);
         Assert.Equal("User 1", result.Name);
         Assert.Equal("user1@test.com", result.Email);
+        Assert.Equal(AccountType.Standard, result.AccountType);
         Assert.False(result.IsArchived);
     }
 
@@ -1257,8 +1537,8 @@ public class UserBusinessTests : IntegrationTestBase
     {
         // Act - SysAdmin user with all admin privileges
         var adminResult = await _userBusiness.GetUserAdminInfo(
-            adminUid, 
-            adminOrgId, 
+            adminUid,
+            adminOrgId,
             directAdminPid);
 
         // Assert
@@ -1270,8 +1550,8 @@ public class UserBusinessTests : IntegrationTestBase
 
         // Act - Regular user with org and project admin privileges
         var regularResult = await _userBusiness.GetUserAdminInfo(
-            nonAdminUid, 
-            adminOrgId, 
+            nonAdminUid,
+            adminOrgId,
             directAdminPid);
 
         // Assert
@@ -1287,8 +1567,8 @@ public class UserBusinessTests : IntegrationTestBase
     {
         // Act - SysAdmin user with mixed permissions (sys admin, org admin, not project admin)
         var result1 = await _userBusiness.GetUserAdminInfo(
-            adminUid, 
-            adminOrgId, 
+            adminUid,
+            adminOrgId,
             nonAdminPid);
 
         // Assert
@@ -1299,8 +1579,8 @@ public class UserBusinessTests : IntegrationTestBase
 
         // Act - Regular user with mixed permissions (not sys admin, not org admin, is project admin via group)
         var result2 = await _userBusiness.GetUserAdminInfo(
-            nonAdminUid, 
-            nonAdminOrgId, 
+            nonAdminUid,
+            nonAdminOrgId,
             groupAdminPid);
 
         // Assert
@@ -1369,6 +1649,7 @@ public class UserBusinessTests : IntegrationTestBase
             Assert.Equal("developer@localhost", result.Email);
             Assert.Equal("Local Developer", result.Name);
             Assert.Equal("localdev", result.Username);
+            Assert.Equal(AccountType.Standard, result.AccountType);
             Assert.True(result.IsSysAdmin);
         }
         finally
@@ -1654,7 +1935,7 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.Equal(0, result.Records);
         Assert.Equal(0, result.Tags);
     }
-    
+
     [Fact]
     public async Task GetUserOverview_Fails_WhenUserDoesNotExist()
     {
@@ -1674,7 +1955,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Admin Alan",
             Email = "adminalan@test.com",
-            Username = "admin",
+            Username = $"admin_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = true
         };
@@ -1682,7 +1963,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Regular Joe",
             Email = "regularjoe@test.com",
-            Username = "regular",
+            Username = $"regular_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = false
         };
@@ -1709,7 +1990,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Regular Joe",
             Email = "regularjoe@test.com",
-            Username = "regular",
+            Username = $"regular_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = false
         };
@@ -1717,7 +1998,7 @@ public class UserBusinessTests : IntegrationTestBase
         {
             Name = "Candidate User",
             Email = "candidate@test.com",
-            Username = "candidate",
+            Username = $"candidate_{Guid.NewGuid()}",
             IsActive = true,
             IsSysAdmin = false
         };

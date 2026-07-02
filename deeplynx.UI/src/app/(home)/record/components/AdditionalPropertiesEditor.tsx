@@ -80,7 +80,7 @@ function EditablePropertyRow({
   };
 
   return (
-    <div className="border-b border-base-300 last:border-b-0">
+    <div className="border-b border-base-300/50 last:border-b-0">
       <div className="flex items-center gap-2 p-2 hover:bg-base-200 transition-colors">
         {/* Indentation */}
         <div style={{ width: `${depth * 20}px` }} />
@@ -216,7 +216,7 @@ export default function AdditionalPropertiesEditor({
     <dialog className="modal modal-open mt-10">
       <div className="modal-box max-w-4xl w-full max-h-[80vh] flex flex-col p-0">
         {/* Header */}
-        <div className="p-6 border-b border-base-300 flex-shrink-0">
+        <div className="p-6 border-b border-base-300/50 flex-shrink-0">
           <div className="flex justify-between items-center">
             <div>
               <h3 className="text-2xl font-bold">
@@ -240,14 +240,14 @@ export default function AdditionalPropertiesEditor({
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto p-6">
           {/* Existing Properties */}
-          <div className="card bg-base-100 border border-base-300 mb-4">
+          <div className="card mb-4 border border-base-300/50 bg-base-100 shadow-sm">
             <div className="card-body p-0">
               {Object.keys(editedProperties).length === 0 ? (
                 <div className="p-8 text-center text-base-content/60">
                   {t.translations.NO_PROPERTIES_YET_ADD_ONE}
                 </div>
               ) : (
-                <div className="divide-y divide-base-300">
+                <div className="divide-y divide-base-300/50">
                   {Object.entries(editedProperties).map(([key, value]) => (
                     <EditablePropertyRow
                       key={key}
@@ -263,7 +263,7 @@ export default function AdditionalPropertiesEditor({
           </div>
 
           {/* Add New Property */}
-          <div className="card bg-base-200 border border-base-300">
+          <div className="card border border-base-300/50 bg-base-100 shadow-sm">
             <div className="card-body">
               <h4 className="card-title text-sm flex items-center gap-2">
                 <PlusIcon className="w-4 h-4" />
@@ -300,7 +300,7 @@ export default function AdditionalPropertiesEditor({
         </div>
 
         {/* Footer */}
-        <div className="modal-action p-6 border-t border-base-300 flex-shrink-0 m-0">
+        <div className="modal-action p-6 border-t border-base-300/50 flex-shrink-0 m-0">
           <div className="flex w-full justify-end">
             <div className="flex gap-3">
               <button

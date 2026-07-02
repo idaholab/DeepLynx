@@ -21,7 +21,7 @@ interface ExpandableTableProps<T> {
 const DATA_CELL_CLASS =
   "text-base-content first:rounded-l-lg last:rounded-r-lg border-b-4 border-base-100";
 const COLLAPSED_ROW_CLASS =
-  "bg-base-200/30 hover:bg-base-300/60 transition-colors shadow shadow-base-content/10";
+  "bg-base-100 hover:bg-base-200/40 transition-colors shadow-sm";
 
 export function ExpandableTable<T>({
   data,
@@ -116,7 +116,7 @@ export function ExpandableTable<T>({
       <td colSpan={columns.length + 2} className="p-0">
         <div className="overflow-visible transition-all duration-500 ease-in-out max-h-[1000px] opacity-100">
           <div
-            className="card bg-base-200 border border-base-300/30 p-6 rounded-box shadow-lg shadow-base-content/10"
+            className="card rounded-box border border-base-300/50 bg-base-100 p-6 shadow-sm"
             data-tour={`project-row-${rowId}-expanded`}
           >
             {renderExpandedContent(row, closeExpanded)}

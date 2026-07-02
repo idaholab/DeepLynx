@@ -66,7 +66,7 @@ const SavedSearches = ({ className }: SavedSearchProps) => {
   ];
 
   return (
-    <div className="card bg-base-200/30 border border-base-300/50 shadow-sm m-2">
+    <div className="card bg-base-100 border border-base-300/50 shadow-sm m-2">
       <div className="card-body">
         {/* Header */}
         <div className="flex justify-between items-center mb-4">

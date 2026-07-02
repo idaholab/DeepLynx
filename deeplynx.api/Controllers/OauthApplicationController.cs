@@ -1,3 +1,4 @@
+using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -8,6 +9,7 @@ namespace deeplynx.api.Controllers;
 
 [ApiController]
 [Authorize]
+[SysAdmin]
 [Route("oauth/applications")]
 public class OauthApplicationController : ControllerBase
 {

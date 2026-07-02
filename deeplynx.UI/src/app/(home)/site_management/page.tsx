@@ -12,6 +12,7 @@ import { getAllUsersServer } from "@/app/lib/server_service/user_services.server
 import { getAllProjectsServer } from "@/app/lib/server_service/projects_services.server";
 import { cookies } from "next/headers";
 import { auth } from "../../../../auth";
+import { requireSystemAdminServer } from "@/app/lib/server_service/rbac_guards.server";
 
 export const dynamic = "force-dynamic";
 
@@ -38,16 +39,18 @@ const SysAdminPage = async () => {
     organizationId = session?.user?.organizationId;
   }
 
+  await requireSystemAdminServer(organizationId);
+
   // Fetch all data
   const OrganizationResponseDtos =
     (await getAllOrganizationsServer()) as OrganizationResponseDto[];
   const oAuthApplications =
     (await getAllOauthApplicationsServer()) as OauthApplicationResponseDto[];
   const members = (await getAllUsersServer()) as UserResponseDto[];
-  
+
   // Fetch projects filtered by organization
   const projects = (await getAllProjectsServer(
-    organizationId as number
+    organizationId as number,
   )) as ProjectResponseDto[];
   const initialProjects = projects.map((p) => ({
     id: String(p.id),

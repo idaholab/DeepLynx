@@ -68,7 +68,9 @@ public class HistoricalEdgeBusiness : IHistoricalEdgeBusiness
                 RelationshipId = e.RelationshipId,
                 RelationshipName = e.RelationshipName,
                 DataSourceId = e.DataSourceId,
+                DataSourceName = e.DataSourceName ?? string.Empty,
                 ProjectId = e.ProjectId,
+                ProjectName = e.ProjectName ?? string.Empty,
                 LastUpdatedAt = e.LastUpdatedAt,
                 LastUpdatedBy = e.LastUpdatedBy,
                 IsArchived = e.IsArchived
@@ -104,7 +106,9 @@ public class HistoricalEdgeBusiness : IHistoricalEdgeBusiness
                 RelationshipId = e.RelationshipId,
                 RelationshipName = e.RelationshipName,
                 DataSourceId = e.DataSourceId,
+                DataSourceName = e.DataSourceName ?? string.Empty,
                 ProjectId = e.ProjectId,
+                ProjectName = e.ProjectName ?? string.Empty,
                 LastUpdatedBy = e.LastUpdatedBy,
                 IsArchived = e.IsArchived,
                 LastUpdatedAt = e.LastUpdatedAt
@@ -167,7 +171,9 @@ public class HistoricalEdgeBusiness : IHistoricalEdgeBusiness
             RelationshipId = edge.RelationshipId,
             RelationshipName = edge.RelationshipName,
             DataSourceId = edge.DataSourceId,
+            DataSourceName = edge.DataSourceName ?? string.Empty,
             ProjectId = edge.ProjectId,
+            ProjectName = edge.ProjectName ?? string.Empty,
             LastUpdatedBy = edge.LastUpdatedBy,
             IsArchived = edge.IsArchived,
             LastUpdatedAt = edge.LastUpdatedAt

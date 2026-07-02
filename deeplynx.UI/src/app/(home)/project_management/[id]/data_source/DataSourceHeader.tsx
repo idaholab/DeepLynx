@@ -9,7 +9,7 @@ type HeaderProps = {
 const DataSourceHeader = ({ hideArchived, setHideArchived }: HeaderProps) => {
   const { t } = useLanguage();
   return (
-    <div className="mb-6 flex items-center justify-between border-b border-base-300 pb-4">
+    <div className="mb-6 flex items-center justify-between border-b border-base-300/50 pb-4">
       <div>
         <h2 className="text-2xl font-bold mb-2">{t.translations.DATA_SOURCES}</h2>
         <p className="text-base-content/70">

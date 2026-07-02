@@ -34,6 +34,9 @@ public class ExtractionClass
     [Column("ontology_class_id")]
     public long? OntologyClassId { get; set; }
 
+    [Column("rejected")]
+    public bool Rejected { get; set; }
+
     public virtual ICollection<ExtractionRecord> Records { get; set; } = [];
     public virtual ICollection<ExtractionRelationship> OriginRelationships { get; set; } = [];
     public virtual ICollection<ExtractionRelationship> DestinationRelationships { get; set; } = [];

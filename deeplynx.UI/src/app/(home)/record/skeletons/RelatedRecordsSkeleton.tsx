@@ -17,12 +17,12 @@ function RelatedRecordsCardSkeleton({
   columns = 4,
 }: RelatedRecordsCardSkeletonProps) {
   return (
-    <div className="card bg-base-100 shadow-md mt-4 p-2 animate-pulse">
+    <div className="card mt-4 border border-base-300/50 bg-base-100 p-2 shadow-sm animate-pulse">
       <h2 className="text-xl font-bold md-4 text-base-content">
         <Skeleton width={320} height={20} />
       </h2>
       <div className="card-body p-4">
-        <div className="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        <div className="overflow-x-auto rounded-box border border-base-300/50 bg-base-100">
           <table className="table">
             <thead>
               <tr className="bg-base-200 text-base-content">

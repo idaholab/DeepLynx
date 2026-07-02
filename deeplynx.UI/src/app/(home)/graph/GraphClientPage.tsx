@@ -6,6 +6,7 @@ import { RecordResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useLanguage } from "@/app/contexts/Language";
 import { getRecord } from "@/app/lib/client_service/record_services.client";
+import { useFilteredNodes } from "./hooks/useFilteredNodes";
 import GraphCanvas from "./components/GraphCanvas";
 import GraphLegend from "./components/GraphLegend";
 import GraphToolbar from "./components/GraphToolbar";
@@ -45,6 +46,11 @@ const GraphClientPage = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showAllLabels, setShowAllLabels] = useState(false);
+  const { filteredNodes, loading: classesLoading } = useFilteredNodes(
+    graphData?.nodes ?? [],
+    projectId
+  );
+
 
   const controllerRef = useRef<GraphController | null>(null);
   const relationshipViewMode: GraphViewMode = "all";
@@ -207,7 +213,7 @@ const GraphClientPage = ({
     [],
   );
 
-  const handleGraphLoadingChange = useCallback((_loading: boolean) => {}, []);
+  const handleGraphLoadingChange = useCallback((_loading: boolean) => { }, []);
 
   return (
     <div className="mt-4 p-4">
@@ -257,7 +263,7 @@ const GraphClientPage = ({
               />
             </div>
 
-            <GraphLegend nodes={graphData?.nodes ?? []} />
+            <GraphLegend nodes={filteredNodes} />
           </section>
 
           {/* Supporting analysis panels under the graph */}

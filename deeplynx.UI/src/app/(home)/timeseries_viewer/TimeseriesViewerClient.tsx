@@ -249,7 +249,7 @@ export default function TimeseriesViewerClient({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
       {/* Available Data Files - Row 1, Col 1 */}
       <div className="lg:col-span-1">
-        <div className="card bg-base-100 shadow-xl">
+        <div className="card border border-base-300/50 bg-base-100 shadow-sm">
           <div className="card-body">
             <div className="flex justify-between">
               <h3 className="font-semibold mb-4">
@@ -269,7 +269,7 @@ export default function TimeseriesViewerClient({
                   className={`p-3 rounded-lg border cursor-pointer transition-all ${
                     activeFile?.id === file.id
                       ? "border-primary bg-primary/10"
-                      : "border-base-300 hover:border-primary/50 hover:bg-base-200"
+                      : "border-base-300/50 hover:border-primary/50 hover:bg-base-200"
                   }`}
                   onClick={() => setActiveFile(file)}
                 >
@@ -298,7 +298,7 @@ export default function TimeseriesViewerClient({
 
       {/* Chart Type Selector - Row 2, Col 1 */}
       <div className="lg:col-span-1">
-        <div className="card bg-base-100 shadow-xl">
+        <div className="card border border-base-300/50 bg-base-100 shadow-sm">
           <div className="card-body">
             <h3 className="font-semibold mb-4">{t.translations.CHART_TYPE}</h3>
             <div className="form-control">
@@ -336,7 +336,7 @@ export default function TimeseriesViewerClient({
   const SchemaTab = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
       <div className="lg:col-span-2">
-        <div className="card bg-base-100 shadow-xl">
+        <div className="card border border-base-300/50 bg-base-100 shadow-sm">
           <div className="card-body">
             <pre className="text-sm overflow-auto">
               {JSON.stringify(schema, null, 2)}
@@ -349,7 +349,7 @@ export default function TimeseriesViewerClient({
 
   const ColumnTab = () => (
     <div className="grid grid-cols-1 gap-6 mt-4">
-      <div className="card bg-base-100 shadow-xl">
+      <div className="card border border-base-300/50 bg-base-100 shadow-sm">
         <div className="card-body">
           <div className="overflow-x-auto max-h-[500px]">
             <table className="table table-zebra table-pin-rows table-sm">
@@ -395,7 +395,7 @@ export default function TimeseriesViewerClient({
 
   return (
     <main className="min-h-screen bg-base-200/30">
-      <section className="border-b border-base-300 bg-base-100">
+      <section className="border-b border-base-300/50 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -426,7 +426,7 @@ export default function TimeseriesViewerClient({
                 </button>
                 <ul
                   tabIndex={0}
-                  className="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300"
+                  className="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300/50"
                 >
                   <li>
                     <a onClick={() => handleExport("png")}>
@@ -445,7 +445,7 @@ export default function TimeseriesViewerClient({
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Chart */}
           <div className="lg:col-span-3">
-            <div className="card bg-base-100 shadow-sm">
+            <div className="card border border-base-300/50 bg-base-100 shadow-sm">
               <div className="card-body p-4">
                 {!activeFile ? (
                   <div className="flex items-center justify-center min-h-96">
@@ -503,7 +503,7 @@ export default function TimeseriesViewerClient({
 
           {/* Right Sidebar with Controls */}
           <div className="lg:col-span-1 space-y-4">
-            <div className="card bg-base-100 shadow-xl">
+            <div className="card border border-base-300/50 bg-base-100 shadow-sm">
               <div className="card-body p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-sm">
@@ -610,7 +610,7 @@ export default function TimeseriesViewerClient({
                       {t.translations.Y_AXES_MULTIPLE}
                     </span>
                   </label>
-                  <div className="space-y-1 max-h-[200px] overflow-y-auto border border-base-300 rounded-lg p-2">
+                  <div className="space-y-1 max-h-[200px] overflow-y-auto border border-base-300/50 rounded-lg p-2">
                     {timeseriesData.length === 0 ? (
                       <p className="text-xs text-base-content/60 text-center py-2">
                         {t.translations.NO_COLUMNS_AVAILABLE}
@@ -676,7 +676,7 @@ export default function TimeseriesViewerClient({
             </div>
 
             {/* Chart Settings */}
-            <div className="card bg-base-100 shadow-xl">
+            <div className="card border border-base-300/50 bg-base-100 shadow-sm">
               <div className="card-body p-4">
                 <h3 className="font-semibold text-sm mb-3">
                   {t.translations.CHART_SETTINGS}

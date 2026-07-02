@@ -12,7 +12,9 @@ import {
   updateProjectMemberRole,
 } from "@/app/lib/client_service/projects_services.client";
 import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import { useRBAC } from "@/app/(home)/rbac/useRBAC";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 import { InviteUserToOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
@@ -60,6 +62,8 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   );
   const [loading, setLoading] = useState(false);
   const { t } = useLanguage();
+  const router = useRouter();
+  const { user, refreshUser } = useRBAC();
 
   /* ------------------------------------------------------------------------ */
   /*                           Add User Modal State                           */
@@ -117,8 +121,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     memberName: "",
     memberType: null,
     currentRoleId: null,
+    currentIsProjectAdmin: false,
   });
   const [editRoleSelectedId, setEditRoleSelectedId] = useState<string>("");
+  const [editIsProjectAdmin, setEditIsProjectAdmin] = useState<boolean>(false);
 
   /* ------------------------------------------------------------------------ */
   /*                          Org / Project Context                           */
@@ -130,6 +136,19 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     ? Number(organization.organizationId)
     : undefined;
   const projectId = project?.id ? Number(project.id) : undefined;
+  const currentUserId = user?.id ? Number(user.id) : undefined;
+
+  const refreshAccessIfAffected = async (
+    memberType?: "user" | "group" | null,
+    memberId?: number | null,
+  ) => {
+    if (!currentUserId) return;
+
+    if (memberType === "group" || memberId === currentUserId) {
+      await refreshUser();
+      router.refresh();
+    }
+  };
 
   /* ------------------------------------------------------------------------ */
   /*                    Sync server-provided members -> table                 */
@@ -180,6 +199,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   const handleAddInviteUser = async (
     emailOrUserId: string | number,
     roleId?: number,
+    isProjectAdmin?: boolean,
   ) => {
     if (!organizationId) {
       throw new Error(t.translations.MISSING_ORG_ID);
@@ -199,6 +219,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       await addMemberToProject(organizationId, projectId, {
         roleId,
         userId: emailOrUserId,
+        isProjectAdmin: isProjectAdmin ?? false,
       });
     }
 
@@ -216,6 +237,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       }
     } catch (refreshError) {
       console.error("Failed to refresh members list:", refreshError);
+    }
+
+    if (typeof emailOrUserId === "number") {
+      await refreshAccessIfAffected("user", emailOrUserId);
     }
   };
 
@@ -335,6 +360,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       // Refresh the members list
       const updatedMembers = await getProjectMembers(organizationId, projectId);
       setTableData(buildTableData(updatedMembers));
+      await refreshAccessIfAffected("group", groupId);
 
       setShowAddGroupModal(false);
       setSelectedGroupId("");
@@ -358,8 +384,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       memberName: row.name,
       memberType: row.memberType,
       currentRoleId: row.roleId ?? null,
+      currentIsProjectAdmin: row.isProjectAdmin,
     });
     setEditRoleSelectedId(row.roleId ? String(row.roleId) : "");
+    setEditIsProjectAdmin(row.isProjectAdmin);
   };
 
   const handleSaveMemberRole = async () => {
@@ -390,6 +418,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
           roleId,
           memberId,
           undefined,
+          editIsProjectAdmin,
         );
       } else {
         await updateProjectMemberRole(
@@ -398,6 +427,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
           roleId,
           undefined,
           memberId,
+          editIsProjectAdmin,
         );
       }
 
@@ -406,11 +436,12 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       setTableData((prev) =>
         prev.map((row) =>
           row.memberId === memberId
-            ? { ...row, role: selectedRole?.name ?? null, roleId }
+            ? { ...row, role: selectedRole?.name ?? null, roleId, isProjectAdmin: editIsProjectAdmin }
             : row,
         ),
       );
 
+      await refreshAccessIfAffected(editRoleModal.memberType, memberId);
       toast.success(t.translations.MEMBER_ROLE_UPDATED);
     } catch (error) {
       console.error("Failed to update member role:", error);
@@ -423,8 +454,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
         memberName: "",
         memberType: null,
         currentRoleId: null,
+        currentIsProjectAdmin: false,
       });
       setEditRoleSelectedId("");
+      setEditIsProjectAdmin(false);
     }
   };
 
@@ -465,6 +498,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       }
 
       setTableData((prev) => prev.filter((row) => row.memberId !== memberId));
+      await refreshAccessIfAffected(confirmModal.memberType, memberId);
 
       toast.success(t.translations.MEMBER_REMOVED_FROM_PROJECT);
     } catch (error) {
@@ -488,8 +522,8 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
   return (
     <div className="p-6">
-      <div className="">
-        <div className="">
+      <div className="card bg-base-100 border border-primary">
+        <div className="card-body">
           <ProjectUsersHeader
             totalMembers={totalMembers}
             userCount={userCount}
@@ -568,7 +602,9 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             roles={roles}
             loading={loading}
             selectedRoleId={editRoleSelectedId}
+            isProjectAdmin={editIsProjectAdmin}
             onChangeRole={setEditRoleSelectedId}
+            onChangeIsProjectAdmin={setEditIsProjectAdmin}
             onCancel={() => {
               setEditRoleModal({
                 isOpen: false,
@@ -576,8 +612,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
                 memberName: "",
                 memberType: null,
                 currentRoleId: null,
+                currentIsProjectAdmin: false,
               });
               setEditRoleSelectedId("");
+              setEditIsProjectAdmin(false);
             }}
             onSave={handleSaveMemberRole}
           />

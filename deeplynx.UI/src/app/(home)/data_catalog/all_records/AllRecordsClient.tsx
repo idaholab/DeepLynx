@@ -58,6 +58,7 @@ import {
   bulkAttachTagsToRecords,
   bulkUnattachTagsFromRecords,
 } from "@/app/lib/client_service/record_services.client";
+import Skeleton from "react-loading-skeleton";
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
 type Props = {
@@ -127,6 +128,12 @@ export default function DataCatalogClient({
 
   // searchTerm is the live value of the search input field.
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
+
+  // loading determines if the records are loading
+  const [loading, setLoading] = useState(false);
+
+  // render helper for loading skeleton
+  const times = (n: number) => Array.from({ length: n }, (_, i) => i);
 
   /**
    * activeFilters is the list of submitted search terms that are currently
@@ -223,9 +230,11 @@ export default function DataCatalogClient({
    * accept a search term — search results come from runSearchTerms instead.
    */
   const fetchRecordsForSelection = useCallback(async () => {
+    setLoading(true);
     const idsNum = effectiveProjectIds.map(Number).filter(Number.isFinite);
     if (idsNum.length === 0) {
       setTableData([]);
+      setLoading(false);
       return;
     }
     const data = await getMultiProjectRecords(
@@ -262,6 +271,7 @@ export default function DataCatalogClient({
       fileType: "",
     }));
     setTableData(transformedData);
+    setLoading(false);
   }, [effectiveProjectIds, organization?.organizationId, projects]);
 
   /**
@@ -892,7 +902,7 @@ export default function DataCatalogClient({
   return (
     <main className="min-h-screen bg-base-200/30">
       {/* ── Page header: title, project dropdown, search bar ──────────────── */}
-      <section className="border-b border-base-300 bg-base-100">
+      <section className="border-b border-base-300/50 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
@@ -1028,8 +1038,40 @@ export default function DataCatalogClient({
 
           {/* Record list */}
           <div className="min-w-0">
-            {scopedRecords.length === 0 ? (
-              <div className="card border border-base-300 bg-base-100 shadow-sm">
+            { loading === true ? (
+              <div className="card border border-base-300/50 bg-base-100 shadow-sm p-1">
+                <ul className="list mt-0">
+                  {times(5).map((i) => (
+                    <li
+                      key={i}
+                      className="border-b border-base-200 hover:bg-base-200/30 p-2 pl-0 rounded-sm"
+                    >
+                      <div className="text-accent-content mb-1">
+                        <Skeleton width="55%" />
+                      </div>
+                      <div className="text-sm text-base-300 space-x-2 flex flex-wrap items-center">
+                        <span>
+                          {t.translations.CLASS}{" "}
+                          <span className="badge badge-info badge-sm text-xs">
+                            <Skeleton width={60} />
+                          </span>
+                        </span>
+                        <span className="ml-4">
+                          {t.translations.LAST_EDIT} <Skeleton width={80} />
+                        </span>
+                        <span className="ml-4">
+                          {t.translations.PROJECT} <Skeleton width={120} />
+                        </span>
+                        <span className="ml-4">
+                          {t.translations.DATA_SOURCE} <Skeleton width={100} />
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : scopedRecords.length === 0 ? (
+              <div className="card border border-base-300/50 bg-base-100 shadow-sm">
                 <div className="card-body items-center py-16 text-center">
                   <DocumentTextIcon className="size-12 text-base-content/30" />
                   <h2 className="card-title">
@@ -1041,7 +1083,7 @@ export default function DataCatalogClient({
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm">
+              <div className="divide-y divide-base-200 overflow-hidden rounded-box border border-base-300/50 bg-base-100 shadow-sm">
                 {currentRecords.map((record) => (
                   <RecordCard
                     key={`${record.projectId}-${record.id}`}

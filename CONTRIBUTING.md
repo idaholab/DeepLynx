@@ -4,6 +4,7 @@
 ## Coding Guidelines
 * Follow the .NET Core coding conventions.
 * For backend API, dependency injection, error handling, and solution structure conventions, see [DeepLynx Nexus Backend Development Style Guide](documentation/development-code-style-guide.md).
+* For frontend routes, components, styling, services, and UI testing conventions, see [DeepLynx Nexus Frontend Development Style Guide](documentation/frontend-development-style-guide.md).
 * Write clear and concise commit messages.
 * For backend architecture, see [backend architecture](documentation/architecture.md).
 * Ensure your code is well-documented and includes necessary comments.
@@ -213,7 +214,7 @@ to remove (skip to step 3 if you have not applied it).
 
 1. To easily find the full migration name, run:
 ```
-dotnet ef migrations list --project deeplynx.datalayer --startup-project deeplynx.api
+dotnet ef migrations list --project deeplynx.datalayer --startup-project deeplynx.api --context DeeplynxContext
 ```
 
 2. Use the full name to run this command (replacing <Full_Migration_Name>):

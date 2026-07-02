@@ -52,12 +52,21 @@ public class MaintenanceController : ControllerBase
     [SysAdmin]
     public async Task<IActionResult> BackfillFileSizes(
         long? organizationId,
-        long? projectId)
+        long? projectId,
+        long? afterRecordId = null,
+        int batchSize = 500,
+        int maxBatches = 5)
     {
         try
         {
-            await _fileBusiness.BackfillFileSizes(organizationId, projectId);
-            return Ok(new { message = $"Backfilled file sizes for org {organizationId}, project {projectId}" });
+            var result = await _fileBusiness.BackfillFileSizes(
+                organizationId,
+                projectId,
+                afterRecordId,
+                batchSize,
+                maxBatches);
+            
+            return Ok(result);
         }
         catch (Exception ex)
         {

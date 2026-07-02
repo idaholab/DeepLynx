@@ -5,6 +5,37 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 import { QueryRecordViewResponseDto } from "@/app/(home)/types/responseDTOs";
 import { getRecordsPaginated } from "../lib/client_service/query_services.client";
 
+const RECORDS_PAGE_SIZE_SESSION_KEY = "deeplynx.records.pageSize";
+
+function getStoredPageSize(fallbackPageSize: number) {
+  if (typeof window === "undefined") return fallbackPageSize;
+
+  try {
+    const storedPageSize = Number(
+      window.sessionStorage.getItem(RECORDS_PAGE_SIZE_SESSION_KEY),
+    );
+
+    return Number.isFinite(storedPageSize) && storedPageSize > 0
+      ? storedPageSize
+      : fallbackPageSize;
+  } catch {
+    return fallbackPageSize;
+  }
+}
+
+function storePageSize(pageSize: number) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(
+      RECORDS_PAGE_SIZE_SESSION_KEY,
+      String(pageSize),
+    );
+  } catch {
+    // Session storage can be unavailable in private/restricted browser modes.
+  }
+}
+
 /**
  * Handles paginating records details
  * @param selectedProjects - The projects to access records from
@@ -24,7 +55,9 @@ export function useRecordsPaginated(
 
   const [sortBy, setSortBy] = useState(initialSortBy);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(initialPageSize);
+  const [pageSize, setPageSizeState] = useState(() =>
+    getStoredPageSize(initialPageSize),
+  );
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
 
   const [isLoading, setIsLoading] = useState(false);
@@ -86,10 +119,19 @@ export function useRecordsPaginated(
     setCurrentPage((previousPage) => Math.min(previousPage, totalPages));
   }, [totalPages]);
 
-  const setPageSize = useCallback((nextPageSize: number) => {
-    setPageSizeState(nextPageSize);
-    setCurrentPage(1);
-  }, []);
+  const setPageSize = useCallback(
+    (nextPageSize: number) => {
+      const validPageSize =
+        Number.isFinite(nextPageSize) && nextPageSize > 0
+          ? nextPageSize
+          : initialPageSize;
+
+      storePageSize(validPageSize);
+      setPageSizeState(validPageSize);
+      setCurrentPage(1);
+    },
+    [initialPageSize],
+  );
 
   return {
     records,

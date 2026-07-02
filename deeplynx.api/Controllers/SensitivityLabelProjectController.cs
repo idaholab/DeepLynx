@@ -43,8 +43,9 @@ public class SensitivityLabelProjectController : ControllerBase
         try
         {
             var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
             var labels = await _sensitivityLabelBusiness
-                .GetAllSensitivityLabels([projectId], organizationId,
+                .GetAllSensitivityLabels(currentUserId, [projectId], organizationId,
                     hideArchived); //setting project ID null for now to circumvent xor logic
             return Ok(labels);
         }
