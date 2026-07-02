@@ -9,6 +9,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -28,6 +29,17 @@ public class QueryBusinessTests : IntegrationTestBase
     private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
+    private FileBusiness _fileBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private DataSourceBusiness _dataSourceBusiness = null!;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private ClassBusiness _classBusiness = null!;
+    private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private OlapBusiness _olapBusiness = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private EncryptionHelper _encryptionHelper = null!;
     private long cid;
     private long cid2;
     private long did;
@@ -61,8 +73,30 @@ public class QueryBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _encryptionHelper = new EncryptionHelper();
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _dataSourceBusiness =
+            new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _relationshipBusiness = new Mock<IRelationshipBusiness>();
+        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
+        _insightBusiness = new Mock<IInsightBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance
+        );
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+            _sensitivityLabelBusiness, _sensitivityLabelService, _fileBusiness);
         _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService);
     }
 
@@ -3829,7 +3863,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Should ONLY match recA. If it matches recCat or recDog due to partial matching, it fails.
         var dtoA = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "tags", Operator = "=", Value = "a"
+            Connector = "AND",
+            Filter = "tags",
+            Operator = "=",
+            Value = "a"
         };
         var resultA = await _queryBusiness.QueryBuilder(uid, [dtoA], organizationId, [pid]);
 
@@ -3840,7 +3877,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Should ONLY match recCat.
         var dtoCat = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "tags", Operator = "=", Value = "cat"
+            Connector = "AND",
+            Filter = "tags",
+            Operator = "=",
+            Value = "cat"
         };
         var resultCat = await _queryBusiness.QueryBuilder(uid, [dtoCat], organizationId, [pid]);
         Assert.Single(resultCat);
@@ -3851,7 +3891,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // If it returns recDog, then it's doing substring match.
         var dtoD = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "tags", Operator = "=", Value = "d"
+            Connector = "AND",
+            Filter = "tags",
+            Operator = "=",
+            Value = "d"
         };
         var resultD = await _queryBusiness.QueryBuilder(uid, [dtoD], organizationId, [pid]);
 
