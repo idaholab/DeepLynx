@@ -6,5 +6,5 @@ export function isInsightHidden(): boolean {
 }
 
 export function isRunHidden(): boolean {
-  return false;
+  return true;
 }
