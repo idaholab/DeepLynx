@@ -59,7 +59,6 @@ export default async function Page({
 
   // Let the client fetch records after mount based on the dropdown selection
   const initialSelectedProjects = fromProject ? [fromProject] : [];
-  // const initialRecords = [] as RecordTableRow[];
 
   return (
     <AllRecordsClient
