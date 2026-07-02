@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using System.IO.Pipelines;
+using System.Threading.Channels;
 
 namespace deeplynx.business;
 
@@ -264,49 +266,92 @@ public class FileFilesystemBusiness : IFileBusiness
         if (!Directory.Exists(fullPath))
             throw new DirectoryNotFoundException($"Directory '{fullPath}' not found.");
 
-        var pipeStream = new System.IO.Pipelines.Pipe();
+        var pipe = new Pipe();
 
         _ = Task.Run(async () =>
         {
+            Exception? error = null;
             try
             {
-                await using var zipArchive = new ZipArchive(pipeStream.Writer.AsStream(), ZipArchiveMode.Create, leaveOpen: true);
-                await AddDirectoryToZipFromLocalPathAsync(fullPath, zipArchive, "", cancellationToken);
+                await using var pipeStream = pipe.Writer.AsStream(leaveOpen: true);
+                using var archive = new ZipArchive(pipeStream, ZipArchiveMode.Create, leaveOpen: true);
+
+                // Create bounded channel for producer-consumer coordination
+                var channel = Channel.CreateBounded<(string EntryName, byte[] Content)>(
+                    new BoundedChannelOptions(128)
+                    {
+                        FullMode = BoundedChannelFullMode.Wait,
+                        SingleReader = true,
+                        SingleWriter = false
+                    });
+
+                // Producer: Concurrently read files and push to channel
+                var producer = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Parallel.ForEachAsync(
+                            Directory.EnumerateFiles(fullPath, "*", SearchOption.AllDirectories),
+                            new ParallelOptions { MaxDegreeOfParallelism = 32, CancellationToken = cancellationToken },
+                            async (filePath, ct) =>
+                            {
+                                var entryName = Path.GetRelativePath(fullPath, filePath).Replace('\\', '/');
+
+                                await using var fileStream = new FileStream(
+                                    filePath,
+                                    FileMode.Open,
+                                    FileAccess.Read,
+                                    FileShare.Read,
+                                    bufferSize: 262_144,
+                                    useAsync: true);
+
+                                using var ms = new MemoryStream();
+                                await fileStream.CopyToAsync(ms, ct);
+
+                                // Push file content to channel
+                                await channel.Writer.WriteAsync((entryName, ms.ToArray()), ct);
+                            });
+
+                        channel.Writer.Complete();
+                    }
+                    catch (Exception ex)
+                    {
+                        channel.Writer.Complete(ex);
+                        throw;
+                    }
+                }, cancellationToken);
+
+                // Consumer: Sequentially read from channel and write to ZipArchive
+                var consumer = Task.Run(async () =>
+                {
+                    await foreach (var (entryName, content) in channel.Reader.ReadAllAsync(cancellationToken))
+                    {
+                        var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
+                        await using var entryStream = entry.Open();
+                        await entryStream.WriteAsync(content, cancellationToken);
+                    }
+                }, cancellationToken);
+
+                // Await both producer and consumer
+                await Task.WhenAll(producer, consumer);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
             }
             finally
             {
-                await pipeStream.Writer.CompleteAsync();
+                await pipe.Writer.CompleteAsync(error);
             }
         }, cancellationToken);
 
-        return new FileStreamResult(pipeStream.Reader.AsStream(), "application/zip")
+        return new FileStreamResult(pipe.Reader.AsStream(), "application/zip")
         {
-            FileDownloadName = $"{record.Name}.zip"
+            FileDownloadName = "appended_file.zip",
+            EnableRangeProcessing = false
         };
     }
 
-
-    private async Task AddDirectoryToZipFromLocalPathAsync(
-        string directoryPath,
-        ZipArchive zipArchive,
-        string currentFolderInZip,
-        CancellationToken cancellationToken)
-    {
-        var directoryInfo = new DirectoryInfo(directoryPath);
-        var files = directoryInfo.GetFiles();
-
-        foreach (var fileInfo in files)
-        {
-            var entryName = Path.Combine(currentFolderInZip, fileInfo.Name).Replace('\\', '/');
-            var zipEntry = zipArchive.CreateEntry(entryName, CompressionLevel.Fastest);
-
-            await using var entryStream = zipEntry.Open();
-            await using var fileStream = fileInfo.OpenRead();
-
-            await fileStream.CopyToAsync(entryStream, cancellationToken);
-
-        }
-    }
 
     public async Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,
         int expirationHours = 1)
