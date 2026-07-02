@@ -304,8 +304,6 @@ export const downloadFile = async (
       true // hideArchived
     );
 
-    console.log("uri: ", record.uri);
-
     // Determine if folder or file by Uri trailing slash or extension
     const isFolder = record.uri?.endsWith('/');
 

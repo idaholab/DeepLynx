@@ -166,7 +166,7 @@ public class FileAzureBusiness : IFileBusiness
             EnableRangeProcessing = true
         };
     }
-    
+
     /// <summary>
     /// Download an Appended File
     /// </summary>
@@ -230,7 +230,7 @@ public class FileAzureBusiness : IFileBusiness
                             },
                             async (blobItem, ct) =>
                             {
-                                var entryName = blobItem.Name[prefix.Length..];
+                                var entryName = blobItem.Name[prefix!.Length..];
                                 if (string.IsNullOrEmpty(entryName)) return;
 
                                 // DownloadContentAsync buffers the blob — fine here since

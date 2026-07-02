@@ -10,7 +10,7 @@ import {
   XCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import React, { useState } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   downloadFile,
@@ -74,6 +74,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
   const searchParams = useSearchParams();
   const [isFolder, setIsFolder] = useState(false);
+  const isFolderRef = useRef(false);
   const projectIdParam = searchParams.get("projectId");
   const recordIdParam = searchParams.get("recordId");
   const projectId = projectIdParam ? Number(projectIdParam) : NaN;
@@ -81,6 +82,10 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const canDownload = Number.isFinite(projectId) && Number.isFinite(recordId);
   const { t } = useLanguage();
   const { organization, hasLoaded } = useOrganizationSession();
+
+  useEffect(() => {
+    isFolderRef.current = isFolder;
+  }, [isFolder]);
 
   const handleDownload = async () => {
     if (!canDownload) return;
@@ -92,6 +97,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     setDownloadProgress(null);
     setTimeRemaining(null);
     setBytesDownloaded(null);
+    setFolderDownloadProgress(null);
     setPreparingDownload(true);
 
     try {
@@ -133,9 +139,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         recordName,
         (progressInfo) => {
           // Only process progress for blob downloads (non-presigned URL)
-          if (isFolder) {
+          if (isFolderRef.current) {
             setFolderDownloadProgress(progressInfo.loaded)
-            setDownloadProgress(1)
           }
           else if (!usePresignedUrl) {
             const now = Date.now();
@@ -210,6 +215,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
       setDownloadProgress(null);
       setTimeRemaining(null);
       setBytesDownloaded(null);
+      setFolderDownloadProgress(null);
       setPreparingDownload(false);
       // Then clear controller and downloading state
       setAbortController(null);
@@ -424,12 +430,9 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   };
 
   // Show progress bar only for blob downloads (non-presigned URL)
-  console.log("downloadProgress: ", downloadProgress)
 
   const showProgressBar =
-    !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null;
-
-  console.log("SHOW PROGRESS BAR: ", showProgressBar)
+    !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null && folderDownloadProgress !== null;
 
 
   return (

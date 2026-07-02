@@ -1,10 +1,8 @@
-using System.IO.Compression;
-using System.IO.Pipelines;
-using System.Threading.Channels;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
+using System.IO.Compression;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
@@ -150,7 +148,50 @@ public class FileFilesystemBusiness : IFileBusiness
             EnableRangeProcessing = true
         };
     }
-    
+
+    /// <summary>
+    ///     Deletes a file from local file storage
+    /// </summary>
+    /// <param name="record">Record that contains file info</param>
+    /// <param name="objectStorageConfig">Contains the config info</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="FileNotFoundException"></exception>
+    public async Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
+    {
+        var filePath = record.Uri;
+        if (string.IsNullOrWhiteSpace(filePath))
+            throw new ArgumentException("File path is not specified in the record.");
+
+        if (!File.Exists(filePath)) throw new FileNotFoundException("The file to update does not exist.", filePath);
+
+        File.Delete(filePath);
+
+        var directory = Path.GetDirectoryName(filePath);
+
+        if (objectStorageConfig.MountPath == null)
+            throw new Exception("File system mount path not set in object storage");
+
+        // Normalize paths for comparison
+        var normalizedBasePath = Path.GetFullPath(objectStorageConfig.MountPath).TrimEnd(Path.DirectorySeparatorChar);
+
+        // deletes all empty directories up to but not including the base path
+        while (!string.IsNullOrEmpty(directory) &&
+               Directory.Exists(directory) &&
+               !Path.GetFullPath(directory).Equals(normalizedBasePath, StringComparison.OrdinalIgnoreCase))
+            if (Directory.GetFileSystemEntries(directory).Length == 0)
+            {
+                Directory.Delete(directory);
+                directory = Path.GetDirectoryName(directory);
+            }
+            else
+            {
+                break;
+            }
+
+        return true;
+    }
+
     /// <summary>
     /// Downloads a file from Azure Object Storage
     /// </summary>
@@ -223,7 +264,7 @@ public class FileFilesystemBusiness : IFileBusiness
         if (!Directory.Exists(fullPath))
             throw new DirectoryNotFoundException($"Directory '{fullPath}' not found.");
 
-        var pipeStream = new Pipe();
+        var pipeStream = new System.IO.Pipelines.Pipe();
 
         _ = Task.Run(async () =>
         {
@@ -244,47 +285,27 @@ public class FileFilesystemBusiness : IFileBusiness
         };
     }
 
-    /// <summary>
-    ///     Deletes a file from local file storage
-    /// </summary>
-    /// <param name="record">Record that contains file info</param>
-    /// <param name="objectStorageConfig">Contains the config info</param>
-    /// <returns></returns>
-    /// <exception cref="ArgumentException"></exception>
-    /// <exception cref="FileNotFoundException"></exception>
-    public async Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
+
+    private async Task AddDirectoryToZipFromLocalPathAsync(
+        string directoryPath,
+        ZipArchive zipArchive,
+        string currentFolderInZip,
+        CancellationToken cancellationToken)
     {
-        var filePath = record.Uri;
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is not specified in the record.");
+        var directoryInfo = new DirectoryInfo(directoryPath);
+        var files = directoryInfo.GetFiles();
 
-        if (!File.Exists(filePath)) throw new FileNotFoundException("The file to update does not exist.", filePath);
+        foreach (var fileInfo in files)
+        {
+            var entryName = Path.Combine(currentFolderInZip, fileInfo.Name).Replace('\\', '/');
+            var zipEntry = zipArchive.CreateEntry(entryName, CompressionLevel.Fastest);
 
-        File.Delete(filePath);
+            await using var entryStream = zipEntry.Open();
+            await using var fileStream = fileInfo.OpenRead();
 
-        var directory = Path.GetDirectoryName(filePath);
+            await fileStream.CopyToAsync(entryStream, cancellationToken);
 
-        if (objectStorageConfig.MountPath == null)
-            throw new Exception("File system mount path not set in object storage");
-
-        // Normalize paths for comparison
-        var normalizedBasePath = Path.GetFullPath(objectStorageConfig.MountPath).TrimEnd(Path.DirectorySeparatorChar);
-
-        // deletes all empty directories up to but not including the base path
-        while (!string.IsNullOrEmpty(directory) &&
-               Directory.Exists(directory) &&
-               !Path.GetFullPath(directory).Equals(normalizedBasePath, StringComparison.OrdinalIgnoreCase))
-            if (Directory.GetFileSystemEntries(directory).Length == 0)
-            {
-                Directory.Delete(directory);
-                directory = Path.GetDirectoryName(directory);
-            }
-            else
-            {
-                break;
-            }
-
-        return true;
+        }
     }
 
     public async Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,
@@ -516,7 +537,7 @@ public class FileFilesystemBusiness : IFileBusiness
         // Kept for IFileBusiness interface compatability.
         // Filesystem records store the full file path in the uri.
         _ = objectStorageConfig;
-        
+
         if (string.IsNullOrWhiteSpace(fileUri))
             throw new ArgumentException("File URI is not specified.");
 
@@ -765,28 +786,6 @@ public class FileFilesystemBusiness : IFileBusiness
 
         var meta = JsonConvert.DeserializeObject<dynamic>(await File.ReadAllTextAsync(metaPath));
         return (string)meta.FileName;
-    }
-    
-    private async Task AddDirectoryToZipFromLocalPathAsync(
-        string directoryPath,
-        ZipArchive zipArchive,
-        string currentFolderInZip,
-        CancellationToken cancellationToken)
-    {
-        var directoryInfo = new DirectoryInfo(directoryPath);
-        var files = directoryInfo.GetFiles();
-
-        foreach (var fileInfo in files)
-        {
-            var entryName = Path.Combine(currentFolderInZip, fileInfo.Name).Replace('\\', '/');
-            var zipEntry = zipArchive.CreateEntry(entryName, CompressionLevel.Fastest);
-
-            await using var entryStream = zipEntry.Open();
-            await using var fileStream = fileInfo.OpenRead();
-
-            await fileStream.CopyToAsync(entryStream, cancellationToken);
-
-        }
     }
 
 }
