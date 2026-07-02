@@ -20,6 +20,7 @@ public class RecordBusiness : IRecordBusiness
     private readonly ISensitivityLabelBusiness _labelBusiness;
     private readonly ISensitivityLabelService _sensitivityLabelService;
     private readonly ITagBusiness _tagBusiness;
+    private readonly FileBusiness _fileBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="RecordBusiness" /> class.
@@ -30,13 +31,15 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="tagBusiness">Used for creating tags related to a record.</param>
     /// <param name="labelBusiness">Used for creating tags related to a record.</param>
     /// <param name="sensitivityLabelService">Service for sensitivity label authorization operations.</param>
+    /// <param name="fileBusiness">Used for handling file storage.</param>
     public RecordBusiness(
         DeeplynxContext context,
         IEventBusiness eventBusiness,
         IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
         ITagBusiness tagBusiness,
         ISensitivityLabelBusiness labelBusiness,
-        ISensitivityLabelService sensitivityLabelService)
+        ISensitivityLabelService sensitivityLabelService,
+        FileBusiness fileBusiness)
     {
         _context = context;
         _eventBusiness = eventBusiness;
@@ -44,6 +47,7 @@ public class RecordBusiness : IRecordBusiness
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
         _labelBusiness = labelBusiness;
         _sensitivityLabelService = sensitivityLabelService;
+        _fileBusiness = fileBusiness;
     }
     /// <summary>
     ///     Retrieves all records for a specific project and datasource.
@@ -1564,6 +1568,7 @@ public class RecordBusiness : IRecordBusiness
         var recordName = returnedRecord.Name;
         var recordDataSourceId = returnedRecord.DataSourceId;
 
+        await _fileBusiness.DeleteFile(currentUserId, organizationId, projectId, recordId);
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
 
