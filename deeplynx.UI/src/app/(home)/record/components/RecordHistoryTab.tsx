@@ -8,7 +8,7 @@ import React, {
   useTransition,
 } from "react";
 import toast from "react-hot-toast";
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import { ClassResponseDto, HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import {
   getHistoricalRecord,
@@ -26,6 +26,7 @@ import {
   normalizeRecord,
 } from "./RecordHistoryDifferenceUtils";
 import RecordHistorySnapshotPropertiesCard from "./RecordHistorySnapshotPropertiesCard";
+import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 
 interface Props {
   organizationId: number;
@@ -64,6 +65,26 @@ export default function RecordHistoryTab({
   const [sliderIndex, setSliderIndex] = useState(0);
   const [maxRenderedRows, setMaxRenderedRows] = useState(300);
   const [isUiPending, startUiTransition] = useTransition();
+  const [activeClassNames, setActiveClassNames] = useState<Set<string>>(new Set());
+  const [classes, setClasses] = useState<ClassResponseDto[]>([]);
+  const [_, setAreClassesLoading] = useState(true);
+
+  interface ClassInfo {
+    name: string;
+    isArchived: boolean;
+  }
+
+  type ClassInfoMap = Record<number, ClassInfo>;
+
+  const classInfoMap: ClassInfoMap = useMemo(() => {
+    const map: ClassInfoMap = {};
+    classes.forEach((cls) => {
+      map[cls.id] = { name: cls.name, isArchived: cls.isArchived };
+    });
+    console.log("map: ", map);
+    return map;
+  }, [classes]);
+
 
   // Runtime caches + debounce timers for high-frequency interactions.
   const snapshotCacheRef = useRef<Map<string, HistoricalRecordResponseDto>>(
@@ -158,6 +179,39 @@ export default function RecordHistoryTab({
     recordId,
     t.translations.FAILED_TO_LOAD_RECORD_HISTORY,
   ]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setClasses([]);
+      setActiveClassNames(new Set());
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadClasses = async () => {
+      try {
+        const classData = await getAllClasses(projectId, false);
+        if (cancelled) return;
+
+        setClasses(classData);
+        const names = new Set(classData.map((cls) => cls.name));
+        setActiveClassNames(names);
+      } catch (error) {
+        console.error("Failed to load classes in RecordHistoryTab:", error);
+        if (!cancelled) {
+          setClasses([]);
+          setActiveClassNames(new Set());
+        }
+      }
+    };
+
+    loadClasses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     // Keep slider UI in sync when selected version changes elsewhere.
@@ -568,6 +622,7 @@ export default function RecordHistoryTab({
         }
         onToggleExpand={toggleExpand}
         onLoadMore={() => setMaxRenderedRows((prev) => prev + 300)}
+        classInfoMap={classInfoMap}
       />
     </div>
   );

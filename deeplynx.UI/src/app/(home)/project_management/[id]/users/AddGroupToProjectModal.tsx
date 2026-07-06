@@ -138,7 +138,7 @@ const AddGroupToProjectModal: React.FC<AddGroupToProjectModalProps> = ({
                     groupsNotInProject.map((g) => (
                       <li
                         key={g.id}
-                        onClick={() => onChangeGroup(g.id.toString())}
+                        onClick={() => { onChangeGroup(g.id.toString()); (document.activeElement as HTMLElement)?.blur(); }}
                       >
                         <a>
                           <span>{g.name}</span>
@@ -174,7 +174,7 @@ const AddGroupToProjectModal: React.FC<AddGroupToProjectModalProps> = ({
                   {roles.map((r) => (
                     <li
                       key={r.id}
-                      onClick={() => onChangeRole(r.id.toString())}
+                      onClick={() => { onChangeRole(r.id.toString()); (document.activeElement as HTMLElement)?.blur(); }}
                     >
                       <a>
                         <span>{r.name}</span>

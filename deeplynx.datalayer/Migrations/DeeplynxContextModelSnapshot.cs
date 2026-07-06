@@ -646,15 +646,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long?>("EmbeddingModel")
                         .HasColumnType("bigint")
                         .HasColumnName("embedding_model");
-                    b.Property<string>("ChunkHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("chunk_hash");
-
-                    b.Property<string>("EmbeddingHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("embedding_hash");
 
                     b.Property<DateTime>("LastUpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -704,6 +695,57 @@ namespace deeplynx.datalayer.Migrations
                         .HasDatabaseName("idx_embeddings_project_model");
 
                     b.ToTable("embeddings", "dl_vector");
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.EmbeddingLogs", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Error")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<string>("JobId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("job_id");
+
+                    b.Property<float>("Progress")
+                        .HasColumnType("real")
+                        .HasColumnName("progress");
+
+                    b.Property<long>("RecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("record_id");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("stage");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("timestamp");
+
+                    b.Property<string>("Worker")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("worker");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("embeddings_logs", "dl_vector");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Event", b =>
@@ -1005,6 +1047,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<string>("FileContentHash")
+                        .HasColumnType("text")
+                        .HasColumnName("file_content_hash");
 
                     b.Property<long?>("FileSize")
                         .HasColumnType("bigint")
@@ -1694,43 +1740,23 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
-                    b.Property<string>("ArtifactVersionId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("artifact_version_id");
-
-                    b.Property<string>("ContentHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("content_hash");
-
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<string>("EmbeddingModelName")
+                    b.Property<string>("FileContentHash")
                         .HasColumnType("text")
-                        .HasColumnName("embedding_model_name");
+                        .HasColumnName("file_content_hash");
+
+                    b.Property<long>("HistoricalRecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("historical_record_id");
 
                     b.Property<long>("OrganizationId")
                         .HasColumnType("bigint")
                         .HasColumnName("organization_id");
-
-                    b.Property<string>("PipelineRunId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("pipeline_run_id");
-
-                    b.Property<string>("PipelineVersion")
-                        .HasColumnType("text")
-                        .HasColumnName("pipeline_version");
-
-                    b.Property<string>("ProcessingConfigVersion")
-                        .HasColumnType("text")
-                        .HasColumnName("processing_config_version");
 
                     b.Property<long>("ProjectId")
                         .HasColumnType("bigint")
@@ -1754,36 +1780,14 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("signature");
 
-                    b.Property<string>("SignatureAlgorithm")
-                        .HasColumnType("text")
-                        .HasColumnName("signature_algorithm");
-
-                    b.Property<DateTime?>("SignedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("signed_at");
-
-                    b.Property<string>("SignedPayloadHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("signed_payload_hash");
-
-                    b.Property<string>("SigningKeyName")
-                        .HasColumnType("text")
-                        .HasColumnName("signing_key_name");
-
-                    b.Property<string>("SigningKeyVersion")
-                        .HasColumnType("text")
-                        .HasColumnName("signing_key_version");
-
-                    b.Property<string>("VerificationStatus")
-                        .HasColumnType("text")
-                        .HasColumnName("verification_status");
-
                     b.HasKey("Id")
                         .HasName("provenance_records_pkey");
 
-                    b.HasIndex("ContentHash")
-                        .HasDatabaseName("idx_provenance_records_content_hash");
+                    b.HasIndex("FileContentHash")
+                        .HasDatabaseName("idx_provenance_records_file_content_hash");
+
+                    b.HasIndex("HistoricalRecordId")
+                        .HasDatabaseName("idx_provenance_records_historical_record_id");
 
                     b.HasIndex("Id")
                         .HasDatabaseName("idx_provenance_records_id");
@@ -1928,6 +1932,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("extraction_id");
 
+                    b.Property<string>("FileContentHash")
+                        .HasColumnType("text")
+                        .HasColumnName("file_content_hash");
+
                     b.Property<long?>("FileSize")
                         .HasColumnType("bigint")
                         .HasColumnName("file_size");
@@ -1956,11 +1964,6 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
-
-                    b.Property<string>("NormalizedContentHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("normalized_content_hash");
 
                     b.Property<long?>("ObjectStorageId")
                         .HasColumnType("bigint")
@@ -3361,6 +3364,13 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.ProvenanceRecord", b =>
                 {
+                    b.HasOne("deeplynx.datalayer.Models.HistoricalRecord", "HistoricalRecord")
+                        .WithMany("ProvenanceRecords")
+                        .HasForeignKey("HistoricalRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("provenance_records_historical_record_id_fkey");
+
                     b.HasOne("deeplynx.datalayer.Models.Organization", "Organization")
                         .WithMany("ProvenanceRecords")
                         .HasForeignKey("OrganizationId")
@@ -3381,6 +3391,8 @@ namespace deeplynx.datalayer.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("provenance_records_record_id_fkey");
+
+                    b.Navigation("HistoricalRecord");
 
                     b.Navigation("Organization");
 
@@ -3730,6 +3742,11 @@ namespace deeplynx.datalayer.Migrations
             modelBuilder.Entity("deeplynx.datalayer.Models.Group", b =>
                 {
                     b.Navigation("ProjectMembers");
+                });
+
+            modelBuilder.Entity("deeplynx.datalayer.Models.HistoricalRecord", b =>
+                {
+                    b.Navigation("ProvenanceRecords");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.OauthApplication", b =>
