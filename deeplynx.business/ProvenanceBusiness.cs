@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
+using deeplynx.models.ResponseDTOs;
 using Microsoft.EntityFrameworkCore;
 
 namespace deeplynx.business;
@@ -18,6 +19,81 @@ public class ProvenanceBusiness : IProvenanceBusiness
     public ProvenanceBusiness(DeeplynxContext context)
     {
         _context = context;
+    }
+    
+    /// <summary>
+    ///     Retrieve a single provenance record by its database ID.
+    /// </summary>
+    /// <param name="provenanceRecordId">The database ID of the provenance record</param>
+    /// <returns>The matching provenance record</returns>
+    /// <exception cref="KeyNotFoundException">Thrown if no matching provenance record is found</exception>
+    public async Task<ProvenanceRecordResponseDto> GetProvenanceRecord(long provenanceRecordId)
+    {
+        var provenanceRecord = await _context.ProvenanceRecords
+            .Where(p => p.Id == provenanceRecordId)
+            .FirstOrDefaultAsync();
+
+        if (provenanceRecord is null)
+            throw new KeyNotFoundException(
+                $"Provenance record with id {provenanceRecordId} not found");
+
+        return new ProvenanceRecordResponseDto
+        {
+            Id = provenanceRecord.Id,
+            RecordId = provenanceRecord.RecordId,
+            HistoricalRecordId = provenanceRecord.HistoricalRecordId,
+            OrganizationId = provenanceRecord.OrganizationId,
+            ProjectId = provenanceRecord.ProjectId,
+            ProvId = provenanceRecord.ProvId,
+            ProvenanceJson = provenanceRecord.ProvenanceJson,
+            FileContentHash = provenanceRecord.FileContentHash,
+            Signature = provenanceRecord.Signature,
+            CreatedAt = provenanceRecord.CreatedAt
+        };
+    }
+    
+    /// <summary>
+    ///     Retrieve all provenance records associated with a given (non-historical) record ID,
+    ///     ordered most-recent first.
+    /// </summary>
+    /// <param name="recordId">The ID of the record whose provenance history is being retrieved</param>
+    /// <returns>List of provenance records for the given record ID, most recent first</returns>
+    public async Task<ProvenanceHistoryResponseDto> GetProvenanceHistory(long recordId)
+    {
+        // check if a record with the supplied record ID exists
+        var recordExists = await _context.Records.AnyAsync(r => r.Id == recordId);
+        if (!recordExists)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
+        
+        // order the records newest to oldest
+        var records = await _context.ProvenanceRecords
+            .Where(p => p.RecordId == recordId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+
+        if (records.Count == 0)
+            return new ProvenanceHistoryResponseDto
+            {
+                Message = $"No provenance history exists yet for record {recordId}",
+                Records = new List<ProvenanceRecordResponseDto>()
+            };
+
+        return new ProvenanceHistoryResponseDto
+        {
+            Records = records.Select(r => new ProvenanceRecordResponseDto
+            {
+                Id = r.Id,
+                RecordId = r.RecordId,
+                HistoricalRecordId = r.HistoricalRecordId,
+                OrganizationId = r.OrganizationId,
+                ProjectId = r.ProjectId,
+                ProvId = r.ProvId,
+                ProvenanceJson = r.ProvenanceJson,
+                FileContentHash = r.FileContentHash,
+                Signature = r.Signature,
+                CreatedAt = r.CreatedAt
+            }).ToList()
+        };
     }
 
     /// <summary>
@@ -92,6 +168,94 @@ public class ProvenanceBusiness : IProvenanceBusiness
 
         _context.ProvenanceRecords.Add(provenanceRecord);
         await _context.SaveChangesAsync();
+        return true;
+    }
+
+    /// <summary>
+    ///     Bulk Create provenance records based on a supplied set of record IDs
+    /// </summary>
+    /// <param name="recordIds">The IDs of the records for which provenance is being updated</param>
+    /// <param name="action">The action that triggered the provenance update</param>
+    /// <param name="currentUserId">The user that triggered the provenance update</param>
+    /// <param name="aiConfigId">(Optional) AI model information, if an embedding event</param>
+    /// <returns>Boolean- if false, throw an error at the caller level</returns>
+    public async Task<bool> BulkCreateProvenanceRecords(
+        List<long> recordIds, 
+        string action, 
+        long currentUserId, 
+        long? aiConfigId)
+    {
+        if (recordIds == null || !recordIds.Any())
+            return true;
+        
+        // deduplicate requested records
+        var distinctRecordIds = recordIds.Distinct().ToList();
+        
+        // get the latest historical record per record_id in a single trip
+        var historicalRecords = await _context.HistoricalRecords
+            .FromSqlInterpolated($@"
+                SELECT DISTINCT ON (record_id) *
+                FROM deeplynx.historical_records
+                WHERE record_id = ANY({distinctRecordIds.ToArray()})
+                ORDER BY record_id, last_updated_at DESC, id DESC")
+            .ToListAsync();
+
+        if (historicalRecords.Count != distinctRecordIds.Count)
+            // some of the supplied records don't have historical records associated
+            return false;
+        
+        // if aiConfig is passed in, fetch once and reuse for each prov record
+        AiModelConfig? aiConfig = null;
+        if (aiConfigId is not null)
+        {
+            aiConfig = await _context.AiModelConfigs
+                .Where(a => a.Id == aiConfigId)
+                .FirstOrDefaultAsync();
+        }
+        
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        var provenanceRecords = new List<ProvenanceRecord>(historicalRecords.Count);
+
+        foreach (var histRecord in historicalRecords)
+        {
+            var provenanceJson = BuildProvenanceRecord(new BuildProvenanceRecordDto
+            {
+                RecordId = histRecord.RecordId,
+                HistoricalRecordId = histRecord.Id,
+                Action = action,
+                ActorId = currentUserId,
+                OrganizationId = histRecord.OrganizationId,
+                ProjectId = histRecord.ProjectId,
+                FileUri = histRecord.Uri,
+                FileHash = histRecord.FileContentHash,
+                FileSize = histRecord.FileSize,
+                FileType = histRecord.FileType,
+                AiConfigId = aiConfigId,
+                AiModelProvider = aiConfig?.ModelProvider,
+                AiModelName = aiConfig?.ModelName,
+                AiModelType = aiConfig?.ModelType,
+                AiServerUrl = aiConfig?.ServerUrl
+            }, out var provId);
+            
+            provenanceRecords.Add(new ProvenanceRecord
+            {
+                RecordId = histRecord.RecordId,
+                HistoricalRecordId = histRecord.Id,
+                OrganizationId = histRecord.OrganizationId,
+                ProjectId = histRecord.ProjectId,
+                ProvId = provId,
+                FileContentHash = histRecord.FileContentHash,
+                ProvenanceJson = provenanceJson,
+                // leaving null for now until we get hashing and signatures implemented
+                Signature = null,
+                CreatedAt = now
+            });
+        }
+        
+        // save all bulk-created prov records in a single DB trip
+        _context.ProvenanceRecords.AddRange(provenanceRecords);
+        await _context.SaveChangesAsync();
+        
         return true;
     }
 

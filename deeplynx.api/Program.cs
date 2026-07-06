@@ -330,6 +330,7 @@ try
                 new() { Name = "Record Collection", Description = "Record Collection management"},
                 new() { Name = "File", Description = "File operations" },
                 new() { Name = "Metadata", Description = "Metadata operations" },
+                new() { Name = "Provenance", Description = "Data Provenance" },
                 new() { Name = "Historical Record", Description = "Record history" },
                 new() { Name = "Historical Edge", Description = "Edge history" },
                 new() { Name = "Edge", Description = "Edges" },

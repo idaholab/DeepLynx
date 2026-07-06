@@ -775,6 +775,7 @@ public class RecordBusiness : IRecordBusiness
     ///     Bulk attach tags and records
     /// </summary>
     /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
+    /// <param name="currentUserId">The user making the request</param>
     /// <returns>True if successful</returns>
     /// <exception cref="Exception">Thrown if tags unable to be attached</exception>
     public async Task<bool> BulkInsertRecordTagLinks(List<RecordTagLinkDto> dtos)
@@ -808,6 +809,7 @@ public class RecordBusiness : IRecordBusiness
     ///     Bulk unattach tags and records
     /// </summary>
     /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
+    /// <param name="currentUserId">The user making the request</param>
     /// <returns>True if successful</returns>
     /// <exception cref="Exception">Thrown if tags unable to be unattached</exception>
     public async Task<bool> BulkDeleteRecordTagLinks(List<RecordTagLinkDto> dtos)
@@ -833,7 +835,7 @@ public class RecordBusiness : IRecordBusiness
         sql = string.Format(sql, valueTuples);
 
         await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
-
+        
         return true;
     }
 
@@ -925,6 +927,11 @@ public class RecordBusiness : IRecordBusiness
             await transaction.RollbackAsync();
             throw;
         }
+        
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(distinctRecordIds, "attach-label", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk label attach, records {RecordIds}", 
+                string.Join(", ", distinctRecordIds));
 
         return true;
     }
@@ -1419,6 +1426,14 @@ public class RecordBusiness : IRecordBusiness
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, events, records.Count);
 
         await tx.CommitAsync();
+        
+        // Trigger provenance record creation
+        var insertedRecordIds = inserted.Select(r => r.Id).ToList();
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(insertedRecordIds, "create-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk record creation, records {RecordIds}", 
+                string.Join(", ", insertedRecordIds));
+
+        
         return inserted;
     }
 
@@ -2075,6 +2090,11 @@ public class RecordBusiness : IRecordBusiness
             throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
 
         await BulkInsertRecordTagLinks(dtos);
+        
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(recordIds, "attach-tag", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk tag attach, records {RecordIds}",
+                string.Join(",", recordIds));
 
         return true;
     }
@@ -2134,6 +2154,11 @@ public class RecordBusiness : IRecordBusiness
             throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
 
         await BulkDeleteRecordTagLinks(dtos);
+        
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(recordIds, "detach-tag", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk tag detach, records {RecordIds}",
+                string.Join(",", recordIds));
 
         return true;
     }
