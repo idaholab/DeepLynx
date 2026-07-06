@@ -177,10 +177,12 @@ public class FileAzureBusiness : IFileBusiness
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="InvalidOperationException"></exception>
     public async Task<FileStreamResult> DownloadAppendedFile(
-    RecordResponseDto record,
-    ObjectStorageConfigDto objectStorageConfig,
-    CancellationToken cancellationToken = default)
+        RecordResponseDto record,
+        ObjectStorageConfigDto objectStorageConfig,
+        CancellationToken cancellationToken = default)
     {
+        const long MaxBufferedFileSize = 10 * 1024 * 1024; // 10 MB
+
         if (objectStorageConfig.AzureObjectConfig == null)
             throw new ArgumentException("Azure configuration is null");
 
@@ -203,20 +205,20 @@ public class FileAzureBusiness : IFileBusiness
                 using var archive = new ZipArchive(pipeStream, ZipArchiveMode.Create, leaveOpen: true);
 
                 // Bounded channel between the concurrent downloader and the sequential zip writer.
-                // Capacity of 128 means up to 128 blobs can be downloaded and waiting before the
-                // producer pauses — prevents unbounded memory growth if downloads outpace writes.
-                var channel = Channel.CreateBounded<(string EntryName, byte[] Content)>(
-                    new BoundedChannelOptions(128)
+                // Items carry EITHER buffered content (small blobs) OR just the blob name
+                // (large blobs, streamed by the consumer at write time).
+                // Worst-case buffered memory ~= capacity * MaxBufferedFileSize.
+                var channel = Channel.CreateBounded<(string EntryName, byte[]? Content, string? BlobName)>(
+                    new BoundedChannelOptions(16)
                     {
                         FullMode = BoundedChannelFullMode.Wait, // producer waits when channel is full
                         SingleReader = true,                    // only the consumer reads
                         SingleWriter = false                    // multiple download tasks write
                     });
 
-                // Producer: enumerate blobs lazily and download them concurrently.
-                // MaxDegreeOfParallelism = 32 means 32 simultaneous Azure round trips.
-                // For tiny files the bottleneck is per-request latency, not bandwidth,
-                // so more concurrency directly translates to faster throughput.
+                // Producer: enumerate blobs lazily. Small blobs are downloaded
+                // concurrently and buffered; large blobs are enqueued as name-only
+                // items so their bytes never sit in memory.
                 var producer = Task.Run(async () =>
                 {
                     try
@@ -233,13 +235,23 @@ public class FileAzureBusiness : IFileBusiness
                                 var entryName = blobItem.Name[prefix!.Length..];
                                 if (string.IsNullOrEmpty(entryName)) return;
 
-                                // DownloadContentAsync buffers the blob — fine here since
-                                // files are 33 bytes. Use DownloadStreamingAsync for large files.
-                                var blobClient = container.GetBlobClient(blobItem.Name);
-                                var download = await blobClient.DownloadContentAsync(ct);
-                                var content = download.Value.Content.ToArray();
+                                var length = blobItem.Properties.ContentLength ?? long.MaxValue;
 
-                                await channel.Writer.WriteAsync((entryName, content), ct);
+                                if (length <= MaxBufferedFileSize)
+                                {
+                                    // Small blob: buffer it. For tiny files the bottleneck
+                                    // is per-request latency, so downloading them with
+                                    // high concurrency here is the big win.
+                                    var blobClient = container.GetBlobClient(blobItem.Name);
+                                    var download = await blobClient.DownloadContentAsync(ct);
+                                    await channel.Writer.WriteAsync((entryName, download.Value.Content.ToArray(), null), ct);
+                                }
+                                else
+                                {
+                                    // Large blob: defer the download; the consumer will
+                                    // stream it directly into the zip entry.
+                                    await channel.Writer.WriteAsync((entryName, null, blobItem.Name), ct);
+                                }
                             });
 
                         // Signal consumer that no more blobs are coming
@@ -257,11 +269,24 @@ public class FileAzureBusiness : IFileBusiness
                 // ZipArchive is not thread-safe — sequential writes are required.
                 var consumer = Task.Run(async () =>
                 {
-                    await foreach (var (entryName, content) in channel.Reader.ReadAllAsync(cancellationToken))
+                    await foreach (var (entryName, content, blobName) in channel.Reader.ReadAllAsync(cancellationToken))
                     {
                         var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
                         await using var entryStream = entry.Open();
-                        await entryStream.WriteAsync(content, cancellationToken);
+
+                        if (content is not null)
+                        {
+                            await entryStream.WriteAsync(content, cancellationToken);
+                        }
+                        else
+                        {
+                            // Large blob: stream from Azure straight into the zip
+                            // entry — never fully materialized in memory.
+                            var blobClient = container.GetBlobClient(blobName!);
+                            var response = await blobClient.DownloadStreamingAsync(cancellationToken: cancellationToken);
+                            await using var blobStream = response.Value.Content;
+                            await blobStream.CopyToAsync(entryStream, cancellationToken);
+                        }
                     }
                 }, cancellationToken);
 

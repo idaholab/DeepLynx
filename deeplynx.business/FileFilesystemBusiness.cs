@@ -208,6 +208,8 @@ public class FileFilesystemBusiness : IFileBusiness
         ObjectStorageConfigDto objectStorageConfig,
         CancellationToken cancellationToken = default)
     {
+        const long MaxBufferedFileSize = 10 * 1024 * 1024; // 10 MB
+
         if (record.Uri == null)
             throw new ArgumentException("Record Uri is null");
         if (string.IsNullOrWhiteSpace(objectStorageConfig?.MountPath))
@@ -276,43 +278,50 @@ public class FileFilesystemBusiness : IFileBusiness
                 await using var pipeStream = pipe.Writer.AsStream(leaveOpen: true);
                 using var archive = new ZipArchive(pipeStream, ZipArchiveMode.Create, leaveOpen: true);
 
-                // Create bounded channel for producer-consumer coordination
-                var channel = Channel.CreateBounded<(string EntryName, byte[] Content)>(
-                    new BoundedChannelOptions(128)
+                // Bounded channel for producer-consumer coordination.
+                // Items carry EITHER buffered content (small files) OR just a
+                // file path (large files, streamed by the consumer at write time).
+                // Worst-case buffered memory ~= capacity * MaxBufferedFileSize.
+                var channel = Channel.CreateBounded<(string EntryName, byte[]? Content, string? FilePath)>(
+                    new BoundedChannelOptions(16)
                     {
                         FullMode = BoundedChannelFullMode.Wait,
                         SingleReader = true,
                         SingleWriter = false
                     });
 
-                // Producer: Concurrently read files and push to channel
+                // Producer: concurrently read small files into memory; enqueue
+                // large files as path-only items so they are never fully buffered.
                 var producer = Task.Run(async () =>
                 {
                     try
                     {
                         await Parallel.ForEachAsync(
                             Directory.EnumerateFiles(fullPath, "*", SearchOption.AllDirectories),
-                            new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = cancellationToken },
+                            new ParallelOptions
+                            {
+                                MaxDegreeOfParallelism = Environment.ProcessorCount,
+                                CancellationToken = cancellationToken
+                            },
                             async (filePath, ct) =>
                             {
                                 var entryName = Path.GetRelativePath(fullPath, filePath).Replace('\\', '/');
+                                var length = new FileInfo(filePath).Length;
 
-                                await using var fileStream = new FileStream(
-                                    filePath,
-                                    FileMode.Open,
-                                    FileAccess.Read,
-                                    FileShare.Read,
-                                    bufferSize: 512 * 1024,
-                                    useAsync: true);
-
-                                using var compressedStream = new MemoryStream();
-                                using (var deflateStream = new DeflateStream(compressedStream, CompressionLevel.NoCompression, leaveOpen: true))
+                                if (length <= MaxBufferedFileSize)
                                 {
-                                    await fileStream.CopyToAsync(deflateStream, ct);
+                                    // Small file: buffer raw bytes. Note: no
+                                    // pre-deflating here — the ZipArchive entry
+                                    // stream handles compression on write, so
+                                    // pre-compressing would double-deflate.
+                                    var bytes = await File.ReadAllBytesAsync(filePath, ct);
+                                    await channel.Writer.WriteAsync((entryName, bytes, null), ct);
                                 }
-
-                                // Push file content to channel
-                                await channel.Writer.WriteAsync((entryName, compressedStream.ToArray()), ct);
+                                else
+                                {
+                                    // Large file: defer the read to the consumer.
+                                    await channel.Writer.WriteAsync((entryName, null, filePath), ct);
+                                }
                             });
 
                         channel.Writer.Complete();
@@ -324,14 +333,32 @@ public class FileFilesystemBusiness : IFileBusiness
                     }
                 }, cancellationToken);
 
-                // Consumer: Sequentially read from channel and write to ZipArchive
+                // Consumer: single sequential writer to the ZipArchive.
                 var consumer = Task.Run(async () =>
                 {
-                    await foreach (var (entryName, content) in channel.Reader.ReadAllAsync(cancellationToken))
+                    await foreach (var (entryName, content, filePath) in channel.Reader.ReadAllAsync(cancellationToken))
                     {
-                        var entry = archive.CreateEntry(entryName);
+                        var entry = archive.CreateEntry(entryName, CompressionLevel.NoCompression);
                         await using var entryStream = entry.Open();
-                        await entryStream.WriteAsync(content, cancellationToken);
+
+                        if (content is not null)
+                        {
+                            await entryStream.WriteAsync(content, cancellationToken);
+                        }
+                        else
+                        {
+                            // Stream the large file straight from disk into the
+                            // zip entry — never fully materialized in memory.
+                            await using var fileStream = new FileStream(
+                                filePath!,
+                                FileMode.Open,
+                                FileAccess.Read,
+                                FileShare.Read,
+                                bufferSize: 512 * 1024,
+                                useAsync: true);
+
+                            await fileStream.CopyToAsync(entryStream, cancellationToken);
+                        }
                     }
                 }, cancellationToken);
 
