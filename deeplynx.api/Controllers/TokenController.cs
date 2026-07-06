@@ -71,6 +71,7 @@ public class TokenController : ControllerBase
     /// <returns>API key and secret (secret only returned once)</returns>
     [HttpPost("keys", Name = "api_create_api_key")]
     [AllowAnonymous]
+    [ForbidServiceAccounts] // service accounts can only act on the project level
     public async Task<IActionResult> CreateApiKey([FromQuery] string? clientId = null)
     {
         try
@@ -90,7 +91,7 @@ public class TokenController : ControllerBase
                 new { message = "An error occurred while creating the API key" });
         }
     }
-    
+
     /// <summary>
     ///     Generate API Key for a service account
     /// </summary>
