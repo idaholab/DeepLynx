@@ -28,6 +28,8 @@ RUN set -eux; \
     test -f "$target/package.json" && grep -q '"version": "4.0.4"' "$target/package.json"; \
     cd / && rm -rf "$tmp"
 
+RUN echo "HOSTED_LINK=$HOSTED_LINK"
+RUN echo "NEXT_PUBLIC_HOSTED_LINK=$NEXT_PUBLIC_HOSTED_LINK"
 # Build the frontend
 RUN npm run build
 
