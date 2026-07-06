@@ -20,8 +20,12 @@ public class RecordBusiness : IRecordBusiness
     private readonly ISensitivityLabelBusiness _labelBusiness;
     private readonly ISensitivityLabelService _sensitivityLabelService;
     private readonly ITagBusiness _tagBusiness;
+<<<<<<< HEAD
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly IFileBusinessFactory _fileBusinessFactory;
+=======
+    private readonly FileBusiness _fileBusiness;
+>>>>>>> 049b551ecc863a4962150fa9ba66c1f09827eb67
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="RecordBusiness" /> class.
@@ -32,6 +36,7 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="tagBusiness">Used for creating tags related to a record.</param>
     /// <param name="labelBusiness">Used for creating tags related to a record.</param>
     /// <param name="sensitivityLabelService">Service for sensitivity label authorization operations.</param>
+    /// <param name="fileBusiness">Used for handling file storage.</param>
     public RecordBusiness(
         DeeplynxContext context,
         IEventBusiness eventBusiness,
@@ -39,8 +44,12 @@ public class RecordBusiness : IRecordBusiness
         ITagBusiness tagBusiness,
         ISensitivityLabelBusiness labelBusiness,
         ISensitivityLabelService sensitivityLabelService,
+<<<<<<< HEAD
         IObjectStorageBusiness objectStorageBusiness,
         IFileBusinessFactory fileBusinessFactory)
+=======
+        FileBusiness fileBusiness)
+>>>>>>> 049b551ecc863a4962150fa9ba66c1f09827eb67
     {
         _context = context;
         _eventBusiness = eventBusiness;
@@ -48,8 +57,12 @@ public class RecordBusiness : IRecordBusiness
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
         _labelBusiness = labelBusiness;
         _sensitivityLabelService = sensitivityLabelService;
+<<<<<<< HEAD
         _objectStorageBusiness = objectStorageBusiness;
         _fileBusinessFactory = fileBusinessFactory;
+=======
+        _fileBusiness = fileBusiness;
+>>>>>>> 049b551ecc863a4962150fa9ba66c1f09827eb67
     }
     /// <summary>
     ///     Retrieves all records for a specific project and datasource.
@@ -1570,7 +1583,11 @@ public class RecordBusiness : IRecordBusiness
         var recordName = returnedRecord.Name;
         var recordDataSourceId = returnedRecord.DataSourceId;
 
+<<<<<<< HEAD
         await DeleteAttachedFileIfPresent(returnedRecord);
+=======
+        await _fileBusiness.DeleteFile(currentUserId, organizationId, projectId, recordId);
+>>>>>>> 049b551ecc863a4962150fa9ba66c1f09827eb67
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
 

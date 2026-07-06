@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace deeplynx.tests;
@@ -34,8 +35,18 @@ public class MetadataBusinessTests : IntegrationTestBase
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
+<<<<<<< HEAD
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+=======
+    private FileBusiness _fileBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private DataSourceBusiness _dataSourceBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private OlapBusiness _olapBusiness = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+>>>>>>> 049b551ecc863a4962150fa9ba66c1f09827eb67
     private EncryptionHelper _encryptionHelper = null!;
     public long cid; // origin class ID
     public long cid2; // destination class ID
@@ -67,10 +78,35 @@ public class MetadataBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
         _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService);
+<<<<<<< HEAD
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _recordBusiness = new RecordBusiness(
             Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService, _objectStorageBusiness, _fileBusinessFactory.Object);
+=======
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _dataSourceBusiness =
+            new DataSourceBusiness(Context, _edgeBusiness, _recordBusiness, _eventBusiness);
+        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness, _eventBusiness);
+        _insightBusiness = new Mock<IInsightBusiness>();
+        _encryptionHelper = new EncryptionHelper();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance
+        );
+        _recordBusiness = new RecordBusiness(
+            Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService, _fileBusiness);
+>>>>>>> 049b551ecc863a4962150fa9ba66c1f09827eb67
         _relationshipBusiness = new RelationshipBusiness(Context, _edgeBusiness, _eventBusiness);
 
         // Now classBusiness gets valid dependencies

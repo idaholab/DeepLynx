@@ -12,6 +12,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -31,8 +32,21 @@ public class RecordBusinessTests : IntegrationTestBase
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private SensitivityLabelService _sensitivityLabelService = null!;
     private EncryptionHelper _encryptionHelper = null!;
+<<<<<<< HEAD
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+=======
+    private FileBusiness _fileBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private DataSourceBusiness _dataSourceBusiness = null!;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private ClassBusiness _classBusiness = null!;
+    private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private OlapBusiness _olapBusiness = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+>>>>>>> 049b551ecc863a4962150fa9ba66c1f09827eb67
     public long cid; // class ID
     public long did; // datasource ID
     public long did2;
@@ -72,10 +86,36 @@ public class RecordBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
+<<<<<<< HEAD
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
             _sensitivityLabelBusiness, _sensitivityLabelService, _objectStorageBusiness, _fileBusinessFactory.Object);
+=======
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _dataSourceBusiness =
+            new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _relationshipBusiness = new Mock<IRelationshipBusiness>();
+        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
+        _insightBusiness = new Mock<IInsightBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance
+        );
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
+            _sensitivityLabelBusiness, _sensitivityLabelService, _fileBusiness);
+>>>>>>> 049b551ecc863a4962150fa9ba66c1f09827eb67
     }
 
     #region RecordResponseDto Tests

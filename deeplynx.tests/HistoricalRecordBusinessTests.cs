@@ -10,6 +10,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -342,6 +343,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
             IsArchived = false
         };
 
+
         var updatePermission = new Permission
         {
             Name = "Update Default Label",
@@ -410,6 +412,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             IsArchived = false
         };
+
 
         var updatePermission2 = new Permission
         {
@@ -812,6 +815,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     {
         Context.ChangeTracker.Clear();
 
+
         // Arrange
         // TODO: insert tags after record to avoid race condition
         var record = await Context.Records
@@ -820,7 +824,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
             .FirstOrDefaultAsync();
         Assert.NotNull(record);
 
+
         Context.ChangeTracker.Clear();
+
 
         // Act
         var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
@@ -1019,8 +1025,10 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // Arrange
         var pointInTime = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
+
         // Ensure temporal separation (prevents same-millisecond issues when tests are run in parallel)
         await Task.Delay(10);
+
 
         var dto = new UpdateRecordRequestDto
         {
