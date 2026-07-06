@@ -77,6 +77,9 @@ public class FileBusiness
     /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
     /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
     /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
+    /// <param name="isSysAdmin">Bool of whether or not the user is a system admin</param>
+    /// <param name="isOrgAdmin">Bool of whether or not the user is an organization admin</param>
+    /// <param name="isProjectAdmin">Bool of whether or not the user is a project admin</param>
     /// <returns>Record response DTO containing file information</returns>
     public async Task<RecordResponseDto> UploadFile(
         long currentUserId,
@@ -90,7 +93,10 @@ public class FileBusiness
         bool embed = false,
         long? vlmConfigId = null,
         long? embeddingModelConfigId = null,
-        string? userJwt = null)
+        string? userJwt = null,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
     {
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
         file = new SanitizedFormFile(file);
@@ -162,7 +168,7 @@ public class FileBusiness
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
-            realDataSourceId, recordRequest, sensitivityLabelIds, embed);
+            realDataSourceId, recordRequest, sensitivityLabelIds, embed, isSysAdmin, isOrgAdmin, isProjectAdmin);
 
         if (embed)
         {
@@ -932,7 +938,7 @@ public class FileBusiness
 
         return false;
     }
-    
+
     private async Task<ClassResponseDto> GetResolvedClass(long organizationId, long projectId, long currentUserId, CreateRecordFileUploadRequestDto? metadata, ClassResponseDto recordClass)
     {
         var providedClassId = metadata?.ClassId;
@@ -943,16 +949,18 @@ public class FileBusiness
         if (providedClassId.HasValue)
         {
             resolvedClass = await _classBusiness.GetClass(organizationId, projectId, providedClassId.Value, true);
-            if (resolvedClass is null) {
+            if (resolvedClass is null)
+            {
                 throw new ArgumentException($"Class ID {providedClassId} does not exist in this project.");
-            } 
-            if (!string.IsNullOrWhiteSpace(providedClassName) && resolvedClass.Name != providedClassName) {
+            }
+            if (!string.IsNullOrWhiteSpace(providedClassName) && resolvedClass.Name != providedClassName)
+            {
                 // Class Name was provided and doesn't match the Class Name from the Id
                 throw new ArgumentException($"Class Name {providedClassName} does not match Class Id {providedClassId}. Expected {resolvedClass.Name}");
             }
-        } 
+        }
         // No Class Id provided, Class Name was provided
-        else if (!string.IsNullOrWhiteSpace(providedClassName)) 
+        else if (!string.IsNullOrWhiteSpace(providedClassName))
         {
             resolvedClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, providedClassName);
         }

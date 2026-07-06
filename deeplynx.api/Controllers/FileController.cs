@@ -66,9 +66,12 @@ public class FileController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var userJwt = UserContextStorage.Token;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt);
+                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
