@@ -1224,6 +1224,87 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     #endregion
 
     // =========================================================================
+    // Provenance Record Creation Tests
+    // =========================================================================
+
+    #region Provenance Record Creation Tests
+
+    [Fact]
+    public async Task TriggerLatticeExtraction_CreatesProvenanceRecord_WhenRecordEmbeddingIsTriggered()
+    {
+        var (_, embCfg) = SetupModelConfigMocks();
+        _mockProvenance
+            .Setup(p => p.CreateProvenanceRecord(recordId, "embedding_requested", uid, embCfg.Id))
+            .ReturnsAsync(true);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.TriggerLatticeExtraction(uid, oid, pid, recordId, ExtractionMode.Strict));
+
+        _mockProvenance.Verify(
+            p => p.CreateProvenanceRecord(recordId, "embedding_requested", uid, embCfg.Id),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task TriggerLatticeExtraction_DoesNotCreateProvenanceRecord_WhenRecordAlreadyEmbedded()
+    {
+        SetupModelConfigMocks();
+ 
+        // Seed an existing embedding for the record so the "record not embedded" branch —
+        // the only branch that creates a provenance record — is skipped. Ontology embeddings
+        // are intentionally left absent so the call still fails fast for retry.
+        await Context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO dl_vector.embeddings (record_id, page_number, text_chunk, vector, last_updated_at) " +
+            "VALUES ({0}, {1}, {2}, '[0]', {3})",
+            recordId, 1, "chunk text", DateTime.UtcNow);
+ 
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.TriggerLatticeExtraction(uid, oid, pid, recordId, ExtractionMode.Strict));
+ 
+        _mockProvenance.Verify(
+            p => p.CreateProvenanceRecord(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<long?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task TriggerLatticeExtraction_PassesEmbeddingModelConfigId_ToProvenanceRecord()
+    {
+        var (_, embCfg) = SetupModelConfigMocks();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.TriggerLatticeExtraction(uid, oid, pid, recordId, ExtractionMode.Strict));
+
+        // The embedding model config (not the vlm/llm config) is the one recorded as
+        // provenance for the embedding_requested action.
+        _mockProvenance.Verify(
+            p => p.CreateProvenanceRecord(recordId, It.IsAny<string>(), uid, embCfg.Id),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task TriggerLatticeExtraction_StillThrowsEmbeddingsPendingError_WhenProvenanceRecordCreationFails()
+    {
+        SetupModelConfigMocks();
+
+        // Simulate ProvenanceBusiness failing to find a historical record (returns false)
+        _mockProvenance
+            .Setup(p => p.CreateProvenanceRecord(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<long?>()))
+            .ReturnsAsync(false);
+
+        // A failed provenance write should not surface as a different error, nor should it
+        // prevent the normal "embeddings pending" retry signal from being thrown.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _business.TriggerLatticeExtraction(uid, oid, pid, recordId, ExtractionMode.Strict));
+
+        Assert.Contains("Embeddings are being generated", ex.Message);
+        _mockProvenance.Verify(
+            p => p.CreateProvenanceRecord(recordId, "embedding_requested", uid, It.IsAny<long?>()),
+            Times.Once);
+    }
+
+    #endregion
+
+    // =========================================================================
     // OriginId Provenance Tests
     // =========================================================================
 

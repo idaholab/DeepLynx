@@ -531,6 +531,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = record.IsArchived,
             FileType = record.FileType,
             FileSize = record.FileSize,
+            Embedded =  record.Embedded,
             Tags = record.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
