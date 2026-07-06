@@ -29,7 +29,7 @@ public interface IInsightBusiness
         long currentUserId,
         long organizationId,
         long projectId,
-        long modelConfigId,
+        long? modelConfigId,
         string modelType);
     
     void TriggerEmbedding(
