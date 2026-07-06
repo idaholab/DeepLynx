@@ -4,10 +4,6 @@ FROM node:22-alpine AS frontend-build
 # Set working directory
 WORKDIR /usr/src/app
 
-# For next inline variable builds
-ARG HOSTED_LINK
-ENV NEXT_PUBLIC_HOSTED_LINK=$HOSTED_LINK
-
 # Copy dependency metadata first
 COPY deeplynx.docs/package.json deeplynx.docs/package-lock.json ./
 
@@ -28,8 +24,6 @@ RUN set -eux; \
     test -f "$target/package.json" && grep -q '"version": "4.0.4"' "$target/package.json"; \
     cd / && rm -rf "$tmp"
 
-RUN echo "HOSTED_LINK=$HOSTED_LINK"
-RUN echo "NEXT_PUBLIC_HOSTED_LINK=$NEXT_PUBLIC_HOSTED_LINK"
 # Build the frontend
 RUN npm run build
 
