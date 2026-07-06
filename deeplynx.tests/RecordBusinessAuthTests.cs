@@ -31,6 +31,8 @@ public class RecordBusinessAuthTests : IntegrationTestBase
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private EncryptionHelper _encryptionHelper = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     public long cid; // class ID
     public long did; // datasource ID
     public long did2;
@@ -82,8 +84,10 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+            _sensitivityLabelBusiness, _sensitivityLabelService, _objectStorageBusiness, _fileBusinessFactory.Object);
     }
 
     #region GetAllRecords_SensitivityLabelsAuthorization Tests

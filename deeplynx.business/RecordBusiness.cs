@@ -20,6 +20,8 @@ public class RecordBusiness : IRecordBusiness
     private readonly ISensitivityLabelBusiness _labelBusiness;
     private readonly ISensitivityLabelService _sensitivityLabelService;
     private readonly ITagBusiness _tagBusiness;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly IFileBusinessFactory _fileBusinessFactory;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="RecordBusiness" /> class.
@@ -36,7 +38,9 @@ public class RecordBusiness : IRecordBusiness
         IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
         ITagBusiness tagBusiness,
         ISensitivityLabelBusiness labelBusiness,
-        ISensitivityLabelService sensitivityLabelService)
+        ISensitivityLabelService sensitivityLabelService,
+        IObjectStorageBusiness objectStorageBusiness,
+        IFileBusinessFactory fileBusinessFactory)
     {
         _context = context;
         _eventBusiness = eventBusiness;
@@ -44,6 +48,8 @@ public class RecordBusiness : IRecordBusiness
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
         _labelBusiness = labelBusiness;
         _sensitivityLabelService = sensitivityLabelService;
+        _objectStorageBusiness = objectStorageBusiness;
+        _fileBusinessFactory = fileBusinessFactory;
     }
     /// <summary>
     ///     Retrieves all records for a specific project and datasource.
@@ -1564,6 +1570,7 @@ public class RecordBusiness : IRecordBusiness
         var recordName = returnedRecord.Name;
         var recordDataSourceId = returnedRecord.DataSourceId;
 
+        await DeleteAttachedFileIfPresent(returnedRecord);
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
 
@@ -1579,6 +1586,46 @@ public class RecordBusiness : IRecordBusiness
         });
 
         return true;
+    }
+
+    private async Task DeleteAttachedFileIfPresent(Record record)
+    {
+        // Guard condition: only file-backed records should delete storage.
+        // ObjectStorageId + Uri + FileType is a practical signal for a DeepLynx file upload.
+        if (!record.ObjectStorageId.HasValue ||
+            string.IsNullOrWhiteSpace(record.Uri) ||
+            string.IsNullOrWhiteSpace(record.FileType))
+        {
+            return;
+        }
+
+        var objectStorage = await _objectStorageBusiness
+            .GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+
+        var storageBusiness = _fileBusinessFactory
+            .CreateFileBusiness(objectStorage.Type);
+
+        var dto = new RecordResponseDto
+        {
+            Id = record.Id,
+            Description = record.Description,
+            Uri = record.Uri,
+            Properties = record.Properties,
+            ObjectStorageId = record.ObjectStorageId,
+            OriginalId = record.OriginalId,
+            Name = record.Name,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedBy = record.LastUpdatedBy,
+            LastUpdatedAt = record.LastUpdatedAt,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize
+        };
+
+        await storageBusiness.DeleteFile(dto, objectStorage.Config);
     }
 
     /// <summary>

@@ -310,7 +310,35 @@ public class FileBusiness
 
         await fileBusiness.DeleteFile(record, objectStorage.Config);
 
-        var deleted = await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+        //var deleted = await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+
+        await InvalidateProjectStorageSizeCache(projectId);
+
+        return true;
+
+        // Embeddings made by Insight that reference this record will be auto deleted
+    }
+
+    /// <summary>
+    ///     Delete a File and not the Record
+    /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <returns>A message stating the file was successfully deleted.</returns>
+    public async Task<bool> DeleteFileOnly(long currentUserId, long organizationId, long projectId, long recordId)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (record == null) throw new KeyNotFoundException("Record not found");
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+
+        var deleted = await fileBusiness.DeleteFile(record, objectStorage.Config);
 
         await InvalidateProjectStorageSizeCache(projectId);
 
@@ -932,7 +960,7 @@ public class FileBusiness
 
         return false;
     }
-    
+
     private async Task<ClassResponseDto> GetResolvedClass(long organizationId, long projectId, long currentUserId, CreateRecordFileUploadRequestDto? metadata, ClassResponseDto recordClass)
     {
         var providedClassId = metadata?.ClassId;
@@ -943,16 +971,18 @@ public class FileBusiness
         if (providedClassId.HasValue)
         {
             resolvedClass = await _classBusiness.GetClass(organizationId, projectId, providedClassId.Value, true);
-            if (resolvedClass is null) {
+            if (resolvedClass is null)
+            {
                 throw new ArgumentException($"Class ID {providedClassId} does not exist in this project.");
-            } 
-            if (!string.IsNullOrWhiteSpace(providedClassName) && resolvedClass.Name != providedClassName) {
+            }
+            if (!string.IsNullOrWhiteSpace(providedClassName) && resolvedClass.Name != providedClassName)
+            {
                 // Class Name was provided and doesn't match the Class Name from the Id
                 throw new ArgumentException($"Class Name {providedClassName} does not match Class Id {providedClassId}. Expected {resolvedClass.Name}");
             }
-        } 
+        }
         // No Class Id provided, Class Name was provided
-        else if (!string.IsNullOrWhiteSpace(providedClassName)) 
+        else if (!string.IsNullOrWhiteSpace(providedClassName))
         {
             resolvedClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, providedClassName);
         }

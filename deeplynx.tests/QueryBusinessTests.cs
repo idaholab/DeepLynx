@@ -28,6 +28,9 @@ public class QueryBusinessTests : IntegrationTestBase
     private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private long cid;
     private long cid2;
     private long did;
@@ -61,8 +64,11 @@ public class QueryBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _encryptionHelper = new EncryptionHelper();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+            _sensitivityLabelBusiness, _sensitivityLabelService, _objectStorageBusiness, _fileBusinessFactory.Object);
         _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService);
     }
 
@@ -3829,7 +3835,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Should ONLY match recA. If it matches recCat or recDog due to partial matching, it fails.
         var dtoA = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "tags", Operator = "=", Value = "a"
+            Connector = "AND",
+            Filter = "tags",
+            Operator = "=",
+            Value = "a"
         };
         var resultA = await _queryBusiness.QueryBuilder(uid, [dtoA], organizationId, [pid]);
 
@@ -3840,7 +3849,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // Should ONLY match recCat.
         var dtoCat = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "tags", Operator = "=", Value = "cat"
+            Connector = "AND",
+            Filter = "tags",
+            Operator = "=",
+            Value = "cat"
         };
         var resultCat = await _queryBusiness.QueryBuilder(uid, [dtoCat], organizationId, [pid]);
         Assert.Single(resultCat);
@@ -3851,7 +3863,10 @@ public class QueryBusinessTests : IntegrationTestBase
         // If it returns recDog, then it's doing substring match.
         var dtoD = new CustomQueryDtos.CustomQueryRequestDto
         {
-            Connector = "AND", Filter = "tags", Operator = "=", Value = "d"
+            Connector = "AND",
+            Filter = "tags",
+            Operator = "=",
+            Value = "d"
         };
         var resultD = await _queryBusiness.QueryBuilder(uid, [dtoD], organizationId, [pid]);
 
