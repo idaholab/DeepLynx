@@ -32,14 +32,15 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="tagBusiness">Used for creating tags related to a record.</param>
     /// <param name="labelBusiness">Used for creating tags related to a record.</param>
     /// <param name="sensitivityLabelService">Service for sensitivity label authorization operations.</param>
-    /// <param name="fileBusiness">Used for handling file storage.</param>
     public RecordBusiness(
         DeeplynxContext context,
         IEventBusiness eventBusiness,
         IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
         ITagBusiness tagBusiness,
         ISensitivityLabelBusiness labelBusiness,
-        ISensitivityLabelService sensitivityLabelService)
+        ISensitivityLabelService sensitivityLabelService,
+        IObjectStorageBusiness objectStorageBusiness,
+        IFileBusinessFactory fileBusinessFactory)
     {
         _context = context;
         _eventBusiness = eventBusiness;
@@ -47,6 +48,8 @@ public class RecordBusiness : IRecordBusiness
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
         _labelBusiness = labelBusiness;
         _sensitivityLabelService = sensitivityLabelService;
+        _objectStorageBusiness = objectStorageBusiness;
+        _fileBusinessFactory = fileBusinessFactory;
     }
     /// <summary>
     ///     Retrieves all records for a specific project and datasource.
