@@ -292,7 +292,7 @@ public class FileFilesystemBusiness : IFileBusiness
                     {
                         await Parallel.ForEachAsync(
                             Directory.EnumerateFiles(fullPath, "*", SearchOption.AllDirectories),
-                            new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount * 3, CancellationToken = cancellationToken },
+                            new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = cancellationToken },
                             async (filePath, ct) =>
                             {
                                 var entryName = Path.GetRelativePath(fullPath, filePath).Replace('\\', '/');
@@ -302,7 +302,7 @@ public class FileFilesystemBusiness : IFileBusiness
                                     FileMode.Open,
                                     FileAccess.Read,
                                     FileShare.Read,
-                                    bufferSize: 1_048_576,
+                                    bufferSize: 512 * 1024,
                                     useAsync: true);
 
                                 using var compressedStream = new MemoryStream();

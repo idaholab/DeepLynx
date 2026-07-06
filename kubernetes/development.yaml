@@ -399,8 +399,8 @@ spec:
               cpu: "500m"
               memory: "512Mi"
             limits:
-              cpu: "2000m"
-              memory: "2Gi"
+              cpu: "10000m"
+              memory: "12Gi"
           ports:
             - containerPort: 5000
             - containerPort: 50051
@@ -785,8 +785,8 @@ spec:
               memory: "512Mi"
               cpu: "1500m"
             limits:
-              memory: "12Gi"
-              cpu: "10000m"
+              memory: "2Gi"
+              cpu: "2000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
