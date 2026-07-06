@@ -231,7 +231,7 @@ public class FileController : ControllerBase
         try
         {
             var uploadSession = await _fileBusiness.StartUpload(
-                organizationId, projectId, dataSourceId, objectStorageId, request);
+                organizationId, projectId, dataSourceId, objectStorageId, request, request.Metadata);
             return Ok(uploadSession);
         }
         catch (Exception exc)

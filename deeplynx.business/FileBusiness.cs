@@ -333,13 +333,15 @@ public class FileBusiness
     /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">The ID of the object storage method</param>
     /// <param name="request">File upload initialization request DTO</param>
+    /// <param name="metadata">Additional metadata that will be appended to the record</param>
     /// <returns>{UploadId, ChunkSize}</returns>
     public async Task<FileUploadSessionResponseDto> StartUpload(
         long organizationId,
         long projectId,
         long? dataSourceId,
         long? objectStorageId,
-        FileUploadInitRequestDto request)
+        FileUploadInitRequestDto request,
+        CreateRecordFileUploadRequestDto? metadata = null)
     {
         var realDataSourceId = await ResolveDataSourceId(organizationId, projectId, dataSourceId);
         var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
@@ -348,6 +350,36 @@ public class FileBusiness
         request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
 
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+
+        if (metadata != null)
+        {
+            ValidationHelper.ValidateModel(metadata);
+
+            // Metadata Validation before starting upload
+            // Properties validation
+            var maxDepth = ValidationHelper.ValidateJsonMaxDepth(metadata.Properties);
+            if (maxDepth > 3) throw new Exception($"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}");
+
+            // original Id validation
+            var recordQuery = _context.Records
+                .Where(r => r.ProjectId == projectId
+                            && r.DataSourceId == realDataSourceId
+                            && r.OrganizationId == organizationId
+                            && r.OriginalId == metadata.OriginalId);
+            var matchingRecord = await recordQuery.FirstOrDefaultAsync();
+            if (matchingRecord != null) 
+                throw new ArgumentException("original_id already exists");
+
+            // class id validation
+            if (metadata.ClassId.HasValue)
+            {
+                var actualClass = await _classBusiness.GetClass(organizationId, projectId, metadata.ClassId.Value, true) 
+                    ?? throw new ArgumentException($"Class ID {metadata.ClassId} does not exist in this project.");
+                if (!string.IsNullOrWhiteSpace(metadata.ClassName) && actualClass.Name != metadata.ClassName) {
+                    throw new ArgumentException($"Class Name {metadata.ClassName} does not match Class Id {metadata.ClassId}. Expected {actualClass.Name}");
+                }
+            } 
+        }
 
         var uploadId = await fileBusiness.StartUpload(organizationId, projectId, realDataSourceId, objectStorage.Config);
         var totalChunks = (int)Math.Ceiling((double)request.FileSize / _recommendedChunkSize);
