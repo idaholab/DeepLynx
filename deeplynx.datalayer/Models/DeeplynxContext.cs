@@ -1584,6 +1584,10 @@ public partial class DeeplynxContext : DbContext
                 .HasColumnName("id")
                 .IsRequired();
 
+            entity.Property(e => e.RecordId)
+                .HasColumnName("record_id")
+                .IsRequired();
+
             entity.Property(e => e.JobId)
                 .HasColumnName("job_id")
                 .IsRequired();
