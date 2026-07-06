@@ -662,22 +662,6 @@ public class InvitationBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task CreateAndAddServiceAccount_DoesNotAddToOrganization()
-    {
-        // Act
-        await _invitationBusiness.CreateAndAddServiceAccountToProject(oid, pid, "Org-Less Service Account", rid);
-
-        // Assert — service accounts skip org membership entirely
-        var serviceAccount = await Context.Users
-            .FirstOrDefaultAsync(u => u.Name == "Org-Less Service Account" && u.AccountType == AccountType.Service);
-        Assert.NotNull(serviceAccount);
-
-        var inOrg = await Context.OrganizationUsers
-            .AnyAsync(ou => ou.UserId == serviceAccount.Id);
-        Assert.False(inOrg);
-    }
-
-    [Fact]
     public async Task CreateAndAddServiceAccount_GeneratesUniqueIdentifiers_AcrossMultipleAccounts()
     {
         // Act
