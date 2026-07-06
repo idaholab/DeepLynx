@@ -3,6 +3,11 @@ import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useLanguage } from "@/app/contexts/Language";
 import { CompareMode, FlatDifferenceRow } from "./RecordHistoryDifferenceUtils";
 
+interface ClassInfo {
+  name: string;
+  isArchived: boolean;
+}
+
 interface Props {
   compareMode: CompareMode;
   showOnlyChanges: boolean;
@@ -18,7 +23,10 @@ interface Props {
   onShowOnlyChangesChange: (checked: boolean) => void;
   onToggleExpand: (id: string) => void;
   onLoadMore: () => void;
+  classInfoMap: ClassInfoMap;
 }
+
+type ClassInfoMap = Record<number, ClassInfo>;
 
 export default function RecordHistoryDifferenceTable({
   compareMode,
@@ -35,15 +43,77 @@ export default function RecordHistoryDifferenceTable({
   onShowOnlyChangesChange,
   onToggleExpand,
   onLoadMore,
+  classInfoMap
 }: Props) {
   const { t } = useLanguage();
 
+  let currentClassName: string = "";
+  let compareClassName: string = "";
+
+  function normalizeCurrentClassNameWithArchivedLabel(
+    classIdStr: string | null | undefined,
+    classInfoMap: ClassInfoMap
+  ): number | null {
+    if (!classIdStr) {
+      currentClassName = t.translations.NO_CLASS;
+      return null;
+    }
+
+    const classId = Number(classIdStr);
+    if (Number.isNaN(classId)) {
+      currentClassName = t.translations.NO_CLASS;
+      return null;
+    }
+
+    const info = classInfoMap[classId];
+
+    if (!info) currentClassName = t.translations.NO_CLASS;
+
+    if (info.isArchived) {
+      currentClassName = `${info.name} (Archived)`;
+    } else {
+      currentClassName = info.name
+    }
+
+    return classId;
+  }
+
+  function normalizeCompareClassNameWithArchivedLabel(
+    classIdStr: string | null | undefined,
+    classInfoMap: ClassInfoMap
+  ): number | null {
+
+    if (!classIdStr) {
+      compareClassName = "N/A";
+      return null;
+    }
+    const classId = Number(classIdStr);
+    if (Number.isNaN(classId)) {
+      compareClassName = "N/A";
+      return null;
+    }
+
+    const info = classInfoMap[classId];
+    if (!info) {
+      compareClassName = "N/A";
+      return null;
+    }
+
+    if (info.isArchived) {
+      compareClassName = `${info.name} (Archived)`;
+    } else {
+      compareClassName = info.name;
+    }
+
+    return classId;
+  }
+
   return (
     // Difference card: filters, loading states, and expandable difference tree table.
-    <div className="card bg-base-100 shadow-lg">
+    <div className="card border border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body p-0">
         {/* Header row with "show only changes" toggle. */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300/50">
           <div>
             <h3 className="font-semibold">
               {t.translations.RECORD_HISTORY_VERSION_DIFFERENCE}
@@ -109,14 +179,36 @@ export default function RecordHistoryDifferenceTable({
                   </td>
                 </tr>
               ) : (
-                visibleRows.map(({ node, depth }) => {
+                visibleRows.map(({ node, depth }, _) => {
                   const hasChildren = node.children.length > 0;
                   const isExpanded = expandedRows.has(node.id);
+
+                  const isClassIdRow = node.field === "record.classId";
+                  const isClassNameRow = node.field === "record.className";
+
+                  let currentValue: number | string | null = null;
+                  let compareValue: number | string | null = null;
+
+                  if (isClassIdRow) {
+                    currentValue = normalizeCurrentClassNameWithArchivedLabel(node.current, classInfoMap) ?? "N/A"
+                  } else if (isClassNameRow) {
+                    currentValue = currentClassName;
+                  }
+                  else {
+                    currentValue = node.current ?? placeholderValue
+                  }
+
+                  if (isClassIdRow) {
+                    compareValue = normalizeCompareClassNameWithArchivedLabel(node.compare, classInfoMap) ?? "N/A"
+                  } else if (isClassNameRow) {
+                    compareValue = compareClassName;
+                  }
+                  else {
+                    compareValue = node.compare ?? placeholderValue
+                  }
+
                   return (
-                    <tr
-                      key={node.id}
-                      className={node.changed ? "bg-warning/10" : ""}
-                    >
+                    <tr key={node.id} className={node.changed ? "bg-warning/10" : ""}>
                       <td className="align-top">
                         <div
                           className="flex items-start gap-2"
@@ -144,7 +236,7 @@ export default function RecordHistoryDifferenceTable({
                                 {isExpanded
                                   ? t.translations.RECORD_HISTORY_EXPANDED
                                   : t.translations
-                                      .RECORD_HISTORY_COLLAPSED}{" "}
+                                    .RECORD_HISTORY_COLLAPSED}{" "}
                                 ({node.leafCount}{" "}
                                 {t.translations.RECORD_HISTORY_FIELDS})
                               </div>
@@ -163,7 +255,7 @@ export default function RecordHistoryDifferenceTable({
                           </span>
                         ) : (
                           <div className="whitespace-pre-wrap break-all text-xs">
-                            {node.current ?? placeholderValue}
+                            {currentValue?.toString() ?? "N/A"}
                           </div>
                         )}
                       </td>
@@ -178,7 +270,7 @@ export default function RecordHistoryDifferenceTable({
                           </span>
                         ) : (
                           <div className="whitespace-pre-wrap break-all text-xs">
-                            {node.compare ?? placeholderValue}
+                            {compareValue?.toString() ?? "N/A"}
                           </div>
                         )}
                       </td>
@@ -204,7 +296,7 @@ export default function RecordHistoryDifferenceTable({
         </div>
         {/* Incremental rendering control for very large trees. */}
         {hasMoreRows && (
-          <div className="px-4 py-3 border-t border-base-300">
+          <div className="px-4 py-3 border-t border-base-300/50">
             <button
               type="button"
               className="btn btn-outline btn-sm"

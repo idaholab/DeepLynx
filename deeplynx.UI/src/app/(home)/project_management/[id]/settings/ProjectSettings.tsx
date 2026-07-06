@@ -38,12 +38,11 @@ import ArchiveStorageModal from "./components/ArchiveStorageModal";
 import RemoveLogoModal from "./components/RemoveLogoModal";
 import { useLanguage } from "@/app/contexts/Language";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { isInsightHidden } from "@/app/lib/feature_flags";
 
 interface ProjectSettingsProps {
   project: ProjectResponseDto | null;
-  setProject: React.Dispatch<
-    React.SetStateAction<ProjectResponseDto | null>
-  >;
+  setProject: React.Dispatch<React.SetStateAction<ProjectResponseDto | null>>;
 }
 
 type StorageTab = "default" | "manage";
@@ -491,7 +490,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     <div className="p-6">
       <div className="mx-auto space-y-6">
         {/* Page Header */}
-        <div className="border-b border-base-300 pb-4">
+        <div className="border-b border-base-300/50 pb-4">
           <h2 className="text-2xl font-bold text-base-content">
             {t.translations.PROJECT_SETTINGS}
           </h2>
@@ -551,12 +550,14 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
               onDeleteStorage={(storageId) => setDeleteStorageId(storageId)}
               t={t}
             />
-            <ProjectInsightModelTemplateSection
-              organizationId={
-                organization?.organizationId as number | undefined
-              }
-              projectId={project.id as number | undefined}
-            />
+            {!isInsightHidden() && (
+              <ProjectInsightModelTemplateSection
+                organizationId={
+                  organization?.organizationId as number | undefined
+                }
+                projectId={project.id as number | undefined}
+              />
+            )}
           </div>
         </div>
       </div>

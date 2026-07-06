@@ -390,6 +390,10 @@ public class OrganizationBusiness : IOrganizationBusiness
         if (user == null || user.IsArchived)
             throw new KeyNotFoundException($"User with id {userId} not found");
 
+        // service users are restricted to project scope. Cannot be added only to an org
+        if (user.AccountType == AccountType.Service)
+            throw new InvalidOperationException("Service accounts must be added directly to a project");
+
         var organization = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId);
         if (organization == null || organization.IsArchived)
             throw new KeyNotFoundException($"Organization with id {organizationId} not found");
@@ -420,10 +424,14 @@ public class OrganizationBusiness : IOrganizationBusiness
     {
         // check if the user exists in the organization
         var existingOrgUser = await _context.OrganizationUsers
+            .Include(ou => ou.User)
             .FirstOrDefaultAsync(ou => ou.OrganizationId == organizationId && ou.UserId == userId);
 
         if (existingOrgUser == null)
             throw new KeyNotFoundException($"User with id {userId} not found in Org with id {organizationId}");
+
+        if (existingOrgUser.User.AccountType == AccountType.Service)
+            throw new InvalidOperationException("Only standard user accounts can be granted org admin status.");
 
         // set is admin and save to DB
         existingOrgUser.IsOrgAdmin = isAdmin;
@@ -535,16 +543,12 @@ public class OrganizationBusiness : IOrganizationBusiness
         // ===============================
         var defaultRoles = new List<CreateRoleRequestDto>
         {
-            new() { Name = "Admin", Description = "Administrator role with full permissions" },
             new() { Name = "User", Description = "User role with limited permissions" }
         };
         var roles = await _roleBusiness.BulkCreateRoles(currentUserId, organizationId, null, defaultRoles);
-        var adminRoleId = roles.Single(r => r.Name == "Admin").Id;
         var userRoleId = roles.Single(r => r.Name == "User").Id;
 
-        // set role permissions for admin and user
-        await _roleBusiness.SetPermissionsByPattern(adminRoleId, DefaultRolePermissions.Admin.AllowedPermissions,
-            organizationId, null);
+        // set role permissions for user
         await _roleBusiness.SetPermissionsByPattern(userRoleId, DefaultRolePermissions.User.AllowedPermissions,
             organizationId, null);
     }

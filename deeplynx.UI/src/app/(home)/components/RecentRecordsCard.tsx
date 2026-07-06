@@ -1,239 +1,249 @@
 "use client";
 import { useLanguage } from "@/app/contexts/Language";
-import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import CatalogViewSkeleton from "./skeletons/catalogviewskeleton";
-import { HistoricalRecordResponseDto } from "../types/responseDTOs";
-import { getRecentlyAddedRecords } from "@/app/lib/client_service/query_services.client";
+import { QueryRecordViewResponseDto } from "@/app/(home)/types/responseDTOs";
 import { formatLocalDateTime } from "@/app/lib/date_time";
 import PaginationControls from "./PaginationControls";
-import { useLocalPagination } from "@/app/hooks/useLocalPagination";
-import SortSelect from "./SortSelect";
-import { useSortedItems } from "../hooks/useSortedItems";
-import type { SortOption } from "../hooks/useSortedItems";
+import { useRecordsPaginated } from "@/app/hooks/useRecordsPaginated";
+import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 
 interface Props {
-  selectedProjects: string[];
-  border?: boolean;
+    selectedProjects: string[];
+    border?: boolean;
+}
+
+interface RecordViewProps {
+    record: QueryRecordViewResponseDto;
+    activeClassNames: Set<string>;
 }
 
 type RecentRecordSortValue = "nameAZ" | "nameZA" | "dateNew" | "dateOld";
 
 const RecentRecordsCard: React.FC<Props> = ({
-  selectedProjects,
-  border = true,
-}) => {
-  const { t } = useLanguage();
-  const router = useRouter();
-  const { organization } = useOrganizationSession();
-
-  // View state
-  const [records, setRecords] = useState<HistoricalRecordResponseDto[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const failedToLoadRecentRecords =
-    t.translations.FAILED_TO_LOAD_RECENT_RECORDS;
-
-  const sortOptions = useMemo<
-    SortOption<HistoricalRecordResponseDto, RecentRecordSortValue>[]
-  >(
-    () => [
-      {
-        value: "nameAZ",
-        label: t.translations.SORT_NAME_A_TO_Z,
-        compare: (a, b) =>
-          (a.name ?? "").localeCompare(b.name ?? "", undefined, {
-            sensitivity: "base",
-          }),
-      },
-      {
-        value: "nameZA",
-        label: t.translations.SORT_NAME_Z_TO_A,
-        compare: (a, b) =>
-          (b.name ?? "").localeCompare(a.name ?? "", undefined, {
-            sensitivity: "base",
-          }),
-      },
-      {
-        value: "dateNew",
-        label: t.translations.SORT_DATE_NEWEST,
-        compare: (a, b) =>
-          new Date(b.lastUpdatedAt).getTime() -
-          new Date(a.lastUpdatedAt).getTime(),
-      },
-      {
-        value: "dateOld",
-        label: t.translations.SORT_DATE_OLDEST,
-        compare: (a, b) =>
-          new Date(a.lastUpdatedAt).getTime() -
-          new Date(b.lastUpdatedAt).getTime(),
-      },
-    ],
-    [t],
-  );
-
-  const {
-    sortValue,
-    setSortValue,
-    sortedItems: sortedRecords,
-  } = useSortedItems({
-    items: records,
-    sortOptions,
-    defaultSortValue: "dateNew",
-  });
-
-  // Local pagination state for the sorted dataset.
-  const {
-    currentPage,
-    pageSize,
-    paginatedItems: paginatedRecords,
-    resetPagination,
-    setCurrentPage,
-    setPageSize,
-    totalPages,
-  } = useLocalPagination({
-    items: sortedRecords,
-    initialPageSize: 5,
-  });
-
-  // Fetch recent records for the selected projects and organization.
-  const fetchRecentRecords = useCallback(async () => {
-    if (
-      !organization?.organizationId ||
-      !selectedProjects ||
-      selectedProjects.length === 0
-    ) {
-      setRecords([]);
-      resetPagination();
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const projectIds = selectedProjects.map((id) => Number(id));
-      const data = await getRecentlyAddedRecords(
-        organization.organizationId as number,
-        projectIds,
-      );
-      setRecords(Array.isArray(data) ? data : []);
-      resetPagination();
-    } catch (e) {
-      console.error("Failed to fetch recent records:", e);
-      setError(failedToLoadRecentRecords);
-      setRecords([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    failedToLoadRecentRecords,
-    organization?.organizationId,
-    resetPagination,
     selectedProjects,
-  ]);
+    border = true,
+}) => {
+    const { t } = useLanguage();
 
-  useEffect(() => {
-    fetchRecentRecords();
-  }, [fetchRecentRecords]);
+    const sortOptions = useMemo<
+        {
+            value: RecentRecordSortValue;
+            label: string;
+        }[]
+    >(
+        () => [
+            {
+                value: "nameAZ",
+                label: t.translations.SORT_NAME_A_TO_Z,
+            },
+            {
+                value: "nameZA",
+                label: t.translations.SORT_NAME_Z_TO_A,
+            },
+            {
+                value: "dateNew",
+                label: t.translations.SORT_DATE_NEWEST,
+            },
+            {
+                value: "dateOld",
+                label: t.translations.SORT_DATE_OLDEST,
+            },
+        ],
+        [t],
+    );
 
-  // Reset back to the first page whenever the sort order changes.
-  useEffect(() => {
-    resetPagination();
-  }, [resetPagination, sortValue]);
+    const {
+        records,
+        totalPages,
+        sortBy,
+        setSortBy,
+        currentPage,
+        setCurrentPage,
+        pageSize,
+        setPageSize,
+        isLoading,
+        requestFailed,
+        fetchRecords,
+    } = useRecordsPaginated(selectedProjects);
 
-  const handleRecordClick = (record: HistoricalRecordResponseDto) => {
-    router.push(`/record?recordId=${record.id}&projectId=${record.projectId}`);
-  };
+    const [activeClassNames, setActiveClassNames] = useState<Set<string>>(new Set());
 
-  if (isLoading) return <CatalogViewSkeleton />;
+    useEffect(() => {
+        if (!selectedProjects || selectedProjects.length === 0) {
+            setActiveClassNames(new Set());
+            return;
+        }
 
-  return (
-    <div className={border ? "shadow-md shadow-dynamic-shadow rounded-xl" : ""}>
-      {/* Header and sort controls */}
-      <div className="flex items-center justify-between p-4">
-        <h2 className="text-lg font-semibold text-base-content">
-          {t.translations.RECENTLY_ADDED_RECORDS}
-        </h2>
+        let cancelled = false;
 
-        <SortSelect
-          value={sortValue}
-          onChange={setSortValue}
-          options={sortOptions}
-        />
-      </div>
+        const fetchActiveClasses = async () => {
+            try {
+                const projectIds = selectedProjects.map((id) => Number(id));
+                const classesArrays = await Promise.all(
+                    projectIds.map((projectId) => getAllClasses(projectId, true))
+                );
+                if (cancelled) return;
 
-      <div className="divider m-0"></div>
+                const allClasses = classesArrays.flat();
+                const classNamesSet = new Set(allClasses.map((cls) => cls.name));
+                setActiveClassNames(classNamesSet);
+            } catch (error) {
+                console.error("Failed to fetch active classes:", error);
+                if (!cancelled) setActiveClassNames(new Set());
+            }
+        };
 
-      {/* Error state */}
-      {error && (
-        <div className="p-4 text-error flex items-center justify-between">
-          <span>{error}</span>
-          <button
-            className="btn btn-sm btn-outline"
-            onClick={fetchRecentRecords}
-          >
-            {t.translations.RETRY}
-          </button>
+        fetchActiveClasses();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedProjects]);
+
+    if (isLoading) return <CatalogViewSkeleton />;
+
+    return (
+        <div
+            className={border ? "shadow-md shadow-base-content/10 rounded-xl" : ""}
+        >
+            {/* Header and sort controls */}
+            <div className="flex items-center justify-between p-4">
+                <h2 className="text-lg font-semibold text-base-content">
+                    {t.translations.RECENTLY_ADDED_RECORDS}
+                </h2>
+
+                <BasicSortSelect
+                    value={sortBy}
+                    options={sortOptions}
+                    onChange={setSortBy}
+                />
+            </div>
+
+            <div className="divider m-0"></div>
+
+            {/* Error state */}
+            {requestFailed && (
+                <div className="p-4 text-error flex items-center justify-between">
+                    <span>{t.translations.FAILED_TO_LOAD_RECENT_RECORDS}</span>
+                    <button className="btn btn-sm btn-outline" onClick={fetchRecords}>
+                        {t.translations.RETRY}
+                    </button>
+                </div>
+            )}
+
+            {/* Paginated records list */}
+            <ul className="space-y-1 p-2">
+                {records.map((record) => (
+                    <RecordView
+                        key={record.id}
+                        record={record}
+                        activeClassNames={activeClassNames}
+                    />
+                ))}
+            </ul>
+
+            {/* Empty state */}
+            {!requestFailed && records.length === 0 && (
+                <div className="text-center py-8 text-base-content/60">
+                    {t.translations.NO_RECENT_RECORDS}
+                </div>
+            )}
+            {/* Shared pagination controls */}
+            <PaginationControls
+                currentPage={currentPage}
+                pageSize={pageSize}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+            />
         </div>
-      )}
+    );
+};
 
-      {/* Paginated records list */}
-      <ul className="space-y-1 p-2">
-        {paginatedRecords.map((record) => (
-          <li
+interface BasicSortSelectProps {
+    value: string;
+    options: {
+        value: string;
+        label: string;
+    }[];
+    onChange: (value: string) => void;
+}
+
+/**
+* A select input for sorting values.
+*/
+function BasicSortSelect({ value, options, onChange }: BasicSortSelectProps) {
+    const { t } = useLanguage();
+
+    if (!options.length) return null;
+
+    return (
+        <div className="flex items-center gap-1">
+            <div className="px-3 py-2 text-md font-semibold text-base-content/50">
+                {t.translations.SORT_BY}
+            </div>
+            <div className="relative inline-block">
+                <select
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    className="select"
+                >
+                    {options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
+            </div>
+        </div>
+    );
+}
+
+/**
+* A view of a single record that redirects users to the record's page.
+*/
+function RecordView({ record, activeClassNames }: RecordViewProps) {
+    const { t } = useLanguage();
+    const router = useRouter();
+
+    const handleRecordClick = () => {
+        router.push(`/record?recordId=${record.id}&projectId=${record.projectId}`);
+    };
+
+    const normalizedClassName =
+        record.className && activeClassNames.has(record.className)
+            ? record.className
+            : t.translations.NO_CLASS;
+
+    return (
+        <li
             key={record.id}
             className="border-b border-base-content/40 cursor-pointer hover:bg-base-100/40 p-3 -mx-1 transition-colors"
-            onClick={() => handleRecordClick(record)}
-          >
+            onClick={() => handleRecordClick()}
+        >
             <div className="font-medium text-base-content mb-2 line-clamp-1 overflow-hidden break-all">
-              {record.name}
+                {record.name}
             </div>
 
             <div className="text-sm text-base-content/60 flex flex-wrap gap-x-4 gap-y-1">
-              <span className="flex items-center gap-1">
-                <span>{t.translations.CLASS}: </span>
-                <span className="badge badge-sm badge-secondary">
-                  {record.className ?? t.translations.UNKNOWN}
+                <span className="flex items-center gap-1">
+                    <span>{t.translations.CLASS}: </span>
+                    <span className="badge badge-sm badge-secondary">{normalizedClassName}</span>
                 </span>
-              </span>
 
-              <span>
-                <span className="text-base-content/50">
-                  {t.translations.LAST_EDIT}:
-                </span>{" "}
-                {formatLocalDateTime(record.lastUpdatedAt)}
-              </span>
+                <span>
+                    <span className="text-base-content/50">{t.translations.LAST_EDIT}:</span>{" "}
+                    {formatLocalDateTime(String(record.lastUpdatedAt))}
+                </span>
 
-              <span>
-                <span className="text-base-content/50">
-                  {t.translations.DATA_SOURCE}:
-                </span>{" "}
-                {record.dataSourceName}
-              </span>
+                <span>
+                    <span className="text-base-content/50">{t.translations.DATA_SOURCE}:</span>{" "}
+                    {record.dataSourceName}
+                </span>
             </div>
-          </li>
-        ))}
-      </ul>
-
-      {/* Empty state */}
-      {!error && paginatedRecords.length === 0 && (
-        <div className="text-center py-8 text-base-content/60">
-          {t.translations.NO_RECENT_RECORDS}
-        </div>
-      )}
-
-      {/* Shared pagination controls */}
-      <PaginationControls
-        currentPage={currentPage}
-        pageSize={pageSize}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        onPageSizeChange={setPageSize}
-      />
-    </div>
-  );
-};
-
+        </li>
+    );
+}
 export default RecentRecordsCard;

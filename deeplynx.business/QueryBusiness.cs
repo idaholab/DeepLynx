@@ -39,8 +39,8 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-    /// <returns>A list of historical record response dtos that match provided filters</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> QueryBuilder(
+    /// <returns>A list of record response dtos from the query view that match provided filters</returns>
+    public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
         long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request, long organizationId, long[] projectIds,
         string? textSearch = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
@@ -57,39 +57,39 @@ public class QueryBusiness : IQueryBusiness
             var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
                 AND (
                     NOT EXISTS (
-                        SELECT 1 
-                        FROM deeplynx.record_labels 
-                        WHERE record_id = hr.record_id
+                        SELECT 1
+                        FROM deeplynx.record_labels rl
+                        WHERE rl.record_id = qr.id
                     )
                     OR
                     NOT EXISTS (
                         SELECT 1
                         FROM deeplynx.record_labels rl2
-                        WHERE rl2.record_id = hr.record_id
+                        WHERE rl2.record_id = qr.id
                         AND rl2.label_id != ALL(@authorizedLabelIds)
                     )
                 )" : "";
 
             var sql = $@"
-                SELECT DISTINCT ON (hr.record_id)
-                    hr.*,
-                    hr.class_id as ClassId,
-                    hr.class_name as ClassName,
-                    hr.original_id as OriginalId,
-                    hr.data_source_name as DataSourceName,
-                    hr.data_source_id as DataSourceId,
-                    hr.project_name as ProjectName,
-                    hr.project_id as ProjectId,
-                    hr.last_updated_at as LastUpdatedAt,
-                    hr.last_updated_by as LastUpdatedBy,
-                    hr.object_storage_name as ObjectStorageName,
-                    hr.object_storage_id as ObjectStorageId,
-                    hr.record_id as RecordId,
-                    hr.is_archived as IsArchived
-                FROM deeplynx.historical_records hr
-                WHERE hr.is_archived = false
-                AND hr.project_id = ANY(@projectIds)
-                AND hr.organization_id = @organizationId
+                SELECT
+                    qr.*,
+                    qr.class_id as ClassId,
+                    qr.class_name as ClassName,
+                    qr.original_id as OriginalId,
+                    qr.data_source_name as DataSourceName,
+                    qr.data_source_id as DataSourceId,
+                    qr.project_name as ProjectName,
+                    qr.project_id as ProjectId,
+                    qr.last_updated_at as LastUpdatedAt,
+                    qr.last_updated_by as LastUpdatedBy,
+                    qr.object_storage_name as ObjectStorageName,
+                    qr.object_storage_id as ObjectStorageId,
+                    qr.id as RecordId,
+                    qr.is_archived as IsArchived
+                FROM deeplynx.query_records qr
+                WHERE qr.is_archived = false
+                AND qr.project_id = ANY(@projectIds)
+                AND qr.organization_id = @organizationId
                 {authorizationFilter}";
 
             var parameters = new List<NpgsqlParameter>
@@ -133,15 +133,15 @@ public class QueryBusiness : IQueryBusiness
                             if (query.Filter.ToLower() == "tags")
                                 // Tags are an array of objects - flatten and search only the name values
                                 condition =
-                                    $"EXISTS (SELECT 1 FROM jsonb_array_elements(hr.{query.Filter}) elem WHERE elem->>'name' ILIKE @{paramName})";
+                                    $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' ILIKE @{paramName})";
                             else
                                 // Properties is a flat object already - we can just search the values
                                 condition =
-                                    $"EXISTS (SELECT 1 FROM jsonb_each_text(hr.{query.Filter}) WHERE value ILIKE @{paramName})";
+                                    $"EXISTS (SELECT 1 FROM jsonb_each_text(qr.{query.Filter}) WHERE value ILIKE @{paramName})";
                         }
                         else
                         {
-                            condition = $"hr.{query.Filter} ILIKE @{paramName}";
+                            condition = $"qr.{query.Filter} ILIKE @{paramName}";
                         }
 
                         parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
@@ -153,31 +153,39 @@ public class QueryBusiness : IQueryBusiness
 
                         if (jsonbColumns.Contains(query.Filter.ToLower()))
                         {
-                            condition = $"jsonb_pretty(hr.{query.Filter}) ILIKE @{paramName}";
-                            parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
+                            if (query.Filter.ToLower() == "tags")
+                            {
+                                condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' = @{paramName})";
+                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                            }
+                            else
+                            {
+                                condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
+                                parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
+                            }
                         }
                         else
                         {
-                            condition = $"hr.{query.Filter} = @{paramName}";
+                            condition = $"qr.{query.Filter} = @{paramName}";
                             if (int.TryParse(query.Value, out var intVal))
                                 parameters.Add(new NpgsqlParameter(paramName, intVal));
                             else if (DateTime.TryParse(query.Value, out var dateVal))
-                                {
-                                    var startOfDay = dateVal.Date;
-                                    var startOfNextDay = dateVal.Date.AddDays(1);
-                                    var paramName2 = $"p{parameters.Count + 1}";
-                                    condition = $"hr.{query.Filter} >= @{paramName} AND hr.{query.Filter} < @{paramName2}";
-                                    parameters.Add(new NpgsqlParameter(paramName, startOfDay));
-                                    parameters.Add(new NpgsqlParameter(paramName2, startOfNextDay));
-                                }
+                            {
+                                var startOfDay = dateVal.Date;
+                                var startOfNextDay = dateVal.Date.AddDays(1);
+                                var paramName2 = $"p{parameters.Count + 1}";
+                                condition = $"qr.{query.Filter} >= @{paramName} AND qr.{query.Filter} < @{paramName2}";
+                                parameters.Add(new NpgsqlParameter(paramName, startOfDay));
+                                parameters.Add(new NpgsqlParameter(paramName2, startOfNextDay));
+                            }
                             else
                                 parameters.Add(new NpgsqlParameter(paramName, query.Value));
                         }
                     }
                     else if (query.Operator == ">")
                     {
-                        
-                        condition = $"hr.{query.Filter} > @{paramName}";
+
+                        condition = $"qr.{query.Filter} > @{paramName}";
 
                         if (DateTime.TryParse(query.Value, out var dateVal))
                             parameters.Add(new NpgsqlParameter(paramName, dateVal));
@@ -186,7 +194,7 @@ public class QueryBusiness : IQueryBusiness
                     }
                     else if (query.Operator == "<")
                     {
-                        condition = $"hr.{query.Filter} < @{paramName}";
+                        condition = $"qr.{query.Filter} < @{paramName}";
 
                         if (DateTime.TryParse(query.Value, out var dateVal))
                             parameters.Add(new NpgsqlParameter(paramName, dateVal));
@@ -243,52 +251,306 @@ public class QueryBusiness : IQueryBusiness
                                 coalesce(properties::text, '') || ' ' ||
                                 coalesce(tags::text, '')
                             )@@ to_tsquery('english', @processedQuery)
-                        OR hr.name ILIKE '%' || @originalQuery || '%'
-                        OR hr.description ILIKE '%' || @originalQuery || '%'
-                        OR hr.original_id ILIKE '%' || @originalQuery || '%'
-                        OR hr.data_source_name ILIKE '%' || @originalQuery || '%'
-                        OR hr.project_name ILIKE '%' || @originalQuery || '%'
-                        OR hr.class_name ILIKE '%' || @originalQuery || '%'
+                        OR qr.name ILIKE '%' || @originalQuery || '%'
+                        OR qr.description ILIKE '%' || @originalQuery || '%'
+                        OR qr.original_id ILIKE '%' || @originalQuery || '%'
+                        OR qr.data_source_name ILIKE '%' || @originalQuery || '%'
+                        OR qr.project_name ILIKE '%' || @originalQuery || '%'
+                        OR qr.class_name ILIKE '%' || @originalQuery || '%'
                     )";
 
                 sql += textSearchCondition;
             }
 
             // Add ORDER BY
-            sql += " ORDER BY hr.record_id, hr.last_updated_at DESC";
+            sql += " ORDER BY qr.id, qr.last_updated_at DESC";
 
             // Execute the query with parameters
-            var historicalRecordResults = _context.HistoricalRecords.FromSqlRaw(sql, parameters.ToArray());
+            var queryRecordResults = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
 
-            return await historicalRecordResults
-                .Select(r => new HistoricalRecordResponseDto
-                {
-                    Id = r.RecordId,
-                    Uri = r.Uri,
-                    Properties = r.Properties,
-                    OriginalId = r.OriginalId,
-                    Name = r.Name,
-                    Description = r.Description,
-                    ClassId = r.ClassId,
-                    ClassName = r.ClassName,
-                    DataSourceId = r.DataSourceId,
-                    DataSourceName = r.DataSourceName,
-                    ObjectStorageId = r.ObjectStorageId,
-                    ObjectStorageName = r.ObjectStorageName,
-                    ProjectId = r.ProjectId,
-                    ProjectName = r.ProjectName,
-                    Tags = r.Tags,
-                    LastUpdatedBy = r.LastUpdatedBy,
-                    LastUpdatedAt = r.LastUpdatedAt
-                }).ToListAsync();
+            var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+                _sensitivityLabelService,
+                currentUserId,
+                organizationId,
+                projectIds,
+                isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+            return await queryRecordResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToListAsync();
         }
         catch (PostgresException ex) when (ex.SqlState == "42703") // undefined_column
         {
             throw new ArgumentException(
-                "Invalid column name in query. Please check your filter fields against the historical_records table structure.",
+                "Invalid column name in query. Please check your filter fields against the query_records view structure.",
                 ex);
         }
         catch (PostgresException ex) when (ex.SqlState == "42601") // syntax_error
+        {
+            throw new ArgumentException("Invalid query syntax. Please check your operators and values.", ex);
+        }
+        catch (PostgresException ex) when (ex.SqlState == "22P02")
+        {
+            throw new ArgumentException(
+                "Invalid data type in query. Please check that your values match the expected column data types.", ex);
+        }
+        catch (JsonException ex)
+        {
+            throw new ArgumentException($"Invalid JSON format in KEY_VALUE operation: {ex.Message}", ex);
+        }
+        catch (Exception ex)
+        {
+            throw new ArgumentException($"Error executing query: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    ///     Build a paginated query
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="request">Array of query component dtos, initial connector string will be null</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectIds">Project ids that a user has access to</param>
+    /// <param name="paginated">Pagination details</param>
+    /// <param name="textSearch">Full text search phrase</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>A paginated list of record response dtos from the query view that match provided filters</returns>
+    public async Task<PaginatedResponse<QueryRecordViewResponseDto>> QueryBuilderPaginated(
+        long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request, long organizationId, long[] projectIds,
+        PaginatedRequestDto paginated, string? textSearch = null, bool isSysAdmin = false, bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
+    {
+        if (request == null) throw new ArgumentException("Custom query request dto cannot be null");
+        try
+        {
+            var authorizedLabelIds = new List<long>();
+            if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+            {
+                authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                    currentUserId, organizationId, projectIds, "read record");
+            }
+
+            var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
+                AND (
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM deeplynx.record_labels rl
+                        WHERE rl.record_id = qr.id
+                    )
+                    OR
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM deeplynx.record_labels rl2
+                        WHERE rl2.record_id = qr.id
+                        AND rl2.label_id != ALL(@authorizedLabelIds)
+                    )
+                )" : "";
+
+            var sql = $@"
+                SELECT
+                    qr.*,
+                    qr.class_id as ClassId,
+                    qr.class_name as ClassName,
+                    qr.original_id as OriginalId,
+                    qr.data_source_name as DataSourceName,
+                    qr.data_source_id as DataSourceId,
+                    qr.project_name as ProjectName,
+                    qr.project_id as ProjectId,
+                    qr.last_updated_at as LastUpdatedAt,
+                    qr.last_updated_by as LastUpdatedBy,
+                    qr.object_storage_name as ObjectStorageName,
+                    qr.object_storage_id as ObjectStorageId,
+                    qr.id as RecordId,
+                    qr.is_archived as IsArchived
+                FROM deeplynx.query_records qr
+                WHERE qr.is_archived = false
+                AND qr.project_id = ANY(@projectIds)
+                AND qr.organization_id = @organizationId
+                {authorizationFilter}";
+
+            var parameters = new List<NpgsqlParameter>
+            {
+                new NpgsqlParameter("projectIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = projectIds },
+                new NpgsqlParameter("organizationId", organizationId)
+            };
+
+            if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+            {
+                parameters.Add(new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+                {
+                    Value = authorizedLabelIds.ToArray()
+                });
+            }
+
+            var conditions = new List<string>();
+            if (request?.Length > 0)
+                for (var i = 0; i < request.Length; i++)
+                {
+                    var query = request[i];
+                    if (string.IsNullOrWhiteSpace(query.Value) && query.Operator != "KEY_VALUE")
+                        throw new ArgumentException("Value cannot be null or empty.");
+                    var condition = "";
+                    var paramName = $"param{i}";
+
+                    if (query.Operator == "KEY_VALUE")
+                    {
+                        condition = $"({query.Filter}::jsonb @> @{paramName}::jsonb)";
+                        parameters.Add(new NpgsqlParameter(paramName, query.Json));
+                    }
+                    else if (query.Operator == "LIKE")
+                    {
+                        var jsonbColumns = new[] { "properties", "tags" };
+
+                        if (jsonbColumns.Contains(query.Filter.ToLower()))
+                        {
+                            if (query.Filter.ToLower() == "tags")
+                                condition =
+                                    $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' ILIKE @{paramName})";
+                            else
+                                condition =
+                                    $"EXISTS (SELECT 1 FROM jsonb_each_text(qr.{query.Filter}) WHERE value ILIKE @{paramName})";
+                        }
+                        else
+                        {
+                            condition = $"qr.{query.Filter} ILIKE @{paramName}";
+                        }
+
+                        parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
+                    }
+                    else if (query.Operator == "=")
+                    {
+                        var jsonbColumns = new[] { "properties", "tags" };
+
+                        if (jsonbColumns.Contains(query.Filter.ToLower()))
+                        {
+                            if (query.Filter.ToLower() == "tags")
+                            {
+                                condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' = @{paramName})";
+                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                            }
+                            else
+                            {
+                                condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
+                                parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
+                            }
+                        }
+                        else
+                        {
+                            condition = $"qr.{query.Filter} = @{paramName}";
+                            if (int.TryParse(query.Value, out var intVal))
+                                parameters.Add(new NpgsqlParameter(paramName, intVal));
+                            else if (DateTime.TryParse(query.Value, out var dateVal))
+                            {
+                                var startOfDay = dateVal.Date;
+                                var startOfNextDay = dateVal.Date.AddDays(1);
+                                var paramName2 = $"p{parameters.Count + 1}";
+                                condition = $"qr.{query.Filter} >= @{paramName} AND qr.{query.Filter} < @{paramName2}";
+                                parameters.Add(new NpgsqlParameter(paramName, startOfDay));
+                                parameters.Add(new NpgsqlParameter(paramName2, startOfNextDay));
+                            }
+                            else
+                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                        }
+                    }
+                    else if (query.Operator == ">")
+                    {
+
+                        condition = $"qr.{query.Filter} > @{paramName}";
+
+                        if (DateTime.TryParse(query.Value, out var dateVal))
+                            parameters.Add(new NpgsqlParameter(paramName, dateVal));
+                        else
+                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                    }
+                    else if (query.Operator == "<")
+                    {
+                        condition = $"qr.{query.Filter} < @{paramName}";
+
+                        if (DateTime.TryParse(query.Value, out var dateVal))
+                            parameters.Add(new NpgsqlParameter(paramName, dateVal));
+                        else
+                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                    }
+                    else
+                    {
+                        throw new ArgumentException("Invalid operator in query.");
+                    }
+
+                    if (!string.IsNullOrEmpty(condition)) conditions.Add(condition);
+                }
+
+            if (conditions.Any())
+            {
+                sql += " AND (";
+
+                for (var i = 0; i < conditions.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        var connector = request[i].Connector?.ToUpper() == "OR" ? " OR " : " AND ";
+                        sql += connector;
+                    }
+
+                    sql += conditions[i];
+                }
+
+                sql += ")";
+            }
+
+            if (!string.IsNullOrWhiteSpace(textSearch))
+            {
+                var processedQuery = string.Join(" & ",
+                    textSearch.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(word => word.Trim() + ":*"));
+                var processedQueryParam = new NpgsqlParameter("processedQuery", processedQuery);
+                var originalQueryParam = new NpgsqlParameter("originalQuery", textSearch);
+                parameters.Add(processedQueryParam);
+                parameters.Add(originalQueryParam);
+
+                var textSearchCondition = @"
+                    AND (
+                        to_tsvector('english',
+                                coalesce(name, '') || ' ' ||
+                                coalesce(description, '') || ' ' ||
+                                coalesce(class_name, '') || ' ' ||
+                                coalesce(uri, '') || ' ' ||
+                                coalesce(original_id, '') || ' ' ||
+                                coalesce(data_source_name, '') || ' ' ||
+                                coalesce(project_name, '') || ' ' ||
+                                coalesce(properties::text, '') || ' ' ||
+                                coalesce(tags::text, '')
+                            )@@ to_tsquery('english', @processedQuery)
+                        OR qr.name ILIKE '%' || @originalQuery || '%'
+                        OR qr.description ILIKE '%' || @originalQuery || '%'
+                        OR qr.original_id ILIKE '%' || @originalQuery || '%'
+                        OR qr.data_source_name ILIKE '%' || @originalQuery || '%'
+                        OR qr.project_name ILIKE '%' || @originalQuery || '%'
+                        OR qr.class_name ILIKE '%' || @originalQuery || '%'
+                    )";
+
+                sql += textSearchCondition;
+            }
+
+            sql += " ORDER BY qr.id, qr.last_updated_at DESC";
+
+            var queryRecordResults = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
+
+            var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+                _sensitivityLabelService,
+                currentUserId,
+                organizationId,
+                projectIds,
+                isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+            return await Paginator.Paginate(paginated, queryRecordResults, r => QueryRecordToResponse(r, isUriAuthorized(r)));
+        }
+        catch (PostgresException ex) when (ex.SqlState == "42703")
+        {
+            throw new ArgumentException(
+                "Invalid column name in query. Please check your filter fields against the query_records view structure.",
+                ex);
+        }
+        catch (PostgresException ex) when (ex.SqlState == "42601")
         {
             throw new ArgumentException("Invalid query syntax. Please check your operators and values.", ex);
         }
@@ -314,13 +576,14 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="userQuery">String query</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectIds">Project ids that a user has access to</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-    /// <returns>A list of historical record response dtos that match provided query parameters</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> Search(
+    /// <returns>A list of record response dtos from the query view that match provided query parameters</returns>
+    public async Task<IEnumerable<QueryRecordViewResponseDto>> Search(
         long currentUserId, string userQuery, long organizationId, long[] projectIds,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+        bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (string.IsNullOrWhiteSpace(userQuery))
             throw new Exception("Search query is required.");
@@ -340,39 +603,43 @@ public class QueryBusiness : IQueryBusiness
         var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
             AND (
                 NOT EXISTS (
-                    SELECT 1 
-                    FROM deeplynx.record_labels 
-                    WHERE record_id = hr.record_id
+                    SELECT 1
+                    FROM deeplynx.record_labels rl
+                    WHERE rl.record_id = qr.id
                 )
                 OR
                 NOT EXISTS (
                     SELECT 1
                     FROM deeplynx.record_labels rl2
-                    WHERE rl2.record_id = hr.record_id
+                    WHERE rl2.record_id = qr.id
                     AND rl2.label_id != ALL(@authorized_label_ids)
                 )
             )" : "";
 
+        var hideArchivedFilter = hideArchived ? @"
+            AND qr.is_archived = false
+            " : "";
+
         var sql = $@"
-            SELECT DISTINCT ON (hr.record_id)
-            hr.*,
-            hr.class_id as ClassId,
-            hr.class_name as ClassName,
-            hr.original_id as OriginalId,
-            hr.data_source_name as DataSourceName,
-            hr.data_source_id as DataSourceId,
-            hr.project_name as ProjectName,
-            hr.project_id as ProjectId,
-            hr.last_updated_at as LastUpdatedAt,
-            hr.last_updated_by as LastUpdatedBy,
-            hr.object_storage_name as ObjectStorageName,
-            hr.object_storage_id as ObjectStorageId,
-            hr.record_id as RecordId,
-            hr.is_archived as IsArchived
-        FROM deeplynx.historical_records hr
-        WHERE hr.is_archived = false
-        AND hr.project_id = ANY(@project_ids)
-        AND hr.organization_id = @organization_id
+            SELECT
+            qr.*,
+            qr.class_id as ClassId,
+            qr.class_name as ClassName,
+            qr.original_id as OriginalId,
+            qr.data_source_name as DataSourceName,
+            qr.data_source_id as DataSourceId,
+            qr.project_name as ProjectName,
+            qr.project_id as ProjectId,
+            qr.last_updated_at as LastUpdatedAt,
+            qr.last_updated_by as LastUpdatedBy,
+            qr.object_storage_name as ObjectStorageName,
+            qr.object_storage_id as ObjectStorageId,
+            qr.id as RecordId,
+            qr.is_archived as IsArchived
+        FROM deeplynx.query_records qr
+        WHERE qr.project_id = ANY(@project_ids)
+        AND qr.organization_id = @organization_id
+        {hideArchivedFilter}
         {authorizationFilter}
         AND (
             to_tsvector('english',
@@ -386,14 +653,14 @@ public class QueryBusiness : IQueryBusiness
                     coalesce(properties::text, '') || ' ' ||
                     coalesce(tags::text, '')
                 ) @@ to_tsquery('english', @processed_query)
-            OR hr.name ILIKE '%' || @original_query || '%'
-            OR hr.description ILIKE '%' || @original_query || '%'
-            OR hr.original_id ILIKE '%' || @original_query || '%'
-            OR hr.data_source_name ILIKE '%' || @original_query || '%'
-            OR hr.project_name ILIKE '%' || @original_query || '%'
-            OR hr.class_name ILIKE '%' || @original_query || '%'
+            OR qr.name ILIKE '%' || @original_query || '%'
+            OR qr.description ILIKE '%' || @original_query || '%'
+            OR qr.original_id ILIKE '%' || @original_query || '%'
+            OR qr.data_source_name ILIKE '%' || @original_query || '%'
+            OR qr.project_name ILIKE '%' || @original_query || '%'
+            OR qr.class_name ILIKE '%' || @original_query || '%'
         )
-        ORDER BY hr.record_id, hr.last_updated_at DESC";
+        ORDER BY qr.id, qr.last_updated_at DESC";
 
         var parameters = new List<NpgsqlParameter>
         {
@@ -411,30 +678,17 @@ public class QueryBusiness : IQueryBusiness
             });
         }
 
-        var historicalRecordsResults =
-            _context.HistoricalRecords.FromSqlRaw(sql, parameters.ToArray());
+        var queryRecordsResults =
+            _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
 
-        return await historicalRecordsResults
-            .Select(r => new HistoricalRecordResponseDto
-            {
-                Id = r.RecordId,
-                Uri = r.Uri,
-                Properties = r.Properties,
-                OriginalId = r.OriginalId,
-                Name = r.Name,
-                Description = r.Description,
-                ClassId = r.ClassId,
-                ClassName = r.ClassName,
-                DataSourceId = r.DataSourceId,
-                DataSourceName = r.DataSourceName,
-                ObjectStorageId = r.ObjectStorageId,
-                ObjectStorageName = r.ObjectStorageName,
-                ProjectId = r.ProjectId,
-                ProjectName = r.ProjectName,
-                Tags = r.Tags,
-                LastUpdatedBy = r.LastUpdatedBy,
-                LastUpdatedAt = r.LastUpdatedAt
-            }).ToListAsync();
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projectIds,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return await queryRecordsResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToListAsync();
     }
 
     /// <summary>
@@ -447,14 +701,14 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>An array of records</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetRecentlyAddedRecords(
+    public async Task<IEnumerable<QueryRecordViewResponseDto>> GetRecentlyAddedRecords(
         long currentUserId, long organizationId, long[] projectIds,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (projectIds.Length == 0)
-            return new List<HistoricalRecordResponseDto>();
+            return new List<QueryRecordViewResponseDto>();
 
-        var query = _context.HistoricalRecords
+        var query = _context.QueryRecords
             .Where(r => r.OrganizationId == organizationId && !r.IsArchived)
             .Where(r => projectIds.Contains(r.ProjectId));
 
@@ -463,23 +717,89 @@ public class QueryBusiness : IQueryBusiness
             var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projectIds, "read record");
 
-            var authorizedRecordIds = await _context.Records
+            var authorizedRecordIds = _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projectIds.Contains(rec.ProjectId))
                 .WithAuthorizedLabels(authorizedLabelIds)
-                .Select(rec => rec.Id)
-                .ToListAsync();
+                .Select(rec => rec.Id);
 
-            query = query.Where(r => authorizedRecordIds.Contains(r.RecordId));
+            query = query.Where(r => authorizedRecordIds.Contains(r.Id));
         }
 
-        var records = await query
-            .GroupBy(r => r.RecordId)
-            .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).First())
-            .ToListAsync();
+        var records = await query.ToListAsync();
 
-        return records.Select(r => new HistoricalRecordResponseDto
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projectIds,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
+    }
+
+    /// <summary>
+    ///     Retrieves current paginated records for projects, ordered as specified
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">An array of project ids</param>
+    /// <param name="sortBy">The sorting method</param>
+    /// <param name="paginated">Pagination details</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>Paginated records</returns>
+    public async Task<PaginatedResponse<QueryRecordViewResponseDto>> GetRecordsPaginated(
+        long currentUserId, long organizationId, SortRecordsRequestDto sortBy, PaginatedRequestDto paginated,
+        long[] projectId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        if (projectId.Length == 0)
+            return new PaginatedResponse<QueryRecordViewResponseDto> { Items = [], PageSize = paginated.PageSize, PageNumber = paginated.PageNumber };
+
+        var query = _context.QueryRecords
+            .Where(r => r.OrganizationId == organizationId && !r.IsArchived)
+            .Where(r => projectId.Contains(r.ProjectId));
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
-            Id = r.RecordId,
-            Uri = r.Uri,
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            var authorizedRecordIds = _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projectId.Contains(rec.ProjectId))
+                .WithAuthorizedLabels(authorizedLabelIds)
+                .Select(rec => rec.Id);
+
+            query = query.Where(r => authorizedRecordIds.Contains(r.Id));
+        }
+
+        query = sortBy switch
+        {
+            SortRecordsRequestDto.NameAZ => query.OrderBy(r => (r.Name ?? "").ToLower()).ThenBy(r => r.Id),
+            SortRecordsRequestDto.NameZA => query.OrderByDescending(r => (r.Name ?? "").ToLower()).ThenBy(r => r.Id),
+            SortRecordsRequestDto.DateNew => query.OrderByDescending(r => r.LastUpdatedAt).ThenBy(r => r.Id),
+            SortRecordsRequestDto.DateOld => query.OrderBy(r => r.LastUpdatedAt).ThenBy(r => r.Id),
+            _ => query.OrderByDescending(r => r.LastUpdatedAt).ThenBy(r => r.Id), // Sorts date by default
+        };
+
+
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projectId,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return await Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r, isUriAuthorized(r)));
+    }
+
+    static private QueryRecordViewResponseDto QueryRecordToResponse(
+        QueryRecord r, bool exposeUri)
+    {
+        return new QueryRecordViewResponseDto
+        {
+            Id = r.Id,
+            Uri = exposeUri ? r.Uri : null,
             Properties = r.Properties,
             OriginalId = r.OriginalId,
             Name = r.Name,
@@ -490,11 +810,12 @@ public class QueryBusiness : IQueryBusiness
             ProjectId = r.ProjectId,
             ProjectName = r.ProjectName,
             Tags = r.Tags,
+            Labels = r.Labels,
             Description = r.Description,
             LastUpdatedBy = r.LastUpdatedBy,
             IsArchived = r.IsArchived,
             LastUpdatedAt = r.LastUpdatedAt
-        });
+        };
     }
 
     /// <summary>
@@ -508,16 +829,16 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of records based on the applied filters.</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetMultiProjectRecords(
+    public async Task<IEnumerable<QueryRecordViewResponseDto>> GetMultiProjectRecords(
         long currentUserId, long organizationId, long[] projects, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         if (projects.Length == 0)
-            return new List<HistoricalRecordResponseDto>();
+            return new List<QueryRecordViewResponseDto>();
 
         var projectSet = new HashSet<long>(projects);
 
-        var recordQuery = _context.HistoricalRecords
+        var recordQuery = _context.QueryRecords
             .Where(r => projectSet.Contains(r.ProjectId) && r.OrganizationId == organizationId);
 
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
@@ -527,37 +848,23 @@ public class QueryBusiness : IQueryBusiness
             var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projects, "read record");
 
-            var authorizedRecordIds = await _context.Records
+            var authorizedRecordIds = _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projects.Contains(rec.ProjectId))
                 .WithAuthorizedLabels(authorizedLabelIds)
-                .Select(rec => rec.Id)
-                .ToListAsync();
+                .Select(rec => rec.Id);
 
-            recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.RecordId));
+            recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.Id));
         }
 
-        var records = await recordQuery
-            .GroupBy(e => e.RecordId)
-            .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
-            .ToListAsync();
+        var records = await recordQuery.ToListAsync();
 
-        return records
-            .Where(r => r != null)
-            .Select(r => new HistoricalRecordResponseDto
-            {
-                Id = r.RecordId,
-                Description = r.Description,
-                Uri = r.Uri,
-                Properties = r.Properties,
-                OriginalId = r.OriginalId,
-                Name = r.Name,
-                ClassId = r.ClassId,
-                ClassName = r.ClassName,
-                DataSourceId = r.DataSourceId,
-                ProjectId = r.ProjectId,
-                LastUpdatedAt = r.LastUpdatedAt,
-                LastUpdatedBy = r.LastUpdatedBy,
-                IsArchived = r.IsArchived,
-                Tags = r.Tags
-            });
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projects,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
     }
 }

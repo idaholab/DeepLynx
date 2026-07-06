@@ -475,7 +475,7 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
     const memberIds = new Set(currentMembers.map((m) => m.id));
 
     return availableUsers.filter(
-      (u) => !memberIds.has(u.id) && u.isActive && !u.isArchived
+      (u) => !memberIds.has(u.id) && !u.isArchived
     );
   };
 

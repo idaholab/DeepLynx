@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import { CheckCircleIcon, XCircleIcon, PencilIcon } from "@heroicons/react/24/outline";
+import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 
 // Table Shape
 interface ProjectPropertyRow {
@@ -19,6 +20,7 @@ interface Props {
 }
 
 const ProjectSettingsTable: React.FC<Props> = (projectInfo) => {
+  const { project, setProject } = useProjectSession();
   // State
   const [editingKey, setEditingKey] = useState<string>("");
   const [editValue, setEditingValue] = useState<string>("");
@@ -31,6 +33,13 @@ const ProjectSettingsTable: React.FC<Props> = (projectInfo) => {
 
   const handleSave = async (row: ProjectPropertyRow) => {
     row.onEdit?.(editValue);
+    if (editingKey == "Project Name ") {
+      if (!project) return;
+      setProject({
+        ...project,
+        projectName: editValue,
+      });
+    }
     setEditingKey("");
   }
 
@@ -48,8 +57,8 @@ const ProjectSettingsTable: React.FC<Props> = (projectInfo) => {
   ) => {
     return (
       <React.Fragment key={index}>
-        <div className={`grid grid-cols-12 border-b border-base-300`}>
-          <div className="col-span-4 p-3 font-medium text-base-content text-sm bg-base-200 border-r border-base-300 flex items-center relative">
+        <div className={`grid grid-cols-12 border-b border-base-300/50`}>
+          <div className="col-span-4 p-3 font-medium text-base-content text-sm bg-base-200 border-r border-base-300/50 flex items-center relative">
             {/* Tree branch visualization */}
             {depth > 0 && (
               <div className="absolute left-0 top-0 bottom-0 flex">
@@ -134,7 +143,7 @@ const ProjectSettingsTable: React.FC<Props> = (projectInfo) => {
 
   // Build table
   return (
-    <div className="border border-base-300 rounded-lg overflow-hidden bg-base-100">
+    <div className="border border-base-300/50 rounded-lg overflow-hidden bg-base-100">
       {projectInfo.projectRows.map((row, index) =>
         renderRow(row, index, 0, index === projectInfo.projectRows.length - 1, []),
       )}

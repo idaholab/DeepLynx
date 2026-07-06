@@ -39,6 +39,7 @@ public class InsightController : ControllerBase
     /// <returns>202 Accepted once Insight has acknowledged the request.</returns>
     [HttpPost("upload", Name = "api_insight_upload")]
     [Auth("write", "insight")]
+    [InsightEnabled]
     public async Task<IActionResult> Upload(
         long organizationId,
         long projectId,
@@ -64,6 +65,23 @@ public class InsightController : ControllerBase
             _logger.LogError("Insight upload failed for project {ProjectId}: {Error}", projectId, exc.Message);
             return BadRequest(exc.Message);
         }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight upload request failed for project {ProjectId}: {Error}",
+                projectId,
+                exc.Message);
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "insight_upload_failed",
+                    message = exc.Message
+                });
+        }
         catch (Exception exc)
         {
             var message = $"An unexpected error occurred while queuing Insight upload for project {projectId}: {exc}";
@@ -88,6 +106,7 @@ public class InsightController : ControllerBase
     [HttpPost("query", Name = "api_insight_query")]
     [Auth("read", "insight")]
     [Sensitivity("read record")]
+    [InsightEnabled]
     public async Task Query(
         long organizationId,
         long projectId,
@@ -155,6 +174,7 @@ public class InsightController : ControllerBase
     /// <param name="fileId">The Insight file ID to check.</param>
     /// <returns>Ingestion status including chunk count and page count.</returns>
     [HttpGet("ingestion_status/{fileId:long}", Name = "api_insight_ingestion_status")]
+    [InsightEnabled]
     public async Task<ActionResult<InsightIngestionStatusResponseDto>> IngestionStatus(
         long organizationId,
         long projectId,
@@ -183,6 +203,78 @@ public class InsightController : ControllerBase
     }
 
     /// <summary>
+    ///     Check the health of a configured model endpoint through the Insight service.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project.</param>
+    /// <param name="dto">Endpoint health request containing the model configuration ID and model type.</param>
+    /// <returns>
+    ///     Endpoint health information for the requested model endpoint.
+    /// </returns>
+    [HttpPost("endpoint_health", Name = "api_insight_endpoint_health")]
+    [Auth("read", "insight")]
+    [InsightEnabled]
+    public async Task<ActionResult<InsightEndpointHealthResponseDto>> EndpointHealth(
+        long organizationId,
+        long projectId,
+        [FromBody] InsightEndpointHealthApiRequestDto dto)
+    {
+        try
+        {
+            var userId = UserContextStorage.UserId;
+
+            var result = await _insightBusiness.CheckEndpointHealth(
+                userId,
+                organizationId,
+                projectId,
+                dto.ModelConfigId,
+                dto.ModelType);
+            
+            return Ok(result);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            _logger.LogError(
+                "Model config not found during Insight endpoint health check for project {ProjectId}: {Error}",
+                projectId, exc.Message);
+
+            return NotFound(exc.Message);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogError(
+                "Insight endpoint health check failed for project {ProjectId}: {Error}",
+                projectId, exc.Message);
+
+            return BadRequest(exc.Message);
+        }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight endpoint health request failed for project {ProjectId}: {Error}",
+                projectId,
+                exc.Message);
+
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "insight_endpoint_health_failed",
+                    message = exc.Message
+                });
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while checking Insight endpoint health for project {projectId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
     ///     Queue embedding jobs for all class and relationship descriptions in the project.
     /// </summary>
     /// <param name="organizationId">ID of the organization.</param>
@@ -190,6 +282,7 @@ public class InsightController : ControllerBase
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default. If no default is configured, Insight falls back to its own environment defaults.</param>
     /// <returns>202 Accepted once all items have been queued.</returns>
     [HttpPost("embed_strings", Name = "api_insight_embed_strings")]
+    [InsightEnabled]
     public async Task<IActionResult> EmbedStrings(
         long organizationId,
         long projectId,
@@ -212,6 +305,23 @@ public class InsightController : ControllerBase
         {
             _logger.LogError("Ontology embeddings failed for project {ProjectId}: {Error}", projectId, exc.Message);
             return BadRequest(exc.Message);
+        }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight ontology embedding request failed for project {ProjectId}: {Error}",
+                projectId,
+                exc.Message);
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "insight_ontology_embedding_failed",
+                    message = exc.Message
+                });
         }
         catch (Exception exc)
         {

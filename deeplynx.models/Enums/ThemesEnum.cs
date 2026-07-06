@@ -5,5 +5,6 @@ public enum OrganizationTheme
     Default,
     Nric,
     Nord,
-    Emerald
+    Emerald,
+    Ron
 }

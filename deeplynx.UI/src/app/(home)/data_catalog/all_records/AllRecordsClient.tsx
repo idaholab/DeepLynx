@@ -36,7 +36,7 @@ import {
   getMultiProjectRecords,
 } from "@/app/lib/client_service/query_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import { QueryRecordViewResponseDto } from "@/app/(home)/types/responseDTOs";
 import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 import { useLanguage } from "@/app/contexts/Language";
 import {
@@ -58,6 +58,7 @@ import {
   bulkAttachTagsToRecords,
   bulkUnattachTagsFromRecords,
 } from "@/app/lib/client_service/record_services.client";
+import Skeleton from "react-loading-skeleton";
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
 type Props = {
@@ -128,6 +129,12 @@ export default function DataCatalogClient({
   // searchTerm is the live value of the search input field.
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
 
+  // loading determines if the records are loading
+  const [loading, setLoading] = useState(false);
+
+  // render helper for loading skeleton
+  const times = (n: number) => Array.from({ length: n }, (_, i) => i);
+
   /**
    * activeFilters is the list of submitted search terms that are currently
    * active. Each filter has a stable numeric id so it can be removed by id
@@ -165,14 +172,16 @@ export default function DataCatalogClient({
   const [isApplyingBulkTags, setIsApplyingBulkTags] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [availableTags, setAvailableTags] = useState<AvailableTag[]>([]);
-  
+
   /**
    * Guard ref that prevents the initial URL search term from being re-submitted
    * every time the component re-renders. We use a ref (not state) so that
    * storing the applied term does not itself trigger a re-render.
    */
   const initialSearchAppliedRef = useRef<string | null>(null);
-
+  const [isInitialSearchPending, setIsInitialSearchPending] = useState(
+    !!initialSearchTerm,
+  );
   // Pre-compute lowercase search terms once for use in getHighlightedContent
   // across all record cards, avoiding repeated toLowerCase calls per field.
   const activeSearchTerms = useMemo(
@@ -223,16 +232,19 @@ export default function DataCatalogClient({
    * accept a search term — search results come from runSearchTerms instead.
    */
   const fetchRecordsForSelection = useCallback(async () => {
+    setLoading(true);
     const idsNum = effectiveProjectIds.map(Number).filter(Number.isFinite);
     if (idsNum.length === 0) {
       setTableData([]);
+      setLoading(false);
       return;
     }
     const data = await getMultiProjectRecords(
       organization?.organizationId as number,
       idsNum,
-      true,
+      false, // archived records will be marked as archived
     );
+
     const transformedData: RecordTableRow[] = data.map((record) => ({
       id: record.id || 0,
       name: record.name,
@@ -262,6 +274,7 @@ export default function DataCatalogClient({
       fileType: "",
     }));
     setTableData(transformedData);
+    setLoading(false);
   }, [effectiveProjectIds, organization?.organizationId, projects]);
 
   /**
@@ -316,13 +329,14 @@ export default function DataCatalogClient({
             organization?.organizationId as number,
             term,
             projects.map((p) => Number(p.id)),
+            false // keep archived ones showing, but will be flagged as archived
           ),
         ),
       );
 
       const recordsByKey = new Map<string, RecordTableRow>();
 
-      searchResults.flat().forEach((dto: HistoricalRecordResponseDto) => {
+      searchResults.flat().forEach((dto: QueryRecordViewResponseDto) => {
         const record: RecordTableRow = {
           ...dto,
           fileType: "",
@@ -347,8 +361,8 @@ export default function DataCatalogClient({
         selectedNums.length === projects.length
           ? convertedResults
           : convertedResults.filter((record) =>
-              selectedNums.includes(Number(record.projectId)),
-            );
+            selectedNums.includes(Number(record.projectId)),
+          );
 
       setTableData(scoped);
     },
@@ -421,11 +435,16 @@ export default function DataCatalogClient({
    */
   useEffect(() => {
     if (!hasLoaded) return;
-    if (!initialSearchTerm) return;
+    if (!initialSearchTerm) {
+      setIsInitialSearchPending(false);
+      return;
+    }
     if (initialSearchAppliedRef.current === initialSearchTerm) return;
 
     initialSearchAppliedRef.current = initialSearchTerm;
-    handleSearch(initialSearchTerm);
+    handleSearch(initialSearchTerm).finally(() => {
+      setIsInitialSearchPending(false);
+    });
   }, [hasLoaded, initialSearchTerm, handleSearch]);
 
   /**
@@ -436,6 +455,7 @@ export default function DataCatalogClient({
    */
   useEffect(() => {
     if (!hasLoaded) return;
+    if (isInitialSearchPending) return; // ← now correctly blocks until search resolves
     if (activeFilters.length > 0) return;
 
     fetchRecordsForSelection().catch((e: unknown) => {
@@ -446,6 +466,7 @@ export default function DataCatalogClient({
     activeFilters.length,
     selectedProjectsToken,
     fetchRecordsForSelection,
+    isInitialSearchPending,
   ]);
 
   /**
@@ -457,37 +478,38 @@ export default function DataCatalogClient({
   useEffect(() => {
     if (!hasLoaded) return;
     if (!organization?.organizationId) return;
-    
+
     const fetchTagsForProjectScope = async () => {
       const organizationId = Number(organization.organizationId);
       const projectIds = effectiveProjectIds
-          .map(Number)
-          .filter(Number.isFinite);
-      
+        .map(Number)
+        .filter(Number.isFinite);
+
       const tags = await getAllTagsOrg(
-          organizationId,
-          projectIds,
-          true,
+        organizationId,
+        projectIds,
+        true,
       );
-      
+
       setAvailableTags(
-          tags.map((tag) => ({
-            id: tag.id,
-            name: tag.name,
-            projectId: tag.projectId ?? null,
-          })),
+        tags.map((tag) => ({
+          id: tag.id,
+          name: tag.name,
+          projectId: tag.projectId ?? null,
+        })),
       );
     };
-    
+
     fetchTagsForProjectScope().catch((error) => {
       console.error("Failed to fetch available tags:", error);
     });
   }, [hasLoaded, organization?.organizationId, selectedProjectsToken]);
-  
+
   /** Bridge between the SearchBar's onSubmit callback shape and handleSearch. */
   const handleSubmit = useCallback(
     async ({ query }: { query: string }) => {
       try {
+        console.log("query from bar", query)
         await handleSearch(query);
       } catch (error) {
         console.error("Failed to send query", error);
@@ -505,6 +527,7 @@ export default function DataCatalogClient({
    */
   const projectScopedRecords = useMemo(() => {
     if (effectiveProjectIds.length === projects.length) return tableData;
+    // console.log("table data", tableData)
 
     const selected = new Set(effectiveProjectIds.map(Number));
     return tableData.filter(
@@ -567,7 +590,6 @@ export default function DataCatalogClient({
       const className = record.className || t.translations.NO_CLASS;
       const tags = parseRecordTags(record.tags);
       const updatedBy = record.lastUpdatedBy || "Unknown";
-
       if (
         selectedClassFilters.length > 0 &&
         !selectedClassFilters.includes(className)
@@ -585,7 +607,7 @@ export default function DataCatalogClient({
 
       if (
         selectedUpdatedByFilters.length > 0 &&
-        !selectedUpdatedByFilters.includes(updatedBy)
+        !selectedUpdatedByFilters.includes(String(updatedBy))
       ) {
         return false;
       }
@@ -617,7 +639,7 @@ export default function DataCatalogClient({
   );
   const selectedRecords = useMemo(() => {
     const selected = new Set(selectedRecordKeys);
-    
+
     return tableData.filter((record) =>
       selected.has(getRecordKey(record)),
     );
@@ -625,9 +647,9 @@ export default function DataCatalogClient({
   const visibleAvailableTags = useMemo(() => {
     if (effectiveProjectIds.length === 1) {
       const projectId = Number(effectiveProjectIds[0]);
-      
+
       return availableTags.filter(
-          (tag) => tag.projectId === null || tag.projectId === projectId,
+        (tag) => tag.projectId === null || tag.projectId === projectId,
       );
     }
     return availableTags.filter((tag) => tag.projectId === null);
@@ -672,18 +694,18 @@ export default function DataCatalogClient({
         : [...prev, value],
     );
   }, []);
-  
+
   const toggleRecordSelection = useCallback(
-      (record: RecordTableRow) => {
-        const recordKey = getRecordKey(record);
-        
-        setSelectedRecordKeys((prev) =>
-          prev.includes(recordKey)
-            ? prev.filter((item) => item !== recordKey)
-            : [...prev, recordKey],  
-        );
-      },
-      [getRecordKey],
+    (record: RecordTableRow) => {
+      const recordKey = getRecordKey(record);
+
+      setSelectedRecordKeys((prev) =>
+        prev.includes(recordKey)
+          ? prev.filter((item) => item !== recordKey)
+          : [...prev, recordKey],
+      );
+    },
+    [getRecordKey],
   );
 
   /**
@@ -693,36 +715,36 @@ export default function DataCatalogClient({
    * marked for attach so all selected records will receive the tag on Apply.
    */
   const getBulkTagState = useCallback(
-      (tag: AvailableTag): BulkTagState => {
-        if (!tag || selectedRecords.length === 0) {
-          return "unchecked";
-        }
-        
-        if (tagsToAttach.includes(tag.id)) {
-          return "checked";
-        }
-        
-        if (tagsToUnattach.includes(tag.id)) {
-          return "unchecked";
-        }
-        
-        const matchingCount = selectedRecords.filter((record) => {
-          const tags = parseRecordTags(record.tags);
-          
-          return tags.includes(tag.name);
-        }).length;
-        
-        if (matchingCount === 0) {
-          return "unchecked";
-        }
-        
-        if (matchingCount === selectedRecords.length) {
-          return "checked";
-        }
-        
-        return "indeterminate";
-      },
-      [selectedRecords, tagsToAttach, tagsToUnattach],
+    (tag: AvailableTag): BulkTagState => {
+      if (!tag || selectedRecords.length === 0) {
+        return "unchecked";
+      }
+
+      if (tagsToAttach.includes(tag.id)) {
+        return "checked";
+      }
+
+      if (tagsToUnattach.includes(tag.id)) {
+        return "unchecked";
+      }
+
+      const matchingCount = selectedRecords.filter((record) => {
+        const tags = parseRecordTags(record.tags);
+
+        return tags.includes(tag.name);
+      }).length;
+
+      if (matchingCount === 0) {
+        return "unchecked";
+      }
+
+      if (matchingCount === selectedRecords.length) {
+        return "checked";
+      }
+
+      return "indeterminate";
+    },
+    [selectedRecords, tagsToAttach, tagsToUnattach],
   );
 
   /**
@@ -732,26 +754,26 @@ export default function DataCatalogClient({
    * reflects what will happen on apply, even before the records are refreshed.
    */
   const toggleBulkTag = useCallback(
-      (tag: AvailableTag) => {
-        const state = getBulkTagState(tag);
-        
-        if (state === "checked") {
-          setTagsToAttach((prev) => prev.filter((id) => id !== tag.id));
-          
-          setTagsToUnattach((prev) =>
-            prev.includes(tag.id) ? prev : [...prev, tag.id],
-          );
-        } else {
-          setTagsToUnattach((prev) => prev.filter((id) => id !== tag.id));
-          
-          setTagsToAttach((prev) =>
-              prev.includes(tag.id) ? prev : [...prev, tag.id],
-          );
-        }
-      },
-      [getBulkTagState],
+    (tag: AvailableTag) => {
+      const state = getBulkTagState(tag);
+
+      if (state === "checked") {
+        setTagsToAttach((prev) => prev.filter((id) => id !== tag.id));
+
+        setTagsToUnattach((prev) =>
+          prev.includes(tag.id) ? prev : [...prev, tag.id],
+        );
+      } else {
+        setTagsToUnattach((prev) => prev.filter((id) => id !== tag.id));
+
+        setTagsToAttach((prev) =>
+          prev.includes(tag.id) ? prev : [...prev, tag.id],
+        );
+      }
+    },
+    [getBulkTagState],
   );
-  
+
   const handleCancelBulkTags = useCallback(() => {
     setIsBulkMode(false);
     setSelectedRecordKeys([]);
@@ -784,46 +806,46 @@ export default function DataCatalogClient({
       });
 
       await Promise.all(
-          Array.from(recordsByProject.entries()).flatMap(([projectId, records]) => {
-            const requests: Promise<unknown>[] = [];
+        Array.from(recordsByProject.entries()).flatMap(([projectId, records]) => {
+          const requests: Promise<unknown>[] = [];
 
-            // API expects one record/tag pair per operation, using keys.
-            const attachDtos = records.flatMap((record) =>
-                tagsToAttach.map((tagId) => ({
-                  record_id: Number(record.id),
-                  tag_id: tagId,
-                })),
+          // API expects one record/tag pair per operation, using keys.
+          const attachDtos = records.flatMap((record) =>
+            tagsToAttach.map((tagId) => ({
+              record_id: Number(record.id),
+              tag_id: tagId,
+            })),
+          );
+
+          const unattachDtos = records.flatMap((record) =>
+            tagsToUnattach.map((tagId) => ({
+              record_id: Number(record.id),
+              tag_id: tagId,
+            })),
+          );
+
+          if (attachDtos.length > 0) {
+            requests.push(
+              bulkAttachTagsToRecords(
+                organizationId,
+                projectId,
+                attachDtos,
+              ),
             );
+          }
 
-            const unattachDtos = records.flatMap((record) =>
-                tagsToUnattach.map((tagId) => ({
-                  record_id: Number(record.id),
-                  tag_id: tagId,
-                })),
+          if (unattachDtos.length > 0) {
+            requests.push(
+              bulkUnattachTagsFromRecords(
+                organizationId,
+                projectId,
+                unattachDtos,
+              ),
             );
+          }
 
-            if (attachDtos.length > 0) {
-              requests.push(
-                  bulkAttachTagsToRecords(
-                      organizationId,
-                      projectId,
-                      attachDtos,
-                  ),
-              );
-            }
-
-            if (unattachDtos.length > 0) {
-              requests.push(
-                  bulkUnattachTagsFromRecords(
-                      organizationId,
-                      projectId,
-                      unattachDtos,
-                  ),
-              );
-            }
-
-            return requests;
-          }),
+          return requests;
+        }),
       );
 
       // Refresh whichever data mode the page is currently in.
@@ -891,7 +913,7 @@ export default function DataCatalogClient({
   return (
     <main className="min-h-screen bg-base-200/30">
       {/* ── Page header: title, project dropdown, search bar ──────────────── */}
-      <section className="border-b border-base-300 bg-base-100">
+      <section className="border-b border-base-300/50 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
@@ -955,7 +977,7 @@ export default function DataCatalogClient({
             </button>
             {isBulkMode && (
               <button
-                type="button"  
+                type="button"
                 className="btn btn-sm btn-primary"
                 onClick={handleApplyBulkTags}
                 disabled={
@@ -995,40 +1017,72 @@ export default function DataCatalogClient({
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
           <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
             <FilterSidebar
-                projectScopedRecords={projectScopedRecords}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-                selectedClassFilters={selectedClassFilters}
-                onToggleClassFilter={toggleClassFilter}
-                filteredClassFacetOptions={filteredClassFacetOptions}
-                classFacetQuery={classFacetQuery}
-                onClassFacetQueryChange={setClassFacetQuery}
-                selectedTagFilters={selectedTagFilters}
-                onToggleTagFilter={toggleTagFilter}
-                filteredTagFacetOptions={filteredTagFacetOptions}
-                tagFacetQuery={tagFacetQuery}
-                onTagFacetQueryChange={setTagFacetQuery}
-                activeFacetCount={activeFacetCount}
-                onClearFacetFilters={clearFacetFilters}
+              projectScopedRecords={projectScopedRecords}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              selectedClassFilters={selectedClassFilters}
+              onToggleClassFilter={toggleClassFilter}
+              filteredClassFacetOptions={filteredClassFacetOptions}
+              classFacetQuery={classFacetQuery}
+              onClassFacetQueryChange={setClassFacetQuery}
+              selectedTagFilters={selectedTagFilters}
+              onToggleTagFilter={toggleTagFilter}
+              filteredTagFacetOptions={filteredTagFacetOptions}
+              tagFacetQuery={tagFacetQuery}
+              onTagFacetQueryChange={setTagFacetQuery}
+              activeFacetCount={activeFacetCount}
+              onClearFacetFilters={clearFacetFilters}
             />
 
             {isBulkMode && (
-                <ManageTagsCard
-                  selectedRecordCount={selectedRecordCount}
-                  bulkTagQuery={bulkTagQuery}
-                  onBulkTagQueryChange={setBulkTagQuery}
-                  availableTags={visibleAvailableTags}
-                  getBulkTagState={getBulkTagState}
-                  onToggleBulkTag={toggleBulkTag}
-                  showProjectScopeNotice={effectiveProjectIds.length > 1}
-                />
+              <ManageTagsCard
+                selectedRecordCount={selectedRecordCount}
+                bulkTagQuery={bulkTagQuery}
+                onBulkTagQueryChange={setBulkTagQuery}
+                availableTags={visibleAvailableTags}
+                getBulkTagState={getBulkTagState}
+                onToggleBulkTag={toggleBulkTag}
+                showProjectScopeNotice={effectiveProjectIds.length > 1}
+              />
             )}
           </div>
 
           {/* Record list */}
           <div className="min-w-0">
-            {scopedRecords.length === 0 ? (
-              <div className="card border border-base-300 bg-base-100 shadow-sm">
+            {loading === true ? (
+              <div className="card border border-base-300/50 bg-base-100 shadow-sm p-1">
+                <ul className="list mt-0">
+                  {times(5).map((i) => (
+                    <li
+                      key={i}
+                      className="border-b border-base-200 hover:bg-base-200/30 p-2 pl-0 rounded-sm"
+                    >
+                      <div className="text-accent-content mb-1">
+                        <Skeleton width="55%" />
+                      </div>
+                      <div className="text-sm text-base-300 space-x-2 flex flex-wrap items-center">
+                        <span>
+                          {t.translations.CLASS}{" "}
+                          <span className="badge badge-info badge-sm text-xs">
+                            <Skeleton width={60} />
+                          </span>
+                        </span>
+                        <span className="ml-4">
+                          {t.translations.LAST_EDIT} <Skeleton width={80} />
+                        </span>
+                        <span className="ml-4">
+                          {t.translations.PROJECT} <Skeleton width={120} />
+                        </span>
+                        <span className="ml-4">
+                          {t.translations.DATA_SOURCE} <Skeleton width={100} />
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : scopedRecords.length === 0 ? (
+              <div className="card border border-base-300/50 bg-base-100 shadow-sm">
                 <div className="card-body items-center py-16 text-center">
                   <DocumentTextIcon className="size-12 text-base-content/30" />
                   <h2 className="card-title">
@@ -1040,7 +1094,7 @@ export default function DataCatalogClient({
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm">
+              <div className="divide-y divide-base-200 overflow-hidden rounded-box border border-base-300/50 bg-base-100 shadow-sm">
                 {currentRecords.map((record) => (
                   <RecordCard
                     key={`${record.projectId}-${record.id}`}

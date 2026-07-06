@@ -8,6 +8,28 @@ export type CustomQueryRequestDto = {
   jsonValue?: string;
 };
 
+export type CreateRecordCollectionRequestDto = {
+  name: string;
+  description: string;
+  properties: Record<string, unknown>;
+  tags?: string[];
+};
+
+export type RecordCollectionQueryRequestDto = {
+  search?: string;
+  sensitivityLabelIds?: number[];
+  tagIds?: number[];
+  sort?: string;
+  pageNumber?: number;
+  pageSize?: number;
+};
+
+export type UpdateRecordCollectionRequestDto = {
+  name?: string;
+  description?: string;
+  properties?: Record<string, unknown>;
+};
+
 export type RelatedRecordsRequestDto = {
   recordId?: number;
   isOrigin?: boolean;
@@ -39,6 +61,7 @@ export type UpdateOrganizationRequestDto = {
   description?: string | null;
   defaultOrg?: boolean | null;
   banner?: string | null;
+  theme?: string | null;
 };
 
 export type CreateOauthApplicationRequestDto = {
@@ -252,11 +275,7 @@ export type UpdateSensitivityLabelDto = {
   description?: string | null;
 };
 
-export type AiModelProvider =
-  | "openai"
-  | "anthropic"
-  | "hpc"
-  | "ollama";
+export type AiModelProvider = "openai" | "anthropic" | "hpc" | "ollama";
 
 export type AiModelType = "llm" | "vlm" | "embedding";
 
@@ -267,7 +286,7 @@ export type CreateAiModelConfigRequestDto = {
   model_name: string;
   requires_token: boolean;
   default: boolean;
-}
+};
 
 export type UpdateAiModelConfigRequestDto = {
   model_name?: string;
@@ -275,16 +294,16 @@ export type UpdateAiModelConfigRequestDto = {
   server_url?: string;
   requires_token?: boolean;
   default?: boolean;
-}
+};
 
 export type CreateUserModelTokenRequestDto = {
   token: string;
   aiModelConfigId: number;
-}
+};
 
 export type UpdateUserModelTokenRequestDto = {
   token: string;
-}
+};
 
 export interface InviteUserToOrganizationRequestDto {
   userEmail: string;
@@ -311,12 +330,12 @@ export interface SearchConditionDto {
   value?: string;
   json?: string;
 }
- 
+
 export interface ExecuteSavedSearchRequest {
   filter: SearchConditionDto[];
   textSearch?: string;
 }
- 
+
 export interface SavedSearchFilterRequest {
   name: string;
   textSearch: string;
@@ -325,3 +344,13 @@ export interface SavedSearchFilterRequest {
   pageNumber?: number;
   pageSize?: number;
 }
+
+export type TriggerDagRunRequestDto = {
+  dag_run_id?: string | null;
+  logical_date?: string | null;
+  data_interval_start?: string | null;
+  data_interval_end?: string | null;
+  run_after?: string | null;
+  conf?: Record<string, unknown> | null;
+  note?: string | null;
+};

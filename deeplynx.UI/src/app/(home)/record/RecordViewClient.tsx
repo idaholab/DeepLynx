@@ -32,6 +32,7 @@ import ConfirmationModal from "@/app/(home)/components/ConfirmationModal";
 import RelatedRecordsCard, {
   CardColumn,
 } from "./components/RelatedRecordsCard";
+import ArchiveDelete from "../components/ArchiveDelete";
 
 // Types & Context
 import { useLanguage } from "@/app/contexts/Language";
@@ -42,6 +43,7 @@ import {
   getClass,
 } from "@/app/lib/client_service/class_services.client";
 import {
+  archiveRecord,
   getHistoricalRecord,
   getRecord,
   unattachSensitivityLabelFromRecord,
@@ -58,6 +60,7 @@ import AddEdgeModal from "./components/AddEdgeModal";
 import AdditionalPropertiesEditor from "./components/AdditionalPropertiesEditor";
 import ClassSelectorModal from "./components/ClassSelectorModal";
 import RecordHistoryTab from "./components/RecordHistoryTab";
+import RecordCollectionsTab from "./components/RecordCollectionsTab";
 import RecordInsightChat from "./components/RecordInsightChat";
 import RecordTagsPanel from "./components/RecordTagsPanel";
 import {
@@ -75,6 +78,7 @@ import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
 } from "@/app/lib/client_service/insight_services.client";
+import { isInsightHidden } from "@/app/lib/feature_flags";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -446,15 +450,29 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       return;
     }
 
+    if (record.classId === null) {
+      setRecordClass(null);
+      return;
+    }
+
     let cancelled = false;
+
+    const timeout = (ms: number) =>
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), ms),
+      );
 
     const fetchClass = async () => {
       try {
-        const data = await getClass(projectId, Number(record.classId), true);
-        if (!cancelled) setRecordClass(data);
+        const data = await Promise.race([
+          getClass(projectId, Number(record.classId), true),
+          timeout(5000),
+        ]);
+        if (!cancelled) setRecordClass(data as ClassResponseDto);
       } catch (error) {
-        console.error("Error fetching class:", error);
-        if (!cancelled) setRecordClass(null);
+        if (cancelled) return;
+        console.error("Error fetching class or fetch timeout:", error);
+        setRecordClass(null);
       }
     };
 
@@ -464,6 +482,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       cancelled = true;
     };
   }, [record?.classId, projectId]);
+
 
   useEffect(() => {
     const fetchTags = async () => {
@@ -570,7 +589,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             value,
             t.translations.RECORD_NAME_UPDATED,
           ),
-        maxCharacterLimit: 250
+        maxCharacterLimit: 250,
       },
       {
         label: t.translations.URI,
@@ -948,6 +967,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     isRecordInsightEmbedded &&
     (latticeMode === "discovery" || ontologyReady);
 
+  const latticeSteps = [
+    { text: t.translations.LATTICE_STEP_EMBED },
+    {
+      text: t.translations.LATTICE_STEP_ONTOLOGY,
+      href: "/data_schema",
+    },
+    { text: t.translations.LATTICE_STEP_MODE },
+    { text: t.translations.LATTICE_STEP_TRIGGER },
+    { text: t.translations.LATTICE_STEP_DECIDE },
+  ];
+
   const tabs = [
     {
       label: t.translations.RECORD_INFORMATION,
@@ -966,11 +996,28 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               rows={additionalPropertiesRows}
               onEditProperties={() => setIsPropertiesEditorOpen(true)}
             />
+            {/* Delete a Record */}
+            <ArchiveDelete
+              actionType="archive"
+              itemType="Record"
+              itemName={record?.name || ""}
+              onConfirm={async () => {
+                if (organization && projectId && record) {
+                  await archiveRecord(
+                    organization.organizationId as number,
+                    projectId as number,
+                    recordId as number,
+                    true,
+                  );
+                  window.location.href = `/project/${projectId}`;
+                }
+              }}
+            />
           </div>
 
           {/* Right Column - Tags & Relations */}
           <div className="w-full xl:w-1/2 space-y-4">
-            {isInsightSupported ? (
+            {isInsightSupported && !isInsightHidden() ? (
               <RecordInsightChat
                 organizationId={
                   organization?.organizationId
@@ -1060,251 +1107,296 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       ),
     },
     {
-      label: t.translations.LATTICE_PAGE_TITLE,
-      displayLabel: (
-        <span className="inline-flex items-center gap-2">
-          {t.translations.LATTICE_PAGE_TITLE}
-          <BetaBadge size="xs" />
-        </span>
-      ),
+      label: t.translations.RECORD_COLLECTIONS,
       content: (
-        <div className="mt-4 flex flex-col lg:flex-row gap-8 lg:gap-12 p-6">
-          {/* Left: About Lattice */}
-          <div className="lg:w-2/5 space-y-5">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">
-                {t.translations.LATTICE_WIDGET_TITLE}
-              </h2>
-            </div>
-            <p className="text-sm text-base-content/60 leading-relaxed">
-              {t.translations.LATTICE_WIDGET_DESCRIPTION}
-            </p>
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/40">
-                {t.translations.LATTICE_HOW_IT_WORKS}
-              </p>
-              <ol className="space-y-3">
-                {[
-                  t.translations.LATTICE_STEP_EMBED,
-                  t.translations.LATTICE_STEP_MODE,
-                  t.translations.LATTICE_STEP_TRIGGER,
-                  t.translations.LATTICE_STEP_DECIDE,
-                ].map((step, i) => (
-                  <li
-                    key={i}
-                    className="flex gap-3 text-sm text-base-content/70"
-                  >
-                    <span className="size-5 rounded-full bg-base-300 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    {step}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
-
-          {/* Right: Controls */}
-          <div className="flex-1 space-y-5">
-            {!isInsightSupported ? (
-              <div className="alert alert-warning">
-                <SparklesIcon className="size-5 shrink-0" />
-                <span>{t.translations.LATTICE_UNSUPPORTED_FILE_TOOLTIP}</span>
-              </div>
-            ) : (
-              <>
-                {!isRecordInsightEmbedded && !isCheckingLatticeReadiness && (
-                  <div className="alert alert-warning">
-                    <span className="flex-1 text-sm">
-                      {t.translations.LATTICE_NOT_EMBEDDED_WARNING}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-warning btn-sm shrink-0"
-                      onClick={handleQueueInsightUpload}
-                      disabled={isQueuingInsightUpload}
-                    >
-                      {isQueuingInsightUpload ? (
-                        <span className="loading loading-spinner loading-sm" />
-                      ) : (
-                        t.translations.LATTICE_QUEUE_FOR_EMBEDDING
-                      )}
-                    </button>
-                  </div>
-                )}
-
-                {/* Ontology Embedding Status */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">
-                      {t.translations.LATTICE_ONTOLOGY_STATUS_TITLE}
-                    </p>
-                    {isLoadingOntologyStatus && !ontologyStatus && (
-                      <span className="loading loading-spinner loading-xs text-base-content/40" />
-                    )}
-                  </div>
-                  {ontologyStatus && (
-                    <div className="rounded-lg border border-base-300 divide-y divide-base-300 text-sm">
-                      {ontologyStatus.class_count === 0 &&
-                        ontologyStatus.relationship_count === 0 ? (
-                        <p className="px-4 py-3 text-base-content/50 text-xs">
-                          {t.translations.LATTICE_ONTOLOGY_NO_SCHEMA}
-                        </p>
-                      ) : (
-                        <>
-                          <div className="flex items-center justify-between px-4 py-2">
-                            <span className="text-base-content/70">
-                              {t.translations.LATTICE_ONTOLOGY_CLASSES}
-                            </span>
-                            <span
-                              className={
-                                ontologyStatus.embedded_class_count ===
-                                  ontologyStatus.class_count
-                                  ? "text-success font-medium"
-                                  : "text-warning font-medium"
-                              }
-                            >
-                              {ontologyStatus.embedded_class_count}{" "}
-                              {t.translations.LATTICE_ONTOLOGY_EMBEDDED_OF}{" "}
-                              {ontologyStatus.class_count}{" "}
-                              {t.translations.LATTICE_ONTOLOGY_EMBEDDED_LABEL}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between px-4 py-2">
-                            <span className="text-base-content/70">
-                              {t.translations.LATTICE_ONTOLOGY_RELATIONSHIPS}
-                            </span>
-                            <span
-                              className={
-                                ontologyStatus.embedded_relationship_count ===
-                                  ontologyStatus.relationship_count
-                                  ? "text-success font-medium"
-                                  : "text-warning font-medium"
-                              }
-                            >
-                              {ontologyStatus.embedded_relationship_count}{" "}
-                              {t.translations.LATTICE_ONTOLOGY_EMBEDDED_OF}{" "}
-                              {ontologyStatus.relationship_count}{" "}
-                              {t.translations.LATTICE_ONTOLOGY_EMBEDDED_LABEL}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {ontologyStatus &&
-                    (ontologyStatus.class_count > 0 ||
-                      ontologyStatus.relationship_count > 0) && (
-                      <div className="flex items-start justify-between gap-3">
-                        {!ontologyReady && (
-                          <p className="text-xs text-base-content/50 leading-relaxed flex-1">
-                            {t.translations.LATTICE_ONTOLOGY_NOT_READY}
-                          </p>
-                        )}
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-xs shrink-0 ml-auto"
-                          onClick={handleQueueOntologyEmbeddings}
-                          disabled={isQueuingOntologyEmbeddings}
-                        >
-                          {isQueuingOntologyEmbeddings ? (
-                            <span className="loading loading-spinner loading-xs" />
-                          ) : (
-                            t.translations.LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS
-                          )}
-                        </button>
-                      </div>
-                    )}
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">
-                    {t.translations.LATTICE_MODE_HEADER}
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setLatticeMode("discovery")}
-                      disabled={isTriggeringLatticeExtraction}
-                      className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "discovery"
-                        ? "border-primary bg-primary/5"
-                        : "border-base-300 hover:border-base-content/30"
-                        }`}
-                    >
-                      <p className="font-semibold text-sm">
-                        {t.translations.LATTICE_DISCOVERY}
-                      </p>
-                      <p className="mt-1 text-xs text-base-content/60 leading-relaxed">
-                        {t.translations.LATTICE_DISCOVERY_TOOLTIP}
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLatticeMode("strict")}
-                      disabled={isTriggeringLatticeExtraction}
-                      className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "strict"
-                        ? "border-primary bg-primary/5"
-                        : "border-base-300 hover:border-base-content/30"
-                        }`}
-                    >
-                      <p className="font-semibold text-sm">
-                        {t.translations.LATTICE_STRICT}
-                      </p>
-                      <p className="mt-1 text-xs text-base-content/60 leading-relaxed">
-                        {t.translations.LATTICE_STRICT_TOOLTIP}
-                      </p>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={handleTriggerLatticeExtraction}
-                    disabled={
-                      isTriggeringLatticeExtraction ||
-                      isCheckingLatticeReadiness ||
-                      !canTriggerLatticeExtract
-                    }
-                  >
-                    {isTriggeringLatticeExtraction ? (
-                      <>
-                        <span className="loading loading-spinner loading-sm" />{" "}
-                        {t.translations.STARTING}…
-                      </>
-                    ) : isCheckingLatticeReadiness ? (
-                      <>
-                        <span className="loading loading-spinner loading-sm" />{" "}
-                        {t.translations.CHECKING}…
-                      </>
-                    ) : (
-                      <>
-                        {t.translations.LATTICE_EXTRACT}{" "}
-                        <ArrowTopRightOnSquareIcon className="size-4" />
-                      </>
-                    )}
-                  </button>
-                  <Link
-                    href={`/lattice/decisions?projectId=${projectId}&organizationId=${organization.organizationId}`}
-                    className="btn btn-ghost btn-sm"
-                  >
-                    {t.translations.LATTICE_VIEW_EXTRACTIONS}
-                    <ArrowTopRightOnSquareIcon className="size-4" />
-                  </Link>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        <RecordCollectionsTab
+          organizationId={organization.organizationId as number}
+          projectId={projectId}
+          recordId={recordId}
+        />
       ),
     },
+    // conditionally include lattice tab
+    ...(!isInsightHidden()
+      ? [
+        {
+          label: t.translations.LATTICE_PAGE_TITLE,
+          displayLabel: (
+            <span className="inline-flex items-center gap-2">
+              {t.translations.LATTICE_PAGE_TITLE}
+              <BetaBadge size="xs" />
+            </span>
+          ),
+          content: (
+            <div className="mt-4 flex flex-col lg:flex-row gap-8 lg:gap-12 p-6">
+              {/* Left: About Lattice */}
+              <div className="lg:w-2/5 space-y-5">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold">
+                    {t.translations.LATTICE_WIDGET_TITLE}
+                  </h2>
+                </div>
+                <p className="text-sm text-base-content/60 leading-relaxed">
+                  {t.translations.LATTICE_WIDGET_DESCRIPTION}
+                </p>
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-base-content/40">
+                    {t.translations.LATTICE_HOW_IT_WORKS}
+                  </p>
+                  <ol className="space-y-3">
+                    {latticeSteps.map((step, i) => (
+                      <li
+                        key={i}
+                        className="flex gap-3 text-sm text-base-content/70"
+                      >
+                        <span className="size-5 rounded-full bg-base-300 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                          {i + 1}
+                        </span>
+
+                        {step.href ? (
+                          <Link
+                            href={step.href}
+                            className="text-primary hover:underline"
+                          >
+                            {step.text}
+                          </Link>
+                        ) : (
+                          step.text
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </div>
+
+              {/* Right: Controls */}
+              <div className="flex-1 space-y-5">
+                {!isInsightSupported ? (
+                  <div className="alert alert-warning">
+                    <SparklesIcon className="size-5 shrink-0" />
+                    <span>
+                      {t.translations.LATTICE_UNSUPPORTED_FILE_TOOLTIP}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    {!isRecordInsightEmbedded &&
+                      !isCheckingLatticeReadiness && (
+                        <div className="alert alert-warning">
+                          <span className="flex-1 text-sm">
+                            {t.translations.LATTICE_NOT_EMBEDDED_WARNING}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-warning btn-sm shrink-0"
+                            onClick={handleQueueInsightUpload}
+                            disabled={isQueuingInsightUpload}
+                          >
+                            {isQueuingInsightUpload ? (
+                              <span className="loading loading-spinner loading-sm" />
+                            ) : (
+                              t.translations.LATTICE_QUEUE_FOR_EMBEDDING
+                            )}
+                          </button>
+                        </div>
+                      )}
+
+                    {/* Ontology Embedding Status */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">
+                          {t.translations.LATTICE_ONTOLOGY_STATUS_TITLE}
+                        </p>
+                        {isLoadingOntologyStatus && !ontologyStatus && (
+                          <span className="loading loading-spinner loading-xs text-base-content/40" />
+                        )}
+                      </div>
+                      {ontologyStatus && (
+
+                        <div className="rounded-lg border border-base-300/50 divide-y divide-base-300/50 text-sm">
+
+                          {ontologyStatus.class_count === 0 &&
+                            ontologyStatus.relationship_count === 0 ? (
+                            <p className="px-4 py-3 text-base-content/50 text-xs">
+                              {t.translations.LATTICE_ONTOLOGY_NO_SCHEMA}
+                            </p>
+                          ) : (
+                            <>
+                              <div className="flex items-center justify-between px-4 py-2">
+                                <span className="text-base-content/70">
+                                  {t.translations.LATTICE_ONTOLOGY_CLASSES}
+                                </span>
+                                <span
+                                  className={
+                                    ontologyStatus.embedded_class_count ===
+                                      ontologyStatus.class_count
+                                      ? "text-success font-medium"
+                                      : "text-warning font-medium"
+                                  }
+                                >
+                                  {ontologyStatus.embedded_class_count}{" "}
+                                  {
+                                    t.translations
+                                      .LATTICE_ONTOLOGY_EMBEDDED_OF
+                                  }{" "}
+                                  {ontologyStatus.class_count}{" "}
+                                  {
+                                    t.translations
+                                      .LATTICE_ONTOLOGY_EMBEDDED_LABEL
+                                  }
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between px-4 py-2">
+                                <span className="text-base-content/70">
+                                  {
+                                    t.translations
+                                      .LATTICE_ONTOLOGY_RELATIONSHIPS
+                                  }
+                                </span>
+                                <span
+                                  className={
+                                    ontologyStatus.embedded_relationship_count ===
+                                      ontologyStatus.relationship_count
+                                      ? "text-success font-medium"
+                                      : "text-warning font-medium"
+                                  }
+                                >
+                                  {ontologyStatus.embedded_relationship_count}{" "}
+                                  {
+                                    t.translations
+                                      .LATTICE_ONTOLOGY_EMBEDDED_OF
+                                  }{" "}
+                                  {ontologyStatus.relationship_count}{" "}
+                                  {
+                                    t.translations
+                                      .LATTICE_ONTOLOGY_EMBEDDED_LABEL
+                                  }
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {ontologyStatus &&
+                        (ontologyStatus.class_count > 0 ||
+                          ontologyStatus.relationship_count > 0) && (
+                          <div className="flex items-start justify-between gap-3">
+                            {!ontologyReady && (
+                              <p className="text-xs text-base-content/50 leading-relaxed flex-1">
+                                {t.translations.LATTICE_ONTOLOGY_NOT_READY}
+                              </p>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-xs shrink-0 ml-auto"
+                              onClick={handleQueueOntologyEmbeddings}
+                              disabled={isQueuingOntologyEmbeddings}
+                            >
+                              {isQueuingOntologyEmbeddings ? (
+                                <span className="loading loading-spinner loading-xs" />
+                              ) : (
+                                t.translations
+                                  .LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS
+                              )}
+                            </button>
+                          </div>
+                        )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">
+                        {t.translations.LATTICE_MODE_HEADER}
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setLatticeMode("discovery")}
+                          disabled={isTriggeringLatticeExtraction}
+                          className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "discovery"
+                            ? "border-primary bg-primary/5"
+
+                            : "border-base-300/50 hover:border-base-content/30"
+
+                            }`}
+                        >
+                          <p className="font-semibold text-sm">
+                            {t.translations.LATTICE_DISCOVERY}
+                          </p>
+                          <p className="mt-1 text-xs text-base-content/60 leading-relaxed">
+                            {t.translations.LATTICE_DISCOVERY_TOOLTIP}
+                          </p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLatticeMode("strict")}
+                          disabled={isTriggeringLatticeExtraction}
+                          className={`rounded-xl border-2 p-4 text-left transition-colors ${latticeMode === "strict"
+                            ? "border-primary bg-primary/5"
+
+                            : "border-base-300/50 hover:border-base-content/30"
+
+                            }`}
+                        >
+                          <p className="font-semibold text-sm">
+                            {t.translations.LATTICE_STRICT}
+                          </p>
+                          <p className="mt-1 text-xs text-base-content/60 leading-relaxed">
+                            {t.translations.LATTICE_STRICT_TOOLTIP}
+                          </p>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={handleTriggerLatticeExtraction}
+                        disabled={
+                          isTriggeringLatticeExtraction ||
+                          isCheckingLatticeReadiness ||
+                          !canTriggerLatticeExtract
+                        }
+                      >
+                        {isTriggeringLatticeExtraction ? (
+                          <>
+                            <span className="loading loading-spinner loading-sm" />{" "}
+                            {t.translations.STARTING}…
+                          </>
+                        ) : isCheckingLatticeReadiness ? (
+                          <>
+                            <span className="loading loading-spinner loading-sm" />{" "}
+                            {t.translations.CHECKING}…
+                          </>
+                        ) : (
+                          <>
+                            {t.translations.LATTICE_EXTRACT}{" "}
+                            <ArrowTopRightOnSquareIcon className="size-4" />
+                          </>
+                        )}
+                      </button>
+                      <Link
+                        href={`/lattice/decisions?projectId=${projectId}&organizationId=${organization.organizationId}`}
+                        className="btn btn-ghost btn-sm"
+                      >
+                        {t.translations.LATTICE_VIEW_EXTRACTIONS}
+                        <ArrowTopRightOnSquareIcon className="size-4" />
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ),
+        },
+      ]
+      : []),
   ];
 
   // ============= MAIN RENDER =============
   return (
     <main className="min-h-screen bg-base-200/30">
-      <section className="border-b border-base-300 bg-base-100">
+      <section className="border-b border-base-300/50 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
@@ -1324,7 +1416,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               {record.classId ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <span className="badge badge-primary h-auto min-h-6 whitespace-normal break-words px-3 py-1 text-center leading-tight">
-                    {recordClass?.name || <div className="loading size-3" />}
+                    {recordClass?.name ?? t.translations.NO_CLASS}
                   </span>
                   <button
                     onClick={() => setIsClassModalOpen(true)}

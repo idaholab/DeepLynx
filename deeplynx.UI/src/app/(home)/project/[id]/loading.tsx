@@ -55,7 +55,7 @@ const LoadingProjectDetail = () => {
               <LargeSearchBar className="mb-4 px-4" />
             </div>
 
-            <div className="card bg-base-200/20 border border-base-300">
+            <div className="card bg-base-100 border border-base-300/50">
               <div className="card-body">
                 <div className="flex justify-between px-4">
                   <h1 className="text-xl font-semibold text-base-content">
@@ -69,7 +69,7 @@ const LoadingProjectDetail = () => {
                   </Link>
                 </div>
                 {/* Recently Added Records Card */}
-                <div className="bg-base-100 rounded-xl p-4 border border-base-300">
+                <div className="bg-base-100 rounded-xl p-4 border border-base-300/50">
                   <h2 className="text-lg text-base-content mb-4 font-semibold">
                     {t.translations.RECENTLY_ADDED_RECORDS}
                   </h2>
@@ -162,12 +162,12 @@ const LoadingProjectDetail = () => {
               </button>
             </div>
             {/* Widget card */}
-            <div className="card bg-base-200/20 border border-base-300 mt-4">
+            <div className="card bg-base-100 border border-base-300/50 mt-4">
               <div className="card-body">
                 <h2 className="card-title text-base-content">
                   {t.translations.PROJECT_OVERVIEW}
                 </h2>
-                <div className="stats bg-base-100 shadow border border-base-300">
+                <div className="stats bg-base-100 shadow border border-base-300/50">
                   <div className="stat">
                     <div className="stat-title text-base-content/70">
                       {t.translations.PROJECTS}
@@ -195,7 +195,7 @@ const LoadingProjectDetail = () => {
                     </div>
                   </div>
                 </div>
-                <div className="stats bg-base-100 shadow border border-base-300">
+                <div className="stats bg-base-100 shadow border border-base-300/50">
                   <div className="stat">
                     <div className="stat-title text-base-content/70">
                       {t.translations.CLASSES}
@@ -226,7 +226,7 @@ const LoadingProjectDetail = () => {
               </div>
             </div>
             {/* Team Members */}
-            <div className="card bg-base-200/20 border border-base-300 mt-4">
+            <div className="card bg-base-100 border border-base-300/50 mt-4">
               <div className="card-body">
                 <div className="">
                   <h2 className="card-title flex items-center text-base-content">

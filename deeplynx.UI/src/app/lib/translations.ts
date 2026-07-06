@@ -45,6 +45,7 @@ export const translations = {
       ADDING: "Adding...",
       ADDITIONAL_FILTERS: "Additional Filters",
       ADDITIONAL_PROPERTIES: "Additional Properties",
+      ADDITIONAL_SETTINGS_COMING_SOON: "Additional Settings Coming Soon",
       ADMIN: "Admin",
       ADMIN_OVERVIEW: "Admin Overview",
       ALIAS: "Alias:",
@@ -134,6 +135,7 @@ export const translations = {
       CANNOT_DEFINE_NEW_TAGS: "cannot define new tags",
       CANT_SWITCH_TO_SINGLE_FILE: "Can't switch to single-file",
       CHANGES_DISCARDED: "Changes discarded",
+      CHANGE_LOGO: "Change Logo",
       CHART_SETTINGS: "Chart Settings",
       CHART_TYPE: "Chart Type",
       CHOOSE_A_CLASS: "Choose a class",
@@ -200,6 +202,7 @@ export const translations = {
       CREATE_NEW_GROUP: "Create New Group",
       CREATE_NEW_LABEL: "Create new label",
       CREATE_NEW_LINK: "Create New Link",
+      CREATE_NEW_ORGANIZATION: "Create New Organization",
       CREATE_NEW_PROJECT_LABEL: "Create new project label",
       CREATE_NEW_PROJECT_TAG: "Create new project tag",
       CREATE_NEW_ROLE: "Create New Role",
@@ -209,6 +212,8 @@ export const translations = {
       CREATE_OAUTH_APPLICATION: "Create OAuth Application",
       CREATE_OBJECT_STORAGE: "Create Object Storage",
       CREATE_ORGANIZATION: "Create Organization",
+      CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
+        "Create your first organization to get started.",
       CREATE_PROJECT: "Create New Project",
       CREATE_RELATIONSHIP: "Create Relationship",
       CREATE_ROLE: "Create Role",
@@ -240,6 +245,7 @@ export const translations = {
       DATA_SOURCES: "Data Sources",
       DATA_TYPE: "Data Type",
       DEEPLYNX_ECOSYSTEM_SERVICES: "DeepLynx Ecosystem Services",
+      DEEPLYNX_LOGO: "DeepLynx logo",
       DEFAULT_BADGE: "Default",
       DEFAULT_STORAGE: "Delete Storage",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
@@ -335,6 +341,8 @@ export const translations = {
       FAILED_TO_CREATE_LABEL: "Failed to create label",
       FAILED_TO_CREATE_RECORD: "Failed to create record.",
       FAILED_TO_CREATE_RELATIONSHIPS: "Failed to create relationships",
+      FAILED_TO_CREATE_ORGANIZATION_TRY_AGAIN:
+        "Failed to create organization. Please try again.",
       FAILED_TO_CREATE_STORAGE: "Failed to create storage",
       FAILED_TO_DELETE_STORAGE: "Failed to delete storage",
       FAILED_TO_FETCH_CLASSES: "Failed to fetch classes",
@@ -343,9 +351,12 @@ export const translations = {
       FAILED_TO_LOAD_DATA_SOURCE: "Failed to load data sources",
       FAILED_TO_LOAD_ORGANIZATION_LABELS: "Failed to load organization labels.",
       FAILED_TO_LOAD_ORGANIZATION_TAGS: "Failed to load organization tags.",
+      FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN:
+        "Failed to load organizations. Please try again.",
       FAILED_TO_LOAD_PROJECT_LABELS: "Failed to load project labels.",
       FAILED_TO_LOAD_PROJECT_TAGS: "Failed to load project tags.",
       FAILED_TO_LOAD_RECENT_RECORDS: "Failed to load recent records.",
+      FAILED_TO_LOAD_RECORD_COLLECTIONS: "Failed to load record collections.",
       FAILED_TO_LOAD_RECORD_HISTORY: "Failed to load record history.",
       FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT:
         "Failed to load selected point-in-time snapshot.",
@@ -635,6 +646,7 @@ export const translations = {
       LABEL_CREATED: "Label created",
       LABEL_CREATED_AND_ATTACHED: "created and attached",
       LABEL_CREATED_BUT_FAILED_TO_ATTACH: "created but failed to attach",
+      LABEL_IN_USE: "Label is currently in use. Remove the label from the record(s) before archiving.",
       LABEL_NAME: "Label Name",
       LABEL_NAME_PLACEHOLDER: "e.g., CUI, ITAR, Public",
       LABELS_ARE_LOCKED: "Labels are locked",
@@ -647,6 +659,7 @@ export const translations = {
         "Labels are locked at the organization level. Cannot create or edit project labels.",
       LABELS_LOWER: "labels",
       LANGUAGE: "Language",
+      LAUNCH: "Launch",
       LAST_EDIT: "Last Edited",
       LAST_LOGIN: "Last Login",
       LAST_UPDATE: "Last update:",
@@ -683,6 +696,7 @@ export const translations = {
         "Automatically extract records, classes, relationships, and edges from this document. Results are staged for review before anything is added to the knowledge graph or data schema.",
       LATTICE_HOW_IT_WORKS: "How it works",
       LATTICE_STEP_EMBED: "Queue this document for AI embedding using Insight",
+      LATTICE_STEP_ONTOLOGY: "Before running a Lattice extraction, add at least 2 classes and 1 relationship to your project's ontology. Once the minimum ontology is in place, you can start an extraction.",
       LATTICE_STEP_MODE: "Choose an extraction mode",
       LATTICE_STEP_TRIGGER:
         "Trigger extraction — results are staged for review",
@@ -727,7 +741,7 @@ export const translations = {
       LATTICE_INVALID_SCHEMA_DESCRIPTION:
         "items could not be reconciled with the schema.",
       LATTICE_APPROVE_PROMOTES_ALL:
-        "Approving an extraction promotes all staged items into the knowledge graph and data schema, regardless of validation status.",
+        "You can approve or reject staged items into the knowledge graph and data schema, regardless of validation status.",
       LATTICE_COMING_SOON: "Coming Soon",
       LATTICE_COMING_SOON_TEXT:
         "Individual item approval and bulk approval for different statuses",
@@ -743,7 +757,7 @@ export const translations = {
       LATTICE_EXTRACTION_RUNNING:
         "Extraction is in progress. This page will update automatically.",
       LATTICE_EXTRACTION_REVIEW:
-        "Review the staged items below, then approve or reject the entire extraction.",
+        "Review the staged items below. Approve or reject each item, then click Save to apply your decisions. You can also use Approve by Status to quickly approve groups of items. Existing schema items are shown for reference and do not require a decision. An extraction is complete once all remaining staged items have been reviewed.",
       LATTICE_EXTRACTION_FAILED_MSG:
         "This extraction failed to complete. This can happen when the LLM response has an unexpected structure — please try triggering a new extraction.",
       LATTICE_EXTRACTION_REJECTED_MSG: "This extraction was rejected.",
@@ -788,6 +802,7 @@ export const translations = {
       LOADING_CLASSES: "Loading classes...",
       LOADING_DATA_SOURCES: "Loading data sources...",
       LOADING_OBJECT_STORAGES: "Loading object storages...",
+      LOCAL_CLUSTER_STORAGE: "Local Cluster Storage",
       LOADING_ORGANIZATION_LABELS: "Loading organization labels...",
       LOADING_ORGANIZATION_TAGS: "Loading organization tags...",
       LOADING_PERMISSIONS: "Loading Permissions...",
@@ -795,6 +810,7 @@ export const translations = {
       LOADING_PROJECT_SECURITY_LABELS: "Loading project sensitivity labels...",
       LOADING_PROJECT_TAGS: "Loading project tags...",
       LOADING_PROJECTS: "Loading projects...",
+      LOADING_RECORD_COLLECTIONS: "Loading record collections...",
       LOADING_RECORD_HISTORY: "Loading record history...",
       LOCKED: "Locked",
       LOCKED_AT_ORGANIZATION_LEVEL: "locked at the organization level",
@@ -918,6 +934,7 @@ export const translations = {
         "No organization selected. Unable to save label.",
       NO_ORGANIZATION_SELECTED_UNABLE_TO_SAVE_TAG:
         "No organization selected. Unable to save tag.",
+      NO_ORGANIZATIONS_FOUND: "No organizations found.",
       NO_PERMISSION: "No permission",
       NO_PERMISSIONS: "No permissions available.",
       NO_PERMISSIONS_AVAILABLE: "No Permissions Available",
@@ -986,11 +1003,15 @@ export const translations = {
       ORGANIZATION: "Organization",
       ORGANIZATION_ADMIN_ACCESS_UPDATED: "Organization admin access updated.",
       ORGANIZATION_DEFAULT: "Organization Default",
+      PROJECT_ADMIN: "Project Admin",
+      PROJECT_ADMIN_ACCESS_UPDATED: "Project admin access updated.",
       ORGANIZATION_ID: "Organization ID",
       ORGANIZATION_LABEL: "Organization Label",
       ORGANIZATION_LABEL_CREATED: "Organization label created.",
       ORGANIZATION_LABEL_UPDATED: "Organization label updated.",
+      ORGANIZATION_LOGO: "Organization Logo",
       ORGANIZATION_MANAGEMENT: "Organization Management",
+      ORGANIZATION_NAME: "Organization Name",
       ORGANIZATION_NOT_FOUND: "Organization not found",
       ORGANIZATION_OVERVIEW: "Organization Overview",
       ORGANIZATION_ROLE: "Organization Role",
@@ -1012,6 +1033,13 @@ export const translations = {
       ORGANIZATION_TAGS_DESCRIPTION:
         "Tags for classification, workflows, and search. All projects inherit these and can optionally add their own.",
       ORGANIZATION_USERS: "Organization Users",
+      ORGANIZATION_THEME: "Organization Theme",
+      ORGANIZATION_THEME_DEFAULT: "Default",
+      ORGANIZATION_THEME_DESCRIPTION:
+        "Applies to all users in this organization.",
+      ORGANIZATION_THEME_EMERALD: "Emerald",
+      ORGANIZATION_THEME_NORD: "Nord",
+      ORGANIZATION_THEME_NRIC: "NRIC",
       ORGANIZATION_WARNING_BANNER: "Organization Warning Banner",
       ORGANIZATIONS: "Organizations",
       ORIGINAL_ID: "Original ID",
@@ -1148,7 +1176,7 @@ export const translations = {
       PROJECT_INSIGHT_STATUS_PROCESSING: "Embedding in progress.",
       PROJECT_INSIGHT_STATUS_QUEUED: "Queued for embedding.",
       PROJECT_INSIGHT_STATUS_UNSUPPORTED:
-        "Insight supports PDF, TXT, and HTML files only.",
+        "Insight supports PDF, TXT, HTML, and image files (PNG, JPG, WEBP) only.",
       PROJECT_INSIGHT_UPDATED_FROM: "Updated from",
       PROJECT_INSIGHT_UPDATED_TO: "Updated to",
       PROJECT_LABEL_CREATED: "Project label created.",
@@ -1204,6 +1232,169 @@ export const translations = {
       RECORD: "Record",
       RECORD_: "Record ",
       RECORD_CREATED_SUCCESSFULLY: "Record created successfully!",
+      RECORD_COLLECTIONS: "Record Collections",
+      RECORD_COLLECTIONS_ADD_SELECTED: "Add selected",
+      RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES: "Additional Properties",
+      RECORD_COLLECTIONS_ALL: "All Collections",
+      RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION:
+        "All matching records are already in this collection.",
+      RECORD_COLLECTIONS_ARCHIVE_COLLECTION: "Archive collection",
+      RECORD_COLLECTIONS_ARCHIVE_CONFIRM:
+        'Archive "{name}"? This removes it from active collections.',
+      RECORD_COLLECTIONS_ARCHIVE_SUCCESS: "Record collection archived",
+      RECORD_COLLECTIONS_ARE_YOU_SURE: "Are you sure?",
+      RECORD_COLLECTIONS_ASSIGNED_COUNT: "{count} assigned",
+      RECORD_COLLECTIONS_ASSIGNED_RECORDS_SHOWN:
+        "{shown} of {total} assigned records shown.",
+      RECORD_COLLECTIONS_BACK_TO_COLLECTIONS: "Back to collections",
+      RECORD_COLLECTIONS_BACK_TO_DETAILS: "Back to details",
+      RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING:
+        "Browse collections, create new collections, and modify existing collections.",
+      RECORD_COLLECTIONS_BROWSE_RECORDS: "Browse records",
+      RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT:
+        "Browse, search, and modify record collections for this project.",
+      RECORD_COLLECTIONS_CLASS: "Class",
+      RECORD_COLLECTIONS_COLLECTION_DASHBOARD: "Collection Dashboard",
+      RECORD_COLLECTIONS_COLLECTION_DETAILS: "Collection Details",
+      RECORD_COLLECTIONS_COLLECTION_ID: "Collection ID",
+      RECORD_COLLECTIONS_CREATED: "Record collection created",
+      RECORD_COLLECTIONS_CREATE_IN_ACTIVE_PROJECT:
+        "Create a record collection in the active project.",
+      RECORD_COLLECTIONS_DESELECT_RECORDS_WITH: "Deselect records with {name}",
+      RECORD_COLLECTIONS_EDIT_COLLECTION: "Edit Collection",
+      RECORD_COLLECTIONS_FAILED_CANCEL_CHANGES:
+        "Failed to cancel collection changes",
+      RECORD_COLLECTIONS_FAILED_CREATE: "Failed to create record collection",
+      RECORD_COLLECTIONS_FAILED_CREATE_LABEL:
+        "Failed to create sensitivity label",
+      RECORD_COLLECTIONS_FAILED_CREATE_TAG: "Failed to create tag",
+      RECORD_COLLECTIONS_FAILED_ARCHIVE: "Failed to archive record collection",
+      RECORD_COLLECTIONS_FAILED_LOAD_COLLECTIONS:
+        "Failed to load record collections",
+      RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS:
+        "Failed to load collection records",
+      RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS:
+        "Failed to load project labels",
+      RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS:
+        "Failed to load project tags",
+      RECORD_COLLECTIONS_FAILED_LOAD_SELECTED_RECORD_METADATA:
+        "Failed to load full record metadata for: {records}",
+      RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS: "Failed to search records",
+      RECORD_COLLECTIONS_FAILED_UPDATE: "Failed to update record collection",
+      RECORD_COLLECTIONS_SAVED_REFRESH_FAILED:
+        "Record collection saved, but the latest data could not be loaded. Reload the page to refresh.",
+      RECORD_COLLECTIONS_FIELD: "Field",
+      RECORD_COLLECTIONS_FILTER_BY_TITLE_OR_DESCRIPTION:
+        "Search by collection title or description...",
+      RECORD_COLLECTIONS_LABELS: "Labels",
+      RECORD_COLLECTIONS_LABEL_CREATED: "Label created",
+      RECORD_COLLECTIONS_LAST_UPDATED_BY: "Last Updated By",
+      RECORD_COLLECTIONS_LOADING_LABELS: "Loading labels",
+      RECORD_COLLECTIONS_LOADING_TAGS: "Loading tags",
+      RECORD_COLLECTIONS_MANAGE: "Manage Collection",
+      RECORD_COLLECTIONS_MANAGE_IDENTITY_LABELS_METADATA:
+        "Edit collection identity, labels, and metadata.",
+      RECORD_COLLECTIONS_MANAGE_RECORDS: "Manage Records",
+      RECORD_COLLECTIONS_MANAGE_RECORDS_DESCRIPTION:
+        "Add records to this collection or remove records already assigned.",
+      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS: "Collection Labels and Tags",
+      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS_HELP:
+        "These labels and tags will be applied to the collection itself. They do not change the included records.",
+      RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED:
+        "Name and description are required",
+      RECORD_COLLECTIONS_NAME_REQUIRED: "Collection Title is required.",
+      RECORD_COLLECTIONS_NEW: "New Collection",
+      RECORD_COLLECTIONS_NOT_UPDATED: "Not updated",
+      RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET:
+        "No additional properties set.",
+      RECORD_COLLECTIONS_NO_DESCRIPTION_PROVIDED: "No description provided.",
+      RECORD_COLLECTIONS_NO_LABELS_FOUND: "No labels found.",
+      RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED:
+        "No records are currently assigned.",
+      RECORD_COLLECTIONS_NO_RECORDS_FOUND: "No records found.",
+      RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH:
+        "No records match this search.",
+      RECORD_COLLECTIONS_NO_SELECTED_RECORDS_MATCH_SEARCH:
+        "No selected records match this search.",
+      RECORD_COLLECTIONS_NO_SENSITIVITY_LABELS_MATCH:
+        "No sensitivity labels match.",
+      RECORD_COLLECTIONS_NO_TAGS_FOUND: "No tags found.",
+      RECORD_COLLECTIONS_CANNOT_CONTINUE_WITH_INCOMPLETE_RECORD_METADATA:
+        "Some selected records are still missing full metadata. Remove them or retry before continuing.",
+      RECORD_COLLECTIONS_OPEN_DETAILS: "Open details",
+      RECORD_NOT_IN_ANY_COLLECTIONS: "This record is not in any collections.",
+      RECORD_COLLECTIONS_PARTIAL_UPDATE:
+        "Collection details saved, but some changes failed: {operations}",
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL: 'add label "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_RECORD: 'add record "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG: 'add tag "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_LABEL: 'remove label "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_RECORD: 'remove record "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_TAG: 'remove tag "{name}"',
+      RECORD_COLLECTIONS_RECORDS_ADDED: "Records added to collection",
+      RECORD_COLLECTIONS_RECORDS_ASSIGNED_TO:
+        "Records currently assigned to {name}.",
+      RECORD_COLLECTIONS_RECORD_ADDED: "Record added to collection",
+      RECORD_COLLECTIONS_RECORD_REMOVED: "Record removed from collection",
+      RECORD_COLLECTIONS_RECORD_SUMMARY: "Included Record Summary",
+      RECORD_COLLECTIONS_RECORD_SUMMARY_HELP:
+        "These labels and tags come from the records currently selected for this collection. Use them to refine which records are included.",
+      RECORD_COLLECTIONS_REMOVE_ITEM: "Remove {name}",
+      RECORD_COLLECTIONS_REVIEW_AND_MODIFY_DETAILS:
+        "Review and modify collection details.",
+      RECORD_COLLECTIONS_SAVE_COLLECTION: "Save Collection",
+      RECORD_COLLECTIONS_SAVE_MODIFICATIONS: "Save Modifications",
+      RECORD_COLLECTIONS_SEARCH_ALL_RECORDS: "Search all records",
+      RECORD_COLLECTIONS_SEARCH_IN_THIS_COLLECTION:
+        "Search records in this collection",
+      RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL: "Search or add label",
+      RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG: "Search or add tag",
+      RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD: "Search records to add",
+      RECORD_COLLECTIONS_SEARCH_SELECTED_RECORDS: "Search selected records",
+      RECORD_COLLECTIONS_SEARCHING_RECORDS: "Searching records",
+      RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS:
+        "Labels and Tags on Selected Records",
+      RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS_HELP:
+        "This is a read-only summary of the labels and tags already present on the selected records.",
+      RECORD_COLLECTIONS_SELECTED_RECORD_METADATA_INCOMPLETE:
+        "{count} selected record(s) still need full metadata before you can continue.",
+      RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT: "{count} records selected",
+      RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
+        "{shown} of {total} records shown",
+      RECORD_COLLECTIONS_SHOW_CURRENT_RECORDS: "Show current list",
+      RECORD_COLLECTIONS_SHOW_MORE: "Show more",
+      RECORD_COLLECTIONS_SOURCE: "Source",
+      RECORD_COLLECTIONS_SORT_ALPHABETICAL_ASC: "Alphabetical (A to Z)",
+      RECORD_COLLECTIONS_SORT_ALPHABETICAL_DESC: "Alphabetical (Z to A)",
+      RECORD_COLLECTIONS_SORT_RECORD_COUNT_ASC: "# of Records (Lowest)",
+      RECORD_COLLECTIONS_SORT_RECORD_COUNT_DESC: "# of Records (Highest)",
+      RECORD_COLLECTIONS_SORT_UPDATED_ASC: "Last Updated (Oldest)",
+      RECORD_COLLECTIONS_SORT_UPDATED_DESC: "Last Updated (Newest)",
+      RECORD_COLLECTIONS_STEP_1: "Step 1",
+      RECORD_COLLECTIONS_STEP_2: "Step 2",
+      RECORD_COLLECTIONS_STEP_3: "Step 3",
+      RECORD_COLLECTIONS_STEP_4: "Step 4",
+      RECORD_COLLECTIONS_STEP_ADD_METADATA: "Describe Collection",
+      RECORD_COLLECTIONS_STEP_MODIFY_LABELS_AND_TAGS:
+        "Set Collection Labels and Tags",
+      RECORD_COLLECTIONS_STEP_REVIEW: "Review",
+      RECORD_COLLECTIONS_STEP_SELECT_RECORDS: "Select Included Records",
+      RECORD_COLLECTIONS_TAGS: "Tags",
+      RECORD_COLLECTIONS_TAG_CREATED: "Tag created",
+      RECORD_COLLECTIONS_TITLE: "Collection Title",
+      RECORD_COLLECTIONS_TOTAL_COLLECTIONS: "Total Collections:",
+      RECORD_COLLECTIONS_TOTAL_RECORDS: "Total Records",
+      RECORD_COLLECTIONS_UNCLASSIFIED: "Unclassified",
+      RECORD_COLLECTIONS_UNNAMED_RECORD: "Unnamed record",
+      RECORD_COLLECTIONS_UNSELECT_ALL: "Unselect All",
+      RECORD_COLLECTIONS_UNTITLED_COLLECTION: "Untitled Collection",
+      RECORD_COLLECTIONS_UPDATED: "Updated",
+      RECORD_COLLECTIONS_UPDATE_SUCCESS: "Record collection updated",
+      RECORD_COLLECTIONS_UPDATED_ON_CREATE: "On create",
+      RECORD_COLLECTIONS_VALUE: "Value",
+      RECORD_COLLECTIONS_VIEW_ALL: "View all",
+      RECORD_COLLECTIONS_WAIT_FOR_SELECTED_RECORD_METADATA:
+        "Wait for selected record metadata to finish loading before continuing.",
       RECORD_COUNT: "Record Count",
       RECORD_DESCRIPTION: "Record Description",
       RECORD_FILE_UPDATED_SUCCESSFULLY: "Record file updated successfully.",
@@ -1291,6 +1482,8 @@ export const translations = {
       ROOT: "Root",
       ROW_WITH_NUMBER: "Row {row}",
       ROWS_FROM_CSV: "rows from CSV",
+      S3_US_EAST_1: "S3 - us-east-1",
+      S3_US_WEST_2: "S3 - us-west-2",
       SAVE: "Save",
       SAVE_ALL_CHANGES: "Save All Changes",
       SAVE_CHANGES: "Save Changes",
@@ -1353,6 +1546,7 @@ export const translations = {
       SELECTED_ORGANIZATION_USERS: "Selected Organization Users",
       SELECTED_RECORD: "Selected record:",
       SELECTED_RECORDS: "Selected Records",
+      SELECT_LOGO: "Select Logo",
       SEND_INVITATION: "Send Invitation",
       SEND_INVITATIONS: "Send invitation(s)",
       SENSITIVITY_LABEL_REMOVED: "Sensitivity label removed",
@@ -1403,6 +1597,8 @@ export const translations = {
       STEP_1_DOWNLOAD_TEMPLATE: "Step 1: Download Template",
       STEP_2_UPLOAD_YOUR_CSV: "Step 2: Upload Your CSV",
       STORAGE: "Storage",
+      STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT:
+        "Storage configuration and additional organization management features are currently in development.",
       STORAGE_CREATED_SUCCESSFULLY: "Storage created successfully",
       STORAGE_DELETE_SUCCESSFULLY: "Storage deleted successfully",
       STORAGE_DESTINATION: "Storage Destination",
@@ -1524,6 +1720,8 @@ export const translations = {
         "User and organization admin access updated.",
       USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED:
         "User and system admin access updated.",
+      USER_AND_PROJECT_ADMIN_ACCESS_UPDATED:
+        "User and project admin access updated.",
       USER_ARCHIVED_SUCCESSFULLY: "User archived successfully.",
       USER_MANAGEMENT: "User Management",
       USER_REMOVED_FROM_ORG: "User removed from organization",
@@ -1556,6 +1754,7 @@ export const translations = {
         "All data contained within DOE computer systems is owned by DOE and may be audited, intercepted, recorded, read, copied, or captured in any manner and disclosed in any manner by authorized personnel. " +
         "THERE IS NO RIGHT OF PRIVACY IN THIS SYSTEM. System personnel may disclose any potential evidence of crime found on DOE computer systems to appropriate authorities. USE OF THIS SYSTEM BY ANY USER, AUTHORIZED OR " +
         "UNAUTHORIZED, CONSTITUTES CONSENT TO THIS AUDITING, INTERCEPTION, RECORDING, READING, COPYING, CAPTURING, and DISCLOSURE OF COMPUTER ACTIVITY. **WARNING**WARNING**WARNING**WARNING**WARNING**",
+      WELCOME_BACK_COMMA: "Welcome back,",
       WELECOME: "Welcome Back",
       WHAT_HAPPENS_NEXT: "What happens next?",
       WHEN_LABELS_ARE: "When labels are",
@@ -1575,9 +1774,46 @@ export const translations = {
       YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
         "You've been added to a project in DeepLynx Nexus",
       ZOOM_CONTROLS: "Zoom controls",
+      THEME_UPDATE_SUCCESS: "Theme updated successfully",
+      FAILED_TO_UPDATE_THEME: "Failed to update theme",
       ARCHIVED_USERS: "Archived Users",
       UNARCHIVE_USER: "Unarchive",
-      NO_ARCHIVED_USERS: "No archived users."
+      NO_ARCHIVED_USERS: "No archived users.",
+      ALL_DAGS: "All DAGs",
+      RUN: "Run",
+      DAG: "DAG",
+      OWNERS: "Owners",
+      SCHEDULE: "Schedule",
+      PAUSED: "Paused",
+      NO_DAGS_FOUND: "No DAGs found.",
+      FAILED_TO_LOAD_DAGS: "Failed to load DAGs. Please try again.",
+      DAGS_OVERVIEW_DESCRIPTION:
+        "A DAG, or Directed Acyclic Graph, is an Airflow workflow. Nexus uses Airflow's public APIs to list DAGs, retrieve their details and configuration parameters, and trigger runs. To review the run history for a specific DAG, open the Airflow instance.",
+      TRIGGER_DAG: "Trigger DAG",
+      TRIGGER_DAG_TOOLTIP: "Trigger this DAG with optional run configuration",
+      DAG_PAUSED_TOOLTIP: "This DAG is paused in Airflow and cannot be triggered",
+      TRIGGER: "Trigger",
+      FAILED_TO_TRIGGER: "Failed to trigger",
+      DAG_RUN_SUBMITTED: "Submitting DAG run for",
+      DAG_RUN_STATUS_UNAVAILABLE:
+        "DAG run was submitted, but final status cannot be checked for",
+      DAG_RUN_SUCCEEDED: "DAG run succeeded for",
+      DAG_RUN_FAILED: "DAG run failed for",
+      DAG_RUN_STILL_RUNNING: "DAG run is still running for",
+      FAILED_TO_CHECK_DAG_RUN_STATUS: "Failed to check DAG run status for",
+      RUN_ID: "Run ID",
+      RUN_ID_PLACEHOLDER: "Leave blank to let Airflow generate one",
+      CONFIGURATION_JSON: "Configuration (JSON)",
+      LOADING_DAG_PARAMETERS: "Loading DAG parameters...",
+      CONF_HELP: "Optional JSON object passed to the DAG run as conf.",
+      CONF_MUST_BE_OBJECT: 'Conf must be a JSON object, e.g. { "key": "value" }.',
+      CONF_INVALID_JSON: "Conf is not valid JSON.",
+      LOGICAL_DATE: "Logical Date",
+      RUN_AFTER: "Run After",
+      DATA_INTERVAL_START: "Data Interval Start",
+      DATA_INTERVAL_END: "Data Interval End",
+      NOTE: "Note",
+      NOTE_PLACEHOLDER: "Optional note for this run"
     },
   },
   es: {
@@ -1626,6 +1862,8 @@ export const translations = {
       ADDING: "Agregando...",
       ADDITIONAL_FILTERS: "Filtros adicionales",
       ADDITIONAL_PROPERTIES: "Propiedades adicionales",
+      ADDITIONAL_SETTINGS_COMING_SOON:
+        "Configuraciones adicionales próximamente",
       ADMIN: "Admin",
       ADMIN_OVERVIEW: "Resumen de administración",
       ALIAS: "Alias:",
@@ -1720,6 +1958,7 @@ export const translations = {
       CANNOT_DEFINE_NEW_TAGS: "no pueden definir nuevas etiquetas",
       CANT_SWITCH_TO_SINGLE_FILE: "No se puede cambiar a archivo único",
       CHANGES_DISCARDED: "Cambios descartados",
+      CHANGE_LOGO: "Cambiar logotipo",
       CHART_SETTINGS: "Configuración del Gráfico",
       CHART_TYPE: "Tipo de Gráfico",
       CHOOSE_A_CLASS: "Elige una clase",
@@ -1788,6 +2027,7 @@ export const translations = {
       CREATE_NEW_GROUP: "Crear nuevo grupo",
       CREATE_NEW_LABEL: "Crear nueva etiqueta",
       CREATE_NEW_LINK: "Crear nuevo enlace",
+      CREATE_NEW_ORGANIZATION: "Crear nueva organización",
       CREATE_NEW_PROJECT_LABEL: "Crear nueva etiqueta del proyecto",
       CREATE_NEW_PROJECT_TAG: "Crear nueva etiqueta del proyecto",
       CREATE_NEW_ROLE: "Crear un rol nuevo",
@@ -1797,6 +2037,8 @@ export const translations = {
       CREATE_OAUTH_APPLICATION: "Crear aplicación OAuth",
       CREATE_OBJECT_STORAGE: "Create Object Storage",
       CREATE_ORGANIZATION: "Crear organización",
+      CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
+        "Crea tu primera organización para comenzar.",
       CREATE_PROJECT: "Crear nuevo proyecto",
       CREATE_RELATIONSHIP: "Crear relacion",
       CREATE_ROLE: "Crear un rol",
@@ -1828,6 +2070,7 @@ export const translations = {
       DATA_SOURCES: "Fuentes de datos",
       DATA_TYPE: "Tipo de dato",
       DEEPLYNX_ECOSYSTEM_SERVICES: "Servicios del ecosistema DeepLynx",
+      DEEPLYNX_LOGO: "Logotipo de DeepLynx",
       DEFAULT_BADGE: "Predeterminado",
       DEFAULT_STORAGE: "Eliminar almacenamiento",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
@@ -1925,6 +2168,8 @@ export const translations = {
       FAILED_TO_CREATE_LABEL: "Error al crear la etiqueta",
       FAILED_TO_CREATE_RECORD: "No se pudo crear el registro.",
       FAILED_TO_CREATE_RELATIONSHIPS: "No se pudieron crear las relaciones",
+      FAILED_TO_CREATE_ORGANIZATION_TRY_AGAIN:
+        "No se pudo crear la organización. Inténtalo de nuevo.",
       FAILED_TO_CREATE_STORAGE: "No se pudo crear el almacenamiento",
       FAILED_TO_DELETE_STORAGE: "No se pudo eliminar el almacenamiento",
       FAILED_TO_FETCH_CLASSES: "No se pudieron obtener las clases",
@@ -1936,12 +2181,16 @@ export const translations = {
         "No se pudieron cargar las etiquetas de la organización.",
       FAILED_TO_LOAD_ORGANIZATION_TAGS:
         "No se pudieron cargar las etiquetas de la organización.",
+      FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN:
+        "No se pudieron cargar las organizaciones. Inténtalo de nuevo.",
       FAILED_TO_LOAD_PROJECT_LABELS:
         "No se pudieron cargar las etiquetas del proyecto.",
       FAILED_TO_LOAD_PROJECT_TAGS:
         "No se pudieron cargar las etiquetas del proyecto.",
       FAILED_TO_LOAD_RECENT_RECORDS:
         "No se pudieron cargar los registros recientes.",
+      FAILED_TO_LOAD_RECORD_COLLECTIONS:
+        "No se pudieron cargar las colecciones de registros.",
       FAILED_TO_LOAD_RECORD_HISTORY:
         "Error al cargar el historial del registro.",
       FAILED_TO_LOAD_SELECTED_POINT_IN_TIME_SNAPSHOT:
@@ -2254,6 +2503,7 @@ export const translations = {
       LABEL_CREATED: "Etiqueta creada",
       LABEL_CREATED_AND_ATTACHED: "creada y adjuntada",
       LABEL_CREATED_BUT_FAILED_TO_ATTACH: "creada pero no se pudo adjuntar",
+      LABEL_IN_USE: "La etiqueta está en uso actualmente. Quita la etiqueta del(los) registro(s) antes de archivarlo(s).",
       LABEL_NAME: "Nombre de la etiqueta",
       LABEL_NAME_PLACEHOLDER: "p. ej., CUI, ITAR, Pública",
       LABELS_ARE_LOCKED: "Las etiquetas de sensibilidad están bloqueadas",
@@ -2269,6 +2519,7 @@ export const translations = {
         "Las etiquetas están bloqueadas a nivel de organización. No se pueden crear ni editar etiquetas del proyecto.",
       LABELS_LOWER: "etiquetas",
       LANGUAGE: "Idioma",
+      LAUNCH: "Iniciar",
       LAST_EDIT: "Última edición",
       LAST_LOGIN: "Último inicio de sesión",
       LAST_UPDATE: "Última actualización:",
@@ -2309,6 +2560,7 @@ export const translations = {
       LATTICE_HOW_IT_WORKS: "Cómo funciona",
       LATTICE_STEP_EMBED:
         "Poner este documento en cola para incrustación con IA",
+      LATTICE_STEP_ONTOLOGY: "Antes de ejecutar una extracción de Lattice, agregue al menos 2 clases y 1 relación a la ontología de su proyecto. Una vez que la ontología mínima esté configurada, podrá iniciar una extracción.",
       LATTICE_STEP_MODE: "Elegir un modo de extracción",
       LATTICE_STEP_TRIGGER:
         "Activar extracción — los resultados se preparan para revisión",
@@ -2373,7 +2625,7 @@ export const translations = {
       LATTICE_EXTRACTION_RUNNING:
         "La extracción está en progreso. Esta página se actualizará automáticamente.",
       LATTICE_EXTRACTION_REVIEW:
-        "Revisa los elementos preparados a continuación, luego aprueba o rechaza la extracción completa.",
+        "Revise los elementos preparados a continuación. Apruebe o rechace cada elemento y, después, haga clic en Guardar para aplicar sus decisiones. También puede usar Aprobar por estado para aprobar rápidamente grupos de elementos. Los elementos que ya existen en el esquema se muestran solo como referencia y no requieren una decisión. Una extracción se considera completa cuando se han revisado todos los elementos pendientes.",
       LATTICE_EXTRACTION_FAILED_MSG:
         "Esta extracción no pudo completarse. Esto puede ocurrir cuando la respuesta del LLM tiene una estructura inesperada — intenta activar una nueva extracción.",
       LATTICE_EXTRACTION_REJECTED_MSG: "Esta extracción fue rechazada.",
@@ -2418,6 +2670,7 @@ export const translations = {
       LOADING_CLASSES: "Cargando clases...",
       LOADING_DATA_SOURCES: "Cargando fuentes de datos...",
       LOADING_OBJECT_STORAGES: "Cargando almacenamientos de objetos...",
+      LOCAL_CLUSTER_STORAGE: "Almacenamiento local del clúster",
       LOADING_ORGANIZATION_LABELS: "Cargando etiquetas de la organización...",
       LOADING_ORGANIZATION_TAGS: "Cargando etiquetas de la organización...",
       LOADING_PERMISSIONS: "Cargando permisos...",
@@ -2426,6 +2679,7 @@ export const translations = {
         "Cargando etiquetas de sensitividad del proyecto...",
       LOADING_PROJECT_TAGS: "Cargando etiquetas del proyecto...",
       LOADING_PROJECTS: "Cargando proyectos...",
+      LOADING_RECORD_COLLECTIONS: "Cargando colecciones de discos...",
       LOADING_RECORD_HISTORY: "Cargando historial del registro...",
       LOCKED: "Bloqueado",
       LOCKED_AT_ORGANIZATION_LEVEL: "bloqueadas a nivel de organización",
@@ -2568,6 +2822,7 @@ export const translations = {
       NO_PROJECT_TAGS_MATCH_SEARCH:
         "Ninguna etiqueta del proyecto coincide con tu búsqueda.",
       NO_PROJECTS: "Sin proyectos",
+      NO_ORGANIZATIONS_FOUND: "No se encontraron organizaciones.",
       NO_PROPERTIES_YET_ADD_ONE: "Aun no hay propiedades. Agrega una abajo.",
       NO_RECENT_RECORDS: "No se encontraron registros recientes",
       NO_RECORDS:
@@ -2624,11 +2879,16 @@ export const translations = {
       ORGANIZATION_ADMIN_ACCESS_UPDATED:
         "Se actualizo el acceso de administrador de la organizacion.",
       ORGANIZATION_DEFAULT: "Predeterminado de la organización",
+      PROJECT_ADMIN: "Administrador del Proyecto",
+      PROJECT_ADMIN_ACCESS_UPDATED:
+        "Se actualizo el acceso de administrador del proyecto.",
       ORGANIZATION_ID: "ID de la organización",
       ORGANIZATION_LABEL: "Etiqueta de la organización",
       ORGANIZATION_LABEL_CREATED: "Etiqueta de la organización creada.",
       ORGANIZATION_LABEL_UPDATED: "Etiqueta de la organización actualizada.",
+      ORGANIZATION_LOGO: "Logotipo de la organización",
       ORGANIZATION_MANAGEMENT: "Gestión de organizaciones",
+      ORGANIZATION_NAME: "Nombre de la organización",
       ORGANIZATION_NOT_FOUND: "Organización no encontrada",
       ORGANIZATION_OVERVIEW: "Resumen de la organización",
       ORGANIZATION_ROLE: "Rol de la organización",
@@ -2651,6 +2911,13 @@ export const translations = {
       ORGANIZATION_TAGS: "Etiquetas de la organización",
       ORGANIZATION_TAGS_DESCRIPTION:
         "Etiquetas para clasificación, flujos de trabajo y búsqueda. Todos los proyectos las heredan y opcionalmente pueden agregar las suyas.",
+      ORGANIZATION_THEME: "Tema de la organización",
+      ORGANIZATION_THEME_DEFAULT: "Predeterminado",
+      ORGANIZATION_THEME_DESCRIPTION:
+        "Se aplica a todos los usuarios de esta organización.",
+      ORGANIZATION_THEME_EMERALD: "Esmeralda",
+      ORGANIZATION_THEME_NORD: "Nord",
+      ORGANIZATION_THEME_NRIC: "NRIC",
       ORGANIZATION_USERS: "Usuarios de la organización",
       ORGANIZATION_WARNING_BANNER: "Banner de advertencia de la organización",
       ORGANIZATIONS: "Organizaciones",
@@ -2853,6 +3120,185 @@ export const translations = {
       RECORD: "Registro",
       RECORD_: "Registro ",
       RECORD_CREATED_SUCCESSFULLY: "¡Registro creado correctamente!",
+      RECORD_COLLECTIONS: "Colecciones de registros",
+      RECORD_COLLECTIONS_ADD_SELECTED: "Agregar seleccionados",
+      RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES: "Propiedades adicionales",
+      RECORD_COLLECTIONS_ALL: "Todas las colecciones",
+      RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION:
+        "Todos los registros coincidentes ya están en esta colección.",
+      RECORD_COLLECTIONS_ARCHIVE_COLLECTION: "Archivar colección",
+      RECORD_COLLECTIONS_ARCHIVE_CONFIRM:
+        '¿Archivar "{name}"? Esto la elimina de las colecciones activas.',
+      RECORD_COLLECTIONS_ARCHIVE_SUCCESS: "Colección de registros archivada",
+      RECORD_COLLECTIONS_ARE_YOU_SURE: "¿Estás seguro?",
+      RECORD_COLLECTIONS_ASSIGNED_COUNT: "{count} asignados",
+      RECORD_COLLECTIONS_ASSIGNED_RECORDS_SHOWN:
+        "Se muestran {shown} de {total} registros asignados.",
+      RECORD_COLLECTIONS_BACK_TO_COLLECTIONS: "Volver a las colecciones",
+      RECORD_COLLECTIONS_BACK_TO_DETAILS: "Volver a los detalles",
+      RECORD_COLLECTIONS_BROWSE_CREATE_MODIFY_EXISTING:
+        "Explora colecciones, crea nuevas colecciones y modifica las existentes.",
+      RECORD_COLLECTIONS_BROWSE_RECORDS: "Explorar registros",
+      RECORD_COLLECTIONS_BROWSE_SEARCH_OPEN_PROJECT:
+        "Explora, busca y modifica colecciones de registros para este proyecto.",
+      RECORD_COLLECTIONS_CLASS: "Clase",
+      RECORD_COLLECTIONS_COLLECTION_DASHBOARD: "Panel de colecciones",
+      RECORD_COLLECTIONS_COLLECTION_DETAILS: "Detalles de la colección",
+      RECORD_COLLECTIONS_COLLECTION_ID: "ID de la colección",
+      RECORD_COLLECTIONS_CREATED: "Colección de registros creada",
+      RECORD_COLLECTIONS_CREATE_IN_ACTIVE_PROJECT:
+        "Crea una colección de registros en el proyecto activo.",
+      RECORD_COLLECTIONS_DESELECT_RECORDS_WITH:
+        "Deseleccionar registros con {name}",
+      RECORD_COLLECTIONS_EDIT_COLLECTION: "Editar colección",
+      RECORD_COLLECTIONS_FAILED_CANCEL_CHANGES:
+        "No se pudieron cancelar los cambios de la colección",
+      RECORD_COLLECTIONS_FAILED_CREATE:
+        "No se pudo crear la colección de registros",
+      RECORD_COLLECTIONS_FAILED_CREATE_LABEL:
+        "No se pudo crear la etiqueta de sensibilidad",
+      RECORD_COLLECTIONS_FAILED_CREATE_TAG: "No se pudo crear la etiqueta",
+      RECORD_COLLECTIONS_FAILED_ARCHIVE:
+        "No se pudo archivar la colección de registros",
+      RECORD_COLLECTIONS_FAILED_LOAD_COLLECTIONS:
+        "No se pudieron cargar las colecciones de registros",
+      RECORD_COLLECTIONS_FAILED_LOAD_COLLECTION_RECORDS:
+        "No se pudieron cargar los registros de la colección",
+      RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_LABELS:
+        "No se pudieron cargar las etiquetas del proyecto",
+      RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS:
+        "No se pudieron cargar las etiquetas del proyecto",
+      RECORD_COLLECTIONS_FAILED_LOAD_SELECTED_RECORD_METADATA:
+        "No se pudieron cargar los metadatos completos de los registros: {records}",
+      RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS:
+        "No se pudieron buscar los registros",
+      RECORD_COLLECTIONS_FAILED_UPDATE:
+        "No se pudo actualizar la colección de registros",
+      RECORD_COLLECTIONS_SAVED_REFRESH_FAILED:
+        "La colección de registros se guardó, pero no se pudieron cargar los datos más recientes. Vuelva a cargar la página para actualizarla.",
+      RECORD_COLLECTIONS_FIELD: "Campo",
+      RECORD_COLLECTIONS_FILTER_BY_TITLE_OR_DESCRIPTION:
+        "Buscar por título o descripción de la colección...",
+      RECORD_COLLECTIONS_LABELS: "Etiquetas",
+      RECORD_COLLECTIONS_LABEL_CREATED: "Etiqueta creada",
+      RECORD_COLLECTIONS_LAST_UPDATED_BY: "Última actualización por",
+      RECORD_COLLECTIONS_LOADING_LABELS: "Cargando etiquetas",
+      RECORD_COLLECTIONS_LOADING_TAGS: "Cargando etiquetas",
+      RECORD_COLLECTIONS_MANAGE: "Administrar colección",
+      RECORD_COLLECTIONS_MANAGE_IDENTITY_LABELS_METADATA:
+        "Edita la identidad, las etiquetas y los metadatos de la colección.",
+      RECORD_COLLECTIONS_MANAGE_RECORDS: "Administrar registros",
+      RECORD_COLLECTIONS_MANAGE_RECORDS_DESCRIPTION:
+        "Agrega registros a esta colección o elimina registros ya asignados.",
+      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS: "Etiquetas de la colección",
+      RECORD_COLLECTIONS_MODIFY_LABELS_AND_TAGS_HELP:
+        "Estas etiquetas se aplicarán a la colección misma. No cambian los registros incluidos.",
+      RECORD_COLLECTIONS_NAME_AND_DESCRIPTION_REQUIRED:
+        "El nombre y la descripción son obligatorios",
+      RECORD_COLLECTIONS_NAME_REQUIRED:
+        "El título de la colección es obligatorio.",
+      RECORD_COLLECTIONS_NEW: "Nueva colección",
+      RECORD_COLLECTIONS_NOT_UPDATED: "No actualizado",
+      RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET:
+        "No hay propiedades adicionales definidas.",
+      RECORD_COLLECTIONS_NO_DESCRIPTION_PROVIDED:
+        "No se proporcionó descripción.",
+      RECORD_COLLECTIONS_NO_LABELS_FOUND: "No se encontraron etiquetas.",
+      RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED:
+        "No hay registros asignados actualmente.",
+      RECORD_COLLECTIONS_NO_RECORDS_FOUND: "No se encontraron registros.",
+      RECORD_COLLECTIONS_NO_RECORDS_MATCH_SEARCH:
+        "Ningún registro coincide con esta búsqueda.",
+      RECORD_COLLECTIONS_NO_SELECTED_RECORDS_MATCH_SEARCH:
+        "Ningún registro seleccionado coincide con esta búsqueda.",
+      RECORD_COLLECTIONS_NO_SENSITIVITY_LABELS_MATCH:
+        "Ninguna etiqueta de sensibilidad coincide.",
+      RECORD_COLLECTIONS_NO_TAGS_FOUND: "No se encontraron etiquetas.",
+      RECORD_COLLECTIONS_CANNOT_CONTINUE_WITH_INCOMPLETE_RECORD_METADATA:
+        "Algunos registros seleccionados todavía no tienen metadatos completos. Quítelos o vuelva a intentarlo antes de continuar.",
+      RECORD_COLLECTIONS_OPEN_DETAILS: "Abrir detalles",
+      RECORD_NOT_IN_ANY_COLLECTIONS:
+        "Este registro no pertenece a ninguna colección.",
+      RECORD_COLLECTIONS_PARTIAL_UPDATE:
+        "Se guardaron los detalles de la colección, pero algunos cambios fallaron: {operations}",
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_LABEL:
+        'agregar la etiqueta de sensibilidad "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_RECORD:
+        'agregar el registro "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_ADD_TAG: 'agregar la etiqueta "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_LABEL:
+        'quitar la etiqueta de sensibilidad "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_RECORD:
+        'quitar el registro "{name}"',
+      RECORD_COLLECTIONS_PARTIAL_UPDATE_REMOVE_TAG:
+        'quitar la etiqueta "{name}"',
+      RECORD_COLLECTIONS_RECORDS_ADDED: "Registros agregados a la colección",
+      RECORD_COLLECTIONS_RECORDS_ASSIGNED_TO:
+        "Registros asignados actualmente a {name}.",
+      RECORD_COLLECTIONS_RECORD_ADDED: "Registro agregado a la colección",
+      RECORD_COLLECTIONS_RECORD_REMOVED: "Registro eliminado de la colección",
+      RECORD_COLLECTIONS_RECORD_SUMMARY: "Resumen de registros incluidos",
+      RECORD_COLLECTIONS_RECORD_SUMMARY_HELP:
+        "Estas etiquetas provienen de los registros seleccionados actualmente para esta colección. Úsalas para refinar qué registros se incluyen.",
+      RECORD_COLLECTIONS_REMOVE_ITEM: "Eliminar {name}",
+      RECORD_COLLECTIONS_REVIEW_AND_MODIFY_DETAILS:
+        "Revisa y modifica los detalles de la colección.",
+      RECORD_COLLECTIONS_SAVE_COLLECTION: "Guardar colección",
+      RECORD_COLLECTIONS_SAVE_MODIFICATIONS: "Guardar modificaciones",
+      RECORD_COLLECTIONS_SEARCH_ALL_RECORDS: "Buscar en todos los registros",
+      RECORD_COLLECTIONS_SEARCH_IN_THIS_COLLECTION:
+        "Buscar registros en esta colección",
+      RECORD_COLLECTIONS_SEARCH_OR_ADD_LABEL: "Buscar o agregar etiqueta",
+      RECORD_COLLECTIONS_SEARCH_OR_ADD_TAG: "Buscar o agregar etiqueta",
+      RECORD_COLLECTIONS_SEARCH_RECORDS_TO_ADD: "Buscar registros para agregar",
+      RECORD_COLLECTIONS_SEARCH_SELECTED_RECORDS:
+        "Buscar registros seleccionados",
+      RECORD_COLLECTIONS_SEARCHING_RECORDS: "Buscando registros",
+      RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS:
+        "Etiquetas de los registros seleccionados",
+      RECORD_COLLECTIONS_SELECTED_LABELS_AND_TAGS_HELP:
+        "Este es un resumen de solo lectura de las etiquetas que ya existen en los registros seleccionados.",
+      RECORD_COLLECTIONS_SELECTED_RECORD_METADATA_INCOMPLETE:
+        "{count} registro(s) seleccionado(s) todavía necesitan metadatos completos antes de continuar.",
+      RECORD_COLLECTIONS_SELECTED_RECORDS_COUNT:
+        "{count} registros seleccionados",
+      RECORD_COLLECTIONS_SELECTED_RECORDS_SHOWN:
+        "Se muestran {shown} de {total} registros",
+      RECORD_COLLECTIONS_SHOW_CURRENT_RECORDS: "Mostrar lista actual",
+      RECORD_COLLECTIONS_SHOW_MORE: "Mostrar más",
+      RECORD_COLLECTIONS_SOURCE: "Fuente",
+      RECORD_COLLECTIONS_SORT_ALPHABETICAL_ASC: "Alfabético (A a Z)",
+      RECORD_COLLECTIONS_SORT_ALPHABETICAL_DESC: "Alfabético (Z a A)",
+      RECORD_COLLECTIONS_SORT_RECORD_COUNT_ASC: "# de registros (menor)",
+      RECORD_COLLECTIONS_SORT_RECORD_COUNT_DESC: "# de registros (mayor)",
+      RECORD_COLLECTIONS_SORT_UPDATED_ASC: "Última actualización (más antigua)",
+      RECORD_COLLECTIONS_SORT_UPDATED_DESC:
+        "Última actualización (más reciente)",
+      RECORD_COLLECTIONS_STEP_1: "Paso 1",
+      RECORD_COLLECTIONS_STEP_2: "Paso 2",
+      RECORD_COLLECTIONS_STEP_3: "Paso 3",
+      RECORD_COLLECTIONS_STEP_4: "Paso 4",
+      RECORD_COLLECTIONS_STEP_ADD_METADATA: "Describir colección",
+      RECORD_COLLECTIONS_STEP_MODIFY_LABELS_AND_TAGS:
+        "Definir etiquetas de la colección",
+      RECORD_COLLECTIONS_STEP_REVIEW: "Revisar",
+      RECORD_COLLECTIONS_STEP_SELECT_RECORDS: "Seleccionar registros incluidos",
+      RECORD_COLLECTIONS_TAGS: "Etiquetas",
+      RECORD_COLLECTIONS_TAG_CREATED: "Etiqueta creada",
+      RECORD_COLLECTIONS_TITLE: "Título de la colección",
+      RECORD_COLLECTIONS_TOTAL_COLLECTIONS: "Total de colecciones:",
+      RECORD_COLLECTIONS_TOTAL_RECORDS: "Total de registros",
+      RECORD_COLLECTIONS_UNCLASSIFIED: "Sin clasificar",
+      RECORD_COLLECTIONS_UNNAMED_RECORD: "Registro sin nombre",
+      RECORD_COLLECTIONS_UNSELECT_ALL: "Deseleccionar todo",
+      RECORD_COLLECTIONS_UNTITLED_COLLECTION: "Colección sin título",
+      RECORD_COLLECTIONS_UPDATED: "Actualizado",
+      RECORD_COLLECTIONS_UPDATE_SUCCESS: "Colección de registros actualizada",
+      RECORD_COLLECTIONS_UPDATED_ON_CREATE: "Al crear",
+      RECORD_COLLECTIONS_VALUE: "Valor",
+      RECORD_COLLECTIONS_VIEW_ALL: "Ver todos",
+      RECORD_COLLECTIONS_WAIT_FOR_SELECTED_RECORD_METADATA:
+        "Espere a que terminen de cargarse los metadatos de los registros seleccionados antes de continuar.",
       RECORD_COUNT: "Conteo de registros",
       RECORD_DESCRIPTION: "Descripción del registro",
       RECORD_FILE_UPDATED_SUCCESSFULLY:
@@ -2942,6 +3388,8 @@ export const translations = {
       ROOT: "Raíz",
       ROW_WITH_NUMBER: "Fila {row}",
       ROWS_FROM_CSV: "filas del CSV",
+      S3_US_EAST_1: "S3 - us-east-1",
+      S3_US_WEST_2: "S3 - us-west-2",
       SAVE: "Guardar",
       SAVE_ALL_CHANGES: "Guardar todos los cambios",
       SAVE_CHANGES: "Guardar cambios",
@@ -3004,6 +3452,7 @@ export const translations = {
       SELECTED_ORGANIZATION_USERS: "Usuarios seleccionados de la organización",
       SELECTED_RECORD: "Registro seleccionado:",
       SELECTED_RECORDS: "Registros seleccionados",
+      SELECT_LOGO: "Seleccionar logotipo",
       SEND_INVITATION: "Enviar invitación",
       SEND_INVITATIONS: "Enviar invitación(es)",
       SENSITIVITY_LABEL_REMOVED: "Etiqueta de sensibilidad eliminada",
@@ -3056,6 +3505,8 @@ export const translations = {
       STEP_1_DOWNLOAD_TEMPLATE: "Paso 1: Descargar plantilla",
       STEP_2_UPLOAD_YOUR_CSV: "Paso 2: Cargue su CSV",
       STORAGE: "Almacenamiento",
+      STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT:
+        "La configuración de almacenamiento y las funciones adicionales de administración de la organización están actualmente en desarrollo.",
       STORAGE_CREATED_SUCCESSFULLY: "El almacenamiento se creó correctamente",
       STORAGE_DELETE_SUCCESSFULLY: "El almacenamiento se eliminó correctamente",
       STORAGE_DESTINATION: "Destino de almacenamiento",
@@ -3187,6 +3638,8 @@ export const translations = {
         "Se actualizaron el usuario y el acceso de administrador de la organizacion.",
       USER_AND_SYSTEM_ADMIN_ACCESS_UPDATED:
         "Se actualizaron el usuario y el acceso de administrador del sistema.",
+      USER_AND_PROJECT_ADMIN_ACCESS_UPDATED:
+        "Se actualizaron el usuario y el acceso de administrador del proyecto.",
       USER_ARCHIVED_SUCCESSFULLY: "Usuario archivado correctamente.",
       USER_MANAGEMENT: "Gestión de usuarios",
       USER_REMOVED_FROM_ORG: "Usuario eliminado de la organización",
@@ -3219,6 +3672,7 @@ export const translations = {
       WARNING:
         "Todos los datos contenidos en los sistemas informáticos del DOE son propiedad del DOE y pueden ser auditados, interceptados, registrados, leídos, copiados o capturados de cualquier manera y divulgados de cualquier forma por personal autorizado. " +
         "NO EXISTE DERECHO A LA PRIVACIDAD EN ESTE SISTEMA. El personal del sistema puede divulgar a las autoridades competentes cualquier evidencia potencial de delito encontrada en los sistemas informáticos del DOE. EL USO DE ESTE SISTEMA POR CUALQUIER USUARIO, AUTORIZADO O NO AUTORIZADO, CONSTITUYE CONSENTIMIENTO PARA ESTA AUDITORÍA, INTERCEPCIÓN, REGISTRO, LECTURA, COPIA, CAPTURA Y DIVULGACIÓN DE LA ACTIVIDAD INFORMÁTICA. **ADVERTENCIA**ADVERTENCIA**ADVERTENCIA**ADVERTENCIA**ADVERTENCIA**",
+      WELCOME_BACK_COMMA: "Bienvenido de nuevo,",
       WELECOME: "Bienvenido de nuevo ",
       WHAT_HAPPENS_NEXT: "¿Qué sigue?",
       WHEN_LABELS_ARE: "Cuando las etiquetas están",
@@ -3238,9 +3692,46 @@ export const translations = {
       YOUVE_BEEN_ADDED_TO_A_PROJECT_IN_DEEPLYNX_NEXUS:
         "Has sido agregado a un proyecto en DeepLynx Nexus",
       ZOOM_CONTROLS: "Controles de zoom",
+      THEME_UPDATE_SUCCESS: "Tema actualizado",
+      FAILED_TO_UPDATE_THEME: "Error al actualizar el tema",
       ARCHIVED_USERS: "Usuarios Archivados",
       UNARCHIVE_USER: "Desarchivar",
-      NO_ARCHIVED_USERS: "No hay usuarios archivados."
+      NO_ARCHIVED_USERS: "No hay usuarios archivados.",
+      ALL_DAGS: "Todos los DAG",
+      RUN: "Ejecutar",
+      DAG: "DAG",
+      OWNERS: "Propietarios",
+      SCHEDULE: "Programación",
+      PAUSED: "Pausado",
+      NO_DAGS_FOUND: "No se encontraron DAG.",
+      FAILED_TO_LOAD_DAGS: "Error al cargar los DAG. Inténtalo de nuevo.",
+      DAGS_OVERVIEW_DESCRIPTION:
+        "Un DAG, o grafo acíclico dirigido, es un flujo de trabajo de Airflow. Nexus usa las API públicas de Airflow para listar DAG, recuperar sus detalles y parámetros de configuración, y ejecutar DAG. Para revisar el historial de ejecuciones de un DAG específico, abra la instancia de Airflow.",
+      TRIGGER_DAG: "Ejecutar DAG",
+      TRIGGER_DAG_TOOLTIP: "Ejecutar este DAG con configuración opcional",
+      DAG_PAUSED_TOOLTIP: "Este DAG está pausado en Airflow y no se puede ejecutar",
+      TRIGGER: "Ejecutar",
+      FAILED_TO_TRIGGER: "Error al ejecutar",
+      DAG_RUN_SUBMITTED: "Enviando ejecución de DAG para",
+      DAG_RUN_STATUS_UNAVAILABLE:
+        "La ejecución del DAG fue enviada, pero no se puede verificar el estado final para",
+      DAG_RUN_SUCCEEDED: "La ejecución del DAG terminó correctamente para",
+      DAG_RUN_FAILED: "La ejecución del DAG falló para",
+      DAG_RUN_STILL_RUNNING: "La ejecución del DAG aún está en curso para",
+      FAILED_TO_CHECK_DAG_RUN_STATUS: "Error al verificar el estado de la ejecución del DAG para",
+      RUN_ID: "ID de ejecución",
+      RUN_ID_PLACEHOLDER: "Déjalo en blanco para que Airflow genere uno",
+      CONFIGURATION_JSON: "Configuración (JSON)",
+      LOADING_DAG_PARAMETERS: "Cargando parámetros del DAG...",
+      CONF_HELP: "Objeto JSON opcional que se pasa a la ejecución del DAG como conf.",
+      CONF_MUST_BE_OBJECT: 'Conf debe ser un objeto JSON, p. ej. { "key": "value" }.',
+      CONF_INVALID_JSON: "Conf no es un JSON válido.",
+      LOGICAL_DATE: "Fecha lógica",
+      RUN_AFTER: "Ejecutar después de",
+      DATA_INTERVAL_START: "Inicio del intervalo de datos",
+      DATA_INTERVAL_END: "Fin del intervalo de datos",
+      NOTE: "Nota",
+      NOTE_PLACEHOLDER: "Nota opcional para esta ejecución"
     },
   },
 };

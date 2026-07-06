@@ -15,7 +15,8 @@ public class InsightBusiness : IInsightBusiness
     /// </summary>
     public static readonly IReadOnlySet<string> SupportedFileTypes = new HashSet<string>
     {
-        "pdf", "txt", "html", "htm"
+        "pdf", "txt", "html", "htm",
+        "png", "jpg", "jpeg", "webp"
     };
 
     private readonly DeeplynxContext _context;
@@ -67,6 +68,9 @@ public class InsightBusiness : IInsightBusiness
         InsightUploadApiRequestDto payload,
         string? userJwt = null)
     {
+        if (payload.FileInfo.Count == 0)
+            throw new InvalidOperationException("Select at least one document to queue for Insight indexing.");
+
         var vlmConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, vlmModelConfigId, "vlm");
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
@@ -78,6 +82,9 @@ public class InsightBusiness : IInsightBusiness
         var authorizedFileInfo = payload.FileInfo
             .Where(f => authorizedIds.Contains(f.FileId))
             .ToList();
+
+        if (authorizedFileInfo.Count == 0)
+            throw new InvalidOperationException("No authorized documents were available to queue for Insight indexing.");
 
         var request = new InsightUploadRequestDto
         {
@@ -202,6 +209,56 @@ public class InsightBusiness : IInsightBusiness
     }
 
     /// <summary>
+    ///     Checks the health of the requested model endpoint using the resolved model configuration.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
+    /// <param name="organizationId">The ID of the organization. Used to scope model configuration resolution.</param>
+    /// <param name="projectId">The ID of the project. Project-level model configurations take priority over organization-level defaults.</param>
+    /// <param name="modelConfigId">The model configuration ID to validate.</param>
+    /// <param name="modelType">The model type string used when falling back to the default (e.g. "llm", "vlm", or "embedding").</param>
+    /// <returns>
+    ///     Returns the endpoint health result, including endpoint reachability,
+    ///     model availability, latency, optional model metadata, and
+    ///     details returned by the Insight service.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">Thrown when the specified model type is invalid.</exception>
+    public async Task<InsightEndpointHealthResponseDto> CheckEndpointHealth(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long modelConfigId,
+        string modelType)
+    {
+        var normalizedModelType = modelType.Trim().ToLowerInvariant();
+
+        if (normalizedModelType is not ("llm" or "vlm" or "embedding"))
+            throw new InvalidOperationException(
+                "modelType must be one of: llm, vlm, embedding.");
+
+        var config = await ResolveModelConfig(
+            currentUserId,
+            organizationId,
+            projectId,
+            modelConfigId,
+            normalizedModelType);
+
+        if (!string.Equals(config.ModelType, normalizedModelType, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Model configuration {config.Id} is type '{config.ModelType}' but '{normalizedModelType}' was requested.");
+        }
+
+        var request = new InsightEndpointHealthRequestDto
+        {
+            ServerUrl = config.ServerUrl,
+            ModelName = config.ModelName,
+            AuthToken = config.Token
+        };
+
+        return await _insightServiceClient.EndpointHealth(request);
+    }
+
+    /// <summary>
     ///     Returns whether the given file type is supported for embedding by Insight.
     ///     Check is case-insensitive.
     /// </summary>
@@ -303,7 +360,7 @@ public class InsightBusiness : IInsightBusiness
         }
 
         var classEmbeds = await _context.Classes
-            .Where(c => c.ProjectId == projectId)
+            .Where(c => c.ProjectId == projectId && !c.IsArchived)
             .Select(c => new InsightEmbedStringRequestDto.EmbedStringDto
             {
                 ClassId = c.Id,
@@ -312,13 +369,30 @@ public class InsightBusiness : IInsightBusiness
             .ToListAsync();
 
         var relationshipEmbeds = await _context.Relationships
-            .Where(r => r.ProjectId == projectId)
+            .Where(r => r.ProjectId == projectId && !r.IsArchived)
             .Select(r => new InsightEmbedStringRequestDto.EmbedStringDto
             {
                 RelationshipId = r.Id,
                 Text = string.IsNullOrEmpty(r.Description) ? r.Name : r.Description
             })
             .ToListAsync();
+
+        var validationErrors = new List<string>();
+
+        if (classEmbeds.Count == 0)
+        {
+            validationErrors.Add("Define at least one class before queueing data schema embeddings.");
+        }
+
+        if (relationshipEmbeds.Count == 0)
+        {
+            validationErrors.Add("Define at least one relationship before queueing data schema embeddings.");
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            throw new InvalidOperationException(string.Join(" ", validationErrors));
+        }
 
         var request = new InsightEmbedStringRequestDto
         {

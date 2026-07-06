@@ -75,7 +75,7 @@ public class ProjectControllerTests : IDisposable
         _mockBusiness.Setup(b => b.GetAllProjects(UserId, OrgId, true))
                      .ReturnsAsync(expected);
 
-        var result = (await _controller.GetAllProjects(OrgId)).Result as OkObjectResult;
+        var result = (await _controller.GetAllProjects(OrgId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -89,7 +89,7 @@ public class ProjectControllerTests : IDisposable
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
                      .ReturnsAsync([]);
 
-        var result = (await _controller.GetAllProjects(OrgId)).Result as OkObjectResult;
+        var result = (await _controller.GetAllProjects(OrgId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -103,7 +103,7 @@ public class ProjectControllerTests : IDisposable
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
-        var result = (await _controller.GetAllProjects(OrgId)).Result as ObjectResult;
+        var result = (await _controller.GetAllProjects(OrgId, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -143,7 +143,7 @@ public class ProjectControllerTests : IDisposable
                      .ReturnsAsync(expected);
 
         var result = (await _controller.GetAllProjectsByUser(
-            OrgId, OtherUserId)).Result as OkObjectResult;
+            OrgId, OtherUserId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -158,7 +158,7 @@ public class ProjectControllerTests : IDisposable
                      .ReturnsAsync([]);
 
         var result = (await _controller.GetAllProjectsByUser(
-            OrgId, OtherUserId)).Result as OkObjectResult;
+            OrgId, OtherUserId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -173,7 +173,7 @@ public class ProjectControllerTests : IDisposable
                      .ThrowsAsync(new Exception("db error"));
 
         var result = (await _controller.GetAllProjectsByUser(
-            OrgId, OtherUserId)).Result as ObjectResult;
+            OrgId, OtherUserId, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -208,7 +208,7 @@ public class ProjectControllerTests : IDisposable
                      .ReturnsAsync(expected);
 
         var result = (await _controller.GetProject(
-            OrgId, ProjectId)).Result as OkObjectResult;
+            OrgId, ProjectId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -223,7 +223,7 @@ public class ProjectControllerTests : IDisposable
                      .ThrowsAsync(new Exception("db error"));
 
         var result = (await _controller.GetProject(
-            OrgId, ProjectId)).Result as ObjectResult;
+            OrgId, ProjectId, true)).Result as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -614,11 +614,11 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task UpdateProjectMemberRole_Returns200_OnSuccess()
     {
-        _mockBusiness.Setup(b => b.UpdateProjectMemberRole(ProjectId, RoleId, OtherUserId, null))
+        _mockBusiness.Setup(b => b.UpdateProjectMemberRole(ProjectId, RoleId, OtherUserId, null, null))
                      .Returns(Task.FromResult(true));
 
         var result = await _controller.UpdateProjectMemberRole(
-            OrgId, ProjectId, RoleId, OtherUserId, groupId: null) as OkObjectResult;
+            OrgId, ProjectId, RoleId, OtherUserId, groupId: null, isProjectAdmin: null) as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -629,11 +629,12 @@ public class ProjectControllerTests : IDisposable
     public async Task UpdateProjectMemberRole_Returns500_OnUnexpectedException()
     {
         _mockBusiness.Setup(b => b.UpdateProjectMemberRole(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>()))
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>(),
+                         It.IsAny<bool?>()))
                      .ThrowsAsync(new Exception("db error"));
 
         var result = await _controller.UpdateProjectMemberRole(
-            OrgId, ProjectId, RoleId, OtherUserId, groupId: null) as ObjectResult;
+            OrgId, ProjectId, RoleId, OtherUserId, groupId: null, isProjectAdmin: null) as ObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(500, result.StatusCode);
@@ -642,14 +643,14 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task UpdateProjectMemberRole_PassesParametersToBusinessLayer()
     {
-        _mockBusiness.Setup(b => b.UpdateProjectMemberRole(ProjectId, RoleId, null, GroupId))
+        _mockBusiness.Setup(b => b.UpdateProjectMemberRole(ProjectId, RoleId, null, GroupId, true))
                      .Returns(Task.FromResult(true));
 
         await _controller.UpdateProjectMemberRole(
-            OrgId, ProjectId, RoleId, userId: null, groupId: GroupId);
+            OrgId, ProjectId, RoleId, userId: null, groupId: GroupId, isProjectAdmin: true);
 
         _mockBusiness.Verify(
-            b => b.UpdateProjectMemberRole(ProjectId, RoleId, null, GroupId),
+            b => b.UpdateProjectMemberRole(ProjectId, RoleId, null, GroupId, true),
             Times.Once);
     }
 
@@ -826,7 +827,7 @@ public class ProjectControllerTests : IDisposable
             "dto");
 
         AssertHasHttpAttribute(method, "HttpPostAttribute");
-        AssertHasAuthAttribute(method, "write", "project");
+        AssertHasAttribute(method, "OrgMemberAttribute");
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -840,7 +841,7 @@ public class ProjectControllerTests : IDisposable
             "dto");
 
         AssertHasHttpAttribute(method, "HttpPutAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -853,7 +854,7 @@ public class ProjectControllerTests : IDisposable
             "projectId");
 
         AssertHasHttpAttribute(method, "HttpDeleteAttribute");
-        AssertHasAuthAttribute(method, "write", "project");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -867,8 +868,8 @@ public class ProjectControllerTests : IDisposable
             "archive");
 
         AssertHasHttpAttribute(method, "HttpPatchAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
-        AssertHasSensitivityEnabledAuthAttribute(method, "update", "project");
+        AssertHasProjectAdminAttribute(method, includeArchived: true);
+        AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
     [Fact]
@@ -880,7 +881,7 @@ public class ProjectControllerTests : IDisposable
             "projectId");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
-        AssertHasAuthAttribute(method, "read", "project");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -907,11 +908,11 @@ public class ProjectControllerTests : IDisposable
             "projectId",
             "roleId",
             "userId",
-            "groupId");
+            "groupId",
+            "isProjectAdmin");
 
         AssertHasHttpAttribute(method, "HttpPostAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
-        AssertHasAuthAttribute(method, "update", "user");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -924,11 +925,27 @@ public class ProjectControllerTests : IDisposable
             "projectId",
             "roleId",
             "userId",
-            "groupId");
+            "groupId",
+            "isProjectAdmin");
 
         AssertHasHttpAttribute(method, "HttpPutAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
-        AssertHasAuthAttribute(method, "update", "user");
+        AssertHasProjectAdminAttribute(method);
+        AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
+    }
+
+    [Fact]
+    public void SetProjectAdminStatus_HasRequiredAuthAttributes()
+    {
+        var method = GetControllerMethod(
+            nameof(ProjectController.SetProjectAdminStatus),
+            "organizationId",
+            "projectId",
+            "userId",
+            "groupId",
+            "isAdmin");
+
+        AssertHasHttpAttribute(method, "HttpPutAttribute");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -943,8 +960,7 @@ public class ProjectControllerTests : IDisposable
             "groupId");
 
         AssertHasHttpAttribute(method, "HttpDeleteAttribute");
-        AssertHasAuthAttribute(method, "update", "project");
-        AssertHasAuthAttribute(method, "update", "user");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -961,9 +977,7 @@ public class ProjectControllerTests : IDisposable
             "roleId");
 
         AssertHasHttpAttribute(method, "HttpPostAttribute");
-        AssertHasAuthAttribute(method, "write", "user");
-        AssertHasAuthAttribute(method, "update", "user");
-        AssertHasAuthAttribute(method, "update", "project");
+        AssertHasProjectAdminAttribute(method);
         AssertDoesNotHaveSensitivityEnabledAuthAttribute(method);
     }
 
@@ -992,6 +1006,14 @@ public class ProjectControllerTests : IDisposable
             attribute.AttributeType.Name == expectedAttributeName);
     }
 
+    private static void AssertHasAttribute(
+        System.Reflection.MethodInfo method,
+        string expectedAttributeName)
+    {
+        Assert.Contains(method.GetCustomAttributesData(), attribute =>
+            attribute.AttributeType.Name == expectedAttributeName);
+    }
+
     private static void AssertHasAuthAttribute(
         System.Reflection.MethodInfo method,
         string expectedAction,
@@ -1005,6 +1027,26 @@ public class ProjectControllerTests : IDisposable
             attribute.ConstructorArguments.Count >= 2 &&
             attribute.ConstructorArguments[0].Value?.ToString() == expectedAction &&
             attribute.ConstructorArguments[1].Value?.ToString() == expectedResource);
+    }
+
+    private static void AssertHasProjectAdminAttribute(
+        System.Reflection.MethodInfo method,
+        bool includeArchived = false)
+    {
+        var attribute = Assert.Single(method.GetCustomAttributesData()
+            .Where(attribute => attribute.AttributeType.Name == "ProjectAdminAttribute"));
+
+        var actualIncludeArchived = false;
+        if (attribute.ConstructorArguments.Count > 0 &&
+            attribute.ConstructorArguments[0].Value is bool constructorValue)
+            actualIncludeArchived = constructorValue;
+
+        var namedIncludeArchived = attribute.NamedArguments
+            .FirstOrDefault(argument => argument.MemberName == "IncludeArchived");
+        if (namedIncludeArchived.TypedValue.Value is bool namedValue)
+            actualIncludeArchived = namedValue;
+
+        Assert.Equal(includeArchived, actualIncludeArchived);
     }
 
     private static void AssertHasSensitivityEnabledAuthAttribute(
