@@ -415,7 +415,7 @@ try
                 {
                     ["name"] = "Data",
                     ["tags"] = new JsonArray
-                        { "Record", "Record Collection", "Historical Record", "Edge", "Historical Edge", "File", "Metadata" }
+                        { "Record", "Record Collection", "Historical Record", "Edge", "Historical Edge", "File", "Metadata", "Provenance" }
                 },
                 new JsonObject
                 {
