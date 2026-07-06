@@ -27,6 +27,7 @@ public class FileBusiness
     private readonly IInsightBusiness _insightBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly ILogger<FileBusiness> _logger;
+    private readonly IEventBusiness _eventBusiness;
 
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
@@ -41,7 +42,8 @@ public class FileBusiness
         IInsightBusiness insightBusiness,
         IOlapBusiness olapBusiness,
         IObjectStorageBusiness objectStorageBusiness,
-        ILogger<FileBusiness> logger)
+        ILogger<FileBusiness> logger,
+        IEventBusiness eventBusiness)
     {
         _context = context;
         _factory = factory;
@@ -52,6 +54,7 @@ public class FileBusiness
         _olapBusiness = olapBusiness;
         _objectStorageBusiness = objectStorageBusiness;
         _logger = logger;
+        _eventBusiness = eventBusiness;
 
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
                            ?? throw new InvalidOperationException(
@@ -310,41 +313,62 @@ public class FileBusiness
 
         await fileBusiness.DeleteFile(record, objectStorage.Config);
 
-        //var deleted = await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
-
-        await InvalidateProjectStorageSizeCache(projectId);
-
-        return true;
-
-        // Embeddings made by Insight that reference this record will be auto deleted
-    }
-
-    /// <summary>
-    ///     Delete a File and not the Record
-    /// </summary>
-    /// <param name="currentUserId">The ID of the requesting user</param>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId">The ID of the project to which the file belongs</param>
-    /// <param name="recordId">The ID of the record that contains file information</param>
-    /// <returns>A message stating the file was successfully deleted.</returns>
-    public async Task<bool> DeleteFileOnly(long currentUserId, long organizationId, long projectId, long recordId)
-    {
-        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
-
-        if (record == null) throw new KeyNotFoundException("Record not found");
-        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
-
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
-
-        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
-
-        var deleted = await fileBusiness.DeleteFile(record, objectStorage.Config);
+        var deleted = await DeleteFileRecordOnly(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId);
 
         await InvalidateProjectStorageSizeCache(projectId);
 
         return deleted;
 
         // Embeddings made by Insight that reference this record will be auto deleted
+    }
+
+    private async Task<bool> DeleteFileRecordOnly(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        var returnedRecord = await _context.Records
+            .Include(r => r.Labels)
+            .Where(r => r.Id == recordId
+                        && r.OrganizationId == organizationId
+                        && r.ProjectId == projectId
+                        && !r.IsArchived)
+            .FirstOrDefaultAsync();
+
+        if (returnedRecord is null)
+            throw new KeyNotFoundException($"Record with id {recordId} is archived or not found");
+
+        if (!returnedRecord.ObjectStorageId.HasValue)
+            throw new InvalidOperationException("Record needs an object storage id.");
+
+        if (string.IsNullOrWhiteSpace(returnedRecord.Uri))
+            throw new InvalidOperationException("Record needs a file URI.");
+
+        if (string.IsNullOrWhiteSpace(returnedRecord.FileType))
+            throw new InvalidOperationException("Record is not a file-backed record.");
+
+        var recordName = returnedRecord.Name;
+        var recordDataSourceId = returnedRecord.DataSourceId;
+
+        _context.Records.Remove(returnedRecord);
+        await _context.SaveChangesAsync();
+
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
+        {
+            Operation = "delete",
+            EntityType = "record",
+            EntityId = recordId,
+            EntityName = recordName,
+            DataSourceId = recordDataSourceId,
+            Properties = JsonSerializer.Serialize(new { recordName })
+        });
+
+        return true;
     }
 
     /// <summary>

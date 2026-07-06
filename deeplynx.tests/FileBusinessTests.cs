@@ -116,7 +116,8 @@ public class FileBusinessTests : IntegrationTestBase
             _insightBusiness.Object,
             _olapBusiness,
             _objectStorageBusiness,
-            NullLogger<FileBusiness>.Instance
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
         );
     }
 
