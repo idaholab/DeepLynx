@@ -44,8 +44,6 @@ export interface InsightIngestionStatusResponse {
   indexed: boolean;
   chunk_count: number;
   page_count: number;
-  available?: boolean;
-  status?: string;
 }
 
 interface InsightQueryRequestBody {
