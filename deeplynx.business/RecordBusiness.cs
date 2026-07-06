@@ -32,6 +32,8 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="tagBusiness">Used for creating tags related to a record.</param>
     /// <param name="labelBusiness">Used for creating tags related to a record.</param>
     /// <param name="sensitivityLabelService">Service for sensitivity label authorization operations.</param>
+    /// <param name="objectStorageBusiness">Used for object storage management.</param>
+    /// <param name="fileBusinessFactory">Used for file management.</param>
     public RecordBusiness(
         DeeplynxContext context,
         IEventBusiness eventBusiness,
