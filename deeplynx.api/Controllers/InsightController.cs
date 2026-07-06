@@ -203,6 +203,78 @@ public class InsightController : ControllerBase
     }
 
     /// <summary>
+    ///     Check the health of a configured model endpoint through the Insight service.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project.</param>
+    /// <param name="dto">Endpoint health request containing the model configuration ID and model type.</param>
+    /// <returns>
+    ///     Endpoint health information for the requested model endpoint.
+    /// </returns>
+    [HttpPost("endpoint_health", Name = "api_insight_endpoint_health")]
+    [Auth("read", "insight")]
+    [InsightEnabled]
+    public async Task<ActionResult<InsightEndpointHealthResponseDto>> EndpointHealth(
+        long organizationId,
+        long projectId,
+        [FromBody] InsightEndpointHealthApiRequestDto dto)
+    {
+        try
+        {
+            var userId = UserContextStorage.UserId;
+
+            var result = await _insightBusiness.CheckEndpointHealth(
+                userId,
+                organizationId,
+                projectId,
+                dto.ModelConfigId,
+                dto.ModelType);
+            
+            return Ok(result);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            _logger.LogError(
+                "Model config not found during Insight endpoint health check for project {ProjectId}: {Error}",
+                projectId, exc.Message);
+
+            return NotFound(exc.Message);
+        }
+        catch (InvalidOperationException exc)
+        {
+            _logger.LogError(
+                "Insight endpoint health check failed for project {ProjectId}: {Error}",
+                projectId, exc.Message);
+
+            return BadRequest(exc.Message);
+        }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight endpoint health request failed for project {ProjectId}: {Error}",
+                projectId,
+                exc.Message);
+
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "insight_endpoint_health_failed",
+                    message = exc.Message
+                });
+        }
+        catch (Exception exc)
+        {
+            var message = $"An unexpected error occurred while checking Insight endpoint health for project {projectId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    
+    /// <summary>
     ///     Queue embedding jobs for all class and relationship descriptions in the project.
     /// </summary>
     /// <param name="organizationId">ID of the organization.</param>
