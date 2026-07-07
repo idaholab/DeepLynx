@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
+import { useLanguage } from "@/app/contexts/Language";
 import {
   archiveOrgRole,
   createOrgRole,
@@ -79,6 +80,7 @@ const RolesAndPermissions = ({
 
   const { organization } = useOrganizationSession();
   const { project } = useProjectSession();
+  const { t } = useLanguage();
 
   /* ------------------------------------------------------------------------ */
   /*                             Create Role Modal                            */
@@ -145,6 +147,12 @@ const RolesAndPermissions = ({
     name?: string | null,
     description?: string | null,
   ) => {
+    const role = roles.find((r) => r.id === roleId);
+    if (role && isSeededUserRole(role)) {
+      toast.error(t.translations.SEEDED_USER_ROLE_CANNOT_BE_MODIFIED);
+      return;
+    }
+
     try {
       const dto: UpdateRoleRequestDto = { name, description };
       const updatedRole = await updateOrgRole(
@@ -185,6 +193,10 @@ const RolesAndPermissions = ({
 
   const handleDeleteRole = async () => {
     if (!roleToDelete) return;
+    if (isSeededUserRole(roleToDelete)) {
+      toast.error(t.translations.SEEDED_USER_ROLE_CANNOT_BE_ARCHIVED);
+      return;
+    }
 
     try {
       await archiveOrgRole(
@@ -232,6 +244,12 @@ const RolesAndPermissions = ({
 
   const handleStartEditingPermissions = () => {
     if (!currentRole) return;
+    if (isSeededUserRole(currentRole)) {
+      toast.error(
+        t.translations.SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED,
+      );
+      return;
+    }
 
     const currentPermissionIds =
       rolePermissions[currentRole.id]?.map((p) => Number(p.id)) || [];
@@ -254,6 +272,12 @@ const RolesAndPermissions = ({
 
   const handleSavePermissions = async () => {
     if (!currentRole) return;
+    if (isSeededUserRole(currentRole)) {
+      toast.error(
+        t.translations.SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED,
+      );
+      return;
+    }
 
     try {
       await setPermissionsForOrgRole(
@@ -324,6 +348,9 @@ const RolesAndPermissions = ({
     roleId: number,
     permissionId: number,
   ) => {
+    const role = roles.find((r) => r.id === roleId);
+    if (role && isSeededUserRole(role)) return;
+
     const scrollTop = tableContainerRef.current?.scrollTop || 0;
     const scrollLeft = tableContainerRef.current?.scrollLeft || 0;
 
@@ -355,7 +382,8 @@ const RolesAndPermissions = ({
 
   const handleSaveMatrixPermissions = async () => {
     try {
-      const updatePromises = roles.map((role) => {
+      const rolesToUpdate = roles.filter((role) => !isSeededUserRole(role));
+      const updatePromises = rolesToUpdate.map((role) => {
         const newPermissions = Array.from(matrixTempPermissions[role.id] || []);
         return setPermissionsForOrgRole(
           organization?.organizationId as number,
@@ -368,7 +396,7 @@ const RolesAndPermissions = ({
 
       const updatedRolePermissions: Record<number, PermissionResponseDto[]> =
         {};
-      roles.forEach((role) => {
+      rolesToUpdate.forEach((role) => {
         const permIds = matrixTempPermissions[role.id] || new Set();
         updatedRolePermissions[role.id] = permissions.filter((p) =>
           permIds.has(Number(p.id)),
@@ -526,11 +554,8 @@ const RolesAndPermissions = ({
     return hasPermission;
   };
 
-  const isStandardRole = (role: RoleResponseDto): boolean => {
-    return (
-      role.name === "Admin" || role.name === "User" || role.name === "Viewer"
-    );
-  };
+  const isSeededUserRole = (role: RoleResponseDto): boolean =>
+    role.name === "User" && role.projectId == null;
 
   /* ------------------------------------------------------------------------ */
   /*                               Main Render                                */
@@ -552,7 +577,9 @@ const RolesAndPermissions = ({
         </div>
         <p className="text-base-content/70">
           Define and manage organization-level roles and permissions. These
-          settings will propagate to all projects.
+          settings propagate to all projects. The User role is seeded when an
+          organization is created and serves as the default baseline for new
+          roles; create a new role when you need a custom permission set.
         </p>
       </div>
 
@@ -614,7 +641,7 @@ const RolesAndPermissions = ({
           onSavePermissions={handleSavePermissions}
           onTogglePermission={handleTogglePermission}
           roleHasPermission={roleHasPermission}
-          isStandardRole={isStandardRole}
+          isSeededUserRole={isSeededUserRole}
         />
       )}
 
@@ -633,7 +660,7 @@ const RolesAndPermissions = ({
           matrixRoleHasPermission={matrixRoleHasPermission}
           onEditClick={handleEditClick}
           onToggleMatrixPermission={handleToggleMatrixPermission}
-          isStandardRole={isStandardRole}
+          isSeededUserRole={isSeededUserRole}
         />
       )}
 

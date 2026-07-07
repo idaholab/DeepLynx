@@ -837,7 +837,7 @@ export const translations = {
       MATCHES: "matches",
       MATCHING_ANY_TERM: "Matching any term",
       MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES:
-        "Matrix editing is only available when custom (non-standard) roles exist.",
+        "Matrix editing is only available when editable organization roles exist.",
       MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES:
         "Matrix editing is only available when custom project roles exist.",
       MATRIX_VIEW: "Matrix View",
@@ -1555,6 +1555,12 @@ export const translations = {
         "The server rejected the upload. Please fix the following issues:",
       SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON:
         "Service configuration will be available in a future release",
+      SEEDED_USER_ROLE_CANNOT_BE_ARCHIVED:
+        "The seeded User role cannot be archived.",
+      SEEDED_USER_ROLE_CANNOT_BE_MODIFIED:
+        "The seeded User role cannot be modified.",
+      SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED:
+        "The seeded User role permissions cannot be modified.",
       SET_AS_DEFAULT_STORAGE: "Set as default storage",
       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
         "Set the default unmounted object storage location for this organization.",
@@ -1747,7 +1753,7 @@ export const translations = {
       VIEW_AS_JSON: "View as JSON",
       VIEW_LAYOUT: "View Layout",
       VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS:
-        "View project-level roles and their permissions. Standard roles are defined by the system and are read-only in this release.",
+        "View project roles and inherited organization roles. Organization roles are read-only at the project level; create a project role for project-specific permissions.",
       VISIT: "Visit",
       VULNERABILITY_DISCLOSURE: "Click here for the Vulnerability Disclosure",
       WARNING:
@@ -2707,7 +2713,7 @@ export const translations = {
       MATCHES: "coincidencias",
       MATCHING_ANY_TERM: "Coincidiendo con cualquier término",
       MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES:
-        "La edición de matriz solo está disponible cuando existen roles personalizados (no estándar).",
+        "La edición de matriz solo está disponible cuando existen roles de organización editables.",
       MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES:
         "La edición de matriz solo está disponible cuando existen roles personalizados del proyecto.",
       MATRIX_VIEW: "Vista de matriz",
@@ -3461,6 +3467,12 @@ export const translations = {
         "El servidor rechazó la carga. Corrija los siguientes problemas:",
       SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON:
         "La configuración del servicio estará disponible en una versión futura",
+      SEEDED_USER_ROLE_CANNOT_BE_ARCHIVED:
+        "El rol Usuario inicial no se puede archivar.",
+      SEEDED_USER_ROLE_CANNOT_BE_MODIFIED:
+        "El rol Usuario inicial no se puede modificar.",
+      SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED:
+        "Los permisos del rol Usuario inicial no se pueden modificar.",
       SET_AS_DEFAULT_STORAGE: "Establecer como almacenamiento predeterminado",
       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
         "Establecer la ubicación predeterminada del almacenamiento de objetos no montado para esta organización.",
@@ -3665,7 +3677,7 @@ export const translations = {
       VIEW_AS_JSON: "Ver como JSON",
       VIEW_LAYOUT: "Vista",
       VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS:
-        "Consulta los roles a nivel de proyecto y sus permisos. Los roles estándar están definidos por el sistema y son de solo lectura en esta versión.",
+        "Consulta los roles del proyecto y los roles heredados de la organización. Los roles de organización son de solo lectura a nivel de proyecto; crea un rol de proyecto para permisos específicos del proyecto.",
       VISIT: "Visitar",
       VULNERABILITY_DISCLOSURE:
         "Haz clic aquí para la Divulgación de Vulnerabilidades",
