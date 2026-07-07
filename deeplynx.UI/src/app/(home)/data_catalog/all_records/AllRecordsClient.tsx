@@ -104,8 +104,6 @@ type Props = {
   initialSelectedProjects: string[];
   /** Search term pre-populated from the URL query string on the server. */
   initialSearchTerm: string;
-  /** Records fetched server-side for the initial render to avoid a loading flash. */
-  initialRecords: RecordTableRow[];
 };
 
 /**
@@ -141,7 +139,6 @@ export default function DataCatalogClient({
   initialProjects,
   initialSelectedProjects,
   initialSearchTerm,
-  initialRecords,
 }: Props) {
   const { t } = useLanguage();
   const router = useRouter();
@@ -158,9 +155,7 @@ export default function DataCatalogClient({
   );
 
   // tableData is the current page returned by the server-side paginated query.
-  const [tableData, setTableData] = useState<RecordTableRow[]>(
-    initialRecords ?? [],
-  );
+  const [tableData, setTableData] = useState<RecordTableRow[]>([]);
 
   // searchTerm is the live value of the search input field.
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
@@ -183,7 +178,7 @@ export default function DataCatalogClient({
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(RECORDS_PER_PAGE);
-  const [totalCount, setTotalCount] = useState(initialRecords?.length ?? 0);
+  const [totalCount, setTotalCount] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(1);
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -247,7 +242,11 @@ export default function DataCatalogClient({
   );
 
   const submittedSearchText = useMemo(
-    () => activeFilters.map((filter) => filter.term).join(" ").trim(),
+    () =>
+      activeFilters
+        .map((filter) => filter.term)
+        .join(" ")
+        .trim(),
     [activeFilters],
   );
 
@@ -330,7 +329,7 @@ export default function DataCatalogClient({
       isArchived: record.isArchived || false,
       fileType: record.fileType ?? "",
       fileSize: record.fileSize ?? undefined,
-      archivedAt: record.isArchived ? record.lastUpdatedAt ?? null : null,
+      archivedAt: record.isArchived ? (record.lastUpdatedAt ?? null) : null,
       timeseries: undefined,
       select: false,
       associatedRecords: undefined,

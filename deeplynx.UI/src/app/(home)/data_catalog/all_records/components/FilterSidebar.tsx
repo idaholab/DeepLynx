@@ -118,45 +118,6 @@ export default function FilterSidebar({
         </div>
 
         <div className="divide-y divide-base-200">
-          {/* ── Status ─────────────────────────────────────────────────────── */}
-          {/*
-           * Uses radio buttons (single-select) because status is mutually
-           * exclusive — a record is either active or archived, not both.
-           * defaultChecked on the hidden checkbox keeps the DaisyUI collapse
-           * open on first render without React needing to manage its state.
-           */}
-          <div className="collapse collapse-arrow rounded-none">
-            <input type="checkbox" defaultChecked />
-            <div className="collapse-title min-h-0 px-4 py-3 text-sm font-semibold">
-              {t.translations.STATUS}
-            </div>
-            <div className="collapse-content px-4 pb-4">
-              <div className="space-y-2">
-                {statusOptions.map((option) => (
-                  <label
-                    key={option.value}
-                    className="flex cursor-pointer items-center justify-between gap-3 text-sm"
-                  >
-                    <span className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        className="radio radio-primary radio-xs"
-                        checked={statusFilter === option.value}
-                        onChange={() => onStatusFilterChange(option.value)}
-                      />
-                      {option.label}
-                    </span>
-                    {option.count !== undefined && (
-                      <span className="text-xs text-base-content/50">
-                        {option.count}
-                      </span>
-                    )}
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
           {/* ── Class ──────────────────────────────────────────────────────── */}
           {/*
            * Multi-select checkboxes so users can view records from several
