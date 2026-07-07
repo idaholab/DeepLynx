@@ -180,17 +180,17 @@ public class ProvenanceBusiness : IProvenanceBusiness
     /// <param name="aiConfigId">(Optional) AI model information, if an embedding event</param>
     /// <returns>Boolean- if false, throw an error at the caller level</returns>
     public async Task<bool> BulkCreateProvenanceRecords(
-        List<long> recordIds, 
-        string action, 
-        long currentUserId, 
+        List<long> recordIds,
+        string action,
+        long currentUserId,
         long? aiConfigId)
     {
         if (recordIds == null || !recordIds.Any())
             return true;
-        
+
         // deduplicate requested records
         var distinctRecordIds = recordIds.Distinct().ToList();
-        
+
         // get the latest historical record per record_id in a single trip
         var historicalRecords = await _context.HistoricalRecords
             .FromSqlInterpolated($@"
@@ -203,7 +203,7 @@ public class ProvenanceBusiness : IProvenanceBusiness
         if (historicalRecords.Count != distinctRecordIds.Count)
             // some of the supplied records don't have historical records associated
             return false;
-        
+
         // if aiConfig is passed in, fetch once and reuse for each prov record
         AiModelConfig? aiConfig = null;
         if (aiConfigId is not null)
@@ -212,50 +212,61 @@ public class ProvenanceBusiness : IProvenanceBusiness
                 .Where(a => a.Id == aiConfigId)
                 .FirstOrDefaultAsync();
         }
-        
+
         var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         var provenanceRecords = new List<ProvenanceRecord>(historicalRecords.Count);
 
-        foreach (var histRecord in historicalRecords)
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
         {
-            var provenanceJson = BuildProvenanceRecord(new BuildProvenanceRecordDto
+            foreach (var histRecord in historicalRecords)
             {
-                RecordId = histRecord.RecordId,
-                HistoricalRecordId = histRecord.Id,
-                Action = action,
-                ActorId = currentUserId,
-                OrganizationId = histRecord.OrganizationId,
-                ProjectId = histRecord.ProjectId,
-                FileUri = histRecord.Uri,
-                FileHash = histRecord.FileContentHash,
-                FileSize = histRecord.FileSize,
-                FileType = histRecord.FileType,
-                AiConfigId = aiConfigId,
-                AiModelProvider = aiConfig?.ModelProvider,
-                AiModelName = aiConfig?.ModelName,
-                AiModelType = aiConfig?.ModelType,
-                AiServerUrl = aiConfig?.ServerUrl
-            }, out var provId);
-            
-            provenanceRecords.Add(new ProvenanceRecord
-            {
-                RecordId = histRecord.RecordId,
-                HistoricalRecordId = histRecord.Id,
-                OrganizationId = histRecord.OrganizationId,
-                ProjectId = histRecord.ProjectId,
-                ProvId = provId,
-                FileContentHash = histRecord.FileContentHash,
-                ProvenanceJson = provenanceJson,
-                // leaving null for now until we get hashing and signatures implemented
-                Signature = null,
-                CreatedAt = now
-            });
+                var provenanceJson = BuildProvenanceRecord(new BuildProvenanceRecordDto
+                {
+                    RecordId = histRecord.RecordId,
+                    HistoricalRecordId = histRecord.Id,
+                    Action = action,
+                    ActorId = currentUserId,
+                    OrganizationId = histRecord.OrganizationId,
+                    ProjectId = histRecord.ProjectId,
+                    FileUri = histRecord.Uri,
+                    FileHash = histRecord.FileContentHash,
+                    FileSize = histRecord.FileSize,
+                    FileType = histRecord.FileType,
+                    AiConfigId = aiConfigId,
+                    AiModelProvider = aiConfig?.ModelProvider,
+                    AiModelName = aiConfig?.ModelName,
+                    AiModelType = aiConfig?.ModelType,
+                    AiServerUrl = aiConfig?.ServerUrl
+                }, out var provId);
+
+                provenanceRecords.Add(new ProvenanceRecord
+                {
+                    RecordId = histRecord.RecordId,
+                    HistoricalRecordId = histRecord.Id,
+                    OrganizationId = histRecord.OrganizationId,
+                    ProjectId = histRecord.ProjectId,
+                    ProvId = provId,
+                    FileContentHash = histRecord.FileContentHash,
+                    ProvenanceJson = provenanceJson,
+                    // leaving null for now until we get hashing and signatures implemented
+                    Signature = null,
+                    CreatedAt = now
+                });
+            }
+
+            // save all bulk-created prov records in a single DB trip
+            _context.ProvenanceRecords.AddRange(provenanceRecords);
+            await _context.SaveChangesAsync();
+
+            await transaction.CommitAsync();
         }
-        
-        // save all bulk-created prov records in a single DB trip
-        _context.ProvenanceRecords.AddRange(provenanceRecords);
-        await _context.SaveChangesAsync();
-        
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+
         return true;
     }
 
