@@ -935,7 +935,7 @@ public class RecordBusiness : IRecordBusiness
         if (dto.Properties == null)
             throw new ArgumentNullException(nameof(dto.Properties), "Properties cannot be null");
 
-        var maxDepth = CalculateJsonMaxDepth(dto.Properties);
+        var maxDepth = ValidationHelper.ValidateJsonMaxDepth(dto.Properties);
         if (maxDepth > 3)
             throw new Exception(
                 $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
@@ -1659,7 +1659,7 @@ public class RecordBusiness : IRecordBusiness
         if (returnedRecord is null)
             throw new KeyNotFoundException($"Record with id {recordId} not found");
 
-        var maxDepth = CalculateJsonMaxDepth(dto.Properties);
+        var maxDepth = ValidationHelper.ValidateJsonMaxDepth(dto.Properties);
         if (maxDepth > 3)
             throw new Exception(
                 $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
@@ -1892,35 +1892,6 @@ public class RecordBusiness : IRecordBusiness
                 Name = l.Name
             }).ToList()
         }).ToList();
-    }
-
-    /// <summary>
-    ///     Private method used to calculate json depth of properties (should be less than three)
-    /// </summary>
-    /// <param name="node"></param>
-    /// <returns></returns>
-    private int CalculateJsonMaxDepth(JsonNode? node)
-    {
-        if (node is not JsonObject && node is not JsonArray)
-            return 0;
-
-        var maxDepth = 0;
-        if (node is JsonObject jsonObject)
-            foreach (var prop in jsonObject)
-            {
-                var depth = CalculateJsonMaxDepth(prop.Value);
-                if (depth > maxDepth)
-                    maxDepth = depth;
-            }
-        else if (node is JsonArray jsonArray)
-            foreach (var item in jsonArray)
-            {
-                var depth = CalculateJsonMaxDepth(item);
-                if (depth > maxDepth)
-                    maxDepth = depth;
-            }
-
-        return maxDepth + 1;
     }
 
     /// <summary>

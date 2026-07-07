@@ -1726,6 +1726,254 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.True(Directory.Exists(uploadPath));
     }
 
+    [Fact]
+    public async Task StartUpload_ValidMetadata_StartsUpload()
+    {
+        // Arrange
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject { ["Name"] = "Name" },
+            OriginalId = "OriginalId",
+            ClassId = fileClass.Id
+        };
+
+        var request = new FileUploadInitRequestDto
+        {
+            FileName = "bigfile.bin",
+            FileSize = 2L * 1024 * 1024 * 1024, // 2GB
+            Metadata = metadata
+        };
+
+        // Act
+        var session = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            request,
+            request.Metadata
+        );
+
+        // Assert
+        Assert.NotNull(session);
+        Assert.False(string.IsNullOrWhiteSpace(session.UploadId));
+        Assert.Equal(100_000_000, session.ChunkSize);
+        Assert.Equal(22, session.TotalChunks); // 2GB / 100MB = 22 chunks
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"org_{oid}",
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        Assert.True(Directory.Exists(uploadPath));
+    }
+
+    [Fact]
+    public async Task StartUpload_MetadataOnlyClassName_StartsUpload()
+    {
+        // Arrange
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject { ["Name"] = "Name" },
+            OriginalId = "OriginalId",
+            ClassName = "Cool Class"
+        };
+
+        var request = new FileUploadInitRequestDto
+        {
+            FileName = "bigfile.bin",
+            FileSize = 2L * 1024 * 1024 * 1024, // 2GB
+            Metadata = metadata
+        };
+
+        // Act
+        var session = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            request,
+            request.Metadata
+        );
+
+        // Assert
+        Assert.NotNull(session);
+        Assert.False(string.IsNullOrWhiteSpace(session.UploadId));
+        Assert.Equal(100_000_000, session.ChunkSize);
+        Assert.Equal(22, session.TotalChunks); // 2GB / 100MB = 22 chunks
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"org_{oid}",
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        Assert.True(Directory.Exists(uploadPath));
+    }
+
+    [Fact]
+    public async Task StartUpload_InvalidMetadataPropertiesDepth_ThrowsException()
+    {
+        // Arrange
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            OriginalId = "OriginalId",
+            Properties = new JsonObject {
+                ["property"]= new JsonObject {
+                    ["property2"]= new JsonObject {
+                        ["more nested properties"]= new JsonObject {
+                            ["one more"]= new JsonObject {
+                                ["last one"]= new JsonObject
+                                {
+                                    ["i was wrong"]= "this is last"
+                                }
+            }}}}}
+        };
+
+        var request = new FileUploadInitRequestDto
+        {
+            FileName = "bigfile.bin",
+            FileSize = 2L * 1024 * 1024 * 1024, // 2GB
+            Metadata = metadata
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<Exception>(() =>
+         _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            request,
+            request.Metadata
+        ));
+    }
+
+    [Fact]
+    public async Task StartUpload_MetadataDuplicateOriginalId_ThrowsArgumentException()
+    {
+        // Arrange
+        var record1 = new Record {
+            Name = "bob",
+            Description = "record1",
+            OriginalId = "OriginalId",
+            DataSourceId = did,
+            ProjectId = pid,
+            OrganizationId = oid,
+            Properties = JsonSerializer.Serialize(new {name = "name"})
+        };
+        Context.Records.Add(record1);
+        await Context.SaveChangesAsync();
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject { ["Name"] = "Name" },
+            OriginalId = "OriginalId"
+        };
+
+        var request = new FileUploadInitRequestDto
+        {
+            FileName = "bigfile.bin",
+            FileSize = 2L * 1024 * 1024 * 1024, // 2GB
+            Metadata = metadata
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+         _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            request,
+            request.Metadata
+        ));
+    }
+
+    [Fact]
+    public async Task StartUpload_MetadataInvalidClassId_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject { ["Name"] = "Name" },
+            OriginalId = "OriginalId",
+            ClassId = 4
+        };
+
+        var request = new FileUploadInitRequestDto
+        {
+            FileName = "bigfile.bin",
+            FileSize = 2L * 1024 * 1024 * 1024, // 2GB
+            Metadata = metadata
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+         _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            request,
+            request.Metadata
+        ));
+    }
+
+    [Fact]
+    public async Task StartUpload_MetadataMismatchClassIdAndName_ThrowsArgumentException()
+    {
+        // Arrange
+        var fileClass = Context.Classes.First(c => c.Name == "File" && c.ProjectId == pid);
+        var fileClass2 = Context.Classes.First(c => c.Name == "Report" && c.ProjectId == pid);
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata",
+            Description = "Description",
+            Properties = new JsonObject { ["Name"] = "Name" },
+            OriginalId = "OriginalId",
+            ClassId = fileClass.Id,
+            ClassName = fileClass2.Name
+        };
+
+        var request = new FileUploadInitRequestDto
+        {
+            FileName = "bigfile.bin",
+            FileSize = 2L * 1024 * 1024 * 1024, // 2GB
+            Metadata = metadata
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+         _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            request,
+            request.Metadata
+        ));
+    }
+
     #endregion
 
     #region UploadChunk Tests

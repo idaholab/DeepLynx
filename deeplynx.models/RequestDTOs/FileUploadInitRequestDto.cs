@@ -8,6 +8,7 @@ public class FileUploadInitRequestDto
     [MaxLength(100)]
     public string FileName { get; set; }
     public long FileSize { get; set; }
+    public CreateRecordFileUploadRequestDto? Metadata { get; set; }
 }
 
 public class FileUploadSessionResponseDto
