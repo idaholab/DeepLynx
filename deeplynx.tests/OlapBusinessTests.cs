@@ -181,7 +181,6 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _insightBusiness.Object,
             _olapBusiness,
             _objectStorageBusiness,
-            _provenanceBusiness.Object,
             NullLogger<FileBusiness>.Instance
         );
     }

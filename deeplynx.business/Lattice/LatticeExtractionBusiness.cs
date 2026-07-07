@@ -162,6 +162,10 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             throw;
         }
 
+        // TODO: Create a new provenance event for lattice extractions once model config is normalized
+        // if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "trigger-extraction", currentUserId, TODO))
+        //     _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", recordId);
+
         return extraction.Id;
     }
 
@@ -898,10 +902,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             var embeddingConfig = await _insightBusiness.ResolveModelConfig(
                 currentUserId, organizationId, projectId, null, "embedding");
-            _insightBusiness.TriggerEmbedding(projectId, recordId, record.Uri!, vlmConfig, embeddingConfig);
-
-            if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "embedding_requested", currentUserId, embeddingConfig.Id))
-                _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", recordId);
+            _insightBusiness.TriggerEmbedding(projectId, recordId, record.Uri!, currentUserId, vlmConfig, embeddingConfig);
         }
 
         if (!ontologyEmbedded)

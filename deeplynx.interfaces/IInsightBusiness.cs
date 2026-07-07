@@ -36,6 +36,7 @@ public interface IInsightBusiness
         long projectId,
         long recordId,
         string uri,
+        long currentUserId,
         AiModelConfigResponseDto.WithToken vlmConfig,
         AiModelConfigResponseDto.WithToken embeddingConfig,
         string? userJwt = null,

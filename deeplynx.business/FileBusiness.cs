@@ -25,7 +25,6 @@ public class FileBusiness
     private readonly IRecordBusiness _recordBusiness;
     private readonly IOlapBusiness _olapBusiness;
     private readonly IInsightBusiness _insightBusiness;
-    private readonly IProvenanceBusiness _provenanceBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly ILogger<FileBusiness> _logger;
 
@@ -42,7 +41,6 @@ public class FileBusiness
         IInsightBusiness insightBusiness,
         IOlapBusiness olapBusiness,
         IObjectStorageBusiness objectStorageBusiness,
-        IProvenanceBusiness provenanceBusiness,
         ILogger<FileBusiness> logger)
     {
         _context = context;
@@ -53,7 +51,6 @@ public class FileBusiness
         _insightBusiness = insightBusiness;
         _olapBusiness = olapBusiness;
         _objectStorageBusiness = objectStorageBusiness;
-        _provenanceBusiness = provenanceBusiness;
         _logger = logger;
 
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
@@ -172,11 +169,8 @@ public class FileBusiness
             var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
             var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                            createdRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt);
-
-            if (!await _provenanceBusiness.CreateProvenanceRecord(createdRecord.Id, "embedding_requested", currentUserId, embeddingModelConfig.Id))
-                _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", createdRecord.Id);
+            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id, createdRecord.Uri!,
+                                        currentUserId, vlmConfig, embeddingModelConfig, userJwt);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -242,10 +236,8 @@ public class FileBusiness
             var embeddingModelConfig =
                 await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
-
-            if (!await _provenanceBusiness.CreateProvenanceRecord(record.Id, "embedding_requested", currentUserId, embeddingModelConfig.Id))
-                _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", record.Id);
+            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, currentUserId,
+                                                    vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -485,11 +477,8 @@ public class FileBusiness
             var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
             var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                createdRecord.Uri!, vlmConfig, embeddingModelConfig);
-
-            if (!await _provenanceBusiness.CreateProvenanceRecord(createdRecord.Id, "embedding_requested", currentUserId, embeddingModelConfig.Id))
-                _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", createdRecord.Id);
+            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id, createdRecord.Uri!,
+                                                currentUserId, vlmConfig, embeddingModelConfig);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -850,11 +839,8 @@ public class FileBusiness
                 var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
                 var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-                _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                    createdRecord.Uri!, vlmConfig, embeddingModelConfig);
-
-                if (!await _provenanceBusiness.CreateProvenanceRecord(createdRecord.Id, "embedding_requested", currentUserId, embeddingModelConfig.Id))
-                    _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", createdRecord.Id);
+                _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id, createdRecord.Uri!,
+                                                    currentUserId, vlmConfig, embeddingModelConfig);
             }
         }
 
