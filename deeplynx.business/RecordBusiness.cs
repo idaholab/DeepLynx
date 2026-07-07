@@ -531,7 +531,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = record.IsArchived,
             FileType = record.FileType,
             FileSize = record.FileSize,
-            Embedded =  record.Embedded,
+            Embedded = record.Embedded,
             Tags = record.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -836,7 +836,7 @@ public class RecordBusiness : IRecordBusiness
         sql = string.Format(sql, valueTuples);
 
         await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
-        
+
         return true;
     }
 
@@ -928,10 +928,10 @@ public class RecordBusiness : IRecordBusiness
             await transaction.RollbackAsync();
             throw;
         }
-        
+
         // Trigger provenance record creation
         if (!await _provenanceBusiness.BulkCreateProvenanceRecords(distinctRecordIds, "attach-label", currentUserId, null))
-            _logger.LogWarning("Failed to create provenance records for bulk label attach, records {RecordIds}", 
+            _logger.LogWarning("Failed to create provenance records for bulk label attach, records {RecordIds}",
                 string.Join(", ", distinctRecordIds));
 
         return true;
@@ -1427,14 +1427,14 @@ public class RecordBusiness : IRecordBusiness
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, events, records.Count);
 
         await tx.CommitAsync();
-        
+
         // Trigger provenance record creation
         var insertedRecordIds = inserted.Select(r => r.Id).ToList();
         if (!await _provenanceBusiness.BulkCreateProvenanceRecords(insertedRecordIds, "create-record", currentUserId, null))
-            _logger.LogWarning("Failed to create provenance records for bulk record creation, records {RecordIds}", 
+            _logger.LogWarning("Failed to create provenance records for bulk record creation, records {RecordIds}",
                 string.Join(", ", insertedRecordIds));
 
-        
+
         return inserted;
     }
 
@@ -1508,7 +1508,7 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
-        // Trigger provenance record creation (outside the transaction block — already committed)
+        // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "archive-record", currentUserId, null))
             _logger.LogWarning("Failed to create provenance record for archive on record {RecordId}", recordId);
 
@@ -1566,11 +1566,6 @@ public class RecordBusiness : IRecordBusiness
                         $"unable to unarchive record {recordId} or its downstream dependents.");
 
                 await transaction.CommitAsync();
-
-                // Trigger provenance record creation; TODO probably put this in a transaction
-                await _provenanceBusiness.CreateProvenanceRecord(recordId, "unarchive", currentUserId, null);
-
-
             }
             catch (Exception exc)
             {
@@ -1580,7 +1575,7 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
-        // Trigger provenance record creation (outside the transaction block — already committed)
+        // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "unarchive-record", currentUserId, null))
             _logger.LogWarning("Failed to create provenance record for unarchive on record {RecordId}", recordId);
 
@@ -2091,7 +2086,7 @@ public class RecordBusiness : IRecordBusiness
             throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
 
         await BulkInsertRecordTagLinks(dtos);
-        
+
         // Trigger provenance record creation
         if (!await _provenanceBusiness.BulkCreateProvenanceRecords(recordIds, "attach-tag", currentUserId, null))
             _logger.LogWarning("Failed to create provenance records for bulk tag attach, records {RecordIds}",
@@ -2155,7 +2150,7 @@ public class RecordBusiness : IRecordBusiness
             throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
 
         await BulkDeleteRecordTagLinks(dtos);
-        
+
         // Trigger provenance record creation
         if (!await _provenanceBusiness.BulkCreateProvenanceRecords(recordIds, "detach-tag", currentUserId, null))
             _logger.LogWarning("Failed to create provenance records for bulk tag detach, records {RecordIds}",
