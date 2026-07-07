@@ -193,6 +193,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
   const [isInsightUnavailable, setIsInsightUnavailable] = useState(false);
+  const [hasCheckedInsightHealth, setHasCheckedInsightHealth] = useState(false);
   const [isQueuingInsightUpload, setIsQueuingInsightUpload] = useState(false);
   const [latticeMode, setLatticeMode] = useState<"strict" | "discovery">(
     "discovery",
@@ -283,6 +284,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     setRecord(null);
     setRecordFileType(null);
     setIsInsightUnavailable(false);
+    setHasCheckedInsightHealth(false);
     setSelectedTags([]);
     setSelectedIds([]);
     setSelectedLabels([]);
@@ -849,6 +851,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         if (!health.reachable || !health.model_available) {
           if (cancelled) return;
           
+          setHasCheckedInsightHealth(true);
           setIsInsightUnavailable(true);
           setIsRecordInsightEmbedded(false);
           
@@ -868,6 +871,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         
         if (cancelled) return;
 
+        setHasCheckedInsightHealth(true);
         setIsInsightUnavailable(false);
         setIsRecordInsightEmbedded(status.indexed);
 
@@ -878,6 +882,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       } catch (error) {
         if (cancelled) return;
 
+        setHasCheckedInsightHealth(true);
         setIsInsightUnavailable(true);
         setIsRecordInsightEmbedded(false);
 
@@ -1057,6 +1062,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 recordName={record.name}
                 recordUri={record.uri}
                 onEmbeddingStatusChange={setIsRecordInsightEmbedded}
+                isInsightUnavailable={!hasCheckedInsightHealth || isInsightUnavailable}
               />
             ) : null}
 

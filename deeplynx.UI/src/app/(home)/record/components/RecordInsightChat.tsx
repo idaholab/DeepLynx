@@ -46,6 +46,7 @@ interface RecordInsightChatProps {
   recordUri?: string | null;
   recordName?: string | null;
   onEmbeddingStatusChange?: (isEmbedded: boolean) => void;
+  isInsightUnavailable?: boolean;
 }
 
 const STATUS_POLL_INTERVAL_MS = 5000;
@@ -90,6 +91,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   recordUri,
   recordName,
   onEmbeddingStatusChange,
+  isInsightUnavailable = false,  
 }) => {
   const { t } = useLanguage();
   const trimmedRecordName = recordName?.trim() ?? "";
@@ -255,7 +257,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   }, [ingestionState]);
 
   useEffect(() => {
-    if (!organizationId || !projectId || !recordId) return;
+    if (isInsightUnavailable || !organizationId || !projectId || !recordId) return;
 
     let cancelled = false;
 
@@ -279,10 +281,10 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [organizationId, projectId, recordId]);
+  }, [organizationId, projectId, recordId, isInsightUnavailable]);
 
   useEffect(() => {
-    if (!organizationId || !projectId || !recordId) return;
+    if (isInsightUnavailable || !organizationId || !projectId || !recordId) return;
     if (ingestionState !== "queued" && ingestionState !== "processing") return;
 
     let cancelled = false;
@@ -317,7 +319,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [organizationId, projectId, recordId, ingestionState]);
+  }, [organizationId, projectId, recordId, ingestionState, isInsightUnavailable]);
 
   async function handleSend(input: string) {
     const prompt = input.trim();
