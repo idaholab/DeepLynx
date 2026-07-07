@@ -1049,7 +1049,7 @@ public class FileBusiness
         else if (objectStorage.Type == "azure_object")
         {
             normalizedUri = record.Uri;
-            expectedPrefix = $"organization_1/project_6/datasource_6/";
+            expectedPrefix = $"organization_{record.OrganizationId}/project_{record.ProjectId}/datasource_{record.DataSourceId}/";
         }
         else
         {
