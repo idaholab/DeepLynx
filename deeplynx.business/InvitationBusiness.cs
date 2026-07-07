@@ -197,7 +197,7 @@ public class InvitationBusiness : IInvitationBusiness
     /// <param name="name"></param>
     /// <param name="makeProjectAdmin"></param>
     /// <returns></returns>
-    public async Task<bool> CreateAndAddServiceAccountToProject(long projectId, string name, long? roleId, bool makeProjectAdmin = false)
+    public async Task<bool> CreateAndAddServiceAccountToProject(long organizationId, long projectId, string name, long? roleId, bool makeProjectAdmin = false)
     {
         var serviceIdentifier = $"service_{Guid.NewGuid()}";
 
@@ -214,6 +214,7 @@ public class InvitationBusiness : IInvitationBusiness
 
         try
         {
+            await _organizationBusiness.AddUserToOrganization(organizationId, serviceAccount.Id, allowServiceAccounts: true);
             await _projectBusiness.AddMemberToProject(
                 projectId, roleId, serviceAccount.Id,
                 groupId: null, makeProjectAdmin, allowServiceAccount: true);

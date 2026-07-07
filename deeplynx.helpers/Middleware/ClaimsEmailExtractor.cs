@@ -1,9 +1,15 @@
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 
 namespace deeplynx.helpers;
 
 public static class ClaimsEmailExtractor
 {
+    // Matches service_<guid> and test_<guid> identifiers stored in the email column
+    private static readonly Regex NonEmailAccountPattern = new(
+        @"^(service|test)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public static string? ExtractEmail(ClaimsPrincipal principal)
     {
         var disableAuth = Environment.GetEnvironmentVariable("DISABLE_BACKEND_AUTHENTICATION");
@@ -51,6 +57,11 @@ public static class ClaimsEmailExtractor
             if (string.IsNullOrWhiteSpace(raw)) continue;
 
             var candidate = raw.Trim().ToLowerInvariant();
+
+            // Service/test account identifiers are stored in the email column;
+            // accept them as-is without email-format validation
+            if (NonEmailAccountPattern.IsMatch(candidate))
+                return candidate;
 
             // Normalize domain
             if (candidate.EndsWith("@azuregov.inl.gov", StringComparison.OrdinalIgnoreCase))

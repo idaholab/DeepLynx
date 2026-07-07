@@ -2,7 +2,7 @@
 import "server-only";
 import { apiFetch, asJson } from "./api.server";
 import { CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import { HistoricalRecordResponseDto, QueryRecordViewResponseDto } from "@/app/(home)/types/responseDTOs";
 
 /**
  * Full text search for records (server-side)
@@ -15,7 +15,7 @@ export async function fullTextSearchServer(
     organizationId: number,
     userQuery: string,
     projectIds: number[]
-): Promise<HistoricalRecordResponseDto[]> {
+): Promise<QueryRecordViewResponseDto[]> {
     const searchParams = new URLSearchParams();
     searchParams.append("userQuery", userQuery);
     projectIds.forEach(id => searchParams.append("projectIds", id.toString()));
@@ -23,7 +23,7 @@ export async function fullTextSearchServer(
     const path = `/organizations/${organizationId}/query/records?${searchParams.toString()}`;
 
     const res = await apiFetch(path);
-    return asJson<HistoricalRecordResponseDto[]>(res);
+    return asJson<QueryRecordViewResponseDto[]>(res);
 }
 
 /**
@@ -94,7 +94,7 @@ export async function getMultiProjectRecordsServer(
     organizationId: number,
     projectIds: number[],
     hideArchived: boolean = true
-): Promise<HistoricalRecordResponseDto[]> {
+): Promise<QueryRecordViewResponseDto[]> {
     const searchParams = new URLSearchParams();
     projectIds.forEach(id => searchParams.append("projects", id.toString()));
     searchParams.append("hideArchived", hideArchived.toString());
@@ -102,5 +102,5 @@ export async function getMultiProjectRecordsServer(
     const path = `/organizations/${organizationId}/query/multiproject?${searchParams.toString()}`;
 
     const res = await apiFetch(path);
-    return asJson<HistoricalRecordResponseDto[]>(res);
+    return asJson<QueryRecordViewResponseDto[]>(res);
 }
