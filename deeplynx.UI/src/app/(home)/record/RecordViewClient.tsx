@@ -75,10 +75,12 @@ import {
 } from "@/app/lib/client_service/lattice_services.client";
 import { EmbeddingStatusResponseDTO } from "@/app/(home)/types/latticeDTOs";
 import {
+  fetchInsightEndpointHealth,
   fetchInsightIngestionStatus,
   queueInsightUpload,
 } from "@/app/lib/client_service/insight_services.client";
 import { isInsightHidden } from "@/app/lib/feature_flags";
+import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -147,7 +149,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const { t } = useLanguage();
   const { organization, hasLoaded } = useOrganizationSession();
   const router = useRouter();
-
+  
+  const organizationId =
+      organization?.organizationId !== undefined
+        ? Number(organization.organizationId)
+        : null;
+  
+  const { selectedInsightModels } = useInsightModelSelection(
+      organizationId,
+      projectId,
+  );
+          
   // ============= STATE MANAGEMENT =============
   // Record & Tags State
   const [record, setRecord] = useState<HistoricalRecordResponseDto | null>(
@@ -827,16 +839,16 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       try {
         if (isInitial) setIsCheckingLatticeReadiness(true);
 
-        const status = await fetchInsightIngestionStatus({
+        const health = await fetchInsightEndpointHealth({
           organizationId: organization.organizationId as number,
           projectId,
-          fileId: recordId,
+          modelConfigId: selectedInsightModels.embeddingModelConfigId,
+          modelType: "embedding",
         });
         
-        if (cancelled) return;
-        
-        if (status.available === false) {
-
+        if (!health.reachable || !health.model_available) {
+          if (cancelled) return;
+          
           setIsInsightUnavailable(true);
           setIsRecordInsightEmbedded(false);
           
@@ -847,6 +859,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           
           return;
         }
+        
+        const status = await fetchInsightIngestionStatus({
+          organizationId: organization.organizationId as number,
+          projectId,
+          fileId: recordId,
+        });
+        
+        if (cancelled) return;
 
         setIsInsightUnavailable(false);
         setIsRecordInsightEmbedded(status.indexed);
@@ -857,8 +877,16 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         }
       } catch (error) {
         if (cancelled) return;
+
+        setIsInsightUnavailable(true);
+        setIsRecordInsightEmbedded(false);
+
+        if (recordEmbedPollRef.current) {
+          clearInterval(recordEmbedPollRef.current);
+          recordEmbedPollRef.current = null;
+        }
+        
         console.error("Failed to check Insight embedding status:", error);
-        if (isInitial) setIsRecordInsightEmbedded(false);
       } finally {
         if (!cancelled && isInitial) {
           setIsCheckingLatticeReadiness(false);
@@ -880,7 +908,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         recordEmbedPollRef.current = null;
       }
     };
-  }, [organization?.organizationId, projectId, recordId]);
+  }, [organization?.organizationId, projectId, recordId, selectedInsightModels.embeddingModelConfigId]);
 
   useEffect(() => {
     if (!organization?.organizationId || !projectId) return;
@@ -1409,7 +1437,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 </h1>
                 {isInsightUnavailable && (
                     <span className="badge badge-warning badge-sm">
-                      Insight service unavailable
+                      Insight unavailable
                     </span>
                 )}
               </div>
