@@ -132,7 +132,6 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         project.id as number,
         false, // Don't hide archived storages
       );
-      setAvailableStorages(storages);
 
       // Fetch the current default storage
       try {
@@ -140,11 +139,28 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
           organization.organizationId as number,
           project.id as number,
         );
-        setDefaultStorage(defaultStorageData);
-        setSelectedStorageId(defaultStorageData.id as number);
+        const projectDefaultStorage =
+          storages.find(
+            (storage) =>
+              storage.default &&
+              Number(storage.projectId) === Number(project.id),
+          ) ?? null;
+        const effectiveDefaultStorage =
+          projectDefaultStorage ?? defaultStorageData;
+
+        setDefaultStorage(effectiveDefaultStorage);
+        setSelectedStorageId(effectiveDefaultStorage.id as number);
+        setAvailableStorages(
+          storages.map((storage) => ({
+            ...storage,
+            default:
+              String(storage.id) === String(effectiveDefaultStorage.id),
+          })),
+        );
       } catch (error) {
         setDefaultStorage(null);
         setSelectedStorageId(null);
+        setAvailableStorages(storages);
       }
     } catch (error) {
       console.error("Error loading storages:", error);
@@ -272,7 +288,13 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         (s) => s.id === selectedStorageId,
       );
       if (updatedDefault) {
-        setDefaultStorage(updatedDefault);
+        setDefaultStorage({ ...updatedDefault, default: true });
+        setAvailableStorages((currentStorages) =>
+          currentStorages.map((storage) => ({
+            ...storage,
+            default: String(storage.id) === String(selectedStorageId),
+          })),
+        );
       }
 
       toast.success(
@@ -338,19 +360,50 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       const dto: CreateObjectStorageRequestDto = {
         name: storageFormData.name,
         config: config,
+        default: storageFormData.default,
       };
 
-      await createProjectObjectStorage(
+      const createdStorage = await createProjectObjectStorage(
         organization.organizationId as number,
         project.id as number,
         dto,
         storageFormData.default,
       );
+      const storageForList = {
+        ...createdStorage,
+        default: storageFormData.default || createdStorage.default,
+      };
+
+      setAvailableStorages((currentStorages) => {
+        const existingStorage = currentStorages.some(
+          (storage) => String(storage.id) === String(storageForList.id),
+        );
+        const nextStorages = existingStorage
+          ? currentStorages.map((storage) =>
+              String(storage.id) === String(storageForList.id)
+                ? storageForList
+                : storage,
+            )
+          : [...currentStorages, storageForList];
+
+        if (!storageForList.default) {
+          return nextStorages;
+        }
+
+        return nextStorages.map((storage) => ({
+          ...storage,
+          default: String(storage.id) === String(storageForList.id),
+        }));
+      });
+
+      if (storageForList.default) {
+        setDefaultStorage(storageForList);
+        setSelectedStorageId(storageForList.id as number);
+      }
 
       toast.success(t.translations.STORAGE_CREATED_SUCCESSFULLY);
       setIsCreateModalOpen(false);
       resetStorageForm();
-      loadStorages();
     } catch (error) {
       console.error("Failed to create storage:", error);
       console.error("Error details:", error);

@@ -54,10 +54,24 @@ const StorageSettingsSection = ({
     (storage) =>
       storage.default && Number(storage.projectId) === currentProjectId,
   );
-  const isCurrentDefaultStorage = (storage: ObjectStorageResponseDto) =>
-    storage.default &&
-    (!hasProjectDefaultStorage ||
-      Number(storage.projectId) === currentProjectId);
+  const defaultStorageProjectId = Number(defaultStorage?.projectId);
+  const hasDefaultStorageWithProject =
+    defaultStorage !== null && defaultStorageProjectId === currentProjectId;
+  const isCurrentDefaultStorage = (storage: ObjectStorageResponseDto) => {
+    if (defaultStorage) {
+      return (
+        String(storage.id) === String(defaultStorage.id) &&
+        (!hasDefaultStorageWithProject ||
+          Number(storage.projectId) === currentProjectId)
+      );
+    }
+
+    return (
+      storage.default &&
+      (!hasProjectDefaultStorage ||
+        Number(storage.projectId) === currentProjectId)
+    );
+  };
 
   const defaultTabContent = (
     <div className="mt-4">
