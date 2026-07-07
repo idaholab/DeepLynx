@@ -283,7 +283,7 @@ public class FileFilesystemBusiness : IFileBusiness
                 // file path (large files, streamed by the consumer at write time).
                 // Worst-case buffered memory ~= capacity * MaxBufferedFileSize.
                 var channel = Channel.CreateBounded<(string EntryName, byte[]? Content, string? FilePath)>(
-                    new BoundedChannelOptions(16)
+                    new BoundedChannelOptions(128)
                     {
                         FullMode = BoundedChannelFullMode.Wait,
                         SingleReader = true,
