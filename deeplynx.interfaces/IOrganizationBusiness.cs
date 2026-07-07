@@ -16,7 +16,7 @@ public interface IOrganizationBusiness
     Task<bool> ArchiveOrganization(long currentUserId, long organizationId);
     Task<bool> UnarchiveOrganization(long currentUserId, long organizationId);
     Task<bool> DeleteOrganization(long organizationId);
-    Task<bool> AddUserToOrganization(long organizationId, long userId, bool isAdmin = false);
+    Task<bool> AddUserToOrganization(long organizationId, long userId, bool isAdmin = false, bool allowServiceAccounts = false);
     Task<bool> SetOrganizationAdminStatus(long organizationId, long userId, bool isAdmin = false);
     Task<bool> RemoveUserFromOrganization(long organizationId, long userId);
 }
