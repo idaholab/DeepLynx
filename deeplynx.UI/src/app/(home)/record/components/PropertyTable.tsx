@@ -76,6 +76,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const [isFolder, setIsFolder] = useState(false);
   const isFolderRef = useRef(false);
   const projectIdParam = searchParams.get("projectId");
+  const [folderDownloadSpeed, setFolderDownloadSpeed] = React.useState<number | null>(null);
   const recordIdParam = searchParams.get("recordId");
   const projectId = projectIdParam ? Number(projectIdParam) : NaN;
   const recordId = recordIdParam ? Number(recordIdParam) : NaN;
@@ -140,12 +141,24 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         (progressInfo) => {
           // Only process progress for blob downloads (non-presigned URL)
           if (isFolderRef.current) {
-            setFolderDownloadProgress(progressInfo.loaded)
-            setDownloadProgress(1)
-            setBytesDownloaded({ loaded: 1, total: 1 })
+            const now = Date.now();
+            const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
 
-          }
-          else if (!usePresignedUrl) {
+            setFolderDownloadProgress(progressInfo.loaded);
+
+            if (timeSinceLastDisplay >= 2) {
+              const bytesDownloadedSinceLastDisplay = progressInfo.loaded - lastDisplayLoaded;
+              const instantSpeed = timeSinceLastDisplay > 0 ? bytesDownloadedSinceLastDisplay / timeSinceLastDisplay : 0;
+
+              setFolderDownloadSpeed(instantSpeed);
+
+              lastDisplayUpdateTime = now;
+              lastDisplayLoaded = progressInfo.loaded;
+            }
+
+            setDownloadProgress(1);
+            setBytesDownloaded({ loaded: 1, total: 1 });
+          } else if (!usePresignedUrl) {
             const now = Date.now();
             const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
 
@@ -470,10 +483,13 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
                   {/* Folder download: show "Downloading..." with current size */}
                   {downloading && isFolder && (
-                    <div className="flex items-center gap-2 min-w-[200px]">
+                    <div className="flex items-center gap-2 min-w-[250px]">
                       <div className="loading loading-spinner loading-sm text-primary"></div>
                       <span className="text-sm text-base-content">
                         Downloading... Current Size: {formatBytes(folderDownloadProgress || 0)}
+                        {folderDownloadSpeed !== null && (
+                          <> ({formatBytes(folderDownloadSpeed)}/s)</>
+                        )}
                       </span>
                     </div>
                   )}

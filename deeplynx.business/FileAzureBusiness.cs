@@ -196,6 +196,15 @@ public class FileAzureBusiness : IFileBusiness
         var prefix = record.Uri;
         var pipe = new Pipe();
 
+        string lastFolderName = Path.GetFileName(record.Uri!.TrimEnd('/', '\\'));
+        string zipFileName = lastFolderName;
+        int underscoreIndex = lastFolderName.LastIndexOf('_');
+        if (underscoreIndex > 0)
+        {
+            zipFileName = lastFolderName.Substring(0, underscoreIndex);
+        }
+        zipFileName += ".zip";
+
         _ = Task.Run(async () =>
         {
             Exception? error = null;
@@ -209,7 +218,7 @@ public class FileAzureBusiness : IFileBusiness
                 // (large blobs, streamed by the consumer at write time).
                 // Worst-case buffered memory ~= capacity * MaxBufferedFileSize.
                 var channel = Channel.CreateBounded<(string EntryName, byte[]? Content, string? BlobName)>(
-                    new BoundedChannelOptions(16)
+                    new BoundedChannelOptions(64)
                     {
                         FullMode = BoundedChannelFullMode.Wait, // producer waits when channel is full
                         SingleReader = true,                    // only the consumer reads
@@ -305,7 +314,7 @@ public class FileAzureBusiness : IFileBusiness
 
         return new FileStreamResult(pipe.Reader.AsStream(), "application/zip")
         {
-            FileDownloadName = $"appended_file.zip",
+            FileDownloadName = zipFileName,
             EnableRangeProcessing = false
         };
     }

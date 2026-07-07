@@ -215,58 +215,21 @@ public class FileFilesystemBusiness : IFileBusiness
         if (string.IsNullOrWhiteSpace(objectStorageConfig?.MountPath))
             throw new ArgumentException("Mounted path configuration is missing");
 
-        var uriSegments = record.Uri
-            .Trim('/')
-            .Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => s.ToLowerInvariant())
-            .ToList();
-
-        int orgIndex = uriSegments.FindIndex(s => s.StartsWith("org"));
-        int projectIndex = uriSegments.FindIndex(s => s.StartsWith("project"));
-        int datasourceIndex = uriSegments.FindIndex(s => s.StartsWith("datasource"));
-
-        if (orgIndex == -1 || projectIndex == -1 || datasourceIndex == -1 ||
-            !(orgIndex < projectIndex && projectIndex < datasourceIndex))
-        {
-            throw new ArgumentException("Record URI must contain 'org_x', 'project_x', and 'datasource_x' segments in correct order.");
-        }
-
-        if (uriSegments.Count <= datasourceIndex + 1)
-        {
-            throw new ArgumentException("Record URI must specify a folder inside the datasource directory.");
-        }
-
-        int ExtractNumberSuffix(string segment, string prefix)
-        {
-            if (!segment.StartsWith(prefix))
-                throw new ArgumentException($"Expected segment starting with '{prefix}' but got '{segment}'.");
-
-            var suffix = segment.Substring(prefix.Length);
-            if (!int.TryParse(suffix, out int number))
-                throw new ArgumentException($"Segment '{segment}' does not contain a valid numeric suffix.");
-
-            return number;
-        }
-
-        int orgNum = ExtractNumberSuffix(uriSegments[orgIndex], "org_");
-        int projectNum = ExtractNumberSuffix(uriSegments[projectIndex], "project_");
-        int datasourceNum = ExtractNumberSuffix(uriSegments[datasourceIndex], "datasource_");
-
-        if (orgNum != record.OrganizationId)
-            throw new ArgumentException($"Organization ID in URI ({orgNum}) does not match record.OrganizationId ({record.OrganizationId}).");
-
-        if (projectNum != record.ProjectId)
-            throw new ArgumentException($"Project ID in URI ({projectNum}) does not match record.ProjectId ({record.ProjectId}).");
-
-        if (datasourceNum != record.DataSourceId)
-            throw new ArgumentException($"Datasource ID in URI ({datasourceNum}) does not match record.DatasourceId ({record.DataSourceId}).");
-
         var fullPath = record.Uri.StartsWith("/")
             ? record.Uri
             : "/" + record.Uri;
 
         if (!Directory.Exists(fullPath))
             throw new DirectoryNotFoundException($"Directory '{fullPath}' not found.");
+
+        string lastFolderName = Path.GetFileName(record.Uri.TrimEnd('/', '\\'));
+        string zipFileName = lastFolderName;
+        int underscoreIndex = lastFolderName.LastIndexOf('_');
+        if (underscoreIndex > 0)
+        {
+            zipFileName = lastFolderName.Substring(0, underscoreIndex);
+        }
+        zipFileName += ".zip";
 
         var pipe = new Pipe();
 
@@ -377,7 +340,7 @@ public class FileFilesystemBusiness : IFileBusiness
 
         return new FileStreamResult(pipe.Reader.AsStream(), "application/zip")
         {
-            FileDownloadName = "appended_file.zip",
+            FileDownloadName = zipFileName,
             EnableRangeProcessing = false
         };
     }
