@@ -1015,6 +1015,8 @@ export const translations = {
       ORGANIZATION_NOT_FOUND: "Organization not found",
       ORGANIZATION_OVERVIEW: "Organization Overview",
       ORGANIZATION_ROLE: "Organization Role",
+      ORGANIZATION_ROLES_AND_PERMISSIONS_DESCRIPTION:
+        "Define and manage organization-level roles and permissions. These settings propagate to all projects. The User role is seeded when an organization is created and serves as the default permission baseline for newly created roles. Create a new role when you need a custom permission set.",
       ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL:
         "Organization role permissions cannot be modified at project level.",
       ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL:
@@ -1753,7 +1755,7 @@ export const translations = {
       VIEW_AS_JSON: "View as JSON",
       VIEW_LAYOUT: "View Layout",
       VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS:
-        "View project roles and inherited organization roles. Organization roles are read-only at the project level; create a project role for project-specific permissions.",
+        "View project roles and inherited organization roles. New project roles start with permissions from the organization's seeded User role. Organization roles are read-only at the project level; create a project role for project-specific permissions.",
       VISIT: "Visit",
       VULNERABILITY_DISCLOSURE: "Click here for the Vulnerability Disclosure",
       WARNING:
@@ -2898,6 +2900,8 @@ export const translations = {
       ORGANIZATION_NOT_FOUND: "Organización no encontrada",
       ORGANIZATION_OVERVIEW: "Resumen de la organización",
       ORGANIZATION_ROLE: "Rol de la organización",
+      ORGANIZATION_ROLES_AND_PERMISSIONS_DESCRIPTION:
+        "Define y administra roles y permisos a nivel de organización. Estos ajustes se propagan a todos los proyectos. El rol Usuario se crea cuando se crea una organización y sirve como la base de permisos predeterminada para los roles nuevos. Crea un rol nuevo cuando necesites un conjunto de permisos personalizado.",
       ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL:
         "Los permisos de roles de organización no se pueden modificar a nivel de proyecto.",
       ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL:
@@ -3677,7 +3681,7 @@ export const translations = {
       VIEW_AS_JSON: "Ver como JSON",
       VIEW_LAYOUT: "Vista",
       VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS:
-        "Consulta los roles del proyecto y los roles heredados de la organización. Los roles de organización son de solo lectura a nivel de proyecto; crea un rol de proyecto para permisos específicos del proyecto.",
+        "Consulta los roles del proyecto y los roles heredados de la organización. Los roles de proyecto nuevos comienzan con los permisos del rol Usuario inicial de la organización. Los roles de organización son de solo lectura a nivel de proyecto; crea un rol de proyecto para permisos específicos del proyecto.",
       VISIT: "Visitar",
       VULNERABILITY_DISCLOSURE:
         "Haz clic aquí para la Divulgación de Vulnerabilidades",

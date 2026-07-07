@@ -576,10 +576,7 @@ const RolesAndPermissions = ({
           </button> */}
         </div>
         <p className="text-base-content/70">
-          Define and manage organization-level roles and permissions. These
-          settings propagate to all projects. The User role is seeded when an
-          organization is created and serves as the default baseline for new
-          roles; create a new role when you need a custom permission set.
+          {t.translations.ORGANIZATION_ROLES_AND_PERMISSIONS_DESCRIPTION}
         </p>
       </div>
 
