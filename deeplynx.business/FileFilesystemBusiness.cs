@@ -223,13 +223,13 @@ public class FileFilesystemBusiness : IFileBusiness
             throw new DirectoryNotFoundException($"Directory '{fullPath}' not found.");
 
         string lastFolderName = Path.GetFileName(record.Uri.TrimEnd('/', '\\'));
-        string zipFileName = lastFolderName;
+
         int underscoreIndex = lastFolderName.LastIndexOf('_');
-        if (underscoreIndex > 0)
-        {
-            zipFileName = lastFolderName.Substring(0, underscoreIndex);
-        }
-        zipFileName += ".zip";
+        string suffix = underscoreIndex >= 0 && underscoreIndex < lastFolderName.Length - 1
+            ? lastFolderName.Substring(underscoreIndex + 1)
+            : string.Empty;
+
+        string zipFileName = suffix + ".zip";
 
         var pipe = new Pipe();
 

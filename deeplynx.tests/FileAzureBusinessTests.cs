@@ -2,10 +2,21 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers.BigData;
 using deeplynx.models;
+using deeplynx.helpers.Hubs;
+using deeplynx.helpers;
 using Microsoft.AspNetCore.Http;
+using deeplynx.interfaces;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using Testcontainers.Azurite;
 using Record = deeplynx.datalayer.Models.Record;
+using Moq;
+using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.IO.Compression;
 
 namespace deeplynx.tests;
 
@@ -36,17 +47,43 @@ public class FileAzuriteFixture : IAsyncLifetime
 public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzuriteFixture>
 {
     private FileAzureBusiness _fileAzureBusiness = null!;
+    private OlapBusiness _olapBusiness = null!;
     private readonly FileAzuriteFixture _azuriteFixture;
+    private long _azureObjectStorageId;
     private string _connectionString = null!;
     private string _containerName = "test-container";
+    private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private ObjectStorageConfigDto _objectStorageConfig = null!;
+    private ClassBusiness _classBusiness = null!;
+    private TagBusiness _tagBusiness = null!;
+    private long _classId;
+    private DataSourceBusiness _dataSourceBusiness = null!;
+    private long _dataSourceId;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private EventBusiness _eventBusiness = null!;
+    private FileBusiness _fileBusiness = null!;
+    private UserBusiness _userBusiness = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
+    private RecordBusiness _recordBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
+    private ObjectStorageBusiness _objectStorageBusiness = null!;
+    private NotificationBusiness _notificationBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+
 
     // Test data IDs
     private long _oid;
     private long _pid;
     private long _dsid;
     private long _uid;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
     private long _recordId;
+    private const string CsvHeaders = "timestamp,sensor_id,value,temperature,pressure";
 
     public FileAzureBusinessTests(TestSuiteFixture fixture, FileAzuriteFixture azuriteFixture) : base(fixture)
     {
@@ -55,6 +92,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
 
     public override async Task InitializeAsync()
     {
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
 
         _connectionString = _azuriteFixture.AzuriteConnectionString;
@@ -69,7 +107,65 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             }
         };
 
+        _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _insightBusiness = new Mock<IInsightBusiness>();
+
+
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+
+        _recordBusiness = null!; // Will be initialized later after dependencies are ready
+        _eventBusiness = null!;
+        _classBusiness = null!;
+        _tagBusiness = null!;
+        _userBusiness = null!;
+        _sensitivityLabelBusiness = null!;
+        _objectStorageBusiness = null!;
+        _notificationBusiness = null!;
+
+        // Initialize dependent services in order:
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor,
+            _tagBusiness ?? new TagBusiness(Context, _eventBusiness),
+            _sensitivityLabelBusiness ?? new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness ?? new UserBusiness(Context)),
+            _sensitivityLabelService);
+
+        _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+
+        // Initialize FileBusinessFactory mocks
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+        var realFileAzureBusiness = new FileAzureBusiness();
+
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
+        _fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(realFileAzureBusiness);
+
         _fileAzureBusiness = new FileAzureBusiness();
+
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance
+        );
     }
 
     public override async Task DisposeAsync()
@@ -147,6 +243,29 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         Context.Classes.Add(testClass);
         await Context.SaveChangesAsync();
 
+
+        var azureConfig = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _azuriteFixture.AzuriteConnectionString,
+                AzureContainerName = "test-container"
+            }
+        };
+        var azureObjectStorage = new ObjectStorage
+        {
+            Name = "Azurite",
+            Type = "azure_object",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(azureConfig),
+            ProjectId = _pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _uid,
+            OrganizationId = _oid
+        };
+        Context.ObjectStorages.Add(azureObjectStorage);
+        await Context.SaveChangesAsync();
+        _azureObjectStorageId = azureObjectStorage.Id;
+
         // Create record
         var record = new Record
         {
@@ -171,13 +290,19 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
     private IFormFile CreateMockFile(string fileName, string content)
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(content);
-        var stream = new MemoryStream(bytes);
-        var formFile = new FormFile(stream, 0, bytes.Length, "file", fileName)
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
+
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
         {
             Headers = new HeaderDictionary(),
-            ContentType = "text/plain"
+            ContentType = contentType
         };
-        return formFile;
     }
 
     private async Task<bool> BlobExistsAsync(string fileName)
@@ -446,6 +571,113 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         var oldExists = await BlobExistsAsync(oldUri);
         Assert.True(oldExists);
     }
+
+    #endregion
+
+
+    #region DownloadAppendedFile Tests
+
+    [Fact]
+    public async Task UploadThenAppendThenDownload_ReturnsCombinedFile()
+    {
+        // Arrange - initial upload
+        var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
+        var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _uid, _oid, _pid, result.Id, 1, appendFile);
+
+
+        var record = await GetRecordEntity(result.Id);
+        var recordDto = MapRecordToDto(record);
+
+
+        // Act - download combined file
+        var downloadResult = await _fileAzureBusiness.DownloadAppendedFile(recordDto, _objectStorageConfig);
+
+        Assert.NotNull(downloadResult);
+        Assert.EndsWith(".zip", downloadResult.FileDownloadName);
+
+        await using var zipStream = downloadResult.FileStream;
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+
+        // Assuming the appended file is in the zip (check your implementation)
+        var entry = archive.Entries.FirstOrDefault();
+        Assert.NotNull(entry);
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_MultipleAppends_ReturnsZipWithAllFiles()
+    {
+        // Arrange
+        var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
+        var appendFile1 = CreateTestCsvFile(CsvHeaders, 3, "append1.csv");
+        var appendFile2 = CreateTestCsvFile(CsvHeaders, 2, "append2.csv");
+
+        await _olapBusiness.AppendTabularBlob(_uid, _oid, _pid, result.Id, 1, appendFile1);
+        await _olapBusiness.AppendTabularBlob(_uid, _oid, _pid, result.Id, 2, appendFile2);
+
+        var record = await GetRecordEntity(result.Id);
+        var recordDto = MapRecordToDto(record);
+
+        // Act
+        var downloadResult = await _fileAzureBusiness.DownloadAppendedFile(recordDto, _objectStorageConfig);
+
+        // Assert
+        Assert.NotNull(downloadResult);
+        Assert.EndsWith(".zip", downloadResult.FileDownloadName);
+
+        await using var zipStream = downloadResult.FileStream;
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+
+        var expectedFiles = new[] { "0.csv", "1.csv", "2.csv" };
+        var entries = archive.Entries.Select(e => e.FullName).ToList();
+
+        foreach (var expectedFile in expectedFiles)
+            Assert.Contains(expectedFile, entries);
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_InvalidRecordUri_ThrowsArgumentException()
+    {
+        // Arrange
+        var recordDto = new RecordResponseDto
+        {
+            Id = 123,
+            Uri = null,  // Invalid
+            OrganizationId = _oid,
+            ProjectId = _pid,
+            DataSourceId = _dsid,
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+        {
+            await _fileAzureBusiness.DownloadAppendedFile(recordDto, _objectStorageConfig);
+        });
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_ConcurrentDownloads_AllSucceed()
+    {
+        // Arrange
+        var recordDto = await PrepareRecordDtoWithAppendedFilesAsync();
+
+        // Act
+        var downloadTasks = Enumerable.Range(0, 5)
+            .Select(_ => _fileAzureBusiness.DownloadAppendedFile(recordDto, _objectStorageConfig))
+            .ToArray();
+
+        await Task.WhenAll(downloadTasks);
+
+        // Assert
+        foreach (var result in downloadTasks.Select(t => t.Result))
+        {
+            Assert.NotNull(result);
+            Assert.EndsWith(".zip", result.FileDownloadName);
+        }
+    }
+
 
     #endregion
 
@@ -3096,6 +3328,114 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         using var stream = new MemoryStream(content);
         await blob.UploadAsync(stream, overwrite: true);
     }
+
+    private static IFormFile CreateTestCsvFile(string content, string fileName = "test.csv")
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes);
+        stream.Position = 0;
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+    }
+
+
+    private static IFormFile CreateTestCsvFile(string headers, int rowCount, string fileName = "test.csv")
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(headers);
+        for (var i = 0; i < rowCount; i++)
+            sb.AppendLine($"2024-01-01T00:00:0{i},sensor_{i % 5},{i}.{i},{20 + i}.0,{1000 + i}.0");
+
+        return CreateTestCsvFile(sb.ToString(), fileName);
+    }
+
+
+    private async Task<RecordResponseDto> UploadAzureCsv(string headers, int rowCount, string fileName = "base.csv")
+    {
+        var file = CreateTestCsvFile(headers, rowCount, fileName);
+        return await _fileBusiness.UploadFile(
+            _uid, _oid, _pid, _dsid, _azureObjectStorageId, file);
+    }
+
+    private async Task<Record> GetRecordEntity(long recordId)
+    {
+        var record = await Context.Records.FirstOrDefaultAsync(r => r.Id == recordId);
+        Assert.NotNull(record);
+        return record!;
+    }
+
+    private RecordResponseDto MapRecordToDto(Record record)
+    {
+        if (record == null)
+            throw new ArgumentNullException(nameof(record));
+
+        return new RecordResponseDto
+        {
+            Id = record.Id,
+            Name = record.Name,
+            Description = record.Description,
+            Uri = record.Uri,
+            Properties = record.Properties ?? string.Empty,  // avoid null
+            ObjectStorageId = record.ObjectStorageId,
+            OriginalId = record.OriginalId ?? string.Empty,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedAt = record.LastUpdatedAt,
+            LastUpdatedBy = record.LastUpdatedBy,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize,
+            Embedded = record.Embedded,
+            Tags = record.Tags?.Select(t => new RecordTagDto
+            {
+                // Map properties as needed
+                Id = t.Id,
+                Name = t.Name
+            }).ToList() ?? new List<RecordTagDto>(),
+            Labels = record.Labels?.Select(l => new RecordLabelDto
+            {
+                // Map properties as needed
+                Id = l.Id,
+                Name = l.Name
+            }).ToList() ?? new List<RecordLabelDto>()
+        };
+    }
+
+    private async Task<RecordResponseDto> PrepareRecordDtoWithAppendedFilesAsync()
+    {
+        // Upload initial file
+        var result = await UploadAzureCsv(CsvHeaders, 5, "dataset.csv");
+
+        // Create append file
+        var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
+
+        // Append to the base file
+        await _olapBusiness.AppendTabularBlob(_uid, _oid, _pid, result.Id, 1, appendFile);
+
+        // Retrieve updated record entity
+        var record = await GetRecordEntity(result.Id);
+
+        // Map to DTO
+        var recordDto = new RecordResponseDto
+        {
+            Id = record.Id,
+            Name = record.Name,
+            Uri = record.Uri,
+            OrganizationId = record.OrganizationId,
+            ProjectId = record.ProjectId,
+            DataSourceId = record.DataSourceId,
+            FileType = record.FileType,
+            ObjectStorageId = _azureObjectStorageId
+        };
+
+        return recordDto;
+    }
+
 
     #endregion
 }

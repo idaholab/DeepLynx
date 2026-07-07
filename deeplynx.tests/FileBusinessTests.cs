@@ -11,6 +11,7 @@ using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -53,6 +54,7 @@ public class FileBusinessTests : IntegrationTestBase
     public long pid; // project ID
     public long uid; // user ID
     const long currentUserId = 1;
+    private const string CsvHeaders = "timestamp,sensor_id,value,temperature,pressure";
 
     public FileBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -226,7 +228,7 @@ public class FileBusinessTests : IntegrationTestBase
             ContentType = "application/octet-stream"
         };
     }
-    
+
     private async Task<Record> CreateBackfillFileRecord(
         string fileName,
         string content,
@@ -1293,6 +1295,126 @@ public class FileBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region DownloadAppendedFile Tests
+
+    [Fact]
+    public async Task DownloadAppendedFile_WorksCorrectly_WithAppendedFiles()
+    {
+        // Arrange: Prepare a record with appended files
+        var recordDto = await PrepareRecordDtoWithAppendedFilesAsync();
+
+        // Act: Call the method to download the appended file
+        var result = await _fileBusiness.DownloadAppendedFile(
+            uid, oid, pid, recordDto.Id, false, false, false, CancellationToken.None);
+
+        // Assert: Verify the file content and properties
+        Assert.NotNull(result);
+        Assert.Equal("application/zip", result.ContentType);
+
+        using var reader = new StreamReader(result.FileStream);
+        var content = await reader.ReadToEndAsync();
+        Assert.NotNull(content);
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_ThrowsInvalidOperationException_ForInvalidAppendedFile()
+    {
+        // Arrange: Upload a base file and append additional rows
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
+
+        await _olapBusiness.AppendTabularBlob(uid, oid, pid, result.Id, 1, appendFile);
+
+        var record = await GetRecordEntity(result.Id);
+
+        // Modify the record URI to an invalid value
+        record.Uri = "invalid-uri";
+
+        // Act & Assert: Expect the method to throw InvalidOperationException
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.DownloadAppendedFile(uid, oid, pid, record.Id, false, false, false));
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_ThrowsKeyNotFoundException_WhenObjectStorageIdIsNull()
+    {
+        // Arrange: Upload a base file and append a file
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
+
+        var record = await GetRecordEntity(result.Id);
+        record.ObjectStorageId = null;
+
+        // Act & Assert: Expect the method to throw KeyNotFoundException
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _fileBusiness.DownloadAppendedFile(uid, oid, pid, record.Id, false, false, false));
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_ThrowsInvalidOperationException_WhenUriOrgIdDoesNotMatchRecord()
+    {
+        // Arrange: Upload a valid appended file record
+        var record = await PrepareRecordDtoWithAppendedFilesAsync();
+
+        // Fetch the underlying record entity to modify Uri
+        var dbRecord = await GetRecordEntity(record.Id);
+
+        // Assuming object storage type is azure_object (adjust if needed)
+        dbRecord.Uri = $"org_89572359/project_{dbRecord.ProjectId}/datasource_{dbRecord.DataSourceId}/subfolder/";
+
+        // Save change to the database to simulate updated record state
+        await Context.SaveChangesAsync();
+
+        // Act & Assert: DownloadAppendedFile must throw because prefix won't match
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.DownloadAppendedFile(uid, oid, pid, dbRecord.Id, false, false, false));
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_ThrowsInvalidOperationException_WhenUriProjectIdDoesNotMatchRecord()
+    {
+        // Arrange: Upload a valid appended file record
+        var record = await PrepareRecordDtoWithAppendedFilesAsync();
+
+        // Fetch the underlying record entity to modify Uri
+        var dbRecord = await GetRecordEntity(record.Id);
+
+        // Assuming object storage type is azure_object (adjust if needed)
+        dbRecord.Uri = $"org_{dbRecord.OrganizationId}/project_5720597/datasource_{dbRecord.DataSourceId}/subfolder/";
+
+        // Save change to the database to simulate updated record state
+        await Context.SaveChangesAsync();
+
+        // Act & Assert: DownloadAppendedFile must throw because prefix won't match
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.DownloadAppendedFile(uid, oid, pid, dbRecord.Id, false, false, false));
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_ThrowsInvalidOperationException_WhenUriDatasourceIdDoesNotMatchRecord()
+    {
+        // Arrange: Upload a valid appended file record
+        var record = await PrepareRecordDtoWithAppendedFilesAsync();
+
+        // Fetch the underlying record entity to modify Uri
+        var dbRecord = await GetRecordEntity(record.Id);
+
+        // Assuming object storage type is azure_object (adjust if needed)
+        dbRecord.Uri = $"org_{dbRecord.OrganizationId}/project_{dbRecord.ProjectId}/datasource_2975023/subfolder/";
+
+        // Save change to the database to simulate updated record state
+        await Context.SaveChangesAsync();
+
+        // Act & Assert: DownloadAppendedFile must throw because prefix won't match
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.DownloadAppendedFile(uid, oid, pid, dbRecord.Id, false, false, false));
+    }
+
+
+    #endregion
+
     #region DownloadFile Tests
 
     [Fact]
@@ -1831,16 +1953,25 @@ public class FileBusinessTests : IntegrationTestBase
             Name = "Metadata",
             Description = "Description",
             OriginalId = "OriginalId",
-            Properties = new JsonObject {
-                ["property"]= new JsonObject {
-                    ["property2"]= new JsonObject {
-                        ["more nested properties"]= new JsonObject {
-                            ["one more"]= new JsonObject {
-                                ["last one"]= new JsonObject
+            Properties = new JsonObject
+            {
+                ["property"] = new JsonObject
+                {
+                    ["property2"] = new JsonObject
+                    {
+                        ["more nested properties"] = new JsonObject
+                        {
+                            ["one more"] = new JsonObject
+                            {
+                                ["last one"] = new JsonObject
                                 {
-                                    ["i was wrong"]= "this is last"
+                                    ["i was wrong"] = "this is last"
                                 }
-            }}}}}
+                            }
+                        }
+                    }
+                }
+            }
         };
 
         var request = new FileUploadInitRequestDto
@@ -1866,14 +1997,15 @@ public class FileBusinessTests : IntegrationTestBase
     public async Task StartUpload_MetadataDuplicateOriginalId_ThrowsArgumentException()
     {
         // Arrange
-        var record1 = new Record {
+        var record1 = new Record
+        {
             Name = "bob",
             Description = "record1",
             OriginalId = "OriginalId",
             DataSourceId = did,
             ProjectId = pid,
             OrganizationId = oid,
-            Properties = JsonSerializer.Serialize(new {name = "name"})
+            Properties = JsonSerializer.Serialize(new { name = "name" })
         };
         Context.Records.Add(record1);
         await Context.SaveChangesAsync();
@@ -4032,7 +4164,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(Encoding.UTF8.GetBytes(content1).Length, after1.FileSize);
         Assert.Equal(Encoding.UTF8.GetBytes(content2).Length, after2.FileSize);
     }
-    
+
     // Verifies that invalid batch sizes are rejected before any backfill work starts.
     [Fact]
     public async Task BackfillFileSizes_ThrowsException_WhenBatchSizeIsZeroOrNegative()
@@ -4124,7 +4256,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         var updatedCount = Context.Records
             .Count(r => recordIds.Contains(r.Id) && r.FileSize != null);
-        
+
         var remainingCount = Context.Records
             .Count(r => recordIds.Contains(r.Id) && r.FileSize == null);
 
@@ -4149,7 +4281,7 @@ public class FileBusinessTests : IntegrationTestBase
             "missing-backfill-file.txt",
             "missing content",
             osid);
-        
+
         var secondGoodRecord = await CreateBackfillFileRecord(
             "second-good-backfill-file.txt",
             "second good content",
@@ -4167,7 +4299,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(2, result.Updated);
         Assert.Equal(1, result.Failed);
         Assert.Equal(secondGoodRecord.Id, result.LastRecordId);
-        
+
         Assert.NotNull(firstGoodAfter!.FileSize);
         Assert.Null(badAfter!.FileSize);
         Assert.NotNull(secondGoodAfter!.FileSize);
@@ -4242,7 +4374,7 @@ public class FileBusinessTests : IntegrationTestBase
         await _fileBusiness.BackfillFileSizes(oid, pid);
 
         var cachedValue = await CacheService.Instance.GetAsync<long?>(cacheKey);
-        
+
         Assert.Null(cachedValue);
     }
 
@@ -4276,23 +4408,23 @@ public class FileBusinessTests : IntegrationTestBase
 
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
-        
+
         var result = await _fileBusiness.BackfillFileSizes(oid, pid);
-        
+
         var updated = await Context.Records.FindAsync(record.Id);
-        
+
         Assert.Equal(1, result.Processed);
         Assert.Equal(1, result.Updated);
         Assert.Equal(0, result.Failed);
-        
+
         Assert.NotNull(updated!.FileSize);
         Assert.Equal(
             Encoding.UTF8.GetBytes("legacy content").Length,
             updated.FileSize);
     }
-    
+
     #endregion
-    
+
     #region CreateUploadTus Tests
 
     [Fact]
@@ -4330,7 +4462,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.True(Directory.Exists(uploadPath));
     }
     #endregion
-    
+
     #region GetUploadOffset Tests
 
     [Fact]
@@ -5011,7 +5143,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 uploadId,
-                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
             Times.Once);
 
         var createdRecord = Context.Records
@@ -5122,7 +5254,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 uploadId,
-                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
             Times.Once);
 
         var createdRecord = Context.Records
@@ -5233,7 +5365,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 uploadId,
-                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
             Times.Once);
 
         var createdRecord = Context.Records
@@ -5345,7 +5477,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 uploadId,
-                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
             Times.Once);
 
         var createdRecord = Context.Records
@@ -5669,7 +5801,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 uploadId,
-                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
             Times.Once);
 
         var createdRecord = Context.Records
@@ -5682,5 +5814,119 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(fileClass.Id, createdRecord.ClassId);
     }
     #endregion
+
+    private static IFormFile CreateTestCsvFile(string content, string fileName = "test.csv")
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes);
+        stream.Position = 0;
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+    }
+
+
+    private static IFormFile CreateTestCsvFile(string headers, int rowCount, string fileName = "test.csv")
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(headers);
+        for (var i = 0; i < rowCount; i++)
+            sb.AppendLine($"2024-01-01T00:00:0{i},sensor_{i % 5},{i}.{i},{20 + i}.0,{1000 + i}.0");
+
+        return CreateTestCsvFile(sb.ToString(), fileName);
+    }
+
+
+    private async Task<RecordResponseDto> UploadAzureCsv(string headers, int rowCount, string fileName = "base.csv")
+    {
+        var file = CreateTestCsvFile(headers, rowCount, fileName);
+        return await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, file);
+    }
+
+    private async Task<Record> GetRecordEntity(long recordId)
+    {
+        var record = await Context.Records.FirstOrDefaultAsync(r => r.Id == recordId);
+        Assert.NotNull(record);
+        return record!;
+    }
+
+    private RecordResponseDto MapRecordToDto(Record record)
+    {
+        if (record == null)
+            throw new ArgumentNullException(nameof(record));
+
+        return new RecordResponseDto
+        {
+            Id = record.Id,
+            Name = record.Name,
+            Description = record.Description,
+            Uri = record.Uri,
+            Properties = record.Properties ?? string.Empty,  // avoid null
+            ObjectStorageId = record.ObjectStorageId,
+            OriginalId = record.OriginalId ?? string.Empty,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedAt = record.LastUpdatedAt,
+            LastUpdatedBy = record.LastUpdatedBy,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize,
+            Embedded = record.Embedded,
+            Tags = record.Tags?.Select(t => new RecordTagDto
+            {
+                // Map properties as needed
+                Id = t.Id,
+                Name = t.Name
+            }).ToList() ?? new List<RecordTagDto>(),
+            Labels = record.Labels?.Select(l => new RecordLabelDto
+            {
+                // Map properties as needed
+                Id = l.Id,
+                Name = l.Name
+            }).ToList() ?? new List<RecordLabelDto>()
+        };
+    }
+
+    private async Task<RecordResponseDto> UploadFilesystemCsv(string headers, int rowCount, string fileName = "base.csv")
+    {
+        var file = CreateTestCsvFile(headers, rowCount, fileName);
+        return await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, file);
+    }
+
+    private async Task<RecordResponseDto> PrepareRecordDtoWithAppendedFilesAsync()
+    {
+        // Upload initial file
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        // Create append file
+        var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
+
+        // Append to the base file
+        await _olapBusiness.AppendTabularBlob(uid, oid, pid, result.Id, 1, appendFile);
+
+        // Retrieve updated record entity
+        var record = await GetRecordEntity(result.Id);
+
+        // Map to DTO
+        var recordDto = new RecordResponseDto
+        {
+            Id = record.Id,
+            Name = record.Name,
+            Uri = record.Uri,
+            OrganizationId = record.OrganizationId,
+            ProjectId = record.ProjectId,
+            DataSourceId = record.DataSourceId,
+            FileType = record.FileType,
+            ObjectStorageId = osid
+        };
+
+        return recordDto;
+    }
 
 }
