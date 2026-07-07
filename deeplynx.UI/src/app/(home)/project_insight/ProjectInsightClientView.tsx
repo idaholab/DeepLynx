@@ -528,6 +528,7 @@ export default function ProjectInsightClientView() {
 
   // UI event handlers
   async function handleQueueSelected() {
+    if (isInsightUnavailable) return;
     if (selectedVisiblePendingIds.length === 0) return;
     if (!organizationId || !projectId) return;
 
@@ -669,7 +670,7 @@ export default function ProjectInsightClientView() {
               type="button"
               className="btn btn-sm btn-primary"
               onClick={() => void handleQueueSelected()}
-              disabled={selectedVisiblePendingIds.length === 0 || isQueueing}
+              disabled={isInsightUnavailable || selectedVisiblePendingIds.length === 0 || isQueueing}
             >
               {isQueueing
                 ? t.translations.UPLOADING

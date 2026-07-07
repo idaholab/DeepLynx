@@ -382,6 +382,11 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   }
 
   async function handleQueueUpload() {
+    if (isInsightUnavailable) {
+      setIngestionState("error");
+      return;
+    }
+    
     if (!organizationId || !projectId || !recordId) {
       setIngestionState("error");
       return;
@@ -469,7 +474,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
             onClick={() => {
               void handleQueueUpload();
             }}
-            disabled={isQueueingUpload || isResponding}
+            disabled={isInsightUnavailable || isQueueingUpload || isResponding}
           >
             <CloudArrowUpIcon className="size-5" />
             {isQueueingUpload
