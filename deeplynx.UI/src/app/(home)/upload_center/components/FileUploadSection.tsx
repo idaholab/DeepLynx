@@ -121,7 +121,7 @@ export default function FileUploadSection({
             key={cardKeys[index]}
             defaultName={file.name}
             fileIndex={index}
-            disableMetadataFile={file.size > CHUNK_THRESHOLD}
+            disableMetadataFile={false}
             onMetadataChange={handleMetadataChange}
             onRemove={() => onRemoveAt(index)}
             availableFiles={availableFiles}
