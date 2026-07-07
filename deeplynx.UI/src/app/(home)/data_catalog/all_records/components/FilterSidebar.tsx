@@ -10,7 +10,7 @@ import { RecordTableRow } from "@/app/(home)/types/types";
  */
 export type RecordStatusFilter = "all" | "active" | "archived";
 
-type FacetOption = { label: string; count: number };
+type FacetOption = { label: string; count?: number };
 
 /**
  * Why projectScopedRecords is passed instead of just pre-computed counts:
@@ -25,7 +25,7 @@ type FacetOption = { label: string; count: number };
  * because the parent controls FACET_LIMIT and the search query state.
  */
 type Props = {
-  projectScopedRecords: RecordTableRow[];
+  projectScopedRecords?: RecordTableRow[];
   statusFilter: RecordStatusFilter;
   onStatusFilterChange: (value: RecordStatusFilter) => void;
   selectedClassFilters: string[];
@@ -79,22 +79,21 @@ export default function FilterSidebar({
 }: Props) {
   const { t } = useLanguage();
 
-  // Counts are computed here from projectScopedRecords (see Props comment above).
   const statusOptions = [
     {
       label: t.translations.ALL,
       value: "all" as const,
-      count: projectScopedRecords.length,
+      count: projectScopedRecords?.length,
     },
     {
       label: t.translations.ACTIVE,
       value: "active" as const,
-      count: projectScopedRecords.filter((r) => !r.isArchived).length,
+      count: projectScopedRecords?.filter((r) => !r.isArchived).length,
     },
     {
       label: t.translations.ARCHIVED_BADGE,
       value: "archived" as const,
-      count: projectScopedRecords.filter((r) => r.isArchived).length,
+      count: projectScopedRecords?.filter((r) => r.isArchived).length,
     },
   ];
 
@@ -147,9 +146,11 @@ export default function FilterSidebar({
                       />
                       {option.label}
                     </span>
-                    <span className="text-xs text-base-content/50">
-                      {option.count}
-                    </span>
+                    {option.count !== undefined && (
+                      <span className="text-xs text-base-content/50">
+                        {option.count}
+                      </span>
+                    )}
                   </label>
                 ))}
               </div>
@@ -191,9 +192,11 @@ export default function FilterSidebar({
                       />
                       <span className="truncate">{option.label}</span>
                     </span>
-                    <span className="text-xs text-base-content/50">
-                      {option.count}
-                    </span>
+                    {option.count !== undefined && (
+                      <span className="text-xs text-base-content/50">
+                        {option.count}
+                      </span>
+                    )}
                   </label>
                 ))}
               </div>
@@ -239,9 +242,11 @@ export default function FilterSidebar({
                         />
                         <span className="truncate">{option.label}</span>
                       </span>
-                      <span className="text-xs text-base-content/50">
-                        {option.count}
-                      </span>
+                      {option.count !== undefined && (
+                        <span className="text-xs text-base-content/50">
+                          {option.count}
+                        </span>
+                      )}
                     </label>
                   ))
                 )}
