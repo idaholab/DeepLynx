@@ -300,7 +300,7 @@ public class FileFilesystemBusiness : IFileBusiness
                             Directory.EnumerateFiles(fullPath, "*", SearchOption.AllDirectories),
                             new ParallelOptions
                             {
-                                MaxDegreeOfParallelism = Environment.ProcessorCount,
+                                MaxDegreeOfParallelism = 32,
                                 CancellationToken = cancellationToken
                             },
                             async (filePath, ct) =>
