@@ -13,6 +13,7 @@ import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 import { getAllDataSources } from "@/app/lib/client_service/data_source_services.client";
 import {
+  fetchInsightEndpointHealth,
   fetchInsightIngestionStatus,
   queueInsightUpload,
 } from "@/app/lib/client_service/insight_services.client";
@@ -186,6 +187,41 @@ export default function ProjectInsightClientView() {
             ]),
           ),
         );
+        
+        const unavailableStatuses = Object.fromEntries(
+            supportedRecords.map((record) => [
+                record.id,
+              {
+                state: "error",
+                error: "Insight unavailable",
+              } satisfies ProjectInsightStatus,
+            ]),
+        );
+        
+        try {
+          const health = await fetchInsightEndpointHealth({
+            organizationId,
+            projectId,
+            modelConfigId: selectedInsightModels.embeddingModelConfigId,
+            modelType: "embedding",
+          });
+          
+          if (!health.reachable || !health.model_available) {
+            if (cancelled) return;
+            
+            setIsInsightUnavailable(true);
+            setStatusMap(unavailableStatuses);
+            return;
+          }
+        } catch {
+          if (cancelled) return;
+          
+          setIsInsightUnavailable(true);
+          setStatusMap(unavailableStatuses);
+          return;
+        }
+        
+        setIsInsightUnavailable(false);
 
         const resolvedStatuses = await Promise.all(
           supportedRecords.map(async (record) => {
@@ -195,10 +231,6 @@ export default function ProjectInsightClientView() {
                 projectId,
                 fileId: record.id,
               });
-
-              if (ingestionStatus.available === false) {
-                setIsInsightUnavailable(true);
-              }
               
               return [
                 record.id,
@@ -243,6 +275,7 @@ export default function ProjectInsightClientView() {
     hasProjectLoaded,
     organizationId,
     projectId,
+    selectedInsightModels.embeddingModelConfigId,
     t.translations.PROJECT_INSIGHT_LOADING_RECORDS,
   ]);
 
@@ -302,7 +335,7 @@ export default function ProjectInsightClientView() {
   ]);
 
   useEffect(() => {
-    if (!organizationId || !projectId || !pollingKey) return;
+    if (!organizationId || !projectId || !pollingKey || isInsightUnavailable) return;
 
     const pollingIds = pollingKey.split(",").map(Number);
 
@@ -366,7 +399,7 @@ export default function ProjectInsightClientView() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [organizationId, projectId, pollingKey]);
+  }, [organizationId, projectId, pollingKey, isInsightUnavailable]);
 
   useEffect(() => {
     setSelectedPendingIds((current) =>
@@ -716,7 +749,7 @@ export default function ProjectInsightClientView() {
                 <BetaBadge size="sm" />
                 {isInsightUnavailable && (
                     <span className="badge badge-warning badge-sm">
-                      Insight service unavailable
+                      Insight unavailable
                     </span>
                 )}
               </div>
