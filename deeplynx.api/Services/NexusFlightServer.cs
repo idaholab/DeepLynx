@@ -25,43 +25,36 @@ public class NexusFlightServer : FlightServer
             long rowsReceived = 0;
             int batchesReceived = 0;
 
-            bool firstRow = true;
+            var expectedColumnCount = schema.FieldsList.Count;
 
             while (await requestStream.MoveNext(context.CancellationToken))
             {
                 var batch = requestStream.Current;
 
-                ValidateBatch(batch, schema);
 
-                if (firstRow)
+                if (batch is null || batch.ColumnCount != expectedColumnCount)
                 {
-                    var preview = BuildBatchPreview(schema, batch);
-
-                    Console.WriteLine("Schema:");
-                    Console.WriteLine(preview.SchemaDisplay);
-
-                    Console.WriteLine("First row sample:");
-                    Console.WriteLine(preview.FirstRowDisplay);
-
-                    firstRow = false;
+                    throw new RpcException(new Status(
+                        StatusCode.InvalidArgument,
+                        $"Expected batch with {expectedColumnCount} columns, got {batch?.ColumnCount.ToString() ?? "null batch"}."));
                 }
+
 
                 rowsReceived += batch.Length;
                 batchesReceived++;
 
                 //temporary status hardcode for now
-                string status = "ok";
+                string status = "not_persisted";
 
                 var result = BuildPutAck(
                         status,
                         target,
                         rowsReceived);
-
+                //per-batch acks are temporary until the storage/checkpointing ticket defines final ack semantics
                 await responseStream.WriteAsync(result);
+
+                //TODO: Add a durable sink for the recieved. Persistance is per batch/checkpoint. 
             }
-
-
-            //commit upload to storage here
         }
         catch (Exception ex)
         {
@@ -127,81 +120,6 @@ public class NexusFlightServer : FlightServer
         }
     }
 
-    private void ValidateBatch(RecordBatch batch, Schema expectedSchema)
-    {
-        if (batch == null)
-        {
-            throw new RpcException(
-                new Status(StatusCode.InvalidArgument, "Record batch is required"));
-        }
-
-        if (expectedSchema == null)
-        {
-            throw new RpcException(
-                new Status(StatusCode.InvalidArgument, "Expected schema is required"));
-        }
-
-        if (batch.Schema == null)
-        {
-            throw new RpcException(
-                new Status(StatusCode.InvalidArgument, "Record batch is missing a schema"));
-        }
-
-        if (batch.ColumnCount != expectedSchema.FieldsList.Count)
-        {
-            throw new RpcException(
-                new Status(
-                    StatusCode.InvalidArgument,
-                    $"Record batch has {batch.ColumnCount} columns, but schema has {expectedSchema.FieldsList.Count} fields"));
-        }
-
-        for (var i = 0; i < expectedSchema.FieldsList.Count; i++)
-        {
-            var expectedField = expectedSchema.FieldsList[i];
-            var actualField = batch.Schema.FieldsList[i];
-
-            if (!string.Equals(actualField.Name, expectedField.Name, StringComparison.Ordinal))
-            {
-                throw new RpcException(
-                    new Status(
-                        StatusCode.InvalidArgument,
-                        $"Field {i} name mismatch. Expected '{expectedField.Name}', received '{actualField.Name}'"));
-            }
-
-            if (actualField.IsNullable != expectedField.IsNullable)
-            {
-                throw new RpcException(
-                    new Status(
-                        StatusCode.InvalidArgument,
-                        $"Field '{expectedField.Name}' nullability does not match"));
-            }
-
-            if (actualField.DataType == null || expectedField.DataType == null)
-            {
-                throw new RpcException(
-                    new Status(
-                        StatusCode.InvalidArgument,
-                        $"Field '{expectedField.Name}' is missing a data type"));
-            }
-
-            if (actualField.DataType.TypeId != expectedField.DataType.TypeId)
-            {
-                throw new RpcException(
-                    new Status(
-                        StatusCode.InvalidArgument,
-                        $"Field '{expectedField.Name}' type mismatch. Expected '{expectedField.DataType.Name}', received '{actualField.DataType.Name}'"));
-            }
-
-            if (!string.Equals(actualField.DataType.Name, expectedField.DataType.Name, StringComparison.Ordinal))
-            {
-                throw new RpcException(
-                    new Status(
-                        StatusCode.InvalidArgument,
-                        $"Field '{expectedField.Name}' type name mismatch. Expected '{expectedField.DataType.Name}', received '{actualField.DataType.Name}'"));
-            }
-        }
-    }
-
     private FlightPutResult BuildPutAck(
         string status,
         string target,
@@ -236,42 +154,5 @@ public class NexusFlightServer : FlightServer
             new Status(
                 StatusCode.Internal,
                 $"DoPut failed: {exception.Message}"));
-    }
-
-    //temporary schema and first row sample
-    private static (string SchemaDisplay, string FirstRowDisplay) BuildBatchPreview(
-        Schema schema,
-        RecordBatch batch)
-    {
-        string schemaDisplay = "";
-        string firstRowDisplay = "";
-
-        for (int i = 0; i < schema.FieldsList.Count; i++)
-        {
-            var field = schema.FieldsList[i];
-
-            schemaDisplay += $"{field.Name}: {field.DataType.Name}";
-
-            if (i < schema.FieldsList.Count - 1)
-            {
-                schemaDisplay += ", ";
-            }
-        }
-
-        for (int i = 0; i < batch.ColumnCount; i++)
-        {
-            var field = schema.FieldsList[i];
-            var column = (StringArray)batch.Arrays.ElementAt(i);
-            var value = column.GetString(0) ?? "null";
-
-            firstRowDisplay += $"{field.Name}={value}";
-
-            if (i < batch.ColumnCount - 1)
-            {
-                firstRowDisplay += ", ";
-            }
-        }
-
-        return (schemaDisplay, firstRowDisplay);
     }
 }
