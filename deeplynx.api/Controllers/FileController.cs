@@ -135,7 +135,10 @@ public class FileController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var fileStreamResult = await _fileBusiness.DownloadFile(currentUserId, organizationId, projectId, recordId);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var fileStreamResult = await _fileBusiness.DownloadFile(currentUserId, organizationId, projectId, recordId, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return fileStreamResult;
         }
         catch (Exception exc)
@@ -225,7 +228,7 @@ public class FileController : ControllerBase
         try
         {
             var uploadSession = await _fileBusiness.StartUpload(
-                organizationId, projectId, dataSourceId, objectStorageId, request);
+                organizationId, projectId, dataSourceId, objectStorageId, request, request.Metadata);
             return Ok(uploadSession);
         }
         catch (Exception exc)

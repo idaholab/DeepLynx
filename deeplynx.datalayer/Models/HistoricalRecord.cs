@@ -75,6 +75,9 @@ public partial class HistoricalRecord
     
     [Column("file_size")]
     public long? FileSize { get; set; }
+    
+    [Column("file_content_hash")]
+    public string? FileContentHash { get; set; }
 
     [ForeignKey("RecordId")]
     [InverseProperty("HistoricalRecords")]
@@ -87,4 +90,7 @@ public partial class HistoricalRecord
     [ForeignKey("OrganizationId")]
     [InverseProperty("HistoricalRecords")]
     public virtual Organization Organization { get; set; } = null!;
+    
+    [InverseProperty("HistoricalRecord")]
+    public virtual ICollection<ProvenanceRecord> ProvenanceRecords { get; set; }
 }

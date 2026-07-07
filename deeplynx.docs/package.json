@@ -20,10 +20,10 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "next": "^16.2.6",
+    "next": "^16.2.10",
     "nextra": "4.4.0",
     "nextra-theme-docs": "4.4.0",
-    "react": "19.1.5",
-    "react-dom": "19.1.5"
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
   }
 }

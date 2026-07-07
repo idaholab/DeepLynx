@@ -209,6 +209,56 @@ public class InsightBusiness : IInsightBusiness
     }
 
     /// <summary>
+    ///     Checks the health of the requested model endpoint using the resolved model configuration.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
+    /// <param name="organizationId">The ID of the organization. Used to scope model configuration resolution.</param>
+    /// <param name="projectId">The ID of the project. Project-level model configurations take priority over organization-level defaults.</param>
+    /// <param name="modelConfigId">The model configuration ID to validate.</param>
+    /// <param name="modelType">The model type string used when falling back to the default (e.g. "llm", "vlm", or "embedding").</param>
+    /// <returns>
+    ///     Returns the endpoint health result, including endpoint reachability,
+    ///     model availability, latency, optional model metadata, and
+    ///     details returned by the Insight service.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">Thrown when the specified model type is invalid.</exception>
+    public async Task<InsightEndpointHealthResponseDto> CheckEndpointHealth(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long modelConfigId,
+        string modelType)
+    {
+        var normalizedModelType = modelType.Trim().ToLowerInvariant();
+
+        if (normalizedModelType is not ("llm" or "vlm" or "embedding"))
+            throw new InvalidOperationException(
+                "modelType must be one of: llm, vlm, embedding.");
+
+        var config = await ResolveModelConfig(
+            currentUserId,
+            organizationId,
+            projectId,
+            modelConfigId,
+            normalizedModelType);
+
+        if (!string.Equals(config.ModelType, normalizedModelType, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Model configuration {config.Id} is type '{config.ModelType}' but '{normalizedModelType}' was requested.");
+        }
+
+        var request = new InsightEndpointHealthRequestDto
+        {
+            ServerUrl = config.ServerUrl,
+            ModelName = config.ModelName,
+            AuthToken = config.Token
+        };
+
+        return await _insightServiceClient.EndpointHealth(request);
+    }
+
+    /// <summary>
     ///     Returns whether the given file type is supported for embedding by Insight.
     ///     Check is case-insensitive.
     /// </summary>

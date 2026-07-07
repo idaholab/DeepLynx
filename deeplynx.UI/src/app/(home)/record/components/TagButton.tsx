@@ -29,6 +29,7 @@ const TagButton: React.FC<TagButtonProps> = ({
   selectedIds,
   setTags,
   setSelectedTags,
+  setSelectedIds,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -66,32 +67,35 @@ const TagButton: React.FC<TagButtonProps> = ({
   }, []);
 
   const toggleTag = async (id: string) => {
-    let newSelectionIds: string[];
+    if (!organization?.organizationId) return;
 
-    if (tempSelectedIds.map(String).includes(id)) {
-      newSelectionIds = tempSelectedIds
-        .map(String)
-        .filter((selectedId) => selectedId !== id);
-      await unattachTagFromRecord(
-        organization?.organizationId as number,
-        projectId,
-        recordId,
-        Number(id),
-      );
-    } else {
-      newSelectionIds = [...tempSelectedIds.map(String), id];
-      try {
-        await attachTagToRecord(
-          organization?.organizationId as number,
+    const isSelected = tempSelectedIds.map(String).includes(id);
+    const newSelectionIds = isSelected ? tempSelectedIds.map(String).filter((selectedId) => selectedId !== id)
+      : [...tempSelectedIds.map(String), id];
+
+    try {
+      if (isSelected) {
+        await unattachTagFromRecord(
+          organization.organizationId as number,
           projectId,
           recordId,
           Number(id),
         );
-      } catch (error) {
-        console.error("Error attaching tag to record:", error);
+      } else {
+        await attachTagToRecord(
+          organization.organizationId as number,
+          projectId,
+          recordId,
+          Number(id),
+        );
       }
+    } catch (error) {
+      console.error("Error attaching tag to record:", error);
+      return;
     }
+
     setTempSelectedIds(newSelectionIds);
+    setSelectedIds(newSelectionIds);
 
     if (onSelectionChange) {
       onSelectionChange(newSelectionIds);
@@ -117,9 +121,12 @@ const TagButton: React.FC<TagButtonProps> = ({
         newTag.id.toString(),
       ];
       setTempSelectedIds(newSelectionIds);
+      setSelectedIds(newSelectionIds);
 
       // Directly update selectedTags in parent
       setSelectedTags((prevSelectedTags) => [...prevSelectedTags, newTag]);
+
+      if (onSelectionChange) onSelectionChange(newSelectionIds);
 
       toast.success(
         `${t.translations.TAG_} "${newTag.name}" ${t.translations.CREATED_AND_ATTACHED}`,

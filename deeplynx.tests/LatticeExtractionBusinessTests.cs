@@ -436,28 +436,6 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetEmbeddingStatus_ReturnsMinimumTargets_WhenOnlyDefaultClassesExist()
-    {
-        var proj = new Project { Name = "Default Schema Status Proj", OrganizationId = oid, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
-        Context.Projects.Add(proj);
-        await Context.SaveChangesAsync();
-
-        Context.Classes.AddRange(
-            new Class { Name = "File", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid },
-            new Class { Name = "Report", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid },
-            new Class { Name = "Timeseries", ProjectId = proj.Id, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid });
-        await Context.SaveChangesAsync();
-
-        var result = await _business.GetEmbeddingStatus(proj.Id);
-
-        Assert.Equal(2, result.ClassCount);
-        Assert.Equal(0, result.EmbeddedClassCount);
-        Assert.Equal(1, result.RelationshipCount);
-        Assert.Equal(0, result.EmbeddedRelationshipCount);
-        Assert.False(result.OntologyReady);
-    }
-
-    [Fact]
     public async Task GetEmbeddingStatus_ReturnsOntologyReady_WhenRequiredSchemaIsEmbedded()
     {
         // OntologyVector.Vector is typed as string in the model but the DB column is
@@ -473,38 +451,6 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         var result = await _business.GetEmbeddingStatus(pid);
 
         Assert.Equal(2, result.EmbeddedClassCount);
-        Assert.Equal(1, result.EmbeddedRelationshipCount);
-        Assert.True(result.OntologyReady);
-    }
-
-    [Fact]
-    public async Task GetEmbeddingStatus_CapsReadinessCountsAtRequiredSchemaMinimum()
-    {
-        var c3 = new Class { Name = "Aircraft", ProjectId = pid, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
-        var c4 = new Class { Name = "Mission", ProjectId = pid, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
-        Context.Classes.AddRange(c3, c4);
-        await Context.SaveChangesAsync();
-
-        var rel2 = new Relationship { Name = "supports", OriginId = c3.Id, DestinationId = c4.Id, ProjectId = pid, OrganizationId = oid, IsArchived = false, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid };
-        Context.Relationships.Add(rel2);
-        await Context.SaveChangesAsync();
-
-        await Context.Database.ExecuteSqlRawAsync(
-            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid1);
-        await Context.Database.ExecuteSqlRawAsync(
-            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", cid2);
-        await Context.Database.ExecuteSqlRawAsync(
-            "INSERT INTO dl_vector.ontology_vector (class_id, vector) VALUES ({0}, '[0]')", c3.Id);
-        await Context.Database.ExecuteSqlRawAsync(
-            "INSERT INTO dl_vector.ontology_vector (relationship_id, vector) VALUES ({0}, '[0]')", relid1);
-        await Context.Database.ExecuteSqlRawAsync(
-            "INSERT INTO dl_vector.ontology_vector (relationship_id, vector) VALUES ({0}, '[0]')", rel2.Id);
-
-        var result = await _business.GetEmbeddingStatus(pid);
-
-        Assert.Equal(2, result.ClassCount);
-        Assert.Equal(2, result.EmbeddedClassCount);
-        Assert.Equal(1, result.RelationshipCount);
         Assert.Equal(1, result.EmbeddedRelationshipCount);
         Assert.True(result.OntologyReady);
     }

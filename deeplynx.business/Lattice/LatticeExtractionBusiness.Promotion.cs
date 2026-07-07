@@ -1,9 +1,8 @@
+using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using System.Text.Json.Nodes;
 
 namespace deeplynx.business;
 
@@ -22,21 +21,19 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             List<ExtractionEdge> stagingEdges)
     {
         if (request.RejectAllRemaining)
-        {
             return (
                 stagingClasses.Where(ClassPending).Select(c => c.Id).ToHashSet(),
                 stagingRecords.Where(RecordPending).Select(r => r.Id).ToHashSet(),
                 stagingRelationships.Where(RelPending).Select(r => r.Id).ToHashSet(),
                 stagingEdges.Where(EdgePending).Select(e => e.Id).ToHashSet()
             );
-        }
 
-        var classIds = request.ClassIds.ToHashSet();
-        var recordIds = request.RecordIds.ToHashSet();
-        var relIds = request.RelationshipIds.ToHashSet();
-        var edgeIds = request.EdgeIds.ToHashSet();
+        var recordIds = (request.RecordIds ?? []).ToHashSet();
+        var classIds = (request.ClassIds ?? []).ToHashSet();
+        var relIds = (request.RelationshipIds ?? []).ToHashSet();
+        var edgeIds = (request.EdgeIds ?? []).ToHashSet();
+        var byStatus = (request.RejectByStatus ?? []).ToHashSet();
 
-        var byStatus = request.RejectByStatus.ToHashSet();
         if (byStatus.Count > 0)
         {
             foreach (var c in stagingClasses.Where(c => ClassPending(c) && byStatus.Contains(c.ValidationStatus!)))
@@ -73,7 +70,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var reqEdges = new HashSet<long>(rejectEdgeIds);
 
         foreach (var r in stagingRecords.Where(RecordPending))
-            if (rejectClassIds.Contains(r.ExtractionClassId)) reqRecords.Add(r.Id);
+            if (rejectClassIds.Contains(r.ExtractionClassId))
+                reqRecords.Add(r.Id);
         foreach (var r in stagingRelationships.Where(RelPending))
             if (rejectClassIds.Contains(r.OriginClassId) || rejectClassIds.Contains(r.DestinationClassId))
                 reqRels.Add(r.Id);
@@ -116,13 +114,17 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var bulkStatuses = approveByStatus.ToHashSet();
         if (bulkStatuses.Count == 0) return;
 
-        foreach (var c in stagingClasses.Where(c => !c.PromotedId.HasValue && !c.Rejected && bulkStatuses.Contains(c.ValidationStatus!)))
+        foreach (var c in stagingClasses.Where(c =>
+                     !c.PromotedId.HasValue && !c.Rejected && bulkStatuses.Contains(c.ValidationStatus!)))
             selectedClassIds.Add(c.Id);
-        foreach (var r in stagingRecords.Where(r => !r.PromotedId.HasValue && !r.Rejected && bulkStatuses.Contains(r.ValidationStatus!)))
+        foreach (var r in stagingRecords.Where(r =>
+                     !r.PromotedId.HasValue && !r.Rejected && bulkStatuses.Contains(r.ValidationStatus!)))
             selectedRecordIds.Add(r.Id);
-        foreach (var r in stagingRelationships.Where(r => !r.PromotedId.HasValue && !r.Rejected && bulkStatuses.Contains(r.ValidationStatus!)))
+        foreach (var r in stagingRelationships.Where(r =>
+                     !r.PromotedId.HasValue && !r.Rejected && bulkStatuses.Contains(r.ValidationStatus!)))
             selectedRelIds.Add(r.Id);
-        foreach (var e in stagingEdges.Where(e => !e.PromotedId.HasValue && !e.Rejected && bulkStatuses.Contains(e.ValidationStatus!)))
+        foreach (var e in stagingEdges.Where(e =>
+                     !e.PromotedId.HasValue && !e.Rejected && bulkStatuses.Contains(e.ValidationStatus!)))
             selectedEdgeIds.Add(e.Id);
     }
 
@@ -176,15 +178,23 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var relById = stagingRelationships.ToDictionary(r => r.Id);
         var edgeById = stagingEdges.ToDictionary(e => e.Id);
 
-        bool ClassSatisfied(long id) =>
-            classById.TryGetValue(id, out var c) && !c.Rejected &&
-            (c.OntologyClassId.HasValue || c.PromotedId.HasValue || selectedClassIds.Contains(id));
-        bool RecordSatisfied(long id) =>
-            recordById.TryGetValue(id, out var r) && !r.Rejected &&
-            (r.PromotedId.HasValue || selectedRecordIds.Contains(id));
-        bool RelSatisfied(long id) =>
-            relById.TryGetValue(id, out var r) && !r.Rejected &&
-            (r.OntologyRelationshipId.HasValue || r.PromotedId.HasValue || selectedRelIds.Contains(id));
+        bool ClassSatisfied(long id)
+        {
+            return classById.TryGetValue(id, out var c) && !c.Rejected &&
+                   (c.OntologyClassId.HasValue || c.PromotedId.HasValue || selectedClassIds.Contains(id));
+        }
+
+        bool RecordSatisfied(long id)
+        {
+            return recordById.TryGetValue(id, out var r) && !r.Rejected &&
+                   (r.PromotedId.HasValue || selectedRecordIds.Contains(id));
+        }
+
+        bool RelSatisfied(long id)
+        {
+            return relById.TryGetValue(id, out var r) && !r.Rejected &&
+                   (r.OntologyRelationshipId.HasValue || r.PromotedId.HasValue || selectedRelIds.Contains(id));
+        }
 
         var errors = new List<string>();
 
@@ -206,7 +216,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             if (!RecordSatisfied(edge.DestinationRecordId)) missing.Add("destination record");
             if (!RelSatisfied(edge.ExtractionRelationshipId)) missing.Add("relationship");
             if (missing.Count > 0)
-                errors.Add($"Edge (id {id}) requires its {string.Join(", ", missing)} to be approved or already promoted.");
+                errors.Add(
+                    $"Edge (id {id}) requires its {string.Join(", ", missing)} to be approved or already promoted.");
         }
 
         if (errors.Count > 0)
@@ -226,7 +237,6 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long organizationId, long projectId, long extractionId,
         long currentUserId, DateTime now)
     {
-
         var pendingIds = stagingClasses
             .Where(c => c.PromotedId.HasValue && c.OntologyClassId == null)
             .Select(c => c.PromotedId!.Value)
@@ -521,8 +531,23 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         return edgePairs.Count;
     }
 
-    private static bool ClassPending(ExtractionClass c) => !c.PromotedId.HasValue && !c.Rejected;
-    private static bool RecordPending(ExtractionRecord r) => !r.PromotedId.HasValue && !r.Rejected;
-    private static bool RelPending(ExtractionRelationship r) => !r.PromotedId.HasValue && !r.Rejected;
-    private static bool EdgePending(ExtractionEdge e) => !e.PromotedId.HasValue && !e.Rejected;
+    private static bool ClassPending(ExtractionClass c)
+    {
+        return !c.PromotedId.HasValue && !c.Rejected;
+    }
+
+    private static bool RecordPending(ExtractionRecord r)
+    {
+        return !r.PromotedId.HasValue && !r.Rejected;
+    }
+
+    private static bool RelPending(ExtractionRelationship r)
+    {
+        return !r.PromotedId.HasValue && !r.Rejected;
+    }
+
+    private static bool EdgePending(ExtractionEdge e)
+    {
+        return !e.PromotedId.HasValue && !e.Rejected;
+    }
 }

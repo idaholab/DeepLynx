@@ -986,6 +986,7 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.NotNull(result);
         Assert.Equal(uid1, result.Id);
         Assert.Equal("User 1", result.Name);
+        Assert.Equal(AccountType.Standard, result.AccountType);
     }
 
     [Fact]
@@ -1321,6 +1322,7 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.Equal(uid1, result.Id);
         Assert.Equal("User 1", result.Name);
         Assert.Equal("user1@test.com", result.Email);
+        Assert.Equal(AccountType.Standard, result.AccountType);
         Assert.False(result.IsArchived);
     }
 
@@ -1647,6 +1649,7 @@ public class UserBusinessTests : IntegrationTestBase
             Assert.Equal("developer@localhost", result.Email);
             Assert.Equal("Local Developer", result.Name);
             Assert.Equal("localdev", result.Username);
+            Assert.Equal(AccountType.Standard, result.AccountType);
             Assert.True(result.IsSysAdmin);
         }
         finally

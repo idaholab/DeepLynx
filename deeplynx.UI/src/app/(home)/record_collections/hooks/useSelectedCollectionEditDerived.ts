@@ -90,9 +90,13 @@ export function useSelectedCollectionEditDerived({
     [collectionRecords],
   );
 
+  const isShowingRecordSearchResults =
+    recordSearchTerm.trim().length > 0 || recordSearchResults.length > 0;
+
   const editRecordResults = useMemo(
-    () => (recordSearchTerm.trim().length ? recordSearchResults : collectionRecords),
-    [collectionRecords, recordSearchResults, recordSearchTerm],
+    () =>
+      isShowingRecordSearchResults ? recordSearchResults : collectionRecords,
+    [collectionRecords, isShowingRecordSearchResults, recordSearchResults],
   );
 
   return {
@@ -102,6 +106,7 @@ export function useSelectedCollectionEditDerived({
     canAddTypedSelectedCollectionTag,
     addableRecordResults,
     collectionRecordIds,
+    isShowingRecordSearchResults,
     editRecordResults,
   };
 }

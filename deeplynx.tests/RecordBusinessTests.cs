@@ -4691,4 +4691,493 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region SearchPaginated Tests
+
+    private static PaginatedRequestDto DefaultPagination() => new() { PageNumber = 1, PageSize = 50 };
+
+    private static RecordSearchRequestDto DefaultSearch() => new()
+    {
+        UserQuery = null,
+        ClassIds = [],
+        TagIds = [],
+        Embedding = "any",
+        HideArchived = false,
+        IsInsightEligible = false
+    };
+
+    [Fact]
+    public async Task SearchPaginated_NoFilters_ReturnsAllRecords()
+    {
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, DefaultSearch(), DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_NoFilters_ReturnsRecordsWithinProject()
+    {
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, 99999L, DefaultSearch(), DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_HideArchivedTrue_ExcludesArchivedRecords()
+    {
+        // Arrange
+        var record = await Context.Records.FindAsync(rid);
+        record!.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        var search = DefaultSearch();
+        search.HideArchived = true;
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.DoesNotContain(result.Items, r => r.Id == rid);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_HideArchivedFalse_IncludesArchivedRecords()
+    {
+        // Arrange
+        var record = await Context.Records.FindAsync(rid);
+        record!.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        var search = DefaultSearch();
+        search.HideArchived = false;
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.Contains(result.Items, r => r.Id == rid);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_ClassIdFilter_ReturnsOnlyMatchingRecords()
+    {
+        // Arrange - rid and rid2 have cid, rid3 and rid4 also have cid per seed data
+        var search = DefaultSearch();
+        search.ClassIds = [cid];
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.True(result.TotalCount > 0);
+        Assert.All(result.Items, r => Assert.Equal(cid, r.ClassId));
+    }
+
+    [Fact]
+    public async Task SearchPaginated_NonExistentClassId_ReturnsEmpty()
+    {
+        // Arrange
+        var search = DefaultSearch();
+        search.ClassIds = [999999L];
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_TagFilter_ReturnsOnlyRecordsWithAllTags()
+    {
+        // Arrange
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+
+        var search = DefaultSearch();
+        search.TagIds = [tid];
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(rid, result.Items.Single().Id);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_MultipleTagFilter_ReturnsOnlyRecordsWithAllTags()
+    {
+        // Arrange
+        var tag2 = new Tag
+        {
+            Name = "Search Tag 2",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            OrganizationId = organizationId
+        };
+        Context.Tags.Add(tag2);
+        await Context.SaveChangesAsync();
+
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tag2.Id);
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid2, tid);
+
+        var search = DefaultSearch();
+        search.TagIds = [tid, tag2.Id];
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert - only rid has both tags
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(rid, result.Items.Single().Id);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_EmbeddedFilter_ReturnsOnlyEmbeddedRecords()
+    {
+        // Arrange - mark rid as embedded, leave the rest as not embedded
+        var record = await Context.Records.FindAsync(rid);
+        record!.Embedded = true;
+        await Context.SaveChangesAsync();
+
+        var search = DefaultSearch();
+        search.Embedding = "embedded";
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert - only the record we marked should appear
+        Assert.Equal(1, result.TotalCount);
+        Assert.Contains(result.Items, r => r.Id == rid);
+
+        // Verify via DB that all returned IDs are actually embedded
+        var returnedIds = result.Items.Select(r => r.Id).ToList();
+        var dbRecords = await Context.Records
+            .Where(r => returnedIds.Contains(r.Id))
+            .ToListAsync();
+        Assert.All(dbRecords, r => Assert.True(r.Embedded));
+    }
+
+    [Fact]
+    public async Task SearchPaginated_NotEmbeddedFilter_ReturnsOnlyNotEmbeddedRecords()
+    {
+        // Arrange - mark rid as embedded so we can confirm it is excluded
+        var record = await Context.Records.FindAsync(rid);
+        record!.Embedded = true;
+        await Context.SaveChangesAsync();
+
+        var search = DefaultSearch();
+        search.Embedding = "pending";
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert - the embedded record must be absent; all others must not be embedded
+        Assert.DoesNotContain(result.Items, r => r.Id == rid);
+
+        var returnedIds = result.Items.Select(r => r.Id).ToList();
+        var dbRecords = await Context.Records
+            .Where(r => returnedIds.Contains(r.Id))
+            .ToListAsync();
+        Assert.All(dbRecords, r => Assert.False(r.Embedded));
+    }
+
+    [Fact]
+    public async Task SearchPaginated_UserQuery_MatchesRecordName()
+    {
+        // Act
+        var search = DefaultSearch();
+        search.UserQuery = "Test Record";
+
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.True(result.TotalCount > 0);
+        Assert.All(result.Items, r =>
+            Assert.True(
+                r.Name.Contains("Test Record", StringComparison.OrdinalIgnoreCase) ||
+                r.Description?.Contains("Test Record", StringComparison.OrdinalIgnoreCase) == true));
+    }
+
+    [Fact]
+    public async Task SearchPaginated_UserQuery_MatchesOriginalId()
+    {
+        // Act
+        var search = DefaultSearch();
+        search.UserQuery = "og_id";
+
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(rid, result.Items.Single().Id);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_UserQuery_NoMatch_ReturnsEmpty()
+    {
+        // Arrange
+        var search = DefaultSearch();
+        search.UserQuery = "zzz_absolutely_no_match_xyz";
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Pagination_RespectsPageSize()
+    {
+        // Arrange
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 2 };
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, DefaultSearch(), paginated, isSysAdmin: true);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(2, result.Items.Count());
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Pagination_SecondPage_ReturnsRemainingRecords()
+    {
+        // Arrange
+        var page1 = new PaginatedRequestDto { PageNumber = 1, PageSize = 2 };
+        var page2 = new PaginatedRequestDto { PageNumber = 2, PageSize = 2 };
+
+        // Act
+        var result1 = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, DefaultSearch(), page1, isSysAdmin: true);
+        var result2 = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, DefaultSearch(), page2, isSysAdmin: true);
+
+        // Assert
+        Assert.Equal(2, result1.Items.Count());
+        Assert.Equal(2, result2.Items.Count());
+        Assert.Empty(result1.Items.Select(r => r.Id).Intersect(result2.Items.Select(r => r.Id)));
+    }
+
+    [Fact]
+    public async Task SearchPaginated_NonAdmin_ExcludesUnauthorizedLabeledRecords()
+    {
+        // Arrange - create a label with no read permission for the test user
+        var restrictedLabel = new SensitivityLabel
+        {
+            Name = $"Restricted {Guid.NewGuid()}",
+            Description = "No read permission",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        var restrictedRecord = new Record
+        {
+            Name = "Restricted Record",
+            Description = "Should not appear for non-admin",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId,
+            FileType = "pdf",
+            Labels = new List<SensitivityLabel> { restrictedLabel }
+        };
+
+        var otherUser = new User
+        {
+            Name = "Other User",
+            Email = $"other-search-{Guid.NewGuid()}@test.com",
+            IsActive = true
+        };
+
+        Context.Users.Add(otherUser);
+        Context.Records.Add(restrictedRecord);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            otherUser.Id, organizationId, pid, DefaultSearch(), DefaultPagination(),
+            isSysAdmin: false, isOrgAdmin: false, isProjectAdmin: false);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, r => r.Id == restrictedRecord.Id);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_SysAdmin_IncludesAllLabeledRecords()
+    {
+        // Arrange
+        var restrictedLabel = new SensitivityLabel
+        {
+            Name = $"SysAdmin Label {Guid.NewGuid()}",
+            Description = "Admin only",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+
+        var restrictedRecord = new Record
+        {
+            Name = "Admin Only Record",
+            Description = "Visible to sysadmin",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId,
+            FileType = "pdf",
+            Labels = new List<SensitivityLabel> { restrictedLabel }
+        };
+
+        Context.Records.Add(restrictedRecord);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, DefaultSearch(), DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.Contains(result.Items, r => r.Id == restrictedRecord.Id);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_IsInsightEligible_ReturnsOnlyEligibleRecords()
+    {
+        // Arrange
+        var search = DefaultSearch();
+        search.IsInsightEligible = true;
+        search.HideArchived = false;
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert - seeded records with pdf file type and a URI should appear; csv-only records should not
+        Assert.All(result.Items, r =>
+        {
+            var fileType = r.FileType?.ToLowerInvariant();
+            var supportedTypes = new[] { "pdf", "txt", "html", "htm", "png", "jpg", "jpeg", "webp" };
+            Assert.Contains(fileType, supportedTypes);
+        });
+    }
+
+    [Fact]
+    public async Task SearchPaginated_CombinedFilters_ClassAndTag_ReturnsIntersection()
+    {
+        // Arrange
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+
+        var search = DefaultSearch();
+        search.ClassIds = [cid];
+        search.TagIds = [tid];
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert - must satisfy both class and tag filter
+        Assert.True(result.TotalCount > 0);
+        Assert.All(result.Items, r =>
+        {
+            Assert.Equal(cid, r.ClassId);
+            Assert.Contains(r.Tags, t => t.Id == tid);
+        });
+    }
+
+    [Fact]
+    public async Task SearchPaginated_CombinedFilters_QueryAndHideArchived_ReturnsCorrectResults()
+    {
+        // Arrange
+        var record = await Context.Records.FindAsync(rid);
+        record!.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        var search = DefaultSearch();
+        search.UserQuery = "Test Record";
+        search.HideArchived = true;
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, search, DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, r => r.Id == rid);
+        Assert.All(result.Items, r => Assert.False(r.IsArchived));
+    }
+
+    [Fact]
+    public async Task SearchPaginated_ReturnsTags()
+    {
+        // Arrange
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+
+        // Act
+        var result = await _recordBusiness.SearchPaginated(
+            uid, organizationId, pid, DefaultSearch(), DefaultPagination(), isSysAdmin: true);
+
+        // Assert
+        var match = result.Items.First(r => r.Id == rid);
+        Assert.NotNull(match.Tags);
+        Assert.Contains(match.Tags, t => t.Id == tid && t.Name == "Test Tag");
+    }
+
+    [Fact]
+    public async Task SearchPaginated_ReturnsUriOnlyWhenUserCanDownload()
+    {
+        // Arrange
+        var (adminUser, restrictedUser, label) =
+            await SeedUriSecurityUsersAndLabel("download file");
+
+        var record = await SeedLabeledRecord(adminUser, label);
+
+        // Act
+        var adminResult = await _recordBusiness.SearchPaginated(
+            adminUser.Id, organizationId, pid, DefaultSearch(), DefaultPagination(), isSysAdmin: true);
+
+        var restrictedResult = await _recordBusiness.SearchPaginated(
+            restrictedUser.Id, organizationId, pid, DefaultSearch(), DefaultPagination());
+
+        // Assert
+        Assert.Equal(record.Uri, adminResult.Items.Single(r => r.Id == record.Id).Uri);
+        Assert.Null(restrictedResult.Items.Single(r => r.Id == record.Id).Uri);
+    }
+
+    #endregion
 }

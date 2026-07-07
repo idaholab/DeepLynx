@@ -3,8 +3,12 @@ export type BackendErrorTranslationOverrides = {
   objectStorageIdNotFoundSuggestion?: string;
   originalIdAlreadyInUse?: string;
   originalIdAlreadyInUseSuggestion?: string;
+  classIdClassNameMismatch?: string;
+  classIdClassNameMismatchSuggestion?: string;
   classIdNotFoundInProject?: string;
   classIdNotFoundSuggestion?: string;
+  jsonDepthExceeded?: string;
+  jsonDepthExceededSuggestion?: string;
   duplicateSuggestion?: string;
   permissionSuggestion?: string;
   validationSuggestion?: string;
@@ -78,6 +82,20 @@ export function parseBackendError(
       translations?.originalIdAlreadyInUseSuggestion ??
       "Update the metadata with a unique OriginalId, or remove OriginalId to let the system generate one.";
   }
+  // Class name / Class Id mismatch errors
+  else if (/class name .* does not match class id|does not match class id/i.test(cleanMessage)) {
+    type = "validation";
+    const idMatch = cleanMessage.match(/ID\s+(\d+)/i);
+    const id = idMatch ? idMatch[1] : "specified";
+    const nameMatch = cleanMessage.match(/Class Name\s+(.+?)\s+does not match/i);
+    const name = nameMatch ? nameMatch[1] : "specified";
+    cleanMessage = translations?.classIdClassNameMismatch 
+      ? translations.classIdClassNameMismatch.replace("{id}", id).replace("{name}", name)
+      : `Class Name ${name} does not match Class ID ${id}.`;
+    suggestion =
+      translations?.classIdClassNameMismatchSuggestion ??
+      "Update the metadata so the Class Name matches the Class Id."
+  }
   // Class errors
   else if (/class.*does not exist|class.*not found/i.test(cleanMessage)) {
     type = "not_found";
@@ -89,6 +107,20 @@ export function parseBackendError(
     suggestion =
       translations?.classIdNotFoundSuggestion ??
       "Verify that the class ID exists in the selected project.";
+  }
+  // Max Depth errors
+  else if (/depth of the json structure exceeds the maximum allowed depth/i.test(cleanMessage)) {
+    type = "validation";
+    const allowedMatch = cleanMessage.match(/maximum allowed depth of (\d+)/i);
+    const currentMatch = cleanMessage.match(/current depth of properties is (\d+)/i);
+    const allowedDepth = allowedMatch ? allowedMatch[1]: "specified";
+    const currentDepth = currentMatch ? currentMatch[1]: "specified";
+    cleanMessage = translations?.jsonDepthExceeded
+      ? translations.jsonDepthExceeded.replace("{allowedDepth}", allowedDepth).replace("{currentDepth}", currentDepth)
+      : `The JSON structure exceeds the maximum allowed depth of ${allowedDepth}. Current depth of properties is ${currentDepth}.`
+    suggestion =
+      translations?.jsonDepthExceededSuggestion ??
+      "Reduce the nesting of objects or arrays in the properties section of the metadata.";
   }
   // Duplicate errors
   else if (/already exists|duplicate/i.test(cleanMessage)) {

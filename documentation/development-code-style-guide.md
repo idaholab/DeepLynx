@@ -393,6 +393,18 @@ app.MapOpenApi();
 app.MapScalarApiReference(...);
 ```
 
+Nexus can also generate the OpenAPI artifact used by SDK tooling:
+
+```bash
+dotnet build deeplynx.api/deeplynx.api.csproj -c Release /p:GenerateOpenApi=true
+```
+
+The generated file is written to `artifacts/openapi/nexus-v1.json`. Python SDK generation,
+linting, and generated-SDK validation live in the external
+[`nexus-python-sdk`](https://github.inl.gov/Digital-Engineering/nexus-python-sdk) repository.
+Developers can still start Nexus and download the current OpenAPI document from Scalar for
+manual inspection or one-off SDK work.
+
 When adding endpoints:
 
 - Use explicit generic return types such as `ActionResult<ClassResponseDto>`.

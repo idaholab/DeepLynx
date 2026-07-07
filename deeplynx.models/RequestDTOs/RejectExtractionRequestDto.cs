@@ -14,7 +14,7 @@ public class RejectExtractionRequestDto
     ///     allowed (unlike approval, which is restricted to <c>valid</c> / <c>novel_discovery</c>).
     /// </summary>
     [JsonPropertyName("reject_by_status")]
-    public List<string> RejectByStatus { get; set; } = [];
+    public List<string>? RejectByStatus { get; set; } = [];
 
     /// <summary>
     ///     When true, reject every still-pending (not promoted, not already rejected) item in the

@@ -24,7 +24,7 @@ interface ProjectUsersListTableProps {
 }
 
 const ACTIONS_COLUMN_CLASS =
-  "sticky right-0 z-20 w-20 min-w-20 border-l border-base-300/50 bg-base-100 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]";
+  "sticky right-0 z-20 w-20 min-w-20 bg-base-100";
 const ACTION_BUTTON_CLASS = "btn btn-ghost btn-sm px-1";
 
 const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
