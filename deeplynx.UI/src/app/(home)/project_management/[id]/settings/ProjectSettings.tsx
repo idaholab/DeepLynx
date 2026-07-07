@@ -532,6 +532,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
             <StorageSettingsSection
               activeTab={activeTab}
               onChangeTab={setActiveTab}
+              projectId={project.id}
               availableStorages={availableStorages}
               selectedStorageId={selectedStorageId}
               onSelectStorage={setSelectedStorageId}
