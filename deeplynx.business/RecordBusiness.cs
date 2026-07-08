@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.exceptions;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -1588,46 +1589,6 @@ public class RecordBusiness : IRecordBusiness
         return true;
     }
 
-    private async Task DeleteAttachedFileIfPresent(Record record)
-    {
-        // Guard condition: only file-backed records should delete storage.
-        // ObjectStorageId + Uri + FileType is a practical signal for a DeepLynx file upload.
-        if (!record.ObjectStorageId.HasValue ||
-            string.IsNullOrWhiteSpace(record.Uri) ||
-            string.IsNullOrWhiteSpace(record.FileType))
-        {
-            return;
-        }
-
-        var objectStorage = await _objectStorageBusiness
-            .GetDecryptedObjectStorage(record.ObjectStorageId.Value);
-
-        var storageBusiness = _fileBusinessFactory
-            .CreateFileBusiness(objectStorage.Type);
-
-        var dto = new RecordResponseDto
-        {
-            Id = record.Id,
-            Description = record.Description,
-            Uri = record.Uri,
-            Properties = record.Properties,
-            ObjectStorageId = record.ObjectStorageId,
-            OriginalId = record.OriginalId,
-            Name = record.Name,
-            ClassId = record.ClassId,
-            DataSourceId = record.DataSourceId,
-            ProjectId = record.ProjectId,
-            OrganizationId = record.OrganizationId,
-            LastUpdatedBy = record.LastUpdatedBy,
-            LastUpdatedAt = record.LastUpdatedAt,
-            IsArchived = record.IsArchived,
-            FileType = record.FileType,
-            FileSize = record.FileSize
-        };
-
-        await storageBusiness.DeleteFile(dto, objectStorage.Config);
-    }
-
     /// <summary>
     ///     Updates a record with new information
     /// </summary>
@@ -2202,4 +2163,54 @@ public class RecordBusiness : IRecordBusiness
         };
     }
 
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private async Task DeleteAttachedFileIfPresent(Record record)
+    {
+        // Guard condition: only file-backed records should delete storage.
+        // ObjectStorageId + Uri + FileType is a practical signal for a DeepLynx file upload.
+        if (!record.ObjectStorageId.HasValue ||
+            string.IsNullOrWhiteSpace(record.Uri) ||
+            string.IsNullOrWhiteSpace(record.FileType))
+        {
+            return;
+        }
+
+        var objectStorage = await _objectStorageBusiness
+            .GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+
+        var storageBusiness = _fileBusinessFactory
+            .CreateFileBusiness(objectStorage.Type);
+
+        var dto = new RecordResponseDto
+        {
+            Id = record.Id,
+            Description = record.Description,
+            Uri = record.Uri,
+            Properties = record.Properties,
+            ObjectStorageId = record.ObjectStorageId,
+            OriginalId = record.OriginalId,
+            Name = record.Name,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedBy = record.LastUpdatedBy,
+            LastUpdatedAt = record.LastUpdatedAt,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize
+        };
+
+        await InvalidateProjectStorageSizeCache(record.ProjectId);
+
+        await storageBusiness.DeleteFile(dto, objectStorage.Config);
+    }
+    private static async Task InvalidateProjectStorageSizeCache(long projectId)
+    {
+        await CacheService.Instance.DeleteAsync(
+            CacheKeys.ProjectStorageSize(projectId));
+    }
 }
