@@ -1,9 +1,6 @@
 // src/app/(home)/organization_management/OrganizationManagementClient.tsx
 "use client";
 
-import { useLanguage } from "@/app/contexts/Language";
-import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { useEffect, useState } from "react";
 import Tabs from "@/app/(home)/components/Tabs";
 import {
   GroupResponseDto,
@@ -13,6 +10,9 @@ import {
   SensitivityLabelsDto,
   UserResponseDto,
 } from "@/app/(home)/types/responseDTOs";
+import { useLanguage } from "@/app/contexts/Language";
+import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useEffect, useState } from "react";
 import InlineGroupsTable from "./groups/InlineGroupsTable";
 import RolesAndPermissions from "./roles_and_permissions/RolesAndPermissions";
 import OrganizationSettings from "./settings/OrganizationSettings";
@@ -35,21 +35,22 @@ const OrganizationManagementClient = ({
   initialRoles,
   initialPermissions,
   initialProjects,
-  initialLabels
+  initialLabels,
 }: OrganizationManagementProps) => {
   const [activeTab, setActiveTab] = useState("");
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
   const [labels, setLabels] = useState<SensitivityLabelsDto[]>(initialLabels);
-  const [permissions, setPermissions] = useState<PermissionResponseDto[]>(initialPermissions);
+  const [permissions, setPermissions] =
+    useState<PermissionResponseDto[]>(initialPermissions);
 
   useEffect(() => {
-    setLabels(initialLabels)
-  }, [initialLabels])
+    setLabels(initialLabels);
+  }, [initialLabels]);
 
   useEffect(() => {
-    setPermissions(initialPermissions)
-  }, [initialPermissions])
+    setPermissions(initialPermissions);
+  }, [initialPermissions]);
 
   const tabData = [
     {
@@ -78,9 +79,9 @@ const OrganizationManagementClient = ({
     {
       label: t.translations.TAGS_AND_SECURITY_LABELS,
       content: (
-        <TagManagementClient 
-          projects={initialProjects} 
-          initialLabels={labels} 
+        <TagManagementClient
+          projects={initialProjects}
+          initialLabels={labels}
         />
       ),
     },
