@@ -318,7 +318,10 @@ internal static class NexusOpenApiExtensions
                 var type = Nullable.GetUnderlyingType(context.JsonTypeInfo.Type)
                         ?? context.JsonTypeInfo.Type;
 
-                if (type == typeof(DateTime) || type == typeof(DateTimeOffset))
+                if (type == typeof(DateTime)
+                    || type == typeof(DateTimeOffset)
+                    || type == typeof(DateTime?)
+                    || type == typeof(DateTimeOffset?))
                 {
                     schema.Type = JsonSchemaType.String;
                     schema.Format = "date-time";
