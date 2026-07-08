@@ -1,4 +1,5 @@
 using deeplynx.business;
+using deeplynx.interfaces;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.models;
@@ -18,7 +19,7 @@ namespace deeplynx.api.Controllers;
 [Authorize]
 public class FileController : ControllerBase
 {
-    private readonly FileBusiness _fileBusiness;
+    private readonly IFileControllerBusiness _fileBusiness;
     private readonly ILogger<FileController> _logger;
 
     /// <summary>
@@ -26,7 +27,7 @@ public class FileController : ControllerBase
     /// </summary>
     /// <param name="fileBusiness">The business logic interface for handling file operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
-    public FileController(FileBusiness fileBusiness, ILogger<FileController> logger)
+    public FileController(IFileControllerBusiness fileBusiness, ILogger<FileController> logger)
     {
         _fileBusiness = fileBusiness;
         _logger = logger;
@@ -153,7 +154,7 @@ public class FileController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Download a File
     /// </summary>

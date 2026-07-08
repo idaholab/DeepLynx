@@ -15,7 +15,7 @@ using System.Runtime.CompilerServices;
 
 namespace deeplynx.business;
 
-public class FileBusiness
+public class FileBusiness : IFileControllerBusiness
 {
     private readonly IClassBusiness _classBusiness;
     private readonly DeeplynxContext _context;
@@ -368,18 +368,19 @@ public class FileBusiness
                             && r.OrganizationId == organizationId
                             && r.OriginalId == metadata.OriginalId);
             var matchingRecord = await recordQuery.FirstOrDefaultAsync();
-            if (matchingRecord != null) 
+            if (matchingRecord != null)
                 throw new ArgumentException("original_id already exists");
 
             // class id validation
             if (metadata.ClassId.HasValue)
             {
-                var actualClass = await _classBusiness.GetClass(organizationId, projectId, metadata.ClassId.Value, true) 
+                var actualClass = await _classBusiness.GetClass(organizationId, projectId, metadata.ClassId.Value, true)
                     ?? throw new ArgumentException($"Class ID {metadata.ClassId} does not exist in this project.");
-                if (!string.IsNullOrWhiteSpace(metadata.ClassName) && actualClass.Name != metadata.ClassName) {
+                if (!string.IsNullOrWhiteSpace(metadata.ClassName) && actualClass.Name != metadata.ClassName)
+                {
                     throw new ArgumentException($"Class Name {metadata.ClassName} does not match Class Id {metadata.ClassId}. Expected {actualClass.Name}");
                 }
-            } 
+            }
         }
 
         var uploadId = await fileBusiness.StartUpload(organizationId, projectId, realDataSourceId, objectStorage.Config);
@@ -1004,7 +1005,7 @@ public class FileBusiness
         }
         return resolvedClass;
     }
-    
+
     /// <summary>
     ///     Download an Appended File
     /// </summary>
@@ -1033,7 +1034,7 @@ public class FileBusiness
 
         return await fileBusiness.DownloadAppendedFile(record, objectStorage.Config, cancellationToken);
     }
-    
+
     private bool IsValidAppendedFile(
         RecordResponseDto record,
         ObjectStorageDecryptedDto objectStorage)
