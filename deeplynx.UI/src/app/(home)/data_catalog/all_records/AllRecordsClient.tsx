@@ -449,6 +449,34 @@ export default function DataCatalogClient({
         if (requestId !== requestIdRef.current) return;
 
         console.error("Failed to fetch records page:", error);
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "response" in error
+        ) {
+          const response = (
+            error as {
+              response?: {
+                status?: number;
+                statusText?: string;
+                data?: unknown;
+                config?: { url?: string; method?: string };
+              };
+            }
+          ).response;
+
+          debugAllRecords("fetch records page error response", {
+            status: response?.status,
+            statusText: response?.statusText,
+            data: response?.data,
+            method: response?.config?.method,
+            url: response?.config?.url,
+            rawSelectedProjects: selectedProjects,
+            effectiveProjectIds,
+            numericProjectIds: idsNum,
+            filters: queryFilters,
+          });
+        }
         setTableData([]);
         setTotalCount(0);
         setServerTotalPages(1);
