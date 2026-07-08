@@ -10,13 +10,14 @@ import {
   XCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import React, { useState } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   downloadFile,
   getStorageType,
   isPresignedUrlStorage,
 } from "@/app/lib/client_service/file_services.client";
+import { getRecord } from "@/app/lib/client_service/record_services.client";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import axios from "axios";
@@ -61,6 +62,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const [abortController, setAbortController] =
     useState<AbortController | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [folderDownloadProgress, setFolderDownloadProgress] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [bytesDownloaded, setBytesDownloaded] = useState<{
@@ -71,13 +73,20 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const [preparingDownload, setPreparingDownload] = useState<boolean>(false);
 
   const searchParams = useSearchParams();
+  const [isFolder, setIsFolder] = useState(false);
+  const isFolderRef = useRef(false);
   const projectIdParam = searchParams.get("projectId");
+  const [folderDownloadSpeed, setFolderDownloadSpeed] = React.useState<number | null>(null);
   const recordIdParam = searchParams.get("recordId");
   const projectId = projectIdParam ? Number(projectIdParam) : NaN;
   const recordId = recordIdParam ? Number(recordIdParam) : NaN;
   const canDownload = Number.isFinite(projectId) && Number.isFinite(recordId);
   const { t } = useLanguage();
   const { organization, hasLoaded } = useOrganizationSession();
+
+  useEffect(() => {
+    isFolderRef.current = isFolder;
+  }, [isFolder]);
 
   const handleDownload = async () => {
     if (!canDownload) return;
@@ -89,6 +98,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     setDownloadProgress(null);
     setTimeRemaining(null);
     setBytesDownloaded(null);
+    setFolderDownloadProgress(null);
     setPreparingDownload(true);
 
     try {
@@ -114,6 +124,15 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
       let lastDisplayUpdateTime = startTime;
       let lastDisplayLoaded = 0;
 
+      const record = await getRecord(
+        organization?.organizationId as number,
+        projectId,
+        recordId,
+      )
+
+      const recordUri = record?.uri || "";
+      setIsFolder(recordUri?.endsWith("/"));
+
       await downloadFile(
         organization?.organizationId as number,
         projectId,
@@ -121,7 +140,25 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         recordName,
         (progressInfo) => {
           // Only process progress for blob downloads (non-presigned URL)
-          if (!usePresignedUrl) {
+          if (isFolderRef.current) {
+            const now = Date.now();
+            const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
+
+            setFolderDownloadProgress(progressInfo.loaded);
+
+            if (timeSinceLastDisplay >= 2) {
+              const bytesDownloadedSinceLastDisplay = progressInfo.loaded - lastDisplayLoaded;
+              const instantSpeed = timeSinceLastDisplay > 0 ? bytesDownloadedSinceLastDisplay / timeSinceLastDisplay : 0;
+
+              setFolderDownloadSpeed(instantSpeed);
+
+              lastDisplayUpdateTime = now;
+              lastDisplayLoaded = progressInfo.loaded;
+            }
+
+            setDownloadProgress(1);
+            setBytesDownloaded({ loaded: 1, total: 1 });
+          } else if (!usePresignedUrl) {
             const now = Date.now();
             const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
 
@@ -194,6 +231,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
       setDownloadProgress(null);
       setTimeRemaining(null);
       setBytesDownloaded(null);
+      setFolderDownloadProgress(null);
       setPreparingDownload(false);
       // Then clear controller and downloading state
       setAbortController(null);
@@ -328,16 +366,15 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                   className="input input-sm input-bordered w-full"
                 />
                 {row.maxCharacterLimit && (
-                  <span className={`text-xs float-right mt-1 ${
-                      !row.maxCharacterLimit ? "text-base-content" :
-                      editValue.length == row.maxCharacterLimit ? "text-error" :
+                  <span className={`text-xs float-right mt-1 ${!row.maxCharacterLimit ? "text-base-content" :
+                    editValue.length == row.maxCharacterLimit ? "text-error" :
                       editValue.length >= row.maxCharacterLimit - 10 ? "text-warning" :
-                      "text-base-content"
+                        "text-base-content"
                     }`}>
-                      {editValue.length}/{row.maxCharacterLimit}
+                    {editValue.length}/{row.maxCharacterLimit}
                   </span>
                 )}
-                </div>
+              </div>
             ) : (
               <div className="break-words">
                 {hasNested ? (
@@ -345,9 +382,9 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                     {isExpanded
                       ? t.translations.RECORD_HISTORY_EXPANDED
                       : t.translations.PROPERTIES_COUNT.replace(
-                          "{count}",
-                          String(row.nestedRows?.length ?? 0),
-                        )}
+                        "{count}",
+                        String(row.nestedRows?.length ?? 0),
+                      )}
                   </span>
                 ) : (
                   row.value
@@ -409,8 +446,10 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   };
 
   // Show progress bar only for blob downloads (non-presigned URL)
+
+
   const showProgressBar =
-    !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null;
+    !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null && folderDownloadProgress !== null;
 
   return (
     <div className={`${className}`}>
@@ -433,19 +472,30 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
               {download && (
                 <div className="flex items-center gap-3">
                   {/* Status indicator - show during preparation or for presigned URL downloads */}
-                  {downloading &&
-                    (preparingDownload || isPresignedUrl) &&
-                    !showProgressBar && (
-                      <div className="flex items-center gap-2 min-w-[200px]">
-                        <div className="loading loading-spinner loading-sm text-primary"></div>
-                        <span className="text-sm text-base-content">
-                          {t.translations.PREPARING_DOWNLOAD}
-                        </span>
-                      </div>
-                    )}
+                  {downloading && (preparingDownload || isPresignedUrl) && !showProgressBar && !isFolder && (
+                    <div className="flex items-center gap-2 min-w-[200px]">
+                      <div className="loading loading-spinner loading-sm text-primary"></div>
+                      <span className="text-sm text-base-content">
+                        {t.translations.PREPARING_DOWNLOAD}
+                      </span>
+                    </div>
+                  )}
 
-                  {/* Progress bar - only show for blob downloads */}
-                  {showProgressBar && (
+                  {/* Folder download: show "Downloading..." with current size */}
+                  {downloading && isFolder && (
+                    <div className="flex items-center gap-2 min-w-[250px]">
+                      <div className="loading loading-spinner loading-sm text-primary"></div>
+                      <span className="text-sm text-base-content">
+                        Downloading... Current Size: {formatBytes(folderDownloadProgress || 0)}
+                        {folderDownloadSpeed !== null && (
+                          <> ({formatBytes(folderDownloadSpeed)}/s)</>
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* File download: show progress bar */}
+                  {downloading && !isFolder && showProgressBar && (
                     <div className="flex flex-col gap-1 min-w-[200px]">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-base-300 rounded-full h-2">
@@ -460,8 +510,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                       </div>
                       <div className="flex justify-between text-xs text-base-content/70">
                         <span>
-                          {formatBytes(bytesDownloaded.loaded)} /{" "}
-                          {formatBytes(bytesDownloaded.total)}
+                          {formatBytes(bytesDownloaded.loaded)} / {formatBytes(bytesDownloaded.total)}
                         </span>
                         {timeRemaining !== null && timeRemaining > 0 && (
                           <span>
@@ -490,11 +539,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                           ? t.translations.DOWNLOAD_FILE
                           : t.translations.MISSING_PROJECT_OR_RECORD_ID_IN_URL
                       }
-                      className={`p-1 transition-colors ${
-                        canDownload
-                          ? "hover:text-primary cursor-pointer"
-                          : "opacity-50 cursor-not-allowed"
-                      }`}
+                      className={`p-1 transition-colors ${canDownload ? "hover:text-primary cursor-pointer" : "opacity-50 cursor-not-allowed"
+                        }`}
                     >
                       <ArrowDownTrayIcon className="w-8 h-8" />
                     </button>
