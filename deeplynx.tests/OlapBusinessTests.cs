@@ -150,7 +150,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _sensitivityLabelBusiness,
             _sensitivityLabelService,
             _provenanceBusiness.Object,
-            _mockRecordLogger.Object);
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
 
         // Wire up the real filesystem implementation via the factory mock
         var realFileFilesystemBusiness =
@@ -181,7 +181,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _insightBusiness.Object,
             _olapBusiness,
             _objectStorageBusiness,
-            NullLogger<FileBusiness>.Instance
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
         );
     }
 

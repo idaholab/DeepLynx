@@ -118,6 +118,11 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
 
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
+
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _recordBusiness = new RecordBusiness(
             Context,
@@ -127,7 +132,9 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             _sensitivityLabelBusiness,
             _sensitivityLabelService,
             _provenanceBusiness.Object,
-            _mockRecordLogger.Object);
+            _mockRecordLogger.Object,
+            _objectStorageBusiness,
+            _fileBusinessFactory.Object);
 
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
@@ -136,11 +143,6 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
-
-        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
-
-        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
-        _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
 
         _fileBusiness = new FileFilesystemBusiness(Context, _mockObjectStorageBusiness.Object, _mockClassBusiness.Object,
             _mockRecordBusiness.Object);
@@ -156,7 +158,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             _insightBusiness.Object,
             _olapBusiness,
             _objectStorageBusiness,
-            NullLogger<FileBusiness>.Instance
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
         );
 
     }
