@@ -1,26 +1,29 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.ResponseDTOs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
 
 public class ProvenanceBusiness : IProvenanceBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly ILogger<ProvenanceBusiness> _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ProvenanceBusiness" /> class
     /// </summary>
     /// <param name="context">Database context used for provenance operations</param>
-    public ProvenanceBusiness(DeeplynxContext context)
+    /// <param name="logger">Error/Info logging interface for database log table.</param>
+    public ProvenanceBusiness(DeeplynxContext context, ILogger<ProvenanceBusiness> logger)
     {
         _context = context;
+        _logger = logger;
     }
-    
+
     /// <summary>
     ///     Retrieve a single provenance record by its database ID.
     /// </summary>
@@ -51,7 +54,7 @@ public class ProvenanceBusiness : IProvenanceBusiness
             CreatedAt = provenanceRecord.CreatedAt
         };
     }
-    
+
     /// <summary>
     ///     Retrieve all provenance records associated with a given (non-historical) record ID,
     ///     ordered most-recent first.
@@ -64,7 +67,7 @@ public class ProvenanceBusiness : IProvenanceBusiness
         var recordExists = await _context.Records.AnyAsync(r => r.Id == recordId);
         if (!recordExists)
             throw new KeyNotFoundException($"Record with id {recordId} not found");
-        
+
         // order the records newest to oldest
         var records = await _context.ProvenanceRecords
             .Where(p => p.RecordId == recordId)
@@ -201,8 +204,17 @@ public class ProvenanceBusiness : IProvenanceBusiness
             .ToListAsync();
 
         if (historicalRecords.Count != distinctRecordIds.Count)
+        {
             // some of the supplied records don't have historical records associated
+            var foundIds = historicalRecords.Select(h => h.RecordId).ToHashSet();
+            var missingIds = distinctRecordIds.Where(id => !foundIds.Contains(id)).ToList();
+
+            _logger.LogWarning(
+                "BulkCreateProvenanceRecords: no historical record found for record_ids [{MissingIds}]",
+                string.Join(", ", missingIds));
+
             return false;
+        }
 
         // if aiConfig is passed in, fetch once and reuse for each prov record
         AiModelConfig? aiConfig = null;
@@ -261,9 +273,27 @@ public class ProvenanceBusiness : IProvenanceBusiness
 
             await transaction.CommitAsync();
         }
-        catch
+        catch (DbUpdateException ex)
         {
             await transaction.RollbackAsync();
+
+            var failedRecordIds = ex.Entries
+                .Select(e => e.Entity)
+                .OfType<ProvenanceRecord>()
+                .Select(p => p.RecordId)
+                .ToList();
+
+            _logger.LogError(ex,
+                "BulkCreateProvenanceRecords failed while saving provenance records for record_ids [{FailedIds}]",
+                string.Join(", ", failedRecordIds));
+
+            throw;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "BulkCreateProvenanceRecords failed unexpectedly for record_ids [{RecordIds}]",
+                string.Join(", ", historicalRecords.Select(h => h.RecordId)));
             throw;
         }
 

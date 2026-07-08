@@ -2,6 +2,8 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Moq;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.tests;
 
@@ -9,6 +11,7 @@ namespace deeplynx.tests;
 public class ProvenanceBusinessTests : IntegrationTestBase
 {
     private ProvenanceBusiness _provenanceBusiness = null!;
+    private Mock<ILogger<ProvenanceBusiness>> _mockProvLogger = null!;
 
     public long uid;  // user ID
     public long oid;  // organization ID
@@ -30,7 +33,8 @@ public class ProvenanceBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _provenanceBusiness = new ProvenanceBusiness(Context);
+        _mockProvLogger = new Mock<ILogger<ProvenanceBusiness>>();
+        _provenanceBusiness = new ProvenanceBusiness(Context, _mockProvLogger.Object);
     }
 
     protected override async Task SeedTestDataAsync()
