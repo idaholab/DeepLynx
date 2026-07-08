@@ -451,7 +451,7 @@ public class ProjectController : ControllerBase
     {
         try
         {
-            await _invitationBusiness.CreateAndAddServiceAccountToProject(projectId, name, roleId, makeProjectAdmin);
+            await _invitationBusiness.CreateAndAddServiceAccountToProject(organizationId, projectId, name, roleId, makeProjectAdmin);
             return Ok(new { message = $"Created service account {name} and added to project {projectId}" });
         }
         catch (Exception exc)
