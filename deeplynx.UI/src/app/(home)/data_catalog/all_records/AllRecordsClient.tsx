@@ -133,13 +133,6 @@ const RECORDS_PER_PAGE = 12;
 /** Maximum number of class or tag facet options shown in the sidebar before truncation. */
 const FACET_LIMIT = 8;
 
-const DEBUG_ALL_RECORDS = true;
-
-function debugAllRecords(message: string, payload?: Record<string, unknown>) {
-  if (!DEBUG_ALL_RECORDS) return;
-  console.log(`[AllRecords] ${message}`, payload ?? {});
-}
-
 /* ─── Component ──────────────────────────────────────────────────────────── */
 
 export default function DataCatalogClient({
@@ -230,15 +223,6 @@ export default function DataCatalogClient({
   const [isInitialSearchPending, setIsInitialSearchPending] =
     useState(!!initialSearchTerm);
 
-  useEffect(() => {
-    debugAllRecords("initial props", {
-      initialProjectsCount: initialProjects.length,
-      initialProjectIds: initialProjects.map((project) => project.id),
-      initialSelectedProjects,
-      initialSearchTerm,
-    });
-  }, [initialProjects, initialSelectedProjects, initialSearchTerm]);
-
   // Pre-compute lowercase search terms once for use in getHighlightedContent
   // across all record cards, avoiding repeated toLowerCase calls per field.
   const activeSearchTerms = useMemo(
@@ -312,14 +296,6 @@ export default function DataCatalogClient({
     return selectedProjects.map(String);
   }, [projects, selectedProjects]);
 
-  const handleProjectSelectionChange = useCallback((nextSelected: string[]) => {
-    debugAllRecords("project dropdown selection changed", {
-      nextSelected,
-      nextSelectedCount: nextSelected.length,
-    });
-    setSelectedProjects(nextSelected);
-  }, []);
-
   const transformRecord = useCallback(
     (record: QueryRecordViewResponseDto): RecordTableRow => ({
       ...record,
@@ -384,24 +360,6 @@ export default function DataCatalogClient({
         selectedUpdatedByFilters,
       });
 
-      debugAllRecords("fetch records page request", {
-        organizationId: Number(organization.organizationId),
-        requestedPageNumber: pageNumber,
-        requestedPageSize: pageSize,
-        rawSelectedProjects: selectedProjects,
-        rawSelectedProjectsCount: selectedProjects.length,
-        initialProjectsCount: projects.length,
-        initialProjectIds: projects.map((project) => project.id),
-        effectiveProjectIds,
-        effectiveProjectIdCount: effectiveProjectIds.length,
-        numericProjectIds: idsNum,
-        numericProjectIdCount: idsNum.length,
-        droppedProjectIds: effectiveProjectIds.filter(
-          (id) => !Number.isFinite(Number(id)),
-        ),
-        textSearch: submittedSearchText || null,
-        filters: queryFilters,
-      });
       if (idsNum.length === 0) {
         setTableData([]);
         setTotalCount(0);
@@ -424,21 +382,6 @@ export default function DataCatalogClient({
 
         if (requestId !== requestIdRef.current) return;
 
-        debugAllRecords("fetch records page response", {
-          requestedPageNumber: pageNumber,
-          requestedPageSize: pageSize,
-          responsePageNumber: result.pageNumber,
-          responsePageSize: result.pageSize,
-          returnedItems: result.items.length,
-          totalCount: result.totalCount,
-          totalPages: result.totalPages,
-          hasPrevious: result.hasPrevious,
-          hasNext: result.hasNext,
-          returnedProjectIds: Array.from(
-            new Set(result.items.map((record) => record.projectId)),
-          ),
-        });
-
         setTableData(result.items.map(transformRecord));
         setCurrentPage(result.pageNumber);
         setTotalCount(result.totalCount);
@@ -449,34 +392,6 @@ export default function DataCatalogClient({
         if (requestId !== requestIdRef.current) return;
 
         console.error("Failed to fetch records page:", error);
-        if (
-          typeof error === "object" &&
-          error !== null &&
-          "response" in error
-        ) {
-          const response = (
-            error as {
-              response?: {
-                status?: number;
-                statusText?: string;
-                data?: unknown;
-                config?: { url?: string; method?: string };
-              };
-            }
-          ).response;
-
-          debugAllRecords("fetch records page error response", {
-            status: response?.status,
-            statusText: response?.statusText,
-            data: response?.data,
-            method: response?.config?.method,
-            url: response?.config?.url,
-            rawSelectedProjects: selectedProjects,
-            effectiveProjectIds,
-            numericProjectIds: idsNum,
-            filters: queryFilters,
-          });
-        }
         setTableData([]);
         setTotalCount(0);
         setServerTotalPages(1);
@@ -493,9 +408,7 @@ export default function DataCatalogClient({
       effectiveProjectIds,
       organization?.organizationId,
       pageSize,
-      projects,
       selectedClassFilters,
-      selectedProjects,
       selectedTagFilters,
       selectedUpdatedByFilters,
       statusFilter,
@@ -955,7 +868,7 @@ export default function DataCatalogClient({
               </div>
               <ProjectDropdown
                 projects={projects}
-                onSelectionChange={handleProjectSelectionChange}
+                onSelectionChange={setSelectedProjects}
                 defaultSelected={
                   initialSelectedProjects.length
                     ? initialSelectedProjects
