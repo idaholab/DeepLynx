@@ -1,12 +1,10 @@
-import React from "react";
+import { useLanguage } from "@/app/contexts/Language";
 import {
+  InformationCircleIcon,
   ShieldCheckIcon,
   TagIcon,
-  LockClosedIcon,
-  LockOpenIcon,
-  InformationCircleIcon,
 } from "@heroicons/react/24/outline";
-import { useLanguage } from "@/app/contexts/Language";
+import React from "react";
 
 interface Props {
   inheritedOrganizationLabelCount: number;
