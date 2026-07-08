@@ -137,6 +137,13 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
 
+        // Initialize FileBusinessFactory mocks
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+        var realFileAzureBusiness = new FileAzureBusiness();
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
+        _fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(realFileAzureBusiness);
+
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _recordBusiness = new RecordBusiness(
             Context,
@@ -146,7 +153,9 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             _sensitivityLabelBusiness,
             _sensitivityLabelService,
             _provenanceBusiness.Object,
-            _mockRecordLogger.Object);
+            _mockRecordLogger.Object,
+            _objectStorageBusiness,
+            _fileBusinessFactory.Object);
 
 
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
@@ -154,14 +163,6 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
-
-        // Initialize FileBusinessFactory mocks
-        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
-        var realFileAzureBusiness = new FileAzureBusiness();
-
-        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
-        _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
-        _fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(realFileAzureBusiness);
 
         _fileAzureBusiness = new FileAzureBusiness();
 
@@ -176,7 +177,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             _insightBusiness.Object,
             _olapBusiness,
             _objectStorageBusiness,
-            NullLogger<FileBusiness>.Instance
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
         );
     }
 
