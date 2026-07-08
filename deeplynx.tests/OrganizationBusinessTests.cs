@@ -1092,6 +1092,76 @@ public class OrganizationBusinessTests : IntegrationTestBase
 
         Assert.Contains("Organization with id 99999 not found", exception.Message);
     }
+    
+    [Fact]
+    public async Task AddUser_Fails_IfServiceAccount_AndNotAllowed()
+    {
+        // Arrange - create a service account user
+        var serviceUser = new User
+        {
+            AccountType = AccountType.Service,
+            Name="test Service Account",
+            Email = "asdfasdfasdfasdf"
+        };
+        Context.Users.Add(serviceUser);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert - default is allowServiceAccounts: false
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _organizationBusiness.AddUserToOrganization(oid, serviceUser.Id));
+
+        Assert.Contains("Service accounts must be added directly to a project", exception.Message);
+
+        // Verify nothing was saved to DB
+        var orgUser = await Context.OrganizationUsers
+            .FirstOrDefaultAsync(ou => ou.OrganizationId == oid && ou.UserId == serviceUser.Id);
+        Assert.Null(orgUser);
+    }
+
+    [Fact]
+    public async Task AddUser_Succeeds_IfServiceAccount_AndAllowed()
+    {
+        // Arrange - create a service account user
+        var serviceUser = new User
+        {
+            AccountType = AccountType.Service,
+            Name="test Service Account",
+            Email = "asdfasdfasdfasdf"
+        };
+        Context.Users.Add(serviceUser);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _organizationBusiness.AddUserToOrganization(
+            oid, serviceUser.Id, allowServiceAccounts: true);
+
+        // Assert
+        Assert.True(result);
+
+        var orgUser = await Context.OrganizationUsers
+            .FirstOrDefaultAsync(ou => ou.OrganizationId == oid && ou.UserId == serviceUser.Id);
+        Assert.NotNull(orgUser);
+        Assert.False(orgUser.IsOrgAdmin);
+    }
+
+    [Fact]
+    public async Task AddUser_Fails_IfServiceAccountExplicitlyDisallowed()
+    {
+        // Arrange
+        var serviceUser = new User
+        {
+            AccountType = AccountType.Service,
+            Name="test Service Account",
+            Email = "asdfasdfasdfasdf"
+        };
+        Context.Users.Add(serviceUser);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert - explicitly passing false behaves the same as the default
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _organizationBusiness.AddUserToOrganization(
+                oid, serviceUser.Id, allowServiceAccounts: false));
+    }
 
     #endregion
 

@@ -19,6 +19,7 @@ type StorageTab = "default" | "manage";
 interface StorageSettingsSectionProps {
   activeTab: StorageTab;
   onChangeTab: (tab: StorageTab) => void;
+  projectId: number | string;
   availableStorages: ObjectStorageResponseDto[];
   selectedStorageId: number | null;
   onSelectStorage: (storageId: number) => void;
@@ -35,6 +36,7 @@ interface StorageSettingsSectionProps {
 const StorageSettingsSection = ({
   activeTab,
   onChangeTab,
+  projectId,
   availableStorages,
   selectedStorageId,
   onSelectStorage,
@@ -47,6 +49,30 @@ const StorageSettingsSection = ({
   onDeleteStorage,
   t,
 }: StorageSettingsSectionProps) => {
+  const currentProjectId = Number(projectId);
+  const hasProjectDefaultStorage = availableStorages.some(
+    (storage) =>
+      storage.default && Number(storage.projectId) === currentProjectId,
+  );
+  const defaultStorageProjectId = Number(defaultStorage?.projectId);
+  const hasDefaultStorageWithProject =
+    defaultStorage !== null && defaultStorageProjectId === currentProjectId;
+  const isCurrentDefaultStorage = (storage: ObjectStorageResponseDto) => {
+    if (defaultStorage) {
+      return (
+        String(storage.id) === String(defaultStorage.id) &&
+        (!hasDefaultStorageWithProject ||
+          Number(storage.projectId) === currentProjectId)
+      );
+    }
+
+    return (
+      storage.default &&
+      (!hasProjectDefaultStorage ||
+        Number(storage.projectId) === currentProjectId)
+    );
+  };
+
   const defaultTabContent = (
     <div className="mt-4">
       <p className="text-sm text-base-content/70 mb-4">
@@ -80,7 +106,9 @@ const StorageSettingsSection = ({
               {availableStorages.map((storage) => (
                 <option key={storage.id} value={storage.id}>
                   {storage.name}
-                  {storage.default ? t.translations.CURRENT_DEFAULT_SUFFIX : ""}
+                  {isCurrentDefaultStorage(storage)
+                    ? t.translations.CURRENT_DEFAULT_SUFFIX
+                    : ""}
                   {storage.isArchived ? t.translations.ARCHIVED_SUFFIX : ""}
                 </option>
               ))}
@@ -140,7 +168,7 @@ const StorageSettingsSection = ({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-semibold">{storage.name}</h4>
-                      {storage.default && (
+                      {isCurrentDefaultStorage(storage) && (
                         <span className="badge badge-primary badge-sm">
                           {t.translations.DEFAULT_BADGE}
                         </span>
