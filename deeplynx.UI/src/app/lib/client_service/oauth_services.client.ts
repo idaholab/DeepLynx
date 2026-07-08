@@ -130,3 +130,43 @@ export const archiveOauthApplication = async (
         throw error;
     }
 };
+export interface DeviceVerificationLookupResponseDto {
+    user_code: string;
+    client_id: string;
+    application_name: string;
+    scope?: string | null;
+    expires_at: string;
+    status: string;
+}
+
+export const getDeviceAuthorizationRequest = async (
+    userCode: string
+): Promise<DeviceVerificationLookupResponseDto> => {
+    try {
+        const res = await api.get<DeviceVerificationLookupResponseDto>(
+            `/oauth/device/verify`,
+            { params: { user_code: userCode } }
+        );
+        return res.data;
+    } catch (error) {
+        console.error("Error fetching device authorization request:", error);
+        throw error;
+    }
+};
+
+export const setDeviceAuthorizationDecision = async (
+    userCode: string,
+    approve: boolean
+): Promise<DeviceVerificationLookupResponseDto> => {
+    try {
+        const res = await api.post<DeviceVerificationLookupResponseDto>(
+            `/oauth/device/verify`,
+            { user_code: userCode, approve },
+            { headers: { "Content-Type": "application/json" } }
+        );
+        return res.data;
+    } catch (error) {
+        console.error("Error setting device authorization decision:", error);
+        throw error;
+    }
+};

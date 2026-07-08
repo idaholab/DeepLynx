@@ -20,14 +20,21 @@ public class TokenController : ControllerBase
 {
     private readonly IEventBusiness _eventBusiness;
     private readonly ILogger<TokenController> _logger;
+    private readonly IOauthDeviceAuthorizationBusiness _oauthDeviceAuthorizationBusiness;
     private readonly ITokenBusiness _tokenBusiness;
 
-    public TokenController(IEventBusiness eventBusiness, ITokenBusiness tokenBusiness, ILogger<TokenController> logger)
+    public TokenController(
+        IEventBusiness eventBusiness,
+        ITokenBusiness tokenBusiness,
+        IOauthDeviceAuthorizationBusiness oauthDeviceAuthorizationBusiness,
+        ILogger<TokenController> logger)
     {
         _eventBusiness = eventBusiness;
         _tokenBusiness = tokenBusiness;
+        _oauthDeviceAuthorizationBusiness = oauthDeviceAuthorizationBusiness;
         _logger = logger;
     }
+
 
     /// <summary>
     ///     Create JWT Token
@@ -61,6 +68,92 @@ public class TokenController : ControllerBase
             _logger.LogError(ex, "Error creating token");
             return StatusCode(StatusCodes.Status500InternalServerError,
                 new { message = "An error occurred while creating the token" });
+        }
+    }
+
+    /// <summary>
+    ///     OAuth 2.0 Token Endpoint
+    /// </summary>
+    /// <param name="grantType">The OAuth grant type</param>
+    /// <param name="deviceCode">The device code returned by the device authorization endpoint</param>
+    /// <param name="refreshToken">The refresh token returned by a previous OAuth token response</param>
+    /// <param name="clientId">The OAuth application's client ID</param>
+    /// <returns>OAuth token response or polling error</returns>
+    [AllowAnonymous]
+    [HttpPost("token", Name = "api_oauth_token")]
+    public async Task<IActionResult> ExchangeOauthToken(
+        [FromForm(Name = "grant_type")] string? grantType,
+        [FromForm(Name = "device_code")] string? deviceCode,
+        [FromForm(Name = "refresh_token")] string? refreshToken,
+        [FromForm(Name = "client_id")] string? clientId)
+    {
+        const string deviceCodeGrantType = "urn:ietf:params:oauth:grant-type:device_code";
+        const string refreshTokenGrantType = "refresh_token";
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(grantType))
+            {
+                throw new ArgumentException("grant_type is required");
+            }
+
+            OauthTokenGrantResponseDto response;
+
+            if (grantType == deviceCodeGrantType)
+            {
+                response = await _oauthDeviceAuthorizationBusiness.ExchangeDeviceCodeForToken(deviceCode, clientId);
+            }
+            else if (grantType == refreshTokenGrantType)
+            {
+                response = await _oauthDeviceAuthorizationBusiness.ExchangeRefreshTokenForToken(refreshToken, clientId);
+            }
+            else
+            {
+                return BadRequest(new OauthErrorResponseDto
+                {
+                    Error = "unsupported_grant_type",
+                    ErrorDescription = "Unsupported grant_type"
+                });
+            }
+
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid OAuth token request");
+            return BadRequest(new OauthErrorResponseDto
+            {
+                Error = "invalid_request",
+                ErrorDescription = ex.Message
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "OAuth application not found for token request");
+            return NotFound(new OauthErrorResponseDto
+            {
+                Error = "invalid_client",
+                ErrorDescription = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "OAuth device token request is not ready");
+            return BadRequest(new OauthErrorResponseDto
+            {
+                Error = ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            const string message = "An unexpected error occurred in the OAuth token flow";
+            _logger.LogError(ex, message);
+
+            return StatusCode(StatusCodes.Status500InternalServerError, new OauthErrorResponseDto
+            {
+                Error = "server_error",
+                ErrorDescription = message
+            });
         }
     }
 
