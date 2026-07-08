@@ -77,7 +77,11 @@ export default function ProjectInsightClientView() {
   const [statusMap, setStatusMap] = useState<
     Record<number, ProjectInsightStatus>
   >({});
-  const [isInsightUnavailable, setIsInsightUnavailable] = useState(false);
+  const [isQueryModelUnavailable, setIsQueryModelUnavailable] = useState(false);
+  const [isUploadModelUnavailable, setIsUploadModelUnavailable] = useState(false);
+  const [isEmbeddingModelUnavailable, setIsEmbeddingModelUnavailable] = useState(false);
+  const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
+  const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;  
   const pollingKey = useMemo(
       () =>
           Object.entries(statusMap)
@@ -132,7 +136,9 @@ export default function ProjectInsightClientView() {
     setLibrarySearchError("");
     setSelectedPendingIds([]);
     setActiveTabKey("library");
-    setIsInsightUnavailable(false);
+    setIsQueryModelUnavailable(false);
+    setIsUploadModelUnavailable(false);
+    setIsEmbeddingModelUnavailable(false);
   }, [projectId]);
 
   useEffect(() => {
@@ -152,7 +158,9 @@ export default function ProjectInsightClientView() {
     const loadProjectInsight = async () => {
       setIsLoadingRecords(true);
       setLibrarySearchError("");
-      setIsInsightUnavailable(false);
+      setIsQueryModelUnavailable(false);
+      setIsUploadModelUnavailable(false);
+      setIsEmbeddingModelUnavailable(false);
 
       try {
         const [recordDtos, classDtos, dataSourceDtos, tagDtos] =
@@ -193,35 +201,58 @@ export default function ProjectInsightClientView() {
                 record.id,
               {
                 state: "error",
-                error: "Insight unavailable",
+                error: "Embedding model unavailable",
               } satisfies ProjectInsightStatus,
             ]),
         );
-        
-        try {
-          const health = await fetchInsightEndpointHealth({
-            organizationId,
-            projectId,
-            modelConfigId: selectedInsightModels.embeddingModelConfigId,
-            modelType: "embedding",
-          });
-          
-          if (!health.reachable || !health.model_available) {
-            if (cancelled) return;
-            
-            setIsInsightUnavailable(true);
-            setStatusMap(unavailableStatuses);
-            return;
-          }
-        } catch {
-          if (cancelled) return;
-          
-          setIsInsightUnavailable(true);
+
+        const [queryHealth, uploadHealth, embeddingHealth] =
+            await Promise.allSettled([
+              fetchInsightEndpointHealth({
+                organizationId,
+                projectId,
+                modelConfigId: selectedInsightModels.queryModelConfigId,
+                modelType: "llm",
+              }),
+              fetchInsightEndpointHealth({
+                organizationId,
+                projectId,
+                modelConfigId: selectedInsightModels.uploadModelConfigId,
+                modelType: "vlm",
+              }),
+              fetchInsightEndpointHealth({
+                organizationId,
+                projectId,
+                modelConfigId: selectedInsightModels.embeddingModelConfigId,
+                modelType: "embedding",
+              }),
+            ]);
+
+        const queryUnavailable =
+            queryHealth.status === "rejected" ||
+            !queryHealth.value.reachable ||
+            !queryHealth.value.model_available;
+
+        const uploadUnavailable =
+            uploadHealth.status === "rejected" ||
+            !uploadHealth.value.reachable ||
+            !uploadHealth.value.model_available;
+
+        const embeddingUnavailable =
+            embeddingHealth.status === "rejected" ||
+            !embeddingHealth.value.reachable ||
+            !embeddingHealth.value.model_available;
+
+        if (cancelled) return;
+
+        setIsQueryModelUnavailable(queryUnavailable);
+        setIsUploadModelUnavailable(uploadUnavailable);
+        setIsEmbeddingModelUnavailable(embeddingUnavailable);
+
+        if (embeddingUnavailable) {
           setStatusMap(unavailableStatuses);
           return;
         }
-        
-        setIsInsightUnavailable(false);
 
         const resolvedStatuses = await Promise.all(
           supportedRecords.map(async (record) => {
@@ -275,6 +306,8 @@ export default function ProjectInsightClientView() {
     hasProjectLoaded,
     organizationId,
     projectId,
+    selectedInsightModels.queryModelConfigId,
+    selectedInsightModels.uploadModelConfigId,
     selectedInsightModels.embeddingModelConfigId,
     t.translations.PROJECT_INSIGHT_LOADING_RECORDS,
   ]);
@@ -335,7 +368,7 @@ export default function ProjectInsightClientView() {
   ]);
 
   useEffect(() => {
-    if (!organizationId || !projectId || !pollingKey || isInsightUnavailable) return;
+    if (!organizationId || !projectId || !pollingKey || isEmbeddingModelUnavailable) return;
 
     const pollingIds = pollingKey.split(",").map(Number);
 
@@ -399,7 +432,7 @@ export default function ProjectInsightClientView() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [organizationId, projectId, pollingKey, isInsightUnavailable]);
+  }, [organizationId, projectId, pollingKey, isEmbeddingModelUnavailable]);
 
   useEffect(() => {
     setSelectedPendingIds((current) =>
@@ -528,7 +561,7 @@ export default function ProjectInsightClientView() {
 
   // UI event handlers
   async function handleQueueSelected() {
-    if (isInsightUnavailable) return;
+    if (isIngestionUnavailable) return;
     if (selectedVisiblePendingIds.length === 0) return;
     if (!organizationId || !projectId) return;
 
@@ -670,7 +703,7 @@ export default function ProjectInsightClientView() {
               type="button"
               className="btn btn-sm btn-primary"
               onClick={() => void handleQueueSelected()}
-              disabled={isInsightUnavailable || selectedVisiblePendingIds.length === 0 || isQueueing}
+              disabled={isIngestionUnavailable || selectedVisiblePendingIds.length === 0 || isQueueing}
             >
               {isQueueing
                 ? t.translations.UPLOADING
@@ -748,9 +781,19 @@ export default function ProjectInsightClientView() {
                   {t.translations.PROJECT_INSIGHT_SCOPE}
                 </h1>
                 <BetaBadge size="sm" />
-                {isInsightUnavailable && (
+                {isQueryModelUnavailable && (
                     <span className="badge badge-warning badge-sm">
-                      Insight unavailable
+                      Query model unavailable
+                    </span>
+                )}
+                {isUploadModelUnavailable && (
+                    <span className="badge badge-warning badge-sm">
+                      Upload/OCR model unavailable
+                    </span>
+                )}
+                {isEmbeddingModelUnavailable && (
+                    <span className="badge badge-warning badge-sm">
+                      Embedding model unavailable
                     </span>
                 )}
               </div>
@@ -776,6 +819,7 @@ export default function ProjectInsightClientView() {
               scopedRecordIds={visibleEmbeddedRecords.map(
                 (record) => record.id,
               )}
+              isChatUnavailable={isChatUnavailable}
             />
           </section>
 
