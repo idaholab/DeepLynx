@@ -31,6 +31,8 @@ public class RecordBusinessAuthTests : IntegrationTestBase
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private EncryptionHelper _encryptionHelper = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     public long cid; // class ID
     public long did; // datasource ID
     public long did2;
@@ -72,6 +74,8 @@ public class RecordBusinessAuthTests : IntegrationTestBase
     {
         _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _sensitivityLabelService = new SensitivityLabelService(Context);
@@ -82,8 +86,15 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object);
     }
 
     #region GetAllRecords_SensitivityLabelsAuthorization Tests

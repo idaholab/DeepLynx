@@ -36,6 +36,7 @@ public class FileBusinessTests : IntegrationTestBase
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
@@ -45,6 +46,7 @@ public class FileBusinessTests : IntegrationTestBase
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
 
     public long did; // datasource ID
@@ -82,6 +84,9 @@ public class FileBusinessTests : IntegrationTestBase
 
         _insightBusiness = new Mock<IInsightBusiness>();
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
 
         _dataSourceBusiness =
             new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
@@ -91,8 +96,15 @@ public class FileBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object);
 
         _dataSourceBusiness =
             new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
@@ -226,7 +238,7 @@ public class FileBusinessTests : IntegrationTestBase
             ContentType = "application/octet-stream"
         };
     }
-    
+
     private async Task<Record> CreateBackfillFileRecord(
         string fileName,
         string content,
@@ -4032,7 +4044,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(Encoding.UTF8.GetBytes(content1).Length, after1.FileSize);
         Assert.Equal(Encoding.UTF8.GetBytes(content2).Length, after2.FileSize);
     }
-    
+
     // Verifies that invalid batch sizes are rejected before any backfill work starts.
     [Fact]
     public async Task BackfillFileSizes_ThrowsException_WhenBatchSizeIsZeroOrNegative()
@@ -4124,7 +4136,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         var updatedCount = Context.Records
             .Count(r => recordIds.Contains(r.Id) && r.FileSize != null);
-        
+
         var remainingCount = Context.Records
             .Count(r => recordIds.Contains(r.Id) && r.FileSize == null);
 
@@ -4149,7 +4161,7 @@ public class FileBusinessTests : IntegrationTestBase
             "missing-backfill-file.txt",
             "missing content",
             osid);
-        
+
         var secondGoodRecord = await CreateBackfillFileRecord(
             "second-good-backfill-file.txt",
             "second good content",
@@ -4167,7 +4179,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(2, result.Updated);
         Assert.Equal(1, result.Failed);
         Assert.Equal(secondGoodRecord.Id, result.LastRecordId);
-        
+
         Assert.NotNull(firstGoodAfter!.FileSize);
         Assert.Null(badAfter!.FileSize);
         Assert.NotNull(secondGoodAfter!.FileSize);
@@ -4242,7 +4254,7 @@ public class FileBusinessTests : IntegrationTestBase
         await _fileBusiness.BackfillFileSizes(oid, pid);
 
         var cachedValue = await CacheService.Instance.GetAsync<long?>(cacheKey);
-        
+
         Assert.Null(cachedValue);
     }
 
@@ -4276,23 +4288,23 @@ public class FileBusinessTests : IntegrationTestBase
 
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
-        
+
         var result = await _fileBusiness.BackfillFileSizes(oid, pid);
-        
+
         var updated = await Context.Records.FindAsync(record.Id);
-        
+
         Assert.Equal(1, result.Processed);
         Assert.Equal(1, result.Updated);
         Assert.Equal(0, result.Failed);
-        
+
         Assert.NotNull(updated!.FileSize);
         Assert.Equal(
             Encoding.UTF8.GetBytes("legacy content").Length,
             updated.FileSize);
     }
-    
+
     #endregion
-    
+
     #region CreateUploadTus Tests
 
     [Fact]
@@ -4330,7 +4342,7 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.True(Directory.Exists(uploadPath));
     }
     #endregion
-    
+
     #region GetUploadOffset Tests
 
     [Fact]
@@ -5011,7 +5023,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 uploadId,
-                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
             Times.Once);
 
         var createdRecord = Context.Records
@@ -5122,7 +5134,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 uploadId,
-                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
             Times.Once);
 
         var createdRecord = Context.Records
@@ -5233,7 +5245,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 uploadId,
-                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
             Times.Once);
 
         var createdRecord = Context.Records
@@ -5345,7 +5357,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 uploadId,
-                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
             Times.Once);
 
         var createdRecord = Context.Records
@@ -5669,7 +5681,7 @@ public class FileBusinessTests : IntegrationTestBase
                 pid,
                 did,
                 uploadId,
-                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)), 
+                It.Is<ObjectStorageConfigDto>(c => c != null && c.MountPath == _testDirectory)),
             Times.Once);
 
         var createdRecord = Context.Records
@@ -5682,5 +5694,4 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(fileClass.Id, createdRecord.ClassId);
     }
     #endregion
-
 }
