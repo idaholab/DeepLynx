@@ -989,36 +989,44 @@ export default function DataCatalogClient({
           {/* Record list */}
           <div className="min-w-0">
             {loading === true ? (
-              <div className="card border border-base-300/50 bg-base-100 shadow-sm p-1">
-                <ul className="list mt-0">
-                  {times(5).map((i) => (
-                    <li
+              <div className="divide-y divide-base-200 overflow-hidden rounded-box border border-base-300/50 bg-base-100 shadow-sm">
+                {times(6).map((i) => (
+                  <article
                       key={i}
-                      className="border-b border-base-200 hover:bg-base-200/30 p-2 pl-0 rounded-sm"
+                    className={`grid grid-cols-1 gap-3 p-4 ${
+                      isBulkMode
+                        ? "md:grid-cols-[auto_minmax(0,1fr)_auto]"
+                        : "md:grid-cols-[minmax(0,1fr)_auto]"
+                    }`}
                     >
-                      <div className="text-accent-content mb-1">
-                        <Skeleton width="55%" />
+                    {isBulkMode && (
+                      <div className="flex items-start pt-1">
+                        <Skeleton width={20} height={20} />
                       </div>
-                      <div className="text-sm text-base-300 space-x-2 flex flex-wrap items-center">
-                        <span>
-                          {t.translations.CLASS}{" "}
-                          <span className="badge badge-info badge-sm text-xs">
-                            <Skeleton width={60} />
-                          </span>
-                        </span>
-                        <span className="ml-4">
-                          {t.translations.LAST_EDIT} <Skeleton width={80} />
-                        </span>
-                        <span className="ml-4">
-                          {t.translations.PROJECT} <Skeleton width={120} />
-                        </span>
-                        <span className="ml-4">
-                          {t.translations.DATA_SOURCE} <Skeleton width={100} />
-                        </span>
+                    )}
+
+                    <div className="min-w-0">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <Skeleton width={54} height={24} />
+                        <Skeleton width={128} height={24} />
+                        {i % 4 === 0 && <Skeleton width={92} height={24} />}
                       </div>
-                    </li>
-                  ))}
-                </ul>
+                      <Skeleton height={20} width="48%" />
+                      <div className="mt-1">
+                        <Skeleton height={16} width="76%" />
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <Skeleton height={14} width={132} />
+                        <Skeleton height={14} width={156} />
+                        <Skeleton height={14} width={118} />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end">
+                      <Skeleton width={40} height={32} />
+                    </div>
+                  </article>
+                ))}
               </div>
             ) : currentRecords.length === 0 ? (
               <div className="card border border-base-300/50 bg-base-100 shadow-sm">
