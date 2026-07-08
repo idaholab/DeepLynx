@@ -1,6 +1,5 @@
 using System.Data;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.exceptions;
@@ -8,6 +7,7 @@ using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -21,6 +21,8 @@ public class RecordBusiness : IRecordBusiness
     private readonly ISensitivityLabelBusiness _labelBusiness;
     private readonly ISensitivityLabelService _sensitivityLabelService;
     private readonly ITagBusiness _tagBusiness;
+    private readonly IProvenanceBusiness _provenanceBusiness;
+    private readonly ILogger<RecordBusiness> _logger;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly IFileBusinessFactory _fileBusinessFactory;
 
@@ -32,7 +34,9 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="bulkCopyUpsertExecutor">Executor for efficient database inserts for bulk operations</param>
     /// <param name="tagBusiness">Used for creating tags related to a record.</param>
     /// <param name="labelBusiness">Used for creating tags related to a record.</param>
+    /// <param name="provenanceBusiness">Used for triggering provenance record creation.</param>
     /// <param name="sensitivityLabelService">Service for sensitivity label authorization operations.</param>
+    /// <param name="logger">Error/Info logging interface for database log table.</param>
     public RecordBusiness(
         DeeplynxContext context,
         IEventBusiness eventBusiness,
@@ -40,6 +44,8 @@ public class RecordBusiness : IRecordBusiness
         ITagBusiness tagBusiness,
         ISensitivityLabelBusiness labelBusiness,
         ISensitivityLabelService sensitivityLabelService,
+        IProvenanceBusiness provenanceBusiness,
+        ILogger<RecordBusiness> logger,
         IObjectStorageBusiness objectStorageBusiness,
         IFileBusinessFactory fileBusinessFactory)
     {
@@ -49,9 +55,12 @@ public class RecordBusiness : IRecordBusiness
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
         _labelBusiness = labelBusiness;
         _sensitivityLabelService = sensitivityLabelService;
+        _provenanceBusiness = provenanceBusiness;
+        _logger = logger;
         _objectStorageBusiness = objectStorageBusiness;
         _fileBusinessFactory = fileBusinessFactory;
     }
+
     /// <summary>
     ///     Retrieves all records for a specific project and datasource.
     /// </summary>
@@ -527,6 +536,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = record.IsArchived,
             FileType = record.FileType,
             FileSize = record.FileSize,
+            Embedded = record.Embedded,
             Tags = record.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -585,6 +595,10 @@ public class RecordBusiness : IRecordBusiness
 
         record.Tags.Add(tag);
         await _context.SaveChangesAsync();
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "attach-tag", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for tag attach on record {RecordId}", recordId);
 
         return true;
     }
@@ -650,13 +664,18 @@ public class RecordBusiness : IRecordBusiness
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
-            return true;
         }
         catch
         {
             await transaction.RollbackAsync();
             throw;
         }
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "attach-label", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for label attach on record {RecordId}", recordId);
+
+        return true;
     }
 
     /// <summary>
@@ -698,6 +717,10 @@ public class RecordBusiness : IRecordBusiness
 
         record.Tags.Remove(tag);
         await _context.SaveChangesAsync();
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "detach-tag", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for tag detach on record {RecordId}", recordId);
 
         return true;
     }
@@ -747,6 +770,10 @@ public class RecordBusiness : IRecordBusiness
         record.Labels.Remove(label);
         await _context.SaveChangesAsync();
 
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "detach-label", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for label detach on record {RecordId}", recordId);
+
         return true;
     }
 
@@ -754,6 +781,7 @@ public class RecordBusiness : IRecordBusiness
     ///     Bulk attach tags and records
     /// </summary>
     /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
+    /// <param name="currentUserId">The user making the request</param>
     /// <returns>True if successful</returns>
     /// <exception cref="Exception">Thrown if tags unable to be attached</exception>
     public async Task<bool> BulkInsertRecordTagLinks(List<RecordTagLinkDto> dtos)
@@ -787,6 +815,7 @@ public class RecordBusiness : IRecordBusiness
     ///     Bulk unattach tags and records
     /// </summary>
     /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
+    /// <param name="currentUserId">The user making the request</param>
     /// <returns>True if successful</returns>
     /// <exception cref="Exception">Thrown if tags unable to be unattached</exception>
     public async Task<bool> BulkDeleteRecordTagLinks(List<RecordTagLinkDto> dtos)
@@ -905,6 +934,11 @@ public class RecordBusiness : IRecordBusiness
             throw;
         }
 
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(distinctRecordIds, "attach-label", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk label attach, records {RecordIds}",
+                string.Join(", ", distinctRecordIds));
+
         return true;
     }
 
@@ -944,6 +978,7 @@ public class RecordBusiness : IRecordBusiness
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
+        RecordResponseDto response;
         try
         {
             if (!isSysAdmin &&
@@ -1024,7 +1059,7 @@ public class RecordBusiness : IRecordBusiness
                 [projectId],
                 isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-            return new RecordResponseDto
+            response = new RecordResponseDto
             {
                 Id = record.Id,
                 Description = record.Description,
@@ -1059,6 +1094,12 @@ public class RecordBusiness : IRecordBusiness
             throw new DependencyDeletionException(
                 $"unable to create record or its downstream dependents: {exc}");
         }
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(response.Id, "create-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for record creation, record {RecordId}", response.Id);
+
+        return response;
     }
 
     /// <summary>
@@ -1391,6 +1432,14 @@ public class RecordBusiness : IRecordBusiness
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, events, records.Count);
 
         await tx.CommitAsync();
+
+        // Trigger provenance record creation
+        var insertedRecordIds = inserted.Select(r => r.Id).ToList();
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(insertedRecordIds, "create-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk record creation, records {RecordIds}",
+                string.Join(", ", insertedRecordIds));
+
+
         return inserted;
     }
 
@@ -1464,6 +1513,10 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "archive-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for archive on record {RecordId}", recordId);
+
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {
             Operation = "archive",
@@ -1527,6 +1580,10 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "unarchive-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for unarchive on record {RecordId}", recordId);
+
         // Log record unarchive event
         await _eventBusiness.CreateEvent(currentUserId,
             organizationId,
@@ -1574,6 +1631,10 @@ public class RecordBusiness : IRecordBusiness
         await DeleteAttachedFileIfPresent(returnedRecord);
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "delete-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for delete on record {RecordId}", recordId);
 
         // Log record delete event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -1678,6 +1739,10 @@ public class RecordBusiness : IRecordBusiness
             organizationId,
             [projectId],
             isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "update-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for update on record {RecordId}", recordId);
 
         return new RecordResponseDto
         {
@@ -2028,6 +2093,11 @@ public class RecordBusiness : IRecordBusiness
 
         await BulkInsertRecordTagLinks(dtos);
 
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(recordIds, "attach-tag", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk tag attach, records {RecordIds}",
+                string.Join(",", recordIds));
+
         return true;
     }
 
@@ -2086,6 +2156,11 @@ public class RecordBusiness : IRecordBusiness
             throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
 
         await BulkDeleteRecordTagLinks(dtos);
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(recordIds, "detach-tag", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk tag detach, records {RecordIds}",
+                string.Join(",", recordIds));
 
         return true;
     }

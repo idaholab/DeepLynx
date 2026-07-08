@@ -35,6 +35,8 @@ public class MetadataBusinessTests : IntegrationTestBase
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private EncryptionHelper _encryptionHelper = null!;
@@ -68,10 +70,19 @@ public class MetadataBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
         _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService);
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _recordBusiness = new RecordBusiness(
-            Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService, _objectStorageBusiness, _fileBusinessFactory.Object);
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
         _relationshipBusiness = new RelationshipBusiness(Context, _edgeBusiness, _eventBusiness);
 
         // Now classBusiness gets valid dependencies

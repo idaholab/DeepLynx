@@ -29,6 +29,8 @@ public class QueryBusinessTests : IntegrationTestBase
     private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
@@ -68,8 +70,17 @@ public class QueryBusinessTests : IntegrationTestBase
         _encryptionHelper = new EncryptionHelper();
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService, _objectStorageBusiness, _fileBusinessFactory.Object);
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
         _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService);
     }
 

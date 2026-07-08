@@ -172,8 +172,8 @@ public class FileBusiness
             var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
             var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                            createdRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt);
+            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id, createdRecord.Uri!,
+                                        currentUserId, vlmConfig, embeddingModelConfig, userJwt);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -239,7 +239,8 @@ public class FileBusiness
             var embeddingModelConfig =
                 await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
+            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, currentUserId,
+                                                    vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -254,9 +255,9 @@ public class FileBusiness
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
-    /// <param name="isSysAdmin">Bool of whether or not the user is a system admin</param>
-    /// <param name="isOrgAdmin">Bool of whether or not the user is an organization admin</param>
-    /// <param name="isProjectAdmin">Bool of whether or not the user is a project admin</param>
+    /// <param name="isSysAdmin">Bool of whether the user is a system admin</param>
+    /// <param name="isOrgAdmin">Bool of whether the user is an organization admin</param>
+    /// <param name="isProjectAdmin">Bool of whether the user is a project admin</param>
     /// <returns>The file stream for download</returns>
     public async Task<FileStreamResult> DownloadFile(long currentUserId, long organizationId, long projectId,
         long recordId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
@@ -516,8 +517,8 @@ public class FileBusiness
             var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
             var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id, createdRecord.Uri!,
+                                                currentUserId, vlmConfig, embeddingModelConfig);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -878,8 +879,8 @@ public class FileBusiness
                 var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
                 var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-                _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                    createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+                _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id, createdRecord.Uri!,
+                                                    currentUserId, vlmConfig, embeddingModelConfig);
             }
         }
 
@@ -1004,6 +1005,90 @@ public class FileBusiness
             resolvedClass = recordClass;
         }
         return resolvedClass;
+    }
+
+    /// <summary>
+    ///     Download an Appended File
+    /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="isSysAdmin">Bool of whether the user is a system admin</param>
+    /// <param name="isOrgAdmin">Bool of whether the user is an organization admin</param>
+    /// <param name="isProjectAdmin">Bool of whether the user is a project admin</param>
+    /// <returns>The file stream for download</returns>
+    public async Task<FileStreamResult> DownloadAppendedFile(long currentUserId, long organizationId, long projectId,
+        long recordId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, CancellationToken cancellationToken = default)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true, isSysAdmin, isOrgAdmin, isProjectAdmin);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+
+        if (!IsValidAppendedFile(record, objectStorage))
+        {
+            throw new InvalidOperationException("Record is not an appended file");
+        }
+
+        return await fileBusiness.DownloadAppendedFile(record, objectStorage.Config, cancellationToken);
+    }
+
+    private bool IsValidAppendedFile(
+        RecordResponseDto record,
+        ObjectStorageDecryptedDto objectStorage)
+    {
+        if (string.IsNullOrWhiteSpace(record.Uri))
+            return false;
+
+        string expectedPrefix;
+        string normalizedUri;
+
+        if (objectStorage.Type == "filesystem")
+        {
+            if (objectStorage.Config.MountPath == null)
+                return false;
+
+            // Normalize separators so comparisons are consistent across platforms
+            normalizedUri = record.Uri.Replace('\\', '/');
+            var normalizedMount = objectStorage.Config.MountPath.Replace('\\', '/').TrimEnd('/');
+
+            expectedPrefix = $"{normalizedMount}/org_{record.OrganizationId}/project_{record.ProjectId}/datasource_{record.DataSourceId}/";
+        }
+        else if (objectStorage.Type == "azure_object")
+        {
+            normalizedUri = record.Uri;
+            expectedPrefix = $"organization_{record.OrganizationId}/project_{record.ProjectId}/datasource_{record.DataSourceId}/";
+        }
+        else
+        {
+            return false;
+        }
+
+        // Prefix must match exactly, including the trailing slash before the variable folder name —
+        // this is what prevents "datasource_3" from matching "datasource_30/..."
+        if (!normalizedUri.StartsWith(expectedPrefix, StringComparison.Ordinal))
+            return false;
+
+        var remainder = normalizedUri[expectedPrefix.Length..];
+
+        // Must actually specify a subfolder — can't be the bare datasource root
+        if (string.IsNullOrEmpty(remainder))
+            return false;
+
+        // Must be a folder, not a file — folder URIs always end in a separator
+        if (!normalizedUri.EndsWith('/'))
+            return false;
+
+        // Reject path traversal segments. Not just paranoia for filesystem — without this,
+        // "datasource_3/../../../etc/" passes the StartsWith check above but escapes the sandbox.
+        var segments = remainder.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Any(s => s == ".."))
+            return false;
+
+        return true;
     }
 
     private async Task<bool> DeleteFileRecordOnly(
