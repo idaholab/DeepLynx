@@ -312,6 +312,20 @@ internal static class NexusOpenApiExtensions
 
                 return Task.CompletedTask;
             });
+
+            options.AddSchemaTransformer((schema, context, cancellationToken) =>
+            {
+                var type = Nullable.GetUnderlyingType(context.JsonTypeInfo.Type)
+                        ?? context.JsonTypeInfo.Type;
+
+                if (type == typeof(DateTime) || type == typeof(DateTimeOffset))
+                {
+                    schema.Type = JsonSchemaType.String;
+                    schema.Format = "date-time";
+                }
+
+                return Task.CompletedTask;
+            });
         });
 
         return services;
