@@ -4,7 +4,6 @@ import React from "react";
 import { useMemo, useState } from "react";
 import {
   CheckIcon,
-  ExclamationCircleIcon,
   PencilIcon,
   ShieldCheckIcon,
   TrashIcon,
@@ -37,7 +36,7 @@ interface SplitViewLayoutProps {
   onTogglePermission: (permissionId: number) => void;
 
   roleHasPermission: (roleId: number, permissionId: number) => boolean;
-  isStandardRole: (role: RoleResponseDto) => boolean;
+  isSeededUserRole: (role: RoleResponseDto) => boolean;
 }
 
 const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
@@ -58,7 +57,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   onSavePermissions,
   onTogglePermission,
   roleHasPermission,
-  isStandardRole,
+  isSeededUserRole,
 }) => {
   const { t } = useLanguage();
   const [activePermissionTab, setActivePermissionTab] = useState(
@@ -124,6 +123,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
     displayMode: "permission-name" | "permission-action" = "permission-name",
   ): React.ReactNode => {
     if (!currentRole) return null;
+    const isSeededUser = isSeededUserRole(currentRole);
 
     return (
       <div className="pt-4">
@@ -131,15 +131,14 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
           <h3 className="text-sm font-semibold">{t.translations.PERMISSIONS}</h3>
           {!isEditingPermissions ? (
             <button
-              disabled={
-                rolesLocked || isStandardRole(currentRole) || isLoadingPermissions
-              }
+              disabled={rolesLocked || isLoadingPermissions || isSeededUser}
               onClick={onStartEditingPermissions}
               className="btn btn-primary btn-sm gap-2"
               title={
-                isStandardRole(currentRole)
-                  ? "Standard role permissions cannot be modified"
-                  : rolesLocked
+                isSeededUser
+                    ? t.translations
+                        .SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
+                    : rolesLocked
                     ? "Roles are locked"
                     : "Edit Permissions"
               }
@@ -165,13 +164,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
             </div>
           )}
         </div>
-
-        {isStandardRole(currentRole) && (
-          <div className="alert alert-info mb-4">
-            <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
-            <span className="text-sm">{t.translations.STANDARD_ROLE_DESC}</span>
-          </div>
-        )}
 
         {isLoadingPermissions ? (
           <div className="flex items-center justify-center py-12">
@@ -298,11 +290,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                       />
                       <span className="font-medium text-sm">{role.name}</span>
                     </div>
-                    {isStandardRole(role) && (
-                      <div className="badge badge-info badge-sm">
-                        {t.translations.STD}
-                      </div>
-                    )}
                   </div>
                   {role.description && (
                     <p className="text-xs text-base-content/60 mt-1 ml-6 truncate">
@@ -326,11 +313,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                 <div>
                   <div className="flex items-center gap-3">
                     <h2 className="card-title">{currentRole.name}</h2>
-                    {isStandardRole(currentRole) && (
-                      <div className="badge badge-info">
-                        {t.translations.STANDARD_ROLE}
-                      </div>
-                    )}
                   </div>
                   {currentRole.description && (
                     <p className="text-sm text-base-content/70 mt-1">
@@ -344,27 +326,29 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                 </div>
                 <div className="flex gap-2">
                   <button
-                    disabled={isStandardRole(currentRole)}
+                    disabled={isSeededUserRole(currentRole)}
                     onClick={() => onEditClick(currentRole)}
                     className="btn btn-ghost btn-sm btn-circle"
                     title={
-                      isStandardRole(currentRole)
-                        ? "Standard roles cannot be edited"
+                      isSeededUserRole(currentRole)
+                        ? t.translations.SEEDED_USER_ROLE_CANNOT_BE_MODIFIED
                         : "Edit Role"
                     }
                   >
                     <PencilIcon className="size-6" />
                   </button>
-                  {!isStandardRole(currentRole) && (
-                    <button
-                      disabled={rolesLocked}
-                      onClick={() => onDeleteClick(currentRole)}
-                      className="btn btn-ghost btn-sm btn-circle text-error"
-                      title="Delete Role"
-                    >
-                      <TrashIcon className="size-6" />
-                    </button>
-                  )}
+                  <button
+                    disabled={rolesLocked || isSeededUserRole(currentRole)}
+                    onClick={() => onDeleteClick(currentRole)}
+                    className="btn btn-ghost btn-sm btn-circle text-error"
+                    title={
+                      isSeededUserRole(currentRole)
+                        ? t.translations.SEEDED_USER_ROLE_CANNOT_BE_ARCHIVED
+                        : "Delete Role"
+                    }
+                  >
+                    <TrashIcon className="size-6" />
+                  </button>
                 </div>
               </div>
             </div>
