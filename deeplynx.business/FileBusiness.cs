@@ -169,8 +169,8 @@ public class FileBusiness
             var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
             var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                            createdRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt);
+            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id, createdRecord.Uri!,
+                                        currentUserId, vlmConfig, embeddingModelConfig, userJwt);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -236,7 +236,8 @@ public class FileBusiness
             var embeddingModelConfig =
                 await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
+            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, currentUserId,
+                                                    vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -508,8 +509,8 @@ public class FileBusiness
             var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
             var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+            _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id, createdRecord.Uri!,
+                                                currentUserId, vlmConfig, embeddingModelConfig);
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
@@ -870,8 +871,8 @@ public class FileBusiness
                 var vlmConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
                 var embeddingModelConfig = await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
-                _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id,
-                    createdRecord.Uri!, vlmConfig, embeddingModelConfig);
+                _insightBusiness.TriggerEmbedding(projectId, createdRecord.Id, createdRecord.Uri!,
+                                                    currentUserId, vlmConfig, embeddingModelConfig);
             }
         }
 
@@ -964,7 +965,7 @@ public class FileBusiness
 
         return false;
     }
-    
+
     private async Task<ClassResponseDto> GetResolvedClass(long organizationId, long projectId, long currentUserId, CreateRecordFileUploadRequestDto? metadata, ClassResponseDto recordClass)
     {
         var providedClassId = metadata?.ClassId;
@@ -975,16 +976,18 @@ public class FileBusiness
         if (providedClassId.HasValue)
         {
             resolvedClass = await _classBusiness.GetClass(organizationId, projectId, providedClassId.Value, true);
-            if (resolvedClass is null) {
+            if (resolvedClass is null)
+            {
                 throw new ArgumentException($"Class ID {providedClassId} does not exist in this project.");
-            } 
-            if (!string.IsNullOrWhiteSpace(providedClassName) && resolvedClass.Name != providedClassName) {
+            }
+            if (!string.IsNullOrWhiteSpace(providedClassName) && resolvedClass.Name != providedClassName)
+            {
                 // Class Name was provided and doesn't match the Class Name from the Id
                 throw new ArgumentException($"Class Name {providedClassName} does not match Class Id {providedClassId}. Expected {resolvedClass.Name}");
             }
-        } 
+        }
         // No Class Id provided, Class Name was provided
-        else if (!string.IsNullOrWhiteSpace(providedClassName)) 
+        else if (!string.IsNullOrWhiteSpace(providedClassName))
         {
             resolvedClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, providedClassName);
         }

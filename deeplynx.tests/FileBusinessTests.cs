@@ -37,6 +37,7 @@ public class FileBusinessTests : IntegrationTestBase
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private RecordBusiness _recordBusiness = null!;
@@ -46,6 +47,7 @@ public class FileBusinessTests : IntegrationTestBase
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
 
     public long did; // datasource ID
@@ -84,6 +86,9 @@ public class FileBusinessTests : IntegrationTestBase
 
         _insightBusiness = new Mock<IInsightBusiness>();
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
 
         _dataSourceBusiness =
             new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
@@ -93,8 +98,15 @@ public class FileBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object);
 
         _dataSourceBusiness =
             new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
@@ -5815,6 +5827,7 @@ public class FileBusinessTests : IntegrationTestBase
     }
     #endregion
 
+
     private static IFormFile CreateTestCsvFile(string content, string fileName = "test.csv")
     {
         var bytes = Encoding.UTF8.GetBytes(content);
@@ -5930,3 +5943,4 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
 }
+

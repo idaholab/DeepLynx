@@ -201,7 +201,7 @@ try
     builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
     builder.Services.AddTransient<ITokenBusiness, TokenBusiness>();
     builder.Services.AddTransient<IOauthApplicationBusiness, OauthApplicationBusiness>();
-
+    builder.Services.AddTransient<IProvenanceBusiness, ProvenanceBusiness>();
     builder.Services.AddTransient<IQueryBusiness, QueryBusiness>();
     builder.Services.AddTransient<IMetadataBusiness, MetadataBusiness>();
     builder.Services.AddTransient<IHistoricalRecordBusiness, HistoricalRecordBusiness>();
