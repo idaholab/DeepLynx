@@ -60,12 +60,15 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private NotificationBusiness _notificationBusiness = null!;
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private FileBusiness _realFileBusiness = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private const string CsvHeaders = "timestamp,sensor_id,value,temperature,pressure";
 
@@ -94,13 +97,16 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockObjectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _mockClassBusiness = new Mock<IClassBusiness>();
+        _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _insightBusiness = new Mock<IInsightBusiness>();
 
 
         _edgeBusiness = new Mock<IEdgeBusiness>();
         _sensitivityLabelService = new SensitivityLabelService(Context);
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
 
-        _recordBusiness = null!; // Will be initialized later after dependencies are ready
+        _recordBusiness = null!;
         _eventBusiness = null!;
         _classBusiness = null!;
         _tagBusiness = null!;
@@ -109,15 +115,19 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _objectStorageBusiness = null!;
         _notificationBusiness = null!;
 
-        // Initialize dependent services in order:
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
 
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor,
-            _tagBusiness ?? new TagBusiness(Context, _eventBusiness),
-            _sensitivityLabelBusiness ?? new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness ?? new UserBusiness(Context)),
-            _sensitivityLabelService);
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object);
 
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
