@@ -242,7 +242,12 @@ public class InsightBusiness : IInsightBusiness
             modelConfigId,
             normalizedModelType);
 
-        if (!string.Equals(config.ModelType, normalizedModelType, StringComparison.OrdinalIgnoreCase))
+        var isAllowedLlmCompatibleModel =
+            normalizedModelType == "llm" &&
+            string.Equals(config.ModelType, "vlm", StringComparison.OrdinalIgnoreCase);
+
+        if (!isAllowedLlmCompatibleModel &&
+            !string.Equals(config.ModelType, normalizedModelType, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
                 $"Model configuration {config.Id} is type '{config.ModelType}' but '{normalizedModelType}' was requested.");

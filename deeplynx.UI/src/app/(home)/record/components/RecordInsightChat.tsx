@@ -6,8 +6,7 @@ import {
   buildInsightModelBadges,
   formatInsightTimestamp,
 } from "@/app/(home)/components/insight/insightChat.utils";
-import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
-import {
+import type { InsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
   streamInsightQuery,
@@ -46,7 +45,10 @@ interface RecordInsightChatProps {
   recordUri?: string | null;
   recordName?: string | null;
   onEmbeddingStatusChange?: (isEmbedded: boolean) => void;
-  isInsightUnavailable?: boolean;
+  isChatUnavailable?: boolean;
+  isIngestionUnavailable?: boolean;
+  selectedInsightModels: InsightModelSelection;
+  onSelectedInsightModelsChange: (nextSelection: InsightModelSelection) => void;
 }
 
 const STATUS_POLL_INTERVAL_MS = 5000;
@@ -91,7 +93,10 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   recordUri,
   recordName,
   onEmbeddingStatusChange,
-  isInsightUnavailable = false,  
+  isChatUnavailable = false,
+  isIngestionUnavailable = false,
+  selectedInsightModels,
+  onSelectedInsightModelsChange,  
 }) => {
   const { t } = useLanguage();
   const trimmedRecordName = recordName?.trim() ?? "";
@@ -114,8 +119,6 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   const [ingestionState, setIngestionState] =
     useState<IngestionState>("not_queued");
   const [messages, setMessages] = useState<InsightMessage[]>([]);
-  const { selectedInsightModels, setSelectedInsightModels } =
-    useInsightModelSelection(organizationId, projectId);
   const selectedModelBadges = buildInsightModelBadges(
     selectedInsightModels,
     t.translations.INSIGHT_NEXUS_MODEL,
@@ -257,7 +260,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   }, [ingestionState]);
 
   useEffect(() => {
-    if (isInsightUnavailable || !organizationId || !projectId || !recordId) return;
+    if (isIngestionUnavailable || !organizationId || !projectId || !recordId) return;
 
     let cancelled = false;
 
@@ -281,10 +284,10 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [organizationId, projectId, recordId, isInsightUnavailable]);
+  }, [organizationId, projectId, recordId, isIngestionUnavailable]);
 
   useEffect(() => {
-    if (isInsightUnavailable || !organizationId || !projectId || !recordId) return;
+    if (isIngestionUnavailable || !organizationId || !projectId || !recordId) return;
     if (ingestionState !== "queued" && ingestionState !== "processing") return;
 
     let cancelled = false;
@@ -319,7 +322,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [organizationId, projectId, recordId, ingestionState, isInsightUnavailable]);
+  }, [organizationId, projectId, recordId, ingestionState, isIngestionUnavailable]);
 
   async function handleSend(input: string) {
     const prompt = input.trim();
@@ -382,7 +385,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   }
 
   async function handleQueueUpload() {
-    if (isInsightUnavailable) {
+    if (isIngestionUnavailable) {
       setIngestionState("error");
       return;
     }
@@ -474,7 +477,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
             onClick={() => {
               void handleQueueUpload();
             }}
-            disabled={isInsightUnavailable || isQueueingUpload || isResponding}
+            disabled={isIngestionUnavailable || isQueueingUpload || isResponding}
           >
             <CloudArrowUpIcon className="size-5" />
             {isQueueingUpload
@@ -591,12 +594,12 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
                     placeholder={t.translations.INSIGHT_ASK_PLACEHOLDER}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    disabled={isResponding}
+                    disabled={isResponding || isChatUnavailable}
                   />
                   <button
                     type="submit"
                     className="btn btn-primary btn-sm gap-2"
-                    disabled={!draft.trim() || isResponding}
+                    disabled={!draft.trim() || isResponding || isChatUnavailable}
                     aria-label={t.translations.INSIGHT_SEND_PROMPT_ARIA}
                   >
                     <PaperAirplaneIcon className="size-5" />
@@ -618,7 +621,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
         projectId={projectId}
         selectedInsightModels={selectedInsightModels}
         onClose={() => setIsSettingsModalOpen(false)}
-        onSaveSelection={setSelectedInsightModels}
+        onSaveSelection={onSelectedInsightModelsChange}
       />
     </div>
   );

@@ -155,7 +155,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         ? Number(organization.organizationId)
         : null;
   
-  const { selectedInsightModels } = useInsightModelSelection(
+  const { selectedInsightModels, setSelectedInsightModels } = useInsightModelSelection(
       organizationId,
       projectId,
   );
@@ -192,7 +192,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
-  const [isInsightUnavailable, setIsInsightUnavailable] = useState(false);
+  const [isQueryModelUnavailable, setIsQueryModelUnavailable] = useState(false);
+  const [isUploadModelUnavailable, setIsUploadModelUnavailable] = useState(false);
+  const [isEmbeddingModelUnavailable, setIsEmbeddingModelUnavailable] = useState(false);
+  const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
+  const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;
   const [hasCheckedInsightHealth, setHasCheckedInsightHealth] = useState(false);
   const [isQueuingInsightUpload, setIsQueuingInsightUpload] = useState(false);
   const [latticeMode, setLatticeMode] = useState<"strict" | "discovery">(
@@ -283,7 +287,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const resetAllState = useCallback(() => {
     setRecord(null);
     setRecordFileType(null);
-    setIsInsightUnavailable(false);
+    setIsQueryModelUnavailable(false);
+    setIsUploadModelUnavailable(false);
+    setIsEmbeddingModelUnavailable(false);
     setHasCheckedInsightHealth(false);
     setSelectedTags([]);
     setSelectedIds([]);
@@ -787,6 +793,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   ]);
 
   const handleQueueInsightUpload = useCallback(async () => {
+    if (isIngestionUnavailable) return;
+    
     const uri = record?.uri?.trim();
     if (!uri || !organization?.organizationId) return;
     setIsQueuingInsightUpload(true);
@@ -795,6 +803,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         organizationId: organization.organizationId as number,
         projectId,
         fileInfo: [{ fileId: recordId, fileUri: uri }],
+        vlmModelConfigId: selectedInsightModels.uploadModelConfigId ?? undefined,
+        embeddingModelConfigId: selectedInsightModels.embeddingModelConfigId ?? undefined,
       });
       toast.success(t.translations.LATTICE_QUEUED_SUCCESS);
     } catch {
@@ -802,9 +812,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     } finally {
       setIsQueuingInsightUpload(false);
     }
-  }, [organization?.organizationId, projectId, record?.uri, recordId]);
+  }, [organization?.organizationId, projectId, record?.uri, recordId, isIngestionUnavailable, selectedInsightModels.uploadModelConfigId, selectedInsightModels.embeddingModelConfigId,]);
 
   const handleQueueOntologyEmbeddings = useCallback(async () => {
+    if (isEmbeddingModelUnavailable) return;
+    
     if (!organization?.organizationId) return;
     setIsQueuingOntologyEmbeddings(true);
     try {
@@ -824,6 +836,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     projectId,
     t.translations.LATTICE_ONTOLOGY_QUEUED_SUCCESS,
     t.translations.LATTICE_ONTOLOGY_QUEUE_FAILED,
+    isEmbeddingModelUnavailable,
   ]);
 
   const recordEmbedPollRef = useRef<ReturnType<typeof setInterval> | null>(
@@ -841,25 +854,58 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       try {
         if (isInitial) setIsCheckingLatticeReadiness(true);
 
-        const health = await fetchInsightEndpointHealth({
-          organizationId: organization.organizationId as number,
-          projectId,
-          modelConfigId: selectedInsightModels.embeddingModelConfigId,
-          modelType: "embedding",
-        });
-        
-        if (!health.reachable || !health.model_available) {
-          if (cancelled) return;
-          
-          setHasCheckedInsightHealth(true);
-          setIsInsightUnavailable(true);
+        const [queryHealth, uploadHealth, embeddingHealth] =
+            await Promise.allSettled([
+              fetchInsightEndpointHealth({
+                organizationId: organization.organizationId as number,
+                projectId,
+                modelConfigId: selectedInsightModels.queryModelConfigId,
+                modelType: "llm",
+              }),
+              fetchInsightEndpointHealth({
+                organizationId: organization.organizationId as number,
+                projectId,
+                modelConfigId: selectedInsightModels.uploadModelConfigId,
+                modelType: "vlm",
+              }),
+              fetchInsightEndpointHealth({
+                organizationId: organization.organizationId as number,
+                projectId,
+                modelConfigId: selectedInsightModels.embeddingModelConfigId,
+                modelType: "embedding",
+              }),
+            ]);
+
+        const queryUnavailable =
+            queryHealth.status === "rejected" ||
+            !queryHealth.value.reachable ||
+            !queryHealth.value.model_available;
+
+        const uploadUnavailable =
+            uploadHealth.status === "rejected" ||
+            !uploadHealth.value.reachable ||
+            !uploadHealth.value.model_available;
+
+        const embeddingUnavailable =
+            embeddingHealth.status === "rejected" ||
+            !embeddingHealth.value.reachable ||
+            !embeddingHealth.value.model_available;
+
+        if (cancelled) return;
+
+        setHasCheckedInsightHealth(true);
+        setIsQueryModelUnavailable(queryUnavailable);
+        setIsUploadModelUnavailable(uploadUnavailable);
+        setIsEmbeddingModelUnavailable(embeddingUnavailable);
+
+        if (embeddingUnavailable) {
           setIsRecordInsightEmbedded(false);
-          
+
           if (recordEmbedPollRef.current) {
             clearInterval(recordEmbedPollRef.current);
             recordEmbedPollRef.current = null;
           }
-          
+
           return;
         }
         
@@ -872,18 +918,28 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
-        setIsInsightUnavailable(false);
         setIsRecordInsightEmbedded(status.indexed);
 
-        if (status.indexed && recordEmbedPollRef.current) {
-          clearInterval(recordEmbedPollRef.current);
-          recordEmbedPollRef.current = null;
+        if (status.indexed) {
+          if (recordEmbedPollRef.current) {
+            clearInterval(recordEmbedPollRef.current);
+            recordEmbedPollRef.current = null;
+          }
+          return;
+        }
+        
+        if (!recordEmbedPollRef.current) {
+          recordEmbedPollRef.current = setInterval(() => {
+            void checkLatticeReadiness();
+          }, POLL_INTERVAL_MS);
         }
       } catch (error) {
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
-        setIsInsightUnavailable(true);
+        setIsQueryModelUnavailable(true);
+        setIsUploadModelUnavailable(true);
+        setIsEmbeddingModelUnavailable(true);
         setIsRecordInsightEmbedded(false);
 
         if (recordEmbedPollRef.current) {
@@ -891,7 +947,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           recordEmbedPollRef.current = null;
         }
         
-        console.error("Failed to check Insight embedding status:", error);
+        console.error("Failed to check Insight status:", error);
       } finally {
         if (!cancelled && isInitial) {
           setIsCheckingLatticeReadiness(false);
@@ -902,10 +958,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
     void checkLatticeReadiness();
 
-    recordEmbedPollRef.current = setInterval(() => {
-      void checkLatticeReadiness();
-    }, POLL_INTERVAL_MS);
-
     return () => {
       cancelled = true;
       if (recordEmbedPollRef.current) {
@@ -913,7 +965,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         recordEmbedPollRef.current = null;
       }
     };
-  }, [organization?.organizationId, projectId, recordId, selectedInsightModels.embeddingModelConfigId]);
+  }, [organization?.organizationId, projectId, recordId, selectedInsightModels.queryModelConfigId, selectedInsightModels.uploadModelConfigId, selectedInsightModels.embeddingModelConfigId]);
 
   useEffect(() => {
     if (!organization?.organizationId || !projectId) return;
@@ -1062,7 +1114,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 recordName={record.name}
                 recordUri={record.uri}
                 onEmbeddingStatusChange={setIsRecordInsightEmbedded}
-                isInsightUnavailable={!hasCheckedInsightHealth || isInsightUnavailable}
+                isChatUnavailable={!hasCheckedInsightHealth || isChatUnavailable}
+                isIngestionUnavailable={!hasCheckedInsightHealth || isIngestionUnavailable}
+                selectedInsightModels={selectedInsightModels}
+                onSelectedInsightModelsChange={setSelectedInsightModels}
               />
             ) : null}
 
@@ -1224,7 +1279,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                             type="button"
                             className="btn btn-warning btn-sm shrink-0"
                             onClick={handleQueueInsightUpload}
-                            disabled={isQueuingInsightUpload}
+                            disabled={isQueuingInsightUpload || isIngestionUnavailable}
                           >
                             {isQueuingInsightUpload ? (
                               <span className="loading loading-spinner loading-sm" />
@@ -1324,7 +1379,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                               type="button"
                               className="btn btn-outline btn-xs shrink-0 ml-auto"
                               onClick={handleQueueOntologyEmbeddings}
-                              disabled={isQueuingOntologyEmbeddings}
+                              disabled={isQueuingOntologyEmbeddings || isEmbeddingModelUnavailable}
                             >
                               {isQueuingOntologyEmbeddings ? (
                                 <span className="loading loading-spinner loading-xs" />
@@ -1441,9 +1496,19 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 <h1 className="break-words text-2xl font-bold text-base-content sm:text-3xl">
                   {record.name}
                 </h1>
-                {isInsightUnavailable && (
+                {isQueryModelUnavailable && (
                     <span className="badge badge-warning badge-sm">
-                      Insight unavailable
+                      Query model unavailable
+                    </span>
+                )}
+                {isUploadModelUnavailable && (
+                    <span className="badge badge-warning badge-sm">
+                      Upload/OCR model unavailable
+                    </span>
+                )}
+                {isEmbeddingModelUnavailable && (
+                    <span className="badge badge-warning badge-sm">
+                      Embedding model unavailable
                     </span>
                 )}
               </div>
