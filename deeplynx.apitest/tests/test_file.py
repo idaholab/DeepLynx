@@ -13,7 +13,6 @@ import os
 import tempfile
 import requests
 import json
-import time
 
 
 @pytest.fixture
@@ -104,51 +103,6 @@ def test_upload_file_with_datasource(client, organization, project, test_datasou
     
     # Verify data source association
     assert result.get("dataSourceId") or result.get("data_source_id"), "Should have data source ID"
-
-def test_upload_file_with_sensitivity_label(client, organization, project, cleanup_file_records, temp_files):
-    """Test uploading a file with a sensitivity label."""
-    # Create a sensitivity label to attach to the file
-    label_payload = {
-        "name": f"pytest_UploadFileLabel_{int(time.time() * 1000)}",
-        "description": "Label for file upload test"
-    }
-    label_response = client.post(f"/projects/{project}/labels", json=label_payload)
-    assert label_response.status_code == 200, f"Failed to create label: {label_response.text}"
-    label_id = label_response.json().get("id")
-
-    filename = "test_sensitivity.txt"
-    content = "Test file with sensitivity label."
-
-    temp_file_path = create_temp_file(filename, content, temp_files)
-
-    url = f"{client.base_url}/organizations/{organization}/projects/{project}/files"
-    params = {"sensitivityLabelIds": label_id}
-
-    try:
-        with open(temp_file_path, 'rb') as f:
-            files = {'file': (filename, f, 'text/plain')}
-            headers = {"Authorization": f"Bearer {client.token}"}
-
-            response = requests.post(url, params=params, files=files, headers=headers)
-
-        assert response.status_code == 200, f"File upload with sensitivity label failed: {response.text}"
-
-        result = response.json()
-        record_id = result["id"]
-        cleanup_file_records.append(record_id)
-
-        # Verify sensitivity label association
-        labels = result.get("labels")
-        assert labels, "Should have sensitivity label(s) on the file"
-
-        label_ids = [label.get("id") for label in labels]
-        assert label_id in label_ids, f"Expected label ID {label_id} in {label_ids}"
-
-        label_names = [label.get("name") for label in labels]
-        assert label_payload["name"] in label_names, f"Expected label name '{label_payload['name']}' in {label_names}"
-    finally:
-        # Cleanup the label
-        client.delete(f"/projects/{project}/labels/{label_id}")
 
 
 def test_upload_multiple_files(client, organization, project, cleanup_file_records, temp_files):

@@ -1,5 +1,4 @@
 using deeplynx.business;
-using deeplynx.interfaces;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.models;
@@ -19,7 +18,7 @@ namespace deeplynx.api.Controllers;
 [Authorize]
 public class FileController : ControllerBase
 {
-    private readonly IFileControllerBusiness _fileBusiness;
+    private readonly FileBusiness _fileBusiness;
     private readonly ILogger<FileController> _logger;
 
     /// <summary>
@@ -27,7 +26,7 @@ public class FileController : ControllerBase
     /// </summary>
     /// <param name="fileBusiness">The business logic interface for handling file operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
-    public FileController(IFileControllerBusiness fileBusiness, ILogger<FileController> logger)
+    public FileController(FileBusiness fileBusiness, ILogger<FileController> logger)
     {
         _fileBusiness = fileBusiness;
         _logger = logger;
@@ -67,12 +66,9 @@ public class FileController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var userJwt = UserContextStorage.Token;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt, isSysAdmin, isOrgAdmin, isProjectAdmin);
+                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
@@ -154,7 +150,7 @@ public class FileController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
     /// <summary>
     ///     Download a File
     /// </summary>

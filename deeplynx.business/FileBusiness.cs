@@ -15,7 +15,7 @@ using System.Runtime.CompilerServices;
 
 namespace deeplynx.business;
 
-public class FileBusiness : IFileControllerBusiness
+public class FileBusiness
 {
     private readonly IClassBusiness _classBusiness;
     private readonly DeeplynxContext _context;
@@ -80,9 +80,6 @@ public class FileBusiness : IFileControllerBusiness
     /// <param name="embed">Boolean value that determines if the file will be embedded by Insight</param>
     /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
     /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
-    /// <param name="isSysAdmin">Bool of whether or not the user is a system admin</param>
-    /// <param name="isOrgAdmin">Bool of whether or not the user is an organization admin</param>
-    /// <param name="isProjectAdmin">Bool of whether or not the user is a project admin</param>
     /// <returns>Record response DTO containing file information</returns>
     public async Task<RecordResponseDto> UploadFile(
         long currentUserId,
@@ -96,10 +93,7 @@ public class FileBusiness : IFileControllerBusiness
         bool embed = false,
         long? vlmConfigId = null,
         long? embeddingModelConfigId = null,
-        string? userJwt = null,
-        bool isSysAdmin = false,
-        bool isOrgAdmin = false,
-        bool isProjectAdmin = false)
+        string? userJwt = null)
     {
         if (file == null || file.Length == 0) throw new ArgumentException("File is required and cannot be empty.");
         file = new SanitizedFormFile(file);
@@ -171,7 +165,7 @@ public class FileBusiness : IFileControllerBusiness
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
-            realDataSourceId, recordRequest, sensitivityLabelIds, embed, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            realDataSourceId, recordRequest, sensitivityLabelIds, embed);
 
         if (embed)
         {
