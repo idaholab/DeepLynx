@@ -382,9 +382,9 @@ public class AuthMiddleware
                         authAttr.Resource
                     );
 
-                    if (projectPermission)
+                    if (!projectPermission)
                     {
-                        hasPermission = true;
+                        hasPermissionInAllProjects = false;
                         break;
                     }
                 }
