@@ -16,6 +16,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organizations/{organizationId:long}/classes")]
 [Authorize]
+[ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Organization - Class")]
 public class ClassOrganizationController : ControllerBase
 {

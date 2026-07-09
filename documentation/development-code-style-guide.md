@@ -123,6 +123,7 @@ Controllers should:
 - Inject business interfaces and `ILogger<T>`.
 - Use explicit `ActionResult<T>` return types so OpenAPI includes DTO schemas.
 - Apply `[Auth]`, `[SysAdmin]`, or `[OrgAdmin]` attributes to protected endpoints.
+- Use `[ForbidServiceAccounts]` on endpoints service accounts should not be able to access.
 - Keep route methods small.
 - Catch exceptions, log failures, and return an API response.
 
