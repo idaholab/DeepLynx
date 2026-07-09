@@ -88,7 +88,7 @@ try
                 .AllowAnyMethod()
                 .AllowAnyHeader()
                 .AllowCredentials()
-                .WithExposedHeaders("Content-Disposition"); 
+                .WithExposedHeaders("Content-Disposition");
         });
     });
 
@@ -229,7 +229,7 @@ try
     builder.Services.AddTransient<IUserModelTokenBusiness, UserModelTokenBusiness>();
     builder.Services.AddTransient<IAiModelConfigBusiness, AiModelConfigBusiness>();
     builder.Services.AddScoped<ISensitivityLabelService, SensitivityLabelService>();
-    builder.Services.AddScoped<FileBusiness>();
+    builder.Services.AddScoped<IFileControllerBusiness, FileBusiness>();
     builder.Services.AddTransient<IInsightBusiness, InsightBusiness>();
     builder.Services.AddTransient<ILatticeExtractionBusiness, LatticeExtractionBusiness>();
     builder.Services.AddMemoryCache();
