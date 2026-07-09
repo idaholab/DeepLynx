@@ -27,6 +27,7 @@ public class FileBusiness
     private readonly IInsightBusiness _insightBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly ILogger<FileBusiness> _logger;
+    private readonly IEventBusiness _eventBusiness;
 
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
@@ -41,7 +42,8 @@ public class FileBusiness
         IInsightBusiness insightBusiness,
         IOlapBusiness olapBusiness,
         IObjectStorageBusiness objectStorageBusiness,
-        ILogger<FileBusiness> logger)
+        ILogger<FileBusiness> logger,
+        IEventBusiness eventBusiness)
     {
         _context = context;
         _factory = factory;
@@ -52,6 +54,7 @@ public class FileBusiness
         _olapBusiness = olapBusiness;
         _objectStorageBusiness = objectStorageBusiness;
         _logger = logger;
+        _eventBusiness = eventBusiness;
 
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
                            ?? throw new InvalidOperationException(
@@ -252,9 +255,9 @@ public class FileBusiness
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
-    /// <param name="isSysAdmin">Bool of whether or not the user is a system admin</param>
-    /// <param name="isOrgAdmin">Bool of whether or not the user is an organization admin</param>
-    /// <param name="isProjectAdmin">Bool of whether or not the user is a project admin</param>
+    /// <param name="isSysAdmin">Bool of whether the user is a system admin</param>
+    /// <param name="isOrgAdmin">Bool of whether the user is an organization admin</param>
+    /// <param name="isProjectAdmin">Bool of whether the user is a project admin</param>
     /// <returns>The file stream for download</returns>
     public async Task<FileStreamResult> DownloadFile(long currentUserId, long organizationId, long projectId,
         long recordId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
@@ -311,7 +314,11 @@ public class FileBusiness
 
         await fileBusiness.DeleteFile(record, objectStorage.Config);
 
-        var deleted = await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+        var deleted = await DeleteFileRecordOnly(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId);
 
         await InvalidateProjectStorageSizeCache(projectId);
 
@@ -362,18 +369,19 @@ public class FileBusiness
                             && r.OrganizationId == organizationId
                             && r.OriginalId == metadata.OriginalId);
             var matchingRecord = await recordQuery.FirstOrDefaultAsync();
-            if (matchingRecord != null) 
+            if (matchingRecord != null)
                 throw new ArgumentException("original_id already exists");
 
             // class id validation
             if (metadata.ClassId.HasValue)
             {
-                var actualClass = await _classBusiness.GetClass(organizationId, projectId, metadata.ClassId.Value, true) 
+                var actualClass = await _classBusiness.GetClass(organizationId, projectId, metadata.ClassId.Value, true)
                     ?? throw new ArgumentException($"Class ID {metadata.ClassId} does not exist in this project.");
-                if (!string.IsNullOrWhiteSpace(metadata.ClassName) && actualClass.Name != metadata.ClassName) {
+                if (!string.IsNullOrWhiteSpace(metadata.ClassName) && actualClass.Name != metadata.ClassName)
+                {
                     throw new ArgumentException($"Class Name {metadata.ClassName} does not match Class Id {metadata.ClassId}. Expected {actualClass.Name}");
                 }
-            } 
+            }
         }
 
         var uploadId = await fileBusiness.StartUpload(organizationId, projectId, realDataSourceId, objectStorage.Config);
@@ -997,5 +1005,134 @@ public class FileBusiness
             resolvedClass = recordClass;
         }
         return resolvedClass;
+    }
+
+    /// <summary>
+    ///     Download an Appended File
+    /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="isSysAdmin">Bool of whether the user is a system admin</param>
+    /// <param name="isOrgAdmin">Bool of whether the user is an organization admin</param>
+    /// <param name="isProjectAdmin">Bool of whether the user is a project admin</param>
+    /// <returns>The file stream for download</returns>
+    public async Task<FileStreamResult> DownloadAppendedFile(long currentUserId, long organizationId, long projectId,
+        long recordId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, CancellationToken cancellationToken = default)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true, isSysAdmin, isOrgAdmin, isProjectAdmin);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+
+        if (!IsValidAppendedFile(record, objectStorage))
+        {
+            throw new InvalidOperationException("Record is not an appended file");
+        }
+
+        return await fileBusiness.DownloadAppendedFile(record, objectStorage.Config, cancellationToken);
+    }
+
+    private bool IsValidAppendedFile(
+        RecordResponseDto record,
+        ObjectStorageDecryptedDto objectStorage)
+    {
+        if (string.IsNullOrWhiteSpace(record.Uri))
+            return false;
+
+        string expectedPrefix;
+        string normalizedUri;
+
+        if (objectStorage.Type == "filesystem")
+        {
+            if (objectStorage.Config.MountPath == null)
+                return false;
+
+            // Normalize separators so comparisons are consistent across platforms
+            normalizedUri = record.Uri.Replace('\\', '/');
+            var normalizedMount = objectStorage.Config.MountPath.Replace('\\', '/').TrimEnd('/');
+
+            expectedPrefix = $"{normalizedMount}/org_{record.OrganizationId}/project_{record.ProjectId}/datasource_{record.DataSourceId}/";
+        }
+        else if (objectStorage.Type == "azure_object")
+        {
+            normalizedUri = record.Uri;
+            expectedPrefix = $"organization_{record.OrganizationId}/project_{record.ProjectId}/datasource_{record.DataSourceId}/";
+        }
+        else
+        {
+            return false;
+        }
+
+        // Prefix must match exactly, including the trailing slash before the variable folder name —
+        // this is what prevents "datasource_3" from matching "datasource_30/..."
+        if (!normalizedUri.StartsWith(expectedPrefix, StringComparison.Ordinal))
+            return false;
+
+        var remainder = normalizedUri[expectedPrefix.Length..];
+
+        // Must actually specify a subfolder — can't be the bare datasource root
+        if (string.IsNullOrEmpty(remainder))
+            return false;
+
+        // Must be a folder, not a file — folder URIs always end in a separator
+        if (!normalizedUri.EndsWith('/'))
+            return false;
+
+        // Reject path traversal segments. Not just paranoia for filesystem — without this,
+        // "datasource_3/../../../etc/" passes the StartsWith check above but escapes the sandbox.
+        var segments = remainder.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Any(s => s == ".."))
+            return false;
+
+        return true;
+    }
+
+    private async Task<bool> DeleteFileRecordOnly(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        var returnedRecord = await _context.Records
+            .Include(r => r.Labels)
+            .Where(r => r.Id == recordId
+                        && r.OrganizationId == organizationId
+                        && r.ProjectId == projectId
+                        && !r.IsArchived)
+            .FirstOrDefaultAsync();
+
+        if (returnedRecord is null)
+            throw new KeyNotFoundException($"Record with id {recordId} is archived or not found");
+
+        if (!returnedRecord.ObjectStorageId.HasValue)
+            throw new InvalidOperationException("Record needs an object storage id.");
+
+        if (string.IsNullOrWhiteSpace(returnedRecord.Uri))
+            throw new InvalidOperationException("Record needs a file URI.");
+
+        if (string.IsNullOrWhiteSpace(returnedRecord.FileType))
+            throw new InvalidOperationException("Record is not a file-backed record.");
+
+        var recordName = returnedRecord.Name;
+        var recordDataSourceId = returnedRecord.DataSourceId;
+
+        _context.Records.Remove(returnedRecord);
+        await _context.SaveChangesAsync();
+
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
+        {
+            Operation = "delete",
+            EntityType = "record",
+            EntityId = recordId,
+            EntityName = recordName,
+            DataSourceId = recordDataSourceId,
+            Properties = JsonSerializer.Serialize(new { recordName })
+        });
+
+        return true;
     }
 }

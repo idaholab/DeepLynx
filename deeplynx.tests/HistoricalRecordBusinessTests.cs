@@ -10,6 +10,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -32,6 +33,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     private EncryptionHelper _encryptionHelper = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
 
     public long cid;
     public long did;
@@ -70,6 +74,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _recordBusiness = new RecordBusiness(
@@ -80,7 +86,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
             _sensitivityLabelBusiness,
             _sensitivityLabelService,
             _provenanceBusiness.Object,
-            _mockRecordLogger.Object);
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()
