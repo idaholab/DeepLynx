@@ -9,6 +9,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -30,6 +31,9 @@ public class QueryBusinessTests : IntegrationTestBase
     private TagBusiness _tagBusiness = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private long cid;
     private long cid2;
     private long did;
@@ -63,6 +67,9 @@ public class QueryBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _encryptionHelper = new EncryptionHelper();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _recordBusiness = new RecordBusiness(
@@ -73,7 +80,7 @@ public class QueryBusinessTests : IntegrationTestBase
             _sensitivityLabelBusiness,
             _sensitivityLabelService,
             _provenanceBusiness.Object,
-            _mockRecordLogger.Object);
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
         _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService);
     }
 

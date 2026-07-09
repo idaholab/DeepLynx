@@ -27,6 +27,7 @@ public class FileBusiness : IFileControllerBusiness
     private readonly IInsightBusiness _insightBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly ILogger<FileBusiness> _logger;
+    private readonly IEventBusiness _eventBusiness;
 
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
@@ -41,7 +42,8 @@ public class FileBusiness : IFileControllerBusiness
         IInsightBusiness insightBusiness,
         IOlapBusiness olapBusiness,
         IObjectStorageBusiness objectStorageBusiness,
-        ILogger<FileBusiness> logger)
+        ILogger<FileBusiness> logger,
+        IEventBusiness eventBusiness)
     {
         _context = context;
         _factory = factory;
@@ -52,6 +54,7 @@ public class FileBusiness : IFileControllerBusiness
         _olapBusiness = olapBusiness;
         _objectStorageBusiness = objectStorageBusiness;
         _logger = logger;
+        _eventBusiness = eventBusiness;
 
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
                            ?? throw new InvalidOperationException(
@@ -317,7 +320,11 @@ public class FileBusiness : IFileControllerBusiness
 
         await fileBusiness.DeleteFile(record, objectStorage.Config);
 
-        var deleted = await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+        var deleted = await DeleteFileRecordOnly(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId);
 
         await InvalidateProjectStorageSizeCache(projectId);
 
@@ -1086,6 +1093,51 @@ public class FileBusiness : IFileControllerBusiness
         var segments = remainder.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Any(s => s == ".."))
             return false;
+
+        return true;
+    }
+
+    private async Task<bool> DeleteFileRecordOnly(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        var returnedRecord = await _context.Records
+            .Include(r => r.Labels)
+            .Where(r => r.Id == recordId
+                        && r.OrganizationId == organizationId
+                        && r.ProjectId == projectId
+                        && !r.IsArchived)
+            .FirstOrDefaultAsync();
+
+        if (returnedRecord is null)
+            throw new KeyNotFoundException($"Record with id {recordId} is archived or not found");
+
+        if (!returnedRecord.ObjectStorageId.HasValue)
+            throw new InvalidOperationException("Record needs an object storage id.");
+
+        if (string.IsNullOrWhiteSpace(returnedRecord.Uri))
+            throw new InvalidOperationException("Record needs a file URI.");
+
+        if (string.IsNullOrWhiteSpace(returnedRecord.FileType))
+            throw new InvalidOperationException("Record is not a file-backed record.");
+
+        var recordName = returnedRecord.Name;
+        var recordDataSourceId = returnedRecord.DataSourceId;
+
+        _context.Records.Remove(returnedRecord);
+        await _context.SaveChangesAsync();
+
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
+        {
+            Operation = "delete",
+            EntityType = "record",
+            EntityId = recordId,
+            EntityName = recordName,
+            DataSourceId = recordDataSourceId,
+            Properties = JsonSerializer.Serialize(new { recordName })
+        });
 
         return true;
     }

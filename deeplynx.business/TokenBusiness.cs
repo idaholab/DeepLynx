@@ -267,13 +267,18 @@ public class TokenBusiness : ITokenBusiness
     /// Accessible by Project, Org, or SysAdmin.
     /// </summary>
     public async Task<TokenResponseDto> GenerateServiceAccountApiKey(
-        long currentUserId, long serviceAccountId)
+        long currentUserId, long organizationId, long projectId, long serviceAccountId)
     {
-        var account = await _context.Users.FindAsync(serviceAccountId)
-            ?? throw new KeyNotFoundException($"Service account {serviceAccountId} not found.");
+        // Middleware ensures the requesting user is an admin and a member of the provided org and project.
+        // Now ensure the service account in question belongs to that same org and project.
+        var isValidServiceAccount = await _context.Users
+            .AnyAsync(u => u.Id == serviceAccountId
+                && u.AccountType == AccountType.Service
+                && u.ProjectMembers.Any(pm => pm.ProjectId == projectId)
+                && u.OrganizationUsers.Any(om => om.OrganizationId == organizationId));
 
-        if (account.AccountType != AccountType.Service)
-            throw new InvalidOperationException("Target account is not a service account.");
+        if (!isValidServiceAccount)
+            throw new KeyNotFoundException($"Service account {serviceAccountId} not found.");
 
         return await CreateApiKey(serviceAccountId, createdByUserId: currentUserId, allowServiceAccount: true);
     }

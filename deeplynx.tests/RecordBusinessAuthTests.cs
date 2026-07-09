@@ -12,6 +12,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -33,6 +34,8 @@ public class RecordBusinessAuthTests : IntegrationTestBase
     private EncryptionHelper _encryptionHelper = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     public long cid; // class ID
     public long did; // datasource ID
     public long did2;
@@ -86,6 +89,8 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _recordBusiness = new RecordBusiness(
             Context,
             _eventBusiness,
@@ -94,7 +99,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
             _sensitivityLabelBusiness,
             _sensitivityLabelService,
             _provenanceBusiness.Object,
-            _mockRecordLogger.Object);
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
     }
 
     #region GetAllRecords_SensitivityLabelsAuthorization Tests

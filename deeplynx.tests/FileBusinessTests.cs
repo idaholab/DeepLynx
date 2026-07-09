@@ -106,7 +106,7 @@ public class FileBusinessTests : IntegrationTestBase
             _sensitivityLabelBusiness,
             _sensitivityLabelService,
             _provenanceBusiness.Object,
-            _mockRecordLogger.Object);
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
 
         _dataSourceBusiness =
             new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
@@ -130,7 +130,8 @@ public class FileBusinessTests : IntegrationTestBase
             _insightBusiness.Object,
             _olapBusiness,
             _objectStorageBusiness,
-            NullLogger<FileBusiness>.Instance
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
         );
     }
 

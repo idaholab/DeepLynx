@@ -1,8 +1,10 @@
 using System.Data;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.exceptions;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +24,8 @@ public class RecordBusiness : IRecordBusiness
     private readonly ITagBusiness _tagBusiness;
     private readonly IProvenanceBusiness _provenanceBusiness;
     private readonly ILogger<RecordBusiness> _logger;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly IFileBusinessFactory _fileBusinessFactory;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="RecordBusiness" /> class.
@@ -42,7 +46,9 @@ public class RecordBusiness : IRecordBusiness
         ISensitivityLabelBusiness labelBusiness,
         ISensitivityLabelService sensitivityLabelService,
         IProvenanceBusiness provenanceBusiness,
-        ILogger<RecordBusiness> logger)
+        ILogger<RecordBusiness> logger,
+        IObjectStorageBusiness objectStorageBusiness,
+        IFileBusinessFactory fileBusinessFactory)
     {
         _context = context;
         _eventBusiness = eventBusiness;
@@ -52,6 +58,8 @@ public class RecordBusiness : IRecordBusiness
         _sensitivityLabelService = sensitivityLabelService;
         _provenanceBusiness = provenanceBusiness;
         _logger = logger;
+        _objectStorageBusiness = objectStorageBusiness;
+        _fileBusinessFactory = fileBusinessFactory;
     }
 
     /// <summary>
@@ -961,7 +969,7 @@ public class RecordBusiness : IRecordBusiness
         if (dto.Properties == null)
             throw new ArgumentNullException(nameof(dto.Properties), "Properties cannot be null");
 
-        var maxDepth = ValidationHelper.ValidateJsonMaxDepth(dto.Properties);
+        var maxDepth = CalculateJsonMaxDepth(dto.Properties);
         if (maxDepth > 3)
             throw new Exception(
                 $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
@@ -1621,6 +1629,7 @@ public class RecordBusiness : IRecordBusiness
         var recordName = returnedRecord.Name;
         var recordDataSourceId = returnedRecord.DataSourceId;
 
+        await DeleteAttachedFileIfPresent(returnedRecord);
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
 
@@ -1671,7 +1680,7 @@ public class RecordBusiness : IRecordBusiness
         if (returnedRecord is null)
             throw new KeyNotFoundException($"Record with id {recordId} not found");
 
-        var maxDepth = ValidationHelper.ValidateJsonMaxDepth(dto.Properties);
+        var maxDepth = CalculateJsonMaxDepth(dto.Properties);
         if (maxDepth > 3)
             throw new Exception(
                 $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
@@ -1908,6 +1917,35 @@ public class RecordBusiness : IRecordBusiness
                 Name = l.Name
             }).ToList()
         }).ToList();
+    }
+
+    /// <summary>
+    ///     Private method used to calculate json depth of properties (should be less than three)
+    /// </summary>
+    /// <param name="node"></param>
+    /// <returns></returns>
+    private int CalculateJsonMaxDepth(JsonNode? node)
+    {
+        if (node is not JsonObject && node is not JsonArray)
+            return 0;
+
+        var maxDepth = 0;
+        if (node is JsonObject jsonObject)
+            foreach (var prop in jsonObject)
+            {
+                var depth = CalculateJsonMaxDepth(prop.Value);
+                if (depth > maxDepth)
+                    maxDepth = depth;
+            }
+        else if (node is JsonArray jsonArray)
+            foreach (var item in jsonArray)
+            {
+                var depth = CalculateJsonMaxDepth(item);
+                if (depth > maxDepth)
+                    maxDepth = depth;
+            }
+
+        return maxDepth + 1;
     }
 
     /// <summary>
@@ -2201,4 +2239,54 @@ public class RecordBusiness : IRecordBusiness
         };
     }
 
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private async Task DeleteAttachedFileIfPresent(Record record)
+    {
+        // Guard condition: only file-backed records should delete storage.
+        // ObjectStorageId + Uri + FileType is a practical signal for a DeepLynx file upload.
+        if (!record.ObjectStorageId.HasValue ||
+            string.IsNullOrWhiteSpace(record.Uri) ||
+            string.IsNullOrWhiteSpace(record.FileType))
+        {
+            return;
+        }
+
+        var objectStorage = await _objectStorageBusiness
+            .GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+
+        var storageBusiness = _fileBusinessFactory
+            .CreateFileBusiness(objectStorage.Type);
+
+        var dto = new RecordResponseDto
+        {
+            Id = record.Id,
+            Description = record.Description,
+            Uri = record.Uri,
+            Properties = record.Properties,
+            ObjectStorageId = record.ObjectStorageId,
+            OriginalId = record.OriginalId,
+            Name = record.Name,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedBy = record.LastUpdatedBy,
+            LastUpdatedAt = record.LastUpdatedAt,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize
+        };
+
+        await InvalidateProjectStorageSizeCache(record.ProjectId);
+
+        await storageBusiness.DeleteFile(dto, objectStorage.Config);
+    }
+    private static async Task InvalidateProjectStorageSizeCache(long projectId)
+    {
+        await CacheService.Instance.DeleteAsync(
+            CacheKeys.ProjectStorageSize(projectId));
+    }
 }

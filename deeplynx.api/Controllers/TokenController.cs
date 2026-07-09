@@ -90,22 +90,27 @@ public class TokenController : ControllerBase
                 new { message = "An error occurred while creating the API key" });
         }
     }
-    
+
     /// <summary>
     ///     Generate API Key for a service account
     /// </summary>
+    /// <param name="organizationId">ID of the organization the service account belongs to</param>
+    /// <param name="projectId">ID of the project the service account belongs to</param>
     /// <param name="serviceAccountId">ID of the service account to generate a key for</param>
     /// <returns>API key and secret (secret only returned once)</returns>
     [Tags("Service Accounts")]
-    [HttpPost("keys/service/{serviceAccountId}", Name = "api_create_service_account_api_key")]
-    [ProjectAdmin(unscoped: true)]
+    [HttpPost("organizations/{organizationId}/projects/{projectId}/keys/service/{serviceAccountId}",
+        Name = "api_create_service_account_api_key")]
+    [ProjectAdmin]
     public async Task<IActionResult> GenerateServiceAccountApiKey(
+        long organizationId,
+        long projectId,
         long serviceAccountId)
     {
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var tokenDto = await _tokenBusiness.GenerateServiceAccountApiKey(currentUserId, serviceAccountId);
+            var tokenDto = await _tokenBusiness.GenerateServiceAccountApiKey(currentUserId, organizationId, projectId, serviceAccountId);
             return Ok(tokenDto);
         }
         catch (Exception ex)
