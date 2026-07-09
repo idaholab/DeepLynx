@@ -315,7 +315,6 @@ public class QueryBusiness : IQueryBusiness
     /// <param name="textSearch">Full text search phrase</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
-    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A paginated list of record response dtos from the query view that match provided filters</returns>
     public async Task<PaginatedResponse<QueryRecordViewResponseDto>> QueryBuilderPaginated(
         long currentUserId,
