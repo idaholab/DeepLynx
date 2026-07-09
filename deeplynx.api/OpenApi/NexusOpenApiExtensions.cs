@@ -85,6 +85,7 @@ internal static class NexusOpenApiExtensions
                     new() { Name = "Record", Description = "Record management" },
                     new() { Name = "Record Collection", Description = "Record Collection management"},
                     new() { Name = "File", Description = "File operations" },
+                    new() { Name = "Provenance", Description = "Data Provenance" },
                     new() { Name = "Metadata", Description = "Metadata operations" },
                     new() { Name = "Historical Record", Description = "Record history" },
                     new() { Name = "Historical Edge", Description = "Edge history" },
@@ -143,7 +144,7 @@ internal static class NexusOpenApiExtensions
                     {
                         ["name"] = "Data",
                         ["tags"] = new JsonArray
-                            { "Record", "Record Collection", "Historical Record", "Edge", "Historical Edge", "File", "Metadata" }
+                            { "Record", "Record Collection", "Historical Record", "Edge", "Historical Edge", "File", "Metadata", "Provenance" }
                     },
                     new JsonObject
                     {
@@ -307,6 +308,23 @@ internal static class NexusOpenApiExtensions
                         Type = JsonSchemaType.Array,
                         Items = new OpenApiSchema()
                     };
+                }
+
+                return Task.CompletedTask;
+            });
+
+            options.AddSchemaTransformer((schema, context, cancellationToken) =>
+            {
+                var type = Nullable.GetUnderlyingType(context.JsonTypeInfo.Type)
+                        ?? context.JsonTypeInfo.Type;
+
+                if (type == typeof(DateTime)
+                    || type == typeof(DateTimeOffset)
+                    || type == typeof(DateTime?)
+                    || type == typeof(DateTimeOffset?))
+                {
+                    schema.Type = JsonSchemaType.String;
+                    schema.Format = "date-time";
                 }
 
                 return Task.CompletedTask;

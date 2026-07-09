@@ -1,32 +1,29 @@
 "use client";
 
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
-import toast from "react-hot-toast";
-import { ClassResponseDto, HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import {
+  ClassResponseDto,
+  HistoricalRecordResponseDto,
+} from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
+import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 import {
   getHistoricalRecord,
   getRecordHistory,
 } from "@/app/lib/client_service/historical_record_services.client";
-import { formatRecordHistoryDate } from "./RecordHistoryDate";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import toast from "react-hot-toast";
 import RecordHistoryControls from "./RecordHistoryControls";
+import { formatRecordHistoryDate } from "./RecordHistoryDate";
 import RecordHistoryDifferenceTable from "./RecordHistoryDifferenceTable";
 import {
   buildDifferenceTree,
   CompareMode,
   DifferenceRow,
-  flattenVisibleTree,
   filterTreeForChanges,
+  flattenVisibleTree,
   normalizeRecord,
 } from "./RecordHistoryDifferenceUtils";
 import RecordHistorySnapshotPropertiesCard from "./RecordHistorySnapshotPropertiesCard";
-import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 
 interface Props {
   organizationId: number;
@@ -65,7 +62,9 @@ export default function RecordHistoryTab({
   const [sliderIndex, setSliderIndex] = useState(0);
   const [maxRenderedRows, setMaxRenderedRows] = useState(300);
   const [isUiPending, startUiTransition] = useTransition();
-  const [activeClassNames, setActiveClassNames] = useState<Set<string>>(new Set());
+  const [activeClassNames, setActiveClassNames] = useState<Set<string>>(
+    new Set(),
+  );
   const [classes, setClasses] = useState<ClassResponseDto[]>([]);
   const [_, setAreClassesLoading] = useState(true);
 
@@ -81,10 +80,8 @@ export default function RecordHistoryTab({
     classes.forEach((cls) => {
       map[cls.id] = { name: cls.name, isArchived: cls.isArchived };
     });
-    console.log("map: ", map);
     return map;
   }, [classes]);
-
 
   // Runtime caches + debounce timers for high-frequency interactions.
   const snapshotCacheRef = useRef<Map<string, HistoricalRecordResponseDto>>(
