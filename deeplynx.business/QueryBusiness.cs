@@ -325,8 +325,7 @@ public class QueryBusiness : IQueryBusiness
         PaginatedRequestDto paginated,
         string? textSearch = null,
         bool isSysAdmin = false,
-        bool isOrgAdmin = false,
-        bool isProjectAdmin = false)
+        bool isOrgAdmin = false)
     {
         if (request == null) throw new ArgumentException("Custom query request dto cannot be null");
         try
@@ -338,6 +337,8 @@ public class QueryBusiness : IQueryBusiness
             }
 
             var userProjectAdminStatus = new Dictionary<long, bool>();
+
+            var isProjectAdmin = false;
 
             foreach (var projectId in projectIds)
             {
