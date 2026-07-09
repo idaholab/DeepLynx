@@ -449,7 +449,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
 
   const showProgressBar =
-    !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null && folderDownloadProgress !== null;
+    !isPresignedUrl && downloadProgress !== null && bytesDownloaded !== null;
 
   return (
     <div className={`${className}`}>
