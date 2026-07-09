@@ -3,12 +3,14 @@ using System.Text.Json.Nodes;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using deeplynx.helpers;
 
 namespace deeplynx.api.Controllers;
 
 [ApiController]
 [Route("airflow")]
 [Authorize]
+[ForbidServiceAccounts] // service accounts can only act on the project level
 public class AirflowController : ControllerBase
 {
     private readonly AirflowServiceClient _airflowClient;
