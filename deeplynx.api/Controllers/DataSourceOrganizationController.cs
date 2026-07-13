@@ -16,6 +16,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organizations/{organizationId:long}/datasources")]
 [Authorize]
+[ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Organization - DataSource")]
 public class DataSourceOrganizationController : ControllerBase
 {

@@ -1,12 +1,9 @@
 // app/(home)/(routes)/data_catalog/all_records/page.tsx
-import { cookies } from "next/headers";
-import { ProjectResponseDto } from "../../types/responseDTOs";
-import { RecordTableRow } from "../../types/types";
-import AllRecordsClient from "./AllRecordsClient";
 import { getAllProjectsServer } from "@/app/lib/server_service/projects_services.server";
+import { cookies } from "next/headers";
 import { auth } from "../../../../../auth";
-import { fullTextSearchServer, getMultiProjectRecordsServer } from "@/app/lib/server_service/query_services.server";
-import { mapDtoToRecordTableRow } from "./mapDtoToRecordTableRow";
+import { ProjectResponseDto } from "../../types/responseDTOs";
+import AllRecordsClient from "./AllRecordsClient";
 
 export default async function Page({
   searchParams,
@@ -46,16 +43,6 @@ export default async function Page({
     id: String(p.id),
     name: p.name,
   }));
-  const projArray = initialProjects.map(proj => Number(proj.id))
-
-  const initialRecordsDto = initialSearch ? await fullTextSearchServer(
-    Number(organizationId),
-    initialSearch,
-    projArray,
-  ) : await getMultiProjectRecordsServer(Number(organizationId), projArray, false);
-  ;
-
-  const initialRecords: RecordTableRow[] = initialRecordsDto.map(mapDtoToRecordTableRow);
 
   // Let the client fetch records after mount based on the dropdown selection
   const initialSelectedProjects = fromProject ? [fromProject] : [];
@@ -65,7 +52,6 @@ export default async function Page({
       initialProjects={initialProjects}
       initialSelectedProjects={initialSelectedProjects}
       initialSearchTerm={initialSearch}
-      initialRecords={initialRecords}
     />
   );
 }

@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace deeplynx.tests;
@@ -34,6 +35,11 @@ public class MetadataBusinessTests : IntegrationTestBase
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private EncryptionHelper _encryptionHelper = null!;
     public long cid; // origin class ID
     public long cid2; // destination class ID
     public long did;
@@ -64,8 +70,19 @@ public class MetadataBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
         _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService);
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _recordBusiness = new RecordBusiness(
-            Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
         _relationshipBusiness = new RelationshipBusiness(Context, _edgeBusiness, _eventBusiness);
 
         // Now classBusiness gets valid dependencies
@@ -135,7 +152,7 @@ public class MetadataBusinessTests : IntegrationTestBase
             ProjectId = project.Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = null,
-            IsArchived = false, 
+            IsArchived = false,
             OrganizationId = organizationId
         };
         Context.DataSources.Add(dataSource);
@@ -155,7 +172,7 @@ public class MetadataBusinessTests : IntegrationTestBase
             Name = "Dest Class",
             ProjectId = pid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false, 
+            IsArchived = false,
             OrganizationId = organizationId
         };
         Context.Classes.AddRange(originClass, destClass);
@@ -197,7 +214,7 @@ public class MetadataBusinessTests : IntegrationTestBase
         };
         // Act
         var result = await _metadataBusiness.CreateMetadata(
-            uid, pid, organizationId,did, dto);
+            uid, pid, organizationId, did, dto);
 
         // Assert
         Assert.NotNull(result);
@@ -233,24 +250,24 @@ public class MetadataBusinessTests : IntegrationTestBase
             }
         };
 
-            // Act
-            var result = await _metadataBusiness.CreateMetadata(
-                uid, pid, organizationId, did, dto);
-            
-            // Assert
-            Assert.Equal(2, result.Classes.Count);
-            Assert.True(result.Classes.All(c => c.LastUpdatedBy == uid && 
-                                                c.ProjectId == pid && 
-                                                !c.IsArchived));
-            Assert.Equal("Bulk Class 1", result.Classes.First().Name);
-            Assert.Equal("First class", result.Classes.First().Description);
-            Assert.Equal("Bulk Class 2", result.Classes.Last().Name);
-            Assert.Equal("Second class", result.Classes.Last().Description);
+        // Act
+        var result = await _metadataBusiness.CreateMetadata(
+            uid, pid, organizationId, did, dto);
 
-            // Ensure both create class events are logged
-            var eventList = await Context.Events.ToListAsync();
-            Assert.Equal(1, eventList.Count); // just one event is created containing the count with the bulk method
-        }
+        // Assert
+        Assert.Equal(2, result.Classes.Count);
+        Assert.True(result.Classes.All(c => c.LastUpdatedBy == uid &&
+                                            c.ProjectId == pid &&
+                                            !c.IsArchived));
+        Assert.Equal("Bulk Class 1", result.Classes.First().Name);
+        Assert.Equal("First class", result.Classes.First().Description);
+        Assert.Equal("Bulk Class 2", result.Classes.Last().Name);
+        Assert.Equal("Second class", result.Classes.Last().Description);
+
+        // Ensure both create class events are logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Equal(1, eventList.Count); // just one event is created containing the count with the bulk method
+    }
 
     [Fact]
     public async Task CreateMetadata_Success_WithRecordsAndAutoClasses()
@@ -266,7 +283,7 @@ public class MetadataBusinessTests : IntegrationTestBase
                     OriginalId = "rec-001",
                     ClassName = "Auto Class",
                     Description = "Test Description",
-                    Properties = JsonObject.Parse("{\"test\": \"value\"}") as JsonObject, 
+                    Properties = JsonObject.Parse("{\"test\": \"value\"}") as JsonObject,
                 }
             }
         };
@@ -468,7 +485,7 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         // Act
         var result = await _metadataBusiness.CreateMetadataFromFile(
-            uid, pid, organizationId,did, file);
+            uid, pid, organizationId, did, file);
 
         // Assert
         Assert.Equal(2, result.Classes.Count);
@@ -602,7 +619,7 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         // Act
         var result = await _metadataBusiness.CreateMetadataFromFile(
-            uid, pid, organizationId,did, file);
+            uid, pid, organizationId, did, file);
 
         // Assert
         Assert.Single(result.Classes);
@@ -768,7 +785,7 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         Assert.Null(createdEdge);
     }
-  
+
     [Fact]
     public async Task CreateMetadata_Success_WithLargeRecordAndEdgeBatch()
     {
@@ -804,7 +821,7 @@ public class MetadataBusinessTests : IntegrationTestBase
         Assert.Equal(count - 1, result.Edges.Count);
     }
 
-[Fact]
+    [Fact]
     public async Task CreateMetadata_Success_WithLargeCrossBatchEdges()
     {
         const int count = 500;
@@ -849,7 +866,7 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         Assert.Equal(count, result.Records.Count);
         Assert.Equal(count, result.Edges.Count);
-    }    
+    }
 
     #endregion
 }

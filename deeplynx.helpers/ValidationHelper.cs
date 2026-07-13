@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using System.Text.Json.Nodes;
 
 namespace deeplynx.helpers;
 
@@ -81,5 +82,28 @@ public class ValidationHelper
                 }
             }
         }
+    }
+    public static int ValidateJsonMaxDepth(JsonNode? node)
+    {
+        if (node is not JsonObject && node is not JsonArray)
+            return 0;
+
+        var maxDepth = 0;
+        if (node is JsonObject jsonObject)
+            foreach (var prop in jsonObject)
+            {
+                var depth = ValidateJsonMaxDepth(prop.Value);
+                if (depth > maxDepth)
+                    maxDepth = depth;
+            }
+        else if (node is JsonArray jsonArray)
+            foreach (var item in jsonArray)
+            {
+                var depth = ValidateJsonMaxDepth(item);
+                if (depth > maxDepth)
+                    maxDepth = depth;
+            }
+
+        return maxDepth + 1;
     }
 }

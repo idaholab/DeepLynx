@@ -148,6 +148,8 @@ export const translations = {
       CLASS: "Class",
       CLASS_CREATED_AND_APPLIED: "Class created and applied!",
       CLASS_ID: "Class ID",
+      CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH: "Class Name {name} does not match Class ID {id}",
+      CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION: "Update the metadata so the Class Name matches the Class Id.",
       CLASS_ID_DOES_NOT_EXIST_IN_PROJECT:
         "Class ID {id} does not exist in this project",
       CLASS_ID_MUST_BE_GREATER_THAN_ZERO: "Class ID must be greater than 0",
@@ -638,6 +640,8 @@ export const translations = {
       INVITE_USER_TO_PROJECT: "Invite User to Project",
       INVITE_USERS_TO_ORG: "Invite Users to this Organization",
       INHERITED_FROM_ORGANIZATION: "Inherited from organization",
+      JSON_DEPTH_EXCEEDED: "The JSON structure exceeds the maximum allowed depth of {allowedDepth}. Current depth of properties is {currentDepth}.",
+      JSON_DEPTH_EXCEEDED_SUGGESTION: "Reduce the nesting of objects or arrays in the properties section of the metadata.",
       KEEP_INVITE: "Keep Invite",
       KEEP_SIGNED_IN: "Keep me signed in",
       L_RECORDS: "records",
@@ -837,7 +841,7 @@ export const translations = {
       MATCHES: "matches",
       MATCHING_ANY_TERM: "Matching any term",
       MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES:
-        "Matrix editing is only available when custom (non-standard) roles exist.",
+        "Matrix editing is only available when editable organization roles exist.",
       MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES:
         "Matrix editing is only available when custom project roles exist.",
       MATRIX_VIEW: "Matrix View",
@@ -1015,6 +1019,8 @@ export const translations = {
       ORGANIZATION_NOT_FOUND: "Organization not found",
       ORGANIZATION_OVERVIEW: "Organization Overview",
       ORGANIZATION_ROLE: "Organization Role",
+      ORGANIZATION_ROLES_AND_PERMISSIONS_DESCRIPTION:
+        "Define and manage organization-level roles and permissions. These settings propagate to all projects. The User role is seeded when an organization is created and serves as the default permission baseline for newly created roles. Create a new role when you need a custom permission set.",
       ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL:
         "Organization role permissions cannot be modified at project level.",
       ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL:
@@ -1555,6 +1561,12 @@ export const translations = {
         "The server rejected the upload. Please fix the following issues:",
       SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON:
         "Service configuration will be available in a future release",
+      SEEDED_USER_ROLE_CANNOT_BE_ARCHIVED:
+        "The seeded User role cannot be archived.",
+      SEEDED_USER_ROLE_CANNOT_BE_MODIFIED:
+        "The seeded User role cannot be modified.",
+      SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED:
+        "The seeded User role permissions cannot be modified.",
       SET_AS_DEFAULT_STORAGE: "Set as default storage",
       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
         "Set the default unmounted object storage location for this organization.",
@@ -1747,7 +1759,7 @@ export const translations = {
       VIEW_AS_JSON: "View as JSON",
       VIEW_LAYOUT: "View Layout",
       VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS:
-        "View project-level roles and their permissions. Standard roles are defined by the system and are read-only in this release.",
+        "View project roles and inherited organization roles. New project roles start with permissions from the organization's seeded User role. Organization roles are read-only at the project level; create a project role for project-specific permissions.",
       VISIT: "Visit",
       VULNERABILITY_DISCLOSURE: "Click here for the Vulnerability Disclosure",
       WARNING:
@@ -1971,6 +1983,8 @@ export const translations = {
       CLASS: "Clase: ",
       CLASS_CREATED_AND_APPLIED: "Clase creada y aplicada!",
       CLASS_ID: "ID de clase",
+      CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH: "El nombre de clase {name} no coincide con el ID de clase {id}",
+      CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION: "Actualiza los metadatos para que el nombre de clase coincida con el ID de clase.",
       CLASS_ID_DOES_NOT_EXIST_IN_PROJECT:
         "El ID de clase {id} no existe en este proyecto",
       CLASS_ID_MUST_BE_GREATER_THAN_ZERO: "El ID de clase debe ser mayor que 0",
@@ -2495,6 +2509,8 @@ export const translations = {
       INVITE_USER_TO_PROJECT: "Invitar usuario al proyecto",
       INVITE_USERS_TO_ORG: "Invitar a usuarios a la organización",
       INHERITED_FROM_ORGANIZATION: "Heredadas de la organización",
+      JSON_DEPTH_EXCEEDED: "La estructura JSON supera la profundidad máxima permitida de {allowedDepth}. La profundidad actual es {currentDepth}.",
+      JSON_DEPTH_EXCEEDED_SUGGESTION: "Reduzca el nivel de anidamiento de objetos o arreglos en la sección de propiedades de los metadatos.",
       KEEP_INVITE: "Mantener invitación",
       KEEP_SIGNED_IN: "Mantenerme conectado",
       L_RECORDS: "registros",
@@ -2707,7 +2723,7 @@ export const translations = {
       MATCHES: "coincidencias",
       MATCHING_ANY_TERM: "Coincidiendo con cualquier término",
       MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES:
-        "La edición de matriz solo está disponible cuando existen roles personalizados (no estándar).",
+        "La edición de matriz solo está disponible cuando existen roles de organización editables.",
       MATRIX_EDIT_REQUIRES_CUSTOM_PROJECT_ROLES:
         "La edición de matriz solo está disponible cuando existen roles personalizados del proyecto.",
       MATRIX_VIEW: "Vista de matriz",
@@ -2892,6 +2908,8 @@ export const translations = {
       ORGANIZATION_NOT_FOUND: "Organización no encontrada",
       ORGANIZATION_OVERVIEW: "Resumen de la organización",
       ORGANIZATION_ROLE: "Rol de la organización",
+      ORGANIZATION_ROLES_AND_PERMISSIONS_DESCRIPTION:
+        "Define y administra roles y permisos a nivel de organización. Estos ajustes se propagan a todos los proyectos. El rol Usuario se crea cuando se crea una organización y sirve como la base de permisos predeterminada para los roles nuevos. Crea un rol nuevo cuando necesites un conjunto de permisos personalizado.",
       ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL:
         "Los permisos de roles de organización no se pueden modificar a nivel de proyecto.",
       ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL:
@@ -3461,6 +3479,12 @@ export const translations = {
         "El servidor rechazó la carga. Corrija los siguientes problemas:",
       SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON:
         "La configuración del servicio estará disponible en una versión futura",
+      SEEDED_USER_ROLE_CANNOT_BE_ARCHIVED:
+        "El rol Usuario inicial no se puede archivar.",
+      SEEDED_USER_ROLE_CANNOT_BE_MODIFIED:
+        "El rol Usuario inicial no se puede modificar.",
+      SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED:
+        "Los permisos del rol Usuario inicial no se pueden modificar.",
       SET_AS_DEFAULT_STORAGE: "Establecer como almacenamiento predeterminado",
       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
         "Establecer la ubicación predeterminada del almacenamiento de objetos no montado para esta organización.",
@@ -3665,7 +3689,7 @@ export const translations = {
       VIEW_AS_JSON: "Ver como JSON",
       VIEW_LAYOUT: "Vista",
       VIEW_PROJECT_LEVEL_ROLES_AND_PERMISSIONS:
-        "Consulta los roles a nivel de proyecto y sus permisos. Los roles estándar están definidos por el sistema y son de solo lectura en esta versión.",
+        "Consulta los roles del proyecto y los roles heredados de la organización. Los roles de proyecto nuevos comienzan con los permisos del rol Usuario inicial de la organización. Los roles de organización son de solo lectura a nivel de proyecto; crea un rol de proyecto para permisos específicos del proyecto.",
       VISIT: "Visitar",
       VULNERABILITY_DISCLOSURE:
         "Haz clic aquí para la Divulgación de Vulnerabilidades",

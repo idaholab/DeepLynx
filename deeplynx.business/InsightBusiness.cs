@@ -22,6 +22,7 @@ public class InsightBusiness : IInsightBusiness
     private readonly DeeplynxContext _context;
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IAiModelConfigBusiness _aiModelConfigBusiness;
+    private readonly IProvenanceBusiness _provenanceBusiness;
     private readonly ILogger<InsightBusiness> _logger;
 
     private readonly ISensitivityLabelService _sensitivityLabelService;
@@ -30,12 +31,14 @@ public class InsightBusiness : IInsightBusiness
         DeeplynxContext context,
         InsightServiceClient insightServiceClient,
         IAiModelConfigBusiness aiModelConfigBusiness,
+        IProvenanceBusiness provenanceBusiness,
         ILogger<InsightBusiness> logger,
         ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
         _insightServiceClient = insightServiceClient;
         _aiModelConfigBusiness = aiModelConfigBusiness;
+        _provenanceBusiness = provenanceBusiness;
         _logger = logger;
         _sensitivityLabelService = sensitivityLabelService;
     }
@@ -115,6 +118,7 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="recordId">The ID of the record to embed.</param>
     /// <param name="uri">The URI of the file to embed.</param>
+    /// <param name="currentUserId">The ID of the user making the request.</param>
     /// <param name="vlmConfig">Optional explicit VLM model config ID. If null, the project/org default is used.</param>
     /// <param name="embeddingConfig">Optional explicit embedding model config ID. If null, the project/org default is used.</param>
     /// <param name="userJwt">The requesting user's JWT used for forwarding to Insight</param>
@@ -123,6 +127,7 @@ public class InsightBusiness : IInsightBusiness
         long projectId,
         long recordId,
         string uri,
+        long currentUserId,
         AiModelConfigResponseDto.WithToken vlmConfig,
         AiModelConfigResponseDto.WithToken embeddingConfig,
         string? userJwt = null,
@@ -148,6 +153,17 @@ public class InsightBusiness : IInsightBusiness
                     _logger.LogError(t.Exception,
                         "Insight enqueue failed for record {RecordId} in project {ProjectId}",
                         recordId, projectId);
+            }, TaskContinuationOptions.None);
+
+        _ = _provenanceBusiness.CreateProvenanceRecord(recordId, "request-embedding", currentUserId, embeddingConfig.Id)
+            .ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    _logger.LogError(t.Exception,
+                        "Provenance record creation threw for embedding trigger on record {RecordId}", recordId);
+                else if (!t.Result)
+                    _logger.LogWarning(
+                        "Failed to create provenance record for embedding trigger on record {RecordId}", recordId);
             }, TaskContinuationOptions.None);
     }
 

@@ -121,6 +121,7 @@ public class ProjectController : ControllerBase
     /// <param name="dto">A data transfer object with details on the new project to be created.</param>
     /// <returns>The new project which was just created.</returns>
     [HttpPost(Name = "api_create_a_project")]
+    [ForbidServiceAccounts]
     [OrgMember]
     public async Task<ActionResult<ProjectResponseDto>> CreateProject(
         long organizationId,
@@ -285,6 +286,7 @@ public class ProjectController : ControllerBase
     /// <param name="isProjectAdmin">Whether the member is a project admin. Defaults to false</param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/members", Name = "api_add_member_to_project")]
+    [ForbidServiceAccounts]
     [ProjectAdmin]
     public async Task<ActionResult> AddMemberToProject(
         long organizationId, long projectId,
@@ -403,6 +405,7 @@ public class ProjectController : ControllerBase
     /// <param name="roleId"></param>
     /// <returns></returns>
     [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
+    [ForbidServiceAccounts]
     [ProjectAdmin]
     public async Task<ActionResult> InviteUserToProject(
         long organizationId,
@@ -429,7 +432,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     /// Create and add service account to project
     /// </summary>
@@ -440,6 +443,7 @@ public class ProjectController : ControllerBase
     /// <param name="makeProjectAdmin"></param>
     /// <returns></returns>
     [Tags("Service Accounts")]
+    [ForbidServiceAccounts]
     [ProjectAdmin]
     [HttpPost("{projectId:long}/invite/serviceAccount", Name = "api_add_service_account")]
     public async Task<ActionResult> CreateAndAddServiceAccountToProject(
@@ -451,7 +455,7 @@ public class ProjectController : ControllerBase
     {
         try
         {
-            await _invitationBusiness.CreateAndAddServiceAccountToProject(projectId, name, roleId, makeProjectAdmin);
+            await _invitationBusiness.CreateAndAddServiceAccountToProject(organizationId, projectId, name, roleId, makeProjectAdmin);
             return Ok(new { message = $"Created service account {name} and added to project {projectId}" });
         }
         catch (Exception exc)
