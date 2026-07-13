@@ -32,6 +32,9 @@ public class RelationshipBusinessTests : IntegrationTestBase
     private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
     public long cid; // origin class ID
     public long cid2; // dest. class ID
+    public long cid3; // origin 2 class ID
+    public long cid4; // dest. 2 class ID
+
     public long oid; // organization ID
 
     public long pid; // project ID
@@ -129,7 +132,17 @@ public class RelationshipBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
-        Context.Classes.Add(originClass);
+        
+        // Add classes
+        var originClass2 = new Class
+        {
+            Name = "Origin Class 2",
+            OrganizationId = oid,
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Classes.AddRange(originClass, originClass2);
 
         var destinationClass = new Class
         {
@@ -139,11 +152,22 @@ public class RelationshipBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
-        Context.Classes.Add(destinationClass);
+        
+        var destinationClass2 = new Class
+        {
+            Name = "Destination Class 2",
+            OrganizationId = oid,
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Classes.AddRange(destinationClass, destinationClass2);
         await Context.SaveChangesAsync();
 
         cid = originClass.Id;
         cid2 = destinationClass.Id;
+        cid3 = originClass2.Id;
+        cid4 = destinationClass2.Id;
 
         // Add relationships
         var existingRelationship = new Relationship
@@ -320,6 +344,98 @@ public class RelationshipBusinessTests : IntegrationTestBase
         // Ensure that no relationship create event is logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+    }
+    
+    [Fact]
+    public async Task CreateRelationship_Success_WithDuplicateNamesDifferentOriginDestination()
+    {
+        // Arrange
+        var dto = new CreateRelationshipRequestDto
+        {
+            Name = $"Duplicate name one",
+            Description = "Test Description",
+            OriginId = cid,
+            DestinationId = cid2
+        };
+        
+        // Arrange
+        var dto2 = new CreateRelationshipRequestDto
+        {
+            Name = $"Duplicate name one",
+            Description = "Test Description",
+            OriginId = cid3,
+            DestinationId = cid4
+        };
+
+        // Act
+        var result = await _relationshipBusiness.CreateRelationship(uid, oid, pid, dto);
+        var result2 = await _relationshipBusiness.CreateRelationship(uid, oid, pid, dto2);
+
+        
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.True(result2.Id > 0);
+        Assert.Equal(result.Name, result2.Name);
+    }
+    
+    [Fact]
+    public async Task CreateRelationship_Fails_WithDuplicateNamesSameOriginDestination()
+    {
+        // Arrange
+        var dto = new CreateRelationshipRequestDto
+        {
+            Name = $"Duplicate name one",
+            Description = "Test Description",
+            OriginId = cid,
+            DestinationId = cid2
+        };
+        
+        // Arrange
+        var dto2 = new CreateRelationshipRequestDto
+        {
+            Name = $"Duplicate name one",
+            Description = "Test Description",
+            OriginId = cid,
+            DestinationId = cid2
+        };
+
+        // Act
+        var result = await _relationshipBusiness.CreateRelationship(uid, oid, pid, dto);
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _relationshipBusiness.CreateRelationship(uid, oid, pid, dto2));
+        
+        Assert.Equal($"A relationship named '{dto2.Name}' already exists between these origin and destination classes in this project.", exception.Message);
+    }
+    
+    [Fact]
+    public async Task CreateRelationship_Fails_WithDuplicateNamesNoOriginDestination()
+    {
+        // Arrange
+        var dto = new CreateRelationshipRequestDto
+        {
+            Name = $"Duplicate name one",
+            Description = "Test Description",
+            OriginId = null,
+            DestinationId = null
+        };
+        
+        // Arrange
+        var dto2 = new CreateRelationshipRequestDto
+        {
+            Name = $"Duplicate name one",
+            Description = "Test Description",
+            OriginId = null,
+            DestinationId = null
+        };
+
+        // Act
+        var result = await _relationshipBusiness.CreateRelationship(uid, oid, pid, dto);
+        var exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _relationshipBusiness.CreateRelationship(uid, oid, pid, dto2));
+        
+        Assert.Equal($"A relationship named '{dto.Name}' with no origin/destination already exists in this project.", exception.Message);
     }
 
     [Fact]
