@@ -230,7 +230,7 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
     /// <param name="organizationId">The ID of the organization. Used to scope model configuration resolution.</param>
     /// <param name="projectId">The ID of the project. Project-level model configurations take priority over organization-level defaults.</param>
-    /// <param name="modelConfigId">The model configuration ID to validate.</param>
+    /// <param name="modelConfigId">Optional model configuration ID. When null, the default config for modelType is resolved.</param>
     /// <param name="modelType">The model type string used when falling back to the default (e.g. "llm", "vlm", or "embedding").</param>
     /// <returns>
     ///     Returns the endpoint health result, including endpoint reachability,
@@ -242,7 +242,7 @@ public class InsightBusiness : IInsightBusiness
         long currentUserId,
         long organizationId,
         long projectId,
-        long modelConfigId,
+        long? modelConfigId,
         string modelType)
     {
         var normalizedModelType = modelType.Trim().ToLowerInvariant();
@@ -258,7 +258,12 @@ public class InsightBusiness : IInsightBusiness
             modelConfigId,
             normalizedModelType);
 
-        if (!string.Equals(config.ModelType, normalizedModelType, StringComparison.OrdinalIgnoreCase))
+        var isAllowedLlmCompatibleModel =
+            normalizedModelType == "llm" &&
+            string.Equals(config.ModelType, "vlm", StringComparison.OrdinalIgnoreCase);
+
+        if (!isAllowedLlmCompatibleModel &&
+            !string.Equals(config.ModelType, normalizedModelType, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
                 $"Model configuration {config.Id} is type '{config.ModelType}' but '{normalizedModelType}' was requested.");
