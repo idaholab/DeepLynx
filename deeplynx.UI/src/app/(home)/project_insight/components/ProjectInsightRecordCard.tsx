@@ -16,7 +16,7 @@ interface ProjectInsightRecordCardProps {
   projectId: number;
   selectable?: boolean;
   checked?: boolean;
-  onToggle?: (recordId: number) => void;
+  onToggle?: (recordId: number, recordUri: string) => void;
 }
 
 export default function ProjectInsightRecordCard({
@@ -126,7 +126,7 @@ export default function ProjectInsightRecordCard({
                   type="checkbox"
                   className="checkbox checkbox-primary checkbox-sm"
                   checked={checked}
-                  onChange={() => onToggle(record.id)}
+                  onChange={() => onToggle(record.id, record.uri ?? "")}
                 />
               )}
             </div>
