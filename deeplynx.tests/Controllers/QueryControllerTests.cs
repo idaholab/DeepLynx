@@ -333,7 +333,6 @@ public class QueryControllerTests : IDisposable
                 paginatedDto,
                 Query,
                 false,
-                false,
                 false))
             .ReturnsAsync(expected);
 
@@ -366,7 +365,6 @@ public class QueryControllerTests : IDisposable
                 paginatedDto,
                 Query,
                 false,
-                false,
                 false))
             .ReturnsAsync(expected);
 
@@ -385,7 +383,6 @@ public class QueryControllerTests : IDisposable
                 ProjectList,
                 paginatedDto,
                 Query,
-                false,
                 false,
                 false),
             Times.Once);

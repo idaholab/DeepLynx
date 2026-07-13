@@ -34,6 +34,7 @@ public class QueryBusinessTests : IntegrationTestBase
     private EncryptionHelper _encryptionHelper = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private Mock<IProjectRolePermissionService> _projectRolePermissionServiceMock;
     private long cid;
     private long cid2;
     private long did;
@@ -60,6 +61,7 @@ public class QueryBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _projectRolePermissionServiceMock = new Mock<IProjectRolePermissionService>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
@@ -3337,12 +3339,19 @@ public class QueryBusinessTests : IntegrationTestBase
     [Fact]
     public async Task QueryBuilderPaginated_ReturnsRequestedPageAndTotalCount()
     {
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(uid, pid, "read", "record"))
+            .ReturnsAsync(true);
+
+        _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService, _projectRolePermissionServiceMock.Object);
+
         var page1 = await _queryBusiness.QueryBuilderPaginated(
             uid,
             [],
             organizationId,
             [pid],
             new PaginatedRequestDto { PageNumber = 1, PageSize = 2 });
+
         var page2 = await _queryBusiness.QueryBuilderPaginated(
             uid,
             [],
