@@ -273,6 +273,45 @@ public class EdgeBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateEdgeUnarchiveEdgeCreateEdge_Success_ReturnsCorrectValues()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        var dto = new CreateEdgeRequestDto
+        {
+            OriginId = (int)originRecordId,
+            DestinationId = (int)destinationRecordId,
+            RelationshipId = (int)relationshipId
+        };
+
+        // Act
+        await _edgeBusiness.CreateEdge(uid1, oid, pid, dsid, dto);
+        await _edgeBusiness.ArchiveEdge(uid1, oid, pid, null, dto.OriginId, dto.DestinationId);
+        var result = await _edgeBusiness.CreateEdge(uid1, oid, pid, dsid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(relationshipId, result.RelationshipId);
+        Assert.Equal(originRecordId, result.OriginId);
+        Assert.Equal(destinationRecordId, result.DestinationId);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.Equal(dsid, result.DataSourceId);
+        Assert.Equal(uid1, result.LastUpdatedBy);
+
+        // Ensure that edge create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.NotEmpty(eventList);
+
+        var actualEvent = eventList[0];
+
+        Assert.Equal(pid, actualEvent.ProjectId);
+        Assert.Equal("create", actualEvent.Operation);
+        Assert.Equal("edge", actualEvent.EntityType);
+        Assert.Equal(result.Id, actualEvent.EntityId);
+    }
+
+    [Fact]
     public async Task CreateEdge_Fails_IfNoOriginId()
     {
         // Arrange
@@ -1306,7 +1345,7 @@ public class EdgeBusinessTests : IntegrationTestBase
         Assert.Equal("parsed-record-001", result.OriginOriginalId);
         Assert.Equal("parsed-record-002", result.DestinationOriginalId);
     }
-    
+
     private async Task SetRecordOriginalIds()
     {
         var origin = await Context.Records.FindAsync(originRecordId);

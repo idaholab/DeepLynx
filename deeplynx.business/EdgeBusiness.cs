@@ -190,7 +190,31 @@ public class EdgeBusiness : IEdgeBusiness
         if (!destinationRecordExists)
             throw new KeyNotFoundException($"Destination record with id {dto.DestinationId} not found");
 
-        var edge = new Edge
+        var edge = await FindEdge(organizationId, null, dto.OriginId, dto.DestinationId);
+
+        if (edge != null && edge.IsArchived == true)
+        {
+            await UnarchiveEdge(currentUserId, organizationId, projectId, null, dto.OriginId, dto.DestinationId);
+
+            return new EdgeResponseDto
+            {
+                Id = edge.Id,
+                OriginOriginalId = edge.Origin?.OriginalId,
+                DestinationOriginalId = edge.Destination?.OriginalId,
+                Properties = edge.Properties,
+                OriginId = edge.OriginId,
+                DestinationId = edge.DestinationId,
+                RelationshipId = edge.RelationshipId,
+                DataSourceId = edge.DataSourceId,
+                ProjectId = edge.ProjectId,
+                OrganizationId = edge.OrganizationId,
+                LastUpdatedAt = edge.LastUpdatedAt,
+                LastUpdatedBy = edge.LastUpdatedBy,
+                IsArchived = false
+            };
+        }
+
+        edge = new Edge
         {
             Properties = dto.Properties?.ToString(),
             OriginId = dto.OriginId.Value,
@@ -659,7 +683,6 @@ public class EdgeBusiness : IEdgeBusiness
         if (edge == null)
         {
             if (edgeId != null) throw new KeyNotFoundException($"Edge with id {edgeId} not found");
-            throw new KeyNotFoundException($"Edge with origin {originId} and destination {destinationId} not found");
         }
 
         return edge;
