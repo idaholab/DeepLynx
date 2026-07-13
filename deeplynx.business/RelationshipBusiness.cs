@@ -201,7 +201,27 @@ public class RelationshipBusiness : IRelationshipBusiness
         };
 
         _context.Relationships.Add(relationship);
-        await _context.SaveChangesAsync();
+        
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pgEx)
+        {
+            if (pgEx.ConstraintName == "unique_project_relationship_origin_name_destination")
+            {
+                throw new InvalidOperationException(
+                    $"A relationship named '{dto.Name}' already exists between these origin and destination classes in this project.");
+            }
+
+            if (pgEx.ConstraintName == "unique_project_relationship_name_no_origin_destination")
+            {
+                throw new InvalidOperationException(
+                    $"A relationship named '{dto.Name}' with no origin/destination already exists in this project.");
+            }
+
+            throw; // some other unique violation — don't mask it as this specific error
+        }
 
         if (dto.OriginId != null)
             await _context.Entry(relationship)
