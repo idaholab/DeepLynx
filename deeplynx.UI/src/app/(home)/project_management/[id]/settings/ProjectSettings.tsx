@@ -38,14 +38,16 @@ import ArchiveStorageModal from "./components/ArchiveStorageModal";
 import RemoveLogoModal from "./components/RemoveLogoModal";
 import { useLanguage } from "@/app/contexts/Language";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { isInsightHidden } from "@/app/lib/feature_flags";
 
 interface ProjectSettingsProps {
   project: ProjectResponseDto | null;
+  setProject: React.Dispatch<React.SetStateAction<ProjectResponseDto | null>>;
 }
 
 type StorageTab = "default" | "manage";
 
-const ProjectSettings = ({ project }: ProjectSettingsProps) => {
+const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   const { clearProject } = useProjectSession();
   const { organization } = useOrganizationSession();
   const { t } = useLanguage();
@@ -130,7 +132,6 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         project.id as number,
         false, // Don't hide archived storages
       );
-      setAvailableStorages(storages);
 
       // Fetch the current default storage
       try {
@@ -138,11 +139,28 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
           organization.organizationId as number,
           project.id as number,
         );
-        setDefaultStorage(defaultStorageData);
-        setSelectedStorageId(defaultStorageData.id as number);
+        const projectDefaultStorage =
+          storages.find(
+            (storage) =>
+              storage.default &&
+              Number(storage.projectId) === Number(project.id),
+          ) ?? null;
+        const effectiveDefaultStorage =
+          projectDefaultStorage ?? defaultStorageData;
+
+        setDefaultStorage(effectiveDefaultStorage);
+        setSelectedStorageId(effectiveDefaultStorage.id as number);
+        setAvailableStorages(
+          storages.map((storage) => ({
+            ...storage,
+            default:
+              String(storage.id) === String(effectiveDefaultStorage.id),
+          })),
+        );
       } catch (error) {
         setDefaultStorage(null);
         setSelectedStorageId(null);
+        setAvailableStorages(storages);
       }
     } catch (error) {
       console.error("Error loading storages:", error);
@@ -270,7 +288,13 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         (s) => s.id === selectedStorageId,
       );
       if (updatedDefault) {
-        setDefaultStorage(updatedDefault);
+        setDefaultStorage({ ...updatedDefault, default: true });
+        setAvailableStorages((currentStorages) =>
+          currentStorages.map((storage) => ({
+            ...storage,
+            default: String(storage.id) === String(selectedStorageId),
+          })),
+        );
       }
 
       toast.success(
@@ -336,19 +360,50 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
       const dto: CreateObjectStorageRequestDto = {
         name: storageFormData.name,
         config: config,
+        default: storageFormData.default,
       };
 
-      await createProjectObjectStorage(
+      const createdStorage = await createProjectObjectStorage(
         organization.organizationId as number,
         project.id as number,
         dto,
         storageFormData.default,
       );
+      const storageForList = {
+        ...createdStorage,
+        default: storageFormData.default || createdStorage.default,
+      };
+
+      setAvailableStorages((currentStorages) => {
+        const existingStorage = currentStorages.some(
+          (storage) => String(storage.id) === String(storageForList.id),
+        );
+        const nextStorages = existingStorage
+          ? currentStorages.map((storage) =>
+              String(storage.id) === String(storageForList.id)
+                ? storageForList
+                : storage,
+            )
+          : [...currentStorages, storageForList];
+
+        if (!storageForList.default) {
+          return nextStorages;
+        }
+
+        return nextStorages.map((storage) => ({
+          ...storage,
+          default: String(storage.id) === String(storageForList.id),
+        }));
+      });
+
+      if (storageForList.default) {
+        setDefaultStorage(storageForList);
+        setSelectedStorageId(storageForList.id as number);
+      }
 
       toast.success(t.translations.STORAGE_CREATED_SUCCESSFULLY);
       setIsCreateModalOpen(false);
       resetStorageForm();
-      loadStorages();
     } catch (error) {
       console.error("Failed to create storage:", error);
       console.error("Error details:", error);
@@ -488,7 +543,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
     <div className="p-6">
       <div className="mx-auto space-y-6">
         {/* Page Header */}
-        <div className="border-b border-base-300 pb-4">
+        <div className="border-b border-base-300/50 pb-4">
           <h2 className="text-2xl font-bold text-base-content">
             {t.translations.PROJECT_SETTINGS}
           </h2>
@@ -501,7 +556,9 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Logo Section */}
           <ProjectSettingsLeftColumn
+            organization={organization}
             project={project}
+            setProject={setProject}
             logoPreview={logoPreview}
             logoFile={logoFile}
             isUploading={isUploading}
@@ -528,6 +585,7 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
             <StorageSettingsSection
               activeTab={activeTab}
               onChangeTab={setActiveTab}
+              projectId={project.id}
               availableStorages={availableStorages}
               selectedStorageId={selectedStorageId}
               onSelectStorage={setSelectedStorageId}
@@ -546,12 +604,14 @@ const ProjectSettings = ({ project }: ProjectSettingsProps) => {
               onDeleteStorage={(storageId) => setDeleteStorageId(storageId)}
               t={t}
             />
-            <ProjectInsightModelTemplateSection
-              organizationId={
-                organization?.organizationId as number | undefined
-              }
-              projectId={project.id as number | undefined}
-            />
+            {!isInsightHidden() && (
+              <ProjectInsightModelTemplateSection
+                organizationId={
+                  organization?.organizationId as number | undefined
+                }
+                projectId={project.id as number | undefined}
+              />
+            )}
           </div>
         </div>
       </div>

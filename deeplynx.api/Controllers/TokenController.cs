@@ -71,6 +71,7 @@ public class TokenController : ControllerBase
     /// <returns>API key and secret (secret only returned once)</returns>
     [HttpPost("keys", Name = "api_create_api_key")]
     [AllowAnonymous]
+    [ForbidServiceAccounts] // service accounts can only act on the project level
     public async Task<IActionResult> CreateApiKey([FromQuery] string? clientId = null)
     {
         try
@@ -86,6 +87,62 @@ public class TokenController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating API key");
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new { message = "An error occurred while creating the API key" });
+        }
+    }
+
+    /// <summary>
+    ///     Generate API Key for a service account
+    /// </summary>
+    /// <param name="organizationId">ID of the organization the service account belongs to</param>
+    /// <param name="projectId">ID of the project the service account belongs to</param>
+    /// <param name="serviceAccountId">ID of the service account to generate a key for</param>
+    /// <returns>API key and secret (secret only returned once)</returns>
+    [Tags("Service Accounts")]
+    [HttpPost("organizations/{organizationId}/projects/{projectId}/keys/service/{serviceAccountId}",
+        Name = "api_create_service_account_api_key")]
+    [ProjectAdmin]
+    public async Task<IActionResult> GenerateServiceAccountApiKey(
+        long organizationId,
+        long projectId,
+        long serviceAccountId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var tokenDto = await _tokenBusiness.GenerateServiceAccountApiKey(currentUserId, organizationId, projectId, serviceAccountId);
+            return Ok(tokenDto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating service account API key for account {ServiceAccountId}", serviceAccountId);
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new { message = "An error occurred while creating the API key" });
+        }
+    }
+
+    /// <summary>
+    ///     Generate API Key for a test account
+    /// </summary>
+    /// <param name="testAccountId">ID of the test account to generate a key for</param>
+    /// <returns>API key and secret (secret only returned once)</returns>
+    [Tags("Test Accounts")]
+    [HttpPost("keys/test/{testAccountId}", Name = "api_create_test_account_api_key")]
+    [SysAdmin]
+    public async Task<IActionResult> GenerateTestAccountApiKey(
+        long testAccountId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var tokenDto = await _tokenBusiness.GenerateTestAccountApiKey(
+                currentUserId, testAccountId);
+            return Ok(tokenDto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating test account API key for account {TestAccountId}", testAccountId);
             return StatusCode(StatusCodes.Status500InternalServerError,
                 new { message = "An error occurred while creating the API key" });
         }

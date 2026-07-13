@@ -1,16 +1,14 @@
 // next.config.ts
 import type { NextConfig } from "next";
 
+const hideInsight =
+  process.env.HIDE_INSIGHT ?? process.env.NEXT_PUBLIC_HIDE_INSIGHT ?? "true";
+
 const nextConfig: NextConfig = {
-  // Add any actual configuration you need here
-  // For example:
-  // images: {
-  //   domains: ['example.com'],
-  // },
-  // env: {
-  //   CUSTOM_KEY: process.env.CUSTOM_KEY,
-  // },
-  output: 'standalone',
+  output: "standalone",
+  env: {
+    NEXT_PUBLIC_HIDE_INSIGHT: hideInsight,
+  },
 };
 
 export default nextConfig;

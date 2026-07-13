@@ -9,12 +9,16 @@ namespace deeplynx.helpers;
 public interface IAdminService
 {
     Task<bool> SysAdminCheck(long userId);
-    
+
     Task<bool> OrgAdminCheck(long userId, long organizationId);
-    
+
     Task<bool> OrgMemberCheck(long userId, long organizationId);
-    
+
     Task<bool> ProjectAdminCheck(long userId, long organizationId, List<long> projectIds);
+
+    Task<bool> OrgAdminInSystemCheck(long userId);
+
+    Task<bool> ProjectAdminInSystemCheck(long userId);
 }
 
 public class AdminService : IAdminService
@@ -33,7 +37,7 @@ public class AdminService : IAdminService
     public async Task<bool> SysAdminCheck(
         long userId)
     {
-        
+
         //check for whether a user has permission to an action/resource within a organization through group membership
         var hasPermission = _dbContext.Database
             .SqlQuery<bool>($@"
@@ -72,7 +76,7 @@ public class AdminService : IAdminService
                 ) as has_permission")
             .AsEnumerable()
             .FirstOrDefault();
-        
+
         if (hasPermission)
             _logger.LogInformation(
                 "Permission granted - User: {UserId}",
@@ -84,7 +88,7 @@ public class AdminService : IAdminService
 
         return hasPermission;
     }
-    
+
     public async Task<bool> OrgMemberCheck(
         long userId, long organizationId)
     {
@@ -110,7 +114,7 @@ public class AdminService : IAdminService
 
         return isMember;
     }
-    
+
     public async Task<bool> ProjectAdminCheck(
         long userId, long organizationId, List<long> projectIds)
     {
@@ -123,11 +127,13 @@ public class AdminService : IAdminService
             return false;
         }
 
-        // Get all project IDs where the user is a direct admin OR an admin through group membership
+        // Get all project IDs where the user is a direct admin OR an admin through group membership.
+        // Scoped by the project's organization (not the member's role) so admin status derives
+        // purely from the is_project_admin flag and does not depend on holding any particular role.
         var adminProjectIds = await _dbContext.ProjectMembers
             .Where(pm =>
-                pm.Role.Name == "Admin" &&
-                pm.Role.OrganizationId == organizationId &&
+                pm.IsProjectAdmin &&
+                pm.Project.OrganizationId == organizationId &&
                 (
                     // Direct membership
                     pm.UserId == userId ||
@@ -151,5 +157,19 @@ public class AdminService : IAdminService
                 userId, organizationId, string.Join(", ", projectIds), string.Join(", ", adminProjectIds));
 
         return hasPermission;
+    }
+
+    public async Task<bool> OrgAdminInSystemCheck(long userId)
+    {
+        return await _dbContext.OrganizationUsers
+            .AnyAsync(ou => ou.UserId == userId && ou.IsOrgAdmin);
+    }
+
+    public async Task<bool> ProjectAdminInSystemCheck(long userId)
+    {
+        // Is the user a project admin of ANY project, directly or through group membership?
+        return await _dbContext.ProjectMembers
+            .AnyAsync(pm => pm.IsProjectAdmin &&
+                (pm.UserId == userId || pm.Group.Users.Any(gu => gu.Id == userId)));
     }
 }

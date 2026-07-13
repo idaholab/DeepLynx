@@ -59,7 +59,7 @@ const CreateStorageModal = ({
             {t.translations.CREATE_STORAGE}
           </h3>
 
-          <div className="form-control mb-4">
+          <div className="form-control mb-4 w-full md:w-2/3">
             <label className="label">
               <span className="label-text required">
                 {t.translations.STORAGE_NAME}
@@ -68,7 +68,7 @@ const CreateStorageModal = ({
             <input
               type="text"
               placeholder={t.translations.PRIMARY_STORAGE_PLACEHOLDER}
-              className="input input-bordered"
+              className="input input-bordered w-full"
               value={storageFormData.name}
               onChange={(e) =>
                 setStorageFormData({ ...storageFormData, name: e.target.value })
@@ -76,14 +76,14 @@ const CreateStorageModal = ({
             />
           </div>
 
-          <div className="form-control mb-4">
+          <div className="form-control mb-4 w-full md:w-2/3">
             <label className="label">
               <span className="label-text">
                 {t.translations.STORAGE_TYPE} *
               </span>
             </label>
             <select
-              className="select select-bordered"
+              className="select select-bordered w-full"
               value={storageType}
               onChange={(e) => setStorageType(e.target.value)}
             >
@@ -98,7 +98,7 @@ const CreateStorageModal = ({
           </div>
 
           {storageType === "filesystem" && (
-            <div className="form-control mb-4">
+            <div className="form-control mb-4 w-full md:w-2/3">
               <label className="label">
                 <span className="label-text">
                   {t.translations.FILESYSTEM_PATH} *
@@ -107,12 +107,12 @@ const CreateStorageModal = ({
               <input
                 type="text"
                 placeholder="/path/to/storage"
-                className="input input-bordered"
+                className="input input-bordered w-full"
                 value={filesystemPath}
                 onChange={(e) => setFilesystemPath(e.target.value)}
               />
               <label className="label">
-                <span className="label-text-alt">
+                <span className="text-xs text-base-content/60">
                   {t.translations.ABSOLUTE_PATH_WHERE_FILES_WILL_BE_STORED}
                 </span>
               </label>
@@ -136,7 +136,7 @@ const CreateStorageModal = ({
 
           {storageType === "azure_blob" && (
             <>
-              <div className="form-control mb-4">
+              <div className="form-control mb-4 w-full md:w-2/3">
                 <label className="label">
                   <span className="label-text">
                     {t.translations.CONNECTION_STRING} *
@@ -145,13 +145,13 @@ const CreateStorageModal = ({
                 <input
                   type="text"
                   placeholder="DefaultEndpointsProtocol=https;AccountName=..."
-                  className="input input-bordered"
+                  className="input input-bordered w-full"
                   value={azureEndpoint}
                   onChange={(e) => setAzureEndpoint(e.target.value)}
                 />
               </div>
 
-              <div className="form-control mb-4">
+              <div className="form-control mb-4 w-full md:w-2/3">
                 <label className="label">
                   <span className="label-text">
                     {t.translations.CONTAINER_NAME} *
@@ -160,7 +160,7 @@ const CreateStorageModal = ({
                 <input
                   type="text"
                   placeholder="my-container"
-                  className="input input-bordered"
+                  className="input input-bordered w-full"
                   value={azureBucketName}
                   onChange={(e) => setAzureBucketName(e.target.value)}
                 />

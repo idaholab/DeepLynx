@@ -1,17 +1,18 @@
 // src/app/(home)/organization_management/OrganizationManagementClient.tsx
 "use client";
 
-import { useLanguage } from "@/app/contexts/Language";
-import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { useState } from "react";
 import Tabs from "@/app/(home)/components/Tabs";
 import {
   GroupResponseDto,
   PermissionResponseDto,
   ProjectResponseDto,
   RoleResponseDto,
+  SensitivityLabelsDto,
   UserResponseDto,
 } from "@/app/(home)/types/responseDTOs";
+import { useLanguage } from "@/app/contexts/Language";
+import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useEffect, useState } from "react";
 import InlineGroupsTable from "./groups/InlineGroupsTable";
 import RolesAndPermissions from "./roles_and_permissions/RolesAndPermissions";
 import OrganizationSettings from "./settings/OrganizationSettings";
@@ -25,6 +26,7 @@ interface OrganizationManagementProps {
   initialRoles: RoleResponseDto[];
   initialSelectedProject?: ProjectResponseDto;
   initialPermissions: PermissionResponseDto[];
+  initialLabels: SensitivityLabelsDto[];
 }
 
 const OrganizationManagementClient = ({
@@ -33,10 +35,22 @@ const OrganizationManagementClient = ({
   initialRoles,
   initialPermissions,
   initialProjects,
+  initialLabels,
 }: OrganizationManagementProps) => {
   const [activeTab, setActiveTab] = useState("");
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
+  const [labels, setLabels] = useState<SensitivityLabelsDto[]>(initialLabels);
+  const [permissions, setPermissions] =
+    useState<PermissionResponseDto[]>(initialPermissions);
+
+  useEffect(() => {
+    setLabels(initialLabels);
+  }, [initialLabels]);
+
+  useEffect(() => {
+    setPermissions(initialPermissions);
+  }, [initialPermissions]);
 
   const tabData = [
     {
@@ -48,7 +62,7 @@ const OrganizationManagementClient = ({
       content: (
         <RolesAndPermissions
           initialRoles={initialRoles}
-          initialPermissions={initialPermissions}
+          initialPermissions={permissions}
         />
       ),
     },
@@ -64,7 +78,12 @@ const OrganizationManagementClient = ({
     },
     {
       label: t.translations.TAGS_AND_SECURITY_LABELS,
-      content: <TagManagementClient projects={initialProjects} />,
+      content: (
+        <TagManagementClient
+          projects={initialProjects}
+          initialLabels={labels}
+        />
+      ),
     },
     {
       label: t.translations.SETTINGS,

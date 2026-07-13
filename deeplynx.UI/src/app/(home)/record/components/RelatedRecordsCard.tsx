@@ -53,9 +53,9 @@ function RelatedRecordsCard<T extends object>({
   }, [onLoadMore, isLoading, hasMore]);
 
   return (
-    <div className="card bg-base-100 shadow-md mt-4 p-2">
+    <div className="card mt-4 border border-base-300/50 bg-base-100 p-2 shadow-sm">
       <div className="flex justify-between px-4">
-        <h2 className="text-xl font-bold md-4 text-base-content">
+        <h2 className="text-xl font-bold md-4 text-base-content break-all">
           {cardTitle}
         </h2>
         {onAddRelationship && (
@@ -70,7 +70,7 @@ function RelatedRecordsCard<T extends object>({
       <div className="card-body p-4">
         <div
           ref={scrollContainerRef}
-          className="overflow-auto rounded-box border border-base-300 bg-base-100"
+          className="overflow-auto rounded-box border border-base-300/50 bg-base-100"
           style={{ maxHeight: "320px" }}
         >
           <table className="table">

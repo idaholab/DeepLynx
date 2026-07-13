@@ -22,7 +22,7 @@ public class RecordCollectionResponseDto
 
     [Column("description")] public string Description { get; set; }
 
-    [Column("properties")] public string Properties { get; set; } = null!;
+    [Column("properties")] public string? Properties { get; set; } = null!;
 
     [Column("project_id")] public long ProjectId { get; set; }
 
@@ -34,6 +34,8 @@ public class RecordCollectionResponseDto
     [Column("last_updated_by")] public long? LastUpdatedBy { get; set; }
 
     [Column("is_archived")] public bool IsArchived { get; set; } = false;
+
+    [NotMapped] public int RecordCount { get; set; }
 
     [NotMapped] public ICollection<RecordCollectionTagDto> Tags { get; set; }
     [NotMapped] public ICollection<RecordCollectionLabelDto> Labels { get; set; }

@@ -1,28 +1,26 @@
 "use client";
 
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
-import toast from "react-hot-toast";
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import {
+  ClassResponseDto,
+  HistoricalRecordResponseDto,
+} from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
+import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 import {
   getHistoricalRecord,
   getRecordHistory,
 } from "@/app/lib/client_service/historical_record_services.client";
-import { formatRecordHistoryDate } from "./RecordHistoryDate";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import toast from "react-hot-toast";
 import RecordHistoryControls from "./RecordHistoryControls";
+import { formatRecordHistoryDate } from "./RecordHistoryDate";
 import RecordHistoryDifferenceTable from "./RecordHistoryDifferenceTable";
 import {
   buildDifferenceTree,
   CompareMode,
   DifferenceRow,
-  flattenVisibleTree,
   filterTreeForChanges,
+  flattenVisibleTree,
   normalizeRecord,
 } from "./RecordHistoryDifferenceUtils";
 import RecordHistorySnapshotPropertiesCard from "./RecordHistorySnapshotPropertiesCard";
@@ -64,6 +62,26 @@ export default function RecordHistoryTab({
   const [sliderIndex, setSliderIndex] = useState(0);
   const [maxRenderedRows, setMaxRenderedRows] = useState(300);
   const [isUiPending, startUiTransition] = useTransition();
+  const [activeClassNames, setActiveClassNames] = useState<Set<string>>(
+    new Set(),
+  );
+  const [classes, setClasses] = useState<ClassResponseDto[]>([]);
+  const [_, setAreClassesLoading] = useState(true);
+
+  interface ClassInfo {
+    name: string;
+    isArchived: boolean;
+  }
+
+  type ClassInfoMap = Record<number, ClassInfo>;
+
+  const classInfoMap: ClassInfoMap = useMemo(() => {
+    const map: ClassInfoMap = {};
+    classes.forEach((cls) => {
+      map[cls.id] = { name: cls.name, isArchived: cls.isArchived };
+    });
+    return map;
+  }, [classes]);
 
   // Runtime caches + debounce timers for high-frequency interactions.
   const snapshotCacheRef = useRef<Map<string, HistoricalRecordResponseDto>>(
@@ -158,6 +176,39 @@ export default function RecordHistoryTab({
     recordId,
     t.translations.FAILED_TO_LOAD_RECORD_HISTORY,
   ]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setClasses([]);
+      setActiveClassNames(new Set());
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadClasses = async () => {
+      try {
+        const classData = await getAllClasses(projectId, false);
+        if (cancelled) return;
+
+        setClasses(classData);
+        const names = new Set(classData.map((cls) => cls.name));
+        setActiveClassNames(names);
+      } catch (error) {
+        console.error("Failed to load classes in RecordHistoryTab:", error);
+        if (!cancelled) {
+          setClasses([]);
+          setActiveClassNames(new Set());
+        }
+      }
+    };
+
+    loadClasses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     // Keep slider UI in sync when selected version changes elsewhere.
@@ -453,7 +504,7 @@ export default function RecordHistoryTab({
   if (isLoadingHistory) {
     // Initial loading state.
     return (
-      <div className="mt-4 card bg-base-100 shadow-lg">
+      <div className="card mt-4 border border-base-300/50 bg-base-100 shadow-sm">
         <div className="card-body">
           <div className="flex items-center gap-3">
             <span className="loading loading-spinner loading-md" />
@@ -476,7 +527,7 @@ export default function RecordHistoryTab({
   if (history.length === 0) {
     // Empty history state.
     return (
-      <div className="mt-4 card bg-base-100 shadow-lg">
+      <div className="card mt-4 border border-base-300/50 bg-base-100 shadow-sm">
         <div className="card-body">
           <h3 className="card-title">{t.translations.RECORD_HISTORY}</h3>
           <p className="opacity-80">
@@ -568,6 +619,7 @@ export default function RecordHistoryTab({
         }
         onToggleExpand={toggleExpand}
         onLoadMore={() => setMaxRenderedRows((prev) => prev + 300)}
+        classInfoMap={classInfoMap}
       />
     </div>
   );

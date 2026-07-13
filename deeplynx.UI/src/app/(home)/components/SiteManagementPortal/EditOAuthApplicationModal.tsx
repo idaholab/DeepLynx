@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLanguage } from "@/app/contexts/Language";
 import { updateOauthApplication } from "@/app/lib/client_service/oauth_services.client";
+import toast from "react-hot-toast";
 
 interface EditOAuthApplicationProps {
   isOpen: boolean;
@@ -38,6 +39,9 @@ const EditOAuthApplication = ({
   const [appOwnerEmail, setAppOwnerEmail] = useState(
     oAuthApplicationAppOwnerEmail || ""
   );
+  const [emailValidated, setEmailValidated] = useState(true);
+  const [baseUrlValidated, setBaseUrlValidated] = useState(true);
+  const [callbackUrlValidated, setCallbackUrlValidated] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
@@ -57,6 +61,10 @@ const EditOAuthApplication = ({
   ]);
 
   const handleUpdate = async () => {
+    if ((appOwnerEmail && !emailValidated) || (baseUrl && !baseUrlValidated) || !callbackUrlValidated) {
+      toast.error("Please make sure your information is valid.");
+      return;
+    }
     try {
       await updateOauthApplication(oAuthApplicationId, {
         name,
@@ -74,6 +82,28 @@ const EditOAuthApplication = ({
     onClose();
   };
 
+  const validateUrl = (urlString: string) => {
+    try {
+      const normalizedUrl = urlString.startsWith("http")
+        ? urlString
+        : `https://${urlString}`
+      const url = new URL(normalizedUrl);
+      return(
+        ["http:", "https:"].includes(url.protocol) && url.hostname.includes(".")
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  const validateEmail = (email: string) => {
+    if (email.includes('@') && email.includes('.') && !email.includes(' ')) {
+      setEmailValidated(true);
+    } else {
+      setEmailValidated(false);
+    }
+  }
+
   return (
     <>
       {isOpen && (
@@ -85,52 +115,94 @@ const EditOAuthApplication = ({
             <label className="font-semibold text-sm text-neutral">
               {t.translations.NAME}
             </label>
-            <input
-              type="text"
-              placeholder="Name"
-              className="input input-primary w-full"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            <label className="font-semibold text-sm text-neutral">
-              {t.translations.CALLBACK_URL}
-            </label>
-            <input
-              type="text"
-              placeholder="CallbackURL"
-              className="input input-primary w-full"
-              value={callbackUrl}
-              onChange={(e) => setCallbackURL(e.target.value)}
-              required
-            />
+            <div>
+              <input
+                type="text"
+                placeholder="Name"
+                className="input input-primary w-full"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={50}
+                required
+              />
+              <span className={`text-xs mt-1 float-right ${name.length >= 50 ? "text-error" :
+                name.length >= 40 ? "text-warning" :
+                  "text-base-content"
+                }`}>
+                {name.length}/50
+              </span>
+            </div>
+            <div>
+              <label className="font-semibold text-sm text-neutral">
+                {t.translations.CALLBACK_URL}
+              </label>
+              <input
+                type="text"
+                placeholder="CallbackURL"
+                className="input input-primary w-full"
+                value={callbackUrl}
+                onChange={(e) => {
+                  setCallbackURL(e.target.value)
+                  setCallbackUrlValidated(validateUrl(e.target.value))
+                }}
+                required
+              />
+              {callbackUrl && !callbackUrlValidated && (
+                <p className="text-xs mt-1 float-right text-error">Please enter a valid url.</p>
+              )}
+            </div>
             <label className="font-semibold text-sm text-neutral">
               {t.translations.DESCRIPTION}
             </label>
-            <textarea
-              placeholder={t.translations.DESCRIPTION}
-              className="textarea textarea-bordered textarea-primary bg-base-100 text-base-content placeholder:text-base-content/40 min-h-[100px] w-full"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-            <label className="font-semibold text-sm text-neutral">
-              {t.translations.BASE_URL}
-            </label>
-            <input
-              placeholder={t.translations.BASE_URL}
-              className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-            />
-            <label className="font-semibold text-sm text-neutral">
-              {t.translations.APP_OWNER_EMAIL}
-            </label>
-            <input
-              placeholder={t.translations.APP_OWNER_EMAIL}
-              className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
-              value={appOwnerEmail}
-              onChange={(e) => setAppOwnerEmail(e.target.value)}
-            />
+            <div>
+              <textarea
+                placeholder={t.translations.DESCRIPTION}
+                className="textarea textarea-bordered textarea-primary bg-base-100 text-base-content placeholder:text-base-content/40 min-h-[100px] w-full"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={250}
+              />
+              <span className={`text-xs mt-1 float-right ${description.length >= 250 ? "text-error" :
+                description.length >= 240 ? "text-warning" :
+                  "text-base-content"
+                }`}>
+                {description.length}/250
+              </span>
+            </div>
+            <div>
+              <label className="font-semibold text-sm text-neutral">
+                {t.translations.BASE_URL}
+              </label>
+              <input
+                placeholder={t.translations.BASE_URL}
+                className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
+                value={baseUrl}
+                onChange={(e) => {
+                  setBaseUrl(e.target.value)
+                  setBaseUrlValidated(validateUrl(e.target.value))
+                }}
+              />
+              {baseUrl && !baseUrlValidated && (
+                <p className="text-xs mt-1 float-right text-error">Please enter a valid url.</p>
+              )}
+            </div>
+            <div>
+              <label className="font-semibold text-sm text-neutral">
+                {t.translations.APP_OWNER_EMAIL}
+              </label>
+              <input
+                placeholder={t.translations.APP_OWNER_EMAIL}
+                className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
+                value={appOwnerEmail}
+                onChange={(e) => {
+                  setAppOwnerEmail(e.target.value)
+                  validateEmail(e.target.value)
+                }}
+              />
+              {appOwnerEmail && !emailValidated && (
+                <p className="text-xs mt-1 float-right text-error">Please enter a correct email.</p>
+              )}
+            </div>
             <div className="modal-action">
               <button type="button" className="btn" onClick={onClose}>
                 {t.translations.CANCEL}

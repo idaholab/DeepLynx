@@ -36,6 +36,7 @@ public static class ExtractionStatus
     public const string Complete = "complete";
     public const string Failed = "failed";
     public const string Promoted = "promoted";
+    public const string PartiallyPromoted = "partially_promoted";
     public const string Rejected = "rejected";
 }
 

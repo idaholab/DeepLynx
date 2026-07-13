@@ -2,6 +2,7 @@ namespace deeplynx.helpers.Context;
 
 public static class UserContextStorage
 {
+    private static AsyncLocal<string> _accountType = new();
     private static AsyncLocal<string> _email = new();
     private static AsyncLocal<long> _userId = new();
     private static AsyncLocal<long> _organizationId = new();
@@ -10,6 +11,12 @@ public static class UserContextStorage
     private static AsyncLocal<bool> _isOrgAdmin = new();
     private static AsyncLocal<bool> _isOrgMember = new();
     private static AsyncLocal<bool> _isProjectAdmin = new();
+
+    public static string AccountType
+    {
+        get => _accountType.Value;
+        set => _accountType.Value = value;
+    }
 
     public static string Email
     {
@@ -46,13 +53,7 @@ public static class UserContextStorage
         get => _isOrgAdmin.Value;
         set => _isOrgAdmin.Value = value;
     }
-    
-    public static bool IsOrgMember
-    {
-        get => _isOrgMember.Value;
-        set => _isOrgMember.Value = value;
-    }
-    
+
     public static bool IsProjectAdmin
     {
         get => _isProjectAdmin.Value;

@@ -21,7 +21,7 @@ public class TestSuiteFixture : IAsyncLifetime
     public TestSuiteFixture()
     {
         _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("pgvector/pgvector:pg18") 
+            .WithImage("pgvector/pgvector:pg18")
             .Build();
 
         _redisContainer = new RedisBuilder()
@@ -33,12 +33,14 @@ public class TestSuiteFixture : IAsyncLifetime
     public string RedisConnectionString { get; private set; }
     public NpgsqlDataSource PostgresDataSource { get; private set; }
 
-    public DeeplynxContext Context { get; private set; }
+    public DeeplynxContext DeeplynxContext { get; private set; }
+    public LatticeContext LatticeContext { get; private set; }
 
     // Runs at the beginning of every test suite
     public async Task InitializeAsync()
     {
-        try {
+        try
+        {
             // Start containers
             await _postgresContainer.StartAsync();
             await _redisContainer.StartAsync();
@@ -53,14 +55,20 @@ public class TestSuiteFixture : IAsyncLifetime
             dataSourceBuilder.UseVector();
             PostgresDataSource = dataSourceBuilder.Build();
 
-            var options = new DbContextOptionsBuilder<DeeplynxContext>()
+            var deeplynxContextOptions = new DbContextOptionsBuilder<DeeplynxContext>()
                 .UseNpgsql(PostgresDataSource, o => o.UseVector())
                 .Options;
 
-            Context = new DeeplynxContext(options);
+            var latticeContextOptions = new DbContextOptionsBuilder<LatticeContext>()
+                .UseNpgsql(PostgresDataSource, o => o.UseVector())
+                .Options;
+
+            DeeplynxContext = new DeeplynxContext(deeplynxContextOptions);
+            LatticeContext = new LatticeContext(latticeContextOptions);
 
             // Apply migrations only once
-            await Context.Database.MigrateAsync();
+            await DeeplynxContext.Database.MigrateAsync();
+            await LatticeContext.Database.MigrateAsync();
 
             // Apply env variables without exposing values in tests
             var projectRoot =
@@ -76,13 +84,14 @@ public class TestSuiteFixture : IAsyncLifetime
             await DisposeAsync();
             throw new InvalidOperationException("Failed to initialize test suite", ex);
         }
-        
+
     }
 
     // Runs at the end of every test suite
     public async Task DisposeAsync()
     {
-        if (Context != null) await Context.DisposeAsync();
+        if (DeeplynxContext != null) await DeeplynxContext.DisposeAsync();
+        if (LatticeContext != null) await LatticeContext.DisposeAsync();
         if (_postgresContainer != null) await _postgresContainer.DisposeAsync();
         if (_redisContainer != null) await _redisContainer.DisposeAsync();
     }
@@ -90,7 +99,7 @@ public class TestSuiteFixture : IAsyncLifetime
 
 // Defines a test collection named "Test Suite Collection".
 // This collection uses the TestSuiteFixture class for setup and teardown.
-[CollectionDefinition("Test Suite Collection")]
+[CollectionDefinition("Test Suite Collection", DisableParallelization = true)] // Note: this may be changed in the future. Just testing serialized tests as we share one DB
 public class TestSuiteCollection : ICollectionFixture<TestSuiteFixture>
 {
     // This class has no code, and is never created. Its purpose is simply
@@ -127,7 +136,7 @@ public class IntegrationTestBase : IAsyncLifetime
         await Context.DisposeAsync();
         await CacheService.Instance.FlushAsync();
     }
-    
+
     /// <summary>
     /// Switch cache type for testing - just create a new instance
     /// </summary>
@@ -182,7 +191,7 @@ public class IntegrationTestBase : IAsyncLifetime
         var relationships = await Context.Relationships.ToListAsync();
         Context.Relationships.RemoveRange(relationships);
         await Context.SaveChangesAsync();
-        
+
         var sensitivityLabels = await Context.SensitivityLabels.ToListAsync();
         Context.SensitivityLabels.RemoveRange(sensitivityLabels);
         await Context.SaveChangesAsync();
@@ -201,6 +210,10 @@ public class IntegrationTestBase : IAsyncLifetime
 
         var dataSources = await Context.DataSources.ToListAsync();
         Context.DataSources.RemoveRange(dataSources);
+        await Context.SaveChangesAsync();
+
+        var extractions = await Context.Extractions.ToListAsync();
+        Context.Extractions.RemoveRange(extractions);
         await Context.SaveChangesAsync();
 
         var projectMembers = await Context.ProjectMembers.ToListAsync();

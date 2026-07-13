@@ -12,7 +12,9 @@ import {
   updateProjectMemberRole,
 } from "@/app/lib/client_service/projects_services.client";
 import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import { useRBAC } from "@/app/(home)/rbac/useRBAC";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 import { InviteUserToOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
@@ -60,6 +62,8 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   );
   const [loading, setLoading] = useState(false);
   const { t } = useLanguage();
+  const router = useRouter();
+  const { user, refreshUser } = useRBAC();
 
   /* ------------------------------------------------------------------------ */
   /*                           Add User Modal State                           */
@@ -83,6 +87,17 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   const [groupMembersCache, setGroupMembersCache] = useState<
     Map<number, UserResponseDto[]>
   >(new Map());
+  const [viewGroupMembersModal, setViewGroupMembersModal] = useState<{
+    isOpen: boolean;
+    groupName: string;
+    members: UserResponseDto[];
+    loading: boolean;
+  }>({
+    isOpen: false,
+    groupName: "",
+    members: [],
+    loading: false,
+  });
 
   /* ------------------------------------------------------------------------ */
   /*                        Confirm Remove / Future Use                       */
@@ -106,8 +121,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     memberName: "",
     memberType: null,
     currentRoleId: null,
+    currentIsProjectAdmin: false,
   });
   const [editRoleSelectedId, setEditRoleSelectedId] = useState<string>("");
+  const [editIsProjectAdmin, setEditIsProjectAdmin] = useState<boolean>(false);
 
   /* ------------------------------------------------------------------------ */
   /*                          Org / Project Context                           */
@@ -119,6 +136,19 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     ? Number(organization.organizationId)
     : undefined;
   const projectId = project?.id ? Number(project.id) : undefined;
+  const currentUserId = user?.id ? Number(user.id) : undefined;
+
+  const refreshAccessIfAffected = async (
+    memberType?: "user" | "group" | null,
+    memberId?: number | null,
+  ) => {
+    if (!currentUserId) return;
+
+    if (memberType === "group" || memberId === currentUserId) {
+      await refreshUser();
+      router.refresh();
+    }
+  };
 
   /* ------------------------------------------------------------------------ */
   /*                    Sync server-provided members -> table                 */
@@ -169,6 +199,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
   const handleAddInviteUser = async (
     emailOrUserId: string | number,
     roleId?: number,
+    isProjectAdmin?: boolean,
   ) => {
     if (!organizationId) {
       throw new Error(t.translations.MISSING_ORG_ID);
@@ -188,6 +219,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       await addMemberToProject(organizationId, projectId, {
         roleId,
         userId: emailOrUserId,
+        isProjectAdmin: isProjectAdmin ?? false,
       });
     }
 
@@ -205,6 +237,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       }
     } catch (refreshError) {
       console.error("Failed to refresh members list:", refreshError);
+    }
+
+    if (typeof emailOrUserId === "number") {
+      await refreshAccessIfAffected("user", emailOrUserId);
     }
   };
 
@@ -253,6 +289,44 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     return []; // Return empty while loading
   };
+  
+  const handleViewGroupMembers = async (row: ProjectMemberTableRow) => {
+    if (!organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
+    
+    setViewGroupMembersModal({
+      isOpen: true,
+      groupName: row.name,
+      members: [],
+      loading: true,
+    });
+    
+    try {
+      // Use members from cache if it exists, if not fetch API
+      const members = groupMembersCache.has(row.memberId)
+        ? groupMembersCache.get(row.memberId)!
+        : await getGroupMembers(organizationId, row.memberId);
+      
+      setGroupMembersCache((prev) => new Map(prev).set(row.memberId, members));
+      
+      setViewGroupMembersModal({
+        isOpen: true,
+        groupName: row.name,
+        members,
+        loading: false,
+      });
+    } catch (error) {
+      console.error(`Failed to load members for group ${row.memberId}:`, error);
+      toast.error(t.translations.UNABLE_TO_LOAD_USERS);
+      
+      setViewGroupMembersModal((prev) => ({
+        ...prev,
+        loading: false,
+      }));
+    }
+  };
 
   const handleAddGroup = async () => {
     if (!organizationId || !projectId) {
@@ -286,6 +360,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       // Refresh the members list
       const updatedMembers = await getProjectMembers(organizationId, projectId);
       setTableData(buildTableData(updatedMembers));
+      await refreshAccessIfAffected("group", groupId);
 
       setShowAddGroupModal(false);
       setSelectedGroupId("");
@@ -309,8 +384,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       memberName: row.name,
       memberType: row.memberType,
       currentRoleId: row.roleId ?? null,
+      currentIsProjectAdmin: row.isProjectAdmin,
     });
     setEditRoleSelectedId(row.roleId ? String(row.roleId) : "");
+    setEditIsProjectAdmin(row.isProjectAdmin);
   };
 
   const handleSaveMemberRole = async () => {
@@ -341,6 +418,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
           roleId,
           memberId,
           undefined,
+          editIsProjectAdmin,
         );
       } else {
         await updateProjectMemberRole(
@@ -349,6 +427,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
           roleId,
           undefined,
           memberId,
+          editIsProjectAdmin,
         );
       }
 
@@ -357,11 +436,12 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       setTableData((prev) =>
         prev.map((row) =>
           row.memberId === memberId
-            ? { ...row, role: selectedRole?.name ?? null, roleId }
+            ? { ...row, role: selectedRole?.name ?? null, roleId, isProjectAdmin: editIsProjectAdmin }
             : row,
         ),
       );
 
+      await refreshAccessIfAffected(editRoleModal.memberType, memberId);
       toast.success(t.translations.MEMBER_ROLE_UPDATED);
     } catch (error) {
       console.error("Failed to update member role:", error);
@@ -374,8 +454,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
         memberName: "",
         memberType: null,
         currentRoleId: null,
+        currentIsProjectAdmin: false,
       });
       setEditRoleSelectedId("");
+      setEditIsProjectAdmin(false);
     }
   };
 
@@ -416,6 +498,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
       }
 
       setTableData((prev) => prev.filter((row) => row.memberId !== memberId));
+      await refreshAccessIfAffected(confirmModal.memberType, memberId);
 
       toast.success(t.translations.MEMBER_REMOVED_FROM_PROJECT);
     } catch (error) {
@@ -439,8 +522,8 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
   return (
     <div className="p-6">
-      <div className="">
-        <div className="">
+      <div className="card bg-base-100 border border-primary">
+        <div className="card-body">
           <ProjectUsersHeader
             totalMembers={totalMembers}
             userCount={userCount}
@@ -454,6 +537,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             tableData={tableData}
             loading={loading}
             onEditRole={handleOpenEditRoleModal}
+            onViewGroupMembers={handleViewGroupMembers}
             onOpenRemoveModal={({ memberId, memberName, memberType }) =>
               setConfirmModal({
                 isOpen: true,
@@ -518,7 +602,9 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
             roles={roles}
             loading={loading}
             selectedRoleId={editRoleSelectedId}
+            isProjectAdmin={editIsProjectAdmin}
             onChangeRole={setEditRoleSelectedId}
+            onChangeIsProjectAdmin={setEditIsProjectAdmin}
             onCancel={() => {
               setEditRoleModal({
                 isOpen: false,
@@ -526,11 +612,59 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
                 memberName: "",
                 memberType: null,
                 currentRoleId: null,
+                currentIsProjectAdmin: false,
               });
               setEditRoleSelectedId("");
+              setEditIsProjectAdmin(false);
             }}
             onSave={handleSaveMemberRole}
           />
+
+          {/* View Group Members Modal*/}
+          {viewGroupMembersModal.isOpen && (
+              <dialog className="modal modal-open">
+                <div className="modal-box">
+                  <h3 className="font-bold text-lg">
+                    Users in {viewGroupMembersModal.groupName}
+                  </h3>
+
+                  {viewGroupMembersModal.loading ? (
+                      <div className="flex justify-center py-8">
+                        <span className="loading loading-spinner loading-lg" />
+                      </div>
+                  ) : viewGroupMembersModal.members.length === 0 ? (
+                      <p className="py-4 text-base-content/70">
+                        No users in this group.
+                      </p>
+                  ) : (
+                      <div className="py-4 space-y-2 max-h-80 overflow-y-auto">
+                        {viewGroupMembersModal.members.map((user) => (
+                            <div key={user.id} className="p-3 rounded-lg bg-base-200">
+                              <p className="font-semibold">{user.name || user.email}</p>
+                              <p className="text-sm text-base-content/70">{user.email}</p>
+                            </div>
+                        ))}
+                      </div>
+                  )}
+                  
+                  <div className="modal-action">
+                    <button
+                      className="btn"
+                      onClick={() =>
+                        setViewGroupMembersModal({
+                          isOpen: false,
+                          groupName: "",
+                          members: [],
+                          loading: false,
+                        })
+                      }
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </dialog>
+          )}
         </div>
       </div>
     </div>

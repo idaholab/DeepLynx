@@ -66,16 +66,11 @@ const ProjectRolesAndPermissions = ({
   /*                               Core State                                */
   /* ------------------------------------------------------------------------ */
 
-  // For this release: only standard roles (Admin, User, Viewer)
-  const standardInitialRoles = initialRoles.filter((role) =>
-    ["Admin", "User", "Viewer"].includes(role.name),
-  );
-
   const [activeLayout, setActiveLayout] = useState<"split-view" | "matrix">(
     "split-view",
   );
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(
-    standardInitialRoles[0]?.id || null,
+    initialRoles[0]?.id || null,
   );
   const [roles, setRoles] = useState<RoleResponseDto[]>(initialRoles);
   const [permissions, setPermissions] =
@@ -277,8 +272,8 @@ const ProjectRolesAndPermissions = ({
   const handleStartEditingPermissions = () => {
     if (!currentRole) return;
 
-    // Only allow editing for project-specific roles
-    if (isStandardRole(currentRole) || isOrganizationRole(currentRole)) {
+    // Only allow editing for project-specific roles.
+    if (isOrganizationRole(currentRole)) {
       toast.error("Cannot edit permissions for inherited roles");
       return;
     }
@@ -406,9 +401,9 @@ const ProjectRolesAndPermissions = ({
 
   const handleSaveMatrixPermissions = async () => {
     try {
-      // Only update project-specific roles
+      // Only update project-specific roles.
       const projectRolesToUpdate = roles.filter(
-        (role) => isProjectRole(role) && !isStandardRole(role),
+        (role) => isProjectRole(role),
       );
 
       const updatePromises = projectRolesToUpdate.map((role) => {
@@ -575,21 +570,11 @@ const ProjectRolesAndPermissions = ({
   const roleHasPermission = (roleId: number, permissionId: number): boolean =>
     rolePermissions[roleId]?.some((p) => p.id === permissionId) || false;
 
-  const isStandardRole = (role: RoleResponseDto): boolean =>
-    role.name === "Admin" || role.name === "User" || role.name === "Viewer";
-
   const isOrganizationRole = (role: RoleResponseDto): boolean =>
     role.organizationId != null && role.projectId == null;
 
   const isProjectRole = (role: RoleResponseDto): boolean =>
     role.projectId != null && role.projectId === projectId;
-
-  const getRoleSource = (role: RoleResponseDto): string => {
-    if (isStandardRole(role)) return "System";
-    if (isOrganizationRole(role)) return "Organization";
-    if (isProjectRole(role)) return "Project";
-    return "Unknown";
-  };
 
   /* ------------------------------------------------------------------------ */
   /*                          Refetch Roles on Mount                          */
@@ -624,7 +609,7 @@ const ProjectRolesAndPermissions = ({
   return (
     <div className="p-6 mx-auto">
       {/* Header */}
-      <div className="mb-6 border-b border-base-300 pb-4">
+      <div className="mb-6 border-b border-base-300/50 pb-4">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold">
             {t.translations.PROJECT_ROLES_AND_PERMISSIONS}
@@ -691,10 +676,8 @@ const ProjectRolesAndPermissions = ({
           tempPermissions={tempPermissions}
           onRoleSelection={handleRoleSelection}
           roleHasPermission={roleHasPermission}
-          isStandardRole={isStandardRole}
           isOrganizationRole={isOrganizationRole}
           isProjectRole={isProjectRole}
-          getRoleSource={getRoleSource}
           onEditClick={handleEditClick}
           onDeleteClick={handleDeleteClick}
           onCreateRole={() => setIsCreateModalOpen(true)}
@@ -719,10 +702,8 @@ const ProjectRolesAndPermissions = ({
           onSaveMatrixPermissions={handleSaveMatrixPermissions}
           onToggleMatrixPermission={handleToggleMatrixPermission}
           roleHasPermission={matrixRoleHasPermission}
-          isStandardRole={isStandardRole}
           isOrganizationRole={isOrganizationRole}
           isProjectRole={isProjectRole}
-          getRoleSource={getRoleSource}
           onEditClick={handleEditClick}
         />
       )}
