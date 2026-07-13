@@ -17,14 +17,13 @@ import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
 } from "@/app/lib/client_service/insight_services.client";
-import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
-import { getAllRecords } from "@/app/lib/client_service/record_services.client";
+import { searchRecordsPaginated } from "@/app/lib/client_service/record_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
 import {
   AdjustmentsHorizontalIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { useDeferredValue, useEffect, useState, useMemo } from "react";
+import { useDeferredValue, useEffect, useState, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
 import ProjectInsightChat from "./components/ProjectInsightChat";
 import ProjectInsightFilters from "./components/ProjectInsightFilters";
@@ -53,6 +52,8 @@ import {
 } from "./components/projectInsight.view-utils";
 import { useProjectInsightTabState } from "./hooks/useProjectInsightTabState";
 import { BetaBadge } from "@/app/(home)/components/BetaBadge";
+import useRecordSearch from "./hooks/useRecordSearch";
+import LazyList from "../components/LazyList";
 
 const STATUS_POLL_INTERVAL_MS = 5000;
 
@@ -71,7 +72,6 @@ export default function ProjectInsightClientView() {
       : null;
 
   // View state
-  const [records, setRecords] = useState<ProjectInsightRecord[]>([]);
   const [classOptions, setClassOptions] = useState<NamedInsightOption[]>([]);
   const [tagOptions, setTagOptions] = useState<NamedInsightOption[]>([]);
   const [statusMap, setStatusMap] = useState<
@@ -94,27 +94,74 @@ export default function ProjectInsightClientView() {
               .join(","),
       [statusMap],
   );
-  const [isLoadingRecords, setIsLoadingRecords] = useState(true);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [activeTabKey, setActiveTabKey] = useState<"library" | "pending">(
     "library",
   );
   const [selectedPendingIds, setSelectedPendingIds] = useState<number[]>([]);
   const [isQueueing, setIsQueueing] = useState(false);
-  const [libraryMatchedSearchIds, setLibraryMatchedSearchIds] = useState<
-    number[] | null
-  >(null);
   const [isLibrarySearchLoading, setIsLibrarySearchLoading] = useState(false);
-  const [librarySearchError, setLibrarySearchError] = useState("");
-  const [libraryState, setLibraryState] = useState<TabFilterState>(
-    EMPTY_TAB_FILTER_STATE,
-  );
-  const [pendingState, setPendingState] = useState<TabFilterState>(
-    EMPTY_TAB_FILTER_STATE,
-  );
-  const deferredLibrarySearchQuery = useDeferredValue(libraryState.searchQuery);
   const { selectedInsightModels, setSelectedInsightModels } =
     useInsightModelSelection(organizationId, projectId);
+
+  // Effects
+  useEffect(() => {
+    setSelectedPendingIds([]);
+    setActiveTabKey("library");
+  }, [projectId]);
+
+const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
+  const [sources, setSources] = useState<DataSourceResponseDto[] | null>(null);
+
+  const loadRecordMeta = useCallback(async () => {
+    if (!projectId) return;
+
+    const [classDtos, dataSourceDtos, tagDtos] =
+      await Promise.all([
+        getAllClasses(projectId, true),
+        getAllDataSources(projectId, true),
+        getAllTags(projectId, true),
+      ]);
+
+    setClasses(classDtos);
+    setSources(dataSourceDtos);
+
+    setClassOptions(sortNamedOptions(classDtos as ClassResponseDto[]));
+    setTagOptions(sortNamedOptions(tagDtos as TagResponseDto[]));
+  }, [projectId]);
+
+  useEffect(() => {
+    loadRecordMeta();
+  }, [loadRecordMeta]);
+
+  const pageSize = 10;
+
+  const {
+    filters: libraryState,
+    setFilters: setLibraryState,
+    records: embedded,
+    status: embeddedStatus,
+    total: embeddedTotal,
+    found: embeddedFound,
+    error: embeddedError,
+    loadNextPage: loadNextEmbeddedPage,
+  } = useRecordSearch(pageSize, "embedded", classes, sources);
+
+  const {
+    filters: pendingState,
+    setFilters: setPendingState,
+    records: pending,
+    status: pendingStatus,
+    total: pendingTotal,
+    found: pendingFound,
+    error: pendingError,
+    loadNextPage: loadNextPendingPage,
+  } = useRecordSearch(pageSize, "pending", classes, sources);
+
+  useEffect(() => {
+    setStatusMap({...embeddedStatus, ...pendingStatus});
+  }, [embeddedStatus, pendingStatus]);
 
   // Tab state helpers
   const {
@@ -127,245 +174,6 @@ export default function ProjectInsightClientView() {
     setLibraryState,
     setPendingState,
   });
-
-  // Effects
-  useEffect(() => {
-    setLibraryState(EMPTY_TAB_FILTER_STATE);
-    setPendingState(EMPTY_TAB_FILTER_STATE);
-    setLibraryMatchedSearchIds(null);
-    setLibrarySearchError("");
-    setSelectedPendingIds([]);
-    setActiveTabKey("library");
-    setIsQueryModelUnavailable(false);
-    setIsUploadModelUnavailable(false);
-    setIsEmbeddingModelUnavailable(false);
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!hasProjectLoaded || !hasOrganizationLoaded) return;
-
-    if (!projectId || !organizationId) {
-      setIsLoadingRecords(false);
-      setRecords([]);
-      setStatusMap({});
-      setClassOptions([]);
-      setTagOptions([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadProjectInsight = async () => {
-      setIsLoadingRecords(true);
-      setLibrarySearchError("");
-      setIsQueryModelUnavailable(false);
-      setIsUploadModelUnavailable(false);
-      setIsEmbeddingModelUnavailable(false);
-
-      try {
-        const [recordDtos, classDtos, dataSourceDtos, tagDtos] =
-          await Promise.all([
-            getAllRecords(organizationId, projectId),
-            getAllClasses(projectId, true),
-            getAllDataSources(projectId, true),
-            getAllTags(projectId, true),
-          ]);
-
-        if (cancelled) return;
-
-        const mappedRecords = mapProjectInsightRecords(
-          recordDtos,
-          classDtos as ClassResponseDto[],
-          dataSourceDtos as DataSourceResponseDto[],
-        );
-
-        setRecords(mappedRecords);
-        setClassOptions(sortNamedOptions(classDtos as ClassResponseDto[]));
-        setTagOptions(sortNamedOptions(tagDtos as TagResponseDto[]));
-
-        const supportedRecords = mappedRecords.filter(
-          (record) => record.isInsightSupported,
-        );
-
-        setStatusMap(
-          Object.fromEntries(
-            supportedRecords.map((record) => [
-              record.id,
-              { state: "checking" } satisfies ProjectInsightStatus,
-            ]),
-          ),
-        );
-        
-        const unavailableStatuses = Object.fromEntries(
-            supportedRecords.map((record) => [
-                record.id,
-              {
-                state: "error",
-                error: "Embedding model unavailable",
-              } satisfies ProjectInsightStatus,
-            ]),
-        );
-
-        const [queryHealth, uploadHealth, embeddingHealth] =
-            await Promise.allSettled([
-              fetchInsightEndpointHealth({
-                organizationId,
-                projectId,
-                modelConfigId: selectedInsightModels.queryModelConfigId,
-                modelType: "llm",
-              }),
-              fetchInsightEndpointHealth({
-                organizationId,
-                projectId,
-                modelConfigId: selectedInsightModels.uploadModelConfigId,
-                modelType: "vlm",
-              }),
-              fetchInsightEndpointHealth({
-                organizationId,
-                projectId,
-                modelConfigId: selectedInsightModels.embeddingModelConfigId,
-                modelType: "embedding",
-              }),
-            ]);
-
-        const queryUnavailable =
-            queryHealth.status === "rejected" ||
-            !queryHealth.value.reachable ||
-            !queryHealth.value.model_available;
-
-        const uploadUnavailable =
-            uploadHealth.status === "rejected" ||
-            !uploadHealth.value.reachable ||
-            !uploadHealth.value.model_available;
-
-        const embeddingUnavailable =
-            embeddingHealth.status === "rejected" ||
-            !embeddingHealth.value.reachable ||
-            !embeddingHealth.value.model_available;
-
-        if (cancelled) return;
-
-        setIsQueryModelUnavailable(queryUnavailable);
-        setIsUploadModelUnavailable(uploadUnavailable);
-        setIsEmbeddingModelUnavailable(embeddingUnavailable);
-
-        if (embeddingUnavailable) {
-          setStatusMap(unavailableStatuses);
-          return;
-        }
-
-        const resolvedStatuses = await Promise.all(
-          supportedRecords.map(async (record) => {
-            try {
-              const ingestionStatus = await fetchInsightIngestionStatus({
-                organizationId,
-                projectId,
-                fileId: record.id,
-              });
-              
-              return [
-                record.id,
-                ingestionStatus.indexed
-                  ? {
-                      state: "embedded",
-                      chunkCount: ingestionStatus.chunk_count,
-                      pageCount: ingestionStatus.page_count,
-                    }
-                  : { state: "not_embedded" },
-              ] as const;
-            } catch (error) {
-              return [record.id, getStatusFromError(error)] as const;
-            }
-          }),
-        );
-
-        if (cancelled) return;
-
-        setStatusMap(Object.fromEntries(resolvedStatuses));
-      } catch (error) {
-        console.error("Failed to load project Insight records:", error);
-        if (!cancelled) {
-          setRecords([]);
-          setStatusMap({});
-          toast.error(t.translations.PROJECT_INSIGHT_LOADING_RECORDS);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingRecords(false);
-        }
-      }
-    };
-
-    void loadProjectInsight();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    hasOrganizationLoaded,
-    hasProjectLoaded,
-    organizationId,
-    projectId,
-    selectedInsightModels.queryModelConfigId,
-    selectedInsightModels.uploadModelConfigId,
-    selectedInsightModels.embeddingModelConfigId,
-    t.translations.PROJECT_INSIGHT_LOADING_RECORDS,
-  ]);
-
-  useEffect(() => {
-    const searchableQuery = deferredLibrarySearchQuery.trim();
-
-    if (!organizationId || !projectId || searchableQuery.length < 2) {
-      setLibraryMatchedSearchIds(null);
-      setIsLibrarySearchLoading(false);
-      setLibrarySearchError("");
-      return;
-    }
-
-    let cancelled = false;
-
-    const runSearch = async () => {
-      setIsLibrarySearchLoading(true);
-      setLibraryMatchedSearchIds(null);
-      setLibrarySearchError("");
-
-      try {
-        const searchResults = await fullTextSearch(
-          organizationId,
-          searchableQuery,
-          [projectId],
-        );
-
-        if (cancelled) return;
-
-        const matchedRecordIds = [
-          ...new Set(searchResults.map((result) => Number(result.id))),
-        ].filter((id) => Number.isFinite(id));
-        setLibraryMatchedSearchIds(matchedRecordIds);
-      } catch (error) {
-        console.error("Project Insight full-text search failed:", error);
-        if (!cancelled) {
-          setLibraryMatchedSearchIds([]);
-          setLibrarySearchError(t.translations.FAILED_TO_SEARCH_RECORDS);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLibrarySearchLoading(false);
-        }
-      }
-    };
-
-    void runSearch();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    deferredLibrarySearchQuery,
-    organizationId,
-    projectId,
-    t.translations.FAILED_TO_SEARCH_RECORDS,
-  ]);
 
   useEffect(() => {
     if (!organizationId || !projectId || !pollingKey || isEmbeddingModelUnavailable) return;
@@ -454,61 +262,14 @@ export default function ProjectInsightClientView() {
     tagIds: pendingState.tagIds,
   };
 
-  const libraryFilteredRecords = records.filter((record) =>
-    matchesInsightFilters(record, libraryFilters),
-  );
-  const libraryFilteredSupportedRecords = libraryFilteredRecords.filter(
-    (record) => record.isInsightSupported,
-  );
-  const libraryEmbeddedRecords = libraryFilteredRecords.filter(
-    (record) => getProjectInsightStatus(record, statusMap).state === "embedded",
-  );
-  const libraryPendingRecords = libraryFilteredSupportedRecords.filter(
-    (record) => getProjectInsightStatus(record, statusMap).state !== "embedded",
-  );
-
-  const pendingFilteredRecords = records.filter((record) =>
-    matchesInsightFilters(record, pendingFilters),
-  );
-  const pendingFilteredSupportedRecords = pendingFilteredRecords.filter(
-    (record) => record.isInsightSupported,
-  );
-  const pendingEmbeddedRecords = pendingFilteredRecords.filter(
-    (record) => getProjectInsightStatus(record, statusMap).state === "embedded",
-  );
-  const pendingRecords = pendingFilteredSupportedRecords.filter(
-    (record) => getProjectInsightStatus(record, statusMap).state !== "embedded",
-  );
-
   const normalizedLibrarySearchQuery = libraryState.searchQuery
     .trim()
     .toLowerCase();
   const normalizedPendingSearchQuery = pendingState.searchQuery
     .trim()
     .toLowerCase();
-  const remoteMatchIds =
-    normalizedLibrarySearchQuery.length >= 2 && libraryMatchedSearchIds
-      ? new Set(libraryMatchedSearchIds)
-      : null;
 
-  const visibleEmbeddedRecords = normalizedLibrarySearchQuery
-    ? libraryEmbeddedRecords.filter((record) => {
-        const metadataMatch = matchesMetadataSearch(
-          record,
-          normalizedLibrarySearchQuery,
-        );
-        const remoteMatch = remoteMatchIds?.has(record.id) ?? false;
-        return metadataMatch || remoteMatch;
-      })
-    : libraryEmbeddedRecords;
-
-  const visiblePendingRecords = normalizedPendingSearchQuery
-    ? pendingRecords.filter((record) =>
-        matchesMetadataSearch(record, normalizedPendingSearchQuery),
-      )
-    : pendingRecords;
-
-  const queueablePendingRecords = visiblePendingRecords.filter((record) => {
+  const queueablePendingRecords = pending.filter((record) => {
     const status = getProjectInsightStatus(record, statusMap).state;
     return (
       Boolean(record.uri) && (status === "not_embedded" || status === "error")
@@ -532,7 +293,7 @@ export default function ProjectInsightClientView() {
       ? t.translations.PROJECT_INSIGHT_SEARCH_PLACEHOLDER
       : t.translations.PROJECT_INSIGHT_PENDING_SEARCH_PLACEHOLDER;
   const activeSearchError =
-    activeTabKey === "library" ? librarySearchError : "";
+    activeTabKey === "library" ? embeddedError : pendingError;
   const activeFilterCount =
     activeFilters.classIds.length + activeFilters.tagIds.length;
   const activeFilterPills = buildActiveFilterPills(
@@ -546,18 +307,11 @@ export default function ProjectInsightClientView() {
     pending: t.translations.PROJECT_INSIGHT_PENDING_TAB,
   };
 
-  const activeFilterStats =
-    activeTabKey === "library"
-      ? {
-          totalRecords: libraryFilteredRecords.length,
-          embeddedRecords: libraryEmbeddedRecords.length,
-          pendingRecords: libraryPendingRecords.length,
-        }
-      : {
-          totalRecords: pendingFilteredRecords.length,
-          embeddedRecords: pendingEmbeddedRecords.length,
-          pendingRecords: pendingRecords.length,
-        };
+  const activeFilterStats = {
+    totalRecords: embeddedFound + pendingFound,
+    embeddedRecords: embeddedFound,
+    pendingRecords: pendingFound,
+  };
 
   // UI event handlers
   async function handleQueueSelected() {
@@ -565,7 +319,7 @@ export default function ProjectInsightClientView() {
     if (selectedVisiblePendingIds.length === 0) return;
     if (!organizationId || !projectId) return;
 
-    const selectedRecords = visiblePendingRecords.filter((record) =>
+    const selectedRecords = pending.filter((record) =>
       selectedVisiblePendingIds.includes(record.id),
     );
     const uploadFileInfo = selectedRecords
@@ -629,9 +383,9 @@ export default function ProjectInsightClientView() {
   const embeddedSearchSummary = normalizedLibrarySearchQuery
     ? isLibrarySearchLoading
       ? t.translations.PROJECT_INSIGHT_SEARCHING
-      : visibleEmbeddedRecords.length > 0
+      : embeddedTotal
         ? withTokens(t.translations.PROJECT_INSIGHT_SEARCH_RESULTS, {
-            count: visibleEmbeddedRecords.length,
+            count: embeddedTotal,
             query: libraryState.searchQuery.trim(),
           })
         : withTokens(t.translations.PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY, {
@@ -640,7 +394,7 @@ export default function ProjectInsightClientView() {
     : t.translations.PROJECT_INSIGHT_LIBRARY_DESCRIPTION;
   const pendingSearchSummary = normalizedPendingSearchQuery
     ? withTokens(t.translations.PROJECT_INSIGHT_PENDING_SEARCH_RESULTS, {
-        count: visiblePendingRecords.length,
+        count: pendingTotal,
       })
     : t.translations.PROJECT_INSIGHT_PENDING_DESCRIPTION;
   const activeContextTitle =
@@ -651,19 +405,20 @@ export default function ProjectInsightClientView() {
     activeTabKey === "library" ? embeddedSearchSummary : pendingSearchSummary;
   const activeContextCount =
     activeTabKey === "library"
-      ? visibleEmbeddedRecords.length
-      : visiblePendingRecords.length;
+      ? embeddedTotal
+      : pendingTotal;
 
   // Render content
   const libraryContent = (
     <ProjectInsightRecordSection
       title={t.translations.PROJECT_INSIGHT_EMBEDDED_TITLE}
       description={embeddedSearchSummary}
-      count={visibleEmbeddedRecords.length}
+      count={embeddedTotal}
       emptyMessage={t.translations.PROJECT_INSIGHT_EMBEDDED_EMPTY}
     >
       <div className="space-y-3">
-        {visibleEmbeddedRecords.map((record) => (
+        <LazyList onReachEnd={loadNextPendingPage}>
+        {embedded.map((record) => (
           <ProjectInsightRecordCard
             key={record.id}
             projectId={projectId ?? 0}
@@ -671,7 +426,10 @@ export default function ProjectInsightClientView() {
             status={getProjectInsightStatus(record, statusMap)}
           />
         ))}
+        </LazyList>
+        {embeddedTotal !== embedded.length ? "Loading . . ." : null}
       </div>
+      <button onClick={loadNextEmbeddedPage}>load more</button>
     </ProjectInsightRecordSection>
   );
 
@@ -679,7 +437,7 @@ export default function ProjectInsightClientView() {
     <ProjectInsightRecordSection
       title={t.translations.PROJECT_INSIGHT_PENDING_TITLE}
       description={pendingSearchSummary}
-      count={visiblePendingRecords.length}
+      count={pendingTotal}
       emptyMessage={t.translations.PROJECT_INSIGHT_PENDING_EMPTY}
       actions={
         queueablePendingIds.length > 0 ? (
@@ -713,6 +471,7 @@ export default function ProjectInsightClientView() {
               <span className="badge badge-outline badge-secondary">
                 {withTokens(t.translations.PROJECT_INSIGHT_SELECTED_COUNT, {
                   count: selectedVisiblePendingIds.length,
+                  total: pendingTotal,
                 })}
               </span>
             )}
@@ -721,30 +480,33 @@ export default function ProjectInsightClientView() {
       }
     >
       <div className="space-y-3">
-        {visiblePendingRecords.map((record) => {
-          const status = getProjectInsightStatus(record, statusMap);
-          const isSelectable =
-            Boolean(record.uri) &&
-            (status.state === "not_embedded" || status.state === "error");
+        <LazyList onReachEnd={loadNextPendingPage}>
+          {pending.map((record) => {
+            const status = getProjectInsightStatus(record, statusMap);
+            const isSelectable =
+              Boolean(record.uri) &&
+              (status.state === "not_embedded" || status.state === "error");
 
-          return (
-            <ProjectInsightRecordCard
-              key={record.id}
-              projectId={projectId ?? 0}
-              record={record}
-              status={status}
-              selectable={isSelectable}
-              checked={selectedPendingIds.includes(record.id)}
-              onToggle={(recordId) =>
-                setSelectedPendingIds((current) =>
-                  current.includes(recordId)
-                    ? current.filter((id) => id !== recordId)
-                    : [...current, recordId],
-                )
-              }
-            />
-          );
-        })}
+            return (
+              <ProjectInsightRecordCard
+                key={record.id}
+                projectId={projectId ?? 0}
+                record={record}
+                status={status}
+                selectable={isSelectable}
+                checked={selectedPendingIds.includes(record.id)}
+                onToggle={(recordId) =>
+                  setSelectedPendingIds((current) =>
+                    current.includes(recordId)
+                      ? current.filter((id) => id !== recordId)
+                      : [...current, recordId],
+                  )
+                }
+              />
+            );
+          })}
+        </LazyList>
+        {pendingTotal !== pending.length ? "Loading . . ." : null}
       </div>
     </ProjectInsightRecordSection>
   );
@@ -816,7 +578,7 @@ export default function ProjectInsightClientView() {
               projectName={projectName}
               selectedInsightModels={selectedInsightModels}
               onSelectedInsightModelsChange={setSelectedInsightModels}
-              scopedRecordIds={visibleEmbeddedRecords.map(
+              scopedRecordIds={embedded.map(
                 (record) => record.id,
               )}
               isChatUnavailable={isChatUnavailable}

@@ -1172,7 +1172,7 @@ export const translations = {
       PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY:
         'No embedded files matched "{query}".',
       PROJECT_INSIGHT_SELECT_ALL_VISIBLE: "Select Visible",
-      PROJECT_INSIGHT_SELECTED_COUNT: "{count} selected",
+      PROJECT_INSIGHT_SELECTED_COUNT: "{count}/{total} selected",
       PROJECT_INSIGHT_STATUS_CHECKING: "Checking Insight status...",
       STARTING: "Starting",
       CHECKING: "Checking",
@@ -3067,7 +3067,7 @@ export const translations = {
       PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY:
         'Ningún archivo incrustado coincidió con "{query}".',
       PROJECT_INSIGHT_SELECT_ALL_VISIBLE: "Seleccionar visibles",
-      PROJECT_INSIGHT_SELECTED_COUNT: "{count} seleccionados",
+      PROJECT_INSIGHT_SELECTED_COUNT: "{count}/{total} seleccionados",
       PROJECT_INSIGHT_STATUS_CHECKING: "Comprobando el estado de Insight...",
       STARTING: "Iniciando",
       CHECKING: "Comprobando",
