@@ -244,15 +244,6 @@ export default function ProjectInsightClientView() {
     };
   }, [organizationId, projectId, pollingKey, isEmbeddingModelUnavailable]);
 
-  useEffect(() => {
-    setSelectedPendingIds((current) =>
-      new Map([...current].filter(([recordId, _]) => {
-        const status = statusMap[recordId];
-        return status?.state !== "embedded";
-      })),
-    );
-  }, [statusMap]);
-
   // Derived tab datasets
   const projectName = project?.projectName ?? "";
   const libraryFilters: ProjectInsightFiltersState = {
@@ -263,6 +254,19 @@ export default function ProjectInsightClientView() {
     classIds: pendingState.classIds,
     tagIds: pendingState.tagIds,
   };
+
+  useEffect(() => {
+    setSelectedPendingIds((current) =>
+      new Map([...current].filter(([recordId, _]) => {
+        const status = statusMap[recordId];
+        return status?.state !== "embedded";
+      })),
+    );
+  }, [statusMap]);
+
+  useEffect(() => {
+    setSelectedPendingIds(new Map());
+  }, [pendingState]);
 
   const normalizedLibrarySearchQuery = libraryState.searchQuery
     .trim()
@@ -452,7 +456,7 @@ export default function ProjectInsightClientView() {
               <span className="badge badge-outline badge-secondary">
                 {withTokens(t.translations.PROJECT_INSIGHT_SELECTED_COUNT, {
                   count: selectedPendingIdsLength,
-                  total: pendingTotal,
+                  total: pendingFound,
                 })}
               </span>
             )}
