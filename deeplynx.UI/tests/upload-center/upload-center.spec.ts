@@ -1,5 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { seedAndNavigateToProject } from "../helpers/seed";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+
+const TEN_GB = 10 * 1024 * 1024 * 1024;
+const TWENTY_MIN_MS = 20 * 60 * 1000;
+
 
 test.describe("Upload Center", () => {
   test.beforeEach(async ({ page }) => {
@@ -143,5 +150,75 @@ test.describe("Upload Center", () => {
     await expect(
       page.getByRole("button", { name: "Step 2: Upload Your CSV" }),
     ).toBeVisible();
+  });
+
+  test.describe('Large file upload', () => {
+    let filePath: string;
+
+    test.beforeAll(async () => {
+      filePath = path.join(os.tmpdir(), 'ten-gb-test-file.bin');
+
+      // Reuse the file across runs if it already exists and is the right size
+      if (fs.existsSync(filePath) && fs.statSync(filePath).size === TEN_GB) {
+        return;
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        const stream = fs.createWriteStream(filePath);
+        const chunkSize = 64 * 1024 * 1024; // 64 MB chunks
+        const chunk = Buffer.alloc(chunkSize, 'a'); // fill, not sparse
+        let written = 0;
+
+        function writeNext() {
+          if (written >= TEN_GB) {
+            stream.end();
+            return;
+          }
+          const remaining = TEN_GB - written;
+          const toWrite = remaining < chunkSize ? chunk.subarray(0, remaining) : chunk;
+          written += toWrite.length;
+
+          // Handle backpressure correctly
+          if (!stream.write(toWrite)) {
+            stream.once('drain', writeNext);
+          } else {
+            setImmediate(writeNext);
+          }
+        }
+
+        stream.on('finish', resolve);
+        stream.on('error', reject);
+        writeNext();
+      });
+    });
+
+    test.afterAll(async () => {
+      // Comment this out if you want to cache the file between test runs
+      // to avoid regenerating 10 GB every time.
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
+    test('Upload a 10 GB file and verify completion in < 20 minutes', async ({ page }) => {
+      test.setTimeout(TWENTY_MIN_MS + 60_000); // budget + buffer for setup/assertions
+
+      const start = Date.now();
+
+      await page.getByText('click to browse').click();
+
+      const fileInput = page.locator('input[type="file"]');
+      await fileInput.setInputFiles(filePath);
+
+      await page.getByRole('button', { name: 'Upload' }).click();
+
+      await expect(page.getByText('File uploaded successfully!')).toBeVisible({
+        timeout: TWENTY_MIN_MS,
+      });
+
+      const elapsedMs = Date.now() - start;
+      console.log(`Upload completed in ${(elapsedMs / 1000 / 60).toFixed(2)} minutes`);
+      expect(elapsedMs).toBeLessThan(TWENTY_MIN_MS);
+    });
   });
 });
