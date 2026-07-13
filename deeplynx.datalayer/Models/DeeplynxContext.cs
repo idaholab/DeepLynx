@@ -1128,10 +1128,6 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.Uuid)
                 .HasDatabaseName("idx_relationships_uuid");
 
-            entity.HasIndex(e => new { e.ProjectId, e.Name })
-                .HasDatabaseName("unique_relationship_name")
-                .IsUnique();
-
             // Unique per project when origin and destination are both set
             entity.HasIndex(e => new { e.OrganizationId, e.ProjectId, e.OriginId, e.Name, e.DestinationId })
                 .HasDatabaseName("unique_project_relationship_origin_name_destination")
