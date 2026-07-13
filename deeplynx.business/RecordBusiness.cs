@@ -1021,9 +1021,25 @@ public class RecordBusiness : IRecordBusiness
             _context.Records.Add(record);
             await _context.SaveChangesAsync();
 
+            if (dto.Tags != null)
+            {
+                dto.Tags = dto.Tags.Select(tag => string.IsNullOrWhiteSpace(tag) ? null : tag).ToList();
+            }
+
+            // Filter out tags that are null or empty
+            var filteredTags = dto.Tags?
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .ToList();
+
+            // If all tags are null or empty, set filteredTags to null
+            if (filteredTags == null || filteredTags.Count == 0)
+            {
+                filteredTags = null;
+            }
+
             // Process tags (can be created on-the-fly)
             var tags = await ProcessTags(
-                currentUserId, organizationId, projectId, record.Id, dto.Tags);
+                currentUserId, organizationId, projectId, record.Id, filteredTags);
 
             if (sensitivityLabelIds?.Count > 0)
             {
