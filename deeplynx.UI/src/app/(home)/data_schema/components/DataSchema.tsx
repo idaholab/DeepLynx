@@ -11,7 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 import Tabs from "@/app/(home)/components/Tabs";
-import type { CreateRelationshipRequestDto } from "@/app/(home)/types/requestDTOs";
+import type { CreateRelationshipRequestDto, CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
 import type {
   ClassResponseDto,
   RelationshipResponseDto,
@@ -30,6 +30,8 @@ import {
   getAllRelationships,
   updateRelationship,
 } from "@/app/lib/client_service/relationship_services.client";
+import ArchiveClassModal from "./ArchiveClassModal";
+import { queryBuilder } from "@/app/lib/client_service/query_services.client";
 
 type LayoutMode = "tabs";
 
@@ -40,6 +42,7 @@ type Selection =
 
 interface DataSchemaProps {
   mode: LayoutMode;
+  organizationId: number | undefined;
 }
 
 const modeDescriptions: Record<LayoutMode, string> = {
@@ -95,7 +98,7 @@ function ModalShell({
   );
 }
 
-export default function DataSchema({ mode }: DataSchemaProps) {
+export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
   const { project } = useProjectSession();
 
   const [classes, setClasses] = useState<ClassResponseDto[]>([]);
@@ -116,6 +119,11 @@ export default function DataSchema({ mode }: DataSchemaProps) {
   const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [isUpdatingClass, setIsUpdatingClass] = useState(false);
   const [isArchivingClass, setIsArchivingClass] = useState(false);
+  const [archiveClassId, setArchiveClassId] = useState<number | null>(null);
+  const [archiveClassAction, setArchiveClassAction] = useState<boolean>(true);
+  const [recordsNumber, setRecordsNumber] = useState<number>();
+  const [cachedRecordsCount, setCachedRecordsCount] = useState<Record<number, number>>({});
+  const [relationshipCount, setRelationshipCount] = useState<number>();
   const [newClassDraft, setNewClassDraft] = useState({
     name: "",
     description: "",
@@ -397,6 +405,29 @@ export default function DataSchema({ mode }: DataSchemaProps) {
     }
   };
 
+  const getRecordsNumber = async (classId: number) => {
+    if (!projectId || !organizationId) {
+      return null;
+    }
+    const cachedCount = cachedRecordsCount[classId];
+    // Only trigger the API call the first time, store the record count for reuse
+    if (cachedCount !== undefined)
+    {
+      setRecordsNumber(cachedCount);
+    } else {
+      const query: CustomQueryRequestDto = {filter: "class_id", operator: "=", value: String(classId)};
+      const records = await queryBuilder(organizationId, [query], [projectId]);
+
+      const count = records.filter(record => record.classId === classId).length;
+      setCachedRecordsCount(prev => ({
+        ...prev,
+        [classId]: count,
+      }));
+
+      setRecordsNumber(count);
+    }
+  }
+
   const toggleArchiveClass = async () => {
     if (!projectId || !selectedClass) return;
 
@@ -422,6 +453,7 @@ export default function DataSchema({ mode }: DataSchemaProps) {
       console.error("Failed to archive class from data schema:", error);
       toast.error("Failed to update class archive state.");
     } finally {
+      setArchiveClassId(null);
       setIsArchivingClass(false);
     }
   };
@@ -806,7 +838,13 @@ export default function DataSchema({ mode }: DataSchemaProps) {
           </button>
           <button
             className="btn btn-outline btn-warning btn-sm"
-            onClick={toggleArchiveClass}
+            onClick={async () => {
+              setArchiveClassId(selectedClass.id);
+              if (selectedClass.id)
+                setRelationshipCount(relationshipCountForClass(selectedClass.id));
+              await getRecordsNumber(selectedClass.id);
+              setArchiveClassAction(!selectedClass.isArchived);
+            }}
             disabled={isArchivingClass}
           >
             <ArchiveBoxIcon className="h-4 w-4" />
@@ -1366,6 +1404,16 @@ export default function DataSchema({ mode }: DataSchemaProps) {
           </div>
         </ModalShell>
       ) : null}
+      <ArchiveClassModal
+        isOpen={archiveClassId !== null}
+        onToggle={(value) =>
+          setArchiveClassId(value ? archiveClassId : null)
+        }
+        archiveAction={archiveClassAction}
+        onArchive={toggleArchiveClass}
+        recordsForClass={recordsNumber}
+        relationshipCount={relationshipCount}
+      />
     </main>
   );
 }
