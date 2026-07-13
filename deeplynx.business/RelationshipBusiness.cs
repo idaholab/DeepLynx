@@ -294,38 +294,53 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         }
 
-        // Bulk insert into relationships; if there is a name collision, update the description and uuid if present
-        var sql = projectId.HasValue
-            ? @"
-          INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, properties,
-                                    uuid, origin_id, destination_id, last_updated_at, is_archived, last_updated_by)
-            VALUES {0}
-            ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
-            DO UPDATE SET
-                origin_id = COALESCE(EXCLUDED.origin_id, relationships.origin_id),
-                destination_id = COALESCE(EXCLUDED.destination_id, relationships.destination_id),
-                description = COALESCE(EXCLUDED.description, relationships.description),
-                properties = COALESCE(EXCLUDED.properties, relationships.properties),
-                uuid = COALESCE(EXCLUDED.uuid, relationships.uuid),
-                last_updated_at = @now,
-                last_updated_by = @lastUpdatedBy
-            RETURNING *;"
-            : @"
-            INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, properties,
-                                    uuid, origin_id, destination_id, last_updated_at, is_archived, last_updated_by)
-            VALUES {0}
-            ON CONFLICT (organization_id, name) WHERE project_id IS NULL
-            DO UPDATE SET
-                origin_id = COALESCE(EXCLUDED.origin_id, relationships.origin_id),
-                destination_id = COALESCE(EXCLUDED.destination_id, relationships.destination_id),
-                description = COALESCE(EXCLUDED.description, relationships.description),
-                properties = COALESCE(EXCLUDED.properties, relationships.properties),
-                uuid = COALESCE(EXCLUDED.uuid, relationships.uuid),
-                last_updated_at = @now,
-                last_updated_by = @lastUpdatedBy
-            RETURNING *;";
+       var withOriginDestination = relationships.Where(r => r.OriginId.HasValue && r.DestinationId.HasValue).ToList();
+       var woOriginDestination = relationships.Where(r => !r.OriginId.HasValue && !r.DestinationId.HasValue).ToList();
+        
+       var results = new List<RelationshipResponseDto>();
 
-        // establish "constant" parameters
+       if (withOriginDestination.Count > 0)
+       {
+           results.AddRange(await ExecuteUpsertBatch(
+               withOriginDestination, organizationId, currentUserId,
+               conflictColumns: "organization_id, project_id, origin_id, name, destination_id",
+               conflictFilter: "project_id IS NOT NULL AND origin_id IS NOT NULL AND destination_id IS NOT NULL", projectId));
+       }
+
+       if (woOriginDestination.Count > 0)
+       {
+           results.AddRange(await ExecuteUpsertBatch(
+               woOriginDestination, organizationId, currentUserId,
+               conflictColumns: "organization_id, project_id, name",
+               conflictFilter: "project_id IS NOT NULL AND origin_id IS NULL AND destination_id IS NULL", projectId));
+       }
+       
+        var createEvent = new CreateEventRequestDto
+        {
+            Operation = "create",
+            EntityType = "relationship"
+        };
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, results.Count);
+
+        return results;
+    }
+    
+    private async Task<List<RelationshipResponseDto>> ExecuteUpsertBatch(List<CreateRelationshipRequestDto> batch, long organizationId, long currentUserId, 
+        string conflictColumns, string conflictFilter, long? projectId)
+    {
+        var sql = $@"
+        INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, properties,
+                                uuid, origin_id, destination_id, last_updated_at, is_archived, last_updated_by)
+        VALUES {{0}}
+        ON CONFLICT ({conflictColumns}) WHERE {conflictFilter}
+        DO UPDATE SET
+            description = COALESCE(EXCLUDED.description, relationships.description),
+            properties = COALESCE(EXCLUDED.properties, relationships.properties),
+            uuid = COALESCE(EXCLUDED.uuid, relationships.uuid),
+            last_updated_at = @now,
+            last_updated_by = @lastUpdatedBy
+        RETURNING *;";
+
         var parameters = new List<NpgsqlParameter>
         {
             new("@organizationId", organizationId),
@@ -334,8 +349,7 @@ public class RelationshipBusiness : IRelationshipBusiness
             new("@lastUpdatedBy", currentUserId)
         };
 
-        // establish "dynamic" parameters (new for each dto in the list)
-        parameters.AddRange(relationships.SelectMany((dto, i) => new[]
+        parameters.AddRange(batch.SelectMany((dto, i) => new[]
         {
             new NpgsqlParameter($"@p{i}_name", dto.Name),
             new NpgsqlParameter($"@p{i}_desc", (object?)dto.Description ?? DBNull.Value),
@@ -345,26 +359,15 @@ public class RelationshipBusiness : IRelationshipBusiness
             new NpgsqlParameter($"@p{i}_destination_id", (object?)dto.DestinationId ?? DBNull.Value)
         }));
 
-        // stringify the params and comma separate them
-        var valueTuples = string.Join(", ", relationships.Select((dto, i) =>
+        var valueTuples = string.Join(", ", batch.Select((dto, i) =>
             $"(@organizationId, @projectId, @p{i}_name, @p{i}_desc, @p{i}_props, @p{i}_uuid, @p{i}_origin_id, @p{i}_destination_id, @now, false, @lastUpdatedBy)"));
 
-        // put everything together and execute the query
         sql = string.Format(sql, valueTuples);
 
-        // returns the resulting upserted relationships
-        var result = await _context.Database
+        return await _context.Database
             .SqlQueryRaw<RelationshipResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
 
-        var createEvent = new CreateEventRequestDto
-        {
-            Operation = "create",
-            EntityType = "relationship"
-        };
-        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
-
-        return result;
     }
 
     /// <summary>
