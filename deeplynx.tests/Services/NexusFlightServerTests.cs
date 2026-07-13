@@ -5,13 +5,42 @@ using Apache.Arrow.Flight;
 using Apache.Arrow.Types;
 using deeplynx.api.Services;
 using Grpc.Core;
+using deeplynx.interfaces;
+using deeplynx.helpers.BigData;
+using deeplynx.business;
+using deeplynx.models;
+using Moq;
+using Microsoft.AspNetCore.SignalR;
+using deeplynx.helpers;
+using Microsoft.Extensions.Logging;
+using deeplynx.helpers.Hubs;
 
 namespace deeplynx.tests.Services;
 
 [Collection("Test Suite Collection")]
 
-public class NexusFlightServerTests
+public class NexusFlightServerTests : IntegrationTestBase
 {
+    private readonly IRecordBusiness _recordBusiness;
+    private EventBusiness _eventBusiness;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private INotificationBusiness _notificationBusiness = null!;
+    private SensitivityLabelService _sensitivityLabelService = null!;
+    private UserBusiness _userBusiness = null!;
+    private TagBusiness _tagBusiness = null!;
+
+    public NexusFlightServerTests(TestSuiteFixture fixture) : base(fixture)
+    {
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
+            _sensitivityLabelBusiness, _sensitivityLabelService);
+    }
+
     [Fact]
     public void ResolveNexusTarget_BuildsTargetFromDescriptorPath()
     {
@@ -114,12 +143,12 @@ public class NexusFlightServerTests
             .Build();
     }
 
-    private static void InvokePrivate(string methodName, params object?[] args)
+    private void InvokePrivate(string methodName, params object?[] args)
     {
         InvokePrivate<object?>(methodName, args);
     }
 
-    private static T InvokePrivate<T>(string methodName, params object?[] args)
+    private T InvokePrivate<T>(string methodName, params object?[] args)
     {
         var method = typeof(NexusFlightServer).GetMethod(
             methodName,
@@ -129,7 +158,7 @@ public class NexusFlightServerTests
 
         var instance = method!.IsStatic
             ? null
-            : new NexusFlightServer();
+            : new NexusFlightServer(_recordBusiness);
 
         try
         {
