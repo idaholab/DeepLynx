@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Asp.Versioning;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
@@ -7,6 +8,7 @@ using deeplynx.helpers.ExceptionHandlers;
 using deeplynx.helpers.Hubs;
 using deeplynx.helpers.Json;
 using deeplynx.interfaces;
+using deeplynx.api.Routing;
 using deeplynx.api.Services;
 using deeplynx.api.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -23,6 +25,10 @@ using Log = Serilog.Log;
 var builder = WebApplication.CreateBuilder(args);
 var isOpenApiDocumentGeneration = OpenApiGenerationMode.IsActive();
 var isRuntimeStartup = !isOpenApiDocumentGeneration;
+const string ApiV1BasePath = "/api/v1";
+const string ApiDocsBasePath = "/api";
+const string OpenApiRoutePattern = $"{ApiDocsBasePath}/openapi/{{documentName}}.json";
+const string ScalarRoutePrefix = $"{ApiDocsBasePath}/scalar";
 
 builder.WebHost.ConfigureKestrel(options => { options.Limits.MaxRequestBodySize = 2L * 1024 * 1024 * 1024; });
 
@@ -135,7 +141,10 @@ try
 
     builder.Services.AddAuthorization();
 
-    builder.Services.AddControllers()
+    builder.Services.AddControllers(options =>
+        {
+            options.Conventions.Add(new ApiVersionRoutePrefixConvention("api/v{version:apiVersion}"));
+        })
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
@@ -160,6 +169,24 @@ try
     {
         options.SerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
     });
+
+    builder.Services
+        .AddApiVersioning(options =>
+        {
+            options.DefaultApiVersion = new ApiVersion(1);
+            options.ReportApiVersions = true;
+            options.AssumeDefaultVersionWhenUnspecified = true;
+            options.ApiVersionReader = new UrlSegmentApiVersionReader();
+        })
+        .AddMvc(options =>
+        {
+            options.Conventions.Add(new DefaultApiVersionConvention(new ApiVersion(1)));
+        })
+        .AddApiExplorer(options =>
+        {
+            options.GroupNameFormat = "'v'V";
+            options.SubstituteApiVersionInUrl = true;
+        });
 
     /*
     ╔════════════════════════════╗
@@ -293,12 +320,6 @@ try
         Log.Information("Migrations applied successfully.");
     }
 
-    /* ╔════════════════════════════╗
-       ║      App Base Path         ║
-       ╚════════════════════════════╝ */
-    PathString basePath = "/api/v1";
-    app.UsePathBase(basePath);
-
     app.UseStaticFiles();
     app.UseRouting();
     app.UseExceptionHandler(); // Runs registered IExceptionHandlers; must precede middleware that may throw
@@ -317,12 +338,12 @@ try
     app.MapControllers(); // Last
 
     //Health check endpoint
-    app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
+    app.MapGet($"{ApiV1BasePath}/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
         .ExcludeFromDescription(); // hide from docs
 
     // Check if the notification service is enabled (defaults to false if not set)
     if (Environment.GetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE") == "true")
-        app.MapHub<EventNotificationHub>("/eventNotificationHub"); // endpoint for real-time notifications with SignalR
+        app.MapHub<EventNotificationHub>($"{ApiV1BasePath}/eventNotificationHub"); // endpoint for real-time notifications with SignalR
 
     /* ╔════════════════════════════╗
        ║   Scalar Configuration     ║
@@ -330,7 +351,8 @@ try
     // Always using scalar:
     //if (app.Environment.IsDevelopment()) { ...
     // app.UseOpenApi();
-    app.MapOpenApi();
+    app.MapOpenApi(OpenApiRoutePattern);
+    app.MapOpenApi($"{ApiV1BasePath}/openapi/{{documentName}}.json");
 
     if (isRuntimeStartup)
     {
@@ -358,11 +380,12 @@ try
       </header>
     </div>";
 
-        app.MapScalarApiReference(options =>
+        void ConfigureScalar(ScalarOptions options)
         {
             options
                 .WithDarkMode()
-                .WithBaseServerUrl(basePath.ToString())
+                .WithOpenApiRoutePattern(OpenApiRoutePattern)
+                .WithBaseServerUrl(ApiV1BasePath)
                 .WithTheme(ScalarTheme.Kepler)
                 .WithTitle("DeepLynx Nexus API")
                 .WithCustomCss(customcss)
@@ -371,10 +394,13 @@ try
 
             if (!string.IsNullOrEmpty(hostedLink))
             {
-                var hostedLinkWithApi = string.Concat(hostedLink + "/api/v1");
+                var hostedLinkWithApi = string.Concat(hostedLink + ApiV1BasePath);
                 options.Servers = new List<ScalarServer> { new(hostedLinkWithApi) };
             }
-        });
+        }
+
+        app.MapScalarApiReference(ScalarRoutePrefix, ConfigureScalar);
+        app.MapScalarApiReference($"{ApiV1BasePath}/scalar", ConfigureScalar);
     }
 
     app.Run();
