@@ -30,10 +30,8 @@ interface MatrixViewLayoutProps {
   onEditClick: (role: RoleResponseDto) => void;
 
   roleHasPermission: (roleId: number, permissionId: number) => boolean;
-  isStandardRole: (role: RoleResponseDto) => boolean;
   isOrganizationRole: (role: RoleResponseDto) => boolean;
   isProjectRole: (role: RoleResponseDto) => boolean;
-  getRoleSource: (role: RoleResponseDto) => string;
 }
 
 const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
@@ -50,10 +48,8 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   onToggleMatrixPermission,
   onEditClick,
   roleHasPermission,
-  isStandardRole,
   isOrganizationRole,
   isProjectRole,
-  getRoleSource,
 }) => {
   const { t } = useLanguage();
   const matrixPermissionCategories = React.useMemo(() => {
@@ -68,12 +64,12 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
 
   // Determine if there are editable (project-only) roles
   const hasEditableRoles = roles.some(
-    (role) => isProjectRole(role) && !isStandardRole(role)
+    (role) => isProjectRole(role)
   );
 
   // Determine if a role can be edited
   const canEditRole = (role: RoleResponseDto) => {
-    return isProjectRole(role) && !isStandardRole(role);
+    return isProjectRole(role);
   };
 
   const editMatrixDisabledReason = !hasEditableRoles
@@ -86,9 +82,9 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
 
   return (
     <div style={{ height: "calc(100vh - 28rem)" }}>
-      <div className="card bg-base-100 shadow-xl h-full flex flex-col overflow-hidden border-2 border-primary">
+      <div className="card h-full flex flex-col overflow-hidden border border-base-300/50 bg-base-100 shadow-sm">
         {/* Matrix Header / Controls */}
-        <div className="px-6 py-3 border-b border-base-300 flex items-center justify-between">
+        <div className="px-6 py-3 border-b border-base-300/50 flex items-center justify-between">
           <h3 className="text-sm font-semibold">
             {t.translations.PERMISSION_MATRIX}
           </h3>
@@ -147,15 +143,12 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                     {t.translations.PERMISSION}
                   </th>
                   {roles.map((role) => {
-                    const isStd = isStandardRole(role);
                     const isOrg = isOrganizationRole(role);
                     const isPrj = isProjectRole(role);
                     const editable = canEditRole(role);
 
                     const editDisabled = !editable;
-                    const editTitle = isStd
-                      ? t.translations.STANDARD_ROLES_CANNOT_BE_EDITED
-                      : isOrg
+                    const editTitle = isOrg
                       ? t.translations.ORGANIZATION_ROLES_CANNOT_BE_EDITED_AT_PROJECT_LEVEL
                       : t.translations.EDIT_ROLE;
 
@@ -165,11 +158,6 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                           <div className="flex items-center gap-2">
                             <ShieldCheckIcon className="w-4 h-4 text-primary" />
                             <span className="font-medium">{role.name}</span>
-                            {isStd && (
-                              <div className="badge badge-info badge-xs">
-                                {t.translations.STD}
-                              </div>
-                            )}
                             {isOrg && (
                               <div className="badge badge-secondary badge-xs flex gap-1">
                                 <BuildingOfficeIcon className="w-3 h-3" />
@@ -197,9 +185,6 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                               {role.description}
                             </span>
                           )}
-                          <span className="text-xs text-base-content/50 font-normal">
-                            {getRoleSource(role)}
-                          </span>
                         </div>
                       </th>
                     );
@@ -244,7 +229,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                             Number(perm.id)
                           );
                           const editable = canEditRole(role);
-                          const isInherited = isStandardRole(role) || isOrganizationRole(role);
+                          const isInherited = isOrganizationRole(role);
 
                           return (
                             <td key={role.id} className="text-center">
@@ -267,9 +252,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                                     : ""
                                 }`}
                                 title={
-                                  isStandardRole(role) && isEditingMatrix
-                                    ? t.translations.STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
-                                    : isOrganizationRole(role) && isEditingMatrix
+                                  isOrganizationRole(role) && isEditingMatrix
                                     ? t.translations.ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL
                                     : isEditingMatrix
                                     ? t.translations.CLICK_TO_TOGGLE

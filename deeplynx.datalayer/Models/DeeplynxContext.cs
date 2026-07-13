@@ -15,6 +15,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<Action> Actions { get; set; }
 
+    public virtual DbSet<AiModelConfig> AiModelConfigs { get; set; }
+
     public virtual DbSet<ApiKey> ApiKeys { get; set; }
 
     public virtual DbSet<Class> Classes { get; set; }
@@ -25,6 +27,10 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<Event> Events { get; set; }
 
+    public virtual DbSet<Embedding> Embeddings { get; set; }
+
+    public virtual DbSet<EmbeddingLogs> EmbeddingLogs { get; set; }
+
     public virtual DbSet<Extraction> Extractions { get; set; }
 
     public virtual DbSet<Group> Groups { get; set; }
@@ -33,11 +39,15 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<HistoricalRecord> HistoricalRecords { get; set; }
 
+    public virtual DbSet<ProvenanceRecord> ProvenanceRecords { get; set; }
+
     public virtual DbSet<OauthApplication> OauthApplications { get; set; }
 
     public virtual DbSet<OauthToken> OauthTokens { get; set; }
 
     public virtual DbSet<ObjectStorage> ObjectStorages { get; set; }
+
+    public virtual DbSet<OntologyVector> OntologyVectors { get; set; }
 
     public virtual DbSet<Organization> Organizations { get; set; }
 
@@ -49,6 +59,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<ProjectMember> ProjectMembers { get; set; }
 
+    public virtual DbSet<QueryRecord> QueryRecords { get; set; }
+
     public virtual DbSet<Record> Records { get; set; }
 
     public virtual DbSet<RecordCollection> RecordCollections { get; set; }
@@ -57,24 +69,17 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<Role> Roles { get; set; }
 
+    public virtual DbSet<SavedSearch> SavedSearches { get; set; }
+
     public virtual DbSet<SensitivityLabel> SensitivityLabels { get; set; }
 
     public virtual DbSet<Subscription> Subscriptions { get; set; }
 
     public virtual DbSet<Tag> Tags { get; set; }
 
-    public virtual DbSet<User> Users { get; set; }
-
-    public virtual DbSet<SavedSearch> SavedSearches { get; set; }
-
-    public virtual DbSet<AiModelConfig> AiModelConfigs { get; set; }
-
     public virtual DbSet<UserModelToken> UserModelTokens { get; set; }
 
-    public virtual DbSet<Embedding> Embeddings { get; set; }
-
-    public virtual DbSet<OntologyVector> OntologyVectors { get; set; }
-
+    public virtual DbSet<User> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -115,6 +120,9 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.ApplicationId)
                 .HasDatabaseName("idx_api_keys_application_id");
 
+            entity.HasIndex(e => e.CreatedBy)
+                .HasDatabaseName("idx_api_keys_created_by");
+
             entity.HasOne(d => d.User).WithMany(p => p.ApiKeys)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("api_keys_user_id_fkey");
@@ -123,6 +131,11 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.ApplicationId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("api_keys_application_id_fkey");
+
+            entity.HasOne(d => d.CreatedByUser).WithMany(p => p.CreatedApiKeys)
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName("api_keys_created_by_fkey");
         });
 
         modelBuilder.Entity<Class>(entity =>
@@ -504,6 +517,52 @@ public partial class DeeplynxContext : DbContext
                 .HasConstraintName("historical_records_project_id_fkey");
         });
 
+        modelBuilder.Entity<ProvenanceRecord>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("provenance_records_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_provenance_records_id");
+
+            entity.HasIndex(e => e.RecordId)
+                .HasDatabaseName("idx_provenance_records_record_id");
+
+            entity.HasIndex(e => e.ProjectId)
+                .HasDatabaseName("idx_provenance_records_project_id");
+
+            entity.HasIndex(e => e.OrganizationId)
+                .HasDatabaseName("idx_provenance_records_organization_id");
+
+            entity.HasIndex(e => e.FileContentHash)
+                .HasDatabaseName("idx_provenance_records_file_content_hash");
+
+            entity.HasIndex(e => e.HistoricalRecordId)
+                .HasDatabaseName("idx_provenance_records_historical_record_id");
+
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Record).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.RecordId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_record_id_fkey");
+
+            entity.HasOne(d => d.Project).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_project_id_fkey");
+
+            entity.HasOne(d => d.Organization).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_organization_id_fkey");
+
+            entity.HasOne(d => d.HistoricalRecord).WithMany(p => p.ProvenanceRecords)
+                .HasForeignKey(d => d.HistoricalRecordId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("provenance_records_historical_record_id_fkey");
+        });
+
         modelBuilder.Entity<OauthApplication>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("oauth_applications_pkey");
@@ -773,6 +832,8 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.Id)
                 .HasDatabaseName("idx_project_members_id");
 
+            entity.Property(e => e.IsProjectAdmin).HasDefaultValue(false);
+
             entity.HasIndex(e => e.ProjectId)
                 .HasDatabaseName("idx_project_members_project_id");
 
@@ -805,6 +866,35 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.ProjectMembers)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("project_members_user_id_fkey");
+        });
+
+        modelBuilder.Entity<QueryRecord>(entity =>
+        {
+            entity.HasNoKey();
+            entity.ToView("query_records", "deeplynx");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Uri).HasColumnName("uri");
+            entity.Property(e => e.Properties).HasColumnName("properties");
+            entity.Property(e => e.OriginalId).HasColumnName("original_id");
+            entity.Property(e => e.Name).HasColumnName("name");
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.ClassId).HasColumnName("class_id");
+            entity.Property(e => e.ClassName).HasColumnName("class_name");
+            entity.Property(e => e.DataSourceId).HasColumnName("data_source_id");
+            entity.Property(e => e.DataSourceName).HasColumnName("data_source_name");
+            entity.Property(e => e.ObjectStorageId).HasColumnName("object_storage_id");
+            entity.Property(e => e.ObjectStorageName).HasColumnName("object_storage_name");
+            entity.Property(e => e.ProjectId).HasColumnName("project_id");
+            entity.Property(e => e.ProjectName).HasColumnName("project_name");
+            entity.Property(e => e.OrganizationId).HasColumnName("organization_id");
+            entity.Property(e => e.FileType).HasColumnName("file_type");
+            entity.Property(e => e.FileSize).HasColumnName("file_size");
+            entity.Property(e => e.Tags).HasColumnName("tags");
+            entity.Property(e => e.Labels).HasColumnName("labels");
+            entity.Property(e => e.LastUpdatedAt).HasColumnName("last_updated_at");
+            entity.Property(e => e.LastUpdatedBy).HasColumnName("last_updated_by");
+            entity.Property(e => e.IsArchived).HasColumnName("is_archived");
         });
 
         modelBuilder.Entity<Record>(entity =>
@@ -1038,25 +1128,17 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.Uuid)
                 .HasDatabaseName("idx_relationships_uuid");
 
-            entity.HasIndex(e => new { e.ProjectId, e.Name })
-                .HasDatabaseName("unique_relationship_name")
-                .IsUnique();
-
-            // Composite unique index - relationship names are unique within an organization or project
-            entity.HasIndex(e => new { e.OrganizationId, e.Name })
-                .HasDatabaseName("unique_organization_relationship_name")
-                .IsUnique()
-                .HasFilter("project_id IS NULL");
-
-            entity.HasIndex(e => new { e.OrganizationId, e.ProjectId, e.Name })
-                .HasDatabaseName("unique_project_relationship_name")
-                .IsUnique()
-                .HasFilter("project_id IS NOT NULL");
-
+            // Unique per project when origin and destination are both set
             entity.HasIndex(e => new { e.OrganizationId, e.ProjectId, e.OriginId, e.Name, e.DestinationId })
                 .HasDatabaseName("unique_project_relationship_origin_name_destination")
                 .IsUnique()
-                .HasFilter("project_id IS NOT NULL");
+                .HasFilter("project_id IS NOT NULL AND origin_id IS NOT NULL AND destination_id IS NOT NULL");
+
+           // Unique per project when origin and destination are both null
+            entity.HasIndex(e => new { e.OrganizationId, e.ProjectId, e.Name })
+                .HasDatabaseName("unique_project_relationship_name_no_origin_destination")
+                .IsUnique()
+                .HasFilter("project_id IS NOT NULL AND origin_id IS NULL AND destination_id IS NULL");
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -1341,6 +1423,10 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.SsoId)
                 .HasDatabaseName("idx_users_sso_id");
 
+            entity.HasIndex(e => e.Username)
+                .HasDatabaseName("idx_users_username")
+                .IsUnique();
+
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
@@ -1348,6 +1434,8 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.IsSysAdmin).HasDefaultValue(false);
 
             entity.Property(e => e.IsActive).HasDefaultValue(false);
+
+            entity.Property(e => e.AccountType).HasDefaultValue("standard");
         });
 
         modelBuilder.Entity<SavedSearch>(entity =>
@@ -1462,6 +1550,64 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.RecordId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("embeddings_record_id_fkey");
+
+            // Add foreign key relationship to AiModelConfig.Id
+            entity.HasOne(e => e.AiModelConfig)
+                .WithMany()
+                .HasForeignKey(e => e.EmbeddingModel)
+                .HasPrincipalKey(a => a.Id)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("embeddings_embedding_model_fkey");
+
+            entity.HasIndex(e => e.EmbeddingModel)
+                .HasDatabaseName("idx_embeddings_embedding_model");
+
+            entity.HasIndex(e => new { e.ProjectId, e.EmbeddingModel })
+                .HasDatabaseName("idx_embeddings_project_model");
+        });
+
+        modelBuilder.Entity<EmbeddingLogs>(entity =>
+        {
+            entity.ToTable("embeddings_logs", schema: "dl_vector");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .IsRequired();
+
+            entity.Property(e => e.RecordId)
+                .HasColumnName("record_id")
+                .IsRequired();
+
+            entity.Property(e => e.JobId)
+                .HasColumnName("job_id")
+                .IsRequired();
+
+            entity.Property(e => e.Stage)
+                .HasColumnName("stage")
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasConversion<string>()
+                .IsRequired();
+
+            entity.Property(e => e.Worker)
+                .HasColumnName("worker")
+                .IsRequired();
+
+            entity.Property(e => e.Progress)
+                .HasColumnName("progress")
+                .IsRequired();
+
+            entity.Property(e => e.Error)
+                .HasColumnName("error")
+                .IsRequired();
+
+            entity.Property(e => e.Timestamp)
+                .HasColumnName("timestamp")
+                .IsRequired();
         });
 
         modelBuilder.Entity<OntologyVector>(entity =>

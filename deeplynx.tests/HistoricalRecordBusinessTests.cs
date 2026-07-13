@@ -10,6 +10,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -21,6 +22,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     private EventBusiness _eventBusiness;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private HistoricalRecordBusiness _historicalRecordBusiness = null!;
+    private UserBusiness _userBusiness;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
@@ -29,7 +31,12 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     private IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private EncryptionHelper _encryptionHelper = null!;
-    
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+
     public long cid;
     public long did;
     public long did2;
@@ -65,9 +72,21 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _bulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -335,7 +354,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             IsArchived = false
         };
-        
+
         var updatePermission = new Permission
         {
             Name = "Update Default Label",
@@ -404,7 +423,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             IsArchived = false
         };
-        
+
         var updatePermission2 = new Permission
         {
             Name = "update Default Label 2",
@@ -805,7 +824,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     public async Task GetHistoricalRecord_ReturnsAllCorrectFields()
     {
         Context.ChangeTracker.Clear();
-        
+
         // Arrange
         // TODO: insert tags after record to avoid race condition
         var record = await Context.Records
@@ -813,9 +832,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
             .Where(r => r.ProjectId == pid && r.Id == rid)
             .FirstOrDefaultAsync();
         Assert.NotNull(record);
-        
+
         Context.ChangeTracker.Clear();
-        
+
         // Act
         var historicalRecord = await _historicalRecordBusiness.GetHistoricalRecord(uid, rid, organizationId, null);
 
@@ -1012,10 +1031,10 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     {
         // Arrange
         var pointInTime = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        
+
         // Ensure temporal separation (prevents same-millisecond issues when tests are run in parallel)
         await Task.Delay(10);
-        
+
         var dto = new UpdateRecordRequestDto
         {
             Name = "Updated Test Record",

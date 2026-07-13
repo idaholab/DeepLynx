@@ -5,9 +5,17 @@ import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { ProjectResponseDto } from "@/app/(home)/types/responseDTOs";
 import Image from "next/image";
 import ArchiveDelete from "@/app/(home)/components/ArchiveDelete";
+import ProjectSettingsTable from "./ProjectSettingsTable";
+import { useCallback, useMemo } from "react";
+import { formatLocalDateTime } from "@/app/lib/date_time";
+import toast from "react-hot-toast";
+import { OrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { updateProject } from "@/app/lib/client_service/projects_services.client";
 
 interface ProjectLogoSectionProps {
-  project: ProjectResponseDto;
+  organization: OrganizationSession | null;
+  project: ProjectResponseDto | null;
+  setProject: React.Dispatch<React.SetStateAction<ProjectResponseDto | null>>;
   logoPreview: string | null;
   logoFile: File | null;
   isUploading: boolean;
@@ -19,8 +27,92 @@ interface ProjectLogoSectionProps {
   t: { translations: Record<string, string> };
 }
 
+interface informationTableProps {
+  organization: OrganizationSession | null;
+  project: ProjectResponseDto | null;
+  t: { translations: Record<string, string> }; 
+  setProject: React.Dispatch<React.SetStateAction<ProjectResponseDto | null>>;
+}
+
+function projectInformationTable({ organization, project, t, setProject }: informationTableProps) {  
+  const handleUpdateProject = useCallback(
+    async (field: string, value: string, successMessage: string) => {
+      if (!organization?.organizationId) return;
+
+      try {
+        const update = await updateProject(
+          organization.organizationId as number,
+          project?.id as number,
+          { [field]: value, organizationId: Number(organization.organizationId) },
+        );
+        setProject((prev) => {
+          if (!prev) return prev;
+
+          return {
+            ...prev,
+            name: update.name ?? prev.name,
+            description: update.description ?? prev.description,
+            abbreviation: update.abbreviation ?? prev.abbreviation,
+            lastUpdatedAt: update.lastUpdatedAt ?? prev.lastUpdatedAt,
+            lastUpdatedBy: update.lastUpdatedBy ?? prev.lastUpdatedBy,
+            isArchived: update.isArchived ?? prev.isArchived,
+            organizationId: update.organizationId ?? prev.organizationId,
+            banner: update.banner ?? prev.banner,
+          };
+        });
+        toast.success(successMessage);
+      } catch (error) {
+        toast.error(`${t.translations.FAILED_TO_UPDATE} ${field}`);
+      }
+    },
+    [
+      organization?.organizationId,
+      project?.id,
+      t.translations.FAILED_TO_UPDATE,
+    ],
+  );
+  
+  const projectInfoRows = useMemo(() => {
+    if (!project) return [];
+    return [
+      { key: t.translations.PROJECT_ID, value: project.id },
+      { 
+        key: t.translations.PROJECT_NAME,
+        value: project.name, 
+        editable: true, 
+        onEdit: (value: string) => 
+          handleUpdateProject(
+            "name", 
+            value, 
+            t.translations.PROJECT_NAME_UPDATED),
+        maxCharacters: 50,
+      },
+      {
+        key: t.translations.PROJECT_DESCRIPTION,
+        value: project.description,
+        editable: true,
+        onEdit: (value: string) => 
+          handleUpdateProject(
+            "description", 
+            value, 
+            t.translations.PROJECT_DESCRIPTION_UPDATED),
+          maxCharacters: 250,
+      },
+      {
+        key: t.translations.LAST_UPDATED_AT,
+        value: formatLocalDateTime(String(project.lastUpdatedAt))
+      }
+    ];
+  }, [project, handleUpdateProject, t.translations])
+  return (
+    <ProjectSettingsTable projectRows={ projectInfoRows }/>
+  );
+}
+
 const ProjectSettingsLeftColumn = ({
+  organization,
   project,
+  setProject,
   logoPreview,
   logoFile,
   isUploading,
@@ -31,13 +123,13 @@ const ProjectSettingsLeftColumn = ({
   onArchiveProject,
   t,
 }: ProjectLogoSectionProps) => (
-  <div className="card self-start bg-base-100 border border-primary/40 shadow-sm">
+  <div className="card self-start border border-base-300/50 bg-base-100 shadow-sm">
     <div className="card-body">
       <h3 className="card-title text-lg mb-4">{t.translations.PROJECT_LOGO}</h3>
 
       <div className="flex items-start gap-6 mb-6">
         <div className="avatar">
-          <div className="w-32 h-32 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border-2 border-base-300">
+          <div className="w-32 h-32 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border-2 border-base-300/50">
             {logoPreview ? (
               <Image
                 src={logoPreview}
@@ -127,7 +219,17 @@ const ProjectSettingsLeftColumn = ({
         </div>
       </div>
 
-      <div className="border-t border-base-300 pt-6">
+      {/* Main Project Settings */}
+      <div className="border-t border-base-300/50 pt-6 pb-6">
+        <h3 className="card-title text-lg mb-4">
+          {t.translations.MAIN_PROJECT_SETTINGS} 
+        </h3>
+        <div>
+          {projectInformationTable({organization, project, t, setProject})}
+        </div>
+      </div>
+
+      <div className="border-t border-base-300/50 pt-6">
         <ArchiveDelete
           actionType="archive"
           itemType="Project"
@@ -135,7 +237,8 @@ const ProjectSettingsLeftColumn = ({
           onConfirm={onArchiveProject}
         />
       </div>
-    </div>
+    </div> 
+    
   </div>
 );
 

@@ -4,9 +4,11 @@ using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.exceptions;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -20,6 +22,10 @@ public class RecordBusiness : IRecordBusiness
     private readonly ISensitivityLabelBusiness _labelBusiness;
     private readonly ISensitivityLabelService _sensitivityLabelService;
     private readonly ITagBusiness _tagBusiness;
+    private readonly IProvenanceBusiness _provenanceBusiness;
+    private readonly ILogger<RecordBusiness> _logger;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly IFileBusinessFactory _fileBusinessFactory;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="RecordBusiness" /> class.
@@ -29,14 +35,20 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="bulkCopyUpsertExecutor">Executor for efficient database inserts for bulk operations</param>
     /// <param name="tagBusiness">Used for creating tags related to a record.</param>
     /// <param name="labelBusiness">Used for creating tags related to a record.</param>
+    /// <param name="provenanceBusiness">Used for triggering provenance record creation.</param>
     /// <param name="sensitivityLabelService">Service for sensitivity label authorization operations.</param>
+    /// <param name="logger">Error/Info logging interface for database log table.</param>
     public RecordBusiness(
         DeeplynxContext context,
         IEventBusiness eventBusiness,
         IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
         ITagBusiness tagBusiness,
         ISensitivityLabelBusiness labelBusiness,
-        ISensitivityLabelService sensitivityLabelService)
+        ISensitivityLabelService sensitivityLabelService,
+        IProvenanceBusiness provenanceBusiness,
+        ILogger<RecordBusiness> logger,
+        IObjectStorageBusiness objectStorageBusiness,
+        IFileBusinessFactory fileBusinessFactory)
     {
         _context = context;
         _eventBusiness = eventBusiness;
@@ -44,6 +56,10 @@ public class RecordBusiness : IRecordBusiness
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
         _labelBusiness = labelBusiness;
         _sensitivityLabelService = sensitivityLabelService;
+        _provenanceBusiness = provenanceBusiness;
+        _logger = logger;
+        _objectStorageBusiness = objectStorageBusiness;
+        _fileBusinessFactory = fileBusinessFactory;
     }
 
     /// <summary>
@@ -58,15 +74,18 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
     /// <returns>A list of records based on the applied filters.</returns>
     public async Task<List<RecordResponseDto>> GetAllRecords(
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
-        string? fileType = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+        string? fileType = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false)
     {
         var recordQuery = _context.Records
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
 
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (isInsightEligible) recordQuery = recordQuery.WhereInsightEligible();
 
         if (dataSourceId.HasValue) recordQuery = recordQuery.Where(r => r.DataSourceId == dataSourceId);
 
@@ -75,15 +94,22 @@ public class RecordBusiness : IRecordBusiness
             var formattedFileType = fileType.TrimStart('.').ToLower();
             recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
         }
-        
+
         // if user is not admin, filter out unauthorized labels
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
             var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
                 currentUserId, organizationId, projectId, "read record");
-            
+
             recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
         }
+
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
         var records = await recordQuery
             .Include(r => r.Tags)
@@ -94,9 +120,12 @@ public class RecordBusiness : IRecordBusiness
         {
             Id = r.Id,
             Description = r.Description,
-            Uri = r.Uri,
+            Uri = isUriAuthorized(r)
+                    ? r.Uri
+                    : null,
             Properties = r.Properties,
             OriginalId = r.OriginalId,
+            ObjectStorageId = r.ObjectStorageId,
             Name = r.Name,
             ClassId = r.ClassId,
             DataSourceId = r.DataSourceId,
@@ -118,6 +147,256 @@ public class RecordBusiness : IRecordBusiness
                 Name = l.Name
             }).ToList()
         }).ToList();
+    }
+
+
+    /// <summary>
+    ///     Paginated full text records search
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belongs</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="search">Search parameters</param>
+    /// <param name="paginated">Pagination parameters</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>Paginated list of record response dtos from the query view that match provided query parameters</returns>
+    public async Task<PaginatedResponse<RecordResponseDto>> SearchPaginated(
+        long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search, PaginatedRequestDto paginated,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        // ============================== QUERIES ==============================
+
+        var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
+        AND (
+            NOT EXISTS (
+                SELECT 1
+                FROM deeplynx.record_labels rl
+                WHERE rl.record_id = r.id
+            )
+            OR
+            NOT EXISTS (
+                SELECT 1
+                FROM deeplynx.record_labels rl2
+                WHERE rl2.record_id = r.id
+                AND rl2.label_id != ALL(@authorized_label_ids)
+            )
+        )" : "";
+
+        var hideArchivedFilter = search.HideArchived ? "AND r.is_archived = false" : "";
+
+        var embeddedFilter = search.Embedding switch
+        {
+            "embedded" => "AND r.embedded = true",
+            "pending" => "AND r.embedded = false",
+            _ => "", // Assume any
+        };
+
+        var tagFilter = search.TagIds.Length > 0 ? @"
+        AND (
+            SELECT COUNT(*)
+            FROM deeplynx.record_tags rt
+            WHERE rt.record_id = r.id
+            AND rt.tag_id = ANY(@required_tag_ids)
+        ) = @required_count" : "";
+
+        var classFilter = search.ClassIds.Length > 0 ? @"
+            AND r.class_id IS NOT NULL
+            AND r.class_id = ANY(@class_ids)" : "";
+
+        var searchFilter = !string.IsNullOrWhiteSpace(search.UserQuery) ? @"
+        AND (
+            to_tsvector('english',
+                coalesce(r.name, '')             || ' ' ||
+                coalesce(r.description, '')      || ' ' ||
+                coalesce(c.name, '')             || ' ' ||
+                coalesce(r.uri, '')              || ' ' ||
+                coalesce(r.original_id, '')      || ' ' ||
+                coalesce(ds.name, '')            || ' ' ||
+                coalesce(p.name, '')             || ' ' ||
+                coalesce(r.properties::text, '')
+            ) @@ to_tsquery('english', @processed_query)
+            OR r.name          ILIKE '%' || @original_query || '%'
+            OR r.description   ILIKE '%' || @original_query || '%'
+            OR r.original_id   ILIKE '%' || @original_query || '%'
+            OR ds.name         ILIKE '%' || @original_query || '%'
+            OR p.name          ILIKE '%' || @original_query || '%'
+            OR c.name          ILIKE '%' || @original_query || '%'
+            OR r.file_type     ILIKE '%' || @original_query || '%'
+            OR r.id::text      ILIKE '%' || @original_query || '%'
+        )" : "";
+
+        var sql = $@"
+        SELECT
+            r.*,
+            ds.name         AS data_source_name,
+            p.name          AS project_name,
+            c.name          AS class_name
+        FROM deeplynx.records r
+        INNER JOIN deeplynx.data_sources ds  ON ds.id = r.data_source_id
+        INNER JOIN deeplynx.projects p       ON p.id  = r.project_id
+        LEFT  JOIN deeplynx.classes c        ON c.id  = r.class_id
+        WHERE r.organization_id = @organization_id
+        AND r.project_id = @project_id
+        {classFilter}
+        {embeddedFilter}
+        {hideArchivedFilter}
+        {authorizationFilter}
+        {tagFilter}
+        {searchFilter}
+        ORDER BY r.last_updated_at DESC, r.id";
+
+        // ============================== PARAMETERS ==============================
+
+        var parameters = new List<NpgsqlParameter>
+        {
+            new("organization_id", organizationId),
+            new("project_id", projectId),
+        };
+
+        if (!string.IsNullOrWhiteSpace(search.UserQuery))
+        {
+            var processedQuery = string.Join(" & ",
+                search.UserQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(word => word.Trim() + ":*"));
+            parameters.Add(new("processed_query", processedQuery));
+            parameters.Add(new("original_query", search.UserQuery));
+        }
+
+        if (search.ClassIds.Length > 0)
+            parameters.Add(new("class_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = search.ClassIds });
+
+        if (search.TagIds.Length > 0)
+        {
+            parameters.Add(new("required_tag_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+            { Value = search.TagIds });
+            parameters.Add(new("required_count", search.TagIds.Length));
+        }
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, [projectId], "read record");
+
+            parameters.Add(new("authorized_label_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+            { Value = authorizedLabelIds.ToArray() });
+        }
+
+        var records = _context.Records.FromSqlRaw(sql, parameters.ToArray());
+
+        // ============================== RETURN ==============================
+
+        if (search.IsInsightEligible) records = records.WhereInsightEligible();
+
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return await Paginator.Paginate(paginated, records, r => RecordToResponse(r, isUriAuthorized(r)));
+    }
+
+    private static RecordResponseDto RecordToResponse(Record r, bool exposeUri)
+    {
+        return new RecordResponseDto
+        {
+            Id = r.Id,
+            Description = r.Description,
+            Uri = exposeUri ? r.Uri : null,
+            Properties = r.Properties,
+            OriginalId = r.OriginalId,
+            Name = r.Name,
+            ClassId = r.ClassId,
+            DataSourceId = r.DataSourceId,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            LastUpdatedBy = r.LastUpdatedBy,
+            LastUpdatedAt = r.LastUpdatedAt,
+            IsArchived = r.IsArchived,
+            FileType = r.FileType,
+            FileSize = r.FileSize,
+            Tags = [.. r.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            })],
+            Labels = [.. r.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            })]
+        };
+    }
+
+    /// <summary>
+    ///     Retrieves a paginated page of records for a specific project and datasource.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="fileType">File extension to filter by (e.g., pdf, png, jpg)</param>
+    /// <param name="paginated">Pagination details</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
+    /// <returns>A paginated list of records based on the applied filters.</returns>
+    public async Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
+        long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
+        string? fileType, PaginatedRequestDto paginated, bool isSysAdmin = false, bool isOrgAdmin = false,
+        bool isProjectAdmin = false, bool isInsightEligible = false)
+    {
+        var recordQuery = _context.Records
+            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
+
+        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (isInsightEligible) recordQuery = recordQuery.WhereInsightEligible();
+
+        if (dataSourceId.HasValue) recordQuery = recordQuery.Where(r => r.DataSourceId == dataSourceId);
+
+        if (!string.IsNullOrWhiteSpace(fileType))
+        {
+            var formattedFileType = fileType.TrimStart('.').ToLower();
+            recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
+        }
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
+        }
+
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        var totalCount = await recordQuery.CountAsync();
+        var records = await recordQuery
+            .OrderBy(r => r.Id)
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .Skip((paginated.PageNumber - 1) * paginated.PageSize)
+            .Take(paginated.PageSize)
+            .ToListAsync();
+
+        return new PaginatedResponse<RecordResponseDto>
+        {
+            Items = records.Select(r => RecordToResponse(r, isUriAuthorized)).ToList(),
+            PageNumber = paginated.PageNumber,
+            PageSize = paginated.PageSize,
+            TotalCount = totalCount
+        };
     }
 
     /// <summary>
@@ -144,7 +423,7 @@ public class RecordBusiness : IRecordBusiness
         // Only return records that contain ALL given IDs
         recordQuery = recordQuery.Where(r =>
             tagIds.All(tagId => r.Tags.Any(t => t.Id == tagId)));
-        
+
         // if user is not admin, filter out unauthorized labels
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
@@ -152,6 +431,13 @@ public class RecordBusiness : IRecordBusiness
                 currentUserId, organizationId, projectId, "read record");
             recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
         }
+
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
 
         var records = await recordQuery
             .Include(r => r.Tags)
@@ -163,9 +449,12 @@ public class RecordBusiness : IRecordBusiness
             {
                 Id = r.Id,
                 Description = r.Description,
-                Uri = r.Uri,
+                Uri = isUriAuthorized(r)
+                        ? r.Uri
+                        : null,
                 Properties = r.Properties,
                 OriginalId = r.OriginalId,
+                ObjectStorageId = r.ObjectStorageId,
                 Name = r.Name,
                 ClassId = r.ClassId,
                 DataSourceId = r.DataSourceId,
@@ -191,16 +480,21 @@ public class RecordBusiness : IRecordBusiness
 
     /// <summary>
     ///     Retrieves a specific record by its ID
+    ///     Will return null for URI if the current user does not have download access for the record's sensitivity labels.
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The project of the record to retrieve</param>
     /// <param name="recordId">The ID of the record to retrieve</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>The record in question</returns>
     /// <exception cref="KeyNotFoundException">Returned if record not found</exception>
     public async Task<RecordResponseDto> GetRecord(
-        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived)
+        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived, bool isSysAdmin = false,
+        bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         var record = await _context.Records
             .Where(r => r.ProjectId == projectId
@@ -216,11 +510,20 @@ public class RecordBusiness : IRecordBusiness
 
         if (hideArchived && record.IsArchived) throw new KeyNotFoundException($"Record with id {recordId} is archived");
 
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
         return new RecordResponseDto
         {
             Id = record.Id,
             Description = record.Description,
-            Uri = record.Uri,
+            Uri = isUriAuthorized(record)
+                ? record.Uri
+                : null,
             Properties = record.Properties,
             OriginalId = record.OriginalId,
             ObjectStorageId = record.ObjectStorageId,
@@ -234,6 +537,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = record.IsArchived,
             FileType = record.FileType,
             FileSize = record.FileSize,
+            Embedded = record.Embedded,
             Tags = record.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -293,6 +597,10 @@ public class RecordBusiness : IRecordBusiness
         record.Tags.Add(tag);
         await _context.SaveChangesAsync();
 
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "attach-tag", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for tag attach on record {RecordId}", recordId);
+
         return true;
     }
 
@@ -308,38 +616,65 @@ public class RecordBusiness : IRecordBusiness
     /// <exception cref="KeyNotFoundException">Thrown if the record or label are not found</exception>
     /// <exception cref="Exception">Thrown if the label is already attached to the record</exception>
     public async Task<bool> AttachLabel(long currentUserId, long organizationId, long projectId, long recordId,
-        long labelId)
+    long labelId)
     {
-        var record = await _context.Records
-            .Where(r => r.ProjectId == projectId
-                        && r.Id == recordId
-                        && r.OrganizationId == organizationId
-                        && !r.IsArchived)
-            .Include(r => r.Labels)
-            .FirstOrDefaultAsync();
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var record = await _context.Records
+                .Where(r => r.ProjectId == projectId
+                            && r.Id == recordId
+                            && r.OrganizationId == organizationId
+                            && !r.IsArchived)
+                .Include(r => r.Labels)
+                .FirstOrDefaultAsync();
 
-        if (record == null)
-            throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
+            if (record == null)
+                throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
 
-        // Check if already attached
-        var alreadyAttached = record.Labels.Any(t => t.Id == labelId);
-        if (alreadyAttached)
-            throw new InvalidOperationException($"Label with id {labelId} is already attached to record {recordId}");
+            var alreadyAttached = record.Labels.Any(t => t.Id == labelId);
+            if (alreadyAttached)
+                throw new InvalidOperationException($"Label with id {labelId} is already attached to record {recordId}");
 
-        // Fetch and validate label in one query with all conditions
-        var label = await _context.SensitivityLabels
-            .Where(t => t.Id == labelId
-                        && t.OrganizationId == organizationId
-                        && (t.ProjectId == projectId || t.ProjectId == null)
-                        && !t.IsArchived)
-            .FirstOrDefaultAsync();
+            var label = await _context.SensitivityLabels
+                .Where(t => t.Id == labelId
+                            && t.OrganizationId == organizationId
+                            && (t.ProjectId == projectId || t.ProjectId == null)
+                            && !t.IsArchived)
+                .FirstOrDefaultAsync();
 
-        if (label == null)
-            throw new KeyNotFoundException(
-                $"Label with id {labelId} not found, is archived, or does not belong to this organization/project.");
+            if (label == null)
+                throw new KeyNotFoundException(
+                    $"Label with id {labelId} not found, is archived, or does not belong to this organization/project.");
 
-        record.Labels.Add(label);
-        await _context.SaveChangesAsync();
+            var collectionsWithRecord = await _context.RecordCollections
+                .Where(c => c.ProjectId == projectId
+                            && c.OrganizationId == organizationId
+                            && !c.IsArchived
+                            && c.Records.Any(r => r.Id == recordId))
+                .Include(c => c.Labels)
+                .ToListAsync();
+
+            record.Labels.Add(label);
+
+            foreach (var collection in collectionsWithRecord)
+            {
+                if (collection.Labels.All(l => l.Id != labelId))
+                    collection.Labels.Add(label);
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "attach-label", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for label attach on record {RecordId}", recordId);
 
         return true;
     }
@@ -383,6 +718,10 @@ public class RecordBusiness : IRecordBusiness
 
         record.Tags.Remove(tag);
         await _context.SaveChangesAsync();
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "detach-tag", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for tag detach on record {RecordId}", recordId);
 
         return true;
     }
@@ -432,6 +771,10 @@ public class RecordBusiness : IRecordBusiness
         record.Labels.Remove(label);
         await _context.SaveChangesAsync();
 
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "detach-label", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for label detach on record {RecordId}", recordId);
+
         return true;
     }
 
@@ -439,15 +782,50 @@ public class RecordBusiness : IRecordBusiness
     ///     Bulk attach tags and records
     /// </summary>
     /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
+    /// <param name="currentUserId">The user making the request</param>
     /// <returns>True if successful</returns>
     /// <exception cref="Exception">Thrown if tags unable to be attached</exception>
-    public async Task<bool> BulkAttachTags(List<RecordTagLinkDto> dtos)
+    public async Task<bool> BulkInsertRecordTagLinks(List<RecordTagLinkDto> dtos)
     {
         if (!dtos.Any())
             return true;
 
         // Bulk insert into record_tags
         var sql = @"INSERT INTO deeplynx.record_tags (record_id, tag_id) VALUES {0} ON CONFLICT DO NOTHING;";
+
+        // establish parameters
+        var parameters = new List<NpgsqlParameter>();
+        parameters.AddRange(dtos.SelectMany((dto, i) => new[]
+        {
+            new NpgsqlParameter($"@record{i}_id", dto.RecordId),
+            new NpgsqlParameter($"@tag{i}_id", dto.TagId)
+        }));
+
+        // stringify params and comma separate them
+        var valueTuples = string.Join(", ", dtos.Select((_, i) => $"(@record{i}_id, @tag{i}_id)"));
+
+        // put everything together and execute the query
+        sql = string.Format(sql, valueTuples);
+
+        await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Bulk unattach tags and records
+    /// </summary>
+    /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
+    /// <param name="currentUserId">The user making the request</param>
+    /// <returns>True if successful</returns>
+    /// <exception cref="Exception">Thrown if tags unable to be unattached</exception>
+    public async Task<bool> BulkDeleteRecordTagLinks(List<RecordTagLinkDto> dtos)
+    {
+        if (!dtos.Any())
+            return true;
+
+        // Bulk delete from record_tags
+        var sql = @"DELETE FROM deeplynx.record_tags WHERE (record_id, tag_id) IN ({0});";
 
         // establish parameters
         var parameters = new List<NpgsqlParameter>();
@@ -480,8 +858,8 @@ public class RecordBusiness : IRecordBusiness
     /// <exception cref="UnauthorizedAccessException">Thrown if user doesn't have access to the labels</exception>
     /// <exception cref="ArgumentException">Thrown if recordIds or sensitivityLabelIds are empty</exception>
     public async Task<bool> BulkAttachLabels(
-        long currentUserId, long organizationId, long projectId,
-        List<long> recordIds, List<long> sensitivityLabelIds)
+    long currentUserId, long organizationId, long projectId,
+    List<long> recordIds, List<long> sensitivityLabelIds)
     {
         if (recordIds == null || !recordIds.Any())
             throw new ArgumentException("Record IDs list cannot be null or empty", nameof(recordIds));
@@ -490,17 +868,18 @@ public class RecordBusiness : IRecordBusiness
             throw new ArgumentException("Sensitivity label IDs list cannot be null or empty",
                 nameof(sensitivityLabelIds));
 
+        var distinctRecordIds = recordIds.Distinct().ToList();
+        var distinctLabelIds = sensitivityLabelIds.Distinct().ToList();
+
         // Create list of record and label ID pairs
-        var recordLabelPairs = new List<(long recordId, long labelId)>();
-        foreach (var recordId in recordIds.Distinct())
-        foreach (var labelId in sensitivityLabelIds.Distinct())
-            recordLabelPairs.Add((recordId, labelId));
+        var recordLabelPairs = distinctRecordIds
+            .SelectMany(recordId => distinctLabelIds.Select(labelId => (recordId, labelId)))
+            .ToList();
 
         // Bulk insert into record_labels using raw SQL
         var sql = @"INSERT INTO deeplynx.record_labels (record_id, label_id) 
                     VALUES {0} ON CONFLICT (record_id, label_id) DO NOTHING;";
 
-        // Establish parameters
         var parameters = new List<NpgsqlParameter>();
         parameters.AddRange(recordLabelPairs.SelectMany((pair, i) => new[]
         {
@@ -509,10 +888,57 @@ public class RecordBusiness : IRecordBusiness
         }));
 
         var valueTuples = string.Join(", ", recordLabelPairs.Select((_, i) => $"(@record{i}_id, @label{i}_id)"));
-
         sql = string.Format(sql, valueTuples);
 
-        await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            await _context.Database.ExecuteSqlRawAsync(sql, parameters.ToArray());
+
+            // Clear tracker so EF fetches fresh state after the raw SQL
+            _context.ChangeTracker.Clear();
+
+            // Fetch labels to attach to collections
+            var labels = await _context.SensitivityLabels
+                .Where(l => distinctLabelIds.Contains(l.Id))
+                .ToListAsync();
+
+            // Find all collections containing any of the records
+            var collectionsWithRecords = await _context.RecordCollections
+                .Where(c => c.ProjectId == projectId
+                            && c.OrganizationId == organizationId
+                            && !c.IsArchived
+                            && c.Records.Any(r => distinctRecordIds.Contains(r.Id)))
+                .Include(c => c.Labels)
+                .ToListAsync();
+
+            foreach (var collection in collectionsWithRecords)
+            {
+                foreach (var label in labels)
+                {
+                    if (collection.Labels.All(l => l.Id != label.Id))
+                    {
+                        collection.Labels.Add(label);
+                    }
+                }
+
+                collection.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                collection.LastUpdatedBy = currentUserId;
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(distinctRecordIds, "attach-label", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk label attach, records {RecordIds}",
+                string.Join(", ", distinctRecordIds));
 
         return true;
     }
@@ -527,11 +953,15 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="dto">The data transfer object containing details on the record to be created</param>
     /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <param name="embedded">Boolean value that determines if the file will be embedded by Insight</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned if the metadata is too deeply nested</exception>
     public async Task<RecordResponseDto> CreateRecord(long currentUserId, long organizationId, long projectId,
-        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null, bool embedded = false)
+        long dataSourceId, CreateRecordRequestDto dto, List<long>? sensitivityLabelIds = null, bool embedded = false,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         ValidationHelper.ValidateModel(dto);
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
@@ -549,8 +979,26 @@ public class RecordBusiness : IRecordBusiness
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
+        RecordResponseDto response;
         try
         {
+            if (!isSysAdmin &&
+                !isOrgAdmin &&
+                !isProjectAdmin &&
+                !string.IsNullOrWhiteSpace(dto.Uri) &&
+                sensitivityLabelIds?.Count > 0)
+            {
+                var authorizedUploadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                    currentUserId,
+                    organizationId,
+                    projectId,
+                    "upload file");
+
+                if (!sensitivityLabelIds.All(id => authorizedUploadLabels.Contains(id)))
+                    throw new UnauthorizedAccessException(
+                        "User is not authorized to assign a URI for one or more sensitivity labels.");
+            }
+
             var record = new Record
             {
                 ProjectId = projectId,
@@ -605,11 +1053,20 @@ public class RecordBusiness : IRecordBusiness
 
             await transaction.CommitAsync();
 
-            return new RecordResponseDto
+            var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+                _sensitivityLabelService,
+                currentUserId,
+                organizationId,
+                [projectId],
+                isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+            response = new RecordResponseDto
             {
                 Id = record.Id,
                 Description = record.Description,
-                Uri = record.Uri,
+                Uri = isUriAuthorized(record)
+                        ? record.Uri
+                        : null,
                 Properties = record.Properties,
                 ObjectStorageId = record.ObjectStorageId,
                 OriginalId = record.OriginalId,
@@ -638,6 +1095,12 @@ public class RecordBusiness : IRecordBusiness
             throw new DependencyDeletionException(
                 $"unable to create record or its downstream dependents: {exc}");
         }
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(response.Id, "create-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for record creation, record {RecordId}", response.Id);
+
+        return response;
     }
 
     /// <summary>
@@ -649,6 +1112,9 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
     /// <param name="records">Enumerable list for of record transfer objects containing details on the records to be created</param>
     /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>The newly created metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if the project or datasource are not found</exception>
     /// <exception cref="Exception">Returned on other general errors</exception>
@@ -658,13 +1124,35 @@ public class RecordBusiness : IRecordBusiness
         long projectId,
         long dataSourceId,
         List<CreateRecordRequestDto> records,
-        List<long>? sensitivityLabelIds = null)
+        List<long>? sensitivityLabelIds = null,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
     {
         await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
 
         if (records.Count == 0) throw new Exception("Unable to bulk create records: no records selected for creation");
 
         await EnsureMultipleObjectStoragesExistOnce(organizationId, projectId, records);
+
+        var containsUri = records.Any(r => !string.IsNullOrWhiteSpace(r.Uri));
+
+        if (!isSysAdmin &&
+            !isOrgAdmin &&
+            !isProjectAdmin &&
+            containsUri &&
+            sensitivityLabelIds?.Count > 0)
+        {
+            var authorizedUploadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId,
+                organizationId,
+                projectId,
+                "upload file");
+
+            if (!sensitivityLabelIds.All(id => authorizedUploadLabels.Contains(id)))
+                throw new UnauthorizedAccessException(
+                    "User is not authorized to assign a URI for one or more sensitivity labels.");
+        }
 
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
@@ -738,7 +1226,7 @@ public class RecordBusiness : IRecordBusiness
               file_size         = COALESCE(EXCLUDED.file_size, records.file_size),
               last_updated_by   = EXCLUDED.last_updated_by
         RETURNING id, organization_id, project_id, data_source_id, original_id, name, class_id, 
-            object_storage_id, file_type, file_size, last_updated_by, description, properties;";
+            object_storage_id, file_type, file_size, last_updated_by, description, properties, uri;";
 
         var inserted = await _bulkCopyUpsertExecutor.CopyUpsertAsync(
             conn, tx,
@@ -800,12 +1288,12 @@ public class RecordBusiness : IRecordBusiness
 
                 // Apply the same label(s) to all inserted records
                 foreach (var record in inserted)
-                foreach (var labelId in sensitivityLabelIds)
-                {
-                    await writer.StartRowAsync();
-                    await writer.WriteAsync(record.Id, NpgsqlDbType.Bigint);
-                    await writer.WriteAsync(labelId, NpgsqlDbType.Bigint);
-                }
+                    foreach (var labelId in sensitivityLabelIds)
+                    {
+                        await writer.StartRowAsync();
+                        await writer.WriteAsync(record.Id, NpgsqlDbType.Bigint);
+                        await writer.WriteAsync(labelId, NpgsqlDbType.Bigint);
+                    }
 
                 await writer.CompleteAsync();
             } // Writer is disposed here
@@ -917,6 +1405,24 @@ public class RecordBusiness : IRecordBusiness
                 record.Labels = new List<RecordLabelDto>();
         }
 
+        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId,
+            organizationId,
+            projectId,
+            "download file");
+
+        foreach (var record in inserted)
+        {
+            var canExposeUri = isSysAdmin ||
+                            isOrgAdmin ||
+                            isProjectAdmin ||
+                            record.Labels.Count == 0 ||
+                            record.Labels.All(l => authorizedDownloadLabels.Contains(l.Id));
+
+            if (!canExposeUri)
+                record.Uri = null;
+        }
+
         // events logging
         var events = new CreateEventRequestDto
         {
@@ -927,6 +1433,14 @@ public class RecordBusiness : IRecordBusiness
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, events, records.Count);
 
         await tx.CommitAsync();
+
+        // Trigger provenance record creation
+        var insertedRecordIds = inserted.Select(r => r.Id).ToList();
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(insertedRecordIds, "create-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk record creation, records {RecordIds}",
+                string.Join(", ", insertedRecordIds));
+
+
         return inserted;
     }
 
@@ -951,25 +1465,45 @@ public class RecordBusiness : IRecordBusiness
         if (returnedRecord is null)
             throw new KeyNotFoundException($"Record with id {recordId} not found or is archived.");
 
-        // set lastUpdatedAt timestamp
         var lastUpdatedAt = DateTime.UtcNow;
 
-        // run archive procedure in a transaction to roll back any errors
         using (var transaction = await _context.Database.BeginTransactionAsync())
         {
             try
             {
-                // run the archive record procedure, which archives this record
-                // and all child objects with record_id as a foreign key
                 var archived = await _context.Database.ExecuteSqlRawAsync(
                     "CALL deeplynx.archive_record({0}::INTEGER, {1}::TIMESTAMP WITHOUT TIME ZONE, {2}::INTEGER)",
                     recordId, lastUpdatedAt, currentUserId
                 );
 
-                if (archived == 0) // if 0 records were updated, assume a failure
+                if (archived == 0)
                     throw new DependencyDeletionException(
                         $"unable to archive record {recordId} or its downstream dependents.");
 
+                // Clear the change tracker so EF fetches fresh state after the procedure
+                _context.ChangeTracker.Clear();
+
+                // Remove record from all collections it belongs to
+                var collectionsWithRecord = await _context.RecordCollections
+                    .Where(c => c.ProjectId == projectId
+                                && c.OrganizationId == organizationId
+                                && !c.IsArchived
+                                && c.Records.Any(r => r.Id == recordId))
+                    .Include(c => c.Records)
+                    .ToListAsync();
+
+                foreach (var collection in collectionsWithRecord)
+                {
+                    var recordToRemove = collection.Records.FirstOrDefault(r => r.Id == recordId);
+                    if (recordToRemove != null)
+                    {
+                        collection.Records.Remove(recordToRemove);
+                        collection.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                        collection.LastUpdatedBy = currentUserId;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
             catch (Exception exc)
@@ -980,7 +1514,10 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
-        // Log record soft delete event
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "archive-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for archive on record {RecordId}", recordId);
+
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {
             Operation = "archive",
@@ -1044,6 +1581,10 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "unarchive-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for unarchive on record {RecordId}", recordId);
+
         // Log record unarchive event
         await _eventBusiness.CreateEvent(currentUserId,
             organizationId,
@@ -1088,8 +1629,13 @@ public class RecordBusiness : IRecordBusiness
         var recordName = returnedRecord.Name;
         var recordDataSourceId = returnedRecord.DataSourceId;
 
+        await DeleteAttachedFileIfPresent(returnedRecord);
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "delete-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for delete on record {RecordId}", recordId);
 
         // Log record delete event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -1113,11 +1659,14 @@ public class RecordBusiness : IRecordBusiness
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record to be updated</param>
     /// <param name="dto">The data transfer object containing details on the record to be updated</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>The newly updated metadata record</returns>
     /// <exception cref="KeyNotFoundException">Returned if record to be updated is not found</exception>
     public async Task<RecordResponseDto> UpdateRecord(long currentUserId, long organizationId, long projectId,
         long recordId,
-        UpdateRecordRequestDto dto)
+        UpdateRecordRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         ValidationHelper.ValidateModel(dto);
 
@@ -1138,6 +1687,26 @@ public class RecordBusiness : IRecordBusiness
 
         if (dto.ObjectStorageId != null)
             await CheckObjectStorageExists(organizationId, projectId, dto.ObjectStorageId.Value);
+
+        if (!isSysAdmin &&
+            !isOrgAdmin &&
+            !isProjectAdmin &&
+            !string.IsNullOrWhiteSpace(dto.Uri) &&
+            dto.Uri != returnedRecord.Uri)
+        {
+            var authorizedUpdateLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId,
+                organizationId,
+                projectId,
+                "update file");
+
+            var canUpdateUri = returnedRecord.Labels.Count == 0 ||
+                            returnedRecord.Labels.All(l => authorizedUpdateLabels.Contains(l.Id));
+
+            if (!canUpdateUri)
+                throw new UnauthorizedAccessException(
+                    "User is not authorized to update the URI for this record.");
+        }
 
         returnedRecord.Uri = dto.Uri ?? returnedRecord.Uri;
         returnedRecord.Properties = dto.Properties != null ? dto.Properties.ToString() : returnedRecord.Properties;
@@ -1165,11 +1734,24 @@ public class RecordBusiness : IRecordBusiness
             DataSourceId = returnedRecord.DataSourceId
         });
 
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "update-record", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance record for update on record {RecordId}", recordId);
+
         return new RecordResponseDto
         {
             Id = returnedRecord.Id,
             Description = returnedRecord.Description,
-            Uri = returnedRecord.Uri,
+            Uri = isUriAuthorized(returnedRecord)
+                    ? returnedRecord.Uri
+                    : null,
             Properties = returnedRecord.Properties,
             ObjectStorageId = returnedRecord.ObjectStorageId,
             OriginalId = returnedRecord.OriginalId,
@@ -1182,7 +1764,13 @@ public class RecordBusiness : IRecordBusiness
             LastUpdatedAt = returnedRecord.LastUpdatedAt,
             IsArchived = returnedRecord.IsArchived,
             FileType = returnedRecord.FileType,
-            FileSize = returnedRecord.FileSize
+            FileSize = returnedRecord.FileSize,
+            Tags = new List<RecordTagDto>(),
+            Labels = returnedRecord.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
         };
     }
 
@@ -1271,7 +1859,7 @@ public class RecordBusiness : IRecordBusiness
                         && r.OrganizationId == organizationId
                         && (!hideArchived || !r.IsArchived)
                         && cleanOriginalIds.Contains(r.OriginalId));
-        
+
         // if user is not admin, filter out unauthorized labels
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
@@ -1279,7 +1867,7 @@ public class RecordBusiness : IRecordBusiness
                 currentUserId, organizationId, projectId, "read record");
             recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
         }
-        
+
         var existingRecords = await recordQuery.ToListAsync();
 
         // Check for missing records
@@ -1290,14 +1878,24 @@ public class RecordBusiness : IRecordBusiness
             throw new KeyNotFoundException(
                 $"Records not found or access is unauthorized with original IDs: {string.Join(", ", missingOriginalIds)}");
 
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
         // Convert to DTOs
         return existingRecords.Select(r => new RecordResponseDto
         {
             Id = r.Id,
             Description = r.Description,
-            Uri = r.Uri,
+            Uri = isUriAuthorized(r)
+                    ? r.Uri
+                    : null,
             Properties = r.Properties,
             OriginalId = r.OriginalId,
+            ObjectStorageId = r.ObjectStorageId,
             Name = r.Name,
             ClassId = r.ClassId,
             DataSourceId = r.DataSourceId,
@@ -1417,7 +2015,7 @@ public class RecordBusiness : IRecordBusiness
             })
             .ToList();
 
-        if (recordTags.Any()) await BulkAttachTags(recordTags);
+        if (recordTags.Any()) await BulkInsertRecordTagLinks(recordTags);
 
         // Convert tagMap to RecordTagDto collection
         return distinctTags
@@ -1441,6 +2039,168 @@ public class RecordBusiness : IRecordBusiness
     }
 
     /// <summary>
+    ///     Validate and bulk attach tags to records for public API use.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId"> The ID of the project to which the records belong</param>
+    /// <param name="dtos">A list of record_id/tag_id pairs to be inserted</param>
+    /// <exception cref="ArgumentException"> Thrown if no record/tag pairs are provided or if no authorized record/tag pairs remain after filtering</exception>
+    /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
+    /// <returns>True if successful</returns>
+    public async Task<bool> BulkAttachTags(long currentUserId, long organizationId,
+        long projectId, List<RecordTagLinkDto> dtos)
+    {
+        if (dtos.Count == 0)
+            throw new ArgumentException("Record,tag pairs cannot be null or empty", nameof(dtos));
+
+        var recordIds = dtos
+            .Select(r => r.RecordId)
+            .Distinct()
+            .ToList();
+
+        var tagIds = dtos
+            .Select(r => r.TagId)
+            .Distinct()
+            .ToList();
+
+        // Validate records belong to this organization/project and are not archived 
+        var records = await _context.Records
+            .Where(r => recordIds.Contains(r.Id) && r.OrganizationId == organizationId && r.ProjectId == projectId && !r.IsArchived)
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        if (records.Count != recordIds.Count)
+            throw new KeyNotFoundException("One or more records were not found or archived.");
+
+        // Validate tags belong to this organization/project and are not archived 
+        var tags = await _context.Tags
+            .Where(t => tagIds.Contains(t.Id) && t.OrganizationId == organizationId && (t.ProjectId == projectId || t.ProjectId == null) && !t.IsArchived)
+            .Select(t => t.Id)
+            .ToListAsync();
+
+        if (tags.Count != tagIds.Count)
+            throw new KeyNotFoundException("One or more tags were not found or archived.");
+
+        var authorizedRecordIds = await _sensitivityLabelService
+            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+
+        dtos = dtos
+            .Where(dto => authorizedRecordIds.Contains(dto.RecordId))
+            .ToList();
+
+        if (dtos.Count == 0)
+            throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
+
+        await BulkInsertRecordTagLinks(dtos);
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(recordIds, "attach-tag", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk tag attach, records {RecordIds}",
+                string.Join(",", recordIds));
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Validate and bulk unattach tags from records for public API use.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId"> The ID of the project to which the records belong</param>
+    /// <param name="dtos">A list of record_id/tag_id pairs to be deleted</param>
+    /// <exception cref="ArgumentException"> Thrown if no record/tag pairs are provided or if no authorized record/tag pairs remain after filtering</exception>
+    /// <exception cref="KeyNotFoundException">Returned if one or more records or tags are not found or archived</exception>
+    /// <returns>True if successful</returns>
+    public async Task<bool> BulkUnattachTags(long currentUserId, long organizationId,
+        long projectId, List<RecordTagLinkDto> dtos)
+    {
+        if (dtos.Count == 0)
+            throw new ArgumentException("Record,tag pairs cannot be null or empty", nameof(dtos));
+
+        var recordIds = dtos
+            .Select(r => r.RecordId)
+            .Distinct()
+            .ToList();
+
+        var tagIds = dtos
+            .Select(r => r.TagId)
+            .Distinct()
+            .ToList();
+
+        // Validate records belong to this organization/project and are not archived 
+        var records = await _context.Records
+            .Where(r => recordIds.Contains(r.Id) && r.OrganizationId == organizationId && r.ProjectId == projectId && !r.IsArchived)
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        if (records.Count != recordIds.Count)
+            throw new KeyNotFoundException("One or more records were not found or archived.");
+
+        // Validate tags belong to this organization/project and are not archived 
+        var tags = await _context.Tags
+            .Where(t => tagIds.Contains(t.Id) && t.OrganizationId == organizationId && (t.ProjectId == projectId || t.ProjectId == null) && !t.IsArchived)
+            .Select(t => t.Id)
+            .ToListAsync();
+
+        if (tags.Count != tagIds.Count)
+            throw new KeyNotFoundException("One or more tags were not found or archived.");
+
+        var authorizedRecordIds = await _sensitivityLabelService
+            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+
+        dtos = dtos
+            .Where(dto => authorizedRecordIds.Contains(dto.RecordId))
+            .ToList();
+
+        if (dtos.Count == 0)
+            throw new ArgumentException("User does not have access to any provided records", nameof(dtos));
+
+        await BulkDeleteRecordTagLinks(dtos);
+
+        // Trigger provenance record creation
+        if (!await _provenanceBusiness.BulkCreateProvenanceRecords(recordIds, "detach-tag", currentUserId, null))
+            _logger.LogWarning("Failed to create provenance records for bulk tag detach, records {RecordIds}",
+                string.Join(",", recordIds));
+
+        return true;
+    }
+
+    private static RecordResponseDto RecordToResponse(Record record, Func<Record, bool> isUriAuthorized)
+    {
+        return new RecordResponseDto
+        {
+            Id = record.Id,
+            Description = record.Description,
+            Uri = isUriAuthorized(record)
+                ? record.Uri
+                : null,
+            Properties = record.Properties,
+            OriginalId = record.OriginalId,
+            ObjectStorageId = record.ObjectStorageId,
+            Name = record.Name,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedBy = record.LastUpdatedBy,
+            LastUpdatedAt = record.LastUpdatedAt,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize,
+            Tags = record.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = record.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        };
+    }
+    /// <summary>
     ///     Map an NPGSQL data reader to a return DTO usually during high scale read operations
     /// </summary>
     /// <param name="r">NPGSQL reader object containing DTO params</param>
@@ -1459,6 +2219,7 @@ public class RecordBusiness : IRecordBusiness
         var iUser = r.GetOrdinal("last_updated_by");
         var iDesc = r.GetOrdinal("description");
         var iProp = r.GetOrdinal("properties");
+        var iUri = r.GetOrdinal("uri");
 
         return new RecordResponseDto
         {
@@ -1473,7 +2234,59 @@ public class RecordBusiness : IRecordBusiness
             FileSize = r.IsDBNull(iSize) ? null : r.GetInt64(iSize),
             LastUpdatedBy = r.IsDBNull(iUser) ? null : r.GetInt64(iUser),
             Description = r.IsDBNull(iDesc) ? null : r.GetString(iDesc),
-            Properties = r.IsDBNull(iProp) ? null : r.GetString(iProp)
+            Properties = r.IsDBNull(iProp) ? null : r.GetString(iProp),
+            Uri = r.IsDBNull(iUri) ? null : r.GetString(iUri)
         };
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private async Task DeleteAttachedFileIfPresent(Record record)
+    {
+        // Guard condition: only file-backed records should delete storage.
+        // ObjectStorageId + Uri + FileType is a practical signal for a DeepLynx file upload.
+        if (!record.ObjectStorageId.HasValue ||
+            string.IsNullOrWhiteSpace(record.Uri) ||
+            string.IsNullOrWhiteSpace(record.FileType))
+        {
+            return;
+        }
+
+        var objectStorage = await _objectStorageBusiness
+            .GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+
+        var storageBusiness = _fileBusinessFactory
+            .CreateFileBusiness(objectStorage.Type);
+
+        var dto = new RecordResponseDto
+        {
+            Id = record.Id,
+            Description = record.Description,
+            Uri = record.Uri,
+            Properties = record.Properties,
+            ObjectStorageId = record.ObjectStorageId,
+            OriginalId = record.OriginalId,
+            Name = record.Name,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedBy = record.LastUpdatedBy,
+            LastUpdatedAt = record.LastUpdatedAt,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize
+        };
+
+        await InvalidateProjectStorageSizeCache(record.ProjectId);
+
+        await storageBusiness.DeleteFile(dto, objectStorage.Config);
+    }
+    private static async Task InvalidateProjectStorageSizeCache(long projectId)
+    {
+        await CacheService.Instance.DeleteAsync(
+            CacheKeys.ProjectStorageSize(projectId));
     }
 }

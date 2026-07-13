@@ -4,8 +4,11 @@ namespace deeplynx.models;
 
 public class FileUploadInitRequestDto
 {
-    [Required] public string FileName { get; set; }
+    [Required]
+    [MaxLength(100)]
+    public string FileName { get; set; }
     public long FileSize { get; set; }
+    public CreateRecordFileUploadRequestDto? Metadata { get; set; }
 }
 
 public class FileUploadSessionResponseDto
@@ -13,6 +16,12 @@ public class FileUploadSessionResponseDto
     public string UploadId { get; set; }
     public long ChunkSize { get; set; }
     public int TotalChunks { get; set; }
+}
+
+public class TusFileUploadSessionResponseDto
+{
+    public string UploadId { get; set; }
+
 }
 
 public class FileUploadCompleteRequestDto

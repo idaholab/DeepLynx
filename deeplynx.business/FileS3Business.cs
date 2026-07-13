@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace deeplynx.business;
 
-public class FileS3Business:  IFileBusiness
+public class FileS3Business : IFileBusiness
 {
     public async Task<string> UploadFile(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig,
         IFormFile file, Guid guid)
@@ -18,7 +18,20 @@ public class FileS3Business:  IFileBusiness
         return "";
     }
 
-    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record,  ObjectStorageConfigDto objectStorageConfig)
+    public async Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
+    {
+        // Create a simple stub with empty content
+        var emptyStream = new MemoryStream();
+        return new FileStreamResult(emptyStream, "application/octet-stream")
+        {
+            FileDownloadName = "stub-file.txt"
+        };
+    }
+
+    public async Task<FileStreamResult> DownloadAppendedFile(
+        RecordResponseDto record,
+        ObjectStorageConfigDto objectStorageConfig,
+        CancellationToken cancellationToken = default)
     {
         // Create a simple stub with empty content
         var emptyStream = new MemoryStream();
@@ -32,13 +45,13 @@ public class FileS3Business:  IFileBusiness
     {
         return true;
     }
-    
+
     public async Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,
         int expirationHours = 1)
     {
         throw new NotImplementedException("Generate download urls is not implemented for filesystem");
     }
-    
+
     /// <summary>
     /// 
     /// </summary>
@@ -51,7 +64,7 @@ public class FileS3Business:  IFileBusiness
     public async Task UploadChunk(long organizationId, long projectId, long datasourceId, long chunkNumber, string uploadId,
         ObjectStorageConfigDto objectStorageConfig, IFormFile chunk)
     {
-        
+
     }
 
     public async Task<string> CompleteUpload(long organizationId, long projectId, long datasourceId,
@@ -78,5 +91,45 @@ public class FileS3Business:  IFileBusiness
     public async Task<long> GetFileSize(string fileUri, ObjectStorageConfigDto objectStorageConfig)
     {
         return 0;
+    }
+
+    public async Task<Guid> CreateUploadTus(long organizationId, long projectId, long realDataSourceId,
+        ObjectStorageConfigDto objectStorageConfig, long uploadLength, string fIlename)
+    {
+        return Guid.Empty;
+    }
+
+    public async Task<long> GetUploadOffset(long organizationId, long projectId, long realDataSourceId, string uploadId,
+        ObjectStorageConfigDto objectStorageConfig)
+    {
+        return 0;
+    }
+
+    public async Task<long> GetUploadLength(long organizationId, long projectId, long realDataSourceId, string uploadId,
+        ObjectStorageConfigDto objectStorageConfig)
+    {
+        return 0;
+    }
+
+    public async Task<long> UploadPartTus(long organizationId, long projectId, long realDataSourceId, string uploadId,
+        long uploadOffset, ObjectStorageConfigDto objectStorageConfig, System.IO.Stream uploadBody)
+    {
+        return 0;
+    }
+
+    public async Task<string> CompleteUploadTus(long organizationId, long projectId, long datasourceId,
+        ObjectStorageConfigDto objectStorageConfig, string uploadId, Guid guid, string fileName)
+    {
+        return "";
+    }
+
+    public async Task<string> GetFileNameTus(
+        long organizationId,
+        long projectId,
+        long realDataSourceId,
+        string uploadId,
+        ObjectStorageConfigDto objectStorageConfig)
+    {
+        return "";
     }
 }

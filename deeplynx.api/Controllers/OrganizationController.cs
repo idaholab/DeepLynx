@@ -37,14 +37,15 @@ public class OrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
     /// <returns></returns>
     [HttpGet(Name = "api_get_all_organizations")]
-    [Auth("read", "organization", allowWithoutContext: true)]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizations(
         [FromQuery] bool hideArchived = true)
     {
         try
         {
+            var userId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
             var organizations = await _organizationBusiness
-                .GetAllOrganizations(hideArchived);
+                .GetAllOrganizations(userId, hideArchived, isSysAdmin);
             return Ok(organizations);
         }
         catch (Exception exc)
@@ -61,7 +62,6 @@ public class OrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
     /// <returns></returns>
     [HttpGet("user", Name = "api_get_organizations_for_user")]
-    [Auth("read", "organization", allowWithoutContext: true)]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizationsForUser(
         [FromQuery] bool hideArchived = true)
     {
@@ -112,7 +112,7 @@ public class OrganizationController : ControllerBase
     /// <param name="dto">Data structure of organization to create</param>
     /// <returns></returns>
     [HttpPost(Name = "api_create_organization")]
-    [Auth("write", "organization", allowWithoutContext: true)]
+    [SysAdmin]
     public async Task<ActionResult<OrganizationResponseDto>> CreateOrganization(
         [FromBody] CreateOrganizationRequestDto dto)
     {
@@ -220,8 +220,6 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
     [OrgAdmin]
-    [Auth("update", "organization")]
-    [Auth("update", "user")]
     public async Task<ActionResult> AddUserToOrganization(
         long organizationId,
         [FromQuery] long userId,
@@ -305,13 +303,10 @@ public class OrganizationController : ControllerBase
     /// <param name="userName"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
-    [OrgAdmin] // skip permission checks for org admins
-    [Auth("write", "user")]
-    [Auth("update", "user")]
-    [Auth("update", "organization")]
+    [ProjectAdmin(unscoped: true)] 
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
-        [FromQuery] string userEmail,
+        [FromQuery] string? userEmail,
         [FromQuery] long? userId)
     {
         try

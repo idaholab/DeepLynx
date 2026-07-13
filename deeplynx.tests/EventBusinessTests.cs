@@ -668,6 +668,41 @@ namespace deeplynx.tests
         }
 
         [Fact]
+        public async Task CreateEvent_Success_WithNullOrganizationId()
+        {
+            // Arrange — system-level entities (e.g. OAuth applications) have no org/project scope,
+            // so CreateEvent must accept null organizationId and persist it as null on the row.
+            var dto = new CreateEventRequestDto
+            {
+                Operation = "delete",
+                EntityType = "oauth_application",
+                EntityId = 1,
+                EntityName = "System App",
+                DataSourceId = null,
+                Properties = "{}",
+                LastUpdatedBy = mockUserId
+            };
+
+            // Act
+            var result = await _eventBusiness.CreateEvent(mockUserId, null, null, dto);
+
+            // Assert — response DTO carries the nulls through
+            Assert.NotNull(result);
+            Assert.NotEqual(0, result.Id);
+            Assert.Null(result.OrganizationId);
+            Assert.Null(result.ProjectId);
+            Assert.Null(result.OrganizationName);
+            Assert.Equal("delete", result.Operation);
+            Assert.Equal("oauth_application", result.EntityType);
+
+            // Assert — row is actually persisted with null org
+            var persisted = await Context.Events.FirstOrDefaultAsync(e => e.Id == result.Id);
+            Assert.NotNull(persisted);
+            Assert.Null(persisted.OrganizationId);
+            Assert.Null(persisted.ProjectId);
+        }
+
+        [Fact]
         public async Task CreateEvent_Fails_IfBadEntityType()
         {
             // Arrange

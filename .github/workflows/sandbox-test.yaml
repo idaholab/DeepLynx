@@ -42,6 +42,7 @@ jobs:
           SERVICE_TOKEN: ${{ secrets.SERVICE_TOKEN }}
           BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
           NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: ${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}
+          NEXT_PUBLIC_HIDE_INSIGHT: ${{ vars.NEXT_PUBLIC_HIDE_INSIGHT }}
         run: |
           az cloud set --name AzureUSGovernment
           az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
@@ -60,6 +61,7 @@ jobs:
             --build-arg SERVICE_TOKEN="$SERVICE_TOKEN" \
             --build-arg BACKEND_BASE_URL="$BACKEND_BASE_URL" \
             --build-arg NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=$NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION \
+            --build-arg NEXT_PUBLIC_HIDE_INSIGHT=$NEXT_PUBLIC_HIDE_INSIGHT \
             .
 
   build-server:
@@ -94,6 +96,7 @@ jobs:
           BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
           NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: ${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}
           HOSTED_LINK: ${{ vars.HOSTED_LINK }}
+          HIDE_INSIGHT: ${{ vars.HIDE_INSIGHT }}
         run: |
           az cloud set --name AzureUSGovernment
           az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
@@ -113,6 +116,7 @@ jobs:
             --build-arg SERVICE_TOKEN="$SERVICE_TOKEN" \
             --build-arg NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=$NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION \
             --build-arg HOSTED_LINK="$HOSTED_LINK" \
+            --build-arg HIDE_INSIGHT=${{ vars.HIDE_INSIGHT }} \
             .
 
   build-docs:
@@ -346,6 +350,7 @@ jobs:
             --from-literal=redirect-link="${{ vars.REDIRECT_LINK }}" \
             --from-literal=backend-base-url="${{ vars.BACKEND_BASE_URL }}" \
             --from-literal=disabled-front-auth="${{ vars.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION }}" \
+            --from-literal=hide-insight="${{ vars.NEXT_PUBLIC_HIDE_INSIGHT }}" \
             --from-literal=hosted-link="${{ vars.HOSTED_LINK }}" \
             --from-literal=rabbitmq-default-user="${{ vars.RABBITMQ_DEFAULT_USER }}" \
             --namespace=deeplynx-test \
@@ -391,10 +396,11 @@ jobs:
           ENCRYPTION_IV: ${{ vars.ENCRYPTION_IV }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           AIRFLOW_BASE_URL: ${{ vars.AIRFLOW_BASE_URL }}
-          AIRFLOW_USERNAME: ${{ vars.AIRFLOW_USERNAME }}
-          AIRFLOW_PASSWORD: ${{ secrets.AIRFLOW_PASSWORD }}
+          AIRFLOW_JWT: ${{ secrets.AIRFLOW_JWT }}
           LATTICE_MODEL: ${{ vars.LATTICE_MODEL }}
           NEXUS_API_URL: ${{ vars.NEXUS_API_URL }}
+          HIDE_INSIGHT: ${{ vars.HIDE_INSIGHT }}
+          NEX_PUBLIC_HIDE_INSIGHT: ${{ vars.NEXT_PUBLIC_HIDE_INSIGHT }}
         run: |
           cd $GITHUB_WORKSPACE/kubernetes
           envsubst < sandbox.yaml > manifest.yaml

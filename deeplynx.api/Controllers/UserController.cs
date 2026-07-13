@@ -31,15 +31,21 @@ public class UserController : ControllerBase
     /// </summary>
     /// <param name="projectId">(Optional) ID of project that users are associated with</param>
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <param name="includeArchived">(Optional) Beelean determining if archived accounts will be included (default: false)</param>
+    /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
+    /// <param name="includeTestAccounts">(Optional) Boolean determining if test accounts will be included (default: false)</param>
     /// <returns>List of user response DTOs</returns>
     [HttpGet(Name = "api_get_all_users")]
     public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetAllUsers(
         [FromQuery] long? projectId,
-        [FromQuery] long? organizationId)
+        [FromQuery] long? organizationId,
+        [FromQuery] bool includeArchived = false,
+        [FromQuery] bool includeServiceAccounts = false,
+        [FromQuery] bool includeTestAccounts = false)
     {
         try
         {
-            var users = await _userBusiness.GetAllUsers(projectId, organizationId);
+            var users = await _userBusiness.GetAllUsers(projectId, organizationId, includeArchived, includeServiceAccounts, includeTestAccounts);
             return Ok(users);
         }
         catch (Exception exc)
@@ -97,7 +103,8 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPost(Name = "api_create_a_user")]
-    [OrgAdmin]
+    [OrgAdmin(unscoped: true)]
+    [ForbidServiceAccounts]
     public async Task<ActionResult<UserResponseDto>> CreateUser([FromBody] CreateUserRequestDto dto)
     {
         try
@@ -114,6 +121,30 @@ public class UserController : ControllerBase
     }
 
     /// <summary>
+    ///     Create a Test Account
+    /// </summary>
+    /// <param name="name">Display name for the test account</param>
+    /// <returns>User response DTO</returns>
+    [Tags("Test Accounts")]
+    [HttpPost("test", Name = "api_create_test_account")]
+    [SysAdmin]
+    [ForbidServiceAccounts]
+    public async Task<ActionResult<UserResponseDto>> CreateTestAccount([FromQuery] string name)
+    {
+        try
+        {
+            var newUser = await _userBusiness.CreateTestAccount(name);
+            return Ok(newUser);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating test account");
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new { message = "An unexpected error occurred while creating the test account." });
+        }
+    }
+
+    /// <summary>
     ///     Update a User
     /// </summary>
     /// ///
@@ -121,7 +152,8 @@ public class UserController : ControllerBase
     /// <param name="dto">User request DTO</param>
     /// <returns>User response DTO</returns>
     [HttpPut("{userId:long}", Name = "api_update_a_user")]
-    [OrgAdmin]
+    [OrgAdmin(unscoped: true)]
+    [ForbidServiceAccounts]
     public async Task<ActionResult<UserResponseDto>> UpdateUser(long userId, [FromBody] UpdateUserRequestDto dto)
     {
         try
@@ -144,6 +176,7 @@ public class UserController : ControllerBase
     /// <returns>A message stating the user was successfully deleted.</returns>
     [HttpDelete("{userId:long}", Name = "api_delete_a_user")]
     [SysAdmin]
+    [ForbidServiceAccounts]
     public async Task<IActionResult> DeleteUser(long userId)
     {
         try
@@ -167,6 +200,7 @@ public class UserController : ControllerBase
     /// <returns>A message stating the user was successfully archived or unarchived.</returns>
     [HttpPatch("{userId:long}", Name = "api_archive_user")]
     [SysAdmin]
+    [ForbidServiceAccounts]
     public async Task<IActionResult> ArchiveUser(
         long userId,
         [FromQuery] bool archive)
@@ -198,6 +232,7 @@ public class UserController : ControllerBase
     /// <returns>User response DTO</returns>
     [HttpPatch("{userId:long}/admin", Name = "api_set_sys_admin")]
     [SysAdmin]
+    [ForbidServiceAccounts]
     public async Task<ActionResult<UserResponseDto>> SetSysAdmin(
         long userId,
         [FromQuery] bool? isAdmin = true
@@ -276,15 +311,17 @@ public class UserController : ControllerBase
     /// </summary>
     /// <param name="projectId">(Optional) ID of project that users are associated with</param>
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
     /// <returns>Active user counts for 24-hour, 7-day, and 30-day windows</returns>
     [HttpGet("active-counts", Name = "api_get_active_user_counts")]
     public async Task<ActionResult<UserActivityCountsDto>> GetActiveUserCounts(
         [FromQuery] long? projectId,
-        [FromQuery] long? organizationId)
+        [FromQuery] long? organizationId,
+        [FromQuery] bool includeServiceAccounts = false)
     {
         try
         {
-            var counts = await _userBusiness.GetActiveUserCounts(projectId, organizationId);
+            var counts = await _userBusiness.GetActiveUserCounts(projectId, organizationId, includeServiceAccounts);
             return Ok(counts);
         }
         catch (Exception exc)
@@ -300,15 +337,17 @@ public class UserController : ControllerBase
     /// </summary>
     /// <param name="projectId">(Optional) ID of project that users are associated with</param>
     /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
+    /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
     /// <returns>Active user counts and users active in the 30-day window</returns>
     [HttpGet("active-users", Name = "api_get_active_users")]
     public async Task<ActionResult<UserActivityUsersDto>> GetActiveUsers(
         [FromQuery] long? projectId,
-        [FromQuery] long? organizationId)
+        [FromQuery] long? organizationId,
+        [FromQuery] bool includeServiceAccounts = false)
     {
         try
         {
-            var activity = await _userBusiness.GetActiveUsers(projectId, organizationId);
+            var activity = await _userBusiness.GetActiveUsers(projectId, organizationId, includeServiceAccounts);
             return Ok(activity);
         }
         catch (Exception exc)

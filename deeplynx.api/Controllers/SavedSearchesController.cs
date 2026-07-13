@@ -65,7 +65,7 @@ public class SavedSearchController : ControllerBase
     /// <param name="searchFilters">Optional filters to narrow results of saved searches query</param>
     /// <returns>A list of saved searches belonging to the user.</returns>
     [HttpPost("search", Name = "api_query_get_saved_searches")]
-    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetSavedSearches(
+    public async Task<ActionResult<PaginatedResponse<SavedSearchResponseDto>>> GetSavedSearches(
         [FromBody] SavedSearchRequestDtos.FilterSavedQueryRequestDto? searchFilters = null)
     {
         try
@@ -116,7 +116,7 @@ public class SavedSearchController : ControllerBase
     /// <returns>List of records retrieved by the query</returns>
     [HttpGet("organizations/{organizationId:long}", Name = "api_query_execute_saved_search")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> ExecuteSavedSearch(
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> ExecuteSavedSearch(
         long organizationId, [FromQuery] long[] projectIds, [FromQuery] long savedSearchId)
     {
         try

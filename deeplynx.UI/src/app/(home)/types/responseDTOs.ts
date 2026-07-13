@@ -88,7 +88,9 @@ export type RecordResponseDto = {
   objectStorageId?: number | null;
   originalId?: string | null;
   classId?: number | null;
+  className?: string | null;
   dataSourceId?: number | null;
+  dataSourceName?: string | null;
   projectId?: number | null;
   lastUpdatedAt?: string;
   lastUpdatedBy?: string | null;
@@ -97,6 +99,68 @@ export type RecordResponseDto = {
   fileSize?: number | null;
   tags?: { id: number | null; name: string }[];
   labels?: { id: number | null; name: string }[];
+};
+
+export type PaginatedResponse<T> = {
+  items: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+};
+
+export type RecordCollectionTagDto = {
+  id: number;
+  name: string;
+};
+
+export type RecordCollectionLabelDto = {
+  id: number;
+  name: string;
+};
+
+export type RecordCollectionResponseDto = {
+  id: number;
+  name: string;
+  description: string;
+  properties?: string | null;
+  projectId: number;
+  organizationId: number;
+  lastUpdatedAt: string;
+  lastUpdatedBy?: number | null;
+  isArchived: boolean;
+  recordCount: number;
+  tags?: RecordCollectionTagDto[];
+  labels?: RecordCollectionLabelDto[];
+};
+
+export type PaginatedRecordCollectionsResponseDto =
+  PaginatedResponse<RecordCollectionResponseDto>;
+
+export type QueryRecordViewResponseDto = {
+  id: number | null;
+  uri?: string | null;
+  properties?: unknown;
+  originalId?: string | null;
+  name: string;
+  description?: string | null;
+  classId?: number | null;
+  className?: string | null;
+  dataSourceId?: number | null;
+  dataSourceName?: string | null;
+  objectStorageId?: number | null;
+  objectStorageName?: string | null;
+  projectId?: number | null;
+  projectName?: string | null;
+  fileType?: string | null;
+  fileSize?: number | null;
+  tags?: string | null;
+  labels?: string | null;
+  lastUpdatedAt?: string;
+  lastUpdatedBy?: number | null;
+  isArchived?: boolean;
 };
 
 export type ObjectStorageResponseDto = {
@@ -119,6 +183,7 @@ export type OrganizationResponseDto = {
   isArchived: boolean;
   defaultOrg?: boolean;
   banner?: string;
+  theme?: string;
 };
 
 export type PermissionResponseDto = {
@@ -274,13 +339,7 @@ export type OauthApplicationSecureResponseDto = {
   clientSecretRaw: string;
 };
 
-export type PaginatedEventsResponseDto = {
-  items: EventResponseDto[] | [];
-  pageNumber: number;
-  pageSize: number;
-  maxPageSize: number;
-  totalCount: number;
-};
+export type PaginatedEventsResponseDto = PaginatedResponse<EventResponseDto>;
 
 export type EventResponseDto = {
   id: number;
@@ -331,6 +390,7 @@ export type ProjectMemberResponseDto = {
   email: string;
   role?: string;
   roleId?: number;
+  isProjectAdmin?: boolean;
 };
 
 export type AiModelConfigResponseDto = {
@@ -371,10 +431,48 @@ export interface SavedSearchesResponseDto {
   };
 }
 
-export type PaginatedSavedSearchesResponseDto = {
-  items: SavedSearchesResponseDto[] | [];
-  pageNumber: number;
-  pageSize: number;
-  maxPageSize: number;
-  totalCount: number;
+export type PaginatedSavedSearchesResponseDto =
+  PaginatedResponse<SavedSearchesResponseDto>;
+
+export type AirflowDagTagResponseDto = {
+  name: string;
+};
+
+export type AirflowDagResponseDto = {
+  dag_id: string;
+  dag_display_name?: string | null;
+  description?: string | null;
+  is_paused: boolean;
+  is_active: boolean;
+  owners: string[];
+  tags: AirflowDagTagResponseDto[];
+  timetable_description?: string | null;
+  params?: Record<string, unknown> | null;
+};
+
+export type AirflowDagListResponseDto = {
+  dags: AirflowDagResponseDto[];
+  total_entries: number;
+};
+
+export type AirflowDagRunResponseDto = {
+  dag_run_id?: string | null;
+  dag_id: string;
+  dag_display_name?: string | null;
+  logical_date?: string | null;
+  queued_at?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  duration?: number | null;
+  data_interval_start?: string | null;
+  data_interval_end?: string | null;
+  run_after?: string | null;
+  last_scheduling_decision?: string | null;
+  run_type?: string | null;
+  state?: string | null;
+  triggered_by?: string | null;
+  triggering_user_name?: string | null;
+  conf?: Record<string, unknown> | null;
+  note?: string | null;
+  bundle_version?: string | null;
 };

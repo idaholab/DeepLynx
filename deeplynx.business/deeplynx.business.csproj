@@ -14,8 +14,11 @@
       <ProjectReference Include="..\deeplynx.models\deeplynx.models.csproj" />
     </ItemGroup>
     <ItemGroup>
+      <PackageReference Include="Apache.Arrow" Version="22.1.0" />
+      <PackageReference Include="Apache.Arrow.Flight" Version="22.1.0" />
       <PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
       <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+      <PackageReference Include="SharpZipLib" Version="1.4.2" />
       <PackageReference Include="Snappier" Version="1.3.1" />
       <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.3" />
       <PackageReference Include="DotNetEnv" Version="3.1.1" />
@@ -24,6 +27,7 @@
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
+      <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" PrivateAssets="all" />
       <PackageReference Include="Parquet.Net" Version="5.5.0" />
       <PackageReference Include="Pgvector" Version="0.3.2" />
       <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
@@ -35,6 +39,12 @@
 
     <ItemGroup>
         <Folder Include="uploads\" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Prompts\*.md" />
+        <EmbeddedResource Include="Templates\*.html" />
+        <EmbeddedResource Include="Templates\*.png" />
     </ItemGroup>
 
 </Project>

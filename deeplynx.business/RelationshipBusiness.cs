@@ -138,6 +138,7 @@ public class RelationshipBusiness : IRelationshipBusiness
 
     /// <summary>
     ///     Creates a new relationship based on the data transfer object supplied.
+    ///     Does not allow relationship between different projects.
     /// </summary>
     /// <param name="currentUserId">ID of the User executing this method.</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -153,16 +154,36 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         if (dto.OriginId != null)
         {
-            var originClass = await _context.Classes.FirstOrDefaultAsync(c => c.Id == dto.OriginId && !c.IsArchived);
-            if (originClass == null) throw new KeyNotFoundException($"Origin class with ID {dto.OriginId} not found.");
+            var originQuery = _context.Classes
+                .Where(c =>
+                    c.Id == dto.OriginId &&
+                    c.OrganizationId == organizationId &&
+                    c.ProjectId == projectId &&
+                    !c.IsArchived)
+                .AsQueryable();
+
+            var originClass = await originQuery.FirstOrDefaultAsync();
+
+            if (originClass == null)
+                throw new KeyNotFoundException(
+                    $"Origin class with ID {dto.OriginId} not found.");
         }
 
         if (dto.DestinationId != null)
         {
-            var destinationClass =
-                await _context.Classes.FirstOrDefaultAsync(c => c.Id == dto.DestinationId && !c.IsArchived);
+            var destinationQuery = _context.Classes
+                .Where(c =>
+                    c.Id == dto.DestinationId &&
+                    c.OrganizationId == organizationId &&
+                    c.ProjectId == projectId &&
+                    !c.IsArchived)
+                .AsQueryable();
+
+            var destinationClass = await destinationQuery.FirstOrDefaultAsync();
+
             if (destinationClass == null)
-                throw new KeyNotFoundException($"Destination class with ID {dto.DestinationId} not found.");
+                throw new KeyNotFoundException(
+                    $"Destination class with ID {dto.DestinationId} not found.");
         }
 
         var relationship = new Relationship
@@ -180,7 +201,27 @@ public class RelationshipBusiness : IRelationshipBusiness
         };
 
         _context.Relationships.Add(relationship);
-        await _context.SaveChangesAsync();
+        
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pgEx)
+        {
+            if (pgEx.ConstraintName == "unique_project_relationship_origin_name_destination")
+            {
+                throw new InvalidOperationException(
+                    $"A relationship named '{dto.Name}' already exists between these origin and destination classes in this project.");
+            }
+
+            if (pgEx.ConstraintName == "unique_project_relationship_name_no_origin_destination")
+            {
+                throw new InvalidOperationException(
+                    $"A relationship named '{dto.Name}' with no origin/destination already exists in this project.");
+            }
+
+            throw; // some other unique violation — don't mask it as this specific error
+        }
 
         if (dto.OriginId != null)
             await _context.Entry(relationship)
@@ -241,34 +282,85 @@ public class RelationshipBusiness : IRelationshipBusiness
         long? projectId,
         List<CreateRelationshipRequestDto> relationships)
     {
-        // Bulk insert into relationships; if there is a name collision, update the description and uuid if present
-        var sql = projectId.HasValue
-            ? @"
-          INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, properties,
-                                              uuid, last_updated_at, is_archived, last_updated_by)
-            VALUES {0}
-            ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
-            DO UPDATE SET
-                description = COALESCE(EXCLUDED.description, relationships.description),
-                properties = COALESCE(EXCLUDED.properties, relationships.properties),
-                uuid = COALESCE(EXCLUDED.uuid, relationships.uuid),
-                last_updated_at = @now,
-                last_updated_by = @lastUpdatedBy
-            RETURNING *;"
-            : @"
-            INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, properties,
-                                                uuid, last_updated_at, is_archived, last_updated_by)
-            VALUES {0}
-            ON CONFLICT (organization_id, name) WHERE project_id IS NULL
-            DO UPDATE SET
-                description = COALESCE(EXCLUDED.description, relationships.description),
-                properties = COALESCE(EXCLUDED.properties, relationships.properties),
-                uuid = COALESCE(EXCLUDED.uuid, relationships.uuid),
-                last_updated_at = @now,
-                last_updated_by = @lastUpdatedBy
-            RETURNING *;";
 
-        // establish "constant" parameters
+        ArgumentNullException.ThrowIfNull(relationships);
+
+        
+        var classIds = relationships
+            .SelectMany(r => new long?[] { r.OriginId, r.DestinationId })
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+
+        var validClassIds = await _context.Classes
+            .Where(c =>
+                classIds.Contains(c.Id) &&
+                c.OrganizationId == organizationId &&
+                c.ProjectId == projectId &&
+                !c.IsArchived)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        var validClassIdSet = validClassIds.ToHashSet();
+
+        foreach (var dto in relationships)
+        {
+            if (dto.OriginId.HasValue && !validClassIdSet.Contains(dto.OriginId.Value))
+                throw new KeyNotFoundException($"Origin class with ID {dto.OriginId} not found.");
+
+            if (dto.DestinationId.HasValue && !validClassIdSet.Contains(dto.DestinationId.Value))
+                throw new KeyNotFoundException($"Destination class with ID {dto.DestinationId} not found.");
+
+        }
+
+       var withOriginDestination = relationships.Where(r => r.OriginId.HasValue && r.DestinationId.HasValue).ToList();
+       var woOriginDestination = relationships.Where(r => !r.OriginId.HasValue && !r.DestinationId.HasValue).ToList();
+        
+       var results = new List<RelationshipResponseDto>();
+
+       if (withOriginDestination.Count > 0)
+       {
+           results.AddRange(await ExecuteUpsertBatch(
+               withOriginDestination, organizationId, currentUserId,
+               conflictColumns: "organization_id, project_id, origin_id, name, destination_id",
+               conflictFilter: "project_id IS NOT NULL AND origin_id IS NOT NULL AND destination_id IS NOT NULL", projectId));
+       }
+
+       if (woOriginDestination.Count > 0)
+       {
+           results.AddRange(await ExecuteUpsertBatch(
+               woOriginDestination, organizationId, currentUserId,
+               conflictColumns: "organization_id, project_id, name",
+               conflictFilter: "project_id IS NOT NULL AND origin_id IS NULL AND destination_id IS NULL", projectId));
+       }
+       
+        var createEvent = new CreateEventRequestDto
+        {
+            Operation = "create",
+            EntityType = "relationship"
+        };
+        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, results.Count);
+
+        return results;
+    }
+    
+    private async Task<List<RelationshipResponseDto>> ExecuteUpsertBatch(List<CreateRelationshipRequestDto> batch, long organizationId, long currentUserId, 
+        string conflictColumns, string conflictFilter, long? projectId)
+    {
+        var sql = $@"
+        INSERT INTO deeplynx.relationships (organization_id, project_id, name, description, properties,
+                                uuid, origin_id, destination_id, last_updated_at, is_archived, last_updated_by)
+        VALUES {{0}}
+        ON CONFLICT ({conflictColumns}) WHERE {conflictFilter}
+        DO UPDATE SET
+            description = COALESCE(EXCLUDED.description, relationships.description),
+            properties = COALESCE(EXCLUDED.properties, relationships.properties),
+            uuid = COALESCE(EXCLUDED.uuid, relationships.uuid),
+            last_updated_at = @now,
+            last_updated_by = @lastUpdatedBy
+        RETURNING *;";
+
         var parameters = new List<NpgsqlParameter>
         {
             new("@organizationId", organizationId),
@@ -277,35 +369,25 @@ public class RelationshipBusiness : IRelationshipBusiness
             new("@lastUpdatedBy", currentUserId)
         };
 
-        // establish "dynamic" parameters (new for each dto in the list)
-        parameters.AddRange(relationships.SelectMany((dto, i) => new[]
+        parameters.AddRange(batch.SelectMany((dto, i) => new[]
         {
             new NpgsqlParameter($"@p{i}_name", dto.Name),
             new NpgsqlParameter($"@p{i}_desc", (object?)dto.Description ?? DBNull.Value),
             new NpgsqlParameter($"@p{i}_props", (object?)dto.Properties ?? DBNull.Value),
-            new NpgsqlParameter($"@p{i}_uuid", (object?)dto.Uuid ?? DBNull.Value)
+            new NpgsqlParameter($"@p{i}_uuid", (object?)dto.Uuid ?? DBNull.Value),
+            new NpgsqlParameter($"@p{i}_origin_id", (object?)dto.OriginId ?? DBNull.Value),
+            new NpgsqlParameter($"@p{i}_destination_id", (object?)dto.DestinationId ?? DBNull.Value)
         }));
 
-        // stringify the params and comma separate them
-        var valueTuples = string.Join(", ", relationships.Select((dto, i) =>
-            $"(@organizationId, @projectId, @p{i}_name, @p{i}_desc, @p{i}_props, @p{i}_uuid, @now, false, @lastUpdatedBy)"));
+        var valueTuples = string.Join(", ", batch.Select((dto, i) =>
+            $"(@organizationId, @projectId, @p{i}_name, @p{i}_desc, @p{i}_props, @p{i}_uuid, @p{i}_origin_id, @p{i}_destination_id, @now, false, @lastUpdatedBy)"));
 
-        // put everything together and execute the query
         sql = string.Format(sql, valueTuples);
 
-        // returns the resulting upserted relationships
-        var result = await _context.Database
+        return await _context.Database
             .SqlQueryRaw<RelationshipResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
 
-        var createEvent = new CreateEventRequestDto
-        {
-            Operation = "create",
-            EntityType = "relationship"
-        };
-        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
-
-        return result;
     }
 
     /// <summary>
@@ -332,20 +414,33 @@ public class RelationshipBusiness : IRelationshipBusiness
         if (relationship is null || relationship.IsArchived)
             throw new KeyNotFoundException($"Relationship with ID {relationshipId} not found.");
 
-        if (dto.OriginId.HasValue)
+        var originId = dto.OriginId ?? relationship.OriginId;
+        var destinationId = dto.DestinationId ?? relationship.DestinationId;
+
+        if (originId.HasValue)
         {
-            var originClass =
-                await _context.Classes.FirstOrDefaultAsync(c =>
-                    c.Id == dto.OriginId && !c.IsArchived);
-            if (originClass == null) throw new KeyNotFoundException($"Origin class with ID {dto.OriginId} not found.");
+            var originClass = await _context.Classes
+                .FirstOrDefaultAsync(c =>
+                    c.Id == originId &&
+                    c.OrganizationId == organizationId &&
+                    c.ProjectId == relationship.ProjectId &&
+                    !c.IsArchived);
+
+            if (originClass == null)
+                throw new KeyNotFoundException($"Origin class with ID {originId} not found.");
         }
 
-        if (dto.DestinationId.HasValue)
+        if (destinationId.HasValue)
         {
-            var destinationClass = await _context.Classes.FirstOrDefaultAsync(c =>
-                c.Id == dto.DestinationId && !c.IsArchived);
+            var destinationClass = await _context.Classes
+                .FirstOrDefaultAsync(c =>
+                    c.Id == destinationId &&
+                    c.OrganizationId == organizationId &&
+                    c.ProjectId == relationship.ProjectId &&
+                    !c.IsArchived);
+
             if (destinationClass == null)
-                throw new KeyNotFoundException($"Destination class with ID {dto.DestinationId} not found.");
+                throw new KeyNotFoundException($"Destination class with ID {destinationId} not found.");
         }
 
         relationship.Name = dto.Name ?? relationship.Name;
