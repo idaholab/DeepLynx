@@ -7,7 +7,7 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { fetchInsightIngestionStatus } from "@/app/lib/client_service/insight_services.client";
 import { searchRecordsPaginated } from "@/app/lib/client_service/record_services.client";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ProjectInsightRecord,
@@ -21,7 +21,7 @@ import {
 import { mapProjectInsightRecords } from "../components/projectInsight.utils";
 
 export default function useRecordSearch(
-  pageSize: number,
+  initialPageSize: number,
   embedding: "embedded" | "pending",
   classes: ClassResponseDto[] | null,
   sources: DataSourceResponseDto[] | null,
@@ -39,13 +39,16 @@ export default function useRecordSearch(
       ? Number(organization.organizationId)
       : null;
 
-  const [filters, setFilters] = useState<TabFilterState>({
-    ...EMPTY_TAB_FILTER_STATE, // unpack here for differentiating from EMPTY_TAB_FILTER_STATE for initial loads
-  });
+  const [filters, setFilters] = useState<TabFilterState>(
+    EMPTY_TAB_FILTER_STATE,
+  );
   const [records, setRecords] = useState<ProjectInsightRecord[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [found, setFound] = useState(0);
+  const [pageSize, setPageSize] = useState(initialPageSize);
+  const prePageSize = useRef(initialPageSize);
 
   const [status, setStatus] = useState<Record<number, ProjectInsightStatus>>(
     {},
@@ -85,18 +88,16 @@ export default function useRecordSearch(
     projectId: number,
   ) {
     // Sets default values while they load
-    const newObjects = Object.fromEntries(
-      newRecords.map((record) => [
-        record.id,
-        { state: "checking" } satisfies ProjectInsightStatus,
-      ]),
+    setStatus(
+      Object.fromEntries(
+        newRecords.map((record) => [
+          record.id,
+          { state: "checking" } satisfies ProjectInsightStatus,
+        ]),
+      ),
     );
 
-    setStatus((previous) => ({
-      ...previous,
-      ...newObjects,
-    }));
-
+    // Load the actual values
     return Object.fromEntries(
       await Promise.all(
         newRecords.map(async (r) =>
@@ -111,12 +112,15 @@ export default function useRecordSearch(
     setFound(0);
     setStatus({});
     setTotal(0);
+    setTotalPages(0);
     setPage(1);
     setError("");
   }
 
-  const loadRecordsPage = useCallback(
-    async (page: number, cancel: () => boolean) => {
+  useEffect(() => {
+    let cancel = false;
+
+    async function loadRecordsPage() {
       if (!hasProjectLoaded || !hasOrganizationLoaded) return;
 
       if (!projectId || !organizationId || !classes || !sources) {
@@ -139,9 +143,13 @@ export default function useRecordSearch(
             hideArchived: true,
           },
           pageSize,
-          page,
+          prePageSize.current !== pageSize ? 1 : page,
         );
-        if (cancel()) return;
+        if (cancel) return;
+
+        // avoids trying to load a page out of bounds
+        if (prePageSize.current !== pageSize) setPage(1);
+        prePageSize.current = pageSize;
 
         // append records
         const newRecords = mapProjectInsightRecords(
@@ -150,9 +158,11 @@ export default function useRecordSearch(
           sources,
         );
 
-        setRecords((records) => [...records, ...newRecords]);
+        setRecords(newRecords);
         setFound(recordDtos.totalCount);
-        setTotal((t) => Math.max(t, recordDtos.totalCount)); // for first time loading
+        // for first time loading. This is a hacky solution to find the total number of records with the initial empty filter search
+        setTotal((t) => Math.max(t, recordDtos.totalCount));
+        setTotalPages(recordDtos.totalPages);
 
         // append status map
         var newStatus = await loadRecordStatus(
@@ -160,55 +170,65 @@ export default function useRecordSearch(
           organizationId,
           projectId,
         );
-        if (cancel()) return;
+        if (cancel) return;
 
-        setStatus((status) => ({ ...status, ...newStatus }));
+        setStatus(newStatus);
       } catch (error) {
         reset();
         console.error("Failed to load project Insight records:", error);
         toast.error(t.translations.PROJECT_INSIGHT_LOADING_RECORDS);
         setError(t.translations.FAILED_TO_SEARCH_RECORDS);
       }
-    },
-    [
-      t,
-      page,
-      pageSize,
-      hasProjectLoaded,
-      hasOrganizationLoaded,
-      projectId,
-      organizationId,
-      classes,
-      sources,
-      filters,
-    ],
-  );
-
-  const loadNextPage = useCallback(async () => {
-    if (records.length === total) return; // no more records to load
-    setPage(page + 1); // this won't work if spammed, but it also shouldn't be spammed
-    await loadRecordsPage(page + 1, () => false);
-  }, [page, records, loadRecordsPage]);
-
-  useEffect(() => {
-    if (projectId && organizationId && sources && classes) {
-      reset();
-      setFilters(EMPTY_TAB_FILTER_STATE);
     }
-  }, [projectId, organizationId, sources, classes]);
 
-  useEffect(() => {
-    let cancel = false;
-    if (projectId && organizationId && sources && classes) {
-      reset();
-      loadRecordsPage(1, () => cancel);
-    }
+    loadRecordsPage();
+
     return () => {
       cancel = true;
     };
-  }, [filters]);
+  }, [
+    t,
+    page,
+    pageSize,
+    hasProjectLoaded,
+    hasOrganizationLoaded,
+    projectId,
+    organizationId,
+    classes,
+    sources,
+    filters,
+  ]);
+
+  // const loadNextPage = useCallback(async () => {
+  //   if (records.length === total) return; // no more records to load
+  //   setPage(page + 1); // this won't work if spammed, but it also shouldn't be spammed
+  //   await loadRecordsPage(page + 1, () => false);
+  // }, [page, records, loadRecordsPage]);
+
+  // useEffect(() => {
+  //   if (projectId && organizationId && sources && classes) {
+  //     reset();
+  //     setFilters(EMPTY_TAB_FILTER_STATE);
+  //   }
+  // }, [projectId, organizationId, sources, classes]);
+
+  // useEffect(() => {
+  //   let cancel = false;
+  //   if (projectId && organizationId && sources && classes) {
+  //     reset();
+  //     loadRecordsPage(1, () => cancel);
+  //   }
+  //   return () => {
+  //     cancel = true;
+  //   };
+  // }, [filters]);
 
   return {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalPages,
     filters,
     setFilters,
     records,
@@ -216,6 +236,5 @@ export default function useRecordSearch(
     total,
     found,
     error,
-    loadNextPage,
   };
 }

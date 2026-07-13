@@ -13,17 +13,15 @@ import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 import { getAllDataSources } from "@/app/lib/client_service/data_source_services.client";
 import {
-  fetchInsightEndpointHealth,
   fetchInsightIngestionStatus,
   queueInsightUpload,
 } from "@/app/lib/client_service/insight_services.client";
-import { searchRecordsPaginated } from "@/app/lib/client_service/record_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
 import {
   AdjustmentsHorizontalIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { useDeferredValue, useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
 import ProjectInsightChat from "./components/ProjectInsightChat";
 import ProjectInsightFilters from "./components/ProjectInsightFilters";
@@ -33,27 +31,21 @@ import ProjectInsightRecordSection from "./components/ProjectInsightRecordSectio
 import type {
   NamedInsightOption,
   ProjectInsightFiltersState,
-  ProjectInsightRecord,
   ProjectInsightStatus,
 } from "./components/projectInsight.types";
 import {
   getProjectInsightStatus,
-  mapProjectInsightRecords,
-  matchesInsightFilters,
 } from "./components/projectInsight.utils";
 import {
   buildActiveFilterPills,
-  EMPTY_TAB_FILTER_STATE,
   getStatusFromError,
-  matchesMetadataSearch,
   sortNamedOptions,
-  type TabFilterState,
   withTokens,
 } from "./components/projectInsight.view-utils";
 import { useProjectInsightTabState } from "./hooks/useProjectInsightTabState";
 import { BetaBadge } from "@/app/(home)/components/BetaBadge";
 import useRecordSearch from "./hooks/useRecordSearch";
-import LazyList from "../components/LazyList";
+import PaginationControls from "../components/PaginationControls";
 
 const STATUS_POLL_INTERVAL_MS = 5000;
 
@@ -99,19 +91,21 @@ export default function ProjectInsightClientView() {
   const [activeTabKey, setActiveTabKey] = useState<"library" | "pending">(
     "library",
   );
-  const [selectedPendingIds, setSelectedPendingIds] = useState<number[]>([]);
+  const [selectedPendingIds, setSelectedPendingIds] = useState<Map<number, string>>(new Map());
   const [isQueueing, setIsQueueing] = useState(false);
   const [isLibrarySearchLoading, setIsLibrarySearchLoading] = useState(false);
   const { selectedInsightModels, setSelectedInsightModels } =
     useInsightModelSelection(organizationId, projectId);
 
+  const selectedPendingIdsLength = selectedPendingIds.size;
+
   // Effects
   useEffect(() => {
-    setSelectedPendingIds([]);
+    setSelectedPendingIds(new Map());
     setActiveTabKey("library");
   }, [projectId]);
 
-const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
+  const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
   const [sources, setSources] = useState<DataSourceResponseDto[] | null>(null);
 
   const loadRecordMeta = useCallback(async () => {
@@ -138,6 +132,11 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
   const pageSize = 10;
 
   const {
+    page: embeddedPage,
+    setPage: setEmbeddedPage,
+    pageSize: embeddedPageSize,
+    setPageSize: setEmbeddedPageSize,
+    totalPages: embeddedTotalPages,
     filters: libraryState,
     setFilters: setLibraryState,
     records: embedded,
@@ -145,10 +144,14 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
     total: embeddedTotal,
     found: embeddedFound,
     error: embeddedError,
-    loadNextPage: loadNextEmbeddedPage,
   } = useRecordSearch(pageSize, "embedded", classes, sources);
 
   const {
+    page: pendingPage,
+    setPage: setPendingPage,
+    pageSize: pendingPageSize,
+    setPageSize: setPendingPageSize,
+    totalPages: pendingTotalPages,
     filters: pendingState,
     setFilters: setPendingState,
     records: pending,
@@ -156,7 +159,6 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
     total: pendingTotal,
     found: pendingFound,
     error: pendingError,
-    loadNextPage: loadNextPendingPage,
   } = useRecordSearch(pageSize, "pending", classes, sources);
 
   useEffect(() => {
@@ -244,10 +246,10 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
 
   useEffect(() => {
     setSelectedPendingIds((current) =>
-      current.filter((recordId) => {
+      new Map([...current].filter(([recordId, _]) => {
         const status = statusMap[recordId];
-        return status?.state === "not_embedded" || status?.state === "error";
-      }),
+        return status?.state !== "embedded";
+      })),
     );
   }, [statusMap]);
 
@@ -268,19 +270,6 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
   const normalizedPendingSearchQuery = pendingState.searchQuery
     .trim()
     .toLowerCase();
-
-  const queueablePendingRecords = pending.filter((record) => {
-    const status = getProjectInsightStatus(record, statusMap).state;
-    return (
-      Boolean(record.uri) && (status === "not_embedded" || status === "error")
-    );
-  });
-  const queueablePendingIds = queueablePendingRecords.map(
-    (record) => record.id,
-  );
-  const selectedVisiblePendingIds = selectedPendingIds.filter((recordId) =>
-    queueablePendingIds.includes(recordId),
-  );
 
   const activeFilters =
     activeTabKey === "library" ? libraryFilters : pendingFilters;
@@ -316,15 +305,10 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
   // UI event handlers
   async function handleQueueSelected() {
     if (isIngestionUnavailable) return;
-    if (selectedVisiblePendingIds.length === 0) return;
     if (!organizationId || !projectId) return;
 
-    const selectedRecords = pending.filter((record) =>
-      selectedVisiblePendingIds.includes(record.id),
-    );
-    const uploadFileInfo = selectedRecords
-      .filter((record) => record.uri)
-      .map((record) => ({ fileId: record.id, fileUri: record.uri as string }));
+    const uploadFileInfo = [...selectedPendingIds]
+      .map(([id, uri]) => ({ fileId: id, fileUri: uri }));
 
     if (uploadFileInfo.length === 0) return;
 
@@ -374,7 +358,7 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
         }),
       );
     } finally {
-      setSelectedPendingIds([]);
+      setSelectedPendingIds(new Map());
       setIsQueueing(false);
     }
   }
@@ -417,7 +401,6 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
       emptyMessage={t.translations.PROJECT_INSIGHT_EMBEDDED_EMPTY}
     >
       <div className="space-y-3">
-        <LazyList onReachEnd={loadNextEmbeddedPage}>
         {embedded.map((record) => (
           <ProjectInsightRecordCard
             key={record.id}
@@ -426,8 +409,6 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
             status={getProjectInsightStatus(record, statusMap)}
           />
         ))}
-        </LazyList>
-        {embeddedTotal !== embedded.length ? "Loading . . ." : null}
       </div>
     </ProjectInsightRecordSection>
   );
@@ -439,20 +420,21 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
       count={pendingTotal}
       emptyMessage={t.translations.PROJECT_INSIGHT_PENDING_EMPTY}
       actions={
-        queueablePendingIds.length > 0 ? (
+        pending.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               className="btn btn-sm btn-ghost"
-              onClick={() => setSelectedPendingIds(queueablePendingIds)}
+              onClick={() => setSelectedPendingIds((current) =>
+                (new Map([...current, ...pending.map(r => [r.id, r.uri ?? ""] as const)])))}
             >
               {t.translations.PROJECT_INSIGHT_SELECT_ALL_VISIBLE}
             </button>
             <button
               type="button"
               className="btn btn-sm btn-ghost"
-              onClick={() => setSelectedPendingIds([])}
-              disabled={selectedPendingIds.length === 0}
+              onClick={() => setSelectedPendingIds(new Map())}
+              disabled={selectedPendingIdsLength === 0}
             >
               {t.translations.PROJECT_INSIGHT_CLEAR_SELECTION}
             </button>
@@ -460,16 +442,16 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
               type="button"
               className="btn btn-sm btn-primary"
               onClick={() => void handleQueueSelected()}
-              disabled={isIngestionUnavailable || selectedVisiblePendingIds.length === 0 || isQueueing}
+              disabled={isIngestionUnavailable || selectedPendingIdsLength === 0 || isQueueing}
             >
               {isQueueing
                 ? t.translations.UPLOADING
                 : t.translations.PROJECT_INSIGHT_EMBED_SELECTED}
             </button>
-            {selectedVisiblePendingIds.length > 0 && (
+            {selectedPendingIdsLength > 0 && (
               <span className="badge badge-outline badge-secondary">
                 {withTokens(t.translations.PROJECT_INSIGHT_SELECTED_COUNT, {
-                  count: selectedVisiblePendingIds.length,
+                  count: selectedPendingIdsLength,
                   total: pendingTotal,
                 })}
               </span>
@@ -479,33 +461,30 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
       }
     >
       <div className="space-y-3">
-        <LazyList onReachEnd={loadNextPendingPage}>
-          {pending.map((record) => {
-            const status = getProjectInsightStatus(record, statusMap);
-            const isSelectable =
-              Boolean(record.uri) &&
-              (status.state === "not_embedded" || status.state === "error");
+        {pending.map((record) => {
+          const status = getProjectInsightStatus(record, statusMap);
+          const isSelectable =
+            Boolean(record.uri) &&
+            (status.state === "not_embedded" || status.state === "error");
 
-            return (
-              <ProjectInsightRecordCard
-                key={record.id}
-                projectId={projectId ?? 0}
-                record={record}
-                status={status}
-                selectable={isSelectable}
-                checked={selectedPendingIds.includes(record.id)}
-                onToggle={(recordId) =>
-                  setSelectedPendingIds((current) =>
-                    current.includes(recordId)
-                      ? current.filter((id) => id !== recordId)
-                      : [...current, recordId],
-                  )
-                }
-              />
-            );
-          })}
-        </LazyList>
-        {pendingTotal !== pending.length ? "Loading . . ." : null}
+          return (
+            <ProjectInsightRecordCard
+              key={record.id}
+              projectId={projectId ?? 0}
+              record={record}
+              status={status}
+              selectable={isSelectable}
+              checked={selectedPendingIds.has(record.id)}
+              onToggle={(recordId, recordUri) =>
+                setSelectedPendingIds((current) =>
+                  current.has(recordId)
+                    ? new Map([...current].filter(([id, _]) => id !== recordId))
+                    : new Map([...current, [recordId, recordUri]]),
+                )
+              }
+            />
+          );
+        })}
       </div>
     </ProjectInsightRecordSection>
   );
@@ -695,6 +674,20 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
               <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                 {activeTabKey === "library" ? libraryContent : pendingContent}
               </div>
+              {(activeTabKey === "library") ?
+                <PaginationControls
+                  currentPage={embeddedPage}
+                  pageSize={embeddedPageSize}
+                  totalPages={embeddedTotalPages}
+                  onPageChange={setEmbeddedPage}
+                  onPageSizeChange={setEmbeddedPageSize}
+                /> : <PaginationControls
+                  currentPage={pendingPage}
+                  pageSize={pendingPageSize}
+                  totalPages={pendingTotalPages}
+                  onPageChange={setPendingPage}
+                  onPageSizeChange={setPendingPageSize}
+                />}
             </div>
           </aside>
         </div>
