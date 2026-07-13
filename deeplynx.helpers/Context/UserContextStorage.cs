@@ -53,6 +53,12 @@ public static class UserContextStorage
         get => _isOrgAdmin.Value;
         set => _isOrgAdmin.Value = value;
     }
+    
+    public static bool IsOrgMember
+    {
+        get => _isOrgMember.Value;
+        set => _isOrgMember.Value = value;
+    }
 
     public static bool IsProjectAdmin
     {
