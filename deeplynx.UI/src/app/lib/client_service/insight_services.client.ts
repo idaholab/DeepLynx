@@ -35,6 +35,13 @@ export interface FetchInsightStatusArgs {
   fileId: number;
 }
 
+export interface FetchInsightEndpointHealthArgs {
+  organizationId: number;
+  projectId: number;
+  modelConfigId?: number | null;
+  modelType: "llm" | "vlm" | "embedding";
+}
+
 export interface InsightUploadResponse {
   message?: string;
 }
@@ -44,6 +51,14 @@ export interface InsightIngestionStatusResponse {
   indexed: boolean;
   chunk_count: number;
   page_count: number;
+}
+
+export interface InsightEndpointHealthResponse {
+  reachable: boolean;
+  model_available: boolean;
+  latency_ms?: number | null;
+  model_metadata?: Record<string, unknown> | null;
+  detail?: string | null;
 }
 
 interface InsightQueryRequestBody {
@@ -282,4 +297,39 @@ export async function fetchInsightIngestionStatus(
   }
 
   return responseBody as InsightIngestionStatusResponse;
+}
+
+export async function fetchInsightEndpointHealth(
+    healthRequest: FetchInsightEndpointHealthArgs,
+): Promise<InsightEndpointHealthResponse> {
+  const queryParams = new URLSearchParams({
+    organizationId: String(healthRequest.organizationId),
+    projectId: String(healthRequest.projectId),
+  });
+  
+  const response = await fetch(
+      `/api/insight/endpoint-health?${queryParams.toString()}`,
+      {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        cache: "no-store",
+        body: JSON.stringify({
+          modelConfigId: healthRequest.modelConfigId ?? null,
+          modelType: healthRequest.modelType,
+        }),
+      },
+  );
+  
+  const responseText = await response.text();
+  const responseBody = parseJsonOrTextResponseBody(responseText);
+  
+  if (!response.ok) {
+    throw new Error(
+        extractInsightErrorMessage(responseBody) ||
+        responseText ||
+        "Insight endpoint health check failed",
+    );
+  }
+  
+  return responseBody as InsightEndpointHealthResponse;
 }

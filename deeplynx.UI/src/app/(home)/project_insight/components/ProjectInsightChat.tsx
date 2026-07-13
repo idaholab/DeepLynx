@@ -30,6 +30,7 @@ interface ProjectInsightChatProps {
   onSelectedInsightModelsChange: (
     nextSelection: InsightModelSelection,
   ) => void;
+  isChatUnavailable?: boolean;
 }
 
 function withTokens(
@@ -49,6 +50,7 @@ export default function ProjectInsightChat({
   scopedRecordIds,
   selectedInsightModels,
   onSelectedInsightModelsChange,
+  isChatUnavailable = false,
 }: ProjectInsightChatProps) {
   const { t } = useLanguage();
   const scopeCount = scopedRecordIds.length;
@@ -280,7 +282,7 @@ export default function ProjectInsightChat({
                 void handleSend(prompt);
               }
             }}
-            disabled={isResponding}
+            disabled={isResponding || isChatUnavailable}
           />
 
           <div className="flex items-center justify-between gap-3">
@@ -294,7 +296,7 @@ export default function ProjectInsightChat({
             <button
               type="submit"
               className="btn btn-primary gap-2 self-end"
-              disabled={!draft.trim() || isResponding}
+              disabled={!draft.trim() || isResponding || isChatUnavailable}
               aria-label={t.translations.INSIGHT_SEND_PROMPT_ARIA}
             >
               <PaperAirplaneIcon className="size-4" />

@@ -12,7 +12,7 @@ public interface IQueryBusiness
 
     Task<PaginatedResponse<QueryRecordViewResponseDto>> QueryBuilderPaginated(long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request,
         long organizationId, long[] projectIds, PaginatedRequestDto paginated, string? textSearch, bool isSysAdmin = false,
-        bool isOrgAdmin = false, bool isProjectAdmin = false);
+        bool isOrgAdmin = false);
 
     Task<IEnumerable<QueryRecordViewResponseDto>> GetRecentlyAddedRecords(long currentUserId, long organizationId,
         long[] projectId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
