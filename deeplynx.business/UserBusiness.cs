@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using deeplynx.datalayer.Migrations;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -24,10 +26,19 @@ public class UserBusiness : IUserBusiness
     /// </summary>
     /// <param name="projectId">Optional ID for project</param>
     /// <param name="organizationId">Optional ID for organization</param>
+    /// <param name="includeArchived">Optional Param to include archived users- defaults to false</param>
+    /// <param name="includeServiceAccounts">Optional Param to include service accounts- defaults to false</param>
+    /// <param name="includeTestAccounts">Optional Param to include test accounts- defaults to false</param>
     /// <returns>A list of users, optionally filtered by project or organization</returns>
-    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId)
+    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false, 
+        bool includeServiceAccounts = false, bool includeTestAccounts = false)
     {
-        var users = _context.Users.Where(p => !p.IsArchived);
+        var users = includeArchived
+        ? _context.Users.AsQueryable()
+        : _context.Users.Where(p => !p.IsArchived);
+
+        if (!includeServiceAccounts) users = users.Where(u => u.AccountType != AccountType.Service);
+        if (!includeTestAccounts) users = users.Where(u => u.AccountType != AccountType.Test);
 
         if (projectId != null)
             users = users.Where(u =>
@@ -51,6 +62,7 @@ public class UserBusiness : IUserBusiness
             IsOrgAdmin = organizationId != null
                 ? p.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
                 : null,
+            AccountType = p.AccountType,
             IsArchived = p.IsArchived,
             IsActive = p.IsActive,
             LastLogin = p.LastLogin
@@ -77,6 +89,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Username = user.Username,
             Email = user.Email,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
@@ -144,6 +157,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Username = user.Username,
             Email = user.Email,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
@@ -152,15 +166,24 @@ public class UserBusiness : IUserBusiness
     }
 
     /// <summary>
-    ///     Creates a new user based on the data transfer object supplied.
+    ///     Creates a new standard user based on the data transfer object supplied.
     /// </summary>
     /// <param name="dto">A data transfer object with details on the new user to be created.</param>
     /// <returns>The new user which was just created.</returns>
     public async Task<UserResponseDto> CreateUser(CreateUserRequestDto dto)
     {
-        // TODO: adjusting is_sys_admin is currently disabled. Enable once route permission protections are in place
+        if (string.IsNullOrWhiteSpace(dto.Name))
+            throw new InvalidOperationException("Name is required.");
+
+        if (string.IsNullOrWhiteSpace(dto.Email))
+            throw new InvalidOperationException("Email is required for standard accounts.");
+
+        if (string.IsNullOrWhiteSpace(dto.Username))
+            throw new InvalidOperationException("Username is required for standard accounts.");
+
         var otherUserHasEmail = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower());
-        if (otherUserHasEmail) throw new ArgumentException("User with email already exists");
+        if (otherUserHasEmail)
+            throw new ArgumentException("A user with that email already exists.");
 
         var user = new User
         {
@@ -168,24 +191,56 @@ public class UserBusiness : IUserBusiness
             Email = dto.Email,
             Username = dto.Username,
             IsActive = dto.IsActive ?? false,
-            IsArchived = dto.IsArchived ?? false
+            IsArchived = dto.IsArchived ?? false,
+            AccountType = AccountType.Standard
         };
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
-        return new UserResponseDto
-        {
-            Id = user.Id,
-            Name = user.Name,
-            Username = user.Username,
-            Email = user.Email,
-            IsSysAdmin = user.IsSysAdmin,
-            IsArchived = user.IsArchived,
-            IsActive = user.IsActive,
-            LastLogin = user.LastLogin
-        };
+        return MapToResponseDto(user);
     }
+
+    /// <summary>
+    ///     SysAdmin only: Creates a new test account with an auto-generated identifier.
+    /// </summary>
+    /// <param name="name">Display name for the test account.</param>
+    /// <returns>The new test account which was just created.</returns>
+    public async Task<UserResponseDto> CreateTestAccount(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new InvalidOperationException("Name is required.");
+
+        var identifier = $"test_{Guid.NewGuid()}";
+
+        var user = new User
+        {
+            Name = name,
+            Email = identifier,
+            Username = identifier,
+            IsActive = false,
+            IsArchived = false,
+            AccountType = AccountType.Test
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        return MapToResponseDto(user);
+    }
+
+    private static UserResponseDto MapToResponseDto(User user) => new()
+    {
+        Id = user.Id,
+        Name = user.Name,
+        Username = user.Username,
+        Email = user.Email,
+        AccountType = user.AccountType,
+        IsSysAdmin = user.IsSysAdmin,
+        IsArchived = user.IsArchived,
+        IsActive = user.IsActive,
+        LastLogin = user.LastLogin,
+    };
 
     /// <summary>
     ///     Updates an existing user by ID
@@ -217,6 +272,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Username = user.Username,
             Email = user.Email,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
@@ -309,6 +365,10 @@ public class UserBusiness : IUserBusiness
         if (candidate == null)
             throw new KeyNotFoundException($"User with ID {candidateId} not found.");
 
+        // Service accounts can never be system admins
+        if (candidate.AccountType == AccountType.Service)
+            throw new InvalidOperationException("Service accounts cannot be granted system administrator privileges.");
+
         if (authorizerId == candidateId && !userIsAdmin)
             throw new InvalidOperationException("You cannot remove your own system administrator access.");
 
@@ -373,10 +433,11 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Email = user.Email,
             Username = user.Username,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
-            LastLogin = user.LastLogin
+            LastLogin = user.LastLogin,
         };
     }
 
@@ -399,6 +460,7 @@ public class UserBusiness : IUserBusiness
             Name = user.Name,
             Email = user.Email,
             Username = user.Username,
+            AccountType = user.AccountType,
             IsSysAdmin = user.IsSysAdmin,
             IsArchived = user.IsArchived,
             IsActive = user.IsActive,
@@ -408,13 +470,16 @@ public class UserBusiness : IUserBusiness
 
     /// <summary>
     ///     Retrieves rolling active user counts using the users' most recent successful login timestamp.
+    ///     Service accounts are excluded by default. Test users are always excluded. 
     /// </summary>
     /// <param name="projectId">Optional ID for project</param>
     /// <param name="organizationId">Optional ID for organization</param>
+    /// <param name="includeServiceAccounts">Optional Param to include service accounts- defaults to false</param>
     /// <returns>Counts for users active within 24 hours, 7 days, and 30 days</returns>
-    public async Task<UserActivityCountsDto> GetActiveUserCounts(long? projectId, long? organizationId)
+    public async Task<UserActivityCountsDto> GetActiveUserCounts(long? projectId, long? organizationId, bool includeServiceAccounts = false)
     {
-        var users = BuildActiveUsersQuery(projectId, organizationId);
+        // user accounts with the type test are always excluded
+        var users = BuildActiveUsersQuery(projectId, organizationId, includeServiceAccounts);
 
         var now = UtcNowWithoutTimezone();
         var last24Hours = now.AddHours(-24);
@@ -445,13 +510,14 @@ public class UserBusiness : IUserBusiness
     /// </summary>
     /// <param name="projectId">Optional ID for project</param>
     /// <param name="organizationId">Optional ID for organization</param>
+    /// <param name="includeServiceAccounts">Optional Param to include service accounts- defaults to false</param>
     /// <returns>Counts and active user details for the requested scope</returns>
-    public async Task<UserActivityUsersDto> GetActiveUsers(long? projectId, long? organizationId)
+    public async Task<UserActivityUsersDto> GetActiveUsers(long? projectId, long? organizationId, bool includeServiceAccounts = false)
     {
-        var counts = await GetActiveUserCounts(projectId, organizationId);
+        var counts = await GetActiveUserCounts(projectId, organizationId, includeServiceAccounts);
         var last30Days = counts.GeneratedAt.AddDays(-30);
 
-        var users = await BuildActiveUsersQuery(projectId, organizationId)
+        var users = await BuildActiveUsersQuery(projectId, organizationId, includeServiceAccounts)
             .Where(u => u.LastLogin.HasValue && u.LastLogin.Value >= last30Days)
             .OrderByDescending(u => u.LastLogin)
             .Select(u => new UserResponseDto
@@ -464,6 +530,7 @@ public class UserBusiness : IUserBusiness
                 IsOrgAdmin = organizationId != null
                     ? u.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
                     : null,
+                AccountType = u.AccountType,
                 IsArchived = u.IsArchived,
                 IsActive = u.IsActive,
                 LastLogin = u.LastLogin
@@ -480,9 +547,12 @@ public class UserBusiness : IUserBusiness
         };
     }
 
-    private IQueryable<User> BuildActiveUsersQuery(long? projectId, long? organizationId)
+    private IQueryable<User> BuildActiveUsersQuery(long? projectId, long? organizationId, bool includeServiceAccounts = false)
     {
-        var users = _context.Users.Where(u => !u.IsArchived && u.IsActive);
+        // Test accounts are always excluded, service accounts are optional- default to false
+        var users = _context.Users.Where(u => !u.IsArchived && u.IsActive && u.AccountType != AccountType.Test);
+
+        if (!includeServiceAccounts) users = users.Where(u => u.AccountType != AccountType.Service);
 
         if (projectId != null)
             users = users.Where(u =>

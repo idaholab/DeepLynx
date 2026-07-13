@@ -3,11 +3,13 @@
 
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
+import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useSafeSession } from "@/app/hooks/useSafeSession";
 import {
   getAllOrganizationsForUser,
   getOrganizationLogoUrl,
 } from "@/app/lib/client_service/organization_services.client";
+import { isRunHidden } from "@/app/lib/feature_flags";
 import {
   AdjustmentsHorizontalIcon,
   ArrowRightStartOnRectangleIcon,
@@ -17,6 +19,7 @@ import {
   Cog6ToothIcon,
   CommandLineIcon,
   GlobeAmericasIcon,
+  PlayIcon,
   QuestionMarkCircleIcon,
   UserCircleIcon,
   UserGroupIcon,
@@ -45,6 +48,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
   const { data: session } = useSafeSession();
   const { user } = useRBAC();
   const { organization, setOrganization } = useOrganizationSession();
+  const { project, clearProject } = useProjectSession();
 
   const [organizations, setOrganizations] = useState<OrganizationResponseDto[]>(
     [],
@@ -129,10 +133,13 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
   };
 
   const handleOrganizationSwitch = (org: OrganizationResponseDto) => {
+    clearProject();
+
     setOrganization({
       organizationId: org.id,
       organizationName: org.name,
       banner: org.banner ?? null,
+      themeName: org.theme ?? "default",
     });
 
     router.push("/");
@@ -153,8 +160,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
     <div className="flex flex-col min-h-screen bg-base-100 text-base-content">
       {/* Top Banner */}
       <TopBanner />
-      {/* Banner/Header */}
-      <header className="bg-[var(--base-400)] text-primary-content flex justify-between items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 z-50 fixed w-full top-6">
+      {/* Header */}
+      <header className="app-header text-neutral-content flex justify-between items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 z-50 fixed w-full top-6">
         {/* Organization Switcher */}
         <div className="flex items-center gap-2 min-w-0">
           <button
@@ -224,10 +231,11 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                     <li key={org.id} className="w-full">
                       <a
                         onClick={() => handleOrganizationSwitch(org)}
-                        className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
-                          ? "active bg-info/60"
-                          : ""
-                          }`}
+                        className={`flex items-center gap-2 w-full max-w-full ${
+                          organization?.organizationId === org.id
+                            ? "active bg-info/60"
+                            : ""
+                        }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
                           <div className=" font-medium truncate">
@@ -271,7 +279,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         </div>
       </header>
       {/* Page Content */}
-      <div className="flex h-full z-0 mt-6">
+      <div className="flex h-full z-0 mt-6 w-full overflow-x-auto">
         {isMobileNavOpen && (
           <button
             type="button"
@@ -282,17 +290,18 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         )}
         {/* Side Menu */}
         <div
-          className={`fixed top-20 bottom-0 hidden lg:flex ${isUserDropdownOpen ? "z-[60]" : "z-40"
-            }`}
+          className={`fixed top-20 bottom-0 hidden lg:flex ${
+            isUserDropdownOpen ? "z-[70]" : "z-[55]"
+          }`}
         >
           <aside
             className={
-              "h-full shadow-xl w-18 login text-primary-content p-4 transition-all duration-300 flex flex-col"
+              "h-full shadow-xl w-18 app-header-inverted text-primary-content p-4 transition-all duration-300 flex flex-col"
             }
           >
             <ul className="mt-20 flex-grow">
               <li>
-                <Link href={"/"}>
+                <Link href={"/"} onClick={clearProject}>
                   <GlobeAmericasIcon className="size-10" />
                 </Link>
               </li>
@@ -301,6 +310,13 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                   <BookOpenIcon className="size-10" />
                 </Link>
               </li>
+              {!isRunHidden() && (
+                <li className="mt-5">
+                  <Link href="/run">
+                    <PlayIcon className="size-10" />
+                  </Link>
+                </li>
+              )}
               <OrgAdminRoute>
                 <li className="mt-5">
                   <Link href="/organization_management">
@@ -319,8 +335,9 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                   </Link>
                 </SysAdminRoute>
               </li>
-              <li className="mt-5">
+              <li className="mt-5 id-tooltip group relative">
                 <Link
+                  target="_blank"
                   href={
                     process.env.NEXT_PUBLIC_API_URL
                       ? `${process.env.NEXT_PUBLIC_API_URL}/scalar`
@@ -330,6 +347,33 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                 >
                   <CommandLineIcon className="size-10" />
                 </Link>
+                <div
+                  role="tooltip"
+                  className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-150 absolute left-full top-1/2 -translate-y-1/2 ml-3 z-[60] bg-base-100 text-base-content rounded-box border border-base-300 shadow-xl p-4 min-w-[22rem] pointer-events-none"
+                >
+                  <p className="text-xs text-base-content/70 mb-3 leading-snug">
+                    {t.translations.API_ID_TOOLTIP_DESCRIPTION}
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-xs font-semibold text-base-content/70 uppercase tracking-wide whitespace-nowrap">
+                        {t.translations.ORGANIZATION_ID}
+                      </span>
+                      <span className="text-sm font-mono text-base-content break-all text-right">
+                        {organization?.organizationId ?? "—"}
+                      </span>
+                    </div>
+                    <div className="divider my-0"></div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-xs font-semibold text-base-content/70 uppercase tracking-wide whitespace-nowrap">
+                        {t.translations.PROJECT_ID}
+                      </span>
+                      <span className="text-sm font-mono text-base-content break-all text-right">
+                        {project?.projectId ?? "—"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </li>
               <li className="mt-5">
                 <div className="relative flex justify-center">
@@ -395,7 +439,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                   <QuestionMarkCircleIcon className="size-10" />
                 </Link>
               </li>
-              <span className="text-xs font-bold text-base-200/50">v0.6.2</span>
+              <span className="text-xs font-bold text-base-200/50">v0.7.0</span>
             </ul>
           </aside>
         </div>
@@ -405,8 +449,9 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
           onMobileClose={() => setIsMobileNavOpen(false)}
         />
         <main
-          className={`transition-all duration-300 w-full mt-20 ml-0 ${isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
-            }`}
+          className={`transition-all duration-300 min-w-[750px] flex-1 w-full mt-20 ml-0 ${
+            isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
+          }`}
         >
           {/* Organization Banner */}
           <div className="sticky top-25 z-20">

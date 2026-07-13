@@ -121,7 +121,7 @@ export default function FileUploadSection({
             key={cardKeys[index]}
             defaultName={file.name}
             fileIndex={index}
-            disableMetadataFile={file.size > CHUNK_THRESHOLD}
+            disableMetadataFile={false}
             onMetadataChange={handleMetadataChange}
             onRemove={() => onRemoveAt(index)}
             availableFiles={availableFiles}
@@ -134,7 +134,7 @@ export default function FileUploadSection({
         ))}
 
       {selectedFiles.length > 0 && (
-        <div className="mt-4 flex justify-end gap-2 border-t border-base-300/60 pt-4">
+        <div className="mt-4 flex justify-end gap-2 border-t border-base-300/50 pt-4">
           <button
             type="button"
             className="btn btn-ghost btn-sm"

@@ -49,7 +49,7 @@ interface ProjectStatCardProps {
 
 function ProjectStatCard({ title, value, Icon }: ProjectStatCardProps) {
   return (
-    <div className="rounded-lg border border-base-300/30 bg-base-200 p-3">
+    <div className="rounded-lg border border-base-300/50 bg-base-100 p-3 shadow-sm">
       <div className="flex items-center gap-3">
         <Icon className="size-8 text-secondary" />
         <div>
@@ -84,7 +84,7 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
     : t.translations.UNKNOWN;
 
   const projectContacts = members
-    .filter((member) => member.role?.trim().toLowerCase() === "admin")
+    .filter((member) => member.isProjectAdmin === true)
     .slice(0, MAX_VISIBLE_CONTACTS);
   const visibleMembers = members.slice(0, MAX_VISIBLE_MEMBERS);
   const hiddenMemberCount = Math.max(members.length - visibleMembers.length, 0);

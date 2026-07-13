@@ -4,10 +4,10 @@ import { seedSession } from "../helpers/seed";
 test.describe("Select Organization", () => {
   test.beforeEach(async ({ page }) => {
     await seedSession(page);
-    await page.goto("/select-org", { waitUntil: "domcontentloaded" });
+    await page.goto("/", { waitUntil: "networkidle" });
   });
 
-  
+
 
   test("banner has an Organization dropdown label", async ({ page }) => {
     const orgLabel = page
@@ -49,13 +49,18 @@ test.describe("Select Organization", () => {
     ).toBeVisible();
   });
 
-  test('Clicking the View All Organizations button opens Select Org', async ({ 
-    page 
+  test('Clicking the View All Organizations button opens Select Org', async ({
+    page
   }) => {
+    const dropdownTrigger = page.locator(
+      'header .dropdown [role="button"]',
+    );
+    await dropdownTrigger.click();
     await page.getByRole('link', { name: 'View All Organizations' }).click();
-    await expect(page).toHaveURL('/select-org'); 
+    await page.waitForLoadState("networkidle");
+    await expect(page).toHaveURL('/select-org');
   });
 
-  
+
 
 });

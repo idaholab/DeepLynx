@@ -555,7 +555,9 @@ public class ProjectBusinessTests : IntegrationTestBase
         Assert.Equal(oid, persisted.OrganizationId);
 
         //Ensure
-        _organizationBusiness.Verify(x => x.GetAllOrganizations(It.IsAny<bool>()), Times.Never);
+        _organizationBusiness.Verify(
+            x => x.GetAllOrganizations(It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<bool>()),
+            Times.Never);
         _organizationBusiness.Verify(
             x => x.CreateOrganization(uid, It.IsAny<CreateOrganizationRequestDto>(), It.IsAny<bool>()),
             Times.Never);
@@ -606,6 +608,32 @@ public class ProjectBusinessTests : IntegrationTestBase
         Assert.Contains(listForSysAdmin, p => p.Name == "Test Project");
         Assert.Contains(listForSysAdmin, p => p.Name == "Other Project");
         Assert.Contains(listForSysAdmin, p => p.Name == "Lone Project");
+    }
+
+    [Fact]
+    public async Task GetAllProjects_OrgAdmin_ReturnsAllOrganizationProjects()
+    {
+        // Arrange - LonelyUser is only a member of Lone Project, but org admin should see the whole org.
+        Context.OrganizationUsers.Add(new OrganizationUser
+        {
+            OrganizationId = oid,
+            UserId = uid3,
+            IsOrgAdmin = true
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var listForOrgAdmin = (await _projectBusiness.GetAllProjects(uid3, oid)).ToList();
+
+        // Assert
+        Assert.NotNull(listForOrgAdmin);
+        Assert.NotEmpty(listForOrgAdmin);
+        Assert.Equal(4, listForOrgAdmin.Count);
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Test Project");
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Other Project");
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Lone Project");
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Other Project 2");
+        Assert.DoesNotContain(listForOrgAdmin, p => p.Name == "Archived Project");
     }
 
     [Fact]
@@ -1571,7 +1599,7 @@ public class ProjectBusinessTests : IntegrationTestBase
             RequireSensitivityLabel = true
         };
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => 
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _projectBusiness.UpdateProject(uid, oid, testProjectId, dto));
     }
 
@@ -1589,7 +1617,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         Context.Projects.Add(project);
         await Context.SaveChangesAsync();
         var testProjectId = project.Id;
-        
+
         var dataSource = new DataSource
         {
             Name = "Test Data Source",
@@ -1602,7 +1630,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         Context.DataSources.Add(dataSource);
         await Context.SaveChangesAsync();
         var did = dataSource.Id;
-        
+
         var testLabel = new SensitivityLabel
         {
             Name = "Test Label",
@@ -1611,7 +1639,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         };
         Context.SensitivityLabels.Add(testLabel);
         await Context.SaveChangesAsync();
-        
+
         var record = new Record
         {
             Name = "Test Record",
@@ -1625,21 +1653,21 @@ public class ProjectBusinessTests : IntegrationTestBase
             FileType = "pdf",
             DataSourceId = did,
             OrganizationId = oid,
-            Labels = new List<SensitivityLabel>{testLabel}
+            Labels = new List<SensitivityLabel> { testLabel }
         };
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
-        
+
         var dto = new UpdateProjectRequestDto
         {
             RequireSensitivityLabel = true
         };
-        
+
         var updateResult = await _projectBusiness.UpdateProject(uid, oid, testProjectId, dto);
         Assert.NotNull(updateResult);
         Assert.NotNull(updateResult.RequireSensitivityLabel);
         Assert.True(updateResult.RequireSensitivityLabel);
     }
 
-#endregion
+    #endregion
 }

@@ -4,7 +4,7 @@ import { SavedSearchFilterRequest } from "@/app/(home)/types/requestDTOs";
 import {
   SavedSearchesResponseDto,
   PaginatedSavedSearchesResponseDto,
-  HistoricalRecordResponseDto,
+  QueryRecordViewResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
 import api from "./api";
@@ -86,9 +86,9 @@ export async function executeSavedSearch(
   savedSearchId: number,
   organizationId: number,
   projectIds: number[]
-): Promise<HistoricalRecordResponseDto[]> {
+): Promise<QueryRecordViewResponseDto[]> {
   try {
-    const res = await api.get<HistoricalRecordResponseDto[]>(
+    const res = await api.get<QueryRecordViewResponseDto[]>(
       `saved-searches/organizations/${organizationId}`,
       {
         params: { savedSearchId, projectIds },

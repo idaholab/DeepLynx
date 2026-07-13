@@ -78,7 +78,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
             Description = "Test Description",
             LastUpdatedAt = now,
             LastUpdatedBy = uid,
-            IsArchived = false
+            IsArchived = false,
+            Theme = "nord"
         };
 
         // Assert
@@ -88,6 +89,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.Equal(now, dto.LastUpdatedAt);
         Assert.Equal(uid, dto.LastUpdatedBy);
         Assert.False(dto.IsArchived);
+        Assert.Equal("nord", dto.Theme);
     }
 
     #endregion
@@ -140,7 +142,16 @@ public class OrganizationBusinessTests : IntegrationTestBase
             UserId = uid,
             IsOrgAdmin = false
         };
+
+        var testOrg2User = new OrganizationUser
+        {
+            OrganizationId = oid2,
+            UserId = uid,
+            IsOrgAdmin = false
+        };
+
         Context.OrganizationUsers.Add(testOrgUser);
+        Context.OrganizationUsers.Add(testOrg2User);
         await Context.SaveChangesAsync();
     }
 
@@ -179,7 +190,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     public async Task GetAllOrganizations_ExcludesArchived()
     {
         // Act
-        var result = await _organizationBusiness.GetAllOrganizations();
+        var result = await _organizationBusiness.GetAllOrganizations(uid);
         var organizations = result.ToList();
 
         // Assert
@@ -192,7 +203,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     public async Task GetAllOrganizations_WithHideArchivedFalse_IncludesArchived()
     {
         // Act
-        var result = await _organizationBusiness.GetAllOrganizations(false);
+        var result = await _organizationBusiness.GetAllOrganizations(uid, hideArchived: false);
         var organizations = result.ToList();
 
         // Assert
@@ -271,6 +282,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.Equal(uid, result.LastUpdatedBy);
         Assert.Equal(dto.Banner, result.Banner);
         Assert.True(result.RequireSensitivityLabel);
+        Assert.Equal("default", result.Theme);
 
         // verify org was actually created in database
         var createdOrg = await Context.Organizations.FindAsync(result.Id);
@@ -327,10 +339,9 @@ public class OrganizationBusinessTests : IntegrationTestBase
 
         var defaultRoles = await Context.Roles.Where(r => r.OrganizationId == result.Id).Include(r => r.Permissions)
             .ToListAsync();
-        var adminRole = defaultRoles.Single(r => r.Name == "Admin");
+        Assert.DoesNotContain(defaultRoles, r => r.Name == "Admin");
         var userRole = defaultRoles.Single(r => r.Name == "User");
 
-        AssertRolePermissions(adminRole, DefaultRolePermissions.Admin.AllowedPermissions);
         AssertRolePermissions(userRole, DefaultRolePermissions.User.AllowedPermissions);
     }
 
@@ -741,7 +752,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Context.DataSources.Add(dataSource);
         await Context.SaveChangesAsync();
         var did = dataSource.Id;
-        
+
         var record = new Record
         {
             Name = "Test Record",
@@ -756,19 +767,19 @@ public class OrganizationBusinessTests : IntegrationTestBase
             DataSourceId = did,
             OrganizationId = oid,
         };
-        
+
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
-        
-        
+
+
         var dto = new UpdateOrganizationRequestDto
         {
             RequireSensitivityLabel = true
         };
-        
+
         await Assert.ThrowsAsync<InvalidOperationException>(() => _organizationBusiness.UpdateOrganization(uid, oid, dto));
     }
-    
+
     [Fact]
     public async Task UpdateOrganization_Success_RequireSensitivityLabels()
     {
@@ -783,7 +794,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         };
         Context.Organizations.Add(otherOrg);
         await Context.SaveChangesAsync();
-        
+
         var project = new Project
         {
             Name = "Test Project",
@@ -808,7 +819,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Context.DataSources.Add(dataSource);
         await Context.SaveChangesAsync();
         var did = dataSource.Id;
-        
+
         var testLabel = new SensitivityLabel
         {
             Name = "Test Label",
@@ -817,7 +828,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
         };
         Context.SensitivityLabels.Add(testLabel);
         await Context.SaveChangesAsync();
-        
+
         var record = new Record
         {
             Name = "Test Record",
@@ -831,20 +842,38 @@ public class OrganizationBusinessTests : IntegrationTestBase
             FileType = "pdf",
             DataSourceId = did,
             OrganizationId = otherOrg.Id,
-            Labels = new List<SensitivityLabel>{testLabel}
+            Labels = new List<SensitivityLabel> { testLabel }
         };
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
-        
+
         var dto = new UpdateOrganizationRequestDto
         {
             RequireSensitivityLabel = true
         };
-        
+
         var updateResult = await _organizationBusiness.UpdateOrganization(uid, oid, dto);
         Assert.NotNull(updateResult);
         Assert.NotNull(updateResult.RequireSensitivityLabel);
         Assert.True(updateResult.RequireSensitivityLabel);
+    }
+
+    [Fact]
+    public async Task UpdateOrganization_Success_UpdateTheme()
+    {
+        var dto = new UpdateOrganizationRequestDto
+        {
+            Theme = OrganizationTheme.Nord
+        };
+
+        var result = await _organizationBusiness.UpdateOrganization(uid, oid, dto);
+
+        Assert.NotNull(result);
+        Assert.Equal("nord", result.Theme);
+
+        var savedOrg = await Context.Organizations.FindAsync(oid);
+        Assert.NotNull(savedOrg);
+        Assert.Equal("nord", savedOrg!.Theme);
     }
 
     #endregion
@@ -1062,6 +1091,76 @@ public class OrganizationBusinessTests : IntegrationTestBase
             () => _organizationBusiness.AddUserToOrganization(99999, uid));
 
         Assert.Contains("Organization with id 99999 not found", exception.Message);
+    }
+    
+    [Fact]
+    public async Task AddUser_Fails_IfServiceAccount_AndNotAllowed()
+    {
+        // Arrange - create a service account user
+        var serviceUser = new User
+        {
+            AccountType = AccountType.Service,
+            Name="test Service Account",
+            Email = "asdfasdfasdfasdf"
+        };
+        Context.Users.Add(serviceUser);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert - default is allowServiceAccounts: false
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _organizationBusiness.AddUserToOrganization(oid, serviceUser.Id));
+
+        Assert.Contains("Service accounts must be added directly to a project", exception.Message);
+
+        // Verify nothing was saved to DB
+        var orgUser = await Context.OrganizationUsers
+            .FirstOrDefaultAsync(ou => ou.OrganizationId == oid && ou.UserId == serviceUser.Id);
+        Assert.Null(orgUser);
+    }
+
+    [Fact]
+    public async Task AddUser_Succeeds_IfServiceAccount_AndAllowed()
+    {
+        // Arrange - create a service account user
+        var serviceUser = new User
+        {
+            AccountType = AccountType.Service,
+            Name="test Service Account",
+            Email = "asdfasdfasdfasdf"
+        };
+        Context.Users.Add(serviceUser);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _organizationBusiness.AddUserToOrganization(
+            oid, serviceUser.Id, allowServiceAccounts: true);
+
+        // Assert
+        Assert.True(result);
+
+        var orgUser = await Context.OrganizationUsers
+            .FirstOrDefaultAsync(ou => ou.OrganizationId == oid && ou.UserId == serviceUser.Id);
+        Assert.NotNull(orgUser);
+        Assert.False(orgUser.IsOrgAdmin);
+    }
+
+    [Fact]
+    public async Task AddUser_Fails_IfServiceAccountExplicitlyDisallowed()
+    {
+        // Arrange
+        var serviceUser = new User
+        {
+            AccountType = AccountType.Service,
+            Name="test Service Account",
+            Email = "asdfasdfasdfasdf"
+        };
+        Context.Users.Add(serviceUser);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert - explicitly passing false behaves the same as the default
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _organizationBusiness.AddUserToOrganization(
+                oid, serviceUser.Id, allowServiceAccounts: false));
     }
 
     #endregion

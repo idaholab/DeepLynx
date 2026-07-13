@@ -45,28 +45,13 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <summary>
     ///     Retrieves all organizations
     /// </summary>
+    /// <param name="userId">The ID of the requesting user</param>
+    /// <param name="isSysAdmin">Boolean determining if the requesting user is a system admin</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
     /// <returns>A list of organizations</returns>
-    public async Task<IEnumerable<OrganizationResponseDto>> GetAllOrganizations(bool hideArchived = true)
+    public async Task<IEnumerable<OrganizationResponseDto>> GetAllOrganizations(long userId, bool hideArchived = true, bool isSysAdmin = false)
     {
-        var organizationQuery = _context.Organizations.AsQueryable();
-
-        if (hideArchived) organizationQuery = organizationQuery.Where(o => !o.IsArchived);
-
-        var organizations = await organizationQuery.ToListAsync();
-
-        return organizations
-            .Select(o => new OrganizationResponseDto
-            {
-                Id = o.Id,
-                Name = o.Name,
-                Description = o.Description,
-                LastUpdatedAt = o.LastUpdatedAt,
-                LastUpdatedBy = o.LastUpdatedBy,
-                IsArchived = o.IsArchived,
-                DefaultOrg = o.DefaultOrg,
-                Banner = o.Banner
-            });
+        return await GetAllOrganizationsForUser(userId, hideArchived, isSysAdmin);
     }
 
     /// <summary>
@@ -101,7 +86,8 @@ public class OrganizationBusiness : IOrganizationBusiness
                 LastUpdatedBy = o.LastUpdatedBy,
                 IsArchived = o.IsArchived,
                 DefaultOrg = o.DefaultOrg,
-                Banner = o.Banner
+                Banner = o.Banner,
+                Theme = o.Theme
             })
             .ToListAsync();
     }
@@ -134,7 +120,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = organization.LastUpdatedBy,
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
-            Banner = organization.Banner
+            Banner = organization.Banner,
+            Theme = organization.Theme
         };
     }
 
@@ -157,7 +144,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = currentUserId,
             Banner = dto.Banner,
-            RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false
+            RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false,
+            Theme = "default"
         };
 
         _context.Organizations.Add(organization);
@@ -178,9 +166,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         // Log create Organization event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organization.Id, 
-            null, 
+            currentUserId,
+            organization.Id,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "create",
@@ -200,7 +188,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
-            RequireSensitivityLabel = organization.RequireSensitivityLabel
+            RequireSensitivityLabel = organization.RequireSensitivityLabel,
+            Theme = organization.Theme
         };
     }
 
@@ -215,6 +204,8 @@ public class OrganizationBusiness : IOrganizationBusiness
     public async Task<OrganizationResponseDto> UpdateOrganization(long currentUserId, long organizationId,
         UpdateOrganizationRequestDto dto)
     {
+        ValidationHelper.ValidateModel(dto);
+
         var organization = await _context.Organizations.FindAsync(organizationId);
 
         if (organization == null || organization.IsArchived)
@@ -227,22 +218,27 @@ public class OrganizationBusiness : IOrganizationBusiness
                 .Include(r => r.Labels)
                 .Where(r => r.OrganizationId == organizationId)
                 .AnyAsync(r => !r.Labels.Any());
-        
+
             if (hasUnlabeledRecords)
                 throw new InvalidOperationException(
                     "Cannot require sensitivity labels: organization contains records without labels. " +
                     "Please label all existing records before enabling this requirement.");
         }
-        
+
         if (dto.RequireSensitivityLabel != null)
             organization.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
+
+        if (dto.Theme != null)
+        {
+            organization.Theme = dto.Theme.Value.ToCamelCaseValue();
+        }
 
         organization.Name = dto.Name ?? organization.Name;
         organization.Description = dto.Description ?? organization.Description;
         organization.DefaultOrg = dto.DefaultOrg ?? organization.DefaultOrg;
         organization.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         organization.LastUpdatedBy = currentUserId;
-        organization.Banner = dto.Banner; 
+        organization.Banner = dto.Banner;
 
         _context.Organizations.Update(organization);
 
@@ -252,9 +248,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         // log update Organization event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organization.Id, 
-            null, 
+            currentUserId,
+            organization.Id,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "update",
@@ -274,7 +270,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
-            RequireSensitivityLabel = organization.RequireSensitivityLabel
+            RequireSensitivityLabel = organization.RequireSensitivityLabel,
+            Theme = organization.Theme
         };
     }
 
@@ -301,9 +298,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         // Log organization archive event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organizationId, 
-            null, 
+            currentUserId,
+            organizationId,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "archive",
@@ -338,9 +335,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         // Log organization archive event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organization.Id, 
-            null, 
+            currentUserId,
+            organization.Id,
+            null,
             new CreateEventRequestDto
             {
                 Operation = "unarchive",
@@ -378,9 +375,10 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <param name="organizationId">The ID of the org to add the user to</param>
     /// <param name="userId">The ID of the user to add</param>
     /// <param name="isAdmin">Whether user should be org admin or not</param>
+    /// <param name="allowServiceAccounts">(Internal Use only) Allows service users to be added to an organization</param>
     /// <returns>False if user is already in org, True upon successfully adding user</returns>
     /// <exception cref="KeyNotFoundException">Returned if user or org does not exist</exception>
-    public async Task<bool> AddUserToOrganization(long organizationId, long userId, bool isAdmin = false)
+    public async Task<bool> AddUserToOrganization(long organizationId, long userId, bool isAdmin = false, bool allowServiceAccounts = false)
     {
         // check if the user is already in the organization
         var existingOrgUser = await _context.OrganizationUsers
@@ -392,6 +390,10 @@ public class OrganizationBusiness : IOrganizationBusiness
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null || user.IsArchived)
             throw new KeyNotFoundException($"User with id {userId} not found");
+
+        // service users are restricted to project scope. Cannot be added only to an org
+        if (user.AccountType == AccountType.Service && !allowServiceAccounts)
+            throw new InvalidOperationException("Service accounts must be added directly to a project");
 
         var organization = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId);
         if (organization == null || organization.IsArchived)
@@ -423,10 +425,14 @@ public class OrganizationBusiness : IOrganizationBusiness
     {
         // check if the user exists in the organization
         var existingOrgUser = await _context.OrganizationUsers
+            .Include(ou => ou.User)
             .FirstOrDefaultAsync(ou => ou.OrganizationId == organizationId && ou.UserId == userId);
 
         if (existingOrgUser == null)
             throw new KeyNotFoundException($"User with id {userId} not found in Org with id {organizationId}");
+
+        if (existingOrgUser.User.AccountType == AccountType.Service)
+            throw new InvalidOperationException("Only standard user accounts can be granted org admin status.");
 
         // set is admin and save to DB
         existingOrgUser.IsOrgAdmin = isAdmin;
@@ -487,10 +493,10 @@ public class OrganizationBusiness : IOrganizationBusiness
         {
             var mountPath =
                 Environment.GetEnvironmentVariable("STORAGE_DIRECTORY");
-            
+
             if (string.IsNullOrWhiteSpace(mountPath))
                 throw new ArgumentException($"STORAGE_DIRECTORY is null or white space, please check your environment variables.");
-            
+
             configDto.MountPath = mountPath;
         }
         else if (defaultObjectStorageMethod == "azure_object")
@@ -502,7 +508,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             var azureContainerName = Environment.GetEnvironmentVariable("AZURE_CONTAINER_NAME");
             if (string.IsNullOrWhiteSpace(azureContainerName))
                 throw new ArgumentException("AZURE_CONTAINER_NAME is null or white space, please check your environment variables.");
-            
+
             configDto.AzureObjectConfig = new AzureObjectConfigDto()
             {
                 AzureConnectionString = azureConnectionString,
@@ -515,7 +521,7 @@ public class OrganizationBusiness : IOrganizationBusiness
                 Environment.GetEnvironmentVariable("AWS_S3_CONNECTION_STRING");
             if (string.IsNullOrWhiteSpace(awsConnectionString))
                 throw new ArgumentException("AWS_S3_CONNECTION_STRING is null or white space, please check your environment variables.");
-            
+
             configDto.AwsConnectionString = awsConnectionString;
         }
         else
@@ -532,22 +538,18 @@ public class OrganizationBusiness : IOrganizationBusiness
         };
         await _objectStorageBusiness.CreateObjectStorage(
             currentUserId, organizationId, null, objectStorageRequestDto);
-        
+
         // ===============================
         // CREATE DEFAULT ROLES
         // ===============================
         var defaultRoles = new List<CreateRoleRequestDto>
         {
-            new() { Name = "Admin", Description = "Administrator role with full permissions" },
             new() { Name = "User", Description = "User role with limited permissions" }
         };
         var roles = await _roleBusiness.BulkCreateRoles(currentUserId, organizationId, null, defaultRoles);
-        var adminRoleId = roles.Single(r => r.Name == "Admin").Id;
         var userRoleId = roles.Single(r => r.Name == "User").Id;
 
-        // set role permissions for admin and user
-        await _roleBusiness.SetPermissionsByPattern(adminRoleId, DefaultRolePermissions.Admin.AllowedPermissions,
-            organizationId, null);
+        // set role permissions for user
         await _roleBusiness.SetPermissionsByPattern(userRoleId, DefaultRolePermissions.User.AllowedPermissions,
             organizationId, null);
     }

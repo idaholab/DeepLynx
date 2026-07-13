@@ -1,12 +1,10 @@
-import React from "react";
+import { useLanguage } from "@/app/contexts/Language";
 import {
+  InformationCircleIcon,
   ShieldCheckIcon,
   TagIcon,
-  LockClosedIcon,
-  LockOpenIcon,
-  InformationCircleIcon,
 } from "@heroicons/react/24/outline";
-import { useLanguage } from "@/app/contexts/Language";
+import React from "react";
 
 interface Props {
   inheritedOrganizationLabelCount: number;
@@ -29,7 +27,7 @@ const ProjectTagOverviewStrip: React.FC<Props> = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+      <div className="stat bg-base-100 border border-base-300/50 rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <ShieldCheckIcon className="w-4 h-4 text-secondary" />
           {t.translations.ORGANIZATION_SECURITY_LABELS}
@@ -43,7 +41,7 @@ const ProjectTagOverviewStrip: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+      <div className="stat bg-base-100 border border-base-300/50 rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <ShieldCheckIcon className="w-4 h-4 text-secondary" />
           {t.translations.PROJECT_SECURITY_LABELS}
@@ -53,7 +51,7 @@ const ProjectTagOverviewStrip: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+      <div className="stat bg-base-100 border border-base-300/50 rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <TagIcon className="w-4 h-4 text-primary" />
           {t.translations.ORGANIZATION_TAGS}
@@ -67,7 +65,7 @@ const ProjectTagOverviewStrip: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="stat bg-base-100 border border-base-300 rounded-xl">
+      <div className="stat bg-base-100 border border-base-300/50 rounded-xl">
         <div className="stat-title flex items-center gap-1 text-xs">
           <TagIcon className="w-4 h-4 text-secondary" />
           {t.translations.PROJECT_TAGS}

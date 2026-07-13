@@ -14,6 +14,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organization/{organizationId:long}/metrics")]
 [Authorize]
+[ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Organization - Metrics")]
 public class MetricsOrganizationController : ControllerBase
 {
@@ -39,7 +40,6 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="organizationId">The organization from which to retrieve the summary statistic</param>
     /// <returns>The total number of bytes of file data stored in this org's registered object storages.</returns>
     [HttpGet("storage/size", Name = "api_storage_size_organization")]
-    [SysAdmin]
     public async Task<IActionResult> GetOrganizationStorageSize(long organizationId)
     {
         try
@@ -63,7 +63,6 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
     /// <returns>A count of data sources for the given organization and its projects.</returns>
     [HttpGet("count", Name = "api_count_data_sources_for_organization")]
-    [Auth("read", "data_source")]
     public async Task<ActionResult<int>> GetDataSourceCount(
         long organizationId,
         [FromQuery] long[]? projectIds,
@@ -82,7 +81,7 @@ public class MetricsOrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get record count for organization
     /// </summary>
@@ -92,8 +91,8 @@ public class MetricsOrganizationController : ControllerBase
     /// <returns>The record count for the given scope</returns>
     [HttpGet("records/count", Name = "api_record_count_organization")]
     public async Task<IActionResult> GetOrganizationRecordCount(
-        long organizationId, 
-        [FromQuery] long[]? projectIds, 
+        long organizationId,
+        [FromQuery] long[]? projectIds,
         [FromQuery] bool hideArchived = true)
     {
         try
@@ -108,7 +107,7 @@ public class MetricsOrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get file count for organization
     /// </summary>
@@ -118,8 +117,8 @@ public class MetricsOrganizationController : ControllerBase
     /// <returns>The file count for the given scope</returns>
     [HttpGet("files/count", Name = "api_file_count_organization")]
     public async Task<IActionResult> GetOrganizationFileCount(
-        long organizationId, 
-        [FromQuery] long[]? projectIds, 
+        long organizationId,
+        [FromQuery] long[]? projectIds,
         [FromQuery] bool hideArchived = true)
     {
         try
@@ -134,7 +133,7 @@ public class MetricsOrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get Organization Data Modality Count
     /// </summary>

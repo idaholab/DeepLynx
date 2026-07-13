@@ -20,7 +20,7 @@ const DataSourceCreateForm = ({
   onCancel,
 }: CreateFormProps) => {
   return (
-    <div className="card bg-base-200/50 border-2 border-dashed border-primary/30 mb-6">
+    <div className="card mb-6 border-2 border-dashed border-base-300/50 bg-base-100 shadow-sm">
       <div className="card-body">
         <h3 className="text-lg font-semibold">Create Data Source</h3>
         <div className="grid md:grid-cols-2 gap-3">

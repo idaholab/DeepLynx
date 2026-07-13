@@ -165,6 +165,8 @@ spec:
               value: ${INSIGHT_FASTAPI_URL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
+            - name: NEXT_PUBLIC_HIDE_INSIGHT
+              value: ${NEXT_PUBLIC_HIDE_INSIGHT}
             # Runtime environment variables from secrets (sensitive)
             - name: OKTA_CLIENT_SECRET
               valueFrom:
@@ -335,10 +337,10 @@ spec:
               value: ${SUPERUSER_EMAIL}
             - name: AIRFLOW_BASE_URL
               value: ${AIRFLOW_BASE_URL}
-            - name: AIRFLOW_USERNAME
-              value: ${AIRFLOW_USERNAME}
-            - name: AIRFLOW_PASSWORD
-              value: ${AIRFLOW_PASSWORD}
+            - name: AIRFLOW_JWT
+              value: ${AIRFLOW_JWT}
+            - name: HIDE_INSIGHT
+              value: ${HIDE_INSIGHT}
             # Backend may also need these environment variables
             - name: OKTA_CLIENT_SECRET
               valueFrom:
@@ -399,6 +401,7 @@ spec:
               memory: "2Gi"
           ports:
             - containerPort: 5000
+            - containerPort: 50051
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
@@ -579,8 +582,6 @@ spec:
         - name: insight-fastapi
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-fastapi-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          command:
-            ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5009"]
           ports:
             - containerPort: 5009
           env:
@@ -693,7 +694,6 @@ spec:
         - name: insight-rabbitmq-runner
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          command: ["python", "-m", "runner"]
           env:
             - name: LITELLM_LOCAL_MODEL_COST_MAP
               value: "True"
@@ -822,6 +822,9 @@ spec:
     - name: http
       port: 80
       targetPort: 5000
+    - name: grpc
+      port: 50051
+      targetPort: 50051
   selector:
     app: deeplynxbackend
 

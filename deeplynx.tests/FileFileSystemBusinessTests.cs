@@ -7,6 +7,18 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Moq;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Specialized;
+using deeplynx.helpers.BigData;
+using deeplynx.helpers.Hubs;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using Testcontainers.Azurite;
+using Record = deeplynx.datalayer.Models.Record;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.IO.Compression;
+
 
 namespace deeplynx.tests;
 
@@ -14,15 +26,52 @@ namespace deeplynx.tests;
 public class FileFileSystemBusinessTests : IntegrationTestBase
 {
     private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "FileBusinessTests");
-    private Mock<IClassBusiness> _classBusiness = null!;
-    private FileFilesystemBusiness _fileBusiness;
-    private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
-    private Mock<IRecordBusiness> _recordBusiness = null!;
+    private ClassBusiness _classBusiness = null!;
+    private ObjectStorageBusiness _objectStorageBusiness = null!;
+    private RecordBusiness _recordBusiness = null!;
+    private OlapBusiness _olapBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
     private long organizationId;
     public long os1;
     public long os2;
+    private long _fileSystemObjectStorageId;
+    private long _recordId;
     public long pid;
+    private const long oid = 2L;
+    private long _userId;
+    private const long did = 2L;
+    private static readonly string fileName = "testfile.txt";
+
+    private Mock<IClassBusiness> _mockClassBusiness = null!;
+    private FileFilesystemBusiness _fileBusiness;
+    private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
+    private Mock<IRecordBusiness> _mockRecordBusiness = null!;
+    private readonly FileAzuriteFixture _azuriteFixture;
+    private long _azureObjectStorageId;
+    private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
+    private ObjectStorageConfigDto _objectStorageConfig = null!;
+    private TagBusiness _tagBusiness = null!;
+    private long _classId;
+    private DataSourceBusiness _dataSourceBusiness = null!;
+    private long _dataSourceId;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private EventBusiness _eventBusiness = null!;
+    private UserBusiness _userBusiness = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
+    private NotificationBusiness _notificationBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
+    private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private FileBusiness _realFileBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private ISensitivityLabelService _sensitivityLabelService = null!;
+    private const string CsvHeaders = "timestamp,sensor_id,value,temperature,pressure";
+
 
     public FileFileSystemBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -32,12 +81,193 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     {
         _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
-        _recordBusiness = new Mock<IRecordBusiness>();
-        _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
-        _classBusiness = new Mock<IClassBusiness>();
-        _fileBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness.Object, _classBusiness.Object,
-            _recordBusiness.Object);
+
+        _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _insightBusiness = new Mock<IInsightBusiness>();
+
+        _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _mockRecordBusiness = new Mock<IRecordBusiness>();
+        _mockObjectStorageBusiness = new Mock<IObjectStorageBusiness>();
+        _mockClassBusiness = new Mock<IClassBusiness>();
+        _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
+        _insightBusiness = new Mock<IInsightBusiness>();
+
+
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+
+        _recordBusiness = null!;
+        _eventBusiness = null!;
+        _classBusiness = null!;
+        _tagBusiness = null!;
+        _userBusiness = null!;
+        _sensitivityLabelBusiness = null!;
+        _objectStorageBusiness = null!;
+        _notificationBusiness = null!;
+
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
+
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object,
+            _objectStorageBusiness,
+            _fileBusinessFactory.Object);
+
+        _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
+        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+
+        _fileBusiness = new FileFilesystemBusiness(Context, _mockObjectStorageBusiness.Object, _mockClassBusiness.Object,
+            _mockRecordBusiness.Object);
+
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+
+        _realFileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
+        );
+
     }
+
+    protected override async Task SeedTestDataAsync()
+    {
+        await base.SeedTestDataAsync();
+
+        var organization = new Organization { Name = "Test Organization" };
+        Context.Organizations.Add(organization);
+        await Context.SaveChangesAsync();
+        organizationId = organization.Id;
+
+        var project = new Project { Name = "Test Project 1", OrganizationId = organizationId };
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+        pid = project.Id;
+
+        var os1Config = new JsonObject();
+        os1Config["mountPath"] = _testDirectory;
+        var objectStorage = new ObjectStorage
+        {
+            Name = "Test Object Storage 1",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
+            Default = true
+        };
+
+        var os2Config = new JsonObject();
+        os2Config["mountPath"] = _testDirectory;
+        var objectStorage2 = new ObjectStorage
+        {
+            Name = "Test Object Storage 2",
+            Type = "filesystem",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os2Config),
+        };
+
+        Context.ObjectStorages.Add(objectStorage);
+        Context.ObjectStorages.Add(objectStorage2);
+        await Context.SaveChangesAsync();
+        os1 = objectStorage.Id;
+        os2 = objectStorage2.Id;
+
+        _objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+        var objectStorage3 = new ObjectStorage
+        {
+            Name = "Test File System",
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(_objectStorageConfig),
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            OrganizationId = organizationId
+        };
+        Context.ObjectStorages.Add(objectStorage3);
+        await Context.SaveChangesAsync();
+        _fileSystemObjectStorageId = objectStorage3.Id;
+
+        // Create data source
+        var dataSource = new DataSource
+        {
+            Name = "Test Datasource",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+        _dataSourceId = dataSource.Id;
+
+        // Create class
+        var testClass = new Class
+        {
+            Name = "Test Class",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
+        };
+        Context.Classes.Add(testClass);
+        await Context.SaveChangesAsync();
+
+        var record = new Record
+        {
+            Name = "Test Record",
+            Description = "Test Record description",
+            ClassId = testClass.Id,
+            DataSourceId = _dataSourceId,
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = organizationId,
+            OriginalId = "test-original-id",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+        _recordId = record.Id;
+    }
+
 
     [Fact]
     public async Task UploadFile_ShouldSaveFileAndReturnPath()
@@ -95,7 +325,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         fileMock.Setup(f => f.FileName).Returns("new.txt");
         fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), default))
             .Returns((Stream stream, CancellationToken token) => ms.CopyToAsync(stream));
-        
+
         var guid = Guid.NewGuid();
 
         try
@@ -163,18 +393,18 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         fileMock.Setup(f => f.FileName).Returns(fileName);
         fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), default))
             .Returns((Stream stream, CancellationToken token) => ms.CopyToAsync(stream));
- 
+
         var guid = Guid.NewGuid();
- 
+
         // need the try finally for if the test fails, still want to do cleanup
         try
         {
             var result = await _fileBusiness.UploadFile(organizationId, pid, 1, config, fileMock.Object, guid);
- 
+
             Assert.Contains(guid.ToString(), result);
             Assert.True(File.Exists(result));
             Assert.True(Directory.Exists(_testDirectory));
-            
+
             var record = new RecordResponseDto
             {
                 Uri = result,
@@ -182,10 +412,10 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 ObjectStorageId = os1,
                 ProjectId = pid
             };
- 
+
             // Act
             var delete = await _fileBusiness.DeleteFile(record, config);
- 
+
             // Assert
             Assert.True(delete);
             Assert.False(File.Exists(result));
@@ -200,37 +430,37 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             Assert.False(Directory.Exists(_testDirectory));
         }
     }
- 
+
     #region GetStorageSize Tests
- 
+
     [Fact]
     public async Task GetStorageSize_ReturnsZero_WhenMountPathIsNull()
     {
         // Arrange
         var config = new ObjectStorageConfigDto { MountPath = null };
         var prefix = "org_1/project_1/";
- 
+
         // Act
         var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
         // Assert
         Assert.Equal(0, result);
     }
- 
+
     [Fact]
     public async Task GetStorageSize_ReturnsZero_WhenDirectoryDoesNotExist()
     {
         // Arrange
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var prefix = "org_999/project_999/";
- 
+
         // Act
         var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
         // Assert
         Assert.Equal(0, result);
     }
- 
+
     [Fact]
     public async Task GetStorageSize_ReturnsZero_WhenDirectoryIsEmpty()
     {
@@ -239,12 +469,12 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var prefix = "org_1/project_1/";
         var fullPath = Path.Combine(_testDirectory, "org_1", "project_1");
         Directory.CreateDirectory(fullPath);
- 
+
         try
         {
             // Act
             var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
             // Assert
             Assert.Equal(0, result);
         }
@@ -254,7 +484,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Directory.Delete(_testDirectory, true);
         }
     }
- 
+
     [Fact]
     public async Task GetStorageSize_ReturnsCorrectSize_ForSingleFile()
     {
@@ -263,17 +493,17 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var prefix = "org_1/project_1/";
         var fullPath = Path.Combine(_testDirectory, "org_1", "project_1");
         Directory.CreateDirectory(fullPath);
-        
+
         var fileContent = new byte[1024]; // 1KB
         new Random().NextBytes(fileContent);
         var filePath = Path.Combine(fullPath, "test-file.txt");
         await File.WriteAllBytesAsync(filePath, fileContent);
- 
+
         try
         {
             // Act
             var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
             // Assert
             Assert.Equal(1024, result);
         }
@@ -283,7 +513,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Directory.Delete(_testDirectory, true);
         }
     }
- 
+
     [Fact]
     public async Task GetStorageSize_ReturnsCorrectSize_ForMultipleFiles()
     {
@@ -292,17 +522,17 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var prefix = "org_1/project_1/";
         var fullPath = Path.Combine(_testDirectory, "org_1", "project_1");
         Directory.CreateDirectory(fullPath);
-        
+
         // Create 3 files of different sizes
         await File.WriteAllBytesAsync(Path.Combine(fullPath, "file1.txt"), new byte[500]);
         await File.WriteAllBytesAsync(Path.Combine(fullPath, "file2.txt"), new byte[1000]);
         await File.WriteAllBytesAsync(Path.Combine(fullPath, "file3.txt"), new byte[1500]);
- 
+
         try
         {
             // Act
             var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
             // Assert
             Assert.Equal(3000, result); // 500 + 1000 + 1500
         }
@@ -312,7 +542,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Directory.Delete(_testDirectory, true);
         }
     }
- 
+
     [Fact]
     public async Task GetStorageSize_ReturnsCorrectSize_ForNestedDirectories()
     {
@@ -320,27 +550,27 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var prefix = "org_1/project_1/";
         var basePath = Path.Combine(_testDirectory, "org_1", "project_1");
-        
+
         // Create nested directory structure
         var datasource1Path = Path.Combine(basePath, "datasource_1");
         var datasource2Path = Path.Combine(basePath, "datasource_2");
         var subfolderPath = Path.Combine(datasource1Path, "subfolder");
-        
+
         Directory.CreateDirectory(datasource1Path);
         Directory.CreateDirectory(datasource2Path);
         Directory.CreateDirectory(subfolderPath);
-        
+
         // Create files at different levels
         await File.WriteAllBytesAsync(Path.Combine(basePath, "root-file.txt"), new byte[100]);
         await File.WriteAllBytesAsync(Path.Combine(datasource1Path, "ds1-file.txt"), new byte[200]);
         await File.WriteAllBytesAsync(Path.Combine(datasource2Path, "ds2-file.txt"), new byte[300]);
         await File.WriteAllBytesAsync(Path.Combine(subfolderPath, "nested-file.txt"), new byte[400]);
- 
+
         try
         {
             // Act
             var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
             // Assert
             Assert.Equal(1000, result); // 100 + 200 + 300 + 400
         }
@@ -350,32 +580,32 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Directory.Delete(_testDirectory, true);
         }
     }
- 
+
     [Fact]
     public async Task GetStorageSize_ReturnsCorrectSize_WithEmptyPrefix()
     {
         // Arrange
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var prefix = "";
-        
+
         // Create files in multiple organizations and projects
         var org1Proj1Path = Path.Combine(_testDirectory, "org_1", "project_1");
         var org1Proj2Path = Path.Combine(_testDirectory, "org_1", "project_2");
         var org2Proj1Path = Path.Combine(_testDirectory, "org_2", "project_1");
-        
+
         Directory.CreateDirectory(org1Proj1Path);
         Directory.CreateDirectory(org1Proj2Path);
         Directory.CreateDirectory(org2Proj1Path);
-        
+
         await File.WriteAllBytesAsync(Path.Combine(org1Proj1Path, "file1.txt"), new byte[1000]);
         await File.WriteAllBytesAsync(Path.Combine(org1Proj2Path, "file2.txt"), new byte[2000]);
         await File.WriteAllBytesAsync(Path.Combine(org2Proj1Path, "file3.txt"), new byte[3000]);
- 
+
         try
         {
             // Act - Empty prefix should count everything
             var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
             // Assert
             Assert.Equal(6000, result); // All files counted
         }
@@ -385,28 +615,28 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Directory.Delete(_testDirectory, true);
         }
     }
- 
+
     [Fact]
     public async Task GetStorageSize_OnlyCountsFilesInSpecificPrefix()
     {
         // Arrange
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
-        
+
         // Create files in different projects
         var proj1Path = Path.Combine(_testDirectory, "org_1", "project_1");
         var proj2Path = Path.Combine(_testDirectory, "org_1", "project_2");
-        
+
         Directory.CreateDirectory(proj1Path);
         Directory.CreateDirectory(proj2Path);
-        
+
         await File.WriteAllBytesAsync(Path.Combine(proj1Path, "file1.txt"), new byte[1000]);
         await File.WriteAllBytesAsync(Path.Combine(proj2Path, "file2.txt"), new byte[2000]);
- 
+
         try
         {
             // Act - Only count project 1
             var result = await _fileBusiness.GetStorageSize("org_1/project_1/", config);
- 
+
             // Assert
             Assert.Equal(1000, result); // Only project 1 file
         }
@@ -416,7 +646,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Directory.Delete(_testDirectory, true);
         }
     }
- 
+
     [Fact]
     public async Task GetStorageSize_HandlesWindowsPathSeparators()
     {
@@ -425,14 +655,14 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var prefix = "org_1/project_1/"; // Unix-style separators
         var fullPath = Path.Combine(_testDirectory, "org_1", "project_1");
         Directory.CreateDirectory(fullPath);
-        
+
         await File.WriteAllBytesAsync(Path.Combine(fullPath, "test.txt"), new byte[500]);
- 
+
         try
         {
             // Act - Method should convert / to platform-specific separator
             var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
             // Assert
             Assert.Equal(500, result);
         }
@@ -442,7 +672,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Directory.Delete(_testDirectory, true);
         }
     }
- 
+
     [Fact]
     public async Task GetStorageSize_ContinuesOnFileAccessError()
     {
@@ -451,16 +681,16 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var prefix = "org_1/project_1/";
         var fullPath = Path.Combine(_testDirectory, "org_1", "project_1");
         Directory.CreateDirectory(fullPath);
-        
+
         // Create accessible files
         await File.WriteAllBytesAsync(Path.Combine(fullPath, "file1.txt"), new byte[1000]);
         await File.WriteAllBytesAsync(Path.Combine(fullPath, "file2.txt"), new byte[2000]);
- 
+
         try
         {
             // Act - Even if one file fails, should count others
             var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
             // Assert - Should count accessible files
             Assert.Equal(3000, result);
         }
@@ -470,7 +700,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Directory.Delete(_testDirectory, true);
         }
     }
- 
+
     [Fact]
     public async Task GetStorageSize_ReturnsCorrectSize_ForLargeFile()
     {
@@ -479,16 +709,16 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var prefix = "org_1/project_1/";
         var fullPath = Path.Combine(_testDirectory, "org_1", "project_1");
         Directory.CreateDirectory(fullPath);
-        
+
         // Create a 5MB file
         var largeFileSize = 5 * 1024 * 1024;
         await File.WriteAllBytesAsync(Path.Combine(fullPath, "large-file.bin"), new byte[largeFileSize]);
- 
+
         try
         {
             // Act
             var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
             // Assert
             Assert.Equal(largeFileSize, result);
         }
@@ -498,85 +728,85 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Directory.Delete(_testDirectory, true);
         }
     }
- 
+
     #endregion
- 
+
     #region BuildPrefix Tests
- 
+
     [Fact]
     public void BuildPrefix_ReturnsCorrectFormat_WithProjectId()
     {
         // Arrange
         long orgId = 123;
         long? projectId = 456;
- 
+
         // Act
         var result = _fileBusiness.BuildPrefix(orgId, projectId);
- 
+
         // Assert
         Assert.Equal("org_123/project_456/", result);
     }
- 
+
     [Fact]
     public void BuildPrefix_ReturnsCorrectFormat_WithoutProjectId()
     {
         // Arrange
         long orgId = 789;
         long? projectId = null;
- 
+
         // Act
         var result = _fileBusiness.BuildPrefix(orgId, projectId);
- 
+
         // Assert
         Assert.Equal("org_789/", result);
     }
- 
+
     [Fact]
     public void BuildPrefix_UsesCorrectNamingConvention()
     {
         // Arrange & Act
         var withProject = _fileBusiness.BuildPrefix(1, 2);
         var withoutProject = _fileBusiness.BuildPrefix(1, null);
- 
+
         // Assert
         // Filesystem uses "org_" prefix (not "organization_" like Azure)
         Assert.StartsWith("org_", withProject);
         Assert.StartsWith("org_", withoutProject);
-        
+
         // Should use "project_" for project
         Assert.Contains("project_", withProject);
         Assert.DoesNotContain("project_", withoutProject);
     }
- 
+
     [Fact]
     public void BuildPrefix_EndsWithSlash()
     {
         // Arrange & Act
         var withProject = _fileBusiness.BuildPrefix(1, 2);
         var withoutProject = _fileBusiness.BuildPrefix(1, null);
- 
+
         // Assert
         Assert.EndsWith("/", withProject);
         Assert.EndsWith("/", withoutProject);
     }
- 
+
     [Fact]
     public void BuildPrefix_MultipleCallsWithSameInput_ReturnsSameResult()
     {
         // Arrange
         long orgId = 100;
         long? projectId = 200;
- 
+
         // Act
         var result1 = _fileBusiness.BuildPrefix(orgId, projectId);
         var result2 = _fileBusiness.BuildPrefix(orgId, projectId);
         var result3 = _fileBusiness.BuildPrefix(orgId, projectId);
- 
+
         // Assert
         Assert.Equal(result1, result2);
         Assert.Equal(result2, result3);
     }
- 
+
     [Fact]
     public async Task GetStorageSize_WithBuildPrefix_WorksCorrectly()
     {
@@ -584,21 +814,21 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         long orgId = 5;
         long projectId = 10;
-        
+
         // Use BuildPrefix to get the prefix
         var prefix = _fileBusiness.BuildPrefix(orgId, projectId);
-        
+
         // Create directory matching the prefix
         var fullPath = Path.Combine(_testDirectory, "org_5", "project_10");
         Directory.CreateDirectory(fullPath);
-        
+
         await File.WriteAllBytesAsync(Path.Combine(fullPath, "file.txt"), new byte[2500]);
- 
+
         try
         {
             // Act
             var result = await _fileBusiness.GetStorageSize(prefix, config);
- 
+
             // Assert
             Assert.Equal(2500, result);
         }
@@ -608,53 +838,10 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Directory.Delete(_testDirectory, true);
         }
     }
-    
+
     #endregion
 
-    protected override async Task SeedTestDataAsync()
-    {
-        await base.SeedTestDataAsync();
 
-        var organization = new Organization { Name = "Test Organization" };
-        Context.Organizations.Add(organization);
-        await Context.SaveChangesAsync();
-        organizationId = organization.Id;
-
-        var project = new Project { Name = "Test Project 1", OrganizationId = organizationId };
-        Context.Projects.Add(project);
-        await Context.SaveChangesAsync();
-        pid = project.Id;
-
-        var os1Config = new JsonObject();
-        os1Config["mountPath"] = _testDirectory;
-        var objectStorage = new ObjectStorage
-        {
-            Name = "Test Object Storage 1",
-            ProjectId = pid,
-            OrganizationId = organizationId,
-            Type = "filesystem",
-            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
-            Default = true
-        };
-
-        var os2Config = new JsonObject();
-        os2Config["mountPath"] = _testDirectory;
-        var objectStorage2 = new ObjectStorage
-        {
-            Name = "Test Object Storage 2",
-            Type = "filesystem",
-            ProjectId = pid,
-            OrganizationId = organizationId,
-            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os2Config),
-        };
-
-        Context.ObjectStorages.Add(objectStorage);
-        Context.ObjectStorages.Add(objectStorage2);
-        await Context.SaveChangesAsync();
-        os1 = objectStorage.Id;
-        os2 = objectStorage2.Id;
-    }
-    
     #region GetFileSize Tests
 
     [Fact]
@@ -664,7 +851,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var testFilePath = Path.Combine(_testDirectory, "size-test.txt");
         Directory.CreateDirectory(_testDirectory);
-        
+
         var fileContent = new byte[1024]; // 1KB
         new Random().NextBytes(fileContent);
         await File.WriteAllBytesAsync(testFilePath, fileContent);
@@ -691,7 +878,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var testFilePath = Path.Combine(_testDirectory, "empty.txt");
         Directory.CreateDirectory(_testDirectory);
-        
+
         await File.WriteAllBytesAsync(testFilePath, Array.Empty<byte>());
 
         try
@@ -725,18 +912,29 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetFileSize_ThrowsException_WhenMountPathIsNull()
+    public async Task GetFileSize_ReturnsCorrectSize_WhenMountPathIsNull()
     {
         // Arrange
         var config = new ObjectStorageConfigDto { MountPath = null };
+
+        Directory.CreateDirectory(_testDirectory);
+
         var testFilePath = Path.Combine(_testDirectory, "test.txt");
+        await File.WriteAllBytesAsync(testFilePath, new byte[1234]);
 
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() =>
-            _fileBusiness.GetFileSize(testFilePath, config)
-        );
+        try
+        {
+            // Act
+            var result = await _fileBusiness.GetFileSize(testFilePath, config);
 
-        Assert.Contains("File system mount path not set", exception.Message);
+            // Assert
+            Assert.Equal(1234, result);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
     }
 
     [Fact]
@@ -746,7 +944,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var testFilePath = Path.Combine(_testDirectory, "large-file.bin");
         Directory.CreateDirectory(_testDirectory);
-        
+
         // Create a 5MB file
         var largeFileSize = 5 * 1024 * 1024;
         await File.WriteAllBytesAsync(testFilePath, new byte[largeFileSize]);
@@ -772,11 +970,11 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         // Arrange
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         Directory.CreateDirectory(_testDirectory);
-        
+
         var file1Path = Path.Combine(_testDirectory, "file1.txt");
         var file2Path = Path.Combine(_testDirectory, "file2.txt");
         var file3Path = Path.Combine(_testDirectory, "file3.txt");
-        
+
         await File.WriteAllBytesAsync(file1Path, new byte[100]);
         await File.WriteAllBytesAsync(file2Path, new byte[500]);
         await File.WriteAllBytesAsync(file3Path, new byte[1000]);
@@ -820,7 +1018,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var nestedPath = Path.Combine(_testDirectory, "level1", "level2", "nested.txt");
         Directory.CreateDirectory(Path.GetDirectoryName(nestedPath)!);
-        
+
         await File.WriteAllBytesAsync(nestedPath, new byte[2048]);
 
         try
@@ -845,7 +1043,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         var testFilePath = Path.Combine(_testDirectory, "modified.txt");
         Directory.CreateDirectory(_testDirectory);
-        
+
         // Create initial file
         await File.WriteAllBytesAsync(testFilePath, new byte[500]);
 
@@ -878,12 +1076,12 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         // Arrange
         var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
         Directory.CreateDirectory(_testDirectory);
-        
+
         var txtPath = Path.Combine(_testDirectory, "test.txt");
         var binPath = Path.Combine(_testDirectory, "test.bin");
         var csvPath = Path.Combine(_testDirectory, "test.csv");
         var jsonPath = Path.Combine(_testDirectory, "test.json");
-        
+
         await File.WriteAllBytesAsync(txtPath, new byte[100]);
         await File.WriteAllBytesAsync(binPath, new byte[200]);
         await File.WriteAllBytesAsync(csvPath, new byte[300]);
@@ -905,4 +1103,968 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region Download Appended File Tests
+
+    [Fact]
+    public async Task UploadThenAppendThenDownload_ReturnsCombinedFile()
+    {
+        // Arrange - initial upload
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+        var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
+
+        await _olapBusiness.AppendTabularBlob(
+            _userId, organizationId, pid, result.Id, 1, appendFile);
+
+
+        var record = await GetRecordEntity(result.Id);
+        var recordDto = MapRecordToDto(record);
+
+
+        // Act - download combined file
+        var downloadResult = await _fileBusiness.DownloadAppendedFile(recordDto, _objectStorageConfig);
+
+        Assert.NotNull(downloadResult);
+        Assert.EndsWith(".zip", downloadResult.FileDownloadName);
+
+        await using var zipStream = downloadResult.FileStream;
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+
+        // Assuming the appended file is in the zip (check your implementation)
+        var entry = archive.Entries.FirstOrDefault();
+        Assert.NotNull(entry);
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_MultipleAppends_ReturnsZipWithAllFiles()
+    {
+        // Arrange
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+        var appendFile1 = CreateTestCsvFile(CsvHeaders, 3, "append1.csv");
+        var appendFile2 = CreateTestCsvFile(CsvHeaders, 2, "append2.csv");
+
+        await _olapBusiness.AppendTabularBlob(_userId, organizationId, pid, result.Id, 1, appendFile1);
+        await _olapBusiness.AppendTabularBlob(_userId, organizationId, pid, result.Id, 2, appendFile2);
+
+        var record = await GetRecordEntity(result.Id);
+        var recordDto = MapRecordToDto(record);
+
+        // Act
+        var downloadResult = await _fileBusiness.DownloadAppendedFile(recordDto, _objectStorageConfig);
+
+        // Assert
+        Assert.NotNull(downloadResult);
+        Assert.EndsWith(".zip", downloadResult.FileDownloadName);
+
+        await using var zipStream = downloadResult.FileStream;
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+
+        var expectedFiles = new[] { "0.csv", "1.csv", "2.csv" };
+        var entries = archive.Entries.Select(e => e.FullName).ToList();
+
+        foreach (var expectedFile in expectedFiles)
+            Assert.Contains(expectedFile, entries);
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_InvalidRecordUri_ThrowsArgumentException()
+    {
+        // Arrange
+        var recordDto = new RecordResponseDto
+        {
+            Id = 123,
+            Uri = null,  // Invalid
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = _dataSourceId,
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+        {
+            await _fileBusiness.DownloadAppendedFile(recordDto, _objectStorageConfig);
+        });
+    }
+
+    [Fact]
+    public async Task DownloadAppendedFile_ConcurrentDownloads_AllSucceed()
+    {
+        // Arrange
+        var recordDto = await PrepareRecordDtoWithAppendedFilesAsync();
+
+        // Act
+        var downloadTasks = Enumerable.Range(0, 5)
+            .Select(_ => _fileBusiness.DownloadAppendedFile(recordDto, _objectStorageConfig))
+            .ToArray();
+
+        await Task.WhenAll(downloadTasks);
+
+        // Assert
+        foreach (var result in downloadTasks.Select(t => t.Result))
+        {
+            Assert.NotNull(result);
+            Assert.EndsWith(".zip", result.FileDownloadName);
+        }
+    }
+
+    #endregion
+
+    #region Resumable Upload Tests
+
+    [Fact]
+    public async Task CreateUpload_WithValidConfig_CreatesUploadDirectoryAndMetaFile()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        const long uploadLength = 1234;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+
+        try
+        {
+            // Act
+            var uploadId = await _fileBusiness.CreateUploadTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                config,
+                uploadLength,
+                fileName);
+
+            var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
+            var metaPath = Path.Combine(uploadPath, "meta.json");
+
+            // Assert
+            Assert.NotEqual(Guid.Empty, uploadId);
+            Assert.True(Directory.Exists(uploadPath));
+            Assert.True(File.Exists(metaPath));
+
+            var metaJson = await File.ReadAllTextAsync(metaPath);
+            Assert.Contains($"\"UploadLength\":{uploadLength}", metaJson.Replace(" ", ""));
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task CreateUpload_WhenMountPathIsNull_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        const long uploadLength = 100;
+        var config = new ObjectStorageConfigDto { MountPath = null };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.CreateUploadTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                config,
+                uploadLength,
+                fileName));
+
+        // Assert
+        Assert.Equal("File system mount path not set in object storage", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetUploadOffset_WhenDataFileDoesNotExist_ReturnsZero()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        const long uploadLength = 100;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+
+        try
+        {
+            var uploadId = await _fileBusiness.CreateUploadTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                config,
+                uploadLength,
+                fileName);
+
+            // Act
+            var result = await _fileBusiness.GetUploadOffset(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId.ToString(),
+                config);
+
+            // Assert
+            Assert.Equal(0, result);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GetUploadOffset_WhenDataFileExists_ReturnsDataFileLength()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        const long uploadLength = 100;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+
+        try
+        {
+            var uploadId = await _fileBusiness.CreateUploadTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                config,
+                uploadLength,
+                fileName);
+
+            var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
+            var dataPath = Path.Combine(uploadPath, "data");
+
+            await File.WriteAllBytesAsync(dataPath, new byte[37]);
+
+            // Act
+            var result = await _fileBusiness.GetUploadOffset(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId.ToString(),
+                config);
+
+            // Assert
+            Assert.Equal(37, result);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GetUploadOffset_WhenUploadSessionDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var uploadId = Guid.NewGuid().ToString();
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetUploadOffset(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId,
+                config));
+
+        // Assert
+        Assert.Equal($"Upload session {uploadId} not found or expired", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetUploadOffset_WhenMountPathIsNull_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        var config = new ObjectStorageConfigDto { MountPath = null };
+        var uploadId = Guid.NewGuid().ToString();
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetUploadOffset(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId,
+                config));
+
+        // Assert
+        Assert.Equal("File system mount path not set in object storage", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetUploadLength_WithMetaFile_ReturnsUploadLength()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        const long uploadLength = 9876;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+
+        try
+        {
+            var uploadId = await _fileBusiness.CreateUploadTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                config,
+                uploadLength,
+                fileName);
+
+            // Act
+            var result = await _fileBusiness.GetUploadLength(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId.ToString(),
+                config);
+
+            // Assert
+            Assert.Equal(uploadLength, result);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GetUploadLength_WhenUploadSessionDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var uploadId = Guid.NewGuid().ToString();
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetUploadLength(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId,
+                config));
+
+        // Assert
+        Assert.Equal($"Upload session {uploadId} not found or expired", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetUploadLength_WhenMetadataFileIsMissing_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var uploadId = Guid.NewGuid().ToString();
+
+        var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId);
+        Directory.CreateDirectory(uploadPath);
+
+        try
+        {
+            // Act
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _fileBusiness.GetUploadLength(
+                    organizationId,
+                    pid,
+                    dataSourceId,
+                    uploadId,
+                    config));
+
+            // Assert
+            Assert.Equal($"Metadata for upload session {uploadId} not found", exception.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GetUploadLength_WhenMountPathIsNull_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        var config = new ObjectStorageConfigDto { MountPath = null };
+        var uploadId = Guid.NewGuid().ToString();
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetUploadLength(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId,
+                config));
+
+        // Assert
+        Assert.Equal("File system mount path not set in object storage", exception.Message);
+    }
+
+    [Fact]
+    public async Task UploadPart_ToNewDataFile_ReturnsNewOffsetAndWritesData()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        const long uploadLength = 100;
+        const long uploadOffset = 0;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
+
+        try
+        {
+            var uploadId = await _fileBusiness.CreateUploadTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                config,
+                uploadLength,
+                fileName);
+
+            var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
+            var dataPath = Path.Combine(uploadPath, "data");
+
+            // Act
+            var result = await _fileBusiness.UploadPartTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId.ToString(),
+                uploadOffset,
+                config,
+                uploadBody);
+
+            // Assert
+            Assert.Equal(5, result);
+            Assert.True(File.Exists(dataPath));
+            Assert.Equal("hello", await File.ReadAllTextAsync(dataPath));
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task UploadPart_WhenAppendingSecondPart_ReturnsCombinedOffsetAndWritesCombinedData()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        const long uploadLength = 100;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+
+        using var firstBody = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
+        using var secondBody = new MemoryStream(Encoding.UTF8.GetBytes(" world"));
+
+        try
+        {
+            var uploadId = await _fileBusiness.CreateUploadTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                config,
+                uploadLength,
+                fileName);
+
+            var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
+            var dataPath = Path.Combine(uploadPath, "data");
+
+            var firstOffset = await _fileBusiness.UploadPartTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId.ToString(),
+                0,
+                config,
+                firstBody);
+
+            // Act
+            var secondOffset = await _fileBusiness.UploadPartTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId.ToString(),
+                firstOffset,
+                config,
+                secondBody);
+
+            // Assert
+            Assert.Equal(5, firstOffset);
+            Assert.Equal(11, secondOffset);
+            Assert.Equal("hello world", await File.ReadAllTextAsync(dataPath));
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task UploadPart_WhenWritingAtExistingOffset_OverwritesExistingData()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        const long uploadLength = 100;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+
+        using var firstBody = new MemoryStream(Encoding.UTF8.GetBytes("hello world"));
+        using var overwriteBody = new MemoryStream(Encoding.UTF8.GetBytes("there"));
+
+        try
+        {
+            var uploadId = await _fileBusiness.CreateUploadTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                config,
+                uploadLength,
+                fileName);
+
+            var uploadPath = GetResumableUploadPath(organizationId, pid, dataSourceId, uploadId.ToString());
+            var dataPath = Path.Combine(uploadPath, "data");
+
+            await _fileBusiness.UploadPartTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId.ToString(),
+                0,
+                config,
+                firstBody);
+
+            // Act
+            var result = await _fileBusiness.UploadPartTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId.ToString(),
+                6,
+                config,
+                overwriteBody);
+
+            // Assert
+            Assert.Equal(11, result);
+            Assert.Equal("hello there", await File.ReadAllTextAsync(dataPath));
+        }
+        finally
+        {
+            if (Directory.Exists(_testDirectory))
+                Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task UploadPart_WhenUploadSessionDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        const long uploadOffset = 0;
+        var config = new ObjectStorageConfigDto { MountPath = _testDirectory };
+        var uploadId = Guid.NewGuid().ToString();
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.UploadPartTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId,
+                uploadOffset,
+                config,
+                uploadBody));
+
+        // Assert
+        Assert.Equal($"Upload session {uploadId} not found or expired", exception.Message);
+    }
+
+    [Fact]
+    public async Task UploadPart_WhenMountPathIsNull_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const long dataSourceId = 1;
+        const long uploadOffset = 0;
+        var config = new ObjectStorageConfigDto { MountPath = null };
+        var uploadId = Guid.NewGuid().ToString();
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.UploadPartTus(
+                organizationId,
+                pid,
+                dataSourceId,
+                uploadId,
+                uploadOffset,
+                config,
+                uploadBody));
+
+        // Assert
+        Assert.Equal("File system mount path not set in object storage", exception.Message);
+    }
+
+    private string GetResumableUploadPath(long orgId, long projectId, long dataSourceId, string uploadId)
+    {
+        return Path.Combine(
+            _testDirectory,
+            $"org_{orgId}",
+            $"project_{projectId}",
+            $"datasource_{dataSourceId}",
+            "uploads",
+            uploadId);
+    }
+
+    #endregion
+
+    #region TUS Filesystem Tests
+
+    private static string BuildTusUploadPath(
+        string mountPath,
+        long organizationId,
+        long projectId,
+        long datasourceId,
+        string uploadId)
+    {
+        return Path.Combine(
+            mountPath,
+            $"org_{organizationId}",
+            $"project_{projectId}",
+            $"datasource_{datasourceId}",
+            "uploads",
+            uploadId
+        );
+    }
+
+    [Fact]
+    public async Task GetFileNameTus_WithValidMetadata_ReturnsFileName()
+    {
+        // Arrange
+        const string uploadId = "test-upload-id";
+        const string expectedFileName = "test-file.csv";
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        var uploadPath = BuildTusUploadPath(_testDirectory, oid, pid, did, uploadId);
+        Directory.CreateDirectory(uploadPath);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(uploadPath, "meta.json"),
+            $"{{\"FileName\":\"{expectedFileName}\"}}");
+
+        // Act
+        var result = await _fileBusiness.GetFileNameTus(
+            oid,
+            pid,
+            did,
+            uploadId,
+            objectStorageConfig);
+
+        // Assert
+        Assert.Equal(expectedFileName, result);
+    }
+
+    [Fact]
+    public async Task GetFileNameTus_WhenMountPathIsNull_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = null
+        };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                "upload-id",
+                objectStorageConfig));
+
+        // Assert
+        Assert.Equal("File system mount path not set in object storage", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileNameTus_WhenUploadDirectoryDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const string uploadId = "missing-upload";
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                objectStorageConfig));
+
+        // Assert
+        Assert.Equal($"Upload session {uploadId} not found or expired", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetFileNameTus_WhenMetadataFileDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const string uploadId = "upload-without-meta";
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        var uploadPath = BuildTusUploadPath(_testDirectory, oid, pid, did, uploadId);
+        Directory.CreateDirectory(uploadPath);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                objectStorageConfig));
+
+        // Assert
+        Assert.Equal($"Metadata for upload session {uploadId} not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task CompleteUploadTus_WithValidUpload_CompletesUploadAndDeletesUploadDirectory()
+    {
+        // Arrange
+        const string uploadId = "complete-tus-upload";
+        const string fileName = "completed-file.txt";
+        const string fileContent = "hello from tus upload";
+
+        var guid = Guid.NewGuid();
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        var uploadPath = BuildTusUploadPath(_testDirectory, oid, pid, did, uploadId);
+        Directory.CreateDirectory(uploadPath);
+
+        var tusDataPath = Path.Combine(uploadPath, "data");
+        await File.WriteAllTextAsync(tusDataPath, fileContent);
+
+        // Act
+        var uri = await _fileBusiness.CompleteUploadTus(
+            oid,
+            pid,
+            did,
+            objectStorageConfig,
+            uploadId,
+            guid,
+            fileName);
+
+        // Assert
+        Assert.False(Directory.Exists(uploadPath));
+        Assert.True(File.Exists(uri));
+        Assert.Equal(fileContent, await File.ReadAllTextAsync(uri));
+        Assert.Contains($"{guid}_{fileName}", uri);
+    }
+
+    [Fact]
+    public async Task CompleteUploadTus_WhenMountPathIsNull_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = null
+        };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.CompleteUploadTus(
+                oid,
+                pid,
+                did,
+                objectStorageConfig,
+                "upload-id",
+                Guid.NewGuid(),
+                "file.txt"));
+
+        // Assert
+        Assert.Equal("File system mount path not set in object storage", exception.Message);
+    }
+
+    [Fact]
+    public async Task CompleteUploadTus_WhenUploadDirectoryDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const string uploadId = "missing-upload";
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.CompleteUploadTus(
+                oid,
+                pid,
+                did,
+                objectStorageConfig,
+                uploadId,
+                Guid.NewGuid(),
+                "file.txt"));
+
+        // Assert
+        Assert.Equal($"Upload session {uploadId} not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task CompleteUploadTus_WhenDataFileDoesNotExist_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        const string uploadId = "upload-without-data";
+
+        var objectStorageConfig = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+
+        var uploadPath = BuildTusUploadPath(_testDirectory, oid, pid, did, uploadId);
+        Directory.CreateDirectory(uploadPath);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _fileBusiness.CompleteUploadTus(
+                oid,
+                pid,
+                did,
+                objectStorageConfig,
+                uploadId,
+                Guid.NewGuid(),
+                "file.txt"));
+
+        // Assert
+        Assert.Equal($"TUS upload file not found for upload {uploadId}", exception.Message);
+    }
+
+    #endregion
+
+    private static IFormFile CreateTestCsvFile(string content, string fileName = "test.csv")
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes);
+        stream.Position = 0;
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/csv"
+        };
+    }
+
+    private static IFormFile CreateTestCsvFile(string headers, int rowCount, string fileName = "test.csv")
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(headers);
+        for (var i = 0; i < rowCount; i++)
+            sb.AppendLine($"2024-01-01T00:00:0{i},sensor_{i % 5},{i}.{i},{20 + i}.0,{1000 + i}.0");
+
+        return CreateTestCsvFile(sb.ToString(), fileName);
+    }
+
+    private async Task<RecordResponseDto> UploadFilesystemCsv(string headers, int rowCount, string fileName = "base.csv")
+    {
+        var file = CreateTestCsvFile(headers, rowCount, fileName);
+        return await _realFileBusiness.UploadFile(
+            _userId, organizationId, pid, _dataSourceId, _fileSystemObjectStorageId, file);
+    }
+
+    private async Task<RecordResponseDto> PrepareRecordDtoWithAppendedFilesAsync()
+    {
+        // Upload initial file
+        var result = await UploadFilesystemCsv(CsvHeaders, 5, "dataset.csv");
+
+        // Create append file
+        var appendFile = CreateTestCsvFile(CsvHeaders, 3, "append.csv");
+
+        // Append to the base file
+        await _olapBusiness.AppendTabularBlob(_userId, organizationId, pid, result.Id, 1, appendFile);
+
+        // Retrieve updated record entity
+        var record = await GetRecordEntity(result.Id);
+
+        // Map to DTO
+        var recordDto = new RecordResponseDto
+        {
+            Id = record.Id,
+            Name = record.Name,
+            Uri = record.Uri,
+            OrganizationId = record.OrganizationId,
+            ProjectId = record.ProjectId,
+            DataSourceId = record.DataSourceId,
+            FileType = record.FileType,
+            ObjectStorageId = _fileSystemObjectStorageId
+        };
+
+        return recordDto;
+    }
+
+    private async Task<Record> GetRecordEntity(long recordId)
+    {
+        var record = await Context.Records.FirstOrDefaultAsync(r => r.Id == recordId);
+        Assert.NotNull(record);
+        return record!;
+    }
+
+    private RecordResponseDto MapRecordToDto(Record record)
+    {
+        if (record == null)
+            throw new ArgumentNullException(nameof(record));
+
+        return new RecordResponseDto
+        {
+            Id = record.Id,
+            Name = record.Name,
+            Description = record.Description,
+            Uri = record.Uri,
+            Properties = record.Properties ?? string.Empty,  // avoid null
+            ObjectStorageId = record.ObjectStorageId,
+            OriginalId = record.OriginalId ?? string.Empty,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedAt = record.LastUpdatedAt,
+            LastUpdatedBy = record.LastUpdatedBy,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize,
+            Embedded = record.Embedded,
+            Tags = record.Tags?.Select(t => new RecordTagDto
+            {
+                // Map properties as needed
+                Id = t.Id,
+                Name = t.Name
+            }).ToList() ?? new List<RecordTagDto>(),
+            Labels = record.Labels?.Select(l => new RecordLabelDto
+            {
+                // Map properties as needed
+                Id = l.Id,
+                Name = l.Name
+            }).ToList() ?? new List<RecordLabelDto>()
+        };
+    }
+
+
 }

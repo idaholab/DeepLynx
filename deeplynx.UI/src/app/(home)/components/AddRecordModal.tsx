@@ -13,7 +13,7 @@ import {
   ProjectResponseDto,
 } from "../types/responseDTOs";
 
-import { getAllDataSourcesOrg } from "@/app/lib/client_service/data_source_services.client";
+import { getAllDataSources } from "@/app/lib/client_service/data_source_services.client";
 import { createRecord } from "@/app/lib/client_service/record_services.client";
 
 /* -------------------------------------------------------------------------- */
@@ -267,9 +267,8 @@ const AddRecordModal: React.FC<Props> = ({
         setDsError(null);
         setSelectedDataSourceId(undefined);
 
-        const list = await getAllDataSourcesOrg(
-          organization?.organizationId as number,
-          [selectedProjectId],
+        const list = await getAllDataSources(
+          selectedProjectId
         );
 
         if (!cancelled) setDataSources(list ?? []);
@@ -376,14 +375,23 @@ const AddRecordModal: React.FC<Props> = ({
           {/* ------------------------------------------------------------------ */}
           {/*                            Required Fields                         */}
           {/* ------------------------------------------------------------------ */}
-          <input
-            type="text"
-            className="input input-primary w-full"
-            placeholder={t.translations.NAME}
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <div>
+            <input
+              type="text"
+              className="input input-primary w-full"
+              maxLength={50}
+              placeholder={t.translations.NAME}
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <span className={`text-xs float-right mt-1 ${name.length >= 50 ? "text-error" :
+              name.length >= 40 ? "text-warning" :
+                "text-base-content"
+              }`}>
+              {name.length}/50
+            </span>
+          </div>
 
           <input
             type="text"
@@ -394,13 +402,22 @@ const AddRecordModal: React.FC<Props> = ({
             onChange={(e) => setAbbreviation(e.target.value)}
           />
 
-          <textarea
-            placeholder={t.translations.DESCRIPTION}
-            className="textarea textarea-primary w-full"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            required
-          />
+          <div>
+            <textarea
+              placeholder={t.translations.DESCRIPTION}
+              className="textarea textarea-primary w-full"
+              maxLength={250}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
+            <span className={`text-xs float-right mt-1 ${description.length >= 250 ? "text-error" :
+              description.length >= 240 ? "text-warning" :
+                "text-base-content"
+            }`}>
+              {description.length}/250
+            </span>
+          </div>
 
           <textarea
             placeholder={t.translations.PROPERTIES_EXAMPLE}

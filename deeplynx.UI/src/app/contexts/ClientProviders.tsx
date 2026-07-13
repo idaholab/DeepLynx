@@ -3,6 +3,7 @@
 
 import { SessionProvider } from "next-auth/react";
 import { LanguageProvider } from "./Language";
+import { ToastProvider } from "./ToastProvider";
 import { Toaster } from "react-hot-toast";
 
 export default function ClientProviders({
@@ -12,11 +13,12 @@ export default function ClientProviders({
 }) {
   // Always render SessionProvider to avoid hook errors
   return (
-    <SessionProvider
-      refetchOnWindowFocus={false}>
+    <SessionProvider refetchOnWindowFocus={false}>
       <LanguageProvider>
-        {children}
-        <Toaster />
+        <ToastProvider>
+          {children}
+          <Toaster />
+        </ToastProvider>
       </LanguageProvider>
     </SessionProvider>
   );

@@ -3,6 +3,7 @@ using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace deeplynx.api.Controllers;
@@ -46,6 +47,7 @@ public class RecordController : ControllerBase
     ///     be removed
     /// </param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
     /// <returns>A list of records based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_records")]
     [Auth("read", "record")]
@@ -55,7 +57,8 @@ public class RecordController : ControllerBase
         long projectId,
         [FromQuery] long? dataSourceId = null,
         [FromQuery] string? fileType = null,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] bool isInsightEligible = false)
     {
         try
         {
@@ -64,12 +67,106 @@ public class RecordController : ControllerBase
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var records =
-                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType, isSysAdmin, isOrgAdmin, isProjectAdmin);
+                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType,
+                    isSysAdmin, isOrgAdmin, isProjectAdmin, isInsightEligible);
             return Ok(records);
         }
         catch (Exception exc)
         {
             var message = $"An error occurred while listing all records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get All Records Paginated
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
+    /// <param name="fileType">
+    ///     (Optional) File extension to filter by (e.g., pdf, png, jpg) - leading dot is optional and will
+    ///     be removed
+    /// </param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
+    /// <param name="paginatedDto">Pagination details</param>
+    /// <returns>A paginated list of records based on the applied filters.</returns>
+    [HttpGet("paginated", Name = "api_get_all_records_paginated")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetAllRecordsPaginated(
+        long organizationId,
+        long projectId,
+        [FromQuery] long? dataSourceId = null,
+        [FromQuery] string? fileType = null,
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] bool isInsightEligible = false,
+        [FromQuery] PaginatedRequestDto? paginatedDto = null)
+    {
+        try
+        {
+            paginatedDto ??= new PaginatedRequestDto();
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _recordBusiness.GetAllRecordsPaginated(
+                currentUserId,
+                organizationId,
+                projectId,
+                dataSourceId,
+                hideArchived,
+                fileType,
+                paginatedDto,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin,
+                isInsightEligible);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while listing paginated records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Paginated full text records search
+    /// </summary>
+    /// <remarks>
+    ///     Embedding must be one of: any, embedded, pending
+    /// </remarks>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belongs</param>
+    /// <param name="search">Search parameters</param>
+    /// <param name="paginated">Pagination parameters</param>
+    /// <returns>Paginated list of record response dtos from the query view that match provided query parameters</returns>
+    [HttpGet("search/paginated", Name = "api_record_search_paginated")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> SearchPaginated(
+        long organizationId,
+        long projectId,
+        [FromQuery] RecordSearchRequestDto search,
+        [FromQuery] PaginatedRequestDto paginated)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records =
+                await _recordBusiness.SearchPaginated(currentUserId, organizationId, projectId, search, paginated,
+                    isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while searching paginated records: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
@@ -109,7 +206,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get Records by Original IDs
     /// </summary>
@@ -175,7 +272,20 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, hideArchived);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
+            var record = await _recordBusiness.GetRecord(
+                currentUserId,
+                organizationId,
+                projectId,
+                recordId,
+                hideArchived,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
+
             return Ok(record);
         }
         catch (Exception exc)
@@ -240,8 +350,20 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var record =
-                await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId, dataSourceId, dto, sensitivityLabelIds);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var record = await _recordBusiness.CreateRecord(
+                currentUserId,
+                organizationId,
+                projectId,
+                dataSourceId,
+                dto,
+                sensitivityLabelIds,
+                embedded: false,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
             return Ok(record);
         }
         catch (Exception exc)
@@ -274,9 +396,20 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var newRecords =
-                await _recordBusiness.BulkCreateRecords(currentUserId, organizationId, projectId, dataSourceId,
-                    records, sensitivityLabelIds);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
+            var newRecords = await _recordBusiness.BulkCreateRecords(
+                currentUserId,
+                organizationId,
+                projectId,
+                dataSourceId,
+                records,
+                sensitivityLabelIds,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
             return Ok(newRecords);
         }
         catch (Exception exc)
@@ -307,7 +440,12 @@ public class RecordController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var updated = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId, dto);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var updated = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId, dto, isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
             return Ok(updated);
         }
         catch (Exception exc)
@@ -444,6 +582,84 @@ public class RecordController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while unattaching tag {tagId} from record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Bulk Attach Tags to Records
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="dtos">List of record/tag pairs to attach</param>
+    /// <returns>A message stating the tags were successfully attached to the records.</returns>
+    [HttpPost("bulk-attach-tags-to-records", Name = "api_bulk_attach_tags_to_records")]
+    [Auth("update", "record")]
+    [Auth("read", "tag")]
+    public async Task<IActionResult> BulkAttachTagsToRecords(
+        long organizationId,
+        long projectId,
+        [FromBody] List<RecordTagLinkDto> dtos)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+
+            await _recordBusiness.BulkAttachTags(currentUserId, organizationId, projectId, dtos);
+
+            return Ok(new { message = "Successfully bulk attached tags to records" });
+        }
+        catch (ArgumentException exc)
+        {
+            return BadRequest(exc.Message);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while bulk attaching tags to records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Bulk Unattach Tags From Records
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="dtos">List of record/tag pairs to unattach</param>
+    /// <returns>A message stating the tags were successfully unattached from the records.</returns>
+    [HttpPost("bulk-unattach-tags-from-records", Name = "api_bulk_unattach_tags_from_records")]
+    [Auth("update", "record")]
+    [Auth("read", "tag")]
+    public async Task<IActionResult> BulkUnattachTagsFromRecords(
+        long organizationId,
+        long projectId,
+        [FromBody] List<RecordTagLinkDto> dtos)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+
+            await _recordBusiness.BulkUnattachTags(currentUserId, organizationId, projectId, dtos);
+
+            return Ok(new { message = "Successfully bulk unattached tags from records" });
+        }
+        catch (ArgumentException exc)
+        {
+            return BadRequest(exc.Message);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while bulk unattaching tags from records: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

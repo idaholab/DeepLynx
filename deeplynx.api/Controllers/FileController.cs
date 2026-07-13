@@ -1,5 +1,6 @@
 using deeplynx.business;
 using deeplynx.helpers;
+using deeplynx.interfaces;
 using deeplynx.helpers.Context;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
@@ -18,7 +19,7 @@ namespace deeplynx.api.Controllers;
 [Authorize]
 public class FileController : ControllerBase
 {
-    private readonly FileBusiness _fileBusiness;
+    private readonly IFileControllerBusiness _fileBusiness;
     private readonly ILogger<FileController> _logger;
 
     /// <summary>
@@ -26,7 +27,7 @@ public class FileController : ControllerBase
     /// </summary>
     /// <param name="fileBusiness">The business logic interface for handling file operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
-    public FileController(FileBusiness fileBusiness, ILogger<FileController> logger)
+    public FileController(IFileControllerBusiness fileBusiness, ILogger<FileController> logger)
     {
         _fileBusiness = fileBusiness;
         _logger = logger;
@@ -66,9 +67,12 @@ public class FileController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var userJwt = UserContextStorage.Token;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt);
+                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
@@ -118,11 +122,46 @@ public class FileController : ControllerBase
     }
 
     /// <summary>
+    ///     Download Appended File
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="cancellationToken">The ID of the record that contains file information</param>
+    /// <returns>The file stream for download</returns>
+    [HttpGet("{recordId:long}/appended", Name = "api_download_appended_file")]
+    [Auth("read", "file")]
+    [Sensitivity("download file")]
+    public async Task<IActionResult> DownloadAppendedFile(
+        long organizationId,
+        long projectId,
+        long recordId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var fileStreamResult = await _fileBusiness.DownloadAppendedFile(currentUserId, organizationId, projectId, recordId, isSysAdmin, isOrgAdmin, isProjectAdmin, cancellationToken);
+            return fileStreamResult;
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while downloading file in record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Download a File
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="cancellationToken">The ID of the record that contains file information</param>
     /// <returns>The file stream for download</returns>
     [HttpGet("{recordId:long}", Name = "api_download_file")]
     [Auth("read", "file")]
@@ -135,7 +174,10 @@ public class FileController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var fileStreamResult = await _fileBusiness.DownloadFile(currentUserId, organizationId, projectId, recordId);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var fileStreamResult = await _fileBusiness.DownloadFile(currentUserId, organizationId, projectId, recordId, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return fileStreamResult;
         }
         catch (Exception exc)
@@ -225,7 +267,7 @@ public class FileController : ControllerBase
         try
         {
             var uploadSession = await _fileBusiness.StartUpload(
-                organizationId, projectId, dataSourceId, objectStorageId, request);
+                organizationId, projectId, dataSourceId, objectStorageId, request, request.Metadata);
             return Ok(uploadSession);
         }
         catch (Exception exc)
@@ -347,5 +389,210 @@ public class FileController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+
+    /// <summary>
+    /// Create Resumable Upload
+    /// </summary>
+    /// <remarks>Creates a reumable upload according to the tus protocol.</remarks>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="dataSourceId"></param>
+    /// <param name="objectStorageId"></param>
+    /// <returns></returns>
+    [HttpPost("res-upload", Name = "api_create_resumable_file_upload")]
+    [Auth("write", "file")]
+    public async Task<IActionResult> CreateUploadTus(
+        long organizationId,
+        long projectId,
+        long userId,
+        [FromQuery] long? dataSourceId,
+        [FromQuery] long? objectStorageId)
+    {
+        try
+        {
+            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+            {
+                Response.Headers["Tus-Resumable"] = "1.0.0";
+                return StatusCode(412);
+            }
+
+            if (!Request.Headers.TryGetValue("Upload-Length", out var uploadLengthHeader) ||
+                !long.TryParse(uploadLengthHeader, out var uploadLength))
+                return BadRequest("Missing or invalid Upload-Length header");
+
+            if (!Request.Headers.TryGetValue("Upload-Metadata", out var uploadMetadata))
+                return BadRequest("Missing Upload-Metadata header");
+
+            var fileName = ParseMetadataValue(uploadMetadata, "filename");
+            if (string.IsNullOrEmpty(fileName))
+                return BadRequest("Missing filename in Upload-Metadata header");
+
+            var request = new FileUploadInitRequestDto
+            {
+                FileName = fileName,
+                FileSize = uploadLength
+            };
+
+            var uploadSession = await _fileBusiness.CreateUploadTus(
+                organizationId, projectId, dataSourceId, objectStorageId, request);
+
+            Response.Headers["Tus-Resumable"] = "1.0.0";
+            Response.Headers["Location"] = $"/api/v1/organizations/{organizationId}/projects/{projectId}/files/res-upload/{uploadSession.UploadId}";
+
+            return StatusCode(201);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while creating upload: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    /// Get Resumable Offset
+    /// </summary>
+    /// <remarks>Gets the offset/upload-progress according to the tus protocol.</remarks>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="uploadId"></param>
+    /// <param name="dataSourceId"></param>
+    /// <param name="objectStorageId"></param>
+    /// <returns></returns>
+    [HttpHead("res-upload/{uploadId}", Name = "api_get_resumable_upload_offset")]
+    [Auth("write", "file")]
+    public async Task<IActionResult> GetUploadOffsetTus(
+        long organizationId,
+        long projectId,
+        string uploadId,
+        [FromQuery] long? dataSourceId,
+        [FromQuery] long? objectStorageId)
+    {
+        try
+        {
+            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+            {
+                Response.Headers["Tus-Resumable"] = "1.0.0";
+                return StatusCode(412);
+            }
+
+            var (offset, uploadLength) = await _fileBusiness.GetUploadOffsetTus(organizationId, projectId, dataSourceId, objectStorageId, uploadId);
+
+            Response.Headers["Tus-Resumable"] = "1.0.0";
+            Response.Headers["Upload-Offset"] = offset.ToString();
+            Response.Headers["Upload-Length"] = uploadLength.ToString();
+            Response.Headers["Cache-Control"] = "no-store";
+            return NoContent();
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while getting offset for upload {uploadId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    /// Upload Resumable Part
+    /// </summary>
+    /// <remarks>Uploads a reumable part of a file at the desired offset according to the tus protocol.</remarks>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="uploadId"></param>
+    /// <param name="dataSourceId"></param>
+    /// <param name="objectStorageId"></param>
+    /// <returns></returns>
+    [HttpPatch("res-upload/{uploadId}", Name = "api_patch_resumable_file_upload")]
+    [Auth("write", "file")]
+    public async Task<IActionResult> UploadPartTus(
+        long organizationId,
+        long projectId,
+        string uploadId,
+        long userId,
+        [FromQuery] long? dataSourceId,
+        [FromQuery] long? objectStorageId)
+    {
+        try
+        {
+            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+            {
+                Response.Headers["Tus-Resumable"] = "1.0.0";
+                return StatusCode(412);
+            }
+
+            if (!Request.Headers.TryGetValue("Upload-Offset", out var offsetHeader) ||
+                !long.TryParse(offsetHeader, out var uploadOffset))
+                return BadRequest("Missing or invalid Upload-Offset header");
+
+            if (!Request.Headers.TryGetValue("Content-Type", out var contentType) ||
+                contentType != "application/offset+octet-stream")
+                return StatusCode(415);
+
+            var newOffset = await _fileBusiness.UploadPartTus(
+                organizationId, projectId, dataSourceId, objectStorageId, uploadId, uploadOffset, userId, Request.Body, null, null, false, null, null);
+
+            Response.Headers["Tus-Resumable"] = "1.0.0";
+            Response.Headers["Upload-Offset"] = newOffset.ToString();
+            return NoContent();
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while uploading chunk for upload {uploadId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    /// Cancel Resumable Upload
+    /// </summary>
+    /// <remarks>Cancels a resumable upload with tus protocol reponse.</remarks>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="uploadId"></param>
+    /// <param name="dataSourceId"></param>
+    /// <param name="objectStorageId"></param>
+    /// <returns></returns>
+    [HttpDelete("res-upload/{uploadId}", Name = "api_cancel_resumable_file_upload")]
+    [Auth("write", "file")]
+    public async Task<IActionResult> CancelTusUpload(
+        long organizationId,
+        long projectId,
+        string uploadId,
+        [FromQuery] long? dataSourceId,
+        [FromQuery] long? objectStorageId)
+    {
+        try
+        {
+            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+            {
+                Response.Headers["Tus-Resumable"] = "1.0.0";
+                return StatusCode(412);
+            }
+
+            var currentUserId = UserContextStorage.UserId;
+            await _fileBusiness.CancelUpload(currentUserId, organizationId, projectId, dataSourceId, objectStorageId, uploadId);
+
+            Response.Headers["Tus-Resumable"] = "1.0.0";
+            return NoContent();
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while cancelling upload {uploadId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+    //Private helper
+    private string ParseMetadataValue(string uploadMetadata, string key)
+    {
+        foreach (var pair in uploadMetadata.Split(','))
+        {
+            var parts = pair.Trim().Split(' ');
+            if (parts.Length == 2 && parts[0] == key)
+                return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(parts[1]));
+        }
+        return null;
     }
 }

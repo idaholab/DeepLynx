@@ -91,6 +91,12 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
 
   // Handler for when filters change
   const handleFilterChange = (newFilters: EventFilterParams) => {
+    if (newFilters.startDate) {
+      newFilters.startDate = `${newFilters.startDate}T00:00:00`;
+    }
+    if (newFilters.endDate) {
+      newFilters.endDate = `${newFilters.endDate}T23:59:59`;
+    }
     setFilters(newFilters);
   };
 
@@ -311,7 +317,7 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
           />
         </section>
       )}
-      <section className="mx-auto flex w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+      <section className="bg-base-100/40 mx-auto flex w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8 min-h-screen">
         <div className="flex-1">
           <GenericTable
             columns={columns}

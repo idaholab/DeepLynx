@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { QueryBuilderQuery } from "@/app/(home)/types/types";
+import { CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { translations } from "@/app/lib/translations";
 import {
@@ -19,22 +20,21 @@ import {
   BookmarkIcon,
 } from "@heroicons/react/24/outline";
 import SaveSearchModal from "@/app/(home)/components/SaveSearchModal";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { DatePicker } from "@/app/(home)/components/DatePicker";
 import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 import {
   ClassResponseDto,
   DataSourceResponseDto,
-  HistoricalRecordResponseDto,
+  QueryRecordViewResponseDto,
   TagResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { getAllClassesOrg } from "@/app/lib/client_service/class_services.client";
 import { getAllDataSourcesOrg } from "@/app/lib/client_service/data_source_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
-import { fullTextSearch, queryBuilder } from "@/app/lib/client_service/query_services.client";
+import { queryBuilderPaginated } from "@/app/lib/client_service/query_services.client";
 import {
   getSavedSearchById,
-  executeSavedSearch,
   saveSearch,
 } from "@/app/lib/client_service/saved_search_services.client";
 import RecordSearchList from "@/app/(home)/components/RecordSearchList";
@@ -78,6 +78,20 @@ const emptyRow = (): QueryBuilderQuery => ({
   },
 });
 
+const QUERY_RESULTS_PAGE_SIZE = 10;
+
+type QueryResultsCriteria = {
+  queryDtos: CustomQueryRequestDto[];
+  projectIds: number[];
+  textSearch?: string | null;
+};
+
+const initialResultsPagination = () => ({
+  pageNumber: 1,
+  pageSize: QUERY_RESULTS_PAGE_SIZE,
+  totalCount: 0,
+  totalPages: 1,
+});
 // ============================================================================
 // Sub-Components
 // ============================================================================
@@ -197,6 +211,7 @@ interface FilterRowProps {
   onUpdate: (id: string, patch: Partial<QueryBuilderQuery>) => void;
   onRemove: (id: string) => void;
   onFieldChange: (field: string) => void;
+  onSearch: () => void;
 }
 
 function FilterRow({
@@ -215,6 +230,7 @@ function FilterRow({
   onUpdate,
   onRemove,
   onFieldChange,
+  onSearch,
 }: FilterRowProps) {
   const getFilterIcon = (field: string) => {
     const type = FILTER_TYPES.find((t) => t.value === field);
@@ -244,6 +260,15 @@ function FilterRow({
   const Icon = getFilterIcon(row.query.filter);
   const color = getFilterColor(row.query.filter);
   const { t } = useLanguage();
+
+  const handleEnterSearch = (
+      e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      onSearch();
+    }
+  };
 
   return (
     <div className="card bg-base-100 border border-base-content/10 hover:border-primary/40 transition-colors shadow-sm">
@@ -289,6 +314,7 @@ function FilterRow({
                     });
                     onFieldChange(e.target.value);
                   }}
+                  onKeyDown={handleEnterSearch}
                 >
                   <option value="" disabled>
                     {t.translations.FILTER}
@@ -311,6 +337,7 @@ function FilterRow({
                     query: { ...row.query, operator: e.target.value },
                   })
                 }
+                onKeyDown={handleEnterSearch}
               >
                 <option value="" disabled>
                   {t.translations.OPERATOR}
@@ -332,6 +359,7 @@ function FilterRow({
               isLoadingDataSources={isLoadingDataSources}
               isLoadingTags={isLoadingTags}
               onUpdate={onUpdate}
+              onSearch={onSearch}
             />
           </div>
 
@@ -360,6 +388,7 @@ interface ValueInputProps {
   isLoadingDataSources: boolean;
   isLoadingTags: boolean;
   onUpdate: (id: string, patch: Partial<QueryBuilderQuery>) => void;
+  onSearch: () => void;
 }
 
 function ValueInput({
@@ -371,11 +400,21 @@ function ValueInput({
   isLoadingDataSources,
   isLoadingTags,
   onUpdate,
+  onSearch,
 }: ValueInputProps) {
   const baseInputClass =
     "input input-sm input-bordered bg-base-100 text-base-content placeholder:text-base-content/40";
   const { t } = useLanguage();
 
+  const handleEnterSearch = (
+      e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      onSearch();
+    }
+  };
+  
   if (row.query.filter === "last_updated_at") {
     return (
       <div className="col-span-5">
@@ -384,6 +423,7 @@ function ValueInput({
           onChange={(dateTime: string) =>
             onUpdate(row.id, { query: { ...row.query, value: dateTime } })
           }
+          onKeyDown={handleEnterSearch}
         />
       </div>
     );
@@ -399,6 +439,7 @@ function ValueInput({
           onChange={(e) =>
             onUpdate(row.id, { query: { ...row.query, jsonKey: e.target.value } })
           }
+          onKeyDown={handleEnterSearch}
           className={`${baseInputClass} w-full`}
         />
         <input
@@ -410,6 +451,7 @@ function ValueInput({
               query: { ...row.query, jsonValue: e.target.value },
             })
           }
+          onKeyDown={handleEnterSearch}
           className={`${baseInputClass} w-full`}
         />
       </div>
@@ -426,6 +468,7 @@ function ValueInput({
           onChange={(e) =>
             onUpdate(row.id, { query: { ...row.query, value: e.target.value } })
           }
+          onKeyDown={handleEnterSearch}
           className={`${baseInputClass} w-full`}
         />
       </div>
@@ -445,6 +488,7 @@ function ValueInput({
                 query: { ...row.query, value: e.target.value },
               })
             }
+            onKeyDown={handleEnterSearch}
             className={`${baseInputClass} w-full`}
           />
         </div>
@@ -460,6 +504,7 @@ function ValueInput({
                 query: { ...row.query, value: e.target.value },
               })
             }
+            onKeyDown={handleEnterSearch}
             disabled={
               (row.query.filter === "class_name" && isLoadingClasses) ||
               (row.query.filter === "data_source_name" && isLoadingDataSources) ||
@@ -523,6 +568,7 @@ function ValueInput({
         onChange={(e) =>
           onUpdate(row.id, { query: { ...row.query, value: e.target.value } })
         }
+        onKeyDown={handleEnterSearch}
         className={`${baseInputClass} w-full`}
       />
     </div>
@@ -660,7 +706,10 @@ export default function QueryBuilderClient({
   // ---- State ----------------------------------------------------------------
   const [projects] = useState(initialProjects);
   const [selectedProjects, setSelectedProjects] = useState<string[]>(initialSelectedProjects);
-  const [records, setQueriedRecords] = useState<HistoricalRecordResponseDto[] | null>();
+  const [records, setQueriedRecords] = useState<QueryRecordViewResponseDto[] | null>(null);
+  const [resultsPagination, setResultsPagination] = useState(initialResultsPagination);
+  const [submittedCriteria, setSubmittedCriteria] = useState<QueryResultsCriteria | null>(null);
+  const [isSearchingRecords, setIsSearchingRecords] = useState(false);
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
   const [showFilters, setShowFilters] = useState(true);
   const [rows, setRows] = useState<QueryBuilderQuery[]>([emptyRow()]);
@@ -692,6 +741,15 @@ export default function QueryBuilderClient({
     return String(selectedProjects[0]);
   }, [projects, selectedProjects]);
 
+  const selectedProjectIds = useMemo(
+    () =>
+      selectedProjects.length === 0 ||
+      selectedProjects.includes("ALL") ||
+      selectedProjects.length === projects.length
+        ? projects.map((p) => Number(p.id))
+        : selectedProjects.map(Number).filter(Number.isFinite),
+    [projects, selectedProjects]
+  );
   const activeFilterCount = useMemo(
     () => rows.filter((r) => r.query.filter !== "").length,
     [rows]
@@ -735,10 +793,17 @@ export default function QueryBuilderClient({
             : initialSelectedProjects.map(Number);
 
         const savedSearch = await getSavedSearchById(savedSearchId);
+        const savedSearchText = savedSearch.query?.textSearch ?? "";
+        const savedSearchFilters: CustomQueryRequestDto[] =
+          savedSearch.query?.filter?.map((condition) => ({
+            connector: condition.connector ?? "",
+            filter: condition.filter ?? "",
+            operator: condition.operator ?? "",
+            value: condition.value ?? "",
+            json: condition.json,
+          })) ?? [];
 
-        if (savedSearch.query?.textSearch) {
-          setSearchTerm(savedSearch.query.textSearch);
-        }
+        setSearchTerm(savedSearchText);
 
         if (savedSearch.query?.filter && savedSearch.query.filter.length > 0) {
           const populatedRows: QueryBuilderQuery[] = savedSearch.query.filter.map(
@@ -771,8 +836,11 @@ export default function QueryBuilderClient({
           setShowFilters(true);
         }
 
-        const data = await executeSavedSearch(savedSearchId, organizationId, projectIds);
-        setQueriedRecords(data);
+        await fetchResultsPage(1, {
+          queryDtos: savedSearchFilters,
+          projectIds,
+          textSearch: savedSearchText,
+        });
       } catch (error) {
         console.error("Failed to execute saved search:", error);
       } finally {
@@ -794,9 +862,10 @@ export default function QueryBuilderClient({
   const reset = () => {
     setRows([emptyRow()]);
     setQueriedRecords(null);
+    setResultsPagination(initialResultsPagination());
+    setSubmittedCriteria(null);
     setSearchTerm("");
   };
-
   const hasValidQueries = (): boolean =>
     rows.map((r) => r.query).some(
       (q) =>
@@ -807,30 +876,48 @@ export default function QueryBuilderClient({
         q.jsonValue !== ""
     );
 
+  const fetchResultsPage = useCallback(
+    async (pageNumber: number, criteriaOverride?: QueryResultsCriteria) => {
+      const criteria = criteriaOverride ?? submittedCriteria;
+      if (!criteria) return;
+
+      setIsSearchingRecords(true);
+      try {
+        const result = await queryBuilderPaginated(
+          organizationId,
+          criteria.queryDtos,
+          criteria.projectIds,
+          pageNumber,
+          QUERY_RESULTS_PAGE_SIZE,
+          criteria.textSearch,
+        );
+
+        setQueriedRecords(result.items);
+        setResultsPagination({
+          pageNumber: result.pageNumber,
+          pageSize: result.pageSize,
+          totalCount: result.totalCount,
+          totalPages: Math.max(1, result.totalPages),
+        });
+        setSubmittedCriteria(criteria);
+      } catch (error) {
+        console.error("Failed to fetch query results", error);
+      } finally {
+        setIsSearchingRecords(false);
+      }
+    },
+    [organizationId, submittedCriteria]
+  );
   // ---- Handlers -------------------------------------------------------------
   const handleSubmit = async () => {
-  try {
-    const queryDtos = rows.map((r) => r.query);
-    
-    const projectIds =
-      selectedProjects.length === 0 ||
-      selectedProjects.includes("ALL") ||
-      selectedProjects.length === projects.length
-        ? projects.map((p) => Number(p.id))
-        : selectedProjects.map(Number);
+    const queryDtos = hasValidQueries() ? rows.map((r) => r.query) : [];
 
-    if (hasValidQueries()) {
-      const data = await queryBuilder(organizationId, queryDtos, projectIds, searchTerm);
-      if (data) setQueriedRecords(data);
-    } else {
-      const data = await fullTextSearch(organizationId, searchTerm, projectIds);
-      if (data) setQueriedRecords(data);
-    }
-    } catch (error) {
-      console.error("Failed to send query", error);
-    }
+    await fetchResultsPage(1, {
+      queryDtos,
+      projectIds: selectedProjectIds,
+      textSearch: searchTerm,
+    });
   };
-
   const handleFieldChange = async (field: string) => {
     const projectIds = selectedProjects.map(Number);
     if (field === "class_name") {
@@ -993,6 +1080,7 @@ export default function QueryBuilderClient({
                       onUpdate={updateRow}
                       onRemove={removeRow}
                       onFieldChange={handleFieldChange}
+                      onSearch={handleSubmit}
                     />
                   ))}
                 </div>
@@ -1011,8 +1099,21 @@ export default function QueryBuilderClient({
           </div>
 
           {/* Results */}
-          {records && records.length > 0 ? (
-            <RecordSearchList data={records} />
+          {isSearchingRecords && !records ? (
+            <div className="flex items-center justify-center gap-3 rounded-lg bg-base-100 py-6 text-sm text-base-content/70">
+              <span className="loading loading-spinner loading-xs" />
+              Loading records...
+            </div>
+          ) : records && records.length > 0 ? (
+            <RecordSearchList
+              data={records}
+              currentPage={resultsPagination.pageNumber}
+              pageSize={resultsPagination.pageSize}
+              totalCount={resultsPagination.totalCount}
+              totalPages={resultsPagination.totalPages}
+              isLoading={isSearchingRecords}
+              onPageChange={fetchResultsPage}
+            />
           ) : (
             records && <EmptyResultsState />
           )}

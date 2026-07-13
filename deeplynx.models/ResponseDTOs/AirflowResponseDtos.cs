@@ -37,6 +37,9 @@ public class AirflowDagDto
 
     [JsonPropertyName("timetable_description")]
     public string? TimetableDescription { get; set; }
+
+    [JsonPropertyName("params")]
+    public JsonObject? Params { get; set; }
 }
 
 public class AirflowDagTagDto

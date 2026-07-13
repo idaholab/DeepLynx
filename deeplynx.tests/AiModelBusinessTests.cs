@@ -396,7 +396,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         {
             UserId = uid,
             AiModelConfigId = mcid1,
-            Token = _encryptionHelper.SerializeAndEncrypt("test-token-abc123")
+            Token = _encryptionHelper.Encrypt("test-token-abc123")
         };
         Context.UserModelTokens.Add(userToken);
         await Context.SaveChangesAsync();
@@ -440,7 +440,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
     public async Task GetDefaultAiModelConfigWithToken_Throws_WhenModelRequiresToken_ButNoneStoredForUser()
     {
         // Act & Assert - config1 requires a token but no UserModelToken exists for uid
-        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _aiModelConfigBusiness.GetDefaultAiModelConfigWithToken(uid, oid, pid, "llm"));
     }
 
@@ -458,8 +458,8 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         Context.UserModelTokens.AddRange(
-            new UserModelToken { UserId = uid, AiModelConfigId = mcid1, Token = _encryptionHelper.SerializeAndEncrypt("token-for-uid") },
-            new UserModelToken { UserId = otherUser.Id, AiModelConfigId = mcid1, Token = _encryptionHelper.SerializeAndEncrypt("token-for-other-user") }
+            new UserModelToken { UserId = uid, AiModelConfigId = mcid1, Token = _encryptionHelper.Encrypt("token-for-uid") },
+            new UserModelToken { UserId = otherUser.Id, AiModelConfigId = mcid1, Token = _encryptionHelper.Encrypt("token-for-other-user") }
         );
         await Context.SaveChangesAsync();
 

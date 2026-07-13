@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Newtonsoft.Json;
 using Parquet;
@@ -61,6 +62,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     private Mock<IEdgeBusiness> _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private FileBusiness _fileBusiness = null!;
+    private UserBusiness _userBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private long _fileSystemObjectStorageId;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
@@ -75,7 +77,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     private OlapBusiness _olapBusiness = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
-
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private long _organizationId;
     private long _projectId;
     private RecordBusiness _recordBusiness = null!;
@@ -116,6 +119,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
         _mockServiceScopeFactory = new Mock<IServiceScopeFactory>();
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
 
         // Set up service scope factory mock
         var mockScope = new Mock<IServiceScope>();
@@ -135,9 +140,17 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
 
         // Wire up the real filesystem implementation via the factory mock
         var realFileFilesystemBusiness =
@@ -167,7 +180,9 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _recordBusiness,
             _insightBusiness.Object,
             _olapBusiness,
-            _objectStorageBusiness
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
         );
     }
 
