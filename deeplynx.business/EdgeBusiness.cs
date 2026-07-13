@@ -683,7 +683,6 @@ public class EdgeBusiness : IEdgeBusiness
         if (edge == null)
         {
             if (edgeId != null) throw new KeyNotFoundException($"Edge with id {edgeId} not found");
-            Console.WriteLine($"Edge with origin {originId} and destination {destinationId} not found");
         }
 
         return edge;
