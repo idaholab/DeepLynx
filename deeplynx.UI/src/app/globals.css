@@ -426,8 +426,8 @@ html {
 [data-theme="ron-dark"] .card,
 [data-theme="ron"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute),
 [data-theme="ron-dark"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute),
-[data-theme="ron"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute),
-[data-theme="ron-dark"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute) {
+[data-theme="ron"] [class*="bg-base-100"][class*="shadow"]:not(table):not(thead):not(tbody):not(tr):not(th):not(td):not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute),
+[data-theme="ron-dark"] [class*="bg-base-100"][class*="shadow"]:not(table):not(thead):not(tbody):not(tr):not(th):not(td):not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute) {
   position: relative;
   border-color: var(--ron-card-border);
   box-shadow:
@@ -440,8 +440,8 @@ html {
 [data-theme="ron-dark"] .card::before,
 [data-theme="ron"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before,
 [data-theme="ron-dark"] .rounded-box[class*="bg-base-100"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before,
-[data-theme="ron"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before,
-[data-theme="ron-dark"] [class*="bg-base-100"][class*="shadow"]:not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before {
+[data-theme="ron"] [class*="bg-base-100"][class*="shadow"]:not(table):not(thead):not(tbody):not(tr):not(th):not(td):not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before,
+[data-theme="ron-dark"] [class*="bg-base-100"][class*="shadow"]:not(table):not(thead):not(tbody):not(tr):not(th):not(td):not([role="tooltip"]):not(.dropdown-content):not(.fixed):not(.absolute)::before {
   content: "";
   position: absolute;
   inset: 0;

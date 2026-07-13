@@ -95,7 +95,7 @@ export default function ProjectResourceSelectors({
   return (
     <fieldset className="grid gap-3 md:grid-cols-3">
       {/* Project Selector */}
-      <label className="label flex min-w-0 flex-col items-start rounded-xl border border-base-300/60 bg-base-200/10 p-3">
+      <label className="label flex min-w-0 flex-col items-start rounded-xl border border-base-300/50 bg-base-200/10 p-3">
         <span className="flex w-full items-center justify-between gap-2">
           <span className="label-text text-base-content font-semibold">
             {t.translations.PROJECT_SELECTOR_LABEL}
@@ -126,7 +126,7 @@ export default function ProjectResourceSelectors({
       </label>
 
       {/* Data Source Selector */}
-      <label className="label flex min-w-0 flex-col items-start rounded-xl border border-base-300/60 bg-base-200/10 p-3">
+      <label className="label flex min-w-0 flex-col items-start rounded-xl border border-base-300/50 bg-base-200/10 p-3">
         <span className="flex w-full items-center justify-between gap-2">
           <span className="label-text text-base-content font-semibold">
             {t.translations.DATA_SOURCE}
@@ -157,7 +157,7 @@ export default function ProjectResourceSelectors({
       </label>
 
       {/* Object Storage Selector */}
-      <label className="label flex min-w-0 flex-col items-start rounded-xl border border-base-300/60 bg-base-200/10 p-3">
+      <label className="label flex min-w-0 flex-col items-start rounded-xl border border-base-300/50 bg-base-200/10 p-3">
         <span className="flex w-full items-center justify-between gap-2">
           <span className="label-text text-base-content font-semibold">
             {t.translations.STORAGE_DESTINATION}

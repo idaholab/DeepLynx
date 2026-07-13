@@ -290,7 +290,9 @@ export function mapSearchResultToCollectionRecord(
     objectStorageId: record.objectStorageId,
     originalId: record.originalId,
     classId: record.classId,
+    className: record.className,
     dataSourceId: record.dataSourceId,
+    dataSourceName: record.dataSourceName,
     projectId: record.projectId,
     lastUpdatedAt: record.lastUpdatedAt,
     lastUpdatedBy:

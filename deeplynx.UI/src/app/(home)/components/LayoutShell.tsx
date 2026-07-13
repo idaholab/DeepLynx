@@ -9,6 +9,7 @@ import {
   getAllOrganizationsForUser,
   getOrganizationLogoUrl,
 } from "@/app/lib/client_service/organization_services.client";
+import { isRunHidden } from "@/app/lib/feature_flags";
 import {
   AdjustmentsHorizontalIcon,
   ArrowRightStartOnRectangleIcon,
@@ -18,6 +19,7 @@ import {
   Cog6ToothIcon,
   CommandLineIcon,
   GlobeAmericasIcon,
+  PlayIcon,
   QuestionMarkCircleIcon,
   UserCircleIcon,
   UserGroupIcon,
@@ -231,8 +233,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                         onClick={() => handleOrganizationSwitch(org)}
                         className={`flex items-center gap-2 w-full max-w-full ${
                           organization?.organizationId === org.id
-                          ? "active bg-info/60"
-                          : ""
+                            ? "active bg-info/60"
+                            : ""
                         }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
@@ -308,6 +310,13 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                   <BookOpenIcon className="size-10" />
                 </Link>
               </li>
+              {!isRunHidden() && (
+                <li className="mt-5">
+                  <Link href="/run">
+                    <PlayIcon className="size-10" />
+                  </Link>
+                </li>
+              )}
               <OrgAdminRoute>
                 <li className="mt-5">
                   <Link href="/organization_management">

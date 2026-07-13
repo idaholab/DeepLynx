@@ -103,7 +103,7 @@ export default function CollectionEntitySelector({
           )}
         </button>
       </div>
-      <div className="mt-3 max-h-48 space-y-2 overflow-auto rounded-xl border border-base-300 bg-base-200/30 p-3">
+      <div className="mt-3 max-h-48 space-y-2 overflow-auto rounded-xl border border-base-300/50 bg-base-100 p-3">
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-base-content/70">
             <span className="loading loading-spinner loading-sm" />

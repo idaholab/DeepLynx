@@ -2,7 +2,7 @@
 
 import { TriggerLatticeExtractionRequestDTO } from "@/app/(home)/types/requestDTOs";
 import { TriggerLatticeExtractionResponseDTO } from "@/app/(home)/types/responseDTOs";
-import { EmbeddingStatusResponseDTO, ExtractionListItemDTO, ExtractionStagingResponseDTO } from "@/app/(home)/types/latticeDTOs";
+import { EmbeddingStatusResponseDTO, ExtractionListItemDTO, ExtractionStagingResponseDTO, PromoteExtractionRequestDto, ExtractionResponseDto, RejectExtractionRequestDto } from "@/app/(home)/types/latticeDTOs";
 import api from "./api";
 
 export async function triggerLatticeExtraction(
@@ -69,12 +69,25 @@ export async function promoteExtraction(
   organizationId: number,
   projectId: number,
   extractionId: number,
-  approve: boolean,
-): Promise<ExtractionStagingResponseDTO> {
+  dto: PromoteExtractionRequestDto,
+): Promise<ExtractionResponseDto> {
   const res = await api.post(
     `/organizations/${organizationId}/projects/${projectId}/extractions/${extractionId}/promote`,
-    null,
-    { params: { approve } },
+    dto,
   );
   return res.data;
 }
+
+export async function rejectExtraction(
+  organizationId: number,
+  projectId: number,
+  extractionId: number,
+  dto: RejectExtractionRequestDto,
+): Promise<ExtractionResponseDto> {
+  const res = await api.post(
+    `/organizations/${organizationId}/projects/${projectId}/extractions/${extractionId}/reject`,
+    dto,
+  );
+  return res.data;
+}
+

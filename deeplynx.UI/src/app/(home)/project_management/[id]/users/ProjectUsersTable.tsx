@@ -522,8 +522,8 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
   return (
     <div className="p-6">
-      <div className="">
-        <div className="">
+      <div className="card bg-base-100 border border-primary">
+        <div className="card-body">
           <ProjectUsersHeader
             totalMembers={totalMembers}
             userCount={userCount}

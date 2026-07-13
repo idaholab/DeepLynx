@@ -227,7 +227,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
 
   return (
     <main className="min-h-screen bg-base-200/30">
-      <section className="border-b border-base-300 bg-base-100">
+      <section className="border-b border-base-300/50 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
@@ -265,7 +265,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
           <div className="flex flex-col 2xl:flex-row gap-4 justify-center items-start">
             {/* Projects table */}
             <div
-              className="max-w-5xl 2xl:flex-1 card card-border shadow-md shadow-base-content/10 p-4 overflow-auto"
+              className="card max-w-5xl overflow-auto border border-base-300/50 bg-base-100 p-4 shadow-sm 2xl:flex-1"
               data-tour="projects-section"
             >
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">

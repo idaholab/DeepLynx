@@ -463,7 +463,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   return (
     <div className="p-6">
       {/* Page Header */}
-      <div className="mb-4 border-b border-base-300 pb-4">
+      <div className="mb-4 border-b border-base-300/50 pb-4">
         <h2 className="text-2xl font-bold text-base-content">
           {t.translations.PROJECT_TAG_MANAGEMENT}
         </h2>

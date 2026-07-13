@@ -54,7 +54,7 @@ export default function RecordLoading() {
 
         {/* Right column: Tags card */}
         <div className="flex-grow">
-          <div className="card bg-base-100 shadow-md p-4">
+          <div className="card border border-base-300/50 bg-base-100 p-4 shadow-sm">
             <div className="card-title mb-2">
               <Skeleton width={120} />
             </div>
@@ -81,7 +81,9 @@ function PropertyTableSkeleton({
   className?: string;
 }) {
   return (
-    <div className={`card bg-base-100 shadow-md p-3 ${className}`}>
+    <div
+      className={`card border border-base-300/50 bg-base-100 p-3 shadow-sm ${className}`}
+    >
       <div className="mb-3">
         <Skeleton width={titleWidth} height={20} />
       </div>

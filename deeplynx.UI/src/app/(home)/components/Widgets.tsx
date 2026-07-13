@@ -19,7 +19,7 @@ const WIDGET_COMPONENTS: Record<WidgetType, React.ComponentType> = {
 };
 
 const BASE_WIDGET_CARD_CLASS =
-  "card bg-base-200/30 border border-base-300/50 shadow-sm hover:shadow-md transition-all";
+  "card bg-base-100 border border-base-300/50 shadow-sm hover:shadow-md transition-all";
 
 const WidgetCard: React.FC<WidgetCardProps> = ({ widgets }) => {
   return (

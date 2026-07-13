@@ -9,9 +9,6 @@ public class PromoteExtractionRequestDto
     [JsonPropertyName("relationship_ids")] public List<long> RelationshipIds { get; set; } = [];
     [JsonPropertyName("edge_ids")] public List<long> EdgeIds { get; set; } = [];
 
-    /// <summary>
-    ///     Bulk-approve every not-yet-promoted item whose validation status is in this list.
-    ///     Only <c>valid</c> and <c>novel_discovery</c> are accepted.
-    /// </summary>
-    [JsonPropertyName("approve_by_status")] public List<string> ApproveByStatus { get; set; } = [];
+    [JsonPropertyName("approve_by_status")]
+    public List<string>? ApproveByStatus { get; set; } = [];
 }

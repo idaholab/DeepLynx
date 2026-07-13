@@ -239,7 +239,7 @@ public class UserControllerTests : IDisposable
 
         var expected = new UserResponseDto { Id = 1, Name = "User 1", AccountType = "Dev", Email = "123@inl.gov", Username = "Testy", IsActive = true, IsArchived = false, IsOrgAdmin = false, IsSysAdmin = true, LastLogin = System.DateTime.Now };
 
-        _mockUserBusiness.Setup(b => b.CreateUser(dto, true, false, false))
+        _mockUserBusiness.Setup(b => b.CreateUser(dto))
                     .ReturnsAsync(expected);
 
         var result = (await _userController.CreateUser(dto)).Result as OkObjectResult;
@@ -265,7 +265,7 @@ public class UserControllerTests : IDisposable
             IsActive = false
         };
 
-        _mockUserBusiness.Setup(b => b.CreateUser(dto, true, false, false))
+        _mockUserBusiness.Setup(b => b.CreateUser(dto))
                     .ThrowsAsync(new Exception("db error"));
 
         var result = (await _userController.CreateUser(dto)).Result as ObjectResult;
@@ -293,13 +293,13 @@ public class UserControllerTests : IDisposable
 
         var expected = new UserResponseDto { Id = 1, Name = "User 1", AccountType = "Dev", Email = "123@inl.gov", Username = "Testy", IsActive = true, IsArchived = false, IsOrgAdmin = false, IsSysAdmin = true, LastLogin = System.DateTime.Now };
 
-        _mockUserBusiness.Setup(b => b.CreateUser(dto, true, false, false))
+        _mockUserBusiness.Setup(b => b.CreateUser(dto))
                     .ReturnsAsync(expected);
 
         await _userController.CreateUser(dto);
 
         _mockUserBusiness.Verify(
-            b => b.CreateUser(dto, true, false, false),
+            b => b.CreateUser(dto),
             Times.Once);
     }
 
@@ -312,6 +312,63 @@ public class UserControllerTests : IDisposable
 
         AssertHasHttpAttribute(method, "HttpPostAttribute");
 
+    }
+
+    #endregion
+    
+    #region CreateTestAccount Tests
+
+    [Fact]
+    public async Task CreateTestAccount_Returns200_WithUser()
+    {
+        var expected = new UserResponseDto
+        {
+            Id = 1, Name = "Test Account", AccountType = "test",
+            Email = "test_abc123", Username = "test_abc123",
+            IsActive = false, IsArchived = false
+        };
+        _mockUserBusiness.Setup(b => b.CreateTestAccount("Test Account"))
+            .ReturnsAsync(expected);
+
+        var result = (await _userController.CreateTestAccount("Test Account")).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task CreateTestAccount_Returns500_OnUnexpectedException()
+    {
+        _mockUserBusiness.Setup(b => b.CreateTestAccount("Test Account"))
+            .ThrowsAsync(new Exception("db error"));
+
+        var result = (await _userController.CreateTestAccount("Test Account")).Result as ObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(500, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateTestAccount_PassesToBusinessLayer()
+    {
+        var expected = new UserResponseDto { Id = 1, Name = "Test Account" };
+        _mockUserBusiness.Setup(b => b.CreateTestAccount("Test Account"))
+            .ReturnsAsync(expected);
+
+        await _userController.CreateTestAccount("Test Account");
+
+        _mockUserBusiness.Verify(b => b.CreateTestAccount("Test Account"), Times.Once);
+    }
+
+    [Fact]
+    public void CreateTestAccount_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(UserController.CreateTestAccount),
+            "name");
+
+        AssertHasHttpAttribute(method, "HttpPostAttribute");
     }
 
     #endregion

@@ -39,7 +39,7 @@ export default function Loadingtranslations() {
             <div
               className="w-4/5 mx-auto"
             >
-              <div className="card card-border p-4">
+              <div className="card border border-base-300/50 bg-base-100 p-4 shadow-sm">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-info-content text-lg font-semibold">
                     {t.translations.YOUR_PROJECTS}
@@ -77,7 +77,7 @@ export default function Loadingtranslations() {
                         const globalIndex = index; // because paginatedRecords index is local
                         return (
                           <React.Fragment key={globalIndex}>
-                            <tr className="bg-base-200/30 hover:bg-base-200/50 rounded-lg overflow-hidden">
+                            <tr className="bg-base-100 hover:bg-base-200/40 rounded-lg overflow-hidden shadow-sm">
                               {columns.map((col, colIndex) => (
                                 <React.Fragment key={`col-${colIndex}`}>
                                   <td className="text-base-content">

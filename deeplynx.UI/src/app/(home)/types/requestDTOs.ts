@@ -344,3 +344,22 @@ export interface SavedSearchFilterRequest {
   pageNumber?: number;
   pageSize?: number;
 }
+
+export type TriggerDagRunRequestDto = {
+  dag_run_id?: string | null;
+  logical_date?: string | null;
+  data_interval_start?: string | null;
+  data_interval_end?: string | null;
+  run_after?: string | null;
+  conf?: Record<string, unknown> | null;
+  note?: string | null;
+};
+
+export type CreateRecordFileUploadRequestDto = {
+  name: string;
+  description: string;
+  properties: Record<string, unknown>;
+  originalId: string;
+  classId?: number | null;
+  className?: string | null;
+}

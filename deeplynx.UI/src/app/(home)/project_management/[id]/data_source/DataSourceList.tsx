@@ -52,7 +52,7 @@ const DataSourceList = ({
 
   if (sources.length === 0) {
     return (
-      <div className="card bg-base-200/50 border-2 border-dashed">
+      <div className="card border-2 border-dashed border-base-300/50 bg-base-100 shadow-sm">
         <div className="card-body items-center justify-center py-12">
           <PlusIcon className="w-16 h-16 text-base-content/30" />
           <h3 className="text-lg font-semibold text-base-content/60">
