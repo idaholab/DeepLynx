@@ -417,7 +417,7 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
       emptyMessage={t.translations.PROJECT_INSIGHT_EMBEDDED_EMPTY}
     >
       <div className="space-y-3">
-        <LazyList onReachEnd={loadNextPendingPage}>
+        <LazyList onReachEnd={loadNextEmbeddedPage}>
         {embedded.map((record) => (
           <ProjectInsightRecordCard
             key={record.id}
@@ -429,7 +429,6 @@ const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
         </LazyList>
         {embeddedTotal !== embedded.length ? "Loading . . ." : null}
       </div>
-      <button onClick={loadNextEmbeddedPage}>load more</button>
     </ProjectInsightRecordSection>
   );
 
