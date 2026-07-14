@@ -414,6 +414,56 @@ Versioning rules:
 - Put breaking response, status-code, route, request DTO, or error-contract changes in a new API version.
 - Update OpenAPI/Scalar documentation and route smoke tests when adding a new API version.
 
+`Program.cs` enables `ReportApiVersions`, so valid versioned controller responses include API version reporting headers:
+
+```text
+api-supported-versions: 1.0
+```
+
+`api-deprecated-versions` is only populated when a version is explicitly marked deprecated, such as with a deprecated API version convention or `[ApiVersion(1, Deprecated = true)]`. These headers are expected on versioned controller endpoints. Do not assume they will be present on manually mapped non-controller endpoints such as health checks, SignalR hubs, Scalar, or OpenAPI JSON.
+
+To deprecate a controller version with attributes, mark the version as deprecated on the controller:
+
+```csharp
+[ApiController]
+[ApiVersion(1, Deprecated = true)]
+[ApiVersion(2)]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
+public class ClassProjectController : ControllerBase
+{
+    [HttpGet]
+    [MapToApiVersion(1)]
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV1(...)
+    {
+        // Deprecated v1 behavior.
+    }
+
+    [HttpGet]
+    [MapToApiVersion(2)]
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV2(...)
+    {
+        // Current v2 behavior.
+    }
+}
+```
+
+If the controller is configured through API versioning conventions instead of attributes, use `HasDeprecatedApiVersion`:
+
+```csharp
+options.Conventions.Controller<ClassProjectController>()
+    .HasDeprecatedApiVersion(new ApiVersion(1))
+    .HasApiVersion(new ApiVersion(2));
+```
+
+After v1 is deprecated, valid responses for that controller should report both headers:
+
+```text
+api-supported-versions: 2.0
+api-deprecated-versions: 1.0
+```
+
+Deprecation advertises that a version is on the way out; it does not remove the route. Keep deprecated versions working until the removal is explicitly scheduled, documented, and coordinated with clients.
+
 ### Query Parameters, Filtering, and Pagination
 
 Use query parameters for optional filters, pagination, sorting, and cross-resource search inputs.
