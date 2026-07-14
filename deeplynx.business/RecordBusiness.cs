@@ -188,8 +188,22 @@ public class RecordBusiness : IRecordBusiness
 
         var embeddedFilter = search.Embedding switch
         {
-            "embedded" => "AND r.embedded = true",
-            "pending" => "AND r.embedded = false",
+            "embedded" => @"
+            AND (
+                EXISTS (
+                    SELECT 1
+                    FROM dl_vector.embeddings embedding
+                    WHERE embedding.record_id = r.id
+                )
+            )",
+            "pending" => @"
+            AND (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM dl_vector.embeddings embedding
+                    WHERE embedding.record_id = r.id
+                )
+            )",
             _ => "", // Assume any
         };
 
