@@ -91,19 +91,35 @@ const CreateOAuthModal = ({
     }
   };
 
-  const validateUrl = (urlString: string) => {
+  const validateUrl = (urlString: string): boolean => {
     try {
       const normalizedUrl = urlString.startsWith("http")
         ? urlString
-        : `https://${urlString}`
+        : `https://${urlString}`;
+
       const url = new URL(normalizedUrl);
-      return(
-        ["http:", "https:"].includes(url.protocol) && url.hostname.includes(".")
-      );
+
+      if (!["http:", "https:"].includes(url.protocol)) {
+        return false;
+      }
+
+      const hostname = url.hostname;
+
+      const isLocalhost = hostname === "localhost";
+      const isIPAddress = /^[0-9]{1,3}(\.[0-9]{1,3}){3}$/.test(hostname);
+
+      const isValidDomain =
+        hostname.includes(".") && !hostname.startsWith(".") && !hostname.endsWith(".");
+
+      if (!isLocalhost && !isIPAddress && !isValidDomain) {
+        return false;
+      }
+
+      return true;
     } catch {
       return false;
     }
-  }
+  };
 
   const validateEmail = (email: string) => {
     if (email.includes('@') && email.includes('.') && !email.includes(' ')) {
@@ -150,18 +166,18 @@ const CreateOAuthModal = ({
               </div>
 
               <div>
-              <input
-                placeholder={t.translations.CALLBACK_URL}
-                className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
-                value={callbackUrl}
-                onChange={(e) => {
-                  setCallbackUrl(e.target.value)
-                  setCallbackUrlValidated(validateUrl(e.target.value))
-                }}
-              />
-              {callbackUrl && !callbackUrlValidated && (
-                <p className="text-xs mt-1 float-right text-error">Please enter a valid url.</p>
-              )}
+                <input
+                  placeholder={t.translations.CALLBACK_URL}
+                  className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
+                  value={callbackUrl}
+                  onChange={(e) => {
+                    setCallbackUrl(e.target.value)
+                    setCallbackUrlValidated(validateUrl(e.target.value))
+                  }}
+                />
+                {callbackUrl && !callbackUrlValidated && (
+                  <p className="text-xs mt-1 float-right text-error">Please enter a valid url.</p>
+                )}
               </div>
               <div>
                 <textarea
