@@ -36,13 +36,14 @@ public class FeatureFlagMiddleware
 
         // if no feature flag attributes, continue. right now it's just the
         // one feature but keeping this check around for future features
-        if (insightAttr == null) {
+        if (insightAttr == null)
+        {
             await _next(context);
             return;
         }
 
-        // HIDE_INSIGHT env var. Defaults to true (hidden) if unset or invalid.
-        var hideInsight = !bool.TryParse(Environment.GetEnvironmentVariable("HIDE_INSIGHT"), out var result) || result;
+        // HIDE_INSIGHT env var. Defaults to false (shown) if unset or invalid.
+        var hideInsight = bool.TryParse(Environment.GetEnvironmentVariable("HIDE_INSIGHT"), out var result) && result;
         if (hideInsight)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
