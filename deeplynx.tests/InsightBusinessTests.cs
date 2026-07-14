@@ -694,6 +694,94 @@ public class InsightBusinessTests : IntegrationTestBase
     }
 
     #endregion
+    
+    // =========================================================================
+    // FetchInsightPipelineStatus Tests
+    // =========================================================================
+
+    #region FetchInsightPipelineStatus Tests
+    
+    [Fact]
+    public async Task FetchInsightPipelineStatus_ReturnsStatus_WhenRecordExistsAndUserAuthorized()
+    {
+        _mockSensitivityLabelService
+            .Setup(s => s.FilterAuthorizedRecordIds(uid, oid, pid, It.IsAny<List<long>>(), Context))
+            .ReturnsAsync(new HashSet<long> { recordId1 });
+
+        SetupHttpSuccess($$"""
+                           {
+                               "record_id": {{recordId1}},
+                               "job_id": "job-123",
+                               "status": "in_progress",
+                               "stage": "DOWNLOAD",
+                               "worker": "file_downloader",
+                               "progress": 25,
+                               "error": null,
+                               "updated_at": "2026-07-08T21:34:45+00:00"
+                           }
+                           """);
+
+        var result = await _insightBusiness.FetchInsightPipelineStatus(
+            uid,
+            oid,
+            pid,
+            recordId1);
+
+        Assert.NotNull(result);
+        Assert.Equal(recordId1, result.RecordId);
+        Assert.Equal("job-123", result.JobId);
+        Assert.Equal("in_progress", result.Status);
+        Assert.Equal("DOWNLOAD", result.Stage);
+        Assert.Equal("file_downloader", result.Worker);
+        Assert.Equal(25, result.Progress);
+        Assert.Null(result.Error);
+        Assert.Equal("2026-07-08T21:34:45+00:00", result.UpdatedAt);
+    }
+    
+    [Fact]
+    public async Task FetchInsightPipelineStatus_ThrowsKeyNotFound_WhenRecordNotInOrgProject()
+    {
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _insightBusiness.FetchInsightPipelineStatus(
+                uid,
+                oid,
+                pid + 999,
+                recordId1));
+    }
+    
+    [Fact]
+    public async Task FetchInsightPipelineStatus_ThrowsUnauthorized_WhenUserCannotReadRecord()
+    {
+        _mockSensitivityLabelService
+            .Setup(s => s.FilterAuthorizedRecordIds(uid, oid, pid, It.IsAny<List<long>>(), Context))
+            .ReturnsAsync(new HashSet<long>());
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _insightBusiness.FetchInsightPipelineStatus(
+                uid,
+                oid,
+                pid,
+                recordId1));
+    }
+    
+    [Fact]
+    public async Task FetchInsightPipelineStatus_PropagatesInsightServiceException_WhenInsightFails()
+    {
+        _mockSensitivityLabelService
+            .Setup(s => s.FilterAuthorizedRecordIds(uid, oid, pid, It.IsAny<List<long>>(), Context))
+            .ReturnsAsync(new HashSet<long> { recordId1 });
+
+        SetupHttpFailure(HttpStatusCode.BadGateway, "Insight unavailable");
+
+        await Assert.ThrowsAsync<InsightServiceException>(() =>
+            _insightBusiness.FetchInsightPipelineStatus(
+                uid,
+                oid,
+                pid,
+                recordId1));
+    }
+    
+    #endregion
 
     // =========================================================================
     // NormalizeFileUri Tests (exercised indirectly via QueueInsightUpload)
