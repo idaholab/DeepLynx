@@ -18,7 +18,7 @@ namespace deeplynx.api.Controllers;
 [Authorize]
 [ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Organization - AI Model Config")]
-[InsightEnabled] // AI model configs are only consumed by Insight features; gate with HIDE_INSIGHT.
+// [InsightEnabled] // AI model configs are only consumed by Insight features; gate with HIDE_INSIGHT.
 public class AiModelConfigController : ControllerBase
 {
     private readonly IAiModelConfigBusiness _aiModelConfigBusiness;
