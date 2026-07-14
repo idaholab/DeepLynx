@@ -48,7 +48,9 @@ export default function useRecordSearch(
   const [totalPages, setTotalPages] = useState(0);
   const [found, setFound] = useState(0);
   const [pageSize, setPageSize] = useState(initialPageSize);
+
   const prePageSize = useRef(initialPageSize);
+  const preFilters = useRef(filters);
 
   const [status, setStatus] = useState<Record<number, ProjectInsightStatus>>(
     {},
@@ -148,8 +150,10 @@ export default function useRecordSearch(
         if (cancel) return;
 
         // avoids trying to load a page out of bounds
-        if (prePageSize.current !== pageSize) setPage(1);
+        if (prePageSize.current !== pageSize || preFilters.current !== filters)
+          setPage(1);
         prePageSize.current = pageSize;
+        preFilters.current = filters;
 
         // append records
         const newRecords = mapProjectInsightRecords(
@@ -198,30 +202,6 @@ export default function useRecordSearch(
     sources,
     filters,
   ]);
-
-  // const loadNextPage = useCallback(async () => {
-  //   if (records.length === total) return; // no more records to load
-  //   setPage(page + 1); // this won't work if spammed, but it also shouldn't be spammed
-  //   await loadRecordsPage(page + 1, () => false);
-  // }, [page, records, loadRecordsPage]);
-
-  // useEffect(() => {
-  //   if (projectId && organizationId && sources && classes) {
-  //     reset();
-  //     setFilters(EMPTY_TAB_FILTER_STATE);
-  //   }
-  // }, [projectId, organizationId, sources, classes]);
-
-  // useEffect(() => {
-  //   let cancel = false;
-  //   if (projectId && organizationId && sources && classes) {
-  //     reset();
-  //     loadRecordsPage(1, () => cancel);
-  //   }
-  //   return () => {
-  //     cancel = true;
-  //   };
-  // }, [filters]);
 
   return {
     page,
