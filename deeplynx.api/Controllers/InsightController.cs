@@ -209,7 +209,7 @@ public class InsightController : ControllerBase
     /// <param name="projectId">ID of the project.</param>
     /// <param name="recordId">The record ID whose Insight pipeline status should be checked.</param>
     /// <returns>Persistent pipeline status including stage, worker, progress, and error details.</returns>
-    [HttpGet("pipeline_status/{recordId: long}", Name = "api_insight_pipeline_status")]
+    [HttpGet("pipeline_status/{recordId:long}", Name = "api_insight_pipeline_status")]
     [Auth("read", "insight")]
     [Sensitivity("read record")]
     [InsightEnabled]
