@@ -40,7 +40,7 @@ docker compose up
 **With Insight:** (Will run everything including Insight)
 
 ```bash
-HIDE_INSIGHT=false docker compose --profile insight up --build
+docker compose --profile insight up --build
 ```
 
 ### PostgreSQL Configuration
@@ -280,24 +280,31 @@ Git tracks submodules as a commit hash, not a branch! When you push changes insi
 Tests are located in deeplynx.UI/tests and organized by page. When running tests, make sure you are in the deeplynx.UI directory, also make sure you have a running backend in a separate terminal using `dotnet run dev`
 
 #### To run all tests
+
 `npx playwright test` or `npm run test`
 
 #### To run tests in UI mode (This allows to step through tests visually)
+
 `npx playwright test --ui`
 
 #### To run tests in headed mode
+
 `npx playwright test --headed`
 
 #### To run a specific file
+
 `npx playwright test tests/organization.spec.ts`
 
 #### To run a specific test by name (-g with partial name will run all related tests)
+
 `npx playwright test -g "user is automatically assigned an organization on startup"`
 
 #### To view the HTML report after the test
+
 `npx playwright show-report`
 
 #### To stop running tests
+
 Ctrl+C
 
 ### Using Playwright plug-in
@@ -328,4 +335,5 @@ Additional settings can be configured under Playwright>Settings at the bottom
 - In the file explorer, locate the specific test and click the play button on the left
 
 #### To stop a running test
+
 Click the stop button in the Test Explorer - cursor will need to be in the testing area
