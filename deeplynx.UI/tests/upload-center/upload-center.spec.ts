@@ -3,7 +3,6 @@ import { seedAndNavigateToProject } from "../helpers/seed";
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { navigate } from "next/dist/client/components/segment-cache/navigation";
 
 const TEN_GB = 10 * 1024 * 1024 * 1024;
 const TWENTY_MIN_MS = 20 * 60 * 1000;
