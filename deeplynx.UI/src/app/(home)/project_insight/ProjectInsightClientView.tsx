@@ -675,9 +675,8 @@ export default function ProjectInsightClientView() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                {activeTabKey === "library" ? libraryContent : pendingContent}
-              </div>
+              {activeTabKey === "library" ? libraryContent : pendingContent}
+
               {(activeTabKey === "library") ?
                 <PaginationControls
                   currentPage={embeddedPage}
