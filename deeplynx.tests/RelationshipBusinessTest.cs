@@ -75,7 +75,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, null);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -132,7 +132,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
-        
+
         // Add classes
         var originClass2 = new Class
         {
@@ -152,7 +152,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
-        
+
         var destinationClass2 = new Class
         {
             Name = "Destination Class 2",
@@ -345,7 +345,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
-    
+
     [Fact]
     public async Task CreateRelationship_Success_WithDuplicateNamesDifferentOriginDestination()
     {
@@ -357,7 +357,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
             OriginId = cid,
             DestinationId = cid2
         };
-        
+
         // Arrange
         var dto2 = new CreateRelationshipRequestDto
         {
@@ -371,13 +371,13 @@ public class RelationshipBusinessTests : IntegrationTestBase
         var result = await _relationshipBusiness.CreateRelationship(uid, oid, pid, dto);
         var result2 = await _relationshipBusiness.CreateRelationship(uid, oid, pid, dto2);
 
-        
+
         // Assert
         Assert.True(result.Id > 0);
         Assert.True(result2.Id > 0);
         Assert.Equal(result.Name, result2.Name);
     }
-    
+
     [Fact]
     public async Task CreateRelationship_Fails_WithDuplicateNamesSameOriginDestination()
     {
@@ -389,7 +389,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
             OriginId = cid,
             DestinationId = cid2
         };
-        
+
         // Arrange
         var dto2 = new CreateRelationshipRequestDto
         {
@@ -404,10 +404,10 @@ public class RelationshipBusinessTests : IntegrationTestBase
         var exception =
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _relationshipBusiness.CreateRelationship(uid, oid, pid, dto2));
-        
+
         Assert.Equal($"A relationship named '{dto2.Name}' already exists between these origin and destination classes in this project.", exception.Message);
     }
-    
+
     [Fact]
     public async Task CreateRelationship_Fails_WithDuplicateNamesNoOriginDestination()
     {
@@ -419,7 +419,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
             OriginId = null,
             DestinationId = null
         };
-        
+
         // Arrange
         var dto2 = new CreateRelationshipRequestDto
         {
@@ -434,7 +434,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         var exception =
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _relationshipBusiness.CreateRelationship(uid, oid, pid, dto2));
-        
+
         Assert.Equal($"A relationship named '{dto.Name}' with no origin/destination already exists in this project.", exception.Message);
     }
 
@@ -1268,7 +1268,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         // Arrange
         var projectA = new Project
         {
-            
+
             Name = $"Project A1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             OrganizationId = oid,
             IsArchived = false
@@ -1276,7 +1276,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
 
         var projectB = new Project
         {
-          
+
             Name = $"Project B1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
             OrganizationId = oid,
             IsArchived = false
@@ -1411,7 +1411,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         });
     }
 
-   [Fact]
+    [Fact]
     public async Task BulkCreateRelationships_Fails_WhenDestinationClassBelongsToDifferentProject()
     {
         // Arrange
@@ -1472,7 +1472,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
                 relationships
             );
         });
-    } 
+    }
 
     [Fact]
     public async Task CreateRelationship_Fails_WhenOrgLevelRelationshipUsesProjectLevelClasses()
@@ -1508,7 +1508,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _relationshipBusiness.CreateRelationship(uid, oid, null, dto));
     }
-    
+
     [Fact]
     public async Task UpdateRelationship_Fails_WhenOrgLevelRelationshipUsesProjectLevelClass()
     {
