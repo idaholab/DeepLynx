@@ -71,7 +71,7 @@ The resulting API path is:
 /api/v1/organizations/{organizationId}/projects
 ```
 
-Controllers that have not been explicitly versioned are treated as v1 by the default API version convention.
+Controllers that have not been explicitly versioned are treated as unchanged APIs by the default API version convention. They are currently registered for both v1 and v2 so endpoints without version-specific behavior remain visible and callable from either Scalar document.
 
 ### API Startup Flow
 
@@ -376,7 +376,7 @@ public class ClassProjectController : ControllerBase
 }
 ```
 
-Existing unannotated controllers are implicitly v1. Do not add `[ApiVersion(1)]` to every controller or action just for consistency. That creates churn without changing behavior.
+Existing unannotated controllers are registered for the currently supported default versions. Do not add `[ApiVersion(1)]` or `[ApiVersion(2)]` to every controller or action just for consistency. That creates churn without changing behavior.
 
 When a controller starts supporting a new API version, make that controller's supported versions explicit:
 
@@ -405,14 +405,34 @@ public class ClassProjectController : ControllerBase
 
 Versioning rules:
 
-- Leave untouched controllers unannotated; they are implicitly v1.
-- Once a controller gets v2 work, add explicit `[ApiVersion(1)]` and `[ApiVersion(2)]` at the controller level.
+- Leave untouched controllers unannotated; they are treated as unchanged APIs and are available in the configured default versions.
+- Once a controller gets version-specific behavior, add explicit `[ApiVersion(1)]` and `[ApiVersion(2)]` at the controller level.
 - If a controller declares only `[ApiVersion(1)]`, its actions are v1 by default; do not add `[MapToApiVersion(1)]` to every action.
 - Use `[MapToApiVersion(...)]` when two actions share the same HTTP verb and route but have version-specific behavior.
 - If an action behaves identically across declared controller versions, one action can serve all declared versions by omitting `[MapToApiVersion]`.
+- If an action is explicitly mapped with `[MapToApiVersion(1)]`, it is v1-only. To keep the same action available in v2, either omit `[MapToApiVersion]` when the controller declares both versions, or map the action to both versions intentionally.
 - Keep v1 behavior byte-for-byte compatible unless the ticket explicitly changes the v1 contract.
 - Put breaking response, status-code, route, request DTO, or error-contract changes in a new API version.
 - Update OpenAPI/Scalar documentation and route smoke tests when adding a new API version.
+- Register new public API versions in `deeplynx.api/NexusApiVersions.cs`. This is the source of truth for default API versioning, supported versions, OpenAPI documents, and the Scalar document dropdown:
+
+```csharp
+public static IReadOnlyList<ApiVersion> Supported { get; } =
+[
+    new(1),
+    new(2),
+    new(3)
+];
+
+public static IReadOnlyList<string> OpenApiDocumentNames { get; } =
+[
+    "v1",
+    "v2",
+    "v3"
+];
+```
+
+Scalar loads versioned docs by document name, so a new API version is not visible in the Scalar dropdown until the matching document name is added to `OpenApiDocumentNames`.
 
 `Program.cs` enables `ReportApiVersions`, so valid versioned controller responses include API version reporting headers:
 
@@ -520,7 +540,7 @@ Scalar uses document-name URLs for API docs:
 /api/scalar/v1
 ```
 
-The Scalar document version controls which OpenAPI document is displayed. The actual request version is still determined by the server URL in that document, such as `/api/v1` or `/api/v2`.
+The Scalar document version controls which OpenAPI document is displayed. OpenAPI operation paths include the URL-segment version, such as `/api/v1/...` or `/api/v2/...`; OpenAPI server URLs should be host-only so generated examples do not duplicate the API prefix.
 
 When adding endpoints:
 

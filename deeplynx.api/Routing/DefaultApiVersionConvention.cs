@@ -6,11 +6,16 @@ namespace deeplynx.api.Routing;
 
 internal sealed class DefaultApiVersionConvention : IControllerConvention
 {
-    private readonly ApiVersion _apiVersion;
+    private readonly IReadOnlyCollection<ApiVersion> _apiVersions;
 
-    public DefaultApiVersionConvention(ApiVersion apiVersion)
+    public DefaultApiVersionConvention(params ApiVersion[] apiVersions)
     {
-        _apiVersion = apiVersion;
+        ArgumentNullException.ThrowIfNull(apiVersions);
+
+        if (apiVersions.Length == 0)
+            throw new ArgumentException("At least one API version must be configured.", nameof(apiVersions));
+
+        _apiVersions = apiVersions;
     }
 
     public bool Apply(IControllerConventionBuilder builder, ControllerModel controller)
@@ -18,7 +23,9 @@ internal sealed class DefaultApiVersionConvention : IControllerConvention
         if (builder is not ControllerApiVersionConventionBuilder controllerBuilder)
             return false;
 
-        controllerBuilder.HasApiVersion(_apiVersion);
+        foreach (var apiVersion in _apiVersions)
+            controllerBuilder.HasApiVersion(apiVersion);
+
         return true;
     }
 }

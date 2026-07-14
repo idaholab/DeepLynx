@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Asp.Versioning;
+using deeplynx.api;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
@@ -173,14 +174,14 @@ try
     builder.Services
         .AddApiVersioning(options =>
         {
-            options.DefaultApiVersion = new ApiVersion(1);
+            options.DefaultApiVersion = NexusApiVersions.Default;
             options.ReportApiVersions = true;
             options.AssumeDefaultVersionWhenUnspecified = true;
             options.ApiVersionReader = new UrlSegmentApiVersionReader();
         })
         .AddMvc(options =>
         {
-            options.Conventions.Add(new DefaultApiVersionConvention(new ApiVersion(1)));
+            options.Conventions.Add(new DefaultApiVersionConvention(NexusApiVersions.Supported.ToArray()));
         })
         .AddApiExplorer(options =>
         {
@@ -380,24 +381,38 @@ try
       </header>
     </div>";
 
-        void ConfigureScalar(ScalarOptions options)
+        void ConfigureScalar(ScalarOptions options, HttpContext context)
         {
+            var defaultDocumentName = context.Request.Query["defaultDocument"].FirstOrDefault()
+                ?? NexusApiVersions.DefaultOpenApiDocumentName;
+
             options
                 .WithDarkMode()
                 .WithOpenApiRoutePattern(OpenApiRoutePattern)
-                .WithBaseServerUrl(ApiV1BasePath)
                 .WithTheme(ScalarTheme.Kepler)
                 .WithTitle("DeepLynx Nexus API")
                 .WithCustomCss(customcss)
                 .AddHeaderContent(scalarHeaderContent);
 
+            foreach (var documentName in NexusApiVersions.OpenApiDocumentNames)
+            {
+                options.AddDocument(
+                    documentName,
+                    documentName,
+                    isDefault: documentName == defaultDocumentName);
+            }
+
 
             if (!string.IsNullOrEmpty(hostedLink))
             {
-                var hostedLinkWithApi = string.Concat(hostedLink + ApiV1BasePath);
-                options.Servers = new List<ScalarServer> { new(hostedLinkWithApi) };
+                options.Servers = new List<ScalarServer> { new(hostedLink) };
             }
         }
+
+        app.MapGet($"{ScalarRoutePrefix}/{{documentName:regex(^v[0-9]+$)}}",
+            (string documentName) => Results.Redirect($"{ScalarRoutePrefix}/?defaultDocument={documentName}"));
+        app.MapGet($"{ApiV1BasePath}/scalar/{{documentName:regex(^v[0-9]+$)}}",
+            (string documentName) => Results.Redirect($"{ScalarRoutePrefix}/?defaultDocument={documentName}"));
 
         app.MapScalarApiReference(ScalarRoutePrefix, ConfigureScalar);
         app.MapScalarApiReference($"{ApiV1BasePath}/scalar", ConfigureScalar);
