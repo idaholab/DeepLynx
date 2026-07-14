@@ -383,6 +383,13 @@ public class ProjectController : ControllerBase
     {
         try
         {
+            var currentUserId = UserContextStorage.UserId;
+
+            if (currentUserId == userId)
+            {
+                return Ok(new { message = "You cannot remove yourself from a project" });
+            }
+
             await _projectBusiness.RemoveMemberFromProject(projectId, userId, groupId);
             return Ok(new { message = $"Removed member from project {projectId}" });
         }
