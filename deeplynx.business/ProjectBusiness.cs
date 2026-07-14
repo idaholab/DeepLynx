@@ -585,6 +585,7 @@ public class ProjectBusiness : IProjectBusiness
                 MemberId = pm.UserId,
                 Email = pm.User.Email,
                 Role = pm.Role.Name,
+                Type = "user",
                 RoleId = pm.Role.Id,
                 IsProjectAdmin = pm.IsProjectAdmin
             });
@@ -597,6 +598,7 @@ public class ProjectBusiness : IProjectBusiness
                 MemberId = pm.GroupId,
                 Email = string.Empty,
                 Role = pm.Role.Name,
+                Type = "group",
                 RoleId = pm.Role.Id,
                 IsProjectAdmin = pm.IsProjectAdmin
             });
@@ -638,7 +640,7 @@ public class ProjectBusiness : IProjectBusiness
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (userId.HasValue && (user == null || user.IsArchived))
             throw new KeyNotFoundException($"User with id {userId} not found");
-        
+
         // Service accounts cannot be invited to other projects. Limited to the project where they are created.
         if (userId.HasValue && user.AccountType == AccountType.Service && !allowServiceAccount)
             throw new InvalidOperationException("Service accounts cannot be added to a project directly. Use CreateAndAddServiceAccountToProject.");
@@ -773,7 +775,7 @@ public class ProjectBusiness : IProjectBusiness
             throw new ArgumentException("One of either User ID or Group ID must be provided");
         if (userId.HasValue && groupId.HasValue)
             throw new ArgumentException("Please provide only one of User ID or Group ID, not both");
-        
+
         // Service Users should not exist without scope. Must Archive or Delete
         if (userId.HasValue)
         {
@@ -894,4 +896,4 @@ public class ProjectBusiness : IProjectBusiness
         // ===============================
         await AddMemberToProject(projectId, null, currentUserId, null, makeProjectAdmin: true);
     }
-} 
+}
