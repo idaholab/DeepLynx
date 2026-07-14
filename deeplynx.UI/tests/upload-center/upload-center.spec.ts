@@ -272,6 +272,8 @@ test.describe("Upload Center", () => {
     });
 
     test('Upload a single CSV file using click to browse', async ({ page }) => {
+      await checkDataSourcesAndStorageDestinations({ page });
+
       await page.getByText('click to browse').click();
 
       const fileInput = page.locator('input[type="file"]');
