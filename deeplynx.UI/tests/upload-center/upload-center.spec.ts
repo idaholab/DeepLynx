@@ -248,4 +248,91 @@ test.describe("Upload Center", () => {
       expect(elapsedMs).toBeLessThan(TWENTY_MIN_MS);
     });
   });
+
+  test.describe('PDF upload', () => {
+    let filePath: string;
+    const MINIMAL_PDF = `%PDF-1.4
+                          1 0 obj
+                          << /Type /Catalog /Pages 2 0 R >>
+                          endobj
+                          2 0 obj
+                          << /Type /Pages /Kids [3 0 R] /Count 1 >>
+                          endobj
+                          3 0 obj
+                          << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+                          endobj
+                          4 0 obj
+                          << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+                          endobj
+                          5 0 obj
+                          << /Length 44 >>
+                          stream
+                          BT /F1 24 Tf 100 700 Td (Test PDF file) Tj ET
+                          endstream
+                          endobj
+                          xref
+                          0 6
+                          0000000000 65535 f 
+                          0000000009 00000 n 
+                          0000000058 00000 n 
+                          0000000115 00000 n
+                          0000000241 00000 n
+                          0000000312 00000 n
+                          trailer
+                          << /Size 6 /Root 1 0 R >>
+                          startxref
+                          407
+                          %%EOF`;
+
+    test.beforeAll(async () => {
+      filePath = path.join(os.tmpdir(), 'test-file.pdf');
+
+      // Reuse the file across runs if it already exists
+      if (fs.existsSync(filePath)) {
+        return;
+      }
+
+      await fs.promises.writeFile(filePath, MINIMAL_PDF);
+    });
+
+    test.afterAll(async () => {
+      // Comment this out if you want to cache the file between test runs
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
+    test('Upload a single PDF file using click to browse', async ({ page }) => {
+      await checkDataSourcesAndStorageDestinations({ page });
+
+      await page.getByText('click to browse').click();
+
+      const fileInput = page.locator('input[type="file"]');
+      await fileInput.setInputFiles(filePath);
+
+      await page.getByRole('button', { name: 'Upload' }).click();
+
+      await expect(
+        page.getByText('File uploaded successfully!')
+      ).toBeVisible();
+
+      await page.getByRole('link', { name: 'Project Dashboard' }).click();
+
+      await expect(
+        page.getByText('test-file.pdf').first()
+      ).toBeVisible();
+
+      await page.getByRole('link', { name: 'Visit' }).first().click();
+
+      await page.getByRole('textbox', { name: 'Search' }).click();
+
+      await page.getByRole('textbox', { name: 'Search' }).fill('test-file.pdf');
+
+      await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+
+      await expect(
+        page.getByRole('link', { name: 'test-file.pdf', exact: true }).first()
+      ).toBeVisible();
+    });
+  });
 });
