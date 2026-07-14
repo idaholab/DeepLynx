@@ -20,7 +20,7 @@ public class InsightPipelineStatusResponseDto
     public string? Worker { get; set; }
 
     [JsonPropertyName("progress")]
-    public int? Progress { get; set; }
+    public float? Progress { get; set; }
 
     [JsonPropertyName("error")]
     public string? Error { get; set; }
