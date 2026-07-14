@@ -42,24 +42,25 @@ public class FeatureFlagMiddleware
             return;
         }
 
-        // HIDE_INSIGHT env var. Defaults to false (shown) if unset or invalid.
-        var hideInsight = bool.TryParse(Environment.GetEnvironmentVariable("HIDE_INSIGHT"), out var result) && result;
-        if (hideInsight)
-        {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
-            {
-                HttpContext = context,
-                ProblemDetails = new ProblemDetails
-                {
-                    Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
-                    Title = "Forbidden",
-                    Status = StatusCodes.Status403Forbidden,
-                    Detail = "Insight features are disabled on this instance."
-                }
-            });
-            return;
-        }
+        // TODO: Fix once actual feature flags are developed
+        // // HIDE_INSIGHT env var. Defaults to false (shown) if unset or invalid.
+        // var hideInsight = bool.TryParse(Environment.GetEnvironmentVariable("HIDE_INSIGHT"), out var result) && result;
+        // if (hideInsight)
+        // {
+        //     context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        //     await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+        //     {
+        //         HttpContext = context,
+        //         ProblemDetails = new ProblemDetails
+        //         {
+        //             Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+        //             Title = "Forbidden",
+        //             Status = StatusCodes.Status403Forbidden,
+        //             Detail = "Insight features are disabled on this instance."
+        //         }
+        //     });
+        //     return;
+        // }
 
         await _next(context);
     }
