@@ -274,5 +274,54 @@ test.describe("Upload Center", () => {
         page.getByRole('link', { name: 'test-file.csv', exact: true }).first()
       ).toBeVisible();
     });
+
+    test('Upload a single CSV file using drag and drop', async ({ page }) => {
+      const buffer = fs.readFileSync(filePath);
+      const fileName = path.basename(filePath);
+
+      // Build a DataTransfer object in the browser context containing the file
+      const dataTransfer = await page.evaluateHandle(
+        ({ bufferData, fileName }) => {
+          const dt = new DataTransfer();
+          const file = new File([new Uint8Array(bufferData)], fileName, {
+            type: 'text/csv',
+          });
+          dt.items.add(file);
+          return dt;
+        },
+        { bufferData: Array.from(buffer), fileName }
+      );
+
+      const dropZone = page.getByText('click to browse');
+
+      // Dispatch the sequence of events a real drag-and-drop would fire
+      await dropZone.dispatchEvent('dragenter', { dataTransfer });
+      await dropZone.dispatchEvent('dragover', { dataTransfer });
+      await dropZone.dispatchEvent('drop', { dataTransfer });
+
+      await page.getByRole('button', { name: 'Upload' }).click();
+
+      await expect(
+        page.getByText('File uploaded successfully!')
+      ).toBeVisible();
+
+      await page.getByRole('link', { name: 'Project Dashboard' }).click();
+
+      await expect(
+        page.getByText('test-file.csv').first()
+      ).toBeVisible();
+
+      await page.getByRole('link', { name: 'Visit' }).first().click();
+
+      await page.getByRole('textbox', { name: 'Search' }).click();
+
+      await page.getByRole('textbox', { name: 'Search' }).fill('test-file.csv');
+
+      await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+
+      await expect(
+        page.getByRole('link', { name: 'test-file.csv', exact: true }).first()
+      ).toBeVisible();
+    });
   });
 });
