@@ -305,6 +305,8 @@ test.describe("Upload Center", () => {
     });
 
     test('Upload a single CSV file using drag and drop', async ({ page }) => {
+      await checkDataSourcesAndStorageDestinations({ page });
+
       const buffer = fs.readFileSync(filePath);
       const fileName = path.basename(filePath);
 
