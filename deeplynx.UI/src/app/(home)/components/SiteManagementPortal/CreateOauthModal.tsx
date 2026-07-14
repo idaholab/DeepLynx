@@ -39,7 +39,6 @@ const CreateOAuthModal = ({
     if (isLoading) return;
     setIsLoading(true);
     try {
-      console.log("callbackUrl: " + callbackUrl)
       const response = await createOauthApplication({
         name,
         callbackUrl,
