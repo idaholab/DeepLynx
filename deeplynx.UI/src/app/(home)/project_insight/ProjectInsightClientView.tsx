@@ -172,6 +172,12 @@ export default function ProjectInsightClientView() {
     setPendingState,
   });
 
+  function retryRecordSearch() {
+    // Hacky solution that refreshes the search because the filters have "changed"
+    setLibraryState((state) => ({...state}));
+    setPendingState((state) => ({...state}));
+  }
+
   useEffect(() => {
     if (!organizationId || !projectId || !pollingKey || isEmbeddingModelUnavailable) return;
 
@@ -221,6 +227,9 @@ export default function ProjectInsightClientView() {
 
           next ??= { ...current };
           next[recordId] = newStatus;
+
+          if (newStatus.state === "embedded")
+            retryRecordSearch(); // Embedded records need to be moved to the embedded section
         }
 
         return next ?? current;
