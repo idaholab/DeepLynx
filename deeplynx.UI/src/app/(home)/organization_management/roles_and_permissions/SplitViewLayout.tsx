@@ -9,7 +9,6 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import Tabs from "@/app/(home)/components/Tabs";
-import { translateBackendText } from "@/app/lib/backendTextTranslations";
 import {
   PermissionResponseDto,
   RoleResponseDto,
@@ -62,6 +61,17 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
 }) => {
   const { t } = useLanguage();
 
+  const translatePermission = (text?: string | null) => {
+    if (!text) return "";
+
+    const key = text
+      .toUpperCase()
+      .replaceAll(" ", "_")
+      .replaceAll("/", "_")
+      .replaceAll("-", "_");
+
+    return t.translations[key as keyof typeof t.translations] ?? text;
+  };
   const [activePermissionTab, setActivePermissionTab] = useState(
     t.translations.RESOURCE_PERMISSIONS,
   );
@@ -180,9 +190,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
             {categories.map((category) => (
               <div key={category.id} className="card bg-base-200/25">
                 <div className="card-body p-4">
-                  <h4 className="card-title text-sm mb-3">
-                    {translateBackendText(t.translations, category.label)}
-                  </h4>
+                  <h4 className="card-title text-sm mb-3">{translatePermission(category.label)}</h4>
                   <div className="grid grid-cols-2 gap-3">
                     {category.permissions.map((perm: PermissionResponseDto) => {
                       const hasPermission = isEditingPermissions
@@ -198,14 +206,8 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                             }`}
                           title={
                             displayMode === "permission-action"
-                              ? translateBackendText(
-                                t.translations,
-                                perm.description || perm.action || perm.name,
-                              )
-                              : translateBackendText(
-                                t.translations,
-                                perm.description || perm.name,
-                              )
+                              ? perm.description || perm.action || perm.name
+                              : translatePermission(perm.description) || translatePermission(perm.name)
                           }
                         >
                           <input
@@ -217,8 +219,8 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                           />
                           <span className="label-text">
                             {displayMode === "permission-action"
-                              ? translateBackendText(t.translations, perm.action)
-                              : translateBackendText(t.translations, perm.name)}
+                              ? translatePermission(perm.action)
+                              : translatePermission(perm.name)}
                           </span>
                         </label>
                       );
@@ -299,7 +301,11 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                   </div>
                   {role.description && (
                     <p className="text-xs text-base-content/60 mt-1 ml-6 truncate">
-                      {translateBackendText(t.translations, role.description)}
+                      {role.description === "Administrator role with full permissions"
+                        ? t.translations.ADMIN_ROLE_FULL_PERMISSIONS
+                        : role.description === "User role with limited permissions"
+                          ? t.translations.USER_ROLE_LIMITED_PERMISSIONS
+                          : role.description}
                     </p>
                   )}
                 </button>
@@ -322,7 +328,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                   </div>
                   {currentRole.description && (
                     <p className="text-sm text-base-content/70 mt-1">
-                      {translateBackendText(t.translations, currentRole.description)}
+                      {currentRole.description}
                     </p>
                   )}
                   <p className="text-sm text-base-content/60 mt-2">

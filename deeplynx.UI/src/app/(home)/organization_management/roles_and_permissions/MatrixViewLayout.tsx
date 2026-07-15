@@ -11,7 +11,6 @@ import {
   PermissionResponseDto,
   RoleResponseDto,
 } from "../../types/responseDTOs";
-import { translateBackendText } from "@/app/lib/backendTextTranslations";
 import { PermissionCategory } from "./RolesAndPermissions";
 import { useLanguage } from "../../../contexts/Language";
 
@@ -51,6 +50,17 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   isSeededUserRole,
 }) => {
   const { t } = useLanguage();
+  const translatePermission = (text?: string | null) => {
+    if (!text) return "";
+
+    const key = text
+      .toUpperCase()
+      .replaceAll(" ", "_")
+      .replaceAll("/", "_")
+      .replaceAll("-", "_");
+
+    return t.translations[key as keyof typeof t.translations] ?? text;
+  };
   const hasEditableRoles = roles.some((role) => !isSeededUserRole(role));
   const matrixPermissionCategories = React.useMemo(() => {
     // Matrix view intentionally excludes sensitivity-label permissions.
@@ -161,7 +171,11 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                           </div>
                           {role.description && (
                             <span className="text-xs text-base-content/60 font-normal">
-                              {translateBackendText(t.translations, role.description)}
+                              {role.description === "Administrator role with full permissions"
+                                ? t.translations.ADMIN_ROLE_FULL_PERMISSIONS
+                                : role.description === "User role with limited permissions"
+                                  ? t.translations.USER_ROLE_LIMITED_PERMISSIONS
+                                  : role.description}
                             </span>
                           )}
                         </div>
@@ -179,7 +193,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                         colSpan={roles.length + 1}
                         className="font-semibold text-sm sticky left-0"
                       >
-                        {translateBackendText(t.translations, category.label)}
+                        {translatePermission(category.label)}
                       </td>
                     </tr>
 
@@ -189,15 +203,15 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                         <td className="sticky left-0 z-10 bg-base-100">
                           <div className="flex flex-col">
                             <span className="font-medium text-sm">
-                              {translateBackendText(t.translations, perm.name)}
+                              {translatePermission(perm.name)}
                             </span>
                             {perm.description && (
                               <span className="text-xs text-base-content/60">
-                                {translateBackendText(t.translations, perm.description)}
+                                {translatePermission(perm.description)}
                               </span>
                             )}
                             <span className="text-xs text-base-content/50 mt-1">
-                              {t.translations.ACTION} {translateBackendText(t.translations, perm.action)}
+                              {t.translations.ACTION} {translatePermission(perm.action)}
                             </span>
                           </div>
                         </td>
