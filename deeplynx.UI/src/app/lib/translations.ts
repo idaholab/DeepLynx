@@ -2304,6 +2304,8 @@ export const translations = {
         "El ID de clase debe ser un número, no una cadena.",
       CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION:
         "Verifique que el ID de clase exista en el proyecto seleccionado.",
+      CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH: "El ID de clase y el nombre de clase no coinciden",
+      CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION: "Verifique que el ID de clase coincida con el nombre de clase seleccionado.",
       CLASS_NAME: "Nombre de la clase",
       CLASS_NAME_REQUIRED: "Nombre de la clase *",
       CLASS_NAME_UPDATED: "Nombre de la clase actualizado",
