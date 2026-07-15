@@ -538,6 +538,8 @@ Scalar uses document-name URLs for API docs:
 
 The Scalar document version controls which OpenAPI document is displayed. OpenAPI operation paths include the URL-segment version, such as `/api/v1/...` or `/api/v2/...`; OpenAPI server URLs should be host-only so generated examples do not duplicate the API prefix.
 
+Deployment ingress must route the `/api` prefix to the backend, not only `/api/v1`. The broader backend route exposes versioned API paths plus `/api/openapi/{documentName}.json` and `/api/scalar`. Keep `/api/auth` as a more-specific frontend route; Kubernetes `Prefix` matching selects the longest matching path.
+
 When adding endpoints:
 
 - Use explicit generic return types such as `ActionResult<ClassResponseDto>`.
