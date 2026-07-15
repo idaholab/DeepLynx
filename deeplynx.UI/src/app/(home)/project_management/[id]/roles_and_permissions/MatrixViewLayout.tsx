@@ -509,6 +509,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                   {roles.map((role) => {
                     const isOrg = isOrganizationRole(role);
                     const isPrj = isProjectRole(role);
+                    const isStd = !isOrg && !isPrj;
                     const editable = canEditRole(role);
 
                     const editDisabled = !editable;
@@ -561,7 +562,10 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                             </span>
                           )}
                           <span className="text-xs text-base-content/50 font-normal">
-                            {getRoleSource(role)}
+                            {getTranslatedRoleSource(
+                              isStd ? "System" : isOrg ? "Organization" : "Project",
+                              t,
+                            )}
                           </span>
                         </div>
                       </th>
@@ -607,7 +611,10 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                             Number(perm.id)
                           );
                           const editable = canEditRole(role);
-                          const isInherited = isOrganizationRole(role);
+                          const isOrg = isOrganizationRole(role);
+                          const isPrj = isProjectRole(role);
+                          const isStd = !isOrg && !isPrj;
+                          const isInherited = isOrg;
 
                           return (
                             <td key={role.id} className="text-center">
@@ -628,7 +635,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                                     : ""
                                   }`}
                                 title={
-                                  isStandardRole(role) && isEditingMatrix
+                                  isStd && isEditingMatrix
                                     ? t.translations.STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
                                     : isOrganizationRole(role) && isEditingMatrix
                                       ? t.translations.ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL
