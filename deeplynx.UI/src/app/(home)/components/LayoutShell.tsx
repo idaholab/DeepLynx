@@ -232,8 +232,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                       <a
                         onClick={() => handleOrganizationSwitch(org)}
                         className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
-                            ? "active bg-info/60"
-                            : ""
+                          ? "active bg-info/60"
+                          : ""
                           }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
@@ -242,9 +242,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                           </div>
                           {org.description && (
                             <div className="text-xs opacity-70 truncate">
-                              {org.description === "Default Organization"
-                                ? t.translations.ORGANIZATION_DEFAULT
-                                : org.description}
+                              {org.description}
                             </div>
                           )}
                         </div>

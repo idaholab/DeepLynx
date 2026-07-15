@@ -128,10 +128,7 @@ const SiteOrganizationManagement = ({
     },
     {
       header: t.translations.DESCRIPTION,
-      cell: (row) =>
-        row.description === "Default Organization"
-          ? t.translations.ORGANIZATION_DEFAULT
-          : row.description,
+      data: "description" as keyof OrganizationResponseDto,
     },
     {
       header: "",

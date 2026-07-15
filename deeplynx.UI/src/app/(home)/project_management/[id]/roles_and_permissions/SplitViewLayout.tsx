@@ -480,13 +480,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                           : "text-base-content/40"
                           }`}
                       />
-                      <span className="font-medium text-sm">
-                        {role.name === "Admin"
-                          ? t.translations.ADMIN
-                          : role.name === "User"
-                            ? t.translations.USER
-                            : role.name}
-                      </span>
+                      <span className="font-medium text-sm">{role.name}</span>
                     </div>
                     {isOrganizationRole(role) && (
                       <div className="badge badge-secondary badge-sm flex gap-1">

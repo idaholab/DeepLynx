@@ -71,11 +71,7 @@ const DataSourceCard = ({
             <div className="flex items-center gap-3 mb-2">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-bold">
-                    {source.name === "Default Data Source"
-                      ? t.translations.DEFAULT_DATA_SOURCE
-                      : source.name}
-                  </h3>
+                  <h3 className="text-xl font-bold">{source.name}</h3>
                   {isDefault}
                   {source.isArchived && (
                     <div className="badge badge-warning">{t.translations.ARCHIVED_BADGE}</div>
