@@ -185,6 +185,25 @@ public class TagBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetAllTags_ValidProjectId_ReturnsActiveProjectAndOrgTagsWithArchivedTags()
+    {
+        // Act
+        var result = await _tagBusiness.GetAllTags(oid, [pid], false);
+        var tags = result.ToList();
+
+
+        // Assert
+        Assert.Equal(4, tags.Count);
+        Assert.All(tags, t => Assert.Equal(oid, t.OrganizationId));
+        Assert.True(tags[2].IsArchived, "The third tag should be archived.");
+        Assert.Contains(tags, t => t.Id == tid);
+        Assert.Contains(tags, t => t.Id == tid2);
+        Assert.Contains(tags, t => t.Id == tid5);
+        Assert.DoesNotContain(tags, t => t.Id == tid4);
+    }
+
+
+    [Fact]
     public async Task GetAllTags_ProjectWithNoTags_ReturnsOrgInheritedTag()
     {
         // Act
@@ -292,7 +311,7 @@ public class TagBusinessTests : IntegrationTestBase
         Assert.Equal(oid, result[0].OrganizationId);
         Assert.Equal("Org Tag By Name", result[0].Name);
     }
-    
+
     [Fact]
     public async Task GetTagsByName_Success_WithProjectId()
     {

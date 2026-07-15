@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, Page } from "@playwright/test";
 import { seedAndNavigateToProject } from "../helpers/seed";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -9,6 +9,31 @@ const TWENTY_MIN_MS = 20 * 60 * 1000;
 
 
 test.describe("Upload Center", () => {
+
+  async function checkDataSourcesAndStorageDestinations({ page }: { page: Page }) {
+    async function checkDataSources(page: Page) {
+      const dataSourceSelect = page.getByLabel('Data sourceData Sources');
+      const selectedText = await dataSourceSelect.locator('option:checked').textContent();
+
+      if (selectedText === 'Data Sources') {
+        await dataSourceSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
+      }
+    }
+
+    async function checkStorageDestinations(page: Page) {
+      const storageSelect = page.getByLabel('Storage DestinationObject');
+      const selectedText = await storageSelect.locator('option:checked').textContent();
+
+      if (selectedText === 'Object storages') {
+        await storageSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
+      }
+    }
+
+    await checkDataSources(page);
+    await checkStorageDestinations(page);
+  }
+
+
   test.beforeEach(async ({ page }) => {
     await seedAndNavigateToProject(page);
     // Navigate to Upload Center via sidebar
@@ -201,6 +226,8 @@ test.describe("Upload Center", () => {
     });
 
     test('Upload a 10 GB file and verify completion in < 20 minutes', async ({ page }) => {
+      await checkDataSourcesAndStorageDestinations({ page });
+
       test.setTimeout(TWENTY_MIN_MS + 60_000); // budget + buffer for setup/assertions
 
       const start = Date.now();
