@@ -248,4 +248,60 @@ test.describe("Upload Center", () => {
       expect(elapsedMs).toBeLessThan(TWENTY_MIN_MS);
     });
   });
+
+  test.describe('CSV upload', () => {
+    let filePath: string;
+
+    test.beforeAll(async () => {
+      filePath = path.join(os.tmpdir(), 'test-file.csv');
+      const header = 'id,name,email,value,timestamp\n';
+
+      // Reuse the file across runs if it already exists
+      if (fs.existsSync(filePath)) {
+        return;
+      }
+
+      await fs.promises.writeFile(filePath, header);
+    });
+
+    test.afterAll(async () => {
+      // Comment this out if you want to cache the file between test runs
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
+    test('Upload a single CSV file using click to browse', async ({ page }) => {
+      await checkDataSourcesAndStorageDestinations({ page });
+
+      await page.getByText('click to browse').click();
+
+      const fileInput = page.locator('input[type="file"]');
+      await fileInput.setInputFiles(filePath);
+
+      await page.getByRole('button', { name: 'Upload' }).click();
+
+      await expect(
+        page.getByText('File uploaded successfully!')
+      ).toBeVisible();
+
+      await page.getByRole('link', { name: 'Project Dashboard' }).click();
+
+      await expect(
+        page.getByText('test-file.csv').first()
+      ).toBeVisible();
+
+      await page.getByRole('link', { name: 'Visit' }).first().click();
+
+      await page.getByRole('textbox', { name: 'Search' }).click();
+
+      await page.getByRole('textbox', { name: 'Search' }).fill('test-file.csv');
+
+      await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+
+      await expect(
+        page.getByRole('link', { name: 'test-file.csv', exact: true }).first()
+      ).toBeVisible();
+    });
+  });
 });
