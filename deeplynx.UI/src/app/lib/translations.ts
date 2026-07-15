@@ -24,6 +24,7 @@ export const translations = {
       ACTIVE_USERS: "Active Users",
       ADD: "Add",
       ADMIN_ROLE_FULL_PERMISSIONS: "Administrator role with full permissions",
+      SYSTEM: "System",
       ADD_A_LABEL: "Add A Label",
       ADD_MEMBERS: "Add Members",
       ALL_USERS_ALREADY_IN_THIS_GROUP: "All users are already in this group",
@@ -2166,6 +2167,7 @@ export const translations = {
       ADDING: "Agregando...",
       ADDITIONAL_FILTERS: "Filtros adicionales",
       ADMIN_ROLE_FULL_PERMISSIONS: "Rol de administrador con permisos completos",
+      SYSTEM: "Sistema",
       ADDITIONAL_PROPERTIES: "Propiedades adicionales",
       ADDITIONAL_SETTINGS_COMING_SOON:
         "Configuraciones adicionales próximamente",
