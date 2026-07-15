@@ -63,3 +63,15 @@ export async function seedAndNavigateToProject(page: Page) {
   await page.locator('main a[href^="/project/"]').first().click();
   await page.waitForURL(/\/project\/\d+/);
 }
+
+export async function seedAppState(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "organizationSession",
+      JSON.stringify({ organizationId: 1, organizationName: "INL" }),
+    );
+    localStorage.setItem("dashboard-tour-completed", "true");
+    localStorage.setItem("project-tour-completed", "true");
+  });
+  // no cookies — auth now comes from storageState
+}
