@@ -28,7 +28,6 @@ import DeleteRoleModal from "./DeleteRoleModal";
 import EditRoleModal from "./EditRoleModal";
 import MatrixViewLayout from "./MatrixViewLayout";
 import SplitViewLayout from "./SplitViewLayout";
-import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
