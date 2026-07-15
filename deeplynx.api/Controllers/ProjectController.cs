@@ -216,7 +216,7 @@ public class ProjectController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The organization to which the project will belong</param>
     /// <param name="dto">A data transfer object with details on the new project to be created.</param>
-    /// <returns>The new project which was just created.</returns>
+    /// <returns>The new project that was just created.</returns>
     [HttpPost(Name = "api_create_a_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -237,7 +237,7 @@ public class ProjectController : ControllerBase
     /// <param name="organizationId">ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to update</param>
     /// <param name="dto">A data transfer object with details on the project to be updated.</param>
-    /// <returns>The project which was just updated.</returns>
+    /// <returns>The project that was just updated.</returns>
     [HttpPut("{projectId:long}", Name = "api_update_a_project")]
     [MapToApiVersion(1)]
     [ProjectAdmin]
@@ -266,7 +266,7 @@ public class ProjectController : ControllerBase
     /// <param name="organizationId">ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to update</param>
     /// <param name="dto">A data transfer object with details on the project to be updated.</param>
-    /// <returns>The project which was just updated.</returns>
+    /// <returns>The project that was just updated.</returns>
     [HttpPut("{projectId:long}", Name = "api_update_a_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -365,7 +365,7 @@ public class ProjectController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to archive or unarchive</param>
     /// <param name="archive">True to archive the project, false to unarchive it.</param>
-    /// <returns>A message stating the project was successfully archived or unarchived.</returns>
+    /// <returns> True if the project was successfully archived or unarchived.</returns>
     [HttpPatch("{projectId:long}", Name = "api_archive_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -378,8 +378,8 @@ public class ProjectController : ControllerBase
             var userId = UserContextStorage.UserId;
             if (archive)
             {
-                await _projectBusiness.ArchiveProject(userId, organizationId, projectId);
-                return Ok(new { message = $"Archived project {projectId}" });
+                var responseA = await _projectBusiness.ArchiveProject(userId, organizationId, projectId);
+                return Ok(responseA);
             }
 
             var response = await _projectBusiness.UnarchiveProject(userId, organizationId, projectId);
@@ -509,7 +509,7 @@ public class ProjectController : ControllerBase
     /// <param name="userId">ID of user if user is member</param>
     /// <param name="groupId">ID of group if group is member</param>
     /// <param name="isProjectAdmin">Whether the member is a project admin. Defaults to false</param>
-    /// <returns></returns>
+    /// <returns>True if the member was successfully added to the project.</returns>
     [HttpPost("{projectId:long}/members", Name = "api_add_member_to_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -533,7 +533,7 @@ public class ProjectController : ControllerBase
     /// <param name="userId">ID of user if user is member</param>
     /// <param name="groupId">ID of group if group is member</param>
     /// <param name="isProjectAdmin">(optional) project admin status to set; left unchanged when omitted</param>
-    /// <returns></returns>
+    /// <returns>A message stating the member was successfully updated</returns>
     [HttpPut("{projectId:long}/members", Name = "api_update_project_member_role")]
     [MapToApiVersion(1)]
     [ProjectAdmin]
@@ -564,7 +564,7 @@ public class ProjectController : ControllerBase
     /// <param name="userId">ID of user if user is member</param>
     /// <param name="groupId">ID of group if group is member</param>
     /// <param name="isProjectAdmin">(optional) project admin status to set; left unchanged when omitted</param>
-    /// <returns></returns>
+    /// <returns>True if the member was successfully updated</returns>
     [HttpPut("{projectId:long}/members", Name = "api_update_project_member_role")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -586,7 +586,7 @@ public class ProjectController : ControllerBase
     /// <param name="userId">ID of user if user is member</param>
     /// <param name="groupId">ID of group if group is member</param>
     /// <param name="isAdmin">Project admin status to set the member to</param>
-    /// <returns></returns>
+    /// <returns>Message stating admin status was updated</returns>
     [HttpPut("{projectId:long}/admin", Name = "api_update_project_member_admin_status")]
     [MapToApiVersion(1)]
     [ProjectAdmin]
@@ -616,7 +616,7 @@ public class ProjectController : ControllerBase
     /// <param name="userId">ID of user if user is member</param>
     /// <param name="groupId">ID of group if group is member</param>
     /// <param name="isAdmin">Project admin status to set the member to</param>
-    /// <returns></returns>
+    /// <returns>True if the admin status was successfully updated</returns>
     [HttpPut("{projectId:long}/admin", Name = "api_update_project_member_admin_status")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -636,7 +636,7 @@ public class ProjectController : ControllerBase
     /// <param name="projectId">ID of the project</param>
     /// <param name="userId">ID of the user if user is member</param>
     /// <param name="groupId">ID of the group if group is member</param>
-    /// <returns></returns>
+    /// <returns>Message stating member was successfully removed from the project</returns>
     [HttpDelete("{projectId:long}/members", Name = "api_remove_member_from_project")]
     [MapToApiVersion(1)]
     [ProjectAdmin]
@@ -666,7 +666,7 @@ public class ProjectController : ControllerBase
     /// <param name="projectId">ID of the project</param>
     /// <param name="userId">ID of the user if user is member</param>
     /// <param name="groupId">ID of the group if group is member</param>
-    /// <returns></returns>
+    /// <returns>True if the member was successfully removed from the project</returns>
     [HttpDelete("{projectId:long}/members", Name = "api_remove_member_from_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -690,7 +690,7 @@ public class ProjectController : ControllerBase
     /// <param name="userId"></param>
     /// <param name="groupId"></param>
     /// <param name="roleId"></param>
-    /// <returns></returns>
+    /// <returns>Message stating user was invited</returns>
     [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
     [MapToApiVersion(1)]
     [ForbidServiceAccounts]
@@ -730,7 +730,7 @@ public class ProjectController : ControllerBase
     /// <param name="userId"></param>
     /// <param name="groupId"></param>
     /// <param name="roleId"></param>
-    /// <returns></returns>
+    /// <returns>True if the user was successfully invited</returns>
     [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -757,7 +757,7 @@ public class ProjectController : ControllerBase
     /// <param name="roleId"></param>
     /// <param name="name"></param>
     /// <param name="makeProjectAdmin"></param>
-    /// <returns></returns>
+    /// <returns>Message stating a service account was created and added to the project</returns>
     [HttpPost("{projectId:long}/invite/serviceAccount", Name = "api_add_service_account")]
     [MapToApiVersion(1)]
     [Tags("Service Accounts")]
@@ -792,7 +792,7 @@ public class ProjectController : ControllerBase
     /// <param name="roleId"></param>
     /// <param name="name"></param>
     /// <param name="makeProjectAdmin"></param>
-    /// <returns></returns>
+    /// <returns>True if the service account was successfully created and added to the project</returns>
     [HttpPost("{projectId:long}/invite/serviceAccount", Name = "api_add_service_account")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
