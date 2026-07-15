@@ -173,6 +173,42 @@ public class RecordController : ControllerBase
     }
 
     /// <summary>
+    ///     Full text records search
+    /// </summary>
+    /// <remarks>
+    ///     Embedding must be one of: any, embedded, pending
+    /// </remarks>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belongs</param>
+    /// <param name="search">Search parameters</param>
+    /// <returns>List of record response dtos from the query view that match provided query parameters</returns>
+    [HttpGet("search", Name = "api_record_search")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<List<RecordResponseDto>>> Search(
+        long organizationId,
+        long projectId,
+        [FromQuery] RecordSearchRequestDto search)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records =
+                await _recordBusiness.Search(currentUserId, organizationId, projectId, search,
+                    isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while searching records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Get Records by Tags
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>

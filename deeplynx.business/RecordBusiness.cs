@@ -149,21 +149,8 @@ public class RecordBusiness : IRecordBusiness
         }).ToList();
     }
 
-
-    /// <summary>
-    ///     Paginated full text records search
-    /// </summary>
-    /// <param name="currentUserId">The ID of current user</param>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId">The ID of the project to which the records belongs</param>
-    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
-    /// <param name="search">Search parameters</param>
-    /// <param name="paginated">Pagination parameters</param>
-    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
-    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-    /// <returns>Paginated list of record response dtos from the query view that match provided query parameters</returns>
-    public async Task<PaginatedResponse<RecordResponseDto>> SearchPaginated(
-        long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search, PaginatedRequestDto paginated,
+    private async Task<IQueryable<Record>> QuerySearch(
+        long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         // ============================== QUERIES ==============================
@@ -303,6 +290,27 @@ public class RecordBusiness : IRecordBusiness
 
         if (search.IsInsightEligible) records = records.WhereInsightEligible();
 
+        return records;
+    }
+
+    /// <summary>
+    ///     Paginated full text records search
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belongs</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="search">Search parameters</param>
+    /// <param name="paginated">Pagination parameters</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>Paginated list of record response dtos from the query view that match provided query parameters</returns>
+    public async Task<PaginatedResponse<RecordResponseDto>> SearchPaginated(
+        long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search, PaginatedRequestDto paginated,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        var records = await QuerySearch(currentUserId, organizationId, projectId, search, isSysAdmin, isOrgAdmin, isProjectAdmin);
+
         var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
             _sensitivityLabelService,
             currentUserId,
@@ -311,6 +319,33 @@ public class RecordBusiness : IRecordBusiness
             isSysAdmin || isOrgAdmin || isProjectAdmin);
 
         return await Paginator.Paginate(paginated, records, r => RecordToResponse(r, isUriAuthorized(r)));
+    }
+
+    /// <summary>
+    ///     Full text records search
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belongs</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="search">Search parameters</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>List of record response dtos from the query view that match provided query parameters</returns>
+    public async Task<List<RecordResponseDto>> Search(
+        long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        var records = await QuerySearch(currentUserId, organizationId, projectId, search, isSysAdmin, isOrgAdmin, isProjectAdmin);
+
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return await records.Select(r => RecordToResponse(r, isUriAuthorized(r))).ToListAsync();
     }
 
     private static RecordResponseDto RecordToResponse(Record r, bool exposeUri)
