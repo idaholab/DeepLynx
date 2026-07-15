@@ -103,17 +103,27 @@ export function accountMeta(name: TestAccountTitle) {
 // Auth comes from storageState (see fixtures.ts). These only control UI state:
 // which org/project the app treats as currently selected.
 
-export async function selectOrganization(page: Page, account: TestAccount) {
-  const meta = accountMeta(account.name);
-  if (!meta?.organizationId) {
-    throw new Error(`No organizationId in registry for "${account.name}" — did auth.setup.ts run?`);
+export function orgIdByName(orgName: string): number {
+  const owner = ACTINGUSERS.find((a) => a.provision?.org === orgName);
+  if (!owner) {
+    throw new Error(`No account is provisioned into org "${orgName}" — can't resolve its organizationId.`);
   }
-  const orgName = account.provision?.org ?? '';
-  // The app compares organizationId against numeric ids from the API
-  // (organization?.organizationId === org.id, where org.id is a number).
-  // testUserCache stores ids as strings, so cast back to a number here or
-  // the strict-equality check silently fails and nothing shows as "Current".
-  const orgId = Number(meta.organizationId);
+  const meta = accountMeta(owner.name);
+  if (!meta?.organizationId) {
+    throw new Error(`No organizationId cached for "${owner.name}" (org "${orgName}") — did auth.setup.ts run?`);
+  }
+  return Number(meta.organizationId);
+}
+
+export async function selectOrganization(page: Page, account: TestAccount, orgNameOverride?: string) {
+  const orgName = orgNameOverride ?? account.provision?.org;
+  if (!orgName) {
+    throw new Error(
+      `No org to select for "${account.name}" — either provision it with an org, ` +
+      `or pass an explicit org name (e.g. via test.use({ actingOrg: ... })).`,
+    );
+  }
+  const orgId = orgIdByName(orgName);
 
   await page.addInitScript(([id, name]) => {
     localStorage.setItem('organizationSession', JSON.stringify({ organizationId: id, organizationName: name }));
@@ -121,10 +131,6 @@ export async function selectOrganization(page: Page, account: TestAccount) {
     localStorage.setItem('project-tour-completed', 'true');
   }, [orgId, orgName] as const);
 
-  // Some routing/redirect logic (e.g. Next.js middleware) runs server-side and
-  // only has access to cookies, not localStorage — so the org selection also
-  // needs to be mirrored into a cookie or the app will redirect to /select-org
-  // even though the client-side state looks correct.
   await page.context().addCookies([
     {
       name: 'organizationSession',
@@ -133,17 +139,12 @@ export async function selectOrganization(page: Page, account: TestAccount) {
     },
   ]);
 }
-
 export async function selectProject(page: Page, account: TestAccount) {
   const meta = accountMeta(account.name);
   if (!meta?.projectId) {
     throw new Error(`No projectId in registry for "${account.name}" — does this account provision a project?`);
   }
   const projectName = account.provision?.project ?? '';
-  // Matches ProjectSessionProvider's real shape: projectId is stored as
-  // whatever type is passed in (string | number in the interface) — the
-  // provider itself does no numeric coercion, so keep it as a string here
-  // matching the confirmed real localStorage shape ({"projectId":"13",...}).
   const serialized = JSON.stringify({ projectId: meta.projectId, projectName });
 
   // ProjectSessionProvider.setProject writes to both localStorage AND a
