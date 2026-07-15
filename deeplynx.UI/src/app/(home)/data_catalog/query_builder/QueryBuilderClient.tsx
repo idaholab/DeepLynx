@@ -694,37 +694,38 @@ export default function QueryBuilderClient({
 }: Props) {
   const { t } = useLanguage();
 
+  const connectorLabels: Record<string, string> = {
+    AND: t.translations.AND,
+    OR: t.translations.OR,
+  };
+
+  const filterLabels: Record<string, string> = {
+    class_name: t.translations.CLASS,
+    tags: t.translations.TAG,
+    original_id: t.translations.ORIGINAL_ID,
+    last_updated_at: t.translations.TIME_RANGE,
+    data_source_name: t.translations.DATA_SOURCE,
+    properties: t.translations.PROPERTIES,
+  };
+
+  const operatorLabels: Record<string, string> = {
+    LIKE: t.translations.LIKE,
+    KEY_VALUE: t.translations.KEY_VALUE,
+  };
+
   const translatedConnectors = connectors.map((c) => ({
     value: c,
-    label: c === "AND" ? t.translations.AND : c === "OR" ? t.translations.OR : c,
+    label: connectorLabels[c] ?? c,
   }));
 
   const translatedFilters = filters.map((f) => ({
     ...f,
-    name:
-      f.value === "class_name"
-        ? t.translations.CLASS
-        : f.value === "tags"
-          ? t.translations.TAG
-          : f.value === "original_id"
-            ? t.translations.ORIGINAL_ID
-            : f.value === "last_updated_at"
-              ? t.translations.TIME_RANGE
-              : f.value === "data_source_name"
-                ? t.translations.DATA_SOURCE
-                : f.value === "properties"
-                  ? t.translations.PROPERTIES
-                  : f.name,
+    name: filterLabels[f.value] ?? f.name,
   }));
 
   const translatedOperators = operators.map((o) => ({
     value: o,
-    label:
-      o === "LIKE"
-        ? t.translations.LIKE
-        : o === "KEY_VALUE"
-          ? t.translations.KEY_VALUE
-          : o,
+    label: operatorLabels[o] ?? o,
   }));
 
   // ---- State ----------------------------------------------------------------
