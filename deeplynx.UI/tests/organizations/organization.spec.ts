@@ -64,8 +64,21 @@ test.describe("Organizations", () => {
   test('Clicking the View All Organizations button opens Select Org', async ({ 
     page 
   }) => {
+    const dropdownTrigger = page.locator(
+      'header .dropdown [role="button"]',
+    );
+    await dropdownTrigger.click();
+
+    await page.pause();
+
+    const dropdownContent = page.locator(
+      "header .dropdown .dropdown-content",
+    );
+    await expect(
+      dropdownContent.getByText("View All Organizations"),
+    ).toBeVisible();
+
     await page.getByRole('link', { name: 'View All Organizations' }).click();
     await expect(page).toHaveURL('/select-org'); 
   });
-
 });

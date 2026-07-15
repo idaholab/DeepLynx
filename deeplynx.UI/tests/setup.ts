@@ -3,7 +3,10 @@ import { test as setup, request, APIRequestContext } from '@playwright/test';
 import jsonWebToken from 'jsonwebtoken';
 import fs from 'fs';
 import { loadEnvConfig } from "@next/env";
-import { ACTINGUSERS, ORGS, PROJECTS, DEFAULT_PROJECT_ROLE_NAME, TestAccount, authFile, testUserCacheFile } from './deeplynx-config';
+import {
+  ACTINGUSERS, ORGS, PROJECTS, DEFAULT_PROJECT_ROLE_NAME, TestAccount,
+  authFile, testUserCacheFile, TestUserCacheEntry,
+} from './deeplynx-config';
 
 loadEnvConfig(process.cwd());
 
@@ -77,7 +80,8 @@ async function saveStorageState(account: TestAccount, jwt: string, email: string
   fs.writeFileSync(authFile(account.name), JSON.stringify(state, null, 2));
 }
 
-// used to fetch the user email for the JWT claim
+// used to fetch the user email for the JWT claim, and (see resolveTestAccount)
+// to confirm a set of credentials still authenticates before reusing them.
 async function fetchCurrentUser(api: APIRequestContext, jwt: string): Promise<{ email: string }> {
   const res = await api.get(`${API_URL}/users/current`, {
     headers: { Authorization: `Bearer ${jwt}` },
@@ -102,6 +106,47 @@ async function upsertTestAccount(sysApi: APIRequestContext, account: TestAccount
   }
   const key = await keyRes.json();
   return { apiKey: key.apiKey, apiSecret: key.apiSecret, userId };
+}
+
+// ---- Reuse cached credentials (avoids POST /users/test minting a new user every run) --------
+// NOTE: /users/test and /oauth/keys/test do not appear to be idempotent by
+// name on the backend — calling them repeatedly creates a new user + key each
+// time. Rather than rely on the backend to dedupe, we persist each account's
+// apiKey/apiSecret/userId in testUserCache.json (same file as the resolved
+// org/project IDs — it's already gitignored under playwright/.auth/), and on
+// every run verify those credentials still work via GET /users/current
+// before ever calling upsertTestAccount again. Only a 401/expired/deleted
+// account falls back to creating a new one.
+function loadTestUserCache(): Record<string, TestUserCacheEntry> {
+  try {
+    return JSON.parse(fs.readFileSync(testUserCacheFile, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+async function resolveTestAccount(
+  sysApi: APIRequestContext,
+  anonApi: APIRequestContext,
+  account: TestAccount,
+  cache: Record<string, TestUserCacheEntry>,
+): Promise<{ apiKey: string; apiSecret: string; userId: string; jwt: string; email: string }> {
+  const cached = cache[account.name];
+
+  if (cached?.apiKey && cached?.apiSecret && cached?.userId) {
+    try {
+      const jwt = await generateJwt(anonApi, cached.apiKey, cached.apiSecret);
+      const { email } = await fetchCurrentUser(anonApi, jwt);
+      return { apiKey: cached.apiKey, apiSecret: cached.apiSecret, userId: cached.userId, jwt, email };
+    } catch (err) {
+      console.warn(`Cached credentials for "${account.name}" no longer valid, re-provisioning: ${err}`);
+    }
+  }
+
+  const { apiKey, apiSecret, userId } = await upsertTestAccount(sysApi, account);
+  const jwt = await generateJwt(anonApi, apiKey, apiSecret);
+  const { email } = await fetchCurrentUser(anonApi, jwt);
+  return { apiKey, apiSecret, userId, jwt, email };
 }
 
 // ---- Org / project resolution (find-or-create by name, run once per org/project) --------
@@ -162,7 +207,7 @@ async function ensureProjectId(sysApi: APIRequestContext, projectName: string, o
   return existing ?? (await createProject(sysApi, projectName, orgId));
 }
 
-// ---- Project roles (find-by-name; no creation — only built-in roles are supported) --------
+// ---- Project roles only supporting the default roles currently
 interface Role {
   id: number;
   name: string;
@@ -211,7 +256,7 @@ async function requireRoleId(
   return id;
 }
 
-// ---- Membership checks (skip add if already present — avoids duplicate-row errors on re-run) --------
+// ---- Membership checks will skip adding if already present
 interface UserSummary {
   id: number;
 }
@@ -222,7 +267,7 @@ async function isOrgMember(sysApi: APIRequestContext, orgId: string, userId: str
       organizationId: orgId,
       includeArchived: 'false',
       includeServiceAccounts: 'false',
-      includeTestAccounts: 'true', // provisioned accounts are test accounts — must be included or they won't appear
+      includeTestAccounts: 'true',
     },
   });
   if (!res.ok()) {
@@ -287,7 +332,7 @@ async function addUserToProject(
   }
 }
 
-// Every provisioned account gets an org membership row (admin flag depends on role).
+// Every test account (except for a sysAdmin) gets an org membership row.
 // If the account also provisions a project, it additionally gets a project membership
 // row. project_admin uses isProjectAdmin=true; standard resolves the built-in
 // non-admin project role by name and passes it as roleId. Custom roles are out of
@@ -321,7 +366,7 @@ async function assignRole(
   }
 }
 
-// ---- The setup test ----------------------------------------------------------
+// Main setup orchestration
 setup('provision and authenticate all TestAccounts', async () => {
   const sysKey = process.env.TEST_SYSADMIN_API_KEY;
   const sysSecret = process.env.TEST_SYSADMIN_SECRET;
@@ -342,8 +387,7 @@ setup('provision and authenticate all TestAccounts', async () => {
     extraHTTPHeaders: { Authorization: `Bearer ${sysJwt}` },
   });
 
-  // 2. Ensure every org/project from the config exists — run once each, up front,
-  //    independent of how many accounts reference them.
+  // 2. Ensure every org/project from the config exists
   const orgIdByName = new Map<string, string>();
   for (const org of Object.values(ORGS)) {
     orgIdByName.set(org.name, await ensureOrgId(sysApi, org.name));
@@ -358,16 +402,13 @@ setup('provision and authenticate all TestAccounts', async () => {
     projectIdByName.set(project.name, await ensureProjectId(sysApi, project.name, orgId));
   }
 
-  // 3. Each remaining account: upsert → key → JWT → identity → storage state → org/project lookup
-  const testUserCache: Record<string, { email: string; organizationId?: string; projectId?: string }> = {};
+  // 3. Each remaining account: reuse cached creds or create if needed
+  const testUserCache: Record<string, TestUserCacheEntry> = loadTestUserCache();
 
   for (const account of ACTINGUSERS.filter(a => a.provision)) {
-    const { apiKey, apiSecret, userId } = await upsertTestAccount(sysApi, account);
-    const jwt = await generateJwt(anonApi, apiKey, apiSecret);
-    const { email } = await fetchCurrentUser(anonApi, jwt);
+    const { apiKey, apiSecret, userId, jwt, email } = await resolveTestAccount(sysApi, anonApi, account, testUserCache);
     await saveStorageState(account, jwt, email);
 
-    // Pure lookups now — no network calls, no re-resolution.
     const orgId = account.provision!.org ? orgIdByName.get(account.provision!.org) : undefined;
     if (account.provision!.org && !orgId) {
       throw new Error(`Account "${account.name}" references unknown org "${account.provision!.org}"`);
@@ -379,8 +420,9 @@ setup('provision and authenticate all TestAccounts', async () => {
 
     await assignRole(sysApi, userId, account.provision!, orgId, projectId);
 
-    testUserCache[account.name] = { email, organizationId: orgId, projectId };
+    testUserCache[account.name] = { email, organizationId: orgId, projectId, userId, apiKey, apiSecret };
   }
 
+  fs.mkdirSync('playwright/.auth', { recursive: true });
   fs.writeFileSync(testUserCacheFile, JSON.stringify(testUserCache, null, 2));
 });

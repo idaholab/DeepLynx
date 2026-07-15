@@ -85,7 +85,16 @@ export const testUserCacheFile = 'playwright/.auth/testUserCache.json';
 // TestUserCache — resolved IDs written by auth.setup.ts, read by tests
 // ============================================================================
 
-type TestUserCache = Record<TestAccountTitle, { email: string; organizationId?: string; projectId?: string }>;
+export interface TestUserCacheEntry {
+  email: string;
+  organizationId?: string;
+  projectId?: string;
+  userId?: string;
+  apiKey?: string;
+  apiSecret?: string;
+}
+
+type TestUserCache = Record<TestAccountTitle, TestUserCacheEntry>;
 
 let cachedTestUsers: TestUserCache;
 function readTestUserCache(): TestUserCache {

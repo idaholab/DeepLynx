@@ -8,41 +8,31 @@ import {
 } from './deeplynx-config';
 
 type Fixtures = {
-  actAs: (account: TestAccount) => Promise<Page>;
-
-  // No default value. Every test file MUST declare
-  // `test.use({ actingUser: <account> })` — there is no implicit fallback
-  // account. This is intentional: silently defaulting to some account (even
-  // sysAdmin) hides which identity a test is actually running as.
-  actingUser: TestAccount;
-
-  // Org to select in the UI. Required when `actingUser` has no
-  // `provision.org` of its own (e.g. sysAdmin — not org-scoped by role, but
-  // org-scoped pages still need *some* organizationSession set to render).
-  // Declared per-file/describe: `test.use({ actingOrg: ORGS.orgA.name })`.
-  // No default — accounts that ARE provisioned into an org use that org
-  // automatically and don't need this set.
-  actingOrg: string;
-
-  page: Page;
+  actAs: (account: TestAccount) => Promise<Page>; // returns a logged in page for the provided test account.
+  actingUser: TestAccount; // the account a given test should run as.
+  actingOrg: string; // an optional override to force a specific organization context (needed for accounts like SysAdmin that aren't tied to one org).
+  page: Page; // this overrides Playwright's built-in page fixture.
 };
 
 export const test = base.extend<Fixtures>({
+  // actAs launches a new isolated browser context with the specified account's saved login session
   actAs: async ({ browser }, use) => {
+    // context is tracked
     const contexts: BrowserContext[] = [];
     await use(async (account) => {
       const context = await browser.newContext({ storageState: authFile(account.name) });
       contexts.push(context);
+      // returns a new page in that context
       return context.newPage();
     });
     await Promise.all(contexts.map((c) => c.close()));
   },
 
-  // `undefined` default + explicit check in `page` below is what forces
-  // every test file to declare this rather than silently inheriting one.
+  // forces every test file to explicitly declare actingUser
   actingUser: [undefined as unknown as TestAccount, { option: true }],
   actingOrg: [undefined as unknown as string, { option: true }],
 
+  // override logic of Playwright's Page fixture
   page: async ({ actAs, actingUser, actingOrg }, use) => {
     if (!actingUser) {
       throw new Error(
@@ -54,10 +44,9 @@ export const test = base.extend<Fixtures>({
     const page = await actAs(actingUser);
 
     if (actingUser.provision?.org) {
-      // Provisioned accounts always act in their own configured org —
-      // actingOrg is ignored here, since a test can't put a provisioned
-      // account into an org it wasn't set up for.
+      // accounts always act in their own configured org
       await selectOrganization(page, actingUser);
+      // if no org is configured acting org must be defined
     } else if (actingOrg) {
       await selectOrganization(page, actingUser, actingOrg);
     } else {
@@ -67,13 +56,15 @@ export const test = base.extend<Fixtures>({
       );
     }
 
+    // for a specific project ensure the the project session is set
     if (actingUser.provision?.project) {
       await selectProject(page, actingUser);
     }
 
+    // start at the root (will be redirected to the org select if no org session is set)
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.goto('/data_catalog/all_records', { waitUntil: 'domcontentloaded' });
-
+    
+    // hands the setup page to the test
     await use(page);
   },
 });

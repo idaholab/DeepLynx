@@ -5,6 +5,10 @@ test.use({ actingUser: sysAdmin});
 test.use({ actingOrg: "PW Org A"});
 
 test.describe("Data Catalog - All Records", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/data_catalog/all_records", { waitUntil: "domcontentloaded" });
+  });
+
   test("Data Catalog page renders with heading", async ({ page }) => {
     await expect(
       page.getByText(/data catalog/i).first(),
