@@ -77,7 +77,7 @@ public class GraphBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, null);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness);
     }
 
     protected override async Task SeedTestDataAsync()

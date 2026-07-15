@@ -29,7 +29,7 @@ public class ProjectBusiness : IProjectBusiness
 
     private readonly ILogger<ProjectBusiness> _logger;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
-    private readonly INotificationBusiness? _notificationBusiness;
+    private readonly INotificationBusiness _notificationBusiness;
     private readonly IOrganizationBusiness _organizationBusiness;
     private readonly IRoleBusiness _roleBusiness;
     private readonly TimeSpan cacheTTL = TimeSpan.FromHours(1);
@@ -43,6 +43,7 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="roleBusiness">Used to create default roles automatically on project creation.</param>
     /// <param name="dataSourceBusiness">Used to create a default datasource on project creation.</param>
     /// <param name="notificationBusiness">The business logic interface for handling notification operations.</param>
+    /// <param name="organizationBusiness">The business logic interface for handling organization operations.</param>
     /// <param name="eventBusiness">Used for logging events during create and update Operations.</param>
     /// <param name="logger">Used for uniformity in logging</param>
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
@@ -50,7 +51,7 @@ public class ProjectBusiness : IProjectBusiness
         DeeplynxContext context, ILogger<ProjectBusiness> logger,
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
-        IOrganizationBusiness organizationBusiness, INotificationBusiness? notificationBusiness)
+        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness)
     {
         _context = context;
         _logger = logger;

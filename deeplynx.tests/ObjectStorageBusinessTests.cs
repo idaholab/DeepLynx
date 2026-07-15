@@ -80,7 +80,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             _mockRoleBusiness.Object,
             _mockDataSourceBusiness.Object,
             _objectStorageBusiness,
-            _eventBusiness, _organizationBusiness.Object, null);
+            _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
     }
 
     #region ObjectStorageResponseDto Tests

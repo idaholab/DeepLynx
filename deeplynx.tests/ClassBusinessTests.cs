@@ -79,7 +79,7 @@ public class ClassBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, null);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
     }
 
     protected override async Task SeedTestDataAsync()
