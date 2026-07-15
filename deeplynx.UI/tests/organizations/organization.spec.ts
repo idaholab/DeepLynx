@@ -1,5 +1,9 @@
-import { test, expect } from "@playwright/test";
+import { sysAdmin } from "../deeplynx-config";
+import { test, expect } from "../fixtures";
 import { seedSession } from "../helpers/seed";
+
+test.use({ actingUser: sysAdmin});
+test.use({ actingOrg: "PW Org A"});
 
 test.describe("Organizations", () => {
   test.beforeEach(async ({ page }) => {
