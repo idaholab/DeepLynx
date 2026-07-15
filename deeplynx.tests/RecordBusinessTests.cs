@@ -56,6 +56,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public long lid; // sensitivity label ID
     public long uid;
     public long roleId;
+    public long eid; // embedding id for rid
 
     public RecordBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -275,7 +276,8 @@ public class RecordBusinessTests : IntegrationTestBase
                 LastUpdatedBy = uid,
                 Uri = "localhost:8090",
                 FileType = "pdf",
-                OrganizationId = organizationId
+                OrganizationId = organizationId,
+                Embedded = true,
             },
             new Record
             {
@@ -326,6 +328,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.Records.AddRange(testRecords);
         Context.Tags.Add(testTag);
         Context.SensitivityLabels.Add(testLabel);
+
         await Context.SaveChangesAsync();
 
         var testRole = new Role
@@ -361,6 +364,13 @@ public class RecordBusinessTests : IntegrationTestBase
         rdesc = testRecords[0].Description;
         ruri = testRecords[0].Uri;
         rfiletype = testRecords[0].FileType;
+
+        // For testing record embedding status with rid
+        // Must remain after Context.SaveChangesAsync() for rid to exist and satisfy foreign key constraints.
+        eid = await Context.Database.ExecuteSqlInterpolatedAsync($@"
+            INSERT INTO dl_vector.embeddings (record_id, page_number, text_chunk, vector, last_updated_at)
+            VALUES ({rid}, {0}, {""}, {"[0]"}::vector, {DateTime.UtcNow})");
+        await Context.SaveChangesAsync();
     }
 
     #region GetRecordsCountByDataSource Tests
@@ -4869,10 +4879,8 @@ public class RecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task SearchPaginated_EmbeddedFilter_ReturnsOnlyEmbeddedRecords()
     {
-        // Arrange - mark rid as embedded, leave the rest as not embedded
+        // Arrange - rid should already be marked as embedded from its initialization
         var record = await Context.Records.FindAsync(rid);
-        record!.Embedded = true;
-        await Context.SaveChangesAsync();
 
         var search = DefaultSearch();
         search.Embedding = "embedded";
@@ -4896,10 +4904,8 @@ public class RecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task SearchPaginated_NotEmbeddedFilter_ReturnsOnlyNotEmbeddedRecords()
     {
-        // Arrange - mark rid as embedded so we can confirm it is excluded
+        // Arrange - rid should already be marked as embedded from its initialization
         var record = await Context.Records.FindAsync(rid);
-        record!.Embedded = true;
-        await Context.SaveChangesAsync();
 
         var search = DefaultSearch();
         search.Embedding = "pending";
