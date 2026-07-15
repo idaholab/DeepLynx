@@ -193,6 +193,7 @@ public class RecordController : ControllerBase
     /// <returns>A paginated list of records based on the applied filters.</returns>
     [HttpGet("paginated", Name = "api_get_all_records_paginated")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetAllRecordsPaginatedV2(
@@ -276,6 +277,7 @@ public class RecordController : ControllerBase
     /// <returns>Paginated list of record response dtos from the query view that match provided query parameters</returns>
     [HttpGet("search/paginated", Name = "api_record_search_paginated")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> SearchPaginatedV2(
         long organizationId,
@@ -339,6 +341,7 @@ public class RecordController : ControllerBase
     /// <returns>A list of records that have all the specified tags.</returns>
     [HttpGet("by-tags", Name = "api_get_records_by_tags")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     [Auth("read", "tag")]
     [Sensitivity("read record")]
@@ -413,6 +416,7 @@ public class RecordController : ControllerBase
     /// <returns>A list of records matching the provided original IDs.</returns>
     [HttpPost("by-original-ids", Name = "api_get_records_by_original_ids")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetRecordsByOriginalIdV2(
@@ -486,6 +490,7 @@ public class RecordController : ControllerBase
     /// <returns>The record associated with the given ID</returns>
     [HttpGet("{recordId:long}", Name = "api_get_a_record")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<RecordResponseDto>> GetRecordV2(
@@ -555,6 +560,7 @@ public class RecordController : ControllerBase
     /// <returns>The record count for the given data source</returns>
     [HttpGet("count", Name = "api_get_records_count_by_data_source")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<int>> GetRecordsCountByDataSourceV2(
@@ -627,6 +633,7 @@ public class RecordController : ControllerBase
     /// <returns>The created record</returns>
     [HttpPost(Name = "api_create_a_record")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "record")]
     [Sensitivity("write record")]
     public async Task<ActionResult<RecordResponseDto>> CreateRecordV2(
@@ -712,6 +719,7 @@ public class RecordController : ControllerBase
     /// <returns>The created records</returns>
     [HttpPost("bulk", Name = "api_create_many_records")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "record")]
     [Sensitivity("write record")]
     public async Task<ActionResult<List<RecordResponseDto>>> BulkCreateRecordsV2(
@@ -786,6 +794,7 @@ public class RecordController : ControllerBase
     /// <returns>The updated record</returns>
     [HttpPut("{recordId:long}", Name = "api_update_a_record")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record")]
     [Sensitivity("update record")]
     public async Task<ActionResult<RecordResponseDto>> UpdateRecordV2(
@@ -843,6 +852,7 @@ public class RecordController : ControllerBase
     /// <returns>A message stating the record was successfully deleted.</returns>
     [HttpDelete("{recordId:long}", Name = "api_delete_a_record")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "record")]
     [Sensitivity("delete record")]
     public async Task<IActionResult> DeleteRecordV2(
@@ -904,6 +914,7 @@ public class RecordController : ControllerBase
     /// <returns>A message stating the record was successfully archived or unarchived.</returns>
     [HttpPatch("{recordId:long}", Name = "api_archive_record")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record")]
     [Sensitivity("update record")]
     public async Task<IActionResult> ArchiveRecordV2(
@@ -966,6 +977,7 @@ public class RecordController : ControllerBase
     /// <returns>A message stating the tag was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/tags", Name = "api_attach_a_tag")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record")]
     [Auth("read", "tag")]
     [Sensitivity("update record")]
@@ -1023,6 +1035,7 @@ public class RecordController : ControllerBase
     /// <returns>A message stating the tag was successfully unattached from the record.</returns>
     [HttpDelete("{recordId:long}/tags", Name = "api_unattach_a_tag")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record")]
     [Auth("read", "tag")]
     [Sensitivity("update record")]
@@ -1086,6 +1099,7 @@ public class RecordController : ControllerBase
     /// <returns>A message stating the tags were successfully attached to the records.</returns>
     [HttpPost("bulk-attach-tags-to-records", Name = "api_bulk_attach_tags_to_records")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record")]
     [Auth("read", "tag")]
     public async Task<IActionResult> BulkAttachTagsToRecordsV2(
@@ -1149,6 +1163,7 @@ public class RecordController : ControllerBase
     /// <returns>A message stating the tags were successfully unattached from the records.</returns>
     [HttpPost("bulk-unattach-tags-from-records", Name = "api_bulk_unattach_tags_from_records")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record")]
     [Auth("read", "tag")]
     public async Task<IActionResult> BulkUnattachTagsFromRecordsV2(
@@ -1206,6 +1221,7 @@ public class RecordController : ControllerBase
     /// <returns>A message stating the label was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/sensitivity-labels", Name = "api_attach_sensitivity_label")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record")]
     [Auth("read", "sensitivity_label")]
     [Sensitivity("update record")]
@@ -1268,6 +1284,7 @@ public class RecordController : ControllerBase
     /// <returns>Boolean value defining if the operation was successful.</returns>
     [HttpPost("bulk-attach-sensitivity-labels", Name = "api_bulk_attach_sensitivity_labels")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record")]
     [Auth("read", "sensitivity_label")]
     [Sensitivity("update record")]
@@ -1326,6 +1343,7 @@ public class RecordController : ControllerBase
     /// <returns>A message stating the label was successfully unattached from the record.</returns>
     [HttpDelete("{recordId:long}/sensitivity-labels", Name = "api_unattach_sensitivity-label")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record")]
     [Auth("read", "sensitivity_label")]
     [Sensitivity("update record")]
@@ -1389,6 +1407,7 @@ public class RecordController : ControllerBase
     /// <returns>A list of related records based on edges.</returns>
     [HttpGet("{recordId:long}/edges", Name = "api_get_edges_by_record")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     [Auth("read", "edge")]
     public async Task<ActionResult<IEnumerable<RelatedRecordsResponseDto>>> GetEdgesByRecordV2(
@@ -1446,6 +1465,7 @@ public class RecordController : ControllerBase
     /// <returns>Graph data including nodes and edges.</returns>
     [HttpGet("{recordId:long}/graph", Name = "api_get_graph_data_for_record")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     public async Task<ActionResult<GraphResponse>> GetGraphDataForRecordV2(
         long organizationId,
