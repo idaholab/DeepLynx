@@ -849,7 +849,7 @@ public class RecordController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record to delete</param>
-    /// <returns>A message stating the record was successfully deleted.</returns>
+    /// <returns>True if the record was successfully deleted</returns>
     [HttpDelete("{recordId:long}", Name = "api_delete_a_record")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -911,7 +911,7 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record to archive or unarchive</param>
     /// <param name="archive">True to archive the record, false to unarchive it.</param>
-    /// <returns>A message stating the record was successfully archived or unarchived.</returns>
+    /// <returns>True if the record was successfully archived or unarchived.</returns>
     [HttpPatch("{recordId:long}", Name = "api_archive_record")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -926,12 +926,12 @@ public class RecordController : ControllerBase
             var currentUserId = UserContextStorage.UserId;
             if (archive)
             {
-                await _recordBusiness.ArchiveRecord(currentUserId, organizationId, projectId, recordId);
-                return Ok(new { message = $"Archived record {recordId}" });
+                var responseA = await _recordBusiness.ArchiveRecord(currentUserId, organizationId, projectId, recordId);
+                return Ok(responseA);
             }
 
-            var response = await _recordBusiness.UnarchiveRecord(currentUserId, organizationId, projectId, recordId);
-            return Ok(response);
+            var responseB = await _recordBusiness.UnarchiveRecord(currentUserId, organizationId, projectId, recordId);
+            return Ok(responseB);
     }
 
     /// <summary>
@@ -974,7 +974,7 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record</param>
     /// <param name="tagId">The ID of the tag to attach</param>
-    /// <returns>A message stating the tag was successfully attached to the record.</returns>
+    /// <returns>True if the tag was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/tags", Name = "api_attach_a_tag")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -1032,7 +1032,7 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record</param>
     /// <param name="tagId">The ID of the tag to unattach</param>
-    /// <returns>A message stating the tag was successfully unattached from the record.</returns>
+    /// <returns>True if the tag was successfully unattached from the record.</returns>
     [HttpDelete("{recordId:long}/tags", Name = "api_unattach_a_tag")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -1096,7 +1096,7 @@ public class RecordController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="dtos">List of record/tag pairs to attach</param>
-    /// <returns>A message stating the tags were successfully attached to the records.</returns>
+    /// <returns>True if the tags were successfully attached to the records.</returns>
     [HttpPost("bulk-attach-tags-to-records", Name = "api_bulk_attach_tags_to_records")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -1160,7 +1160,7 @@ public class RecordController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="dtos">List of record/tag pairs to unattach</param>
-    /// <returns>A message stating the tags were successfully unattached from the records.</returns>
+    /// <returns>True if the tags were successfully unattached from the records.</returns>
     [HttpPost("bulk-unattach-tags-from-records", Name = "api_bulk_unattach_tags_from_records")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -1172,9 +1172,7 @@ public class RecordController : ControllerBase
         [FromBody] List<RecordTagLinkDto> dtos)
     {
             var currentUserId = UserContextStorage.UserId;
-
             var response = await _recordBusiness.BulkUnattachTags(currentUserId, organizationId, projectId, dtos);
-
             return Ok(response);
     }
 
@@ -1218,7 +1216,7 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record</param>
     /// <param name="sensitivityLabelId">The ID of the label to attach</param>
-    /// <returns>A message stating the label was successfully attached to the record.</returns>
+    /// <returns>True if the label was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/sensitivity-labels", Name = "api_attach_sensitivity_label")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -1340,7 +1338,7 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The ID of the record</param>
     /// <param name="sensitivityLabelId">The ID of the label to unattach</param>
-    /// <returns>A message stating the label was successfully unattached from the record.</returns>
+    /// <returns>True if the label was successfully unattached from the record.</returns>
     [HttpDelete("{recordId:long}/sensitivity-labels", Name = "api_unattach_sensitivity-label")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
