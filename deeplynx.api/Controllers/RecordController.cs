@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
@@ -15,6 +16,8 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to create, update, delete, and retrieve record information.
 /// </remarks>
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/records")]
 [Authorize]
 public class RecordController : ControllerBase
@@ -50,6 +53,7 @@ public class RecordController : ControllerBase
     /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
     /// <returns>A list of records based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_records")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetAllRecords(
@@ -78,6 +82,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
 
     /// <summary>
     ///     Get All Records Paginated
@@ -94,6 +99,7 @@ public class RecordController : ControllerBase
     /// <param name="paginatedDto">Pagination details</param>
     /// <returns>A paginated list of records based on the applied filters.</returns>
     [HttpGet("paginated", Name = "api_get_all_records_paginated")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetAllRecordsPaginated(
@@ -146,6 +152,7 @@ public class RecordController : ControllerBase
     /// <param name="paginated">Pagination parameters</param>
     /// <returns>Paginated list of record response dtos from the query view that match provided query parameters</returns>
     [HttpGet("search/paginated", Name = "api_record_search_paginated")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> SearchPaginated(
         long organizationId,
@@ -181,6 +188,7 @@ public class RecordController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
     /// <returns>A list of records that have all the specified tags.</returns>
     [HttpGet("by-tags", Name = "api_get_records_by_tags")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Auth("read", "tag")]
     [Sensitivity("read record")]
@@ -217,6 +225,7 @@ public class RecordController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
     /// <returns>A list of records matching the provided original IDs.</returns>
     [HttpPost("by-original-ids", Name = "api_get_records_by_original_ids")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetRecordsByOriginalId(
@@ -261,6 +270,7 @@ public class RecordController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
     /// <returns>The record associated with the given ID</returns>
     [HttpGet("{recordId:long}", Name = "api_get_a_record")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<RecordResponseDto>> GetRecord(
@@ -305,6 +315,7 @@ public class RecordController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
     /// <returns>The record count for the given data source</returns>
     [HttpGet("count", Name = "api_get_records_count_by_data_source")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<int>> GetRecordsCountByDataSource(
@@ -338,6 +349,7 @@ public class RecordController : ControllerBase
     /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <returns>The created record</returns>
     [HttpPost(Name = "api_create_a_record")]
+    [MapToApiVersion(1)]
     [Auth("write", "record")]
     [Sensitivity("write record")]
     public async Task<ActionResult<RecordResponseDto>> CreateRecord(
@@ -384,6 +396,7 @@ public class RecordController : ControllerBase
     /// <param name="sensitivityLabelIds">List of sensitivity labels that will be attached to created records</param>
     /// <returns>The created records</returns>
     [HttpPost("bulk", Name = "api_create_many_records")]
+    [MapToApiVersion(1)]
     [Auth("write", "record")]
     [Sensitivity("write record")]
     public async Task<ActionResult<List<RecordResponseDto>>> BulkCreateRecords(
@@ -429,6 +442,7 @@ public class RecordController : ControllerBase
     /// <param name="dto">The record request data transfer object containing updated record details</param>
     /// <returns>The updated record</returns>
     [HttpPut("{recordId:long}", Name = "api_update_a_record")]
+    [MapToApiVersion(1)]
     [Auth("update", "record")]
     [Sensitivity("update record")]
     public async Task<ActionResult<RecordResponseDto>> UpdateRecord(
@@ -464,6 +478,7 @@ public class RecordController : ControllerBase
     /// <param name="recordId">The ID of the record to delete</param>
     /// <returns>A message stating the record was successfully deleted.</returns>
     [HttpDelete("{recordId:long}", Name = "api_delete_a_record")]
+    [MapToApiVersion(1)]
     [Auth("write", "record")]
     [Sensitivity("delete record")]
     public async Task<IActionResult> DeleteRecord(
@@ -494,6 +509,7 @@ public class RecordController : ControllerBase
     /// <param name="archive">True to archive the record, false to unarchive it.</param>
     /// <returns>A message stating the record was successfully archived or unarchived.</returns>
     [HttpPatch("{recordId:long}", Name = "api_archive_record")]
+    [MapToApiVersion(1)]
     [Auth("update", "record")]
     [Sensitivity("update record")]
     public async Task<IActionResult> ArchiveRecord(
@@ -532,6 +548,7 @@ public class RecordController : ControllerBase
     /// <param name="tagId">The ID of the tag to attach</param>
     /// <returns>A message stating the tag was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/tags", Name = "api_attach_a_tag")]
+    [MapToApiVersion(1)]
     [Auth("update", "record")]
     [Auth("read", "tag")]
     [Sensitivity("update record")]
@@ -564,6 +581,7 @@ public class RecordController : ControllerBase
     /// <param name="tagId">The ID of the tag to unattach</param>
     /// <returns>A message stating the tag was successfully unattached from the record.</returns>
     [HttpDelete("{recordId:long}/tags", Name = "api_unattach_a_tag")]
+    [MapToApiVersion(1)]
     [Auth("update", "record")]
     [Auth("read", "tag")]
     [Sensitivity("update record")]
@@ -595,6 +613,7 @@ public class RecordController : ControllerBase
     /// <param name="dtos">List of record/tag pairs to attach</param>
     /// <returns>A message stating the tags were successfully attached to the records.</returns>
     [HttpPost("bulk-attach-tags-to-records", Name = "api_bulk_attach_tags_to_records")]
+    [MapToApiVersion(1)]
     [Auth("update", "record")]
     [Auth("read", "tag")]
     public async Task<IActionResult> BulkAttachTagsToRecords(
@@ -634,6 +653,7 @@ public class RecordController : ControllerBase
     /// <param name="dtos">List of record/tag pairs to unattach</param>
     /// <returns>A message stating the tags were successfully unattached from the records.</returns>
     [HttpPost("bulk-unattach-tags-from-records", Name = "api_bulk_unattach_tags_from_records")]
+    [MapToApiVersion(1)]
     [Auth("update", "record")]
     [Auth("read", "tag")]
     public async Task<IActionResult> BulkUnattachTagsFromRecords(
@@ -674,6 +694,7 @@ public class RecordController : ControllerBase
     /// <param name="sensitivityLabelId">The ID of the label to attach</param>
     /// <returns>A message stating the label was successfully attached to the record.</returns>
     [HttpPost("{recordId:long}/sensitivity-labels", Name = "api_attach_sensitivity_label")]
+    [MapToApiVersion(1)]
     [Auth("update", "record")]
     [Auth("read", "sensitivity_label")]
     [Sensitivity("update record")]
@@ -706,6 +727,7 @@ public class RecordController : ControllerBase
     /// <param name="sensitivityLabelIds">The ID of the labels that will be attached to all provided records by ID</param>
     /// <returns>Boolean value defining if the operation was successful.</returns>
     [HttpPost("bulk-attach-sensitivity-labels", Name = "api_bulk_attach_sensitivity_labels")]
+    [MapToApiVersion(1)]
     [Auth("update", "record")]
     [Auth("read", "sensitivity_label")]
     [Sensitivity("update record")]
@@ -743,6 +765,7 @@ public class RecordController : ControllerBase
     /// <param name="sensitivityLabelId">The ID of the label to unattach</param>
     /// <returns>A message stating the label was successfully unattached from the record.</returns>
     [HttpDelete("{recordId:long}/sensitivity-labels", Name = "api_unattach_sensitivity-label")]
+    [MapToApiVersion(1)]
     [Auth("update", "record")]
     [Auth("read", "sensitivity_label")]
     [Sensitivity("update record")]
@@ -777,6 +800,7 @@ public class RecordController : ControllerBase
     /// <param name="pageSize">Indicates the page size for pagination</param>
     /// <returns>A list of related records based on edges.</returns>
     [HttpGet("{recordId:long}/edges", Name = "api_get_edges_by_record")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Auth("read", "edge")]
     public async Task<ActionResult<IEnumerable<RelatedRecordsResponseDto>>> GetEdgesByRecord(
@@ -811,6 +835,7 @@ public class RecordController : ControllerBase
     /// <param name="depth">The number of levels you want to search through</param>
     /// <returns>Graph data including nodes and edges.</returns>
     [HttpGet("{recordId:long}/graph", Name = "api_get_graph_data_for_record")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     public async Task<ActionResult<GraphResponse>> GetGraphDataForRecord(
         long organizationId,
