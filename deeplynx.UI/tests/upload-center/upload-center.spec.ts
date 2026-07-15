@@ -248,4 +248,71 @@ test.describe("Upload Center", () => {
       expect(elapsedMs).toBeLessThan(TWENTY_MIN_MS);
     });
   });
+
+  test.describe("Upload multiple files", () => {
+    let filePaths: [string, string, string, string, string];
+
+    test.beforeEach(async ({ page }) => {
+      await seedAndNavigateToProject(page);
+
+      // Create the files locally
+      filePaths = [
+          path.join(os.tmpdir(), 'upload-test-file-one'),
+          path.join(os.tmpdir(), 'upload-test-file-two'),
+          path.join(os.tmpdir(), 'upload-test-file-three'),
+          path.join(os.tmpdir(), 'upload-test-file-four'),
+          path.join(os.tmpdir(), 'upload-test-file-five')
+      ]
+
+      for (const filePath of filePaths) {
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size !== 400 * 1024 * 1024) {
+          await fs.promises.writeFile(filePath, Buffer.alloc(1));
+          await fs.promises.truncate(filePath, 400 * 1024 * 1024);
+        }
+      }
+    });
+
+    test.afterAll(async () => {
+      for (const filePath in filePaths) {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+    });
+
+    test("uploads multiple files", async ({ page }) => {
+      test.setTimeout(120_000); // two minutes buffer time
+      const start = Date.now();
+
+      // Upload the files
+      await page.locator("aside a", { hasText: "Upload Center" }).click();
+      await page.waitForURL(/\/upload_center/);
+      await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
+
+      await checkDataSourcesAndStorageDestinations({ page });
+
+      await page.getByText('click to browse').click();
+      const fileInput = page.locator('input[type="file"]');
+      await fileInput.setInputFiles(filePaths);
+      await page.getByRole('button', { name: 'Upload' }).click();
+      await expect(page.getByText('Uploaded 5 file(s)')).toBeVisible({
+      timeout: 120_000,
+      });
+
+      // Navigate to Project Page
+      await page.locator("aside a", { hasText: "Project Dashboard" }).click();
+      await page.waitForURL(/\/project/);
+      await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+
+      await expect(page.getByText('upload-test-file-one')).toBeVisible();
+      await expect(page.getByText('upload-test-file-two')).toBeVisible();
+      await expect(page.getByText('upload-test-file-three')).toBeVisible();
+      await expect(page.getByText('upload-test-file-four')).toBeVisible();
+      await expect(page.getByText('upload-test-file-five')).toBeVisible();
+
+      const elapsedMs = Date.now() - start;
+
+      expect(elapsedMs).toBeLessThan(60_000);
+    });
+  });
 });
