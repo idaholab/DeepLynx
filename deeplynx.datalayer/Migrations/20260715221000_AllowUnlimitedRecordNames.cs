@@ -40,16 +40,22 @@ public partial class AllowUnlimitedRecordNames : Migration
     protected override void Down(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.Sql(@"
-            DO $$
+            DO $
+            DECLARE
+                over_limit bigint;
             BEGIN
-                IF EXISTS (
-                    SELECT 1
-                    FROM deeplynx.records
-                    WHERE length(name) > 500
-                ) THEN
-                    RAISE EXCEPTION 'Cannot restore the 500-character record name limit while longer values exist';
+                SELECT count(*) INTO over_limit
+                FROM deeplynx.records
+                WHERE length(name) > 500;
+
+                IF over_limit > 0 THEN
+                    RAISE WARNING 'Truncating % record name(s) to 500 characters during rollback', over_limit;
+
+                    UPDATE deeplynx.records
+                    SET name = left(name, 500)
+                    WHERE length(name) > 500;
                 END IF;
-            END $$;
+            END $;
 
             DROP VIEW deeplynx.query_records;
 
