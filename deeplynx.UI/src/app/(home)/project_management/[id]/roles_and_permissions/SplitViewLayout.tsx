@@ -532,7 +532,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                           ? t.translations.USER
                           : currentRole.name}
                     </h2>
-                    {isStandardRole(currentRole) && (
+                    {!isOrganizationRole(currentRole) && !isProjectRole(currentRole) && (
                       <div className="badge badge-info">
                         {t.translations.STANDARD_ROLE}
                       </div>
