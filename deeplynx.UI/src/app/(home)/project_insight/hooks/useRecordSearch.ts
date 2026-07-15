@@ -11,7 +11,14 @@ import {
   searchRecords,
   searchRecordsPaginated,
 } from "@/app/lib/client_service/record_services.client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import toast from "react-hot-toast";
 import {
   ProjectInsightRecord,
@@ -210,8 +217,13 @@ function useRecordSearchGeneric(
   const [status, setStatus] = useState<Record<number, ProjectInsightStatus>>(
     {},
   );
-
   const [error, setError] = useState("");
+
+  const [reloadKey, setReloadKey] = useState(0);
+
+  function forceReload() {
+    setReloadKey((prev) => prev + 1);
+  }
 
   function reset() {
     setRecords([]);
@@ -260,7 +272,9 @@ function useRecordSearchGeneric(
         );
         if (cancel) return;
 
-        setStatus(newStatus);
+        setStatus((previous) =>
+          updateStatusKeepQueuedOrProcessing(previous, newStatus),
+        );
       } catch (error) {
         reset();
         console.error("Failed to load project Insight records:", error);
@@ -284,6 +298,7 @@ function useRecordSearchGeneric(
     sources,
     filters,
     fetchRecords,
+    reloadKey,
   ]);
 
   return {
@@ -291,7 +306,9 @@ function useRecordSearchGeneric(
     setFilters,
     records,
     status,
+    setStatus,
     error,
+    forceReload,
   };
 }
 
@@ -301,7 +318,7 @@ async function fetchInsightStatus(
   record: ProjectInsightRecord,
   organizationId: number,
   projectId: number,
-) {
+): Promise<[number, ProjectInsightStatus]> {
   try {
     const ingestionStatus = await fetchInsightIngestionStatus({
       organizationId,
@@ -327,11 +344,12 @@ async function loadRecordStatus(
   newRecords: ProjectInsightRecord[],
   organizationId: number,
   projectId: number,
-  setStatus: (_: Record<number, ProjectInsightStatus>) => void,
-) {
+  setStatus: Dispatch<SetStateAction<Record<number, ProjectInsightStatus>>>,
+): Promise<[number, ProjectInsightStatus][]> {
   // Sets default values while they load
-  setStatus(
-    Object.fromEntries(
+  setStatus((previous: Record<number, ProjectInsightStatus>) =>
+    updateStatusKeepQueuedOrProcessing(
+      previous,
       newRecords.map((record) => [
         record.id,
         { state: "checking" } satisfies ProjectInsightStatus,
@@ -340,11 +358,24 @@ async function loadRecordStatus(
   );
 
   // Load the actual values
-  return Object.fromEntries(
-    await Promise.all(
-      newRecords.map(async (r) =>
-        fetchInsightStatus(r, organizationId, projectId),
-      ),
+  return await Promise.all(
+    newRecords.map(async (r) =>
+      fetchInsightStatus(r, organizationId, projectId),
     ),
   );
+}
+
+function updateStatusKeepQueuedOrProcessing(
+  previous: Record<number, ProjectInsightStatus>,
+  current: [number, ProjectInsightStatus][],
+): Record<number, ProjectInsightStatus> {
+  return {
+    ...Object.fromEntries(current),
+    ...Object.fromEntries(
+      Object.entries(previous).filter(
+        ([_, status]) =>
+          status.state === "queued" || status.state === "processing",
+      ),
+    ),
+  };
 }

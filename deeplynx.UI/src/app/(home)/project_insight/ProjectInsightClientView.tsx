@@ -21,7 +21,7 @@ import {
   AdjustmentsHorizontalIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import toast from "react-hot-toast";
 import ProjectInsightChat from "./components/ProjectInsightChat";
 import ProjectInsightFilters from "./components/ProjectInsightFilters";
@@ -66,26 +66,11 @@ export default function ProjectInsightClientView() {
   // View state
   const [classOptions, setClassOptions] = useState<NamedInsightOption[]>([]);
   const [tagOptions, setTagOptions] = useState<NamedInsightOption[]>([]);
-  const [statusMap, setStatusMap] = useState<
-    Record<number, ProjectInsightStatus>
-  >({});
   const [isQueryModelUnavailable, setIsQueryModelUnavailable] = useState(false);
   const [isUploadModelUnavailable, setIsUploadModelUnavailable] = useState(false);
   const [isEmbeddingModelUnavailable, setIsEmbeddingModelUnavailable] = useState(false);
   const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
   const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;  
-  const pollingKey = useMemo(
-      () =>
-          Object.entries(statusMap)
-              .filter(
-                  ([, status]) =>
-                      status.state === "queued" || status.state === "processing",
-              )
-              .map(([recordId]) => Number(recordId))
-              .sort((a, b) => a - b)
-              .join(","),
-      [statusMap],
-  );
   const [isLoadingRecords, setIsLoadingRecords] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [activeTabKey, setActiveTabKey] = useState<"library" | "pending">(
@@ -139,6 +124,7 @@ export default function ProjectInsightClientView() {
     total: embeddedTotal,
     found: embeddedFound,
     error: embeddedError,
+    forceReload: embeddedForceReload,
   } = useRecordSearch("embedded", classes, sources);
 
   const {
@@ -151,14 +137,12 @@ export default function ProjectInsightClientView() {
     setFilters: setPendingState,
     records: pending,
     status: pendingStatus,
+    setStatus: setPendingStatus,
     total: pendingTotal,
     found: pendingFound,
     error: pendingError,
+    forceReload: pendingForceReload,
   } = useRecordSearchPaginated(pageSize, "pending", classes, sources);
-
-  useEffect(() => {
-    setStatusMap({...embeddedStatus, ...pendingStatus});
-  }, [embeddedStatus, pendingStatus]);
 
   // Tab state helpers
   const {
@@ -172,22 +156,17 @@ export default function ProjectInsightClientView() {
     setPendingState,
   });
 
-  function retryRecordSearch() {
-    // Hacky solution that refreshes the search because the filters have "changed"
-    setLibraryState((state) => ({...state}));
-    setPendingState((state) => ({...state}));
+  function forceReload() {
+    pendingForceReload();
+    embeddedForceReload();
   }
 
-  useEffect(() => {
-    if (!organizationId || !projectId || !pollingKey || isEmbeddingModelUnavailable) return;
-
-    const pollingIds = pollingKey.split(",").map(Number);
-
-    let cancelled = false;
+  async function continuouslyPollStatus(queue: Set<number>) {
+    if (!organizationId || !projectId || isEmbeddingModelUnavailable || !queue.size) return;
 
     const pollStatuses = async () => {
       const updatedStatuses: Array<[number, ProjectInsightStatus]> = await Promise.all(
-        pollingIds.map(async (recordId) => {
+        [...queue].map(async (recordId) => {
           try {
             const ingestionStatus = await fetchInsightIngestionStatus({
               organizationId,
@@ -210,12 +189,16 @@ export default function ProjectInsightClientView() {
         }),
       );
 
-      if (cancelled) return;
-
-      setStatusMap((current) => {
+      setPendingStatus((current) => {
         let next: typeof current | undefined;
 
         for (const [recordId, newStatus] of updatedStatuses) {
+          if (newStatus.state !== "queued" && newStatus.state !== "processing")
+            queue.delete(recordId);
+
+          if (newStatus.state === "embedded")
+            forceReload(); // Embedded records need to be moved to the embedded section
+
           const oldStatus = current[recordId];
 
           const changed =
@@ -227,26 +210,18 @@ export default function ProjectInsightClientView() {
 
           next ??= { ...current };
           next[recordId] = newStatus;
-
-          if (newStatus.state === "embedded")
-            retryRecordSearch(); // Embedded records need to be moved to the embedded section
         }
 
         return next ?? current;
       });
-        
     };
 
     void pollStatuses();
     const interval = window.setInterval(() => {
       void pollStatuses();
+      if (!queue.size) window.clearInterval(interval); // no more, all done
     }, STATUS_POLL_INTERVAL_MS);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [organizationId, projectId, pollingKey, isEmbeddingModelUnavailable]);
+  }
 
   // Derived tab datasets
   const projectName = project?.projectName ?? "";
@@ -262,11 +237,11 @@ export default function ProjectInsightClientView() {
   useEffect(() => {
     setSelectedPendingIds((current) =>
       new Map([...current].filter(([recordId, _]) => {
-        const status = statusMap[recordId];
+        const status = pendingStatus[recordId];
         return status?.state !== "embedded";
       })),
     );
-  }, [statusMap]);
+  }, [pendingStatus]);
 
   useEffect(() => {
     setSelectedPendingIds(new Map());
@@ -321,7 +296,7 @@ export default function ProjectInsightClientView() {
     if (uploadFileInfo.length === 0) return;
 
     setIsQueueing(true);
-    setStatusMap((current) => ({
+    setPendingStatus((current) => ({
       ...current,
       ...Object.fromEntries(
         uploadFileInfo.map((file) => [file.fileId, { state: "queued" }]),
@@ -338,6 +313,8 @@ export default function ProjectInsightClientView() {
         embeddingModelConfigId:
           selectedInsightModels.embeddingModelConfigId ?? undefined,
       });
+      continuouslyPollStatus(new Set(selectedPendingIds.keys()));
+
       toast.success(
         withTokens(t.translations.PROJECT_INSIGHT_QUEUED_SUMMARY, {
           count: uploadFileInfo.length,
@@ -345,7 +322,7 @@ export default function ProjectInsightClientView() {
       );
     } catch (error) {
       console.error("Failed to queue project Insight uploads:", error);
-      setStatusMap((current) => ({
+      setPendingStatus((current) => ({
         ...current,
         ...Object.fromEntries(
           uploadFileInfo.map((file) => [
@@ -414,7 +391,7 @@ export default function ProjectInsightClientView() {
             key={record.id}
             projectId={projectId ?? 0}
             record={record}
-            status={getProjectInsightStatus(record, statusMap)}
+            status={getProjectInsightStatus(record, embeddedStatus)}
           />
         ))}
       </div>
@@ -470,7 +447,7 @@ export default function ProjectInsightClientView() {
     >
       <div className="space-y-2">
         {pending.map((record) => {
-          const status = getProjectInsightStatus(record, statusMap);
+          const status = getProjectInsightStatus(record, pendingStatus);
           const isSelectable =
             Boolean(record.uri) &&
             (status.state === "not_embedded" || status.state === "error");
