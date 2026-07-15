@@ -24,6 +24,8 @@ import {
   updateUserModelToken,
 } from "@/app/lib/client_service/user_model_token_services.client";
 import type { InsightModelSelection } from "./useInsightModelSelection";
+import { fetchInsightEndpointHealth } from "@/app/lib/client_service/insight_services.client";
+import type { InsightEndpointHealthByRole, InsightModelHealthState } from "@/app/lib/client_service/insight_services.client";
 
 type InsightSelectionSection = "query" | "upload" | "embedding";
 
@@ -34,6 +36,7 @@ interface InsightModelSettingsModalProps {
   selectedInsightModels: InsightModelSelection;
   onClose: () => void;
   onSaveSelection: (nextSelection: InsightModelSelection) => void;
+  endpointHealth?: InsightEndpointHealthByRole;
 }
 
 interface InsightModelSelectionCardProps {
@@ -46,6 +49,7 @@ interface InsightModelSelectionCardProps {
   savedUserTokensByConfigId: Record<number, UserModelTokenResponseDto>;
   onSelectedModelChange: (nextModelConfigId: number | null) => void;
   onOpenTokenEditor: () => void;
+  endpointHealth?: InsightModelHealthState;
 }
 
 interface InsightTokenEditorState {
@@ -148,6 +152,7 @@ function InsightModelSelectionCard({
   savedUserTokensByConfigId,
   onSelectedModelChange,
   onOpenTokenEditor,
+  endpointHealth,
 }: InsightModelSelectionCardProps) {
   const { t } = useLanguage();
   const selectedModelConfig =
@@ -219,6 +224,55 @@ function InsightModelSelectionCard({
           </span>
         )}
       </div>
+      {endpointHealth ? (
+          <div className="mt-3 rounded-box border border-base-300 bg-base-200/50 p-3 text-sm">
+            {endpointHealth.isChecking ? (
+                <div className="flex items-center gap-2 text-base-content/70">
+                  <span className="loading loading-spinner loading-xs" />
+                  <span>Checking endpoint health...</span>
+                </div>
+            ) : endpointHealth.response ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+          <span
+              className={`badge badge-sm ${
+                  endpointHealth.response.reachable &&
+                  endpointHealth.response.model_available
+                      ? "badge-success"
+                      : "badge-warning"
+              }`}
+          >
+            {endpointHealth.response.reachable &&
+            endpointHealth.response.model_available
+                ? "Healthy"
+                : "Unavailable"}
+          </span>
+
+                    {typeof endpointHealth.response.latency_ms === "number" ? (
+                        <span className="text-xs text-base-content/60">
+              {endpointHealth.response.latency_ms} ms
+            </span>
+                    ) : null}
+                  </div>
+
+                  {endpointHealth.response.detail ? (
+                      <p className="text-xs text-base-content/70">
+                        {endpointHealth.response.detail}
+                      </p>
+                  ) : null}
+                </div>
+            ) : endpointHealth.error ? (
+                <div className="space-y-2">
+                  <span className="badge badge-error badge-sm">Unavailable</span>
+                  <p className="text-xs text-base-content/70">{endpointHealth.error}</p>
+                </div>
+            ) : (
+                <span className="text-xs text-base-content/60">
+        Endpoint health has not been checked yet.
+      </span>
+            )}
+          </div>
+      ) : null}
     </div>
   );
 }
@@ -240,6 +294,7 @@ export default function InsightModelSettingsModal({
   selectedInsightModels,
   onClose,
   onSaveSelection,
+  endpointHealth,
 }: InsightModelSettingsModalProps) {
   const { t } = useLanguage();
   const { user } = useRBAC();
@@ -270,6 +325,7 @@ export default function InsightModelSettingsModal({
   const [isLoadingModelSettings, setIsLoadingModelSettings] = useState(false);
   const [isSavingUserToken, setIsSavingUserToken] = useState(false);
   const [tokenSaveError, setTokenSaveError] = useState("");
+  const [draftEndpointHealth, setDraftEndpointHealth] = useState<InsightEndpointHealthByRole | null>(null);
 
   const queryModelConfigs = useMemo(
     () =>
@@ -334,6 +390,102 @@ export default function InsightModelSettingsModal({
     savedUserTokensByConfigId,
   ]);
 
+  useEffect(() => {
+    if (
+        !isOpen ||
+        !resolvedOrganizationId ||
+        !resolvedProjectId ||
+        isLoadingModelSettings
+    ) {
+      setDraftEndpointHealth(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function checkDraftEndpointHealth() {
+      setDraftEndpointHealth({
+        query: { isChecking: true, response: null, error: null },
+        upload: { isChecking: true, response: null, error: null },
+        embedding: { isChecking: true, response: null, error: null },
+      });
+
+      const [queryHealth, uploadHealth, embeddingHealth] =
+          await Promise.allSettled([
+            fetchInsightEndpointHealth({
+              organizationId: resolvedOrganizationId,
+              projectId: resolvedProjectId,
+              modelConfigId: draftInsightModelSelection.queryModelConfigId,
+              modelType: "llm",
+            }),
+            fetchInsightEndpointHealth({
+              organizationId: resolvedOrganizationId,
+              projectId: resolvedProjectId,
+              modelConfigId: draftInsightModelSelection.uploadModelConfigId,
+              modelType: "vlm",
+            }),
+            fetchInsightEndpointHealth({
+              organizationId: resolvedOrganizationId,
+              projectId: resolvedProjectId,
+              modelConfigId: draftInsightModelSelection.embeddingModelConfigId,
+              modelType: "embedding",
+            }),
+          ]);
+
+      if (cancelled) return;
+
+      setDraftEndpointHealth({
+        query:
+            queryHealth.status === "fulfilled"
+                ? { isChecking: false, response: queryHealth.value, error: null }
+                : {
+                  isChecking: false,
+                  response: null,
+                  error:
+                      queryHealth.reason instanceof Error
+                          ? queryHealth.reason.message
+                          : "Query model health check failed",
+                },
+        upload:
+            uploadHealth.status === "fulfilled"
+                ? { isChecking: false, response: uploadHealth.value, error: null }
+                : {
+                  isChecking: false,
+                  response: null,
+                  error:
+                      uploadHealth.reason instanceof Error
+                          ? uploadHealth.reason.message
+                          : "Upload/OCR model health check failed",
+                },
+        embedding:
+            embeddingHealth.status === "fulfilled"
+                ? { isChecking: false, response: embeddingHealth.value, error: null }
+                : {
+                  isChecking: false,
+                  response: null,
+                  error:
+                      embeddingHealth.reason instanceof Error
+                          ? embeddingHealth.reason.message
+                          : "Embedding model health check failed",
+                },
+      });
+    }
+
+    void checkDraftEndpointHealth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    draftInsightModelSelection.queryModelConfigId,
+    draftInsightModelSelection.uploadModelConfigId,
+    draftInsightModelSelection.embeddingModelConfigId,
+    isLoadingModelSettings,
+    isOpen,
+    resolvedOrganizationId,
+    resolvedProjectId,
+  ]);
+  
   const modelSelectionSections = [
     {
       sectionKey: "query" as const,
@@ -342,6 +494,7 @@ export default function InsightModelSettingsModal({
       availableModelConfigs: queryModelConfigs,
       selectedModelConfigId: draftInsightModelSelection.queryModelConfigId,
       selectedModelName: draftInsightModelSelection.queryModelName,
+      endpointHealth: draftEndpointHealth?.query ?? endpointHealth?.query,
     },
     {
       sectionKey: "upload" as const,
@@ -350,6 +503,7 @@ export default function InsightModelSettingsModal({
       availableModelConfigs: uploadModelConfigs,
       selectedModelConfigId: draftInsightModelSelection.uploadModelConfigId,
       selectedModelName: draftInsightModelSelection.uploadModelName,
+      endpointHealth: draftEndpointHealth?.upload ?? endpointHealth?.upload,
     },
     {
       sectionKey: "embedding" as const,
@@ -358,6 +512,7 @@ export default function InsightModelSettingsModal({
       availableModelConfigs: embeddingModelConfigs,
       selectedModelConfigId: draftInsightModelSelection.embeddingModelConfigId,
       selectedModelName: draftInsightModelSelection.embeddingModelName,
+      endpointHealth: draftEndpointHealth?.embedding ?? endpointHealth?.embedding,
     },
   ];
 
@@ -635,6 +790,7 @@ export default function InsightModelSettingsModal({
                         openTokenEditor(selectedModelConfig);
                       }
                     }}
+                    endpointHealth={modelSelectionSection.endpointHealth}
                   />
                 ))}
               </div>

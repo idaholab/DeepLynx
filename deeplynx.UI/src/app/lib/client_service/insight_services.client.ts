@@ -61,6 +61,18 @@ export interface InsightEndpointHealthResponse {
   detail?: string | null;
 }
 
+export type InsightModelHealthState = {
+  isChecking: boolean;
+  response: InsightEndpointHealthResponse | null;
+  error: string | null;
+}
+
+export type InsightEndpointHealthByRole = {
+  query: InsightModelHealthState;
+  upload: InsightModelHealthState;
+  embedding: InsightModelHealthState;
+};
+
 interface InsightQueryRequestBody {
   question: string;
   file_ids?: number[];
@@ -333,3 +345,4 @@ export async function fetchInsightEndpointHealth(
   
   return responseBody as InsightEndpointHealthResponse;
 }
+
