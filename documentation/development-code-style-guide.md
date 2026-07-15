@@ -382,8 +382,10 @@ public class ClassProjectController : ControllerBase
         // Existing legacy behavior.
     }
 
+    /// <summary>Get Classes</summary>
     [HttpGet]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV2(...)
     {
         // New v2 behavior.
@@ -401,6 +403,10 @@ Versioning rules:
 - If an action is explicitly mapped with `[MapToApiVersion(1)]`, it is v1-only. To keep the same action available in v2, either omit `[MapToApiVersion]` when the controller declares both versions, or map the action to both versions intentionally.
 - Keep v1 behavior byte-for-byte compatible unless the ticket explicitly changes the v1 contract.
 - Put breaking response, status-code, route, request DTO, or error-contract changes in a new API version.
+- Add a Scalar version badge to an action introduced or changed in a newer API version. Use the uppercase major-version label and the standard badge styling: `[Badge("V2", BadgePosition.Before, "#72e6a1")]`.
+- Put version badges on the version-specific action, not on the controller. Unchanged actions inherited by the newer version should not be labeled as new.
+- Scalar badges are documentation metadata only. They do not replace `[ApiVersion]` or `[MapToApiVersion]` and do not affect routing.
+- Scalar renders operation badges in the endpoint details, but not in the sidebar. Keep operations in their normal functional group and do not duplicate tags solely to display version metadata in the sidebar.
 - Update OpenAPI/Scalar documentation and route smoke tests when adding a new API version.
 - Register new public API versions in `deeplynx.api/NexusApiVersions.cs`. This is the source of truth for default API versioning, supported versions, OpenAPI documents, and the Scalar document dropdown:
 
@@ -429,6 +435,24 @@ public static IReadOnlyList<string> OpenApiDocumentNames { get; } =
 ```
 
 Scalar loads versioned docs by document name, so a new API version is not visible in the Scalar dropdown until the matching document name is added to `OpenApiDocumentNames`.
+
+#### Scalar Version Badges
+
+Nexus enables Scalar's OpenAPI transformers for every versioned document. Import `Scalar.AspNetCore` in a controller before using the `Badge` annotation:
+
+```csharp
+using Scalar.AspNetCore;
+
+/// <summary>Create a Class</summary>
+[HttpPost]
+[MapToApiVersion(2)]
+[Badge("V2", BadgePosition.Before, "#72e6a1")]
+public async Task<ActionResult<ClassResponseDto>> CreateClassV2(...)
+```
+
+Use the badge label `V{major}`, such as `V2` or `V3`, so version badges remain consistent across controllers. Add the badge only to the version-specific action introduced or materially changed in that version. Do not badge an unchanged action that is inherited by a newer API version.
+
+The `Badge` annotation affects OpenAPI/Scalar documentation only. It does not assign an API version, constrain a route, or replace `[ApiVersion]` and `[MapToApiVersion]`. The versioned URL communicates which API document and route the user is viewing; the badge highlights the operations that differ in that version.
 
 `Program.cs` enables `ReportApiVersions`, so valid versioned controller responses include API version reporting headers:
 
