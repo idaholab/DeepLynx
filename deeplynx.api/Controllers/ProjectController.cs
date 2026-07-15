@@ -5,6 +5,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
@@ -62,6 +63,27 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get all projects
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to list projects from</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived projects from the result (Default true)</param>
+    /// <returns>A list of projects</returns>
+    [HttpGet(Name = "api_get_all_projects")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "project")]
+    public async Task<ActionResult<IEnumerable<ProjectResponseDto>>> GetAllProjectsV2(
+        long organizationId,
+        [FromQuery] bool hideArchived = true)
+    {
+            // get user ID from the middleware context
+            var currentUserId = UserContextStorage.UserId;
+            var projects = await _projectBusiness
+                .GetAllProjects(currentUserId, organizationId, hideArchived);
+            return Ok(projects);
+    }
 
     /// <summary>
     ///     Get all user projects
@@ -91,6 +113,27 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get all user projects
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to list projects from</param>
+    /// <param name="userId">ID of the user whose projects to retrieve</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived projects from the result (Default true)</param>
+    /// <returns>A list of projects</returns>
+    [HttpGet("GetProjectsByUser", Name = "api_get_all_projects_by_user")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "project")]
+    public async Task<ActionResult<IEnumerable<ProjectResponseDto>>> GetAllProjectsByUserV2(
+        long organizationId,
+        [FromQuery] long userId,
+        [FromQuery] bool hideArchived = true)
+    {
+            var projects = await _projectBusiness
+                .GetAllProjects(userId, organizationId, hideArchived);
+            return Ok(projects);
+    }
 
     /// <summary>
     ///     Get a Project
@@ -119,6 +162,26 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get a Project
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID by which to retrieve the project</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived projects from the result (Default true)</param>
+    /// <returns>The given project to return</returns>
+    [HttpGet("{projectId:long}", Name = "api_get_a_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "project")]
+    public async Task<ActionResult<ProjectResponseDto>> GetProjectV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] bool hideArchived = true)
+    {
+            var project = await _projectBusiness.GetProject(organizationId, projectId, hideArchived);
+            return Ok(project);
+    }
 
     /// <summary>
     ///     Create a Project
@@ -146,6 +209,26 @@ public class ProjectController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    ///     Create a Project
+    /// </summary>
+    /// <param name="organizationId">The organization to which the project will belong</param>
+    /// <param name="dto">A data transfer object with details on the new project to be created.</param>
+    /// <returns>The new project which was just created.</returns>
+    [HttpPost(Name = "api_create_a_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ForbidServiceAccounts]
+    [OrgMember]
+    public async Task<ActionResult<ProjectResponseDto>> CreateProjectV2(
+        long organizationId,
+        [FromBody] CreateProjectRequestDto dto)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var project = await _projectBusiness.CreateProject(currentUserId, organizationId, dto);
+            return Ok(project);
     }
 
     /// <summary>
@@ -176,6 +259,27 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Update a Project
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to update</param>
+    /// <param name="dto">A data transfer object with details on the project to be updated.</param>
+    /// <returns>The project which was just updated.</returns>
+    [HttpPut("{projectId:long}", Name = "api_update_a_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin]
+    public async Task<ActionResult<ProjectResponseDto>> UpdateProjectV2(
+        long organizationId,
+        long projectId,
+        [FromBody] UpdateProjectRequestDto dto)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var project = await _projectBusiness.UpdateProject(currentUserId, organizationId, projectId, dto);
+            return Ok(project);
+    }
 
     /// <summary>
     ///     Delete a Project
@@ -200,6 +304,23 @@ public class ProjectController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    ///     Delete a Project
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">ID of the project to delete.</param>
+    /// <returns>Boolean true on successful deletion.</returns>
+    [HttpDelete("{projectId:long}", Name = "api_delete_a_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin]
+    public async Task<IActionResult> DeleteProjectV2(long organizationId, long projectId)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var response = await _projectBusiness.DeleteProject(currentUserId, organizationId, projectId);
+            return Ok(response);
     }
 
     /// <summary>
@@ -237,6 +358,33 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Archive or Unarchive a Project
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to archive or unarchive</param>
+    /// <param name="archive">True to archive the project, false to unarchive it.</param>
+    /// <returns>A message stating the project was successfully archived or unarchived.</returns>
+    [HttpPatch("{projectId:long}", Name = "api_archive_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin(includeArchived: true)]
+    public async Task<IActionResult> ArchiveProjectV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] bool archive)
+    {
+            var userId = UserContextStorage.UserId;
+            if (archive)
+            {
+                await _projectBusiness.ArchiveProject(userId, organizationId, projectId);
+                return Ok(new { message = $"Archived project {projectId}" });
+            }
+
+            var response = await _projectBusiness.UnarchiveProject(userId, organizationId, projectId);
+            return Ok(response);
+    }
 
     /// <summary>
     ///     Get Project Stats
@@ -260,6 +408,22 @@ public class ProjectController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    ///     Get Project Stats
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">ID of the project to display stats about.</param>
+    /// <returns>Project stats</returns>
+    [HttpGet("{projectId:long}/stats", Name = "api_get_a_projects_stats")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin]
+    public async Task<ActionResult<ProjectStatResponseDto>> ProjectStatsV2(long organizationId, long projectId)
+    {
+       var stats = await _projectBusiness.GetProjectStats(organizationId, projectId);
+            return Ok(stats);
     }
 
     /// <summary>
@@ -285,6 +449,23 @@ public class ProjectController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    ///     Get Project Members
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">(Optional)ID of the project</param>
+    /// <returns>A list of groups and users in the project, along with their roles</returns>
+    [HttpGet("{projectId:long}/members", Name = "api_get_project_members")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "project")]
+    [Auth("read", "user")]
+    public async Task<ActionResult<IEnumerable<ProjectMemberResponseDto>>> GetProjectMembersV2(long organizationId, long projectId)
+    {
+            var members = await _projectBusiness.GetProjectMembers(projectId);
+            return Ok(members);
     }
 
     /// <summary>
@@ -318,6 +499,30 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Add User or Group to Project
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">ID of project</param>
+    /// <param name="roleId">(Optional) ID of member role</param>
+    /// <param name="userId">ID of user if user is member</param>
+    /// <param name="groupId">ID of group if group is member</param>
+    /// <param name="isProjectAdmin">Whether the member is a project admin. Defaults to false</param>
+    /// <returns></returns>
+    [HttpPost("{projectId:long}/members", Name = "api_add_member_to_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ForbidServiceAccounts]
+    [ProjectAdmin]
+    public async Task<ActionResult> AddMemberToProjectV2(
+        long organizationId, long projectId,
+        [FromQuery] long? roleId, [FromQuery] long? userId, [FromQuery] long? groupId,
+        [FromQuery] bool isProjectAdmin = false)
+    {
+        var response = await _projectBusiness.AddMemberToProject(projectId, roleId, userId, groupId, isProjectAdmin);
+        return Ok(response);
+    }
 
     /// <summary>
     ///     Update Member Role in Project
@@ -349,6 +554,29 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Update Member Role in Project
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">ID of project</param>
+    /// <param name="roleId">ID of role</param>
+    /// <param name="userId">ID of user if user is member</param>
+    /// <param name="groupId">ID of group if group is member</param>
+    /// <param name="isProjectAdmin">(optional) project admin status to set; left unchanged when omitted</param>
+    /// <returns></returns>
+    [HttpPut("{projectId:long}/members", Name = "api_update_project_member_role")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin]
+    public async Task<ActionResult> UpdateProjectMemberRoleV2(
+        long organizationId, long projectId,
+        [FromQuery] long roleId, [FromQuery] long? userId, [FromQuery] long? groupId,
+        [FromQuery] bool? isProjectAdmin = null)
+    {
+      var response = await _projectBusiness.UpdateProjectMemberRole(projectId, roleId, userId, groupId, isProjectAdmin);
+        return Ok(response);
+    }
 
     /// <summary>
     ///     Set Project Admin Status for a Project Member
@@ -379,6 +607,27 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Set Project Admin Status for a Project Member
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">ID of project</param>
+    /// <param name="userId">ID of user if user is member</param>
+    /// <param name="groupId">ID of group if group is member</param>
+    /// <param name="isAdmin">Project admin status to set the member to</param>
+    /// <returns></returns>
+    [HttpPut("{projectId:long}/admin", Name = "api_update_project_member_admin_status")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin]
+    public async Task<ActionResult> SetProjectAdminStatusV2(
+        long organizationId, long projectId,
+        [FromQuery] long? userId, [FromQuery] long? groupId, [FromQuery] bool isAdmin)
+    {
+       var response = await _projectBusiness.SetProjectAdminStatus(projectId, userId, groupId, isAdmin);
+            return Ok(response);
+    }
 
     /// <summary>
     ///     Remove User or Group from Project
@@ -408,6 +657,28 @@ public class ProjectController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    ///     Remove User or Group from Project
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the project belongs</param>
+    /// <param name="projectId">ID of the project</param>
+    /// <param name="userId">ID of the user if user is member</param>
+    /// <param name="groupId">ID of the group if group is member</param>
+    /// <returns></returns>
+    [HttpDelete("{projectId:long}/members", Name = "api_remove_member_from_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin]
+    public async Task<ActionResult> RemoveMemberFromProjectV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] long? userId,
+        [FromQuery] long? groupId)
+    {
+        var response = await _projectBusiness.RemoveMemberFromProject(projectId, userId, groupId);
+            return Ok(response);
     }
 
     /// <summary>
@@ -449,6 +720,34 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Invite/Add User to Project
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="userEmail"></param>
+    /// <param name="userId"></param>
+    /// <param name="groupId"></param>
+    /// <param name="roleId"></param>
+    /// <returns></returns>
+    [HttpPost("{projectId:long}/invite", Name = "api_invite_user_to_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ForbidServiceAccounts]
+    [ProjectAdmin]
+    public async Task<ActionResult> InviteUserToProjectV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] string? userEmail,
+        [FromQuery] long? userId,
+        [FromQuery] long? groupId,
+        [FromQuery] long? roleId)
+    {
+       var response = await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, projectId, groupId, roleId, userId,
+                userEmail);
+            return Ok(response);
+    }
 
     /// <summary>
     /// Create and add service account to project
@@ -483,5 +782,32 @@ public class ProjectController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    /// Create and add service account to project
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="roleId"></param>
+    /// <param name="name"></param>
+    /// <param name="makeProjectAdmin"></param>
+    /// <returns></returns>
+    [HttpPost("{projectId:long}/invite/serviceAccount", Name = "api_add_service_account")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Tags("Service Accounts")]
+    [ForbidServiceAccounts]
+    [ProjectAdmin]
+    public async Task<ActionResult> CreateAndAddServiceAccountToProjectV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] string name,
+        [FromQuery] long? roleId,
+        [FromQuery] bool makeProjectAdmin = false)
+    {
+        
+        var response = await _invitationBusiness.CreateAndAddServiceAccountToProject(organizationId, projectId, name, roleId, makeProjectAdmin);
+            return Ok(response);
     }
 }
