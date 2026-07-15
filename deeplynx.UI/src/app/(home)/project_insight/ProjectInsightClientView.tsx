@@ -44,7 +44,7 @@ import {
 } from "./components/projectInsight.view-utils";
 import { useProjectInsightTabState } from "./hooks/useProjectInsightTabState";
 import { BetaBadge } from "@/app/(home)/components/BetaBadge";
-import useRecordSearch from "./hooks/useRecordSearch";
+import { useRecordSearchPaginated, useRecordSearch } from "./hooks/useRecordSearch";
 import PaginationControls from "../components/PaginationControls";
 
 const STATUS_POLL_INTERVAL_MS = 5000;
@@ -132,11 +132,6 @@ export default function ProjectInsightClientView() {
   const pageSize = 10;
 
   const {
-    page: embeddedPage,
-    setPage: setEmbeddedPage,
-    pageSize: embeddedPageSize,
-    setPageSize: setEmbeddedPageSize,
-    totalPages: embeddedTotalPages,
     filters: libraryState,
     setFilters: setLibraryState,
     records: embedded,
@@ -144,7 +139,7 @@ export default function ProjectInsightClientView() {
     total: embeddedTotal,
     found: embeddedFound,
     error: embeddedError,
-  } = useRecordSearch(pageSize, "embedded", classes, sources);
+  } = useRecordSearch("embedded", classes, sources);
 
   const {
     page: pendingPage,
@@ -159,7 +154,7 @@ export default function ProjectInsightClientView() {
     total: pendingTotal,
     found: pendingFound,
     error: pendingError,
-  } = useRecordSearch(pageSize, "pending", classes, sources);
+  } = useRecordSearchPaginated(pageSize, "pending", classes, sources);
 
   useEffect(() => {
     setStatusMap({...embeddedStatus, ...pendingStatus});
@@ -404,7 +399,7 @@ export default function ProjectInsightClientView() {
       count={embeddedTotal}
       emptyMessage={t.translations.PROJECT_INSIGHT_EMBEDDED_EMPTY}
     >
-      <div className="space-y-3">
+      <div className="space-y-1">
         {embedded.map((record) => (
           <ProjectInsightRecordCard
             key={record.id}
@@ -464,7 +459,7 @@ export default function ProjectInsightClientView() {
         ) : undefined
       }
     >
-      <div className="space-y-3">
+      <div className="space-y-2">
         {pending.map((record) => {
           const status = getProjectInsightStatus(record, statusMap);
           const isSelectable =
@@ -568,7 +563,7 @@ export default function ProjectInsightClientView() {
           </section>
 
           <aside className="card card-border bg-base-100 shadow-md shadow-base-content/10 xl:h-full xl:min-h-0">
-            <div className="card-body h-full min-h-0 gap-4 p-4 sm:p-5">
+            <div className="card-body h-full min-h-0 gap-2 p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex gap-3 items-center">
@@ -613,11 +608,21 @@ export default function ProjectInsightClientView() {
               </div>
 
               <div className="card bg-base-100">
-                <div className="card-body gap-4 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="card-body gap-2 p-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <SearchBar
+                      className="flex-1 min-w-[160px]"
+                      value={activeSearchQuery}
+                      onChange={(event) => updateActiveSearchQuery(event.target.value)}
+                      onEnter={updateActiveSearchQuery}
+                      onClearAll={clearActiveSearchQuery}
+                      placeholder={activeSearchPlaceholder}
+                      aditionalFilters={false}
+                    />
+
                     <button
                       type="button"
-                      className="btn btn-outline btn-sm gap-2"
+                      className="btn btn-outline btn-sm gap-2 shrink-0"
                       onClick={() => setIsFiltersOpen(true)}
                     >
                       <AdjustmentsHorizontalIcon className="size-4" />
@@ -629,18 +634,6 @@ export default function ProjectInsightClientView() {
                       )}
                     </button>
                   </div>
-
-                  <SearchBar
-                    className="w-full"
-                    value={activeSearchQuery}
-                    onChange={(event) =>
-                      updateActiveSearchQuery(event.target.value)
-                    }
-                    onEnter={updateActiveSearchQuery}
-                    onClearAll={clearActiveSearchQuery}
-                    placeholder={activeSearchPlaceholder}
-                    aditionalFilters={false}
-                  />
 
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-2">
@@ -677,14 +670,8 @@ export default function ProjectInsightClientView() {
 
               {activeTabKey === "library" ? libraryContent : pendingContent}
 
-              {(activeTabKey === "library") ?
+              {(activeTabKey !== "library") &&
                 <PaginationControls
-                  currentPage={embeddedPage}
-                  pageSize={embeddedPageSize}
-                  totalPages={embeddedTotalPages}
-                  onPageChange={setEmbeddedPage}
-                  onPageSizeChange={setEmbeddedPageSize}
-                /> : <PaginationControls
                   currentPage={pendingPage}
                   pageSize={pendingPageSize}
                   totalPages={pendingTotalPages}
