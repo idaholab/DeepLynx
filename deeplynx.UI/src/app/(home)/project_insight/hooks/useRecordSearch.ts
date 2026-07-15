@@ -1,13 +1,17 @@
 import type {
   ClassResponseDto,
   DataSourceResponseDto,
+  RecordResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { fetchInsightIngestionStatus } from "@/app/lib/client_service/insight_services.client";
-import { searchRecordsPaginated } from "@/app/lib/client_service/record_services.client";
-import { useEffect, useRef, useState } from "react";
+import {
+  searchRecords,
+  searchRecordsPaginated,
+} from "@/app/lib/client_service/record_services.client";
+import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ProjectInsightRecord,
@@ -20,11 +24,171 @@ import {
 } from "../components/projectInsight.view-utils";
 import { mapProjectInsightRecords } from "../components/projectInsight.utils";
 
-export default function useRecordSearch(
+// ============================== NON-PAGINATED RECORD SEARCH ==============================
+
+/**
+ *
+ * @param embedding The record Insight embedding status
+ * @param classes Required record classes
+ * @param sources Required
+ * @returns
+ */
+export function useRecordSearch(
+  embedding: "embedded" | "pending",
+  classes: ClassResponseDto[] | null,
+  sources: DataSourceResponseDto[] | null,
+) {
+  const { t } = useLanguage();
+
+  const [total, setTotal] = useState(0);
+  const [found, setFound] = useState(0);
+
+  function reset() {
+    setTotal(0);
+  }
+
+  const fetchRecords = useCallback(
+    async (
+      organizationId: number,
+      projectId: number,
+      filters: TabFilterState,
+      embedding: "embedded" | "pending",
+      cancel: () => boolean,
+    ) => {
+      const recordDtos = await searchRecords(organizationId, projectId, {
+        userQuery: filters.searchQuery,
+        tagIds: filters.tagIds,
+        classIds: filters.classIds,
+        embedding,
+        isInsightEligible: true,
+        hideArchived: true,
+      });
+      if (cancel()) return [];
+
+      // for first time loading. This is a hacky solution to find the total number of records with the initial empty filter search
+      setTotal((t) => Math.max(t, recordDtos.length));
+      setFound(recordDtos.length);
+
+      return recordDtos;
+    },
+    [t],
+  );
+
+  const search = useRecordSearchGeneric(
+    embedding,
+    classes,
+    sources,
+    fetchRecords,
+    reset,
+  );
+
+  return {
+    ...search,
+    total,
+    found,
+  };
+}
+
+// ============================== PAGINATED RECORD SEARCH ==============================
+
+export function useRecordSearchPaginated(
   initialPageSize: number,
   embedding: "embedded" | "pending",
   classes: ClassResponseDto[] | null,
   sources: DataSourceResponseDto[] | null,
+) {
+  const { t } = useLanguage();
+
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [found, setFound] = useState(0);
+  const [pageSize, setPageSize] = useState(initialPageSize);
+
+  const prePageSize = useRef(initialPageSize);
+  const preFilters = useRef(EMPTY_TAB_FILTER_STATE);
+
+  function reset() {
+    setFound(0);
+    setTotal(0);
+    setTotalPages(0);
+    setPage(1);
+  }
+
+  const fetchRecords = useCallback(
+    async (
+      organizationId: number,
+      projectId: number,
+      filters: TabFilterState,
+      embedding: "embedded" | "pending",
+      cancel: () => boolean,
+    ) => {
+      const recordDtos = await searchRecordsPaginated(
+        organizationId,
+        projectId,
+        {
+          userQuery: filters.searchQuery,
+          tagIds: filters.tagIds,
+          classIds: filters.classIds,
+          embedding,
+          isInsightEligible: true,
+          hideArchived: true,
+        },
+        pageSize,
+        prePageSize.current !== pageSize ? 1 : page,
+      );
+      if (cancel()) return [];
+
+      // avoids trying to load a page out of bounds
+      if (prePageSize.current !== pageSize || preFilters.current !== filters)
+        setPage(1);
+      prePageSize.current = pageSize;
+      preFilters.current = filters;
+
+      setFound(recordDtos.totalCount);
+      // for first time loading. This is a hacky solution to find the total number of records with the initial empty filter search
+      setTotal((t) => Math.max(t, recordDtos.totalCount));
+      setTotalPages(recordDtos.totalPages);
+
+      return recordDtos.items;
+    },
+    [t, page, pageSize],
+  );
+
+  const search = useRecordSearchGeneric(
+    embedding,
+    classes,
+    sources,
+    fetchRecords,
+    reset,
+  );
+
+  return {
+    ...search,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalPages,
+    total,
+    found,
+  };
+}
+
+// ============================== GENERIC RECORD SEARCH ==============================
+
+function useRecordSearchGeneric(
+  embedding: "embedded" | "pending",
+  classes: ClassResponseDto[] | null,
+  sources: DataSourceResponseDto[] | null,
+  fetchRecords: (
+    organizationId: number,
+    projectId: number,
+    filters: TabFilterState,
+    embedding: "embedded" | "pending",
+    cancel: () => boolean,
+  ) => Promise<RecordResponseDto[]>,
+  resetState: () => void,
 ) {
   const { t } = useLanguage();
 
@@ -43,80 +207,17 @@ export default function useRecordSearch(
     EMPTY_TAB_FILTER_STATE,
   );
   const [records, setRecords] = useState<ProjectInsightRecord[]>([]);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [found, setFound] = useState(0);
-  const [pageSize, setPageSize] = useState(initialPageSize);
-
-  const prePageSize = useRef(initialPageSize);
-  const preFilters = useRef(filters);
-
   const [status, setStatus] = useState<Record<number, ProjectInsightStatus>>(
     {},
   );
 
   const [error, setError] = useState("");
 
-  async function fetchInsightStatus(
-    record: ProjectInsightRecord,
-    organizationId: number,
-    projectId: number,
-  ) {
-    try {
-      const ingestionStatus = await fetchInsightIngestionStatus({
-        organizationId,
-        projectId,
-        fileId: record.id,
-      });
-      return [
-        record.id,
-        ingestionStatus.indexed
-          ? {
-              state: "embedded",
-              chunkCount: ingestionStatus.chunk_count,
-              pageCount: ingestionStatus.page_count,
-            }
-          : { state: "not_embedded" },
-      ] as const;
-    } catch (error) {
-      return [record.id, getStatusFromError(error)] as const;
-    }
-  }
-
-  async function loadRecordStatus(
-    newRecords: ProjectInsightRecord[],
-    organizationId: number,
-    projectId: number,
-  ) {
-    // Sets default values while they load
-    setStatus(
-      Object.fromEntries(
-        newRecords.map((record) => [
-          record.id,
-          { state: "checking" } satisfies ProjectInsightStatus,
-        ]),
-      ),
-    );
-
-    // Load the actual values
-    return Object.fromEntries(
-      await Promise.all(
-        newRecords.map(async (r) =>
-          fetchInsightStatus(r, organizationId, projectId),
-        ),
-      ),
-    );
-  }
-
   function reset() {
     setRecords([]);
-    setFound(0);
     setStatus({});
-    setTotal(0);
-    setTotalPages(0);
-    setPage(1);
     setError("");
+    resetState();
   }
 
   useEffect(() => {
@@ -133,46 +234,29 @@ export default function useRecordSearch(
       setError("");
 
       try {
-        const recordDtos = await searchRecordsPaginated(
+        const recordDtos = await fetchRecords(
           organizationId,
           projectId,
-          {
-            userQuery: filters.searchQuery,
-            tagIds: filters.tagIds,
-            classIds: filters.classIds,
-            embedding,
-            isInsightEligible: true,
-            hideArchived: true,
-          },
-          pageSize,
-          prePageSize.current !== pageSize ? 1 : page,
+          filters,
+          embedding,
+          () => cancel,
         );
         if (cancel) return;
 
-        // avoids trying to load a page out of bounds
-        if (prePageSize.current !== pageSize || preFilters.current !== filters)
-          setPage(1);
-        prePageSize.current = pageSize;
-        preFilters.current = filters;
-
         // append records
         const newRecords = mapProjectInsightRecords(
-          recordDtos.items,
+          recordDtos,
           classes,
           sources,
         );
-
         setRecords(newRecords);
-        setFound(recordDtos.totalCount);
-        // for first time loading. This is a hacky solution to find the total number of records with the initial empty filter search
-        setTotal((t) => Math.max(t, recordDtos.totalCount));
-        setTotalPages(recordDtos.totalPages);
 
         // append status map
         var newStatus = await loadRecordStatus(
           newRecords,
           organizationId,
           projectId,
+          setStatus,
         );
         if (cancel) return;
 
@@ -192,8 +276,6 @@ export default function useRecordSearch(
     };
   }, [
     t,
-    page,
-    pageSize,
     hasProjectLoaded,
     hasOrganizationLoaded,
     projectId,
@@ -201,20 +283,68 @@ export default function useRecordSearch(
     classes,
     sources,
     filters,
+    fetchRecords,
   ]);
 
   return {
-    page,
-    setPage,
-    pageSize,
-    setPageSize,
-    totalPages,
     filters,
     setFilters,
     records,
     status,
-    total,
-    found,
     error,
   };
+}
+
+// ============================== INSIGHT STATUS FUNCTIONS ==============================
+
+async function fetchInsightStatus(
+  record: ProjectInsightRecord,
+  organizationId: number,
+  projectId: number,
+) {
+  try {
+    const ingestionStatus = await fetchInsightIngestionStatus({
+      organizationId,
+      projectId,
+      fileId: record.id,
+    });
+    return [
+      record.id,
+      ingestionStatus.indexed
+        ? {
+            state: "embedded",
+            chunkCount: ingestionStatus.chunk_count,
+            pageCount: ingestionStatus.page_count,
+          }
+        : { state: "not_embedded" },
+    ] as const;
+  } catch (error) {
+    return [record.id, getStatusFromError(error)] as const;
+  }
+}
+
+async function loadRecordStatus(
+  newRecords: ProjectInsightRecord[],
+  organizationId: number,
+  projectId: number,
+  setStatus: (_: Record<number, ProjectInsightStatus>) => void,
+) {
+  // Sets default values while they load
+  setStatus(
+    Object.fromEntries(
+      newRecords.map((record) => [
+        record.id,
+        { state: "checking" } satisfies ProjectInsightStatus,
+      ]),
+    ),
+  );
+
+  // Load the actual values
+  return Object.fromEntries(
+    await Promise.all(
+      newRecords.map(async (r) =>
+        fetchInsightStatus(r, organizationId, projectId),
+      ),
+    ),
+  );
 }
