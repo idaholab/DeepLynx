@@ -6,7 +6,6 @@ import type {
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
-import { fetchInsightIngestionStatus } from "@/app/lib/client_service/insight_services.client";
 import {
   searchRecords,
   searchRecordsPaginated,
@@ -19,7 +18,6 @@ import {
 } from "../components/projectInsight.types";
 import {
   EMPTY_TAB_FILTER_STATE,
-  getStatusFromError,
   TabFilterState,
 } from "../components/projectInsight.view-utils";
 import { mapProjectInsightRecords } from "../components/projectInsight.utils";
