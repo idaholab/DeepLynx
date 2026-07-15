@@ -53,14 +53,13 @@ Do not accept EF entities as API request bodies. Use request DTOs.
 
 The API is hosted by `deeplynx.api/Program.cs`.
 
-The app applies a base path:
+The app uses URL-segment API versioning:
 
-```csharp
-PathString basePath = "/api/v1";
-app.UsePathBase(basePath);
+```text
+api/v{version:apiVersion}/
 ```
 
-Controller routes are written relative to `/api/v1`. For example:
+Controller routes are written without the version prefix. A global route-prefix convention adds the versioned API prefix at startup. For example:
 
 ```csharp
 [Route("organizations/{organizationId:long}/projects")]
@@ -71,6 +70,8 @@ The resulting API path is:
 ```text
 /api/v1/organizations/{organizationId}/projects
 ```
+
+Controllers that have not been explicitly versioned are treated as unchanged APIs by the default API version convention. They are currently registered for both v1 and v2 so endpoints without version-specific behavior remain visible and callable from either Scalar document.
 
 ### API Startup Flow
 
@@ -93,13 +94,14 @@ The resulting API path is:
 Middleware order matters. The current API pipeline is:
 
 ```csharp
-app.UsePathBase(basePath);
 app.UseStaticFiles();
 app.UseRouting();
+app.UseExceptionHandler();
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseMiddleware<UserContextMiddleware>();
 app.UseMiddleware<AuthMiddleware>();
+app.UseMiddleware<FeatureFlagMiddleware>();
 app.UseMiddleware<SensitivityMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
@@ -123,6 +125,7 @@ Controllers should:
 - Inject business interfaces and `ILogger<T>`.
 - Use explicit `ActionResult<T>` return types so OpenAPI includes DTO schemas.
 - Apply `[Auth]`, `[SysAdmin]`, or `[OrgAdmin]` attributes to protected endpoints.
+- Use `[ForbidServiceAccounts]` on endpoints service accounts should not be able to access.
 - Keep route methods small.
 - Catch exceptions, log failures, and return an API response.
 
@@ -355,6 +358,132 @@ Compatibility rules:
 - Preserve existing success status codes unless the ticket explicitly changes the API contract.
 - If a breaking change is required, call it out in the PR description and update API documentation.
 
+### API Versioning
+
+Nexus uses URL-segment API versioning. Public controller routes are shaped as:
+
+```text
+/api/v{version}/...
+```
+
+Do not put the `api/v1` prefix in controller `[Route]` attributes. Controller routes should stay resource-focused:
+
+```csharp
+[ApiController]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
+public class ClassProjectController : ControllerBase
+{
+}
+```
+
+Existing unannotated controllers are registered for the currently supported default versions. Do not add `[ApiVersion(1)]` or `[ApiVersion(2)]` to every controller or action just for consistency. That creates churn without changing behavior.
+
+When a controller starts supporting a new API version, make that controller's supported versions explicit:
+
+```csharp
+[ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
+public class ClassProjectController : ControllerBase
+{
+    [HttpGet]
+    [MapToApiVersion(1)]
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV1(...)
+    {
+        // Existing legacy behavior.
+    }
+
+    [HttpGet]
+    [MapToApiVersion(2)]
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV2(...)
+    {
+        // New v2 behavior.
+    }
+}
+```
+
+Versioning rules:
+
+- Leave untouched controllers unannotated; they are treated as unchanged APIs and are available in the configured default versions.
+- Once a controller gets version-specific behavior, add explicit `[ApiVersion(1)]` and `[ApiVersion(2)]` at the controller level.
+- If a controller declares only `[ApiVersion(1)]`, its actions are v1 by default; do not add `[MapToApiVersion(1)]` to every action.
+- Use `[MapToApiVersion(...)]` when two actions share the same HTTP verb and route but have version-specific behavior.
+- If an action behaves identically across declared controller versions, one action can serve all declared versions by omitting `[MapToApiVersion]`.
+- If an action is explicitly mapped with `[MapToApiVersion(1)]`, it is v1-only. To keep the same action available in v2, either omit `[MapToApiVersion]` when the controller declares both versions, or map the action to both versions intentionally.
+- Keep v1 behavior byte-for-byte compatible unless the ticket explicitly changes the v1 contract.
+- Put breaking response, status-code, route, request DTO, or error-contract changes in a new API version.
+- Update OpenAPI/Scalar documentation and route smoke tests when adding a new API version.
+- Register new public API versions in `deeplynx.api/NexusApiVersions.cs`. This is the source of truth for default API versioning, supported versions, OpenAPI documents, and the Scalar document dropdown:
+
+```csharp
+public static IReadOnlyList<ApiVersion> Supported { get; } =
+[
+    new(1),
+    new(2),
+    new(3)
+];
+
+public static IReadOnlyList<string> OpenApiDocumentNames { get; } =
+[
+    "v1",
+    "v2",
+    "v3"
+];
+```
+
+Scalar loads versioned docs by document name, so a new API version is not visible in the Scalar dropdown until the matching document name is added to `OpenApiDocumentNames`.
+
+`Program.cs` enables `ReportApiVersions`, so valid versioned controller responses include API version reporting headers:
+
+```text
+api-supported-versions: 1.0
+```
+
+`api-deprecated-versions` is only populated when a version is explicitly marked deprecated, such as with a deprecated API version convention or `[ApiVersion(1, Deprecated = true)]`. These headers are expected on versioned controller endpoints. Do not assume they will be present on manually mapped non-controller endpoints such as health checks, SignalR hubs, Scalar, or OpenAPI JSON.
+
+To deprecate a controller version with attributes, mark the version as deprecated on the controller:
+
+```csharp
+[ApiController]
+[ApiVersion(1, Deprecated = true)]
+[ApiVersion(2)]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
+public class ClassProjectController : ControllerBase
+{
+    [HttpGet]
+    [MapToApiVersion(1)]
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV1(...)
+    {
+        // Deprecated v1 behavior.
+    }
+
+    [HttpGet]
+    [MapToApiVersion(2)]
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV2(...)
+    {
+        // Current v2 behavior.
+    }
+}
+```
+
+If the controller is configured through API versioning conventions instead of attributes, use `HasDeprecatedApiVersion`:
+
+```csharp
+options.Conventions.Controller<ClassProjectController>()
+    .HasDeprecatedApiVersion(new ApiVersion(1))
+    .HasApiVersion(new ApiVersion(2));
+```
+
+After v1 is deprecated, valid responses for that controller should report both headers:
+
+```text
+api-supported-versions: 2.0
+api-deprecated-versions: 1.0
+```
+
+Deprecation advertises that a version is on the way out; it does not remove the route. Keep deprecated versions working until the removal is explicitly scheduled, documented, and coordinated with clients.
+
 ### Query Parameters, Filtering, and Pagination
 
 Use query parameters for optional filters, pagination, sorting, and cross-resource search inputs.
@@ -389,7 +518,7 @@ OpenAPI is configured in `Program.cs` with:
 
 ```csharp
 builder.Services.AddOpenApi(...)
-app.MapOpenApi();
+app.MapOpenApi("/api/openapi/{documentName}.json");
 app.MapScalarApiReference(...);
 ```
 
@@ -404,6 +533,14 @@ linting, and generated-SDK validation live in the external
 [`nexus-python-sdk`](https://github.inl.gov/Digital-Engineering/nexus-python-sdk) repository.
 Developers can still start Nexus and download the current OpenAPI document from Scalar for
 manual inspection or one-off SDK work.
+
+Scalar uses document-name URLs for API docs:
+
+```text
+/api/scalar/v1
+```
+
+The Scalar document version controls which OpenAPI document is displayed. OpenAPI operation paths include the URL-segment version, such as `/api/v1/...` or `/api/v2/...`; OpenAPI server URLs should be host-only so generated examples do not duplicate the API prefix.
 
 When adding endpoints:
 

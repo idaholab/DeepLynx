@@ -14,6 +14,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organization/{organizationId:long}/metrics")]
 [Authorize]
+[ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Organization - Metrics")]
 public class MetricsOrganizationController : ControllerBase
 {
@@ -80,7 +81,7 @@ public class MetricsOrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get record count for organization
     /// </summary>
@@ -90,8 +91,8 @@ public class MetricsOrganizationController : ControllerBase
     /// <returns>The record count for the given scope</returns>
     [HttpGet("records/count", Name = "api_record_count_organization")]
     public async Task<IActionResult> GetOrganizationRecordCount(
-        long organizationId, 
-        [FromQuery] long[]? projectIds, 
+        long organizationId,
+        [FromQuery] long[]? projectIds,
         [FromQuery] bool hideArchived = true)
     {
         try
@@ -106,7 +107,7 @@ public class MetricsOrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get file count for organization
     /// </summary>
@@ -116,8 +117,8 @@ public class MetricsOrganizationController : ControllerBase
     /// <returns>The file count for the given scope</returns>
     [HttpGet("files/count", Name = "api_file_count_organization")]
     public async Task<IActionResult> GetOrganizationFileCount(
-        long organizationId, 
-        [FromQuery] long[]? projectIds, 
+        long organizationId,
+        [FromQuery] long[]? projectIds,
         [FromQuery] bool hideArchived = true)
     {
         try
@@ -132,7 +133,7 @@ public class MetricsOrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get Organization Data Modality Count
     /// </summary>

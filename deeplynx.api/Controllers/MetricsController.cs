@@ -14,19 +14,20 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("metrics")]
 [Authorize]
+[ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Metrics")]
 public class MetricsController : ControllerBase
 {
     private readonly IMetricsBusiness _metricsBusiness;
     private readonly ILogger<MetricsController> _logger;
-    
+
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsController" /> class
     /// </summary>
     /// <param name="metricsBusiness">The business logic interface for handling metrics retrievals</param>
     /// <param name="logger">Error/info logging interface for database log table</param>
     public MetricsController(
-        IMetricsBusiness metricsBusiness, 
+        IMetricsBusiness metricsBusiness,
         ILogger<MetricsController> logger)
     {
         _metricsBusiness = metricsBusiness;
@@ -75,7 +76,7 @@ public class MetricsController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get record count for system
     /// </summary>
@@ -97,7 +98,7 @@ public class MetricsController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get file count for system
     /// </summary>

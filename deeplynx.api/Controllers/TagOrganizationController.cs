@@ -10,6 +10,7 @@ namespace deeplynx.api.Controllers;
 [Route("organizations/{organizationId:long}/tags")]
 [ApiController]
 [Authorize]
+[ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Organization - Tag")]
 public class TagOrganizationController : ControllerBase
 {
@@ -51,7 +52,7 @@ public class TagOrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get Tags By Name
     /// </summary>
@@ -62,13 +63,13 @@ public class TagOrganizationController : ControllerBase
     [HttpPost("by-name", Name = "api_get_tags_by_name_organization")]
     [Auth("read", "tag")]
     public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetTagsByName(
-        long organizationId, 
+        long organizationId,
         [FromBody] List<string> tagNames,
         [FromQuery] bool hideArchived = true)
     {
         try
         {
-            var tags = await _tagBusiness.GetTagsByName(organizationId, null , tagNames, hideArchived);
+            var tags = await _tagBusiness.GetTagsByName(organizationId, null, tagNames, hideArchived);
             return Ok(tags);
         }
         catch (Exception exception)

@@ -611,6 +611,32 @@ public class ProjectBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetAllProjects_OrgAdmin_ReturnsAllOrganizationProjects()
+    {
+        // Arrange - LonelyUser is only a member of Lone Project, but org admin should see the whole org.
+        Context.OrganizationUsers.Add(new OrganizationUser
+        {
+            OrganizationId = oid,
+            UserId = uid3,
+            IsOrgAdmin = true
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var listForOrgAdmin = (await _projectBusiness.GetAllProjects(uid3, oid)).ToList();
+
+        // Assert
+        Assert.NotNull(listForOrgAdmin);
+        Assert.NotEmpty(listForOrgAdmin);
+        Assert.Equal(4, listForOrgAdmin.Count);
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Test Project");
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Other Project");
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Lone Project");
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Other Project 2");
+        Assert.DoesNotContain(listForOrgAdmin, p => p.Name == "Archived Project");
+    }
+
+    [Fact]
     public async Task GetAllProjects_SysAdmin_IncludesArchivedWhenSpecified()
     {
         // Arrange - Mark TestUser as sys admin

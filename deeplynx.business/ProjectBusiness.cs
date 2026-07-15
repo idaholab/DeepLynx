@@ -75,11 +75,16 @@ public class ProjectBusiness : IProjectBusiness
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null) throw new ArgumentException($"User with id {userId} not found.");
 
+        var isOrgAdmin = await _context.OrganizationUsers
+            .AnyAsync(ou => ou.UserId == userId
+                            && ou.OrganizationId == organizationId
+                            && ou.IsOrgAdmin);
+
         var projectQuery = _context.Projects
             .Where(p => p.OrganizationId == organizationId
                         && (!hideArchived || !p.IsArchived));
 
-        if (!user.IsSysAdmin)
+        if (!user.IsSysAdmin && !isOrgAdmin)
             projectQuery = projectQuery.Where(p =>
                 p.ProjectMembers.Any(pm =>
                     pm.UserId == userId ||
@@ -890,4 +895,3 @@ public class ProjectBusiness : IProjectBusiness
         await AddMemberToProject(projectId, null, currentUserId, null, makeProjectAdmin: true);
     }
 } 
-

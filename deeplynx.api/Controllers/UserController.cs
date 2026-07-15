@@ -104,6 +104,7 @@ public class UserController : ControllerBase
     /// <returns>User response DTO</returns>
     [HttpPost(Name = "api_create_a_user")]
     [OrgAdmin(unscoped: true)]
+    [ForbidServiceAccounts]
     public async Task<ActionResult<UserResponseDto>> CreateUser([FromBody] CreateUserRequestDto dto)
     {
         try
@@ -127,6 +128,7 @@ public class UserController : ControllerBase
     [Tags("Test Accounts")]
     [HttpPost("test", Name = "api_create_test_account")]
     [SysAdmin]
+    [ForbidServiceAccounts]
     public async Task<ActionResult<UserResponseDto>> CreateTestAccount([FromQuery] string name)
     {
         try
@@ -141,7 +143,7 @@ public class UserController : ControllerBase
                 new { message = "An unexpected error occurred while creating the test account." });
         }
     }
-    
+
     /// <summary>
     ///     Update a User
     /// </summary>
@@ -151,6 +153,7 @@ public class UserController : ControllerBase
     /// <returns>User response DTO</returns>
     [HttpPut("{userId:long}", Name = "api_update_a_user")]
     [OrgAdmin(unscoped: true)]
+    [ForbidServiceAccounts]
     public async Task<ActionResult<UserResponseDto>> UpdateUser(long userId, [FromBody] UpdateUserRequestDto dto)
     {
         try
@@ -173,6 +176,7 @@ public class UserController : ControllerBase
     /// <returns>A message stating the user was successfully deleted.</returns>
     [HttpDelete("{userId:long}", Name = "api_delete_a_user")]
     [SysAdmin]
+    [ForbidServiceAccounts]
     public async Task<IActionResult> DeleteUser(long userId)
     {
         try
@@ -196,6 +200,7 @@ public class UserController : ControllerBase
     /// <returns>A message stating the user was successfully archived or unarchived.</returns>
     [HttpPatch("{userId:long}", Name = "api_archive_user")]
     [SysAdmin]
+    [ForbidServiceAccounts]
     public async Task<IActionResult> ArchiveUser(
         long userId,
         [FromQuery] bool archive)
@@ -227,6 +232,7 @@ public class UserController : ControllerBase
     /// <returns>User response DTO</returns>
     [HttpPatch("{userId:long}/admin", Name = "api_set_sys_admin")]
     [SysAdmin]
+    [ForbidServiceAccounts]
     public async Task<ActionResult<UserResponseDto>> SetSysAdmin(
         long userId,
         [FromQuery] bool? isAdmin = true

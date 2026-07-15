@@ -104,13 +104,13 @@ public class QueryController : ControllerBase
     /// <param name="organizationId">The organization to which the records/projects belong</param>
     /// <param name="filterArray">Array of QueryComponent dtos</param>
     /// <param name="textSearch">Full text search phrase</param>
-    /// <param name="projectIds">Project IDs in the organization to search across</param>
+    /// <param name="projects">Project IDs in the organization to search across</param>
     /// <param name="paginatedDto">Pagination details</param>
     /// <returns>Paginated record response DTOs from the query_record view</returns>
     [HttpPost("records/advanced/paginated", Name = "api_query_builder_records_paginated")]
     [Auth("read", "record")]
     public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> QueryBuilderPaginated(
-        long organizationId, [FromQuery] string? textSearch, [FromQuery] long[] projectIds,
+        long organizationId, [FromQuery] string? textSearch, [FromQuery] long[] projects,
         [FromQuery] PaginatedRequestDto paginatedDto,
         [FromBody] CustomQueryDtos.CustomQueryRequestDto[] filterArray)
     {
@@ -125,12 +125,11 @@ public class QueryController : ControllerBase
                 currentUserId,
                 filterArray,
                 organizationId,
-                projectIds,
+                projects,
                 paginatedDto,
                 textSearch,
                 isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin);
+                isOrgAdmin);
             return Ok(records);
         }
         catch (Exception exc)

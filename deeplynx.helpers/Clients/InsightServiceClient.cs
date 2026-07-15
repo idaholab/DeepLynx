@@ -53,6 +53,29 @@ public class InsightServiceClient
                ?? throw new InvalidOperationException($"Insight returned an empty response body for file {fileId}");
     }
 
+    public async Task<InsightEndpointHealthResponseDto> EndpointHealth(
+        InsightEndpointHealthRequestDto dto)
+    {
+        var response = await _client.PostAsJsonAsync("/endpoint_health", dto);
+        var responseBody = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InsightServiceException(
+                BuildInsightEndpointFailureMessage("/endpoint_health", response, responseBody),
+                response.StatusCode,
+                responseBody);
+        }
+        
+        if (string.IsNullOrWhiteSpace(responseBody))
+            throw new InvalidOperationException("Insight returned an empty response body");
+        
+        return JsonSerializer.Deserialize<InsightEndpointHealthResponseDto>(
+            responseBody,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new InvalidOperationException("Insight returned an empty response body");
+    }
+    
     public async Task EmbedStrings(InsightEmbedStringRequestDto dto)
     {
         var response = await _client.PostAsJsonAsync("/embed_strings", dto);

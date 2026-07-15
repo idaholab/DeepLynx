@@ -10,6 +10,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organizations/{organizationId:long}/groups")]
 [Authorize]
+[ForbidServiceAccounts] // Service accounts can only act on the project level
 public class GroupController : ControllerBase
 {
     private readonly IGroupBusiness _groupBusiness;

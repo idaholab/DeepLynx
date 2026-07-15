@@ -25,10 +25,18 @@ public interface IInsightBusiness
 
     Task<InsightIngestionStatusResponseDto> FetchInsightIngestionStatus(long recordId);
 
+    Task<InsightEndpointHealthResponseDto> CheckEndpointHealth(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long? modelConfigId,
+        string modelType);
+    
     void TriggerEmbedding(
         long projectId,
         long recordId,
         string uri,
+        long currentUserId,
         AiModelConfigResponseDto.WithToken vlmConfig,
         AiModelConfigResponseDto.WithToken embeddingConfig,
         string? userJwt = null,

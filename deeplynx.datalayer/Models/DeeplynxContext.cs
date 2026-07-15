@@ -1128,25 +1128,17 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.Uuid)
                 .HasDatabaseName("idx_relationships_uuid");
 
-            entity.HasIndex(e => new { e.ProjectId, e.Name })
-                .HasDatabaseName("unique_relationship_name")
-                .IsUnique();
-
-            // Composite unique index - relationship names are unique within an organization or project
-            entity.HasIndex(e => new { e.OrganizationId, e.Name })
-                .HasDatabaseName("unique_organization_relationship_name")
-                .IsUnique()
-                .HasFilter("project_id IS NULL");
-
-            entity.HasIndex(e => new { e.OrganizationId, e.ProjectId, e.Name })
-                .HasDatabaseName("unique_project_relationship_name")
-                .IsUnique()
-                .HasFilter("project_id IS NOT NULL");
-
+            // Unique per project when origin and destination are both set
             entity.HasIndex(e => new { e.OrganizationId, e.ProjectId, e.OriginId, e.Name, e.DestinationId })
                 .HasDatabaseName("unique_project_relationship_origin_name_destination")
                 .IsUnique()
-                .HasFilter("project_id IS NOT NULL");
+                .HasFilter("project_id IS NOT NULL AND origin_id IS NOT NULL AND destination_id IS NOT NULL");
+
+           // Unique per project when origin and destination are both null
+            entity.HasIndex(e => new { e.OrganizationId, e.ProjectId, e.Name })
+                .HasDatabaseName("unique_project_relationship_name_no_origin_destination")
+                .IsUnique()
+                .HasFilter("project_id IS NOT NULL AND origin_id IS NULL AND destination_id IS NULL");
 
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");

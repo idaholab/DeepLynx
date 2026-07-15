@@ -30,7 +30,7 @@ interface MatrixViewLayoutProps {
   onToggleMatrixPermission: (roleId: number, permissionId: number) => void;
 
   matrixRoleHasPermission: (roleId: number, permissionId: number) => boolean;
-  isStandardRole: (role: RoleResponseDto) => boolean;
+  isSeededUserRole: (role: RoleResponseDto) => boolean;
 }
 
 const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
@@ -47,7 +47,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   onEditClick,
   onToggleMatrixPermission,
   matrixRoleHasPermission,
-  isStandardRole,
+  isSeededUserRole,
 }) => {
   const { t } = useLanguage();
   const translatePermission = (text?: string | null) => {
@@ -72,7 +72,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
       .filter((category) => category.permissions.length > 0);
   }, [permissionCategories]);
 
-  const editMatrixDisabledReason = !hasNonStandardRoles
+  const editMatrixDisabledReason = !hasEditableRoles
     ? t.translations.MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES
     : rolesLocked
       ? t.translations.ROLES_ARE_LOCKED
@@ -93,7 +93,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
           {!isEditingMatrix ? (
             <button
               disabled={
-                rolesLocked || isLoadingPermissions || !hasNonStandardRoles
+                rolesLocked || isLoadingPermissions || !hasEditableRoles
               }
               onClick={onStartEditingMatrix}
               className="btn btn-primary btn-sm gap-2"
@@ -143,9 +143,8 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                     {t.translations.PERMISSION}
                   </th>
                   {roles.map((role) => {
-                    const standard = isStandardRole(role);
-
-                    const editDisabled = standard || !hasNonStandardRoles;
+                    const seededUser = isSeededUserRole(role);
+                    const editDisabled = seededUser;
 
                     const editTitle = !hasNonStandardRoles
                       ? t.translations.ONLY_STANDARD_ROLES_NO_CUSTOM_TO_EDIT
@@ -159,11 +158,6 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                           <div className="flex items-center gap-2">
                             <ShieldCheckIcon className="w-4 h-4 text-primary" />
                             <span className="font-medium">{role.name}</span>
-                            {standard && (
-                              <div className="badge badge-info badge-xs">
-                                {t.translations.STD}
-                              </div>
-                            )}
                             {!isEditingMatrix && (
                               <button
                                 disabled={editDisabled}
@@ -227,13 +221,13 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                             role.id,
                             Number(perm.id)
                           );
-                          const standard = isStandardRole(role);
+                          const seededUser = isSeededUserRole(role);
 
                           return (
                             <td key={role.id} className="text-center">
                               <div
                                 onClick={() => {
-                                  if (isEditingMatrix && !standard) {
+                                  if (isEditingMatrix && !seededUser) {
                                     onToggleMatrixPermission(
                                       role.id,
                                       Number(perm.id)
@@ -241,15 +235,16 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                                   }
                                 }}
                                 className={`inline-block ${isEditingMatrix && !standard
-                                  ? "cursor-pointer hover:scale-110 transition-transform"
-                                  : "cursor-default"
+                                    ? "cursor-pointer hover:scale-110 transition-transform"
+                                    : "cursor-default"
                                   } ${standard && isEditingMatrix
                                     ? "opacity-60 ring-2 ring-warning rounded-lg p-1"
                                     : ""
                                   }`}
                                 title={
-                                  standard && isEditingMatrix
-                                    ? t.translations.STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
+                                  seededUser && isEditingMatrix
+                                    ? t.translations
+                                      .SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
                                     : isEditingMatrix
                                       ? t.translations.CLICK_TO_TOGGLE
                                       : hasPermission
@@ -260,19 +255,19 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                                 {hasPermission ? (
                                   <CheckIcon
                                     className={`size-8 mx-auto ${isEditingMatrix && !standard
-                                      ? "text-success hover:text-success/70"
-                                      : standard && isEditingMatrix
-                                        ? "text-warning"
-                                        : "text-success"
+                                        ? "text-success hover:text-success/70"
+                                        : standard && isEditingMatrix
+                                          ? "text-warning"
+                                          : "text-success"
                                       }`}
                                   />
                                 ) : (
                                   <XMarkIcon
                                     className={`size-8 mx-auto ${isEditingMatrix && !standard
-                                      ? "text-base-300 hover:text-success/50"
-                                      : standard && isEditingMatrix
-                                        ? "text-warning/50"
-                                        : "text-base-300"
+                                        ? "text-base-300 hover:text-success/50"
+                                        : standard && isEditingMatrix
+                                          ? "text-warning/50"
+                                          : "text-base-300"
                                       }`}
                                   />
                                 )}

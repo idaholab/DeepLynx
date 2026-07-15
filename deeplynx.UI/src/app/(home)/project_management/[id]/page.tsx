@@ -1,24 +1,24 @@
 // src/app/(home)/project_management/[id]/page.tsx
 
 import { cookies } from "next/headers";
-import { redirect, notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import ProjectManagementClient from "./ProjectManagementClient";
 
 import {
   GroupResponseDto,
-  ProjectResponseDto,
-  RoleResponseDto,
   PermissionResponseDto,
   ProjectMemberResponseDto,
+  ProjectResponseDto,
+  RoleResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 
-import {
-  getProjectServer,
-  getProjectMembersServer,
-} from "@/app/lib/server_service/projects_services.server";
-import { getAllRolesServer } from "@/app/lib/server_service/role_services.server";
 import { getAllPermissionsServer } from "@/app/lib/server_service/permissions_services.server";
+import {
+  getProjectMembersServer,
+  getProjectServer,
+} from "@/app/lib/server_service/projects_services.server";
 import { requireProjectAdminServer } from "@/app/lib/server_service/rbac_guards.server";
+import { getAllRolesServer } from "@/app/lib/server_service/role_services.server";
 
 export const dynamic = "force-dynamic";
 
@@ -62,10 +62,8 @@ export default async function ProjectManagementPage({ params }: Props) {
   let projectPermissions: PermissionResponseDto[] = [];
 
   if (!isNaN(organizationId) && !isNaN(projectId)) {
-    console.log(`[ProjectManagementPage] Loading project ${projectId} for org ${organizationId}`);
     try {
       project = await getProjectServer(organizationId, projectId, true);
-      console.log(`[ProjectManagementPage] Project loaded:`, project ? "SUCCESS" : "NULL");
     } catch (e) {
       console.error("[ProjectManagementPage] getProjectServer failed:", e);
     }

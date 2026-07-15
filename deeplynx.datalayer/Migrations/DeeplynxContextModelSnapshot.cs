@@ -2201,24 +2201,15 @@ namespace deeplynx.datalayer.Migrations
                     b.HasIndex("Uuid")
                         .HasDatabaseName("idx_relationships_uuid");
 
-                    b.HasIndex("OrganizationId", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("unique_organization_relationship_name")
-                        .HasFilter("project_id IS NULL");
-
-                    b.HasIndex("ProjectId", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("unique_relationship_name");
-
                     b.HasIndex("OrganizationId", "ProjectId", "Name")
                         .IsUnique()
-                        .HasDatabaseName("unique_project_relationship_name")
-                        .HasFilter("project_id IS NOT NULL");
+                        .HasDatabaseName("unique_project_relationship_name_no_origin_destination")
+                        .HasFilter("project_id IS NOT NULL AND origin_id IS NULL AND destination_id IS NULL");
 
                     b.HasIndex("OrganizationId", "ProjectId", "OriginId", "Name", "DestinationId")
                         .IsUnique()
                         .HasDatabaseName("unique_project_relationship_origin_name_destination")
-                        .HasFilter("project_id IS NOT NULL");
+                        .HasFilter("project_id IS NOT NULL AND origin_id IS NOT NULL AND destination_id IS NOT NULL");
 
                     b.ToTable("relationships", "deeplynx");
                 });
