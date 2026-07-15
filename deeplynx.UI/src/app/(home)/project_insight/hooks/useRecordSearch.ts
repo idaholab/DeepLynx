@@ -263,17 +263,14 @@ function useRecordSearchGeneric(
         );
         setRecords(newRecords);
 
-        // append status map
-        var newStatus = await loadRecordStatus(
-          newRecords,
-          organizationId,
-          projectId,
-          setStatus,
-        );
-        if (cancel) return;
-
         setStatus((previous) =>
-          updateStatusKeepQueuedOrProcessing(previous, newStatus),
+          updateStatusKeepQueuedOrProcessing(
+            previous,
+            newRecords.map((record) => [
+              record.id,
+              { state: embedding == "embedded" ? "embedded" : "not_embedded" },
+            ]),
+          ),
         );
       } catch (error) {
         reset();
@@ -313,57 +310,6 @@ function useRecordSearchGeneric(
 }
 
 // ============================== INSIGHT STATUS FUNCTIONS ==============================
-
-async function fetchInsightStatus(
-  record: ProjectInsightRecord,
-  organizationId: number,
-  projectId: number,
-): Promise<[number, ProjectInsightStatus]> {
-  try {
-    const ingestionStatus = await fetchInsightIngestionStatus({
-      organizationId,
-      projectId,
-      fileId: record.id,
-    });
-    return [
-      record.id,
-      ingestionStatus.indexed
-        ? {
-            state: "embedded",
-            chunkCount: ingestionStatus.chunk_count,
-            pageCount: ingestionStatus.page_count,
-          }
-        : { state: "not_embedded" },
-    ] as const;
-  } catch (error) {
-    return [record.id, getStatusFromError(error)] as const;
-  }
-}
-
-async function loadRecordStatus(
-  newRecords: ProjectInsightRecord[],
-  organizationId: number,
-  projectId: number,
-  setStatus: Dispatch<SetStateAction<Record<number, ProjectInsightStatus>>>,
-): Promise<[number, ProjectInsightStatus][]> {
-  // Sets default values while they load
-  setStatus((previous: Record<number, ProjectInsightStatus>) =>
-    updateStatusKeepQueuedOrProcessing(
-      previous,
-      newRecords.map((record) => [
-        record.id,
-        { state: "checking" } satisfies ProjectInsightStatus,
-      ]),
-    ),
-  );
-
-  // Load the actual values
-  return await Promise.all(
-    newRecords.map(async (r) =>
-      fetchInsightStatus(r, organizationId, projectId),
-    ),
-  );
-}
 
 function updateStatusKeepQueuedOrProcessing(
   previous: Record<number, ProjectInsightStatus>,
