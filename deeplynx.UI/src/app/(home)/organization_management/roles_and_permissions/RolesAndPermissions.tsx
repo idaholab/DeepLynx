@@ -81,7 +81,6 @@ const RolesAndPermissions = ({
 
   const { organization } = useOrganizationSession();
   const { project } = useProjectSession();
-  const { t } = useLanguage();
 
   /* ------------------------------------------------------------------------ */
   /*                             Create Role Modal                            */
