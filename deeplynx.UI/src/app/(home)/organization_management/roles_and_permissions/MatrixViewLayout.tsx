@@ -61,7 +61,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
 
     return t.translations[key as keyof typeof t.translations] ?? text;
   };
-  const hasNonStandardRoles = roles.some((role) => !isStandardRole(role));
+  const hasEditableRoles = roles.some((role) => !isSeededUserRole(role));
   const matrixPermissionCategories = React.useMemo(() => {
     // Matrix view intentionally excludes sensitivity-label permissions.
     return permissionCategories
@@ -144,12 +144,12 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                   </th>
                   {roles.map((role) => {
                     const seededUser = isSeededUserRole(role);
-                    const editDisabled = seededUser;
+                    const editDisabled = seededUser || !hasEditableRoles;
 
-                    const editTitle = !hasNonStandardRoles
+                    const editTitle = !hasEditableRoles
                       ? t.translations.ONLY_STANDARD_ROLES_NO_CUSTOM_TO_EDIT
-                      : standard
-                        ? t.translations.STANDARD_ROLES_CANNOT_BE_EDITED
+                      : seededUser
+                        ? t.translations.SEEDED_USER_ROLE_CANNOT_BE_MODIFIED
                         : t.translations.EDIT_ROLE;
 
                     return (
@@ -234,10 +234,10 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                                     );
                                   }
                                 }}
-                                className={`inline-block ${isEditingMatrix && !standard
-                                    ? "cursor-pointer hover:scale-110 transition-transform"
-                                    : "cursor-default"
-                                  } ${standard && isEditingMatrix
+                                className={`inline-block ${isEditingMatrix && !seededUser
+                                  ? "cursor-pointer hover:scale-110 transition-transform"
+                                  : "cursor-default"
+                                  } ${seededUser && isEditingMatrix
                                     ? "opacity-60 ring-2 ring-warning rounded-lg p-1"
                                     : ""
                                   }`}
@@ -254,20 +254,20 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                               >
                                 {hasPermission ? (
                                   <CheckIcon
-                                    className={`size-8 mx-auto ${isEditingMatrix && !standard
-                                        ? "text-success hover:text-success/70"
-                                        : standard && isEditingMatrix
-                                          ? "text-warning"
-                                          : "text-success"
+                                    className={`size-8 mx-auto ${isEditingMatrix && !seededUser
+                                      ? "text-success hover:text-success/70"
+                                      : seededUser && isEditingMatrix
+                                        ? "text-warning"
+                                        : "text-success"
                                       }`}
                                   />
                                 ) : (
                                   <XMarkIcon
-                                    className={`size-8 mx-auto ${isEditingMatrix && !standard
-                                        ? "text-base-300 hover:text-success/50"
-                                        : standard && isEditingMatrix
-                                          ? "text-warning/50"
-                                          : "text-base-300"
+                                    className={`size-8 mx-auto ${isEditingMatrix && !seededUser
+                                      ? "text-base-300 hover:text-success/50"
+                                      : seededUser && isEditingMatrix
+                                        ? "text-warning/50"
+                                        : "text-base-300"
                                       }`}
                                   />
                                 )}
