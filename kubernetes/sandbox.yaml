@@ -924,7 +924,7 @@ spec:
                 name: deeplynx-service
                 port:
                   number: 80
-          - path: /api/v1
+          - path: /api
             pathType: Prefix
             backend:
               service:

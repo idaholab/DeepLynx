@@ -873,6 +873,58 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateRecord_EmptyStringTag_DoesNotCreateTag()
+    {
+        // Arrange
+
+        var now = DateTime.UtcNow;
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "New Test Record",
+            Description = "Test Record Description",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            Uri = "test://uri",
+            OriginalId = "original-123",
+            ClassId = cid,
+            FileType = "png",
+            Tags = [""]
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("New Test Record", result.Name);
+        Assert.Equal("Test Record Description", result.Description);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.Equal(did, result.DataSourceId);
+        Assert.Equal("test://uri", result.Uri);
+        Assert.Equal("original-123", result.OriginalId);
+        Assert.Equal(cid, result.ClassId);
+        Assert.Equal("png", result.FileType);
+        Assert.Empty(result.Tags);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(uid, result.LastUpdatedBy);
+
+        // Verify record was actually created in database
+        var createdRecord = await Context.Records.FindAsync(result.Id);
+        Assert.NotNull(createdRecord);
+        Assert.Equal("New Test Record", createdRecord.Name);
+
+        // Ensure that record create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Single(eventList);
+
+        var actualEvent = eventList[0];
+
+        Assert.Equal(createdRecord.ProjectId, actualEvent.ProjectId);
+        Assert.Equal("create", actualEvent.Operation);
+        Assert.Equal("record", actualEvent.EntityType);
+        Assert.Equal(createdRecord.Id, actualEvent.EntityId);
+    }
+
+    [Fact]
     public async Task CreateRecord_InvalidProjectId_ThrowsKeyNotFoundException()
     {
         // Arrange
