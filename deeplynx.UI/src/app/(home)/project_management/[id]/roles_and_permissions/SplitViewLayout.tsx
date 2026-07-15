@@ -14,6 +14,7 @@ import {
   RoleResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import Tabs from "@/app/(home)/components/Tabs";
+import { translateBackendText } from "@/app/lib/backendTextTranslations";
 import { PermissionCategory } from "./ProjectRolesAndPermissions";
 import { useLanguage } from "../../../../contexts/Language";
 
@@ -124,130 +125,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
     }));
   }, [splitPermissionCategories.withLabelId]);
 
-  const getTranslatedPermissionName = (name: string) => {
-    switch (name) {
-      case "Read Project":
-        return t.translations.READ_PROJECT;
-      case "Write Project":
-        return t.translations.WRITE_PROJECT;
-      case "Update Projects":
-        return t.translations.UPDATE_PROJECTS;
-
-      case "Read Object Storage":
-        return t.translations.READ_OBJECT_STORAGE;
-      case "Write Object Storage":
-        return t.translations.WRITE_OBJECT_STORAGE;
-      case "Update Object Storages":
-        return t.translations.UPDATE_OBJECT_STORAGES;
-
-      case "Read Data Source":
-        return t.translations.READ_DATA_SOURCE;
-      case "Write Data Source":
-        return t.translations.WRITE_DATA_SOURCE;
-      case "Update Data Sources":
-        return t.translations.UPDATE_DATA_SOURCES;
-
-      case "Read Record":
-        return t.translations.READ_RECORD;
-      case "Write Record":
-        return t.translations.WRITE_RECORD;
-      case "Update Records":
-        return t.translations.UPDATE_RECORDS;
-
-      case "Read Edge":
-        return t.translations.READ_EDGE;
-      case "Write Edge":
-        return t.translations.WRITE_EDGE;
-      case "Update Edges":
-        return t.translations.UPDATE_EDGES;
-
-      case "Read File":
-        return t.translations.READ_FILE;
-      case "Write File":
-        return t.translations.WRITE_FILE;
-      case "Update Files":
-        return t.translations.UPDATE_FILES;
-
-      case "Read Tag":
-        return t.translations.READ_TAG;
-      case "Write Tag":
-        return t.translations.WRITE_TAG;
-      case "Update Tags":
-        return t.translations.UPDATE_TAGS;
-
-      case "Read Class":
-        return t.translations.READ_CLASS;
-      case "Write Class":
-        return t.translations.WRITE_CLASS;
-      case "Update Classes":
-        return t.translations.UPDATE_CLASSES;
-
-      case "Read Relationship":
-        return t.translations.READ_RELATIONSHIP;
-      case "Write Relationship":
-        return t.translations.WRITE_RELATIONSHIP;
-      case "Update Relationships":
-        return t.translations.UPDATE_RELATIONSHIPS;
-
-      case "Read User":
-        return t.translations.READ_USER;
-      case "Write User":
-        return t.translations.WRITE_USER;
-      case "Update Users":
-        return t.translations.UPDATE_USERS;
-
-      case "Read Group":
-        return t.translations.READ_GROUP;
-      case "Write Group":
-        return t.translations.WRITE_GROUP;
-      case "Update Groups":
-        return t.translations.UPDATE_GROUPS;
-
-      case "Read Organization":
-        return t.translations.READ_ORGANIZATION;
-      case "Write Organization":
-        return t.translations.WRITE_ORGANIZATION;
-      case "Update Organizations":
-        return t.translations.UPDATE_ORGANIZATIONS;
-
-      case "Read Role":
-        return t.translations.READ_ROLE;
-      case "Write Role":
-        return t.translations.WRITE_ROLE;
-      case "Update Roles":
-        return t.translations.UPDATE_ROLES;
-
-      case "Read Permission":
-        return t.translations.READ_PERMISSION;
-      case "Write Permission":
-        return t.translations.WRITE_PERMISSION;
-      case "Update Permissions":
-        return t.translations.UPDATE_PERMISSIONS;
-
-      case "Read Sensitivity Label":
-        return t.translations.READ_SENSITIVITY_LABEL;
-      case "Write Sensitivity Label":
-        return t.translations.WRITE_SENSITIVITY_LABEL;
-      case "Update Sensitivity Labels":
-        return t.translations.UPDATE_SENSITIVITY_LABELS;
-
-      case "Read Insight":
-        return t.translations.READ_INSIGHT;
-      case "Write Insight":
-        return t.translations.WRITE_INSIGHT;
-
-      case "Read Record Collection":
-        return t.translations.READ_RECORD_COLLECTION;
-      case "Write Record Collection":
-        return t.translations.WRITE_RECORD_COLLECTION;
-      case "Update Record Collection":
-        return t.translations.UPDATE_RECORD_COLLECTION;
-
-      default:
-        return name;
-    }
-  };
-
   const renderPermissionsContent = (
     categories: PermissionCategory[],
     displayMode: "permission-name" | "permission-action" = "permission-name",
@@ -322,41 +199,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
               >
                 <div className="card-body p-4">
                   <h4 className="card-title text-sm mb-3">
-                    {category.label === "class"
-                      ? t.translations.CLASS
-                      : category.label === "data_source"
-                        ? t.translations.DATA_SOURCE
-                        : category.label === "edge"
-                          ? t.translations.EDGE
-                          : category.label === "file"
-                            ? t.translations.FILE
-                            : category.label === "group"
-                              ? t.translations.GROUP
-                              : category.label === "insight"
-                                ? t.translations.INSIGHT
-                                : category.label === "object_storage"
-                                  ? t.translations.OBJECT_STORAGE
-                                  : category.label === "organization"
-                                    ? t.translations.ORGANIZATION
-                                    : category.label === "permission"
-                                      ? t.translations.PERMISSION
-                                      : category.label === "project"
-                                        ? t.translations.PROJECT
-                                        : category.label === "record"
-                                          ? t.translations.RECORD
-                                          : category.label === "record_collection"
-                                            ? t.translations.RECORD_COLLECTION
-                                            : category.label === "relationship"
-                                              ? t.translations.RELATIONSHIP
-                                              : category.label === "role"
-                                                ? t.translations.ROLE
-                                                : category.label === "sensitivity_label"
-                                                  ? t.translations.SENSITIVITY_LABEL
-                                                  : category.label === "tag"
-                                                    ? t.translations.TAG
-                                                    : category.label === "user"
-                                                      ? t.translations.USER
-                                                      : category.label}
+                    {translateBackendText(t.translations, category.label)}
                   </h4>
                   <div className="grid grid-cols-2 gap-3">
                     {category.permissions.map((perm: PermissionResponseDto) => {
@@ -386,8 +229,8 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                           />
                           <span className="label-text">
                             {displayMode === "permission-action"
-                              ? perm.action
-                              : getTranslatedPermissionName(perm.name)}
+                              ? translateBackendText(t.translations, perm.action)
+                              : translateBackendText(t.translations, perm.name)}
                           </span>
                         </label>
                       );
@@ -502,11 +345,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                   </div>
                   {role.description && (
                     <p className="text-xs text-base-content/60 mt-1 ml-6 truncate">
-                      {role.description === "Administrator role with full permissions"
-                        ? t.translations.ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS
-                        : role.description === "User role with limited permissions"
-                          ? t.translations.USER_ROLE_WITH_LIMITED_PERMISSIONS
-                          : role.description}
+                      {translateBackendText(t.translations, role.description)}
                     </p>
                   )}
                 </button>
@@ -551,11 +390,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                   </div>
                   {currentRole.description && (
                     <p className="text-sm text-base-content/70 mt-1">
-                      {currentRole.description === "Administrator role with full permissions"
-                        ? t.translations.ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS
-                        : currentRole.description === "User role with limited permissions"
-                          ? t.translations.USER_ROLE_WITH_LIMITED_PERMISSIONS
-                          : currentRole.description}
+                      {translateBackendText(t.translations, currentRole.description)}
                     </p>
                   )}
                   <p className="text-xs text-base-content/60 mt-2">
