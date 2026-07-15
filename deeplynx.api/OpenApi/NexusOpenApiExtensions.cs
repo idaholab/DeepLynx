@@ -3,6 +3,7 @@ using deeplynx.api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.OpenApi;
 
@@ -20,6 +21,8 @@ internal static class NexusOpenApiExtensions
     {
         services.AddOpenApi(documentName, options =>
         {
+            options.AddScalarTransformers();
+
             options.ShouldInclude = apiDescription =>
                 string.Equals(apiDescription.GroupName, documentName, StringComparison.OrdinalIgnoreCase);
 

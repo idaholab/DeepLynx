@@ -12,6 +12,7 @@ using deeplynx.interfaces;
 using deeplynx.api.Routing;
 using deeplynx.api.Services;
 using deeplynx.api.OpenApi;
+using deeplynx.api.ExceptionHandlers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
@@ -154,16 +155,8 @@ try
         })
         .ConfigureApiBehaviorOptions(options =>
         {
-            options.InvalidModelStateResponseFactory = context =>
-            {
-                return new BadRequestObjectResult(
-                    BadRequestProblemDetailsFactory.CreateForModelState(
-                        context.ModelState,
-                        context.ActionDescriptor.Parameters))
-                {
-                    ContentTypes = { "application/problem+json" }
-                };
-            };
+            options.InvalidModelStateResponseFactory =
+                VersionedInvalidModelStateResponseFactory.Create;
         });
 
     builder.Services.ConfigureHttpJsonOptions(options =>
