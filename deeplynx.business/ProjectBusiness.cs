@@ -29,6 +29,7 @@ public class ProjectBusiness : IProjectBusiness
 
     private readonly ILogger<ProjectBusiness> _logger;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly INotificationBusiness _notificationBusiness;
     private readonly IOrganizationBusiness _organizationBusiness;
     private readonly IRoleBusiness _roleBusiness;
     private readonly TimeSpan cacheTTL = TimeSpan.FromHours(1);
@@ -41,6 +42,8 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="classBusiness">Used to create default classes automatically on project creation.</param>
     /// <param name="roleBusiness">Used to create default roles automatically on project creation.</param>
     /// <param name="dataSourceBusiness">Used to create a default datasource on project creation.</param>
+    /// <param name="notificationBusiness">The business logic interface for handling notification operations.</param>
+    /// <param name="organizationBusiness">The business logic interface for handling organization operations.</param>
     /// <param name="eventBusiness">Used for logging events during create and update Operations.</param>
     /// <param name="logger">Used for uniformity in logging</param>
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
@@ -48,13 +51,14 @@ public class ProjectBusiness : IProjectBusiness
         DeeplynxContext context, ILogger<ProjectBusiness> logger,
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
-        IOrganizationBusiness organizationBusiness)
+        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness)
     {
         _context = context;
         _logger = logger;
         _classBusiness = classBusiness;
         _roleBusiness = roleBusiness;
         _dataSourceBusiness = dataSourceBusiness;
+        _notificationBusiness = notificationBusiness;
         _objectStorageBusiness = objectStorageBusiness;
         _eventBusiness = eventBusiness;
         _organizationBusiness = organizationBusiness;
@@ -669,6 +673,24 @@ public class ProjectBusiness : IProjectBusiness
 
         _context.ProjectMembers.Add(projMember);
         await _context.SaveChangesAsync();
+
+        if (userId.HasValue)
+        {
+            user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user != null)
+            {
+                try
+                {
+                    await _notificationBusiness!.SendEmail(user.Email, user.Name, false, null, projectId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to send notification email to user {user.Email} after adding to project {projectId}");
+                }
+
+                return true;
+            }
+        }
 
         return true;
     }
