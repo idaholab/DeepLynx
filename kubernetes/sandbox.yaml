@@ -952,6 +952,13 @@ spec:
                 name: deeplynx-mcp-service
                 port:
                   number: 80
+          - path: /api/oauth
+            pathType: Prefix
+            backend:
+              service:
+                name: deeplynx-service
+                port:
+                  number: 80
 
 ---
 # # Database if needed for deployment
