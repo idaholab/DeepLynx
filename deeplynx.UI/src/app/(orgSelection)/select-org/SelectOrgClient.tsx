@@ -83,13 +83,13 @@ const SelectOrgClient = ({ session }: Props) => {
               userCount: 0,
             };
           }
-        })
+        }),
       );
 
       setOrganizations(orgsWithCounts);
     } catch (err) {
       console.error("Failed to fetch organizations:", err);
-      setError("Failed to load organizations. Please try again.");
+      setError(t.translations.FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN);
     } finally {
       setLoading(false);
     }
@@ -111,7 +111,7 @@ const SelectOrgClient = ({ session }: Props) => {
       await fetchOrganizationsWithCounts();
     } catch (err) {
       console.error("Failed to create organization:", err);
-      setCreateError("Failed to create organization. Please try again.");
+      setCreateError(t.translations.FAILED_TO_CREATE_ORGANIZATION_TRY_AGAIN);
     } finally {
       setIsCreating(false);
     }
@@ -122,6 +122,7 @@ const SelectOrgClient = ({ session }: Props) => {
     setOrganization({
       organizationId: org.id,
       organizationName: org.name,
+      themeName: org.theme,
     });
 
     router.push("/");
@@ -137,7 +138,7 @@ const SelectOrgClient = ({ session }: Props) => {
 
   if (loading) {
     return (
-      <div className="login min-h-screen flex items-center justify-center">
+      <div className="app-header min-h-screen flex items-center justify-center">
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
@@ -145,7 +146,7 @@ const SelectOrgClient = ({ session }: Props) => {
 
   if (error) {
     return (
-      <div className="login min-h-screen flex items-center justify-center">
+      <div className="app-header min-h-screen flex items-center justify-center">
         <div className="alert alert-error max-w-md">
           <span>{error}</span>
         </div>
@@ -155,11 +156,11 @@ const SelectOrgClient = ({ session }: Props) => {
 
   return (
     <>
-      <div className="login min-h-screen h-[700px] flex flex-col items-center justify-center p-4">
+      <div className="app-header min-h-screen h-[700px] flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center gap-4 max-w-4xl w-full flex-1 justify-center">
           <Image
             src="/assets/nexusWhite.png"
-            alt="DeepLynx logo"
+            alt={t.translations.DEEPLYNX_LOGO}
             width={365.8}
             height={213.9}
             priority
@@ -170,7 +171,8 @@ const SelectOrgClient = ({ session }: Props) => {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-semibold text-base-content">
-                    Welcome back, {formatUserName(session.user.name)}
+                    {t.translations.WELCOME_BACK_COMMA}{" "}
+                    {formatUserName(session.user.name)}
                   </h2>
                 </div>
                 <RoleGate role="sysAdmin">
@@ -190,9 +192,12 @@ const SelectOrgClient = ({ session }: Props) => {
               <div className="space-y-3 mt-4">
                 {organizations.length === 0 ? (
                   <div className="text-center py-8 text-base-content/70">
-                    <p>No organizations found.</p>
+                    <p>{t.translations.NO_ORGANIZATIONS_FOUND}</p>
                     <p className="text-sm mt-2">
-                      Create your first organization to get started.
+                      {
+                        t.translations
+                          .CREATE_FIRST_ORGANIZATION_TO_GET_STARTED
+                      }
                     </p>
                   </div>
                 ) : (
@@ -217,12 +222,16 @@ const SelectOrgClient = ({ session }: Props) => {
                             <span className="font-semibold">
                               {org.projectCount}
                             </span>{" "}
-                            {org.projectCount === 1 ? "Project" : "Projects"}
+                            {org.projectCount === 1
+                              ? t.translations.PROJECT
+                              : t.translations.PROJECTS}
                             {" • "}
                             <span className="font-semibold">
                               {org.userCount}
                             </span>{" "}
-                            {org.userCount === 1 ? "Member" : "Members"}
+                            {org.userCount === 1
+                              ? t.translations.MEMBER
+                              : t.translations.MEMBERS}
                           </p>
                         </div>
                       </div>
@@ -238,7 +247,7 @@ const SelectOrgClient = ({ session }: Props) => {
                           className="btn btn-primary btn-sm"
                           onClick={() => handleLaunchOrganization(org)}
                         >
-                          Launch
+                          {t.translations.LAUNCH}
                           <ArrowRightIcon className="size-5" />
                         </button>
                       </div>
@@ -273,7 +282,9 @@ const SelectOrgClient = ({ session }: Props) => {
         <dialog className="modal modal-open">
           <div className="modal-box max-w-lg">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg text-base-content">Create New Organization</h3>
+              <h3 className="font-bold text-lg text-base-content">
+                {t.translations.CREATE_NEW_ORGANIZATION}
+              </h3>
               <button
                 className="btn btn-sm btn-circle btn-ghost"
                 onClick={() => {
@@ -292,10 +303,13 @@ const SelectOrgClient = ({ session }: Props) => {
               </div>
             )}
 
-            <form onSubmit={handleCreateOrganization} className="flex flex-col gap-4">
+            <form
+              onSubmit={handleCreateOrganization}
+              className="flex flex-col gap-4"
+            >
               <input
                 type="text"
-                placeholder="Organization Name"
+                placeholder={t.translations.ORGANIZATION_NAME}
                 className="input input-bordered input-primary bg-base-100 text-base-content placeholder:text-base-content/40 w-full"
                 value={formData.name}
                 onChange={(e) =>
@@ -306,7 +320,7 @@ const SelectOrgClient = ({ session }: Props) => {
               />
               <textarea
                 className="textarea textarea-bordered textarea-primary bg-base-100 text-base-content placeholder:text-base-content/40 min-h-[100px] w-full"
-                placeholder="Description (Optional)"
+                placeholder={t.translations.DESCRIPTION_OPTIONAL}
                 value={formData.description || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
@@ -325,7 +339,7 @@ const SelectOrgClient = ({ session }: Props) => {
                   }}
                   disabled={isCreating}
                 >
-                  Cancel
+                  {t.translations.CANCEL}
                 </button>
                 <button
                   type="submit"
@@ -335,10 +349,10 @@ const SelectOrgClient = ({ session }: Props) => {
                   {isCreating ? (
                     <>
                       <span className="loading loading-spinner loading-sm"></span>
-                      Creating...
+                      {t.translations.CREATING}
                     </>
                   ) : (
-                    "Create Organization"
+                    t.translations.CREATE_ORGANIZATION
                   )}
                 </button>
               </div>

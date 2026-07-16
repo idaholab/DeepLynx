@@ -247,8 +247,29 @@ public class OauthApplicationBusiness : IOauthApplicationBusiness
         if (application == null || application.IsArchived)
             throw new KeyNotFoundException($"Oauth application with id {applicationId} not found");
 
+        // grab event-relevant details before deletion
+        var appId = application.Id;
+        var appName = application.Name;
+        var appClientId = application.ClientId;
+        var lastUpdatedBy = application.LastUpdatedBy;
+
         _context.OauthApplications.Remove(application);
         await _context.SaveChangesAsync();
+
+        // null is passed for organizationId and projectId, because an OAuth application is a system scoped entity and doesn't belong to either
+        await _eventBusiness.CreateEvent(userId, null, null, new CreateEventRequestDto
+        {
+            Operation = "delete",
+            EntityType = "oauth_application",
+            EntityId = appId,
+            EntityName = appName,
+            Properties = JsonSerializer.Serialize(new
+            {
+                AppName = appName,
+                AppClientId = appClientId,
+                LastUpdatedBy = lastUpdatedBy
+            })
+        });
 
         return true;
     }

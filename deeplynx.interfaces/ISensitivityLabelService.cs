@@ -23,6 +23,8 @@ public interface ISensitivityLabelService
 
     Task<List<long>> GetRecordSensitivityLabels(long recordId);
 
+    Task<List<long>> GetRecordCollectionSensitivityLabels(long recordCollectionId);
+
     Task<HashSet<long>> FilterAuthorizedRecordIds(
         long currentUserId,
         long organizationId,

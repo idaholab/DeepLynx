@@ -1,23 +1,24 @@
 // src/app/(home)/project_management/[id]/page.tsx
 
 import { cookies } from "next/headers";
-import { redirect, notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import ProjectManagementClient from "./ProjectManagementClient";
 
 import {
   GroupResponseDto,
-  ProjectResponseDto,
-  RoleResponseDto,
   PermissionResponseDto,
   ProjectMemberResponseDto,
+  ProjectResponseDto,
+  RoleResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 
-import {
-  getProjectServer,
-  getProjectMembersServer,
-} from "@/app/lib/server_service/projects_services.server";
-import { getAllRolesServer } from "@/app/lib/server_service/role_services.server";
 import { getAllPermissionsServer } from "@/app/lib/server_service/permissions_services.server";
+import {
+  getProjectMembersServer,
+  getProjectServer,
+} from "@/app/lib/server_service/projects_services.server";
+import { requireProjectAdminServer } from "@/app/lib/server_service/rbac_guards.server";
+import { getAllRolesServer } from "@/app/lib/server_service/role_services.server";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,8 @@ export default async function ProjectManagementPage({ params }: Props) {
     redirect("/select-org");
   }
 
+  await requireProjectAdminServer(organizationId, projectId);
+
   let project: ProjectResponseDto | null = null;
   let projectMembers: ProjectMemberResponseDto[] = [];
   let projectRoles: RoleResponseDto[] = [];
@@ -62,7 +65,7 @@ export default async function ProjectManagementPage({ params }: Props) {
     try {
       project = await getProjectServer(organizationId, projectId, true);
     } catch (e) {
-      console.error("getProjectServer failed:", e);
+      console.error("[ProjectManagementPage] getProjectServer failed:", e);
     }
 
     try {
@@ -90,8 +93,8 @@ export default async function ProjectManagementPage({ params }: Props) {
 
     // Extract groups from projectMembers (groups have empty emails)
     const projectGroups: GroupResponseDto[] = projectMembers
-      .filter(member => member.email === "" && member.memberId !== undefined)
-      .map(member => ({
+      .filter((member) => member.email === "" && member.memberId !== undefined)
+      .map((member) => ({
         id: member.memberId!,
         name: member.name,
         isArchived: false,

@@ -31,7 +31,7 @@ export default function LoginGuard({
   // Show loading while checking authentication
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center login">
+      <div className="min-h-screen flex items-center justify-center app-header">
         <div className="text-center text-white">
           <div className="loading loading-spinner loading-lg"></div>
           <p className="mt-4">Loading...</p>
@@ -43,7 +43,7 @@ export default function LoginGuard({
   // If authenticated, show loading while redirecting
   if (status === "authenticated" && session) {
     return (
-      <div className="min-h-screen flex items-center justify-center login">
+      <div className="min-h-screen flex items-center justify-center app-header">
         <div className="text-center text-white">
           <div className="loading loading-spinner loading-lg"></div>
           <p className="mt-4">Redirecting to dashboard...</p>

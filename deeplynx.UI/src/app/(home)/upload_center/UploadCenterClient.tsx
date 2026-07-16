@@ -44,7 +44,7 @@ function mapRecordToExistingFile(record: {
   name?: string | null;
   description?: string | null;
   lastUpdatedAt?: string | null;
-  lastUpdatedBy?: string | null;
+  lastUpdatedBy?: string | number | null;
   dataSourceName?: string | null;
 }): ExistingFile | null {
   if (record.id == null) return null;
@@ -53,7 +53,7 @@ function mapRecordToExistingFile(record: {
     name: record.name?.trim() || String(record.id),
     description: record.description ?? undefined,
     lastUpdate: record.lastUpdatedAt ?? undefined,
-    updatedBy: record.lastUpdatedBy ?? undefined,
+    updatedBy: String(record.lastUpdatedBy) ?? undefined,
     dataSource: record.dataSourceName ?? undefined,
   };
 }
@@ -279,10 +279,18 @@ export default function UploadCenterClient() {
         originalIdAlreadyInUse: t.translations.ORIGINAL_ID_ALREADY_IN_USE,
         originalIdAlreadyInUseSuggestion:
           t.translations.ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION,
+        classIdClassNameMismatch:
+          t.translations.CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH,
+        classIdClassNameMismatchSuggestion:
+          t.translations.CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION,
         classIdNotFoundInProject:
           t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT,
         classIdNotFoundSuggestion:
           t.translations.CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        jsonDepthExceeded:
+          t.translations.JSON_DEPTH_EXCEEDED,
+        jsonDepthExceededSuggestion:
+          t.translations.JSON_DEPTH_EXCEEDED_SUGGESTION,
         duplicateSuggestion: t.translations.DUPLICATE_RECORD_SUGGESTION,
         permissionSuggestion: t.translations.PERMISSION_REQUIRED_SUGGESTION,
         validationSuggestion: t.translations.VALIDATION_ERROR_SUGGESTION,
@@ -578,10 +586,18 @@ export default function UploadCenterClient() {
         originalIdAlreadyInUse: t.translations.ORIGINAL_ID_ALREADY_IN_USE,
         originalIdAlreadyInUseSuggestion:
           t.translations.ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION,
+        classIdClassNameMismatch:
+          t.translations.CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH,
+        classIdClassNameMismatchSuggestion:
+          t.translations.CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION,
         classIdNotFoundInProject:
           t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT,
         classIdNotFoundSuggestion:
           t.translations.CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        jsonDepthExceeded:
+          t.translations.JSON_DEPTH_EXCEEDED,
+        jsonDepthExceededSuggestion:
+          t.translations.JSON_DEPTH_EXCEEDED_SUGGESTION,
         duplicateSuggestion: t.translations.DUPLICATE_RECORD_SUGGESTION,
         permissionSuggestion: t.translations.PERMISSION_REQUIRED_SUGGESTION,
         validationSuggestion: t.translations.VALIDATION_ERROR_SUGGESTION,
@@ -606,7 +622,7 @@ export default function UploadCenterClient() {
 
   return (
     <main className="min-h-screen bg-base-200/30">
-      <section className="border-b border-base-300 bg-base-100">
+      <section className="border-b border-base-300/50 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -638,7 +654,7 @@ export default function UploadCenterClient() {
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-3 py-5 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-5xl">
           <section className="w-full">
-            <div className="card bg-base-100 shadow-xl">
+            <div className="card border border-base-300/50 bg-base-100 shadow-sm">
               <div className="card-body space-y-6">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
@@ -651,7 +667,7 @@ export default function UploadCenterClient() {
                   <div
                     role="radiogroup"
                     aria-label={t.translations.UPLOAD_WORKFLOW_VIEW_ARIA}
-                    className="inline-flex rounded-full border border-base-300/70 bg-base-200/50 p-1"
+                    className="inline-flex rounded-full border border-base-300/50 bg-base-200/50 p-1"
                   >
                     <button
                       type="button"

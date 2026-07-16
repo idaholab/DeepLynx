@@ -63,6 +63,10 @@ namespace deeplynx.datalayer.Migrations.Lattice
                         .HasColumnType("bigint")
                         .HasColumnName("promoted_id");
 
+                    b.Property<bool>("Rejected")
+                        .HasColumnType("boolean")
+                        .HasColumnName("rejected");
+
                     b.Property<string>("ValidationStatus")
                         .HasColumnType("text")
                         .HasColumnName("validation_status");
@@ -134,6 +138,14 @@ namespace deeplynx.datalayer.Migrations.Lattice
                     b.Property<long?>("PromotedId")
                         .HasColumnType("bigint")
                         .HasColumnName("promoted_id");
+
+                    b.Property<bool>("Rejected")
+                        .HasColumnType("boolean")
+                        .HasColumnName("rejected");
+
+                    b.Property<long?>("SourceRecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_record_id");
 
                     b.Property<double>("StatisticalFrequency")
                         .HasColumnType("double precision")
@@ -226,6 +238,14 @@ namespace deeplynx.datalayer.Migrations.Lattice
                         .HasColumnType("bigint")
                         .HasColumnName("promoted_id");
 
+                    b.Property<bool>("Rejected")
+                        .HasColumnType("boolean")
+                        .HasColumnName("rejected");
+
+                    b.Property<long?>("SourceRecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_record_id");
+
                     b.Property<double>("StatisticalFrequency")
                         .HasColumnType("double precision")
                         .HasColumnName("statistical_frequency");
@@ -292,6 +312,10 @@ namespace deeplynx.datalayer.Migrations.Lattice
                     b.Property<long?>("PromotedId")
                         .HasColumnType("bigint")
                         .HasColumnName("promoted_id");
+
+                    b.Property<bool>("Rejected")
+                        .HasColumnType("boolean")
+                        .HasColumnName("rejected");
 
                     b.Property<string>("ValidationStatus")
                         .HasColumnType("text")

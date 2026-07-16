@@ -81,12 +81,12 @@ services:
       INSIGHT_FASTAPI_URL: http://insight-fastapi:5009
       ENCRYPTION_KEY: SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE= # base64 encoded from the string "INSECURE_DEV_KEY_32_BYTES_LONG!!"
       ENCRYPTION_IV: SU5TRUNVUkVfREVWX0lWIQ== # base64 encoded from the string "INSECURE_DEV_IV!"
-      AIRFLOW_BASE_URL: http://localhost:8080
-      AIRFLOW_USERNAME: admin
-      AIRFLOW_PASSWORD: admin
+      AIRFLOW_BASE_URL: ${AIRFLOW_BASE_URL:-http://localhost:8080}
+      AIRFLOW_JWT: ${AIRFLOW_JWT:-}
     entrypoint: /usr/local/bin/entrypoint.sh
     ports:
       - "5000:5000"
+      - "50051:50051"
     networks:
       - nexus-network
     volumes:
@@ -110,11 +110,10 @@ services:
     volumes:
       - nx_postgres_data:/var/lib/postgresql
     healthcheck:
-      test:
-        [
+      test: [
           "CMD-SHELL",
           "pg_isready -U postgres && psql -U postgres -d deeplynx -c 'SELECT
-            1;'",
+          1;'",
         ]
       interval: 10s
       timeout: 5s
@@ -157,7 +156,7 @@ services:
       - server
 
   insight-rabbitmq:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight
       dockerfile: Dockerfiles/Dockerfile.rabbitmq.production
@@ -168,7 +167,7 @@ services:
     env_file:
       - ./deeplynx.insight/.env.production
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity" ]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -177,21 +176,14 @@ services:
       - nexus-network
 
   insight-fastapi:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight
       dockerfile: Dockerfiles/Dockerfile.fastapi.production
     ports:
       - "5009:5009"
     command:
-      [
-        "uvicorn",
-        "app.fastapi.main:app",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "5009",
-      ]
+      ["uvicorn", "app.fastapi.main:app", "--host", "0.0.0.0", "--port", "5009"]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:
@@ -214,11 +206,11 @@ services:
       - nexus-network
 
   insight-rabbitmq-runner:
-    profiles: [ insight ]
+    profiles: [insight]
     build:
       context: ./deeplynx.insight
       dockerfile: Dockerfiles/Dockerfile.runner.production
-    command: [ "python", "-m", "app.rabbitmq.runner" ]
+    command: ["python", "-m", "app.rabbitmq.runner"]
     env_file:
       - ./deeplynx.insight/.env.production
     environment:

@@ -1,3 +1,4 @@
+using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -16,6 +17,7 @@ namespace deeplynx.api.Controllers;
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/ai-model-configs")]
 [Authorize]
 [Tags("Project - AI Model Config")]
+// [InsightEnabled] // AI model configs are only consumed by Insight features; gate with HIDE_INSIGHT.
 public class AiModelConfigProjectController : ControllerBase
 {
     private readonly IAiModelConfigBusiness _aiModelConfigBusiness;

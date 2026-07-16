@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace deeplynx.tests;
@@ -25,6 +26,7 @@ public class MetadataBusinessTests : IntegrationTestBase
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private MetadataBusiness _metadataBusiness = null!;
     private EdgeBusiness _mockEdgeBusiness = null!;
+    private UserBusiness _userBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
@@ -33,6 +35,11 @@ public class MetadataBusinessTests : IntegrationTestBase
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private EncryptionHelper _encryptionHelper = null!;
     public long cid; // origin class ID
     public long cid2; // destination class ID
     public long did;
@@ -56,14 +63,26 @@ public class MetadataBusinessTests : IntegrationTestBase
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
 
         // Build leaf dependencies first
+        _userBusiness = new UserBusiness(Context);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
         _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService);
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _recordBusiness = new RecordBusiness(
-            Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _sensitivityLabelBusiness, _sensitivityLabelService);
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
         _relationshipBusiness = new RelationshipBusiness(Context, _edgeBusiness, _eventBusiness);
 
         // Now classBusiness gets valid dependencies
@@ -133,7 +152,7 @@ public class MetadataBusinessTests : IntegrationTestBase
             ProjectId = project.Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = null,
-            IsArchived = false, 
+            IsArchived = false,
             OrganizationId = organizationId
         };
         Context.DataSources.Add(dataSource);
@@ -153,7 +172,7 @@ public class MetadataBusinessTests : IntegrationTestBase
             Name = "Dest Class",
             ProjectId = pid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false, 
+            IsArchived = false,
             OrganizationId = organizationId
         };
         Context.Classes.AddRange(originClass, destClass);
@@ -195,7 +214,7 @@ public class MetadataBusinessTests : IntegrationTestBase
         };
         // Act
         var result = await _metadataBusiness.CreateMetadata(
-            uid, pid, organizationId,did, dto);
+            uid, pid, organizationId, did, dto);
 
         // Assert
         Assert.NotNull(result);
@@ -231,24 +250,24 @@ public class MetadataBusinessTests : IntegrationTestBase
             }
         };
 
-            // Act
-            var result = await _metadataBusiness.CreateMetadata(
-                uid, pid, organizationId, did, dto);
-            
-            // Assert
-            Assert.Equal(2, result.Classes.Count);
-            Assert.True(result.Classes.All(c => c.LastUpdatedBy == uid && 
-                                                c.ProjectId == pid && 
-                                                !c.IsArchived));
-            Assert.Equal("Bulk Class 1", result.Classes.First().Name);
-            Assert.Equal("First class", result.Classes.First().Description);
-            Assert.Equal("Bulk Class 2", result.Classes.Last().Name);
-            Assert.Equal("Second class", result.Classes.Last().Description);
+        // Act
+        var result = await _metadataBusiness.CreateMetadata(
+            uid, pid, organizationId, did, dto);
 
-            // Ensure both create class events are logged
-            var eventList = await Context.Events.ToListAsync();
-            Assert.Equal(1, eventList.Count); // just one event is created containing the count with the bulk method
-        }
+        // Assert
+        Assert.Equal(2, result.Classes.Count);
+        Assert.True(result.Classes.All(c => c.LastUpdatedBy == uid &&
+                                            c.ProjectId == pid &&
+                                            !c.IsArchived));
+        Assert.Equal("Bulk Class 1", result.Classes.First().Name);
+        Assert.Equal("First class", result.Classes.First().Description);
+        Assert.Equal("Bulk Class 2", result.Classes.Last().Name);
+        Assert.Equal("Second class", result.Classes.Last().Description);
+
+        // Ensure both create class events are logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Equal(1, eventList.Count); // just one event is created containing the count with the bulk method
+    }
 
     [Fact]
     public async Task CreateMetadata_Success_WithRecordsAndAutoClasses()
@@ -264,7 +283,7 @@ public class MetadataBusinessTests : IntegrationTestBase
                     OriginalId = "rec-001",
                     ClassName = "Auto Class",
                     Description = "Test Description",
-                    Properties = JsonObject.Parse("{\"test\": \"value\"}") as JsonObject, 
+                    Properties = JsonObject.Parse("{\"test\": \"value\"}") as JsonObject,
                 }
             }
         };
@@ -466,7 +485,7 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         // Act
         var result = await _metadataBusiness.CreateMetadataFromFile(
-            uid, pid, organizationId,did, file);
+            uid, pid, organizationId, did, file);
 
         // Assert
         Assert.Equal(2, result.Classes.Count);
@@ -600,7 +619,7 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         // Act
         var result = await _metadataBusiness.CreateMetadataFromFile(
-            uid, pid, organizationId,did, file);
+            uid, pid, organizationId, did, file);
 
         // Assert
         Assert.Single(result.Classes);
@@ -615,6 +634,238 @@ public class MetadataBusinessTests : IntegrationTestBase
         // Ensure all complex data events are created and logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Equal(5, eventList.Count);
+    }
+
+    [Fact]
+    public async Task CreateMetadata_EdgeCanReferenceExistingRecordByOriginalId()
+    {
+        // Arrange: first upload creates record A
+        var firstDto = new CreateMetadataRequestDto
+        {
+            Records = new List<CreateRecordRequestDto>
+            {
+                new()
+                {
+                    Name = "Record A",
+                    OriginalId = "record-a",
+                    Description = "Record A description",
+                    Properties = JsonObject.Parse("{}") as JsonObject
+                }
+            }
+        };
+
+        await _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, firstDto);
+
+        // Act: second upload creates record B and edge A -> B
+        var secondDto = new CreateMetadataRequestDto
+        {
+            Records = new List<CreateRecordRequestDto>
+            {
+                new()
+                {
+                    Name = "Record B",
+                    OriginalId = "record-b",
+                    Description = "Record B description",
+                    Properties = JsonObject.Parse("{}") as JsonObject
+                }
+            },
+            Edges = new List<CreateEdgeRequestDto>
+            {
+                new()
+                {
+                    OriginOid = "record-a",
+                    DestinationOid = "record-b"
+                }
+            }
+        };
+
+        var result = await _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, secondDto);
+
+        // Assert
+        Assert.NotNull(result.Edges);
+        Assert.Single(result.Edges);
+    }
+
+    [Fact]
+    public async Task CreateMetadata_ValidMetadataPersists_WhenEdgeReferencesMissingRecord()
+    {
+        // Arrange
+        var dto = new CreateMetadataRequestDto
+        {
+            Classes = new List<CreateClassRequestDto>
+            {
+                new()
+                {
+                    Name = "Independent Class",
+                    Description = "Class should persist"
+                }
+            },
+            Relationships = new List<CreateRelationshipRequestDto>
+            {
+                new()
+                {
+                    Name = "Independent Relationship"
+                }
+            },
+            Tags = new List<CreateTagRequestDto>
+            {
+                new()
+                {
+                    Name = "Independent Tag"
+                }
+            },
+            Records = new List<CreateRecordRequestDto>
+            {
+                new()
+                {
+                    Name = "Record Independent",
+                    OriginalId = "record-independent",
+                    Description = "Record should persist",
+                    ClassName = "Independent Class",
+                    Tags = new List<string> { "Independent Tag" },
+                    Properties = JsonObject.Parse("{}") as JsonObject
+                }
+            },
+            Edges = new List<CreateEdgeRequestDto>
+            {
+                new()
+                {
+                    RelationshipName = "Independent Relationship",
+                    OriginOid = "record-independent",
+                    DestinationOid = "missing-record"
+                }
+            }
+        };
+
+        // Act
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
+            _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, dto));
+
+        // Assert
+        Assert.Contains("missing-record", exception.Message);
+
+        var createdClass = await Context.Classes
+            .FirstOrDefaultAsync(c =>
+                c.ProjectId == pid &&
+                c.OrganizationId == organizationId &&
+                c.Name == "Independent Class");
+
+        Assert.NotNull(createdClass);
+
+        var createdRelationship = await Context.Relationships
+            .FirstOrDefaultAsync(r =>
+                r.ProjectId == pid &&
+                r.OrganizationId == organizationId &&
+                r.Name == "Independent Relationship");
+
+        Assert.NotNull(createdRelationship);
+
+        var createdTag = await Context.Tags
+            .FirstOrDefaultAsync(t =>
+                t.ProjectId == pid &&
+                t.OrganizationId == organizationId &&
+                t.Name == "Independent Tag");
+
+        Assert.NotNull(createdTag);
+
+        var createdRecord = await Context.Records
+            .FirstOrDefaultAsync(r =>
+                r.ProjectId == pid &&
+                r.DataSourceId == did &&
+                r.OriginalId == "record-independent");
+
+        Assert.NotNull(createdRecord);
+        Assert.Equal(createdClass.Id, createdRecord.ClassId);
+
+        var createdEdge = await Context.Edges
+            .FirstOrDefaultAsync(e =>
+                e.ProjectId == pid &&
+                e.DataSourceId == did &&
+                e.OriginId == createdRecord.Id);
+
+        Assert.Null(createdEdge);
+    }
+
+    [Fact]
+    public async Task CreateMetadata_Success_WithLargeRecordAndEdgeBatch()
+    {
+        const int count = 500;
+
+        var records = Enumerable.Range(1, count)
+            .Select(i => new CreateRecordRequestDto
+            {
+                Name = $"Record {i}",
+                OriginalId = $"large-record-{i}",
+                Description = $"Record {i} description",
+                Properties = JsonObject.Parse("{}") as JsonObject
+            })
+            .ToList();
+
+        var edges = Enumerable.Range(1, count - 1)
+            .Select(i => new CreateEdgeRequestDto
+            {
+                OriginOid = $"large-record-{i}",
+                DestinationOid = $"large-record-{i + 1}"
+            })
+            .ToList();
+
+        var dto = new CreateMetadataRequestDto
+        {
+            Records = records,
+            Edges = edges
+        };
+
+        var result = await _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, dto);
+
+        Assert.Equal(count, result.Records.Count);
+        Assert.Equal(count - 1, result.Edges.Count);
+    }
+
+    [Fact]
+    public async Task CreateMetadata_Success_WithLargeCrossBatchEdges()
+    {
+        const int count = 500;
+
+        var firstBatch = new CreateMetadataRequestDto
+        {
+            Records = Enumerable.Range(1, count)
+                .Select(i => new CreateRecordRequestDto
+                {
+                    Name = $"Existing Record {i}",
+                    OriginalId = $"existing-record-{i}",
+                    Description = $"Existing Record {i} description",
+                    Properties = JsonObject.Parse("{}") as JsonObject
+                })
+                .ToList()
+        };
+
+        await _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, firstBatch);
+
+        var secondBatch = new CreateMetadataRequestDto
+        {
+            Records = Enumerable.Range(1, count)
+                .Select(i => new CreateRecordRequestDto
+                {
+                    Name = $"New Record {i}",
+                    OriginalId = $"new-record-{i}",
+                    Description = $"New Record {i} description",
+                    Properties = JsonObject.Parse("{}") as JsonObject
+                })
+                .ToList(),
+
+            Edges = Enumerable.Range(1, count)
+                .Select(i => new CreateEdgeRequestDto
+                {
+                    OriginOid = $"existing-record-{i}",
+                    DestinationOid = $"new-record-{i}"
+                })
+                .ToList()
+        };
+
+        var result = await _metadataBusiness.CreateMetadata(uid, pid, organizationId, did, secondBatch);
+
+        Assert.Equal(count, result.Records.Count);
+        Assert.Equal(count, result.Edges.Count);
     }
 
     #endregion
