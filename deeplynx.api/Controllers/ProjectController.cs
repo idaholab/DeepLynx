@@ -822,7 +822,6 @@ public class ProjectController : ControllerBase
     /// <returns>File path for the logo</returns>
     [HttpPost("{projectId}/logo", Name = "api_upload_project_logo")]
     [MapToApiVersion(1)]
-    [ProjectAdmin]
     [Sensitivity("upload file")]
     public async Task<IActionResult> UploadProjectLogo(
         long organizationId,
@@ -851,8 +850,8 @@ public class ProjectController : ControllerBase
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <returns>File stream of the logo bytes</returns>
     [HttpGet("{projectId}/logo/image", Name = "api_get_project_image")]
+    [Auth("read", "project")]
     [MapToApiVersion(1)]
-    [ProjectAdmin]
     public async Task<IActionResult> GetProjectLogoImage(long organizationId, long projectId)
     {
         try
@@ -889,7 +888,6 @@ public class ProjectController : ControllerBase
     /// <returns>True if file was sucessfully deleted</returns>
     [HttpDelete("{projectId}/logo/{fileName}", Name = "api_delete_project_logo")]
     [MapToApiVersion(1)]
-    [ProjectAdmin]
     [Sensitivity("delete file")]
     public async Task<IActionResult> RemoveProjectLogo(
         long organizationId,
