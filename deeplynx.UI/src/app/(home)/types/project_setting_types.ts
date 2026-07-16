@@ -11,6 +11,11 @@ export interface UploadProjectLogoRequest {
   file: File;
 }
 
+export interface FetchProjectLogoResponse {
+  blobUrl: string | null;
+  fileName?: string;
+}
+
 export interface UploadProjectLogoResponse {
   success: boolean;
   logoUrl: string;

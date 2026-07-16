@@ -12,7 +12,18 @@ import {
   ProjectMemberResponseDto
 } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
-import { UploadProjectLogoRequest, UploadProjectLogoResponse, RemoveProjectLogoRequest, RemoveProjectLogoResponse, ProjectBannerSettings, SaveProjectBannerRequest, ProjectStorageSettings, AddStorageLocationRequest, RemoveStorageLocationRequest } from "@/app/(home)/types/project_setting_types";
+import {
+  UploadProjectLogoRequest,
+  UploadProjectLogoResponse,
+  RemoveProjectLogoRequest,
+  RemoveProjectLogoResponse,
+  ProjectBannerSettings,
+  SaveProjectBannerRequest,
+  ProjectStorageSettings,
+  AddStorageLocationRequest,
+  RemoveStorageLocationRequest,
+  FetchProjectLogoResponse
+} from "@/app/(home)/types/project_setting_types";
 
 /* -------------------------------------------------------------------------- */
 /*                         Project CRUD Operations                            */
@@ -496,6 +507,42 @@ export const uploadProjectLogo = async (
       `Failed to upload project logo for project ID ${request.projectId}: ${error}`
     );
     throw new Error(`Failed to upload project logo: ${error}`);
+  }
+};
+
+
+/**
+ * Fetch project logo image as a Blob URL
+ * Returns an object containing the blob URL and filename (if known)
+ */
+export const fetchProjectLogo = async (
+  organizationId: number,
+  projectId: number
+): Promise<FetchProjectLogoResponse> => {
+  try {
+    const res = await api.get<Blob>(
+      `/organizations/${organizationId}/projects/${projectId}/logo/image`,
+      { responseType: "blob" }
+    );
+
+    const contentDisposition = res.headers["content-disposition"];
+    let fileName: string | undefined = undefined;
+
+    if (contentDisposition) {
+      const fileNameMatch = contentDisposition.match(/filename="?(.+)"?/);
+      if (fileNameMatch && fileNameMatch.length > 1) {
+        fileName = fileNameMatch[1];
+      }
+    }
+
+    const blobUrl = URL.createObjectURL(res.data);
+    return { blobUrl, fileName };
+  } catch (error) {
+    console.error(
+      `Failed to fetch project logo for project ID ${projectId}:`,
+      error
+    );
+    return { blobUrl: null };
   }
 };
 

@@ -7,6 +7,7 @@ import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
   archiveProject,
+  fetchProjectLogo,
   removeProjectLogo,
   uploadProjectLogo,
 } from "@/app/lib/client_service/projects_services.client";
@@ -103,8 +104,12 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       try {
         setIsCheckingLogo(true);
 
-        const logoUrl = `${apiBaseUrl}/organizations/${organization.organizationId}/projects/${project.id}/logo/image`;
-        setLogoPreview(logoUrl);
+        const { blobUrl } = await fetchProjectLogo(
+          organization.organizationId as number,
+          project.id as number
+        );
+
+        setLogoPreview(blobUrl);
 
       } catch (error) {
         console.error("Error checking for existing logo:", error);
@@ -115,6 +120,13 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     };
 
     loadExistingLogo();
+
+    // Cleanup to revoke blob URL on unmount
+    return () => {
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+    };
   }, [project?.id, organization?.organizationId]);
 
 
@@ -244,10 +256,12 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         file: logoFile,
       });
 
-      const logoUrl = `${apiBaseUrl}/organizations/${organization!.organizationId}/projects/${project.id}/logo/image`;
+      const { blobUrl } = await fetchProjectLogo(
+        organization.organizationId as number,
+        project.id as number
+      );
 
-      // Add timestamp to force browser to reload the image
-      setLogoPreview(logoUrl);
+      setLogoPreview(blobUrl);
       setLogoFile(null);
       toast.success(t.translations.LOGO_UPLOADED_SUCCESSFULLY);
     } catch (error) {
@@ -255,12 +269,13 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       toast.error(
         error instanceof Error
           ? error.message
-          : t.translations.FAILED_TO_UPLOAD_LOGO,
+          : t.translations.FAILED_TO_UPLOAD_LOGO
       );
     } finally {
       setIsUploading(false);
     }
   };
+
 
   const handleRemoveLogo = async () => {
     if (!organization?.organizationId || !project?.id) return;
@@ -299,9 +314,12 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     }
 
     try {
-      const logoUrl = `${apiBaseUrl}/organizations/${organization!.organizationId}/projects/${project.id}/logo/image`;
+      const { blobUrl } = await fetchProjectLogo(
+        organization.organizationId as number,
+        project.id as number
+      )
 
-      setLogoPreview(logoUrl);
+      setLogoPreview(blobUrl);
     } catch (error) {
       console.error("Failed to restore previous logo:", error);
       setLogoPreview(null);
@@ -315,7 +333,6 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       return;
     }
 
-    // Check if the selected storage is already the default
     if (defaultStorage?.id === selectedStorageId) {
       toast.error(t.translations.THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT);
       return;
