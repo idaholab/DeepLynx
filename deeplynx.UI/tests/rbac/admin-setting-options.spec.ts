@@ -1,5 +1,5 @@
-import { test, expect } from "./fixtures";
-import { sysAdmin, orgAdminA, projectAdminX, standardUserX } from "./deeplynx-config";
+import { test, expect } from "../fixtures";
+import { sysAdmin, orgAdminA, projectAdminX, standardUserX } from "../deeplynx-config";
 
 // Each describe block below acts as a different account to verify that
 // settings visibility scales down correctly with role: sysAdmin sees
@@ -12,6 +12,7 @@ import { sysAdmin, orgAdminA, projectAdminX, standardUserX } from "./deeplynx-co
 // actingProject is used to put them on a project dashboard — otherwise
 // "Project Settings" would never be reachable to check for either of them.
 
+// SysAdmin Acting
 test.describe("SysAdmin settings visibility", () => {
   test.use({ actingUser: sysAdmin, actingOrg: "PW Org A", actingProject: "PW Project X" });
 
@@ -28,6 +29,7 @@ test.describe("SysAdmin settings visibility", () => {
   });
 });
 
+// OrgAdmin Acting
 test.describe("Org admin settings visibility", () => {
   test.use({ actingUser: orgAdminA, actingProject: "PW Project X" });
 
@@ -44,6 +46,7 @@ test.describe("Org admin settings visibility", () => {
   });
 });
 
+// Project Admin Acting
 test.describe("Project admin settings visibility", () => {
   test.use({ actingUser: projectAdminX });
 
@@ -60,6 +63,7 @@ test.describe("Project admin settings visibility", () => {
   });
 });
 
+// Standard User Acting
 test.describe("Standard user settings visibility", () => {
   test.use({ actingUser: standardUserX });
 

@@ -25,8 +25,7 @@ export const PROJECTS = {
   projectX: { name: 'PW Project X', org: ORGS.orgA.name },
 } as const satisfies Record<string, TestProject>;
 
-// ============================================================================
-// Accounts and Roles
+// Accounts and Roles- configure any additional test accounts with their roles here
 
 export const DEFAULT_ROLE_NAME = 'User';
 
@@ -58,9 +57,6 @@ export const standardUserX: TestAccount = {
   provision: { role: 'user', org: ORGS.orgA.name, project: PROJECTS.projectX.name },
 };
 
-// Developers: to add a new account, declare it above and add it here.
-// To add a new org/project for a boundary test, add it to ORGS/PROJECTS above
-// and reference it from an account's `provision`. Nothing else needs to change.
 export const ACTINGUSERS: TestAccount[] = [
   sysAdmin, orgAdminA, orgAdminB, projectAdminX, standardUserX,
 ];
@@ -68,10 +64,7 @@ export const ACTINGUSERS: TestAccount[] = [
 export const authFile = (name: TestAccountTitle) => `playwright/.auth/${name}.json`;
 export const testUserCacheFile = 'playwright/.auth/testUserCache.json';
 
-// ============================================================================
 // TestUserCache — resolved IDs written by auth.setup.ts, read by tests
-// ============================================================================
-
 export interface TestUserCacheEntry {
   email: string;
   organizationId?: string;
@@ -93,11 +86,9 @@ export function accountMeta(name: TestAccountTitle) {
   return readTestUserCache()[name];
 }
 
-// ============================================================================
-// UI selection helpers — which org/project is "active" in the browser
-// ============================================================================
+// UI selection helpers.
 // Auth comes from storageState (see fixtures.ts). These only control UI state:
-// which org/project the app treats as currently selected.
+// Determines which org/project is active in the browser
 
 export function orgIdByName(orgName: string): number {
   const owner = ACTINGUSERS.find((a) => a.provision?.org === orgName);

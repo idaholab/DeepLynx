@@ -1,5 +1,9 @@
 import type { Page } from "@playwright/test";
 
+/************************
+  THIS SEED SCRIPT IS DEPRECATED. When all tests are updated to use the fixture this can be deleted
+ ********************/
+
 /**
  * Seeds localStorage and cookies with an organization session so that
  * OrganizationSessionProvider finds it on mount.  Also suppresses the
@@ -62,16 +66,4 @@ export async function seedAndNavigateToProject(page: Page) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.locator('main a[href^="/project/"]').first().click();
   await page.waitForURL(/\/project\/\d+/);
-}
-
-export async function seedAppState(page: Page) {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      "organizationSession",
-      JSON.stringify({ organizationId: 1, organizationName: "INL" }),
-    );
-    localStorage.setItem("dashboard-tour-completed", "true");
-    localStorage.setItem("project-tour-completed", "true");
-  });
-  // no cookies — auth now comes from storageState
 }

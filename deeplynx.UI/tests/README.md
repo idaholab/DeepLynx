@@ -95,6 +95,9 @@ test('owner invites a member', async ({ actAs }) => {
 
 Contexts are tracked and closed automatically.
 
+> [!NOTE]
+> For a real test example see: [admin-setting-options.spec.ts](rbac/admin-setting-options.spec.ts)
+
 ## Where accounts come from
 
 `TestAccount` definitions live in `./deeplynx-config`. `tests/setup.ts`
@@ -106,7 +109,7 @@ resolves to the backend's org-scoped `DEFAULT_ROLE_NAME` ("User"). Custom
 roles aren't supported yet.
 
 > [!NOTE]
-> Currently as implemented, test users can't be configured for more than one Organization and one Project
+> Currently as implemented, A single test user can't be configured for more than one Organization and one Project
 
 ## Errors
 
