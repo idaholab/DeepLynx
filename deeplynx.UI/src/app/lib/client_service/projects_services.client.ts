@@ -482,45 +482,36 @@ export async function setProjectAdminStatus(
 export const uploadProjectLogo = async (
   request: UploadProjectLogoRequest
 ): Promise<UploadProjectLogoResponse> => {
-  const formData = new FormData();
-  formData.append("file", request.file);
+  try {
+    const formData = new FormData();
+    formData.append("file", request.file);
 
-  const response = await fetch(
-    `/api/project/${request.projectId}/logo`,
-    {
-      method: "POST",
-      body: formData,
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to upload logo");
+    const res = await api.post(
+      `/organizations/${request.organizationId}/projects/${request.projectId}/logo`,
+      formData
+    );
+    return res.data;
+  } catch (error) {
+    console.error(
+      `Failed to upload project logo for project ID ${request.projectId}: ${error}`
+    );
+    throw new Error(`Failed to upload project logo: ${error}`);
   }
-
-  return response.json();
 };
 
 /**
  * Remove project logo
- * Deletes the logo file from /public/images
+ * Deletes the logo file from the logos folder and updates the active_logo.txt file.
  */
 export const removeProjectLogo = async (
   request: RemoveProjectLogoRequest
 ): Promise<RemoveProjectLogoResponse> => {
-  const response = await fetch(
-    `/api/project/${request.projectId}/logo`,
-    {
-      method: "DELETE",
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to remove logo");
+  try {
+    const response = await api.delete<RemoveProjectLogoResponse>(`/organizations/${request.organizationId}/projects/${request.projectId}/logo/${request.fileName}`);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to remove logo");
   }
-
-  return response.json();
 };
 
 /**
