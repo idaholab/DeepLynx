@@ -191,7 +191,9 @@ public class RelationshipBusiness : IRelationshipBusiness
             Name = dto.Name,
             Description = dto.Description,
             Properties = dto.Properties?.ToString(),
-            Uuid = dto.Uuid,
+            Uuid = string.IsNullOrWhiteSpace(dto.Uuid)
+                ? Guid.NewGuid().ToString()
+                : dto.Uuid.Trim(),
             OriginId = dto.OriginId,
             DestinationId = dto.DestinationId,
             OrganizationId = organizationId,
