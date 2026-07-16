@@ -401,6 +401,9 @@ export default function InsightModelSettingsModal({
       return;
     }
 
+    const organizationIdForHealthCheck = resolvedOrganizationId;
+    const projectIdForHealthCheck = resolvedProjectId;
+
     let cancelled = false;
 
     async function checkDraftEndpointHealth() {
@@ -413,20 +416,20 @@ export default function InsightModelSettingsModal({
       const [queryHealth, uploadHealth, embeddingHealth] =
           await Promise.allSettled([
             fetchInsightEndpointHealth({
-              organizationId: resolvedOrganizationId,
-              projectId: resolvedProjectId,
+              organizationId: organizationIdForHealthCheck,
+              projectId: projectIdForHealthCheck,
               modelConfigId: draftInsightModelSelection.queryModelConfigId,
               modelType: "llm",
             }),
             fetchInsightEndpointHealth({
-              organizationId: resolvedOrganizationId,
-              projectId: resolvedProjectId,
+              organizationId: organizationIdForHealthCheck,
+              projectId: projectIdForHealthCheck,
               modelConfigId: draftInsightModelSelection.uploadModelConfigId,
               modelType: "vlm",
             }),
             fetchInsightEndpointHealth({
-              organizationId: resolvedOrganizationId,
-              projectId: resolvedProjectId,
+              organizationId: organizationIdForHealthCheck,
+              projectId: projectIdForHealthCheck,
               modelConfigId: draftInsightModelSelection.embeddingModelConfigId,
               modelType: "embedding",
             }),
