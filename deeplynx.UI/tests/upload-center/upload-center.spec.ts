@@ -613,6 +613,12 @@ INSERT INTO test_table (id, name) VALUES (1, 'Test Row');
       content: createFakeTdms(),
     },
     {
+      label: 'GZ',
+      fileName: 'test-file.gz',
+      mimeType: 'application/gzip',
+      content: zlib.gzipSync(Buffer.from('id,name,email,value,timestamp\n1,Test Row,test@example.com,42,2024-01-01T00:00:00Z\n', 'utf8')),
+    },
+    {
       label: 'JSON',
       fileName: 'test-file.json',
       mimeType: 'application/json',
