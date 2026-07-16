@@ -524,130 +524,84 @@ test.describe("Upload Center", () => {
     });
   });
 
-  let filePath: string;
-  let baseFileName: string;
-
-  async function setUp(fileName: string, fileContents: any) {
-    filePath = path.join(os.tmpdir(), fileName);
+  async function setUp(fileName: string, fileContents: any): Promise<string> {
+    const filePath = path.join(os.tmpdir(), fileName);
     // Reuse the file across runs if it already exists
     if (fs.existsSync(filePath)) {
-      return;
+      return filePath;
     }
     await fs.promises.writeFile(filePath, fileContents);
+    return filePath;
   }
 
-  test.describe('Upload a file', () => {
+  type FileTypeConfig = {
+    label: string;           // used in describe/test names
+    fileName: string;
+    mimeType: string;
+    content: any;            // string | Buffer, whatever setUp/writeFile accepts
+    dragAndDropOnly?: boolean;   // e.g. PDF-only quirks can go here if ever needed
+  };
 
-    test.afterEach(async () => {
-      // Comment this out if you want to cache the file between test runs
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    });
-
-    test.describe('SQL upload', () => {
-      test.beforeEach(async () => {
-        baseFileName = 'test-file.sql';
-        await setUp(baseFileName, `-- Minimal test SQL file
+  const fileTypes: FileTypeConfig[] = [
+    {
+      label: 'TXT',
+      fileName: 'test-file.txt',
+      mimeType: 'text/plain',
+      content: 'TESTING',
+    },
+    {
+      label: 'SQL',
+      fileName: 'test-file.sql',
+      mimeType: 'application/sql',
+      content: `-- Minimal test SQL file
 CREATE TABLE test_table (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 INSERT INTO test_table (id, name) VALUES (1, 'Test Row');
-`);
-      });
-      test('Upload a single SQL file using click to browse', async ({ page }) => {
-        await clickToBrowse({ page }, baseFileName, filePath);
-      });
-
-      test('Upload a single SQL file using drag and drop', async ({ page }) => {
-        await dragAndDrop({ page }, baseFileName, filePath, 'application/sql');
-      });
-    });
-
-    test.describe('DOCX upload', () => {
-      test.beforeEach(async () => {
-        baseFileName = 'test-file.docx';
-        await setUp(baseFileName, createMinimalDocx());
-      });
-      test('Upload a single DOCX file using click to browse', async ({ page }) => {
-        await clickToBrowse({ page }, baseFileName, filePath);
-      });
-
-      test('Upload a single DOCX file using drag and drop', async ({ page }) => {
-        await dragAndDrop({ page }, baseFileName, filePath, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      });
-    });
-
-    test.describe('TXT upload', () => {
-      test.beforeEach(async () => {
-        baseFileName = 'test-file.txt';
-        await setUp(baseFileName, 'TESTING');
-      });
-      test('Upload a single TXT file using click to browse', async ({ page }) => {
-        await clickToBrowse({ page }, baseFileName, filePath);
-      });
-      test('Upload a single TXT file using drag and drop', async ({ page }) => {
-        await dragAndDrop({ page }, baseFileName, filePath, 'text/plain');
-      });
-    });
-
-    test.describe('HDF5 upload', () => {
-      test.beforeEach(async () => {
-        baseFileName = 'test-file.hdf5';
-        await setUp(baseFileName, createFakeHdf5());
-      });
-      test('Upload a single HDF5 file using click to browse', async ({ page }) => {
-        await clickToBrowse({ page }, baseFileName, filePath);
-      });
-
-      test('Upload a single HDF5 file using drag and drop', async ({ page }) => {
-        await dragAndDrop({ page }, baseFileName, filePath, 'application/x-hdf5');
-      });
-    });
-
-    test.describe('JSON upload', () => {
-      test.beforeEach(async () => {
-        baseFileName = 'test-file.json';
-        await setUp(baseFileName, JSON.stringify({
-          id: 1,
-          name: 'Test Row',
-          createdAt: '2024-01-01T00:00:00Z',
-        }, null, 2));
-      });
-      test('Upload a single JSON file using click to browse', async ({ page }) => {
-        await clickToBrowse({ page }, baseFileName, filePath);
-      });
-      test('Upload a single JSON file using drag and drop', async ({ page }) => {
-        await dragAndDrop({ page }, baseFileName, filePath, 'application/json');
-      });
-    });
-
-    test.describe('XML upload', () => {
-      test.beforeEach(async () => {
-        baseFileName = 'test-file.xml';
-        await setUp(baseFileName, `<?xml version="1.0" encoding="UTF-8"?>
+`,
+    },
+    {
+      label: 'DOCX',
+      fileName: 'test-file.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      content: createMinimalDocx(),
+    },
+    {
+      label: 'HDF5',
+      fileName: 'test-file.hdf5',
+      mimeType: 'application/x-hdf5',
+      content: createFakeHdf5(),
+    },
+    {
+      label: 'JSON',
+      fileName: 'test-file.json',
+      mimeType: 'application/json',
+      content: JSON.stringify({
+        id: 1,
+        name: 'Test Row',
+        createdAt: '2024-01-01T00:00:00Z',
+      }, null, 2),
+    },
+    {
+      label: 'XML',
+      fileName: 'test-file.xml',
+      mimeType: 'text/xml',
+      content: `<?xml version="1.0" encoding="UTF-8"?>
 <testData>
   <record id="1">
     <name>Test Row</name>
     <createdAt>2024-01-01T00:00:00Z</createdAt>
   </record>
 </testData>
-`);
-      });
-      test('Upload a single XML file using click to browse', async ({ page }) => {
-        await clickToBrowse({ page }, baseFileName, filePath);
-      });
-      test('Upload a single XML file using drag and drop', async ({ page }) => {
-        await dragAndDrop({ page }, baseFileName, filePath, 'text/xml');
-      });
-    });
-
-    test.describe('PDF upload', () => {
-      test.beforeEach(async () => {
-        baseFileName = 'test-file.pdf';
-        await setUp(baseFileName, `%PDF-1.4
+`,
+    },
+    {
+      label: 'PDF',
+      fileName: 'test-file.pdf',
+      mimeType: 'application/pdf',
+      content: `%PDF-1.4
 1 0 obj
 << /Type /Catalog /Pages 2 0 R >>
 endobj
@@ -678,58 +632,51 @@ trailer
 << /Size 6 /Root 1 0 R >>
 startxref
 407
-%%EOF`);
-      });
-      test('Upload a single PDF file using drag and drop', async ({ page }) => {
-        await dragAndDrop({ page }, baseFileName, filePath, 'application/pdf');
-      });
+%%EOF`,
+    },
+    {
+      label: 'CSV',
+      fileName: 'test-file.csv',
+      mimeType: 'text/csv',
+      content: 'id,name,email,value,timestamp\n',
+    },
+    {
+      label: 'ZIP',
+      fileName: 'test-file.zip',
+      mimeType: 'application/zip',
+      content: createZip('fileToZip.txt', 'Zipped'),
+    },
+    {
+      label: 'XLSX',
+      fileName: 'test-file.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      content: createMinimalXlsx(),
+    },
+  ];
 
-      test('Upload a single PDF file using click to browse', async ({ page }) => {
-        await clickToBrowse({ page }, baseFileName, filePath);
-      });
-    });
+  test.describe('Upload a file', () => {
+    for (const fileType of fileTypes) {
+      test.describe(`${fileType.label} upload`, () => {
+        let filePath: string;
 
-    test.describe('CSV upload', () => {
-      test.beforeEach(async () => {
-        baseFileName = 'test-file.csv';
-        await setUp(baseFileName, 'id,name,email,value,timestamp\n');
-      });
-      test('Upload a single CSV file using click to browse', async ({ page }) => {
-        await clickToBrowse({ page }, baseFileName, filePath);
-      });
+        test.beforeEach(async () => {
+          filePath = await setUp(fileType.fileName, fileType.content);
+        });
 
-      test('Upload a single CSV file using drag and drop', async ({ page }) => {
-        await dragAndDrop({ page }, baseFileName, filePath, 'text/csv');
-      });
-    });
+        test.afterEach(async () => {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        });
 
-    test.describe('ZIP upload', () => {
-      test.beforeEach(async () => {
-        baseFileName = 'test-file.zip';
-        await setUp(baseFileName, createZip('fileToZip.txt', 'Zipped'));
-      });
-      test('Upload a single ZIP file using drag and drop', async ({ page }) => {
-        await dragAndDrop({ page }, baseFileName, filePath, 'application/zip');
-      });
+        test(`Upload a single ${fileType.label} file using click to browse`, async ({ page }) => {
+          await clickToBrowse({ page }, fileType.fileName, filePath);
+        });
 
-      test('Upload a single ZIP file using click to browse', async ({ page }) => {
-        await clickToBrowse({ page }, baseFileName, filePath);
+        test(`Upload a single ${fileType.label} file using drag and drop`, async ({ page }) => {
+          await dragAndDrop({ page }, fileType.fileName, filePath, fileType.mimeType);
+        });
       });
-    });
-
-    test.describe('XLSX upload', () => {
-      test.beforeEach(async () => {
-        baseFileName = 'test-file.xlsx';
-        await setUp(baseFileName, createMinimalXlsx());
-      });
-
-      test('Upload a single XLSX file using drag and drop', async ({ page }) => {
-        await dragAndDrop({ page }, baseFileName, filePath, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      });
-
-      test('Upload a single XLSX file using click to browse', async ({ page }) => {
-        await clickToBrowse({ page }, baseFileName, filePath);
-      });
-    });
+    }
   });
 });
