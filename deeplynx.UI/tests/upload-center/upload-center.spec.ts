@@ -309,6 +309,34 @@ test.describe("Upload Center", () => {
     return Buffer.concat([signature, filler]);
   }
 
+  function createFakeTdms(): Buffer {
+    // TDMS (National Instruments) lead-in structure — real tag + a
+    // structurally-shaped (but not spec-complete) segment header, so
+    // magic-byte/content-sniffing on the backend correctly identifies
+    // the file as TDMS. This is NOT a valid TDMS file: there is no real
+    // metadata section, no channel groups, no raw data index, and no
+    // real lead-in values. It will NOT open in NI DIAdem or nptdms.
+    // It only exercises the upload pipeline.
+    //
+    // Real TDMS lead-in is 28 bytes:
+    //   [0:4]   tag              "TDSm" (0x54 0x44 0x53 0x6D)
+    //   [4:8]   ToC mask         uint32 LE (table-of-contents flags)
+    //   [8:12]  version number   uint32 LE (e.g. 4713 for TDMS 2.0)
+    //   [12:20] next segment offset   uint64 LE
+    //   [20:28] raw data offset       uint64 LE
+    const lead = Buffer.alloc(28);
+    lead.write('TDSm', 0, 'ascii');       // tag
+    lead.writeUInt32LE(0x0e, 4);          // ToC mask (arbitrary nonzero flags)
+    lead.writeUInt32LE(4713, 8);          // version number
+    lead.writeUInt32LE(0, 12);            // next segment offset (low 32 bits)
+    lead.writeUInt32LE(0, 16);            // next segment offset (high 32 bits)
+    lead.writeUInt32LE(0, 20);            // raw data offset (low 32 bits)
+    lead.writeUInt32LE(0, 24);            // raw data offset (high 32 bits)
+
+    const filler = Buffer.from('Fake TDMS content for upload test purposes only.', 'utf8');
+    return Buffer.concat([lead, filler]);
+  }
+
   test.beforeEach(async ({ page }) => {
     await seedAndNavigateToProject(page);
     // Navigate to Upload Center via sidebar
@@ -534,6 +562,10 @@ test.describe("Upload Center", () => {
     return filePath;
   }
 
+  // ---------------------------------------------------------------------
+  // Single source of truth for every uploadable file type.
+  // Add a new format by adding one entry here — no new test blocks needed.
+  // ---------------------------------------------------------------------
   type FileTypeConfig = {
     label: string;           // used in describe/test names
     fileName: string;
@@ -573,6 +605,12 @@ INSERT INTO test_table (id, name) VALUES (1, 'Test Row');
       fileName: 'test-file.hdf5',
       mimeType: 'application/x-hdf5',
       content: createFakeHdf5(),
+    },
+    {
+      label: 'TDMS',
+      fileName: 'test-file.tdms',
+      mimeType: 'application/octet-stream',
+      content: createFakeTdms(),
     },
     {
       label: 'JSON',
