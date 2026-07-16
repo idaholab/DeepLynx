@@ -190,11 +190,13 @@ public class ProjectBusiness : IProjectBusiness
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
     /// <param name="logoFile">The file to upload</param>
     /// <returns>The full path of the uploaded logo file</returns>
     public async Task<string> UploadProjectLogo(
         long organizationId,
         long projectId,
+        long? objectStorageId,
         IFormFile logoFile)
     {
         if (logoFile == null || logoFile.Length == 0)
@@ -213,7 +215,8 @@ public class ProjectBusiness : IProjectBusiness
         if (logoFile.Length > maxFileSize)
             throw new ArgumentException("File size exceeds the 5MB limit.");
 
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(organizationId);
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
         if (objectStorage.Config.MountPath == null)
             throw new Exception("File system mount path not set in object storage");
 
@@ -1133,5 +1136,18 @@ public class ProjectBusiness : IProjectBusiness
         // Add current user as admin to project
         // ===============================
         await AddMemberToProject(projectId, null, currentUserId, null, makeProjectAdmin: true);
+    }
+
+    private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
+    {
+        if (objectStorageId.HasValue)
+        {
+            // object storage could be org-level so just return object storage, don't check for project existence
+            return objectStorageId.Value;
+        }
+
+        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
+            ?? throw new KeyNotFoundException("Default object storage not found");
+        return defaultObjectStorage.Id;
     }
 }

@@ -817,6 +817,7 @@ public class ProjectController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
     /// <param name="file">The file to upload</param>
     /// <returns>File path for the logo</returns>
     [HttpPost("{projectId}/logo", Name = "api_upload_project_logo")]
@@ -826,11 +827,12 @@ public class ProjectController : ControllerBase
     public async Task<IActionResult> UploadProjectLogo(
         long organizationId,
         long projectId,
+        long? objectStorageId,
         IFormFile file)
     {
         try
         {
-            var logoUri = await _projectBusiness.UploadProjectLogo(organizationId, projectId, file);
+            var logoUri = await _projectBusiness.UploadProjectLogo(organizationId, projectId, objectStorageId, file);
 
             return Ok(new { message = "Logo uploaded successfully", logoUri });
         }

@@ -23,7 +23,7 @@ public interface IProjectBusiness
         bool? isProjectAdmin = null);
     Task<bool> SetProjectAdminStatus(long projectId, long? userId, long? groupId, bool isAdmin = false);
     Task<bool> RemoveMemberFromProject(long projectId, long? userId, long? groupId);
-    Task<string> UploadProjectLogo(long organizationId, long projectId, IFormFile logoFile);
+    Task<string> UploadProjectLogo(long organizationId, long projectId, long? objectStorageId, IFormFile logoFile);
     Task<(Stream Stream, string FullPath)?> GetProjectLogoStreamAsync(long organizationId, long projectId);
     Task<bool> RemoveLogoFileAsync(long organizationId, long projectId, string fileName);
 }
