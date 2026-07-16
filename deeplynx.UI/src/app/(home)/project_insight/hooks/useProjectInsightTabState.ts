@@ -23,7 +23,11 @@ export function useProjectInsightTabState({
     tabKey: ProjectInsightTabKey,
     updater: (current: TabFilterState) => TabFilterState,
   ) {
-    setLibraryState(updater);
+    if (tabKey === "library") {
+      setLibraryState(updater);
+      return;
+    }
+
     setPendingState(updater);
   }
 

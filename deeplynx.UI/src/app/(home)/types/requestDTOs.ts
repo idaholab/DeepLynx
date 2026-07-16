@@ -206,15 +206,6 @@ export type UpdateProjectRequestDto = {
   banner?: string | null;
 };
 
-export type RecordSearchRequestDto = {
-  userQuery?: string;
-  tagIds?: number[];
-  classIds?: number[];
-  isInsightEligible?: boolean;
-  embedding?: "embedded" | "pending" | "any";
-  hideArchived?: boolean;
-};
-
 export type CreateRecordRequestDto = {
   name: string;
   description: string;
