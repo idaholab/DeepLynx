@@ -298,6 +298,17 @@ test.describe("Upload Center", () => {
     ]);
   }
 
+  function createFakeHdf5(): Buffer {
+    // Real HDF5 signature (8 bytes): \x89 H D F \r \n \x1a \n
+    // This lets any magic-byte/content-sniffing on the backend correctly
+    // identify the file as HDF5. Everything after the signature is
+    // arbitrary filler, NOT a valid superblock — this file will not
+    // open in h5py/HDFView. It only exercises the upload pipeline.
+    const signature = Buffer.from([0x89, 0x48, 0x44, 0x46, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const filler = Buffer.from('Fake HDF5 content for upload test purposes only.', 'utf8');
+    return Buffer.concat([signature, filler]);
+  }
+
   test.beforeEach(async ({ page }) => {
     await seedAndNavigateToProject(page);
     // Navigate to Upload Center via sidebar
@@ -579,6 +590,20 @@ INSERT INTO test_table (id, name) VALUES (1, 'Test Row');
       });
       test('Upload a single TXT file using drag and drop', async ({ page }) => {
         await dragAndDrop({ page }, baseFileName, filePath, 'text/plain');
+      });
+    });
+
+    test.describe('HDF5 upload', () => {
+      test.beforeEach(async () => {
+        baseFileName = 'test-file.hdf5';
+        await setUp(baseFileName, createFakeHdf5());
+      });
+      test('Upload a single HDF5 file using click to browse', async ({ page }) => {
+        await clickToBrowse({ page }, baseFileName, filePath);
+      });
+
+      test('Upload a single HDF5 file using drag and drop', async ({ page }) => {
+        await dragAndDrop({ page }, baseFileName, filePath, 'application/x-hdf5');
       });
     });
 
