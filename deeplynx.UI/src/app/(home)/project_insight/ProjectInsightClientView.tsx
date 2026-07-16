@@ -468,7 +468,7 @@ export default function ProjectInsightClientView() {
         ) : undefined
       }
     >
-      <div className="space-y-2">
+      <div className="space-y-1">
         {pending.map((record) => {
           const status = getProjectInsightStatus(record, statusMap);
           const isSelectable =
@@ -572,8 +572,8 @@ export default function ProjectInsightClientView() {
           </section>
 
           <aside className="card card-border bg-base-100 shadow-md shadow-base-content/10 xl:h-full xl:min-h-0">
-            <div className="card-body h-full min-h-0 gap-2 p-4 sm:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="card-body h-full min-h-0 gap-1 p-4 sm:p-5">
+              {/* <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex gap-3 items-center">
                     <h2 className="card-title text-base-content">
@@ -589,12 +589,12 @@ export default function ProjectInsightClientView() {
                     </p>
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               <div className="inline-flex w-fit rounded-full border border-base-300/60 bg-base-200/60 p-1">
                 <button
                   type="button"
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${
                     activeTabKey === "library"
                       ? "bg-base-100 text-base-content shadow-sm"
                       : "text-base-content/70 hover:text-base-content"
@@ -602,10 +602,13 @@ export default function ProjectInsightClientView() {
                   onClick={() => setActiveTabKey("library")}
                 >
                   {tabLabels.library}
+                  <span className="badge badge-secondary badge-sm shrink-0">
+                    {embeddedTotal}
+                  </span>
                 </button>
                 <button
                   type="button"
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${
                     activeTabKey === "pending"
                       ? "bg-base-100 text-base-content shadow-sm"
                       : "text-base-content/70 hover:text-base-content"
@@ -613,6 +616,9 @@ export default function ProjectInsightClientView() {
                   onClick={() => setActiveTabKey("pending")}
                 >
                   {tabLabels.pending}
+                  <span className="badge badge-secondary badge-sm shrink-0">
+                    {pendingTotal}
+                  </span>
                 </button>
               </div>
 
@@ -644,36 +650,31 @@ export default function ProjectInsightClientView() {
                     </button>
                   </div>
 
+                  {(activeFilterPills.length !== 0 || activeSearchError) &&
                   <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {activeFilterPills.length === 0 ? (
-                        <span className="text-sm text-base-content/60">
-                          {activeTabKey === "library"
-                            ? t.translations.PROJECT_INSIGHT_SCOPE_HINT
-                            : t.translations
-                                .PROJECT_INSIGHT_PENDING_SEARCH_HINT}
-                        </span>
-                      ) : (
-                        activeFilterPills.map((pill) => (
-                          <button
-                            key={pill.id}
-                            type="button"
-                            className="btn btn-xs btn-outline gap-1"
-                            onClick={() => removeActiveFilterPill(pill)}
-                          >
-                            {pill.label}
-                            <XMarkIcon className="size-3.5" />
-                          </button>
-                        ))
+                      {activeFilterPills.length === 0 ?
+                      null : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {activeFilterPills.map((pill) => (
+                            <button
+                              key={pill.id}
+                              type="button"
+                              className="btn btn-xs btn-outline gap-1"
+                              onClick={() => removeActiveFilterPill(pill)}
+                            >
+                              {pill.label}
+                              <XMarkIcon className="size-3.5" />
+                            </button>
+                          ))}
+                        </div>
                       )}
-                    </div>
 
                     {activeSearchError && (
                       <span className="text-sm text-warning">
                         {activeSearchError}
                       </span>
                     )}
-                  </div>
+                  </div>}
                 </div>
               </div>
 
