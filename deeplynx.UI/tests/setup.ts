@@ -4,7 +4,7 @@ import jsonWebToken from 'jsonwebtoken';
 import fs from 'fs';
 import { loadEnvConfig } from "@next/env";
 import {
-  ACTINGUSERS, ORGS, PROJECTS, DEFAULT_PROJECT_ROLE_NAME, TestAccount,
+  ACTINGUSERS, ORGS, PROJECTS, DEFAULT_ROLE_NAME, TestAccount,
   authFile, testUserCacheFile, TestUserCacheEntry,
 } from './deeplynx-config';
 
@@ -108,15 +108,6 @@ async function upsertTestAccount(sysApi: APIRequestContext, account: TestAccount
   return { apiKey: key.apiKey, apiSecret: key.apiSecret, userId };
 }
 
-// ---- Reuse cached credentials (avoids POST /users/test minting a new user every run) --------
-// NOTE: /users/test and /oauth/keys/test do not appear to be idempotent by
-// name on the backend — calling them repeatedly creates a new user + key each
-// time. Rather than rely on the backend to dedupe, we persist each account's
-// apiKey/apiSecret/userId in testUserCache.json (same file as the resolved
-// org/project IDs — it's already gitignored under playwright/.auth/), and on
-// every run verify those credentials still work via GET /users/current
-// before ever calling upsertTestAccount again. Only a 401/expired/deleted
-// account falls back to creating a new one.
 function loadTestUserCache(): Record<string, TestUserCacheEntry> {
   try {
     return JSON.parse(fs.readFileSync(testUserCacheFile, 'utf8'));
@@ -213,22 +204,21 @@ interface Role {
   name: string;
 }
 
-const roleIdCache = new Map<string, string>(); // key: `${orgId}:${projectId}:${roleName}`
 
-async function findRoleId(
+const roleIdCache = new Map<string, string>(); // key: `${orgId}:${roleName}`
+
+// Default roles are org-scoped, not project-scoped
+async function findDefaultRoleId(
   sysApi: APIRequestContext,
   orgId: string,
-  projectId: string,
   roleName: string,
 ): Promise<string | undefined> {
-  const cacheKey = `${orgId}:${projectId}:${roleName}`;
+  const cacheKey = `${orgId}:${roleName}`;
   if (roleIdCache.has(cacheKey)) return roleIdCache.get(cacheKey)!;
 
-  const res = await sysApi.get(`${API_URL}/organizations/${orgId}/projects/${projectId}/roles`, {
-    params: { hideArchived: 'true' },
-  });
+  const res = await sysApi.get(`${API_URL}/organizations/${orgId}/roles`);
   if (!res.ok()) {
-    throw new Error(`Fetch roles failed for org ${orgId} project ${projectId} (${res.status()}): ${await res.text()}`);
+    throw new Error(`Fetch roles failed for org ${orgId} (${res.status()}): ${await res.text()}`);
   }
 
   const roles = (await res.json()) as Role[];
@@ -243,14 +233,13 @@ async function findRoleId(
 async function requireRoleId(
   sysApi: APIRequestContext,
   orgId: string,
-  projectId: string,
   roleName: string,
 ): Promise<string> {
-  const id = await findRoleId(sysApi, orgId, projectId, roleName);
+  const id = await findDefaultRoleId(sysApi, orgId, roleName);
   if (!id) {
     throw new Error(
-      `Role "${roleName}" not found for org ${orgId} project ${projectId} — ` +
-      `expected a built-in role with this name to already exist`
+      `Role "${roleName}" not found for org ${orgId} — ` +
+      `expected a built-in org-level role with this name to already exist`
     );
   }
   return id;
@@ -334,9 +323,8 @@ async function addUserToProject(
 
 // Every test account (except for a sysAdmin) gets an org membership row.
 // If the account also provisions a project, it additionally gets a project membership
-// row. project_admin uses isProjectAdmin=true; standard resolves the built-in
-// non-admin project role by name and passes it as roleId. Custom roles are out of
-// scope — only the built-in role is looked up.
+// row. project_admin uses isProjectAdmin=true; the role "user" resolves to the default user role
+// The logic to assign custom roles is not yet implemented
 async function assignRole(
   sysApi: APIRequestContext,
   userId: string,
@@ -359,8 +347,8 @@ async function assignRole(
     if (provision.role === 'project_admin') {
       await addUserToProject(sysApi, orgId, projectId, userId, true);
     } else {
-      // 'standard' — assign the built-in non-admin project role by id.
-      const roleId = await requireRoleId(sysApi, orgId, projectId, DEFAULT_PROJECT_ROLE_NAME);
+      // 'user' — assign the built-in non-admin project role by id.
+      const roleId = await requireRoleId(sysApi, orgId, DEFAULT_ROLE_NAME);
       await addUserToProject(sysApi, orgId, projectId, userId, false, roleId);
     }
   }
@@ -371,7 +359,7 @@ setup('provision and authenticate all TestAccounts', async () => {
   const sysKey = process.env.TEST_SYSADMIN_API_KEY;
   const sysSecret = process.env.TEST_SYSADMIN_SECRET;
   if (!sysKey || !sysSecret) {
-    throw new Error('Missing TEST_SYSADMIN_API_KEY / TEST_SYSADMIN_SECRET — see testing README for bootstrap steps');
+    throw new Error('Missing TEST_SYSADMIN_API_KEY / TEST_SYSADMIN_SECRET — see testing README for details steps');
   }
 
   const anonApi = await request.newContext();

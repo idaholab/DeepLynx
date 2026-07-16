@@ -7,10 +7,7 @@ loadEnvConfig(process.cwd());
 
 const FRONTEND_URL = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
 
-// ============================================================================
-// Orgs & Projects
-// ============================================================================
-
+// Orgs & Projects- configure any additional orgs and projects that are needed for testing here
 export interface TestOrg {
   name: string;
 }
@@ -29,19 +26,9 @@ export const PROJECTS = {
 } as const satisfies Record<string, TestProject>;
 
 // ============================================================================
-// Roles
-// ============================================================================
-// Org-level admin status is a boolean (isAdmin) — there is no named org role.
-// Project-level roles are named and fetched from
-// GET /organizations/{orgId}/projects/{projectId}/roles.
-// "standard" accounts are assigned this built-in project role by name.
-// Custom roles are out of scope for test provisioning.
+// Accounts and Roles
 
-export const DEFAULT_PROJECT_ROLE_NAME = 'User';
-
-// ============================================================================
-// Accounts & Roles
-// ============================================================================
+export const DEFAULT_ROLE_NAME = 'User';
 
 export type TestAccountTitle =
   | 'sysAdmin'
@@ -53,7 +40,7 @@ export type TestAccountTitle =
 export interface TestAccount {
   name: TestAccountTitle;
   provision?: {
-    role: 'org_admin' | 'project_admin' | 'standard';
+    role: 'org_admin' | 'project_admin' | 'user'; // currently setup for only assigning the available default roles
     org?: string;     // an ORGS[...].name
     project?: string; // a PROJECTS[...].name
   };
@@ -68,7 +55,7 @@ export const projectAdminX: TestAccount = {
 };
 export const standardUserX: TestAccount = {
   name: 'standardUserX',
-  provision: { role: 'standard', org: ORGS.orgA.name, project: PROJECTS.projectX.name },
+  provision: { role: 'user', org: ORGS.orgA.name, project: PROJECTS.projectX.name },
 };
 
 // Developers: to add a new account, declare it above and add it here.
@@ -124,6 +111,18 @@ export function orgIdByName(orgName: string): number {
   return Number(meta.organizationId);
 }
 
+export function projectIdByName(projectName: string): number {
+  const owner = ACTINGUSERS.find((a) => a.provision?.project === projectName);
+  if (!owner) {
+    throw new Error(`No account is provisioned into project "${projectName}" — can't resolve its projectId.`);
+  }
+  const meta = accountMeta(owner.name);
+  if (!meta?.projectId) {
+    throw new Error(`No projectId cached for "${owner.name}" (project "${projectName}") — did auth.setup.ts run?`);
+  }
+  return Number(meta.projectId);
+}
+
 export async function selectOrganization(page: Page, account: TestAccount, orgNameOverride?: string) {
   const orgName = orgNameOverride ?? account.provision?.org;
   if (!orgName) {
@@ -148,18 +147,28 @@ export async function selectOrganization(page: Page, account: TestAccount, orgNa
     },
   ]);
 }
-export async function selectProject(page: Page, account: TestAccount) {
-  const meta = accountMeta(account.name);
-  if (!meta?.projectId) {
-    throw new Error(`No projectId in registry for "${account.name}" — does this account provision a project?`);
-  }
-  const projectName = account.provision?.project ?? '';
-  const serialized = JSON.stringify({ projectId: meta.projectId, projectName });
 
-  // ProjectSessionProvider.setProject writes to both localStorage AND a
-  // cookie (see src/app/contexts/ProjectSessionProvider.tsx) — mirror both,
-  // even though today's middleware only reads organizationSession for
-  // redirects. Other server-side code may still read the project cookie.
+export async function selectProject(page: Page, account: TestAccount, projectNameOverride?: string) {
+  const projectName = projectNameOverride ?? account.provision?.project;
+  if (!projectName) {
+    throw new Error(
+      `No project to select for "${account.name}" — either provision it with a ` +
+      `project, or pass an explicit project name (e.g. via test.use({ actingProject: ... })).`,
+    );
+  }
+
+  // When overriding, resolve the projectId from whichever account actually owns that project
+  const projectId = projectNameOverride
+    ? projectIdByName(projectNameOverride)
+    : Number(accountMeta(account.name)?.projectId);
+
+  if (!projectId) {
+    throw new Error(`No projectId resolved for "${account.name}" / project "${projectName}".`);
+  }
+
+  const serialized = JSON.stringify({ projectId, projectName });
+
+  // ProjectSessionProvider.setProject writes to both localStorage AND a cookie
   await page.addInitScript((serialized) => {
     localStorage.setItem('projectSession', serialized);
   }, serialized);
@@ -171,6 +180,4 @@ export async function selectProject(page: Page, account: TestAccount) {
       url: FRONTEND_URL,
     },
   ]);
-
-  await page.waitForURL(`**/project/${meta.projectId}`).catch(() => {});
 }
