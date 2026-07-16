@@ -50,17 +50,6 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   isSeededUserRole,
 }) => {
   const { t } = useLanguage();
-  const translatePermission = (text?: string | null) => {
-    if (!text) return "";
-
-    const key = text
-      .toUpperCase()
-      .replaceAll(" ", "_")
-      .replaceAll("/", "_")
-      .replaceAll("-", "_");
-
-    return t.translations[key as keyof typeof t.translations] ?? text;
-  };
   const hasEditableRoles = roles.some((role) => !isSeededUserRole(role));
   const matrixPermissionCategories = React.useMemo(() => {
     // Matrix view intentionally excludes sensitivity-label permissions.
@@ -75,10 +64,10 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   const editMatrixDisabledReason = !hasEditableRoles
     ? t.translations.MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES
     : rolesLocked
-      ? t.translations.ROLES_ARE_LOCKED
-      : isLoadingPermissions
-        ? t.translations.PERMISSIONS_STILL_LOADING
-        : "";
+    ? t.translations.ROLES_ARE_LOCKED
+    : isLoadingPermissions
+    ? t.translations.PERMISSIONS_STILL_LOADING
+    : "";
 
   return (
     <div style={{ height: "calc(100vh - 28rem)" }}>
@@ -144,13 +133,11 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                   </th>
                   {roles.map((role) => {
                     const seededUser = isSeededUserRole(role);
-                    const editDisabled = seededUser || !hasEditableRoles;
+                    const editDisabled = seededUser;
 
-                    const editTitle = !hasEditableRoles
-                      ? t.translations.ONLY_STANDARD_ROLES_NO_CUSTOM_TO_EDIT
-                      : seededUser
-                        ? t.translations.SEEDED_USER_ROLE_CANNOT_BE_MODIFIED
-                        : t.translations.EDIT_ROLE;
+                    const editTitle = seededUser
+                      ? t.translations.SEEDED_USER_ROLE_CANNOT_BE_MODIFIED
+                      : t.translations.EDIT_ROLE;
 
                     return (
                       <th key={role.id} className="text-center">
@@ -171,11 +158,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                           </div>
                           {role.description && (
                             <span className="text-xs text-base-content/60 font-normal">
-                              {role.description === "Administrator role with full permissions"
-                                ? t.translations.ADMIN_ROLE_FULL_PERMISSIONS
-                                : role.description === "User role with limited permissions"
-                                  ? t.translations.USER_ROLE_LIMITED_PERMISSIONS
-                                  : role.description}
+                              {role.description}
                             </span>
                           )}
                         </div>
@@ -193,7 +176,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                         colSpan={roles.length + 1}
                         className="font-semibold text-sm sticky left-0"
                       >
-                        {translatePermission(category.label)}
+                        {category.label}
                       </td>
                     </tr>
 
@@ -203,15 +186,15 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                         <td className="sticky left-0 z-10 bg-base-100">
                           <div className="flex flex-col">
                             <span className="font-medium text-sm">
-                              {translatePermission(perm.name)}
+                              {perm.name}
                             </span>
                             {perm.description && (
                               <span className="text-xs text-base-content/60">
-                                {translatePermission(perm.description)}
+                                {perm.description}
                               </span>
                             )}
                             <span className="text-xs text-base-content/50 mt-1">
-                              {t.translations.ACTION} {translatePermission(perm.action)}
+                              {t.translations.ACTION} {perm.action}
                             </span>
                           </div>
                         </td>
@@ -234,41 +217,45 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                                     );
                                   }
                                 }}
-                                className={`inline-block ${isEditingMatrix && !seededUser
-                                  ? "cursor-pointer hover:scale-110 transition-transform"
-                                  : "cursor-default"
-                                  } ${seededUser && isEditingMatrix
+                                className={`inline-block ${
+                                  isEditingMatrix && !seededUser
+                                    ? "cursor-pointer hover:scale-110 transition-transform"
+                                    : "cursor-default"
+                                } ${
+                                  seededUser && isEditingMatrix
                                     ? "opacity-60 ring-2 ring-warning rounded-lg p-1"
                                     : ""
-                                  }`}
+                                }`}
                                 title={
                                   seededUser && isEditingMatrix
                                     ? t.translations
-                                      .SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
+                                        .SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
                                     : isEditingMatrix
-                                      ? t.translations.CLICK_TO_TOGGLE
-                                      : hasPermission
-                                        ? t.translations.HAS_PERMISSION
-                                        : t.translations.NO_PERMISSION
+                                    ? t.translations.CLICK_TO_TOGGLE
+                                    : hasPermission
+                                    ? t.translations.HAS_PERMISSION
+                                    : t.translations.NO_PERMISSION
                                 }
                               >
                                 {hasPermission ? (
                                   <CheckIcon
-                                    className={`size-8 mx-auto ${isEditingMatrix && !seededUser
-                                      ? "text-success hover:text-success/70"
-                                      : seededUser && isEditingMatrix
+                                    className={`size-8 mx-auto ${
+                                      isEditingMatrix && !seededUser
+                                        ? "text-success hover:text-success/70"
+                                        : seededUser && isEditingMatrix
                                         ? "text-warning"
                                         : "text-success"
-                                      }`}
+                                    }`}
                                   />
                                 ) : (
                                   <XMarkIcon
-                                    className={`size-8 mx-auto ${isEditingMatrix && !seededUser
-                                      ? "text-base-300 hover:text-success/50"
-                                      : seededUser && isEditingMatrix
+                                    className={`size-8 mx-auto ${
+                                      isEditingMatrix && !seededUser
+                                        ? "text-base-300 hover:text-success/50"
+                                        : seededUser && isEditingMatrix
                                         ? "text-warning/50"
                                         : "text-base-300"
-                                      }`}
+                                    }`}
                                   />
                                 )}
                               </div>
@@ -284,7 +271,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
           </div>
         )}
       </div>
-    </div >
+    </div>
   );
 };
 

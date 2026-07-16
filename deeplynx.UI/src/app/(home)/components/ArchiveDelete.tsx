@@ -21,14 +21,7 @@ const ArchiveDelete: React.FC<ArchiveDeleteProps> = ({
   const { t } = useLanguage();
 
   const isArchive = actionType === "archive";
-  const translatedAction = isArchive
-    ? t.translations.ARCHIVE
-    : t.translations.DELETE;
-
-  const translatedItemType =
-    itemType === "Project"
-      ? t.translations.PROJECT
-      : itemType;
+  const capitalizedAction = actionType === "archive" ? "Archive" : "Delete";
 
   const handleConfirm = async () => {
     setIsLoading(true);
@@ -67,20 +60,20 @@ const ArchiveDelete: React.FC<ArchiveDeleteProps> = ({
             />
           </svg>
           <h3 className="font-semibold text-base-content">
-            {translatedAction} {translatedItemType}
+            {capitalizedAction} {itemType}
           </h3>
         </div>
         <p className="text-sm text-base-content mt-1">
           {isArchive
-            ? t.translations.ARCHIVE_PROJECT_DESCRIPTION
-            : t.translations.DELETE_PROJECT_DESCRIPTION}
+            ? `Archive this ${itemType.toLowerCase()} to remove it from your active ${itemType.toLowerCase()}s. Archived ${itemType.toLowerCase()}s can be restored later.`
+            : `Permanently delete this ${itemType.toLowerCase()}. This action cannot be undone.`}
         </p>
         <button
           onClick={() => setShowConfirm(true)}
           className={`px-4 py-2 mt-4 border ${isArchive ? "border-orange-600 text-orange-600 hover:bg-orange-600" : "border-red-600 text-red-600 hover:bg-red-600"
             } text-xs font-medium rounded-lg hover:text-white transition-colors whitespace-nowrap`}
         >
-          {translatedAction} {translatedItemType}: {itemName}
+          {capitalizedAction} {itemType}: {itemName}
         </button>
       </div>
 
@@ -108,7 +101,7 @@ const ArchiveDelete: React.FC<ArchiveDeleteProps> = ({
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-black">
-                  {translatedAction} {translatedItemType}
+                  {capitalizedAction} {itemType}
                 </h3>
                 <p className="text-sm text-black mt-2">
                   {isArchive
@@ -132,7 +125,7 @@ const ArchiveDelete: React.FC<ArchiveDeleteProps> = ({
                 className={`px-4 py-2 ${isArchive ? "bg-orange-600 hover:bg-orange-700" : "bg-red-600 hover:bg-red-700"
                   } text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {isLoading ? t.translations.ARCHIVING : `${translatedAction} ${translatedItemType}`}
+                {isLoading ? `${capitalizedAction}ing...` : `${capitalizedAction} ${itemType}`}
               </button>
             </div>
           </div>
