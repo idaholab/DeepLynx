@@ -582,6 +582,23 @@ INSERT INTO test_table (id, name) VALUES (1, 'Test Row');
       });
     });
 
+    test.describe('JSON upload', () => {
+      test.beforeEach(async () => {
+        baseFileName = 'test-file.json';
+        await setUp(baseFileName, JSON.stringify({
+          id: 1,
+          name: 'Test Row',
+          createdAt: '2024-01-01T00:00:00Z',
+        }, null, 2));
+      });
+      test('Upload a single JSON file using click to browse', async ({ page }) => {
+        await clickToBrowse({ page }, baseFileName, filePath);
+      });
+      test('Upload a single JSON file using drag and drop', async ({ page }) => {
+        await dragAndDrop({ page }, baseFileName, filePath, 'application/json');
+      });
+    });
+
     test.describe('XML upload', () => {
       test.beforeEach(async () => {
         baseFileName = 'test-file.xml';
