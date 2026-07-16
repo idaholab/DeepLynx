@@ -54,7 +54,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCheckingLogo, setIsCheckingLogo] = useState(true);
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? process.env.BACKEND_BASE_URL ?? "https://deeplynx.dev.inl.gov/api/v1";
 
   // Storage states
   const [activeTab, setActiveTab] = useState<StorageTab>("default");
