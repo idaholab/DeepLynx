@@ -894,6 +894,8 @@ startxref
       await page.waitForURL(/\/project/);
       await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
       await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
+      await page.getByText('timeseries-test-file').first().click();
+      await expect(page.getByText('Timeseries', { exact: true })).toBeVisible();
 
       // Check that it shows up on the timeseries page
       await page.locator("aside a", { hasText: "Timeseries Viewer" }).click();
