@@ -582,6 +582,26 @@ INSERT INTO test_table (id, name) VALUES (1, 'Test Row');
       });
     });
 
+    test.describe('XML upload', () => {
+      test.beforeEach(async () => {
+        baseFileName = 'test-file.xml';
+        await setUp(baseFileName, `<?xml version="1.0" encoding="UTF-8"?>
+<testData>
+  <record id="1">
+    <name>Test Row</name>
+    <createdAt>2024-01-01T00:00:00Z</createdAt>
+  </record>
+</testData>
+`);
+      });
+      test('Upload a single XML file using click to browse', async ({ page }) => {
+        await clickToBrowse({ page }, baseFileName, filePath);
+      });
+      test('Upload a single XML file using drag and drop', async ({ page }) => {
+        await dragAndDrop({ page }, baseFileName, filePath, 'text/xml');
+      });
+    });
+
     test.describe('PDF upload', () => {
       test.beforeEach(async () => {
         baseFileName = 'test-file.pdf';
