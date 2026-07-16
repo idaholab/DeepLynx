@@ -1,15 +1,9 @@
 import { sysAdmin } from "../deeplynx-config";
 import { test, expect } from "../fixtures";
-import { seedSession } from "../helpers/seed";
 
-test.use({ actingUser: sysAdmin});
-test.use({ actingOrg: "PW Org A"});
+test.use({ actingUser: sysAdmin, actingOrg: 'PW Org A' })
 
 test.describe("Organizations", () => {
-  test.beforeEach(async ({ page }) => {
-    await seedSession(page);
-    await page.goto("/", { waitUntil: "domcontentloaded" });
-  });
 
   test("user is automatically assigned an organization on startup", async ({
     page,
@@ -68,8 +62,6 @@ test.describe("Organizations", () => {
       'header .dropdown [role="button"]',
     );
     await dropdownTrigger.click();
-
-    await page.pause();
 
     const dropdownContent = page.locator(
       "header .dropdown .dropdown-content",
