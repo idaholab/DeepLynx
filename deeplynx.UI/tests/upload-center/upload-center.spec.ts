@@ -190,6 +190,114 @@ test.describe("Upload Center", () => {
     ]);
   }
 
+  function createMultiEntryZip(files: { name: string; content: string }[]): Buffer {
+    const localParts: Buffer[] = [];
+    const centralParts: Buffer[] = [];
+    let offset = 0;
+
+    for (const { name, content } of files) {
+      const data = Buffer.from(content, 'utf8');
+      const compressed = zlib.deflateRawSync(data);
+      const crc = crc32(data);
+      const nameBuf = Buffer.from(name, 'utf8');
+
+      const localHeader = Buffer.alloc(30);
+      localHeader.writeUInt32LE(0x04034b50, 0);
+      localHeader.writeUInt16LE(20, 4);
+      localHeader.writeUInt16LE(0, 6);
+      localHeader.writeUInt16LE(8, 8);
+      localHeader.writeUInt16LE(0, 10);
+      localHeader.writeUInt16LE(0, 12);
+      localHeader.writeUInt32LE(crc, 14);
+      localHeader.writeUInt32LE(compressed.length, 18);
+      localHeader.writeUInt32LE(data.length, 22);
+      localHeader.writeUInt16LE(nameBuf.length, 26);
+      localHeader.writeUInt16LE(0, 28);
+
+      const localEntry = Buffer.concat([localHeader, nameBuf, compressed]);
+      localParts.push(localEntry);
+
+      const centralHeader = Buffer.alloc(46);
+      centralHeader.writeUInt32LE(0x02014b50, 0);
+      centralHeader.writeUInt16LE(20, 4);
+      centralHeader.writeUInt16LE(20, 6);
+      centralHeader.writeUInt16LE(0, 8);
+      centralHeader.writeUInt16LE(8, 10);
+      centralHeader.writeUInt16LE(0, 12);
+      centralHeader.writeUInt16LE(0, 14);
+      centralHeader.writeUInt32LE(crc, 16);
+      centralHeader.writeUInt32LE(compressed.length, 20);
+      centralHeader.writeUInt32LE(data.length, 24);
+      centralHeader.writeUInt16LE(nameBuf.length, 28);
+      centralHeader.writeUInt16LE(0, 30);
+      centralHeader.writeUInt16LE(0, 32);
+      centralHeader.writeUInt16LE(0, 34);
+      centralHeader.writeUInt16LE(0, 36);
+      centralHeader.writeUInt32LE(0, 38);
+      centralHeader.writeUInt32LE(offset, 42);
+
+      centralParts.push(Buffer.concat([centralHeader, nameBuf]));
+      offset += localEntry.length;
+    }
+
+    const centralDir = Buffer.concat(centralParts);
+    const localSection = Buffer.concat(localParts);
+
+    const endRecord = Buffer.alloc(22);
+    endRecord.writeUInt32LE(0x06054b50, 0);
+    endRecord.writeUInt16LE(0, 4);
+    endRecord.writeUInt16LE(0, 6);
+    endRecord.writeUInt16LE(files.length, 8);
+    endRecord.writeUInt16LE(files.length, 10);
+    endRecord.writeUInt32LE(centralDir.length, 12);
+    endRecord.writeUInt32LE(localSection.length, 16);
+    endRecord.writeUInt16LE(0, 20);
+
+    return Buffer.concat([localSection, centralDir, endRecord]);
+  }
+
+  function createMinimalXlsx(): Buffer {
+    const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`;
+
+    const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+
+    const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+
+    const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`;
+
+    const sheet1 = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="str"><v>id</v></c><c r="B1" t="str"><v>name</v></c></row><row r="2"><c r="A2"><v>1</v></c><c r="B2" t="str"><v>Test Row</v></c></row></sheetData></worksheet>`;
+
+    return createMultiEntryZip([
+      { name: '[Content_Types].xml', content: contentTypes },
+      { name: '_rels/.rels', content: rootRels },
+      { name: 'xl/workbook.xml', content: workbook },
+      { name: 'xl/_rels/workbook.xml.rels', content: workbookRels },
+      { name: 'xl/worksheets/sheet1.xml', content: sheet1 },
+    ]);
+  }
+
+  function createMinimalDocx(): Buffer {
+    const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+
+    const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+
+    const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Test Row content for upload test</w:t></w:r></w:p></w:body></w:document>`;
+
+    return createMultiEntryZip([
+      { name: '[Content_Types].xml', content: contentTypes },
+      { name: '_rels/.rels', content: rootRels },
+      { name: 'word/document.xml', content: document },
+    ]);
+  }
+
   test.beforeEach(async ({ page }) => {
     await seedAndNavigateToProject(page);
     // Navigate to Upload Center via sidebar
@@ -417,7 +525,7 @@ test.describe("Upload Center", () => {
     await fs.promises.writeFile(filePath, fileContents);
   }
 
-  test.describe('Uploading Tests of Various File Types', () => {
+  test.describe('Upload a file', () => {
 
     test.afterEach(async () => {
       // Comment this out if you want to cache the file between test runs
@@ -444,6 +552,20 @@ INSERT INTO test_table (id, name) VALUES (1, 'Test Row');
 
       test('Upload a single SQL file using drag and drop', async ({ page }) => {
         await dragAndDrop({ page }, baseFileName, filePath, 'application/sql');
+      });
+    });
+
+    test.describe('DOCX upload', () => {
+      test.beforeEach(async () => {
+        baseFileName = 'test-file.docx';
+        await setUp(baseFileName, createMinimalDocx());
+      });
+      test('Upload a single DOCX file using click to browse', async ({ page }) => {
+        await clickToBrowse({ page }, baseFileName, filePath);
+      });
+
+      test('Upload a single DOCX file using drag and drop', async ({ page }) => {
+        await dragAndDrop({ page }, baseFileName, filePath, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       });
     });
 
@@ -529,6 +651,21 @@ startxref
       });
 
       test('Upload a single ZIP file using click to browse', async ({ page }) => {
+        await clickToBrowse({ page }, baseFileName, filePath);
+      });
+    });
+
+    test.describe('XLSX upload', () => {
+      test.beforeEach(async () => {
+        baseFileName = 'test-file.xlsx';
+        await setUp(baseFileName, createMinimalXlsx());
+      });
+
+      test('Upload a single XLSX file using drag and drop', async ({ page }) => {
+        await dragAndDrop({ page }, baseFileName, filePath, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      });
+
+      test('Upload a single XLSX file using click to browse', async ({ page }) => {
         await clickToBrowse({ page }, baseFileName, filePath);
       });
     });
