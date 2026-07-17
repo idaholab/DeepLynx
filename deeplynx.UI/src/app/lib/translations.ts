@@ -1428,6 +1428,7 @@ export const translations = {
       READ: "read",
       READY: "Ready",
       RUN: "Run",
+      REFRESH: "Refresh",
       RUNNING: "Running",
       RECENT_ACTIVITY: "Recent Activity",
       RECENTLY_ADDED_RECORDS: "Recently Added Records",
@@ -1621,7 +1622,6 @@ export const translations = {
       RECORD_HISTORY_LOADING_COMPARISON_SNAPSHOT:
         "Loading comparison snapshot...",
       RECORD_HISTORY_LOADING_SELECTED_SNAPSHOT: "Loading selected snapshot...",
-      REFRESH: "Refresh",
       RECORD_HISTORY_MANUAL: "Manual",
       RECORD_HISTORY_MANUAL_COMPARE_VERSION: "Manual Compare Version",
       RECORD_HISTORY_NAME_LABEL: "Name:",
@@ -3682,6 +3682,7 @@ export const translations = {
         "No se pudieron cargar los metadatos completos de los registros: {records}",
       RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS:
         "No se pudieron buscar los registros",
+      REFRESH: "Actualizar",
       RECORD_COLLECTIONS_FAILED_UPDATE:
         "No se pudo actualizar la colección de registros",
       RECORD_COLLECTIONS_SAVED_REFRESH_FAILED:

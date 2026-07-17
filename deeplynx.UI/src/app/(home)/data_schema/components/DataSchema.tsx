@@ -30,6 +30,8 @@ import {
   getAllRelationships,
   updateRelationship,
 } from "@/app/lib/client_service/relationship_services.client";
+import { useLanguage } from "@/app/contexts/Language";
+
 import ArchiveClassModal from "./ArchiveClassModal";
 import { queryBuilder } from "@/app/lib/client_service/query_services.client";
 
