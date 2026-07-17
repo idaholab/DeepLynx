@@ -860,4 +860,57 @@ startxref
       }
     });
   });
+  test.describe('Empty file upload', () => {
+    const emptyFileName = 'empty-test-file.txt';
+    let filePath: string;
+
+    test.beforeEach(async () => {
+      filePath = path.join(os.tmpdir(), emptyFileName);
+      await fs.promises.writeFile(filePath, Buffer.alloc(0)); // zero-byte file
+    });
+
+    test.afterEach(async () => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
+    test('Uploading an empty file fails with a notification and no record is created', async ({ page }) => {
+      // Keep default Project/Data Source settings — do not call
+      await checkDataSourcesAndStorageDestinations({ page });
+
+      await page.getByText('click to browse').click();
+
+      const fileInput = page.locator('input[type="file"]');
+      await fileInput.setInputFiles(filePath);
+
+      await page.getByRole('button', { name: 'Upload' }).click();
+
+      // TODO: replace with the actual failure notification text/selector
+      await expect(
+        page.getByText('Upload failed')
+      ).toBeVisible();
+
+      // No success notification should appear
+      await expect(
+        page.getByText('File uploaded successfully!')
+      ).not.toBeVisible();
+
+      // No folder/record should show on the Project Dashboard
+      await page.getByRole('link', { name: 'Project Dashboard' }).click();
+      await expect(
+        page.getByText(emptyFileName)
+      ).not.toBeVisible();
+
+      // File should still be visible in the Data Catalog
+      await page.getByRole('link', { name: 'Visit' }).first().click();
+      await page.getByRole('textbox', { name: 'Search' }).click();
+      await page.getByRole('textbox', { name: 'Search' }).fill(emptyFileName);
+      await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+
+      await expect(
+        page.getByRole('link', { name: emptyFileName, exact: true }).first()
+      ).not.toBeVisible();
+    });
+  });
 });
