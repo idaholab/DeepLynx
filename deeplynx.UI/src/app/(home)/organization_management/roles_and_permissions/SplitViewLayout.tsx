@@ -60,18 +60,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   isSeededUserRole,
 }) => {
   const { t } = useLanguage();
-
-  const translatePermission = (text?: string | null) => {
-    if (!text) return "";
-
-    const key = text
-      .toUpperCase()
-      .replaceAll(" ", "_")
-      .replaceAll("/", "_")
-      .replaceAll("-", "_");
-
-    return t.translations[key as keyof typeof t.translations] ?? text;
-  };
   const [activePermissionTab, setActivePermissionTab] = useState(
     t.translations.RESOURCE_PERMISSIONS,
   );
@@ -190,7 +178,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
             {categories.map((category) => (
               <div key={category.id} className="card bg-base-200/25">
                 <div className="card-body p-4">
-                  <h4 className="card-title text-sm mb-3">{translatePermission(category.label)}</h4>
+                  <h4 className="card-title text-sm mb-3">{category.label}</h4>
                   <div className="grid grid-cols-2 gap-3">
                     {category.permissions.map((perm: PermissionResponseDto) => {
                       const hasPermission = isEditingPermissions
@@ -200,14 +188,15 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                       return (
                         <label
                           key={perm.id}
-                          className={`label justify-start gap-2 ${isEditingPermissions
-                            ? "cursor-pointer"
-                            : "cursor-default"
-                            }`}
+                          className={`label justify-start gap-2 ${
+                            isEditingPermissions
+                              ? "cursor-pointer"
+                              : "cursor-default"
+                          }`}
                           title={
                             displayMode === "permission-action"
                               ? perm.description || perm.action || perm.name
-                              : translatePermission(perm.description) || translatePermission(perm.name)
+                              : perm.description || perm.name
                           }
                         >
                           <input
@@ -219,8 +208,8 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                           />
                           <span className="label-text">
                             {displayMode === "permission-action"
-                              ? translatePermission(perm.action)
-                              : translatePermission(perm.name)}
+                              ? perm.action
+                              : perm.name}
                           </span>
                         </label>
                       );
@@ -280,32 +269,31 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                   key={role.id}
                   onClick={() => onRoleSelection(role.id)}
                   disabled={isEditingPermissions}
-                  className={`w-full px-4 py-3 text-left border-b border-base-300 transition-colors ${selectedRoleId === role.id
-                    ? "bg-primary/10 border-l-4 border-l-primary"
-                    : ""
-                    } ${isEditingPermissions
+                  className={`w-full px-4 py-3 text-left border-b border-base-300 transition-colors ${
+                    selectedRoleId === role.id
+                      ? "bg-primary/10 border-l-4 border-l-primary"
+                      : ""
+                  } ${
+                    isEditingPermissions
                       ? "opacity-50 cursor-not-allowed"
                       : "hover:bg-base-200 cursor-pointer"
-                    }`}
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <ShieldCheckIcon
-                        className={`w-4 h-4 ${selectedRoleId === role.id
-                          ? "text-primary"
-                          : "text-base-content/40"
-                          }`}
+                        className={`w-4 h-4 ${
+                          selectedRoleId === role.id
+                            ? "text-primary"
+                            : "text-base-content/40"
+                        }`}
                       />
                       <span className="font-medium text-sm">{role.name}</span>
                     </div>
                   </div>
                   {role.description && (
                     <p className="text-xs text-base-content/60 mt-1 ml-6 truncate">
-                      {role.description === "Administrator role with full permissions"
-                        ? t.translations.ADMIN_ROLE_FULL_PERMISSIONS
-                        : role.description === "User role with limited permissions"
-                          ? t.translations.USER_ROLE_LIMITED_PERMISSIONS
-                          : role.description}
+                      {role.description}
                     </p>
                   )}
                 </button>
