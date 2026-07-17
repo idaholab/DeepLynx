@@ -11,7 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 import Tabs from "@/app/(home)/components/Tabs";
-import type { CreateRelationshipRequestDto } from "@/app/(home)/types/requestDTOs";
+import type { CreateRelationshipRequestDto, CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
 import type {
   ClassResponseDto,
   RelationshipResponseDto,
@@ -30,7 +30,8 @@ import {
   getAllRelationships,
   updateRelationship,
 } from "@/app/lib/client_service/relationship_services.client";
-import { useLanguage } from "@/app/contexts/Language";
+import ArchiveClassModal from "./ArchiveClassModal";
+import { queryBuilder } from "@/app/lib/client_service/query_services.client";
 
 type LayoutMode = "tabs";
 
@@ -41,6 +42,7 @@ type Selection =
 
 interface DataSchemaProps {
   mode: LayoutMode;
+  organizationId: number | undefined;
 }
 
 function statusClass(isArchived: boolean) {
@@ -91,7 +93,7 @@ function ModalShell({
   );
 }
 
-export default function DataSchema({ mode }: DataSchemaProps) {
+export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
   const { project } = useProjectSession();
   const { t } = useLanguage();
 
@@ -112,7 +114,13 @@ export default function DataSchema({ mode }: DataSchemaProps) {
   const [isCreateClassModalOpen, setIsCreateClassModalOpen] = useState(false);
   const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [isUpdatingClass, setIsUpdatingClass] = useState(false);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isArchivingClass, setIsArchivingClass] = useState(false);
+  const [archiveClassId, setArchiveClassId] = useState<number | null>(null);
+  const [archiveClassAction, setArchiveClassAction] = useState<boolean>(true);
+  const [recordsNumber, setRecordsNumber] = useState<number>();
+  const [cachedRecordsCount, setCachedRecordsCount] = useState<Record<number, number>>({});
+  const [relationshipCount, setRelationshipCount] = useState<number>();
   const [newClassDraft, setNewClassDraft] = useState({
     name: "",
     description: "",
@@ -394,6 +402,30 @@ export default function DataSchema({ mode }: DataSchemaProps) {
     }
   };
 
+  const getRecordsNumber = async (classId: number) => {
+    if (!projectId || !organizationId) {
+      return 0;
+    }
+    const cachedCount = cachedRecordsCount[classId];
+    // Only trigger the API call the first time, store the record count for reuse
+    if (cachedCount !== undefined) {
+      setRecordsNumber(cachedCount);
+      return cachedCount;
+    } else {
+      const query: CustomQueryRequestDto = { filter: "class_id", operator: "=", value: String(classId) };
+      const records = await queryBuilder(organizationId, [query], [projectId]);
+
+      const count = records.filter(record => record.classId === classId).length;
+      setCachedRecordsCount(prev => ({
+        ...prev,
+        [classId]: count,
+      }));
+
+      setRecordsNumber(count);
+      return count;
+    }
+  }
+
   const toggleArchiveClass = async () => {
     if (!projectId || !selectedClass) return;
 
@@ -423,7 +455,9 @@ export default function DataSchema({ mode }: DataSchemaProps) {
       console.error("Failed to archive class from data schema:", error);
       toast.error("Failed to update class archive state.");
     } finally {
+      setArchiveClassId(null);
       setIsArchivingClass(false);
+      setIsArchiveModalOpen(false);
     }
   };
 
@@ -807,7 +841,21 @@ export default function DataSchema({ mode }: DataSchemaProps) {
           </button>
           <button
             className="btn btn-outline btn-warning btn-sm"
-            onClick={toggleArchiveClass}
+            onClick={async () => {
+              const relationships = relationshipCountForClass(selectedClass.id);
+              const records = await getRecordsNumber(selectedClass.id);
+              if (relationships == 0 && records == 0 || selectedClass.isArchived) {
+                // no warning, just toggle archive/unarchive
+                await toggleArchiveClass();
+              }
+              else {
+                // warn about relationships and records
+                setRelationshipCount(relationships);
+                setIsArchiveModalOpen(true);
+                setArchiveClassId(selectedClass.id);
+                setArchiveClassAction(!selectedClass.isArchived);
+              }
+            }}
             disabled={isArchivingClass}
           >
             <ArchiveBoxIcon className="h-4 w-4" />
@@ -1376,6 +1424,17 @@ export default function DataSchema({ mode }: DataSchemaProps) {
           </div>
         </ModalShell>
       ) : null}
+      <ArchiveClassModal
+        isOpen={isArchiveModalOpen !== false}
+        onToggle={(value) => {
+          setArchiveClassId(value ? archiveClassId : null);
+          setIsArchiveModalOpen(false);
+        }}
+        archiveAction={archiveClassAction}
+        onArchive={toggleArchiveClass}
+        recordsForClass={recordsNumber}
+        relationshipCount={relationshipCount}
+      />
     </main>
   );
 }

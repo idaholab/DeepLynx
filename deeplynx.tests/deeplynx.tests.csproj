@@ -55,4 +55,8 @@
       <ProjectReference Include="..\deeplynx.models\deeplynx.models.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="ExceptionHandlers\Snapshots\*.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
 </Project>

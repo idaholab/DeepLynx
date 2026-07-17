@@ -57,9 +57,9 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // These are pre-generated valid AES-256 keys for testing
         Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
         Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
-        
+
         _encryptionHelper = new EncryptionHelper();
-        
+
         await base.InitializeAsync();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
@@ -80,7 +80,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             _mockRoleBusiness.Object,
             _mockDataSourceBusiness.Object,
             _objectStorageBusiness,
-            _eventBusiness, _organizationBusiness.Object);
+            _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
     }
 
     #region ObjectStorageResponseDto Tests
@@ -253,7 +253,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os9Config),
             IsArchived = false
         };
-        
+
         var os10Config = new JsonObject();
         os10Config["mountPath"] = "Test 10";
         var objectStorage10 = new ObjectStorage
@@ -262,7 +262,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             Type = "filesystem",
             OrganizationId = oid2,
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os10Config),
-            IsArchived = false, 
+            IsArchived = false,
             Default = true
         };
 
@@ -906,7 +906,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
                 _objectStorageBusiness.GetDefaultObjectStorage(oid3, null));
         Assert.Contains("Default object storage not found", exception.Message);
     }
-    
+
     [Fact]
     public async Task GetDefaultObjectStorage_Success_ReturnsDefaultObjectInherited()
     {
@@ -1117,7 +1117,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region GetDecryptedObjectStorages Tests
 
     [Fact]
@@ -1140,7 +1140,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
                 AzureContainerName = "container-name"
             }
         };
-        
+
         var encryptedConfig1 = _encryptionHelper.SerializeAndEncrypt(config1);
         var encryptedConfig2 = _encryptionHelper.SerializeAndEncrypt(config2);
         var encryptedConfig3 = _encryptionHelper.SerializeAndEncrypt(config3);
@@ -1157,7 +1157,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
-        
+
         var storage2 = new ObjectStorage
         {
             Name = "Storage 2",
@@ -1170,7 +1170,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
-        
+
         var storage3 = new ObjectStorage
         {
             Name = "Storage 3",
@@ -1299,9 +1299,9 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(decryptedStorage.Config.AzureObjectConfig);
-        Assert.Equal("my-azure-connection-string", 
+        Assert.Equal("my-azure-connection-string",
             decryptedStorage.Config.AzureObjectConfig.AzureConnectionString);
-        Assert.Equal("my-container", 
+        Assert.Equal("my-container",
             decryptedStorage.Config.AzureObjectConfig.AzureContainerName);
     }
 

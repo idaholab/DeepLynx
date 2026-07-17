@@ -2,6 +2,7 @@ export const translations = {
   en: {
     translations: {
       _MARKED_FOR_REMOVAL: " marked for removal",
+      _THIS_CLASS: "this class?",
       _THIS_STORAGE: "this storage?",
       ABBREVIATION: "Abbreviation (optional)",
       ABBREVIATION_REQUIRED: "Abbreviation",
@@ -69,6 +70,8 @@ export const translations = {
         "All {count} records are valid and ready to upload.",
       ALL_YOUR_PROJECTS: "All your Projects",
       AND: "and",
+      ANY_RECORD_CLASS_REMOVED: "Any record using this class will have the class removed from it.",
+      ANY_RELATIONSHIP_CLASS_UNABLE_TO_EDIT: "Any relationship using this class will not be able to be edited while the class is archived.",
       API_ID_TOOLTIP_DESCRIPTION:
         "Use these IDs when using the API scoped to your current organization and project.",
       API_KEYPAIRS: "API Keys",
@@ -1657,12 +1660,14 @@ export const translations = {
       RECORD_PREVIEW_WITH_TOTAL: "Record Preview ({total} total)",
       RECORDS_HAVE_ERRORS: "records have errors",
       RECORDS_VALIDATED_SUCCESSFULLY: "records validated successfully!",
+      RECORDS_WITH_THIS_CLASS: "records using this class.",
       RELATIONSHIP: "Relationship",
       RELATIONSHIP_DETAILS: "Relationship Details",
       RELATIONSHIP_ID_NOT_FOUND_SUGGESTION:
         "Verify that the relationship IDs exist in the selected project.",
       RELATED_TO: "Related to",
       RELATIONSHIPS: "Relationships",
+      RELATIONSHIPS_WITH_THIS_CLASS: "relationships using this class.",
       REMOTE_DB: "Remote Database",
       REMOVE: "Remove",
       REMOVE_FROM_ORGANIZATION: "Remove from organization",
@@ -1901,6 +1906,7 @@ export const translations = {
       ETA: "ETA",
       TAGS_UPDATED_SUCCESS: "Tags updated successfully",
       TEAM_MEMBERS: "Team Members",
+      THERE_ARE: "There are",
       THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS:
         "from this organization? They will lose access to all projects.",
       THEY_WILL_NO_LONGER_BE_ABLE_TO_SIGN_IN_UNTIL_UNARCHIVED:
@@ -2119,6 +2125,7 @@ export const translations = {
   es: {
     translations: {
       _MARKED_FOR_REMOVAL: " marcado para eliminación",
+      _THIS_CLASS: "este clase?",
       _THIS_STORAGE: "este almacenamiento?",
       ABBREVIATION: "Abreviatura (opcional)",
       ABBREVIATION_REQUIRED: "Abreviatura",
@@ -2185,6 +2192,8 @@ export const translations = {
         "Los {count} registros son válidos y están listos para cargarse.",
       ALL_YOUR_PROJECTS: "Todos tus proyectos",
       AND: "y",
+      ANY_RECORD_CLASS_REMOVED: "Cualquier registro que use esta clase tendrá la clase eliminada.",
+      ANY_RELATIONSHIP_CLASS_UNABLE_TO_EDIT: "Cualquier relación que use esta clase no se podrá editar mientras la clase esté archivada.",
       API_ID_TOOLTIP_DESCRIPTION:
         "Usa estos identificadores al usar la API en el ámbito de tu organización y proyecto actuales.",
       API_KEYPAIRS: "Claves API",
@@ -3863,13 +3872,14 @@ export const translations = {
       RECORD_PREVIEW_WITH_TOTAL: "Vista previa de registros ({total} en total)",
       RECORDS_HAVE_ERRORS: "los registros tienen errores",
       RECORDS_VALIDATED_SUCCESSFULLY: "¡registros validados correctamente!",
-      REFRESH: "Actualizar",
+      RECORDS_WITH_THIS_CLASS: "registros que usan esta clase.",
       RELATIONSHIP: "Relación",
       RELATIONSHIP_DETAILS: "Detalles de relacion",
       RELATIONSHIP_ID_NOT_FOUND_SUGGESTION:
         "Verifique que los IDs de relación existan en el proyecto seleccionado.",
       RELATED_TO: "Relacionado con",
       RELATIONSHIPS: "Relaciones",
+      RELATIONSHIPS_WITH_THIS_CLASS: "relaciones que usan esta clase.",
       REMOTE_DB: "Base de datos remota",
       REMOVE: "Eliminar",
       REMOVE_FROM_ORGANIZATION: "Eliminar de la organizacion",
@@ -4112,6 +4122,7 @@ export const translations = {
       ETA: "ETA",
       TAGS_UPDATED_SUCCESS: "Etiquetas actualizadas correctamente",
       TEAM_MEMBERS: "Miembros del equipo",
+      THERE_ARE: "Hay",
       THEY_WILL_LOSE_ACCESS_FROM_ALL_PROJECTS:
         "de esta organización? Perderá acceso a todos los proyectos.",
       THEY_WILL_NO_LONGER_BE_ABLE_TO_SIGN_IN_UNTIL_UNARCHIVED:
