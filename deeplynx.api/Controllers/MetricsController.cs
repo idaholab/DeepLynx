@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -12,6 +13,8 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to populate the DeepLynx metrics pages for Nexus admins.
 /// </remarks>
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("metrics")]
 [Authorize]
 [ForbidServiceAccounts] // service accounts can only act on the project level
@@ -39,6 +42,7 @@ public class MetricsController : ControllerBase
     /// </summary>
     /// <returns>The total number of bytes of file data stored in Nexus-registered object storages.</returns>
     [HttpGet("storage/size", Name = "api_storage_size_system")]
+    [MapToApiVersion(1)]
     [SysAdmin]
     public async Task<IActionResult> GetSystemStorageSize()
     {
@@ -61,6 +65,7 @@ public class MetricsController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
     /// <returns>A count of data sources for the given project.</returns>
     [HttpGet("datasources/count", Name = "api_datasource_count_system")]
+    [MapToApiVersion(1)]
     [SysAdmin]
     public async Task<IActionResult> GetSystemDataSourceCount(bool hideArchived = true)
     {
@@ -83,6 +88,7 @@ public class MetricsController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <returns>The record count for the given scope</returns>
     [HttpGet("records/count", Name = "api_record_count_system")]
+    [MapToApiVersion(1)]
     [SysAdmin]
     public async Task<IActionResult> GetSystemRecordCount(bool hideArchived = true)
     {
@@ -105,6 +111,7 @@ public class MetricsController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
     /// <returns>The file count for the given scope</returns>
     [HttpGet("files/count", Name = "api_file_count_system")]
+    [MapToApiVersion(1)]
     [SysAdmin]
     public async Task<IActionResult> GetSystemFileCount(bool hideArchived = true)
     {
