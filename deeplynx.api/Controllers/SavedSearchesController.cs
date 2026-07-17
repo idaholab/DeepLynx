@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
@@ -14,6 +15,8 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to create, update, delete, and retrieve class information.
 /// </remarks>
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("saved-searches")]
 [Authorize]
 [Tags("Saved Search")]
@@ -40,6 +43,7 @@ public class SavedSearchController : ControllerBase
     /// <param name="alias">Name for saved search</param>
     /// <returns>True if successfully saved</returns>
     [HttpPost(Name = "api_save_search")]
+    [MapToApiVersion(1)]
     public async Task<ActionResult<bool>> SaveSearch(
         [FromQuery] string? textSearch, [FromQuery] string? alias,
         [FromBody] CustomQueryDtos.CustomQueryRequestDto[] filterArray)
@@ -65,6 +69,7 @@ public class SavedSearchController : ControllerBase
     /// <param name="searchFilters">Optional filters to narrow results of saved searches query</param>
     /// <returns>A list of saved searches belonging to the user.</returns>
     [HttpPost("search", Name = "api_query_get_saved_searches")]
+    [MapToApiVersion(1)]
     public async Task<ActionResult<PaginatedResponse<SavedSearchResponseDto>>> GetSavedSearches(
         [FromBody] SavedSearchRequestDtos.FilterSavedQueryRequestDto? searchFilters = null)
     {
@@ -89,6 +94,7 @@ public class SavedSearchController : ControllerBase
     /// <param name="savedSearchId">The ID of the saved search to be fetched</param>
     /// <returns>The saved search with the matching user and ID</returns>
     [HttpGet(Name = "api_query_get_saved_search_by_id")]
+    [MapToApiVersion(1)]
     public async Task<ActionResult<SavedSearchResponseDto>> GetSavedSearchById(
         [FromQuery] long savedSearchId
     )
@@ -115,6 +121,7 @@ public class SavedSearchController : ControllerBase
     /// <param name="projectIds">List of project ID's that the query will take place in</param>
     /// <returns>List of records retrieved by the query</returns>
     [HttpGet("organizations/{organizationId:long}", Name = "api_query_execute_saved_search")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> ExecuteSavedSearch(
         long organizationId, [FromQuery] long[] projectIds, [FromQuery] long savedSearchId)
@@ -143,6 +150,7 @@ public class SavedSearchController : ControllerBase
     /// <param name="savedSearchId">The ID of the saved search that will be deleted</param>
     /// <returns>True if successful</returns>
     [HttpDelete(Name = "api_query_delete_saved_search")]
+    [MapToApiVersion(1)]
     public async Task<ActionResult<bool>> DeleteSavedSearch(
         [FromQuery] long savedSearchId)
     {
