@@ -7,7 +7,7 @@ export const formatLocalDateTime = (dateString: string): string => {
   const normalized = toUtcIsoIfNaive(dateString);
   const date = new Date(normalized);
 
-  return date.toLocaleString("es-ES", {
+  return date.toLocaleString(undefined, {
     month: "long",
     day: "numeric",
     year: "numeric",
