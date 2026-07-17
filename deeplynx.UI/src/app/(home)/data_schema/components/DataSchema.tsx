@@ -252,13 +252,15 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
     [classes, selection],
   );
 
-  const selectedRelationship = useMemo(
-    () =>
+  const selectedRelationship = useMemo(() => {
+
+    const foundRelationship =
       selection?.kind === "relationship"
         ? relationships.find((item) => item.id === selection.id) ?? null
-        : null,
-    [relationships, selection],
-  );
+        : null;
+
+    return foundRelationship;
+  }, [relationships, selection]);
 
   useEffect(() => {
     if (!selectedClass) return;
@@ -271,15 +273,25 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
   }, [selectedClass]);
 
   useEffect(() => {
-    if (!selectedRelationship) return;
+    if (!selectedRelationship) {
+      setRelationshipDraft({
+        name: "Unassigned",
+        description: "",
+        uuid: "",
+        originId: null,
+        destinationId: null,
+      });
+      return;
+    }
 
     setRelationshipDraft({
-      name: selectedRelationship.name,
+      name: selectedRelationship.name ?? "Unassigned",
       description: selectedRelationship.description ?? "",
       uuid: selectedRelationship.uuid ?? "",
       originId: selectedRelationship.originId ?? null,
       destinationId: selectedRelationship.destinationId ?? null,
     });
+
   }, [selectedRelationship]);
 
   const classLookup = useMemo(
@@ -412,12 +424,11 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
     }
     const cachedCount = cachedRecordsCount[classId];
     // Only trigger the API call the first time, store the record count for reuse
-    if (cachedCount !== undefined)
-    {
+    if (cachedCount !== undefined) {
       setRecordsNumber(cachedCount);
       return cachedCount;
     } else {
-      const query: CustomQueryRequestDto = {filter: "class_id", operator: "=", value: String(classId)};
+      const query: CustomQueryRequestDto = { filter: "class_id", operator: "=", value: String(classId) };
       const records = await queryBuilder(organizationId, [query], [projectId]);
 
       const count = records.filter(record => record.classId === classId).length;
@@ -444,10 +455,10 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         previous.map((item) =>
           item.id === selectedClass.id
             ? {
-                ...item,
-                isArchived: shouldArchive,
-                lastUpdatedAt: new Date().toISOString(),
-              }
+              ...item,
+              isArchived: shouldArchive,
+              lastUpdatedAt: new Date().toISOString(),
+            }
             : item,
         ),
       );
@@ -532,8 +543,8 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           description:
             relationshipDraft.description.trim() ||
             (selectedRelationship.description ?? ""),
-          origin_id: relationshipDraft.originId ?? undefined,
-          destination_id: relationshipDraft.destinationId ?? undefined,
+          origin_id: relationshipDraft.originId ?? null,
+          destination_id: relationshipDraft.destinationId ?? null,
         },
       );
 
@@ -564,10 +575,10 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         previous.map((item) =>
           item.id === selectedRelationship.id
             ? {
-                ...item,
-                isArchived: shouldArchive,
-                lastUpdatedAt: new Date().toISOString(),
-              }
+              ...item,
+              isArchived: shouldArchive,
+              lastUpdatedAt: new Date().toISOString(),
+            }
             : item,
         ),
       );
@@ -617,9 +628,8 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           )
         ) : (
           <div
-            className={`overflow-x-auto rounded-lg border border-base-300/50 ${
-              filteredClasses.length > 5 ? "max-h-[22rem] overflow-y-auto" : ""
-            }`}
+            className={`overflow-x-auto rounded-lg border border-base-300/50 ${filteredClasses.length > 5 ? "max-h-[22rem] overflow-y-auto" : ""
+              }`}
           >
             <table className="table">
               <thead className="bg-base-200">
@@ -637,9 +647,8 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
                   return (
                     <tr
                       key={item.id}
-                      className={`cursor-pointer transition-colors ${
-                        isSelected ? "bg-primary/10" : "hover"
-                      }`}
+                      className={`cursor-pointer transition-colors ${isSelected ? "bg-primary/10" : "hover"
+                        }`}
                       onClick={() => focusClass(item.id)}
                     >
                       <td>
@@ -702,11 +711,10 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           )
         ) : (
           <div
-            className={`overflow-x-auto rounded-lg border border-base-300/50 ${
-              filteredRelationships.length > 5
-                ? "max-h-[22rem] overflow-y-auto"
-                : ""
-            }`}
+            className={`overflow-x-auto rounded-lg border border-base-300/50 ${filteredRelationships.length > 5
+              ? "max-h-[22rem] overflow-y-auto"
+              : ""
+              }`}
           >
             <table className="table">
               <thead className="bg-base-200">
@@ -725,9 +733,8 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
                   return (
                     <tr
                       key={item.id}
-                      className={`cursor-pointer transition-colors ${
-                        isSelected ? "bg-primary/10" : "hover"
-                      }`}
+                      className={`cursor-pointer transition-colors ${isSelected ? "bg-primary/10" : "hover"
+                        }`}
                       onClick={() => focusRelationship(item.id)}
                     >
                       <td>
@@ -848,7 +855,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               if (relationships == 0 && records == 0 || selectedClass.isArchived) {
                 // no warning, just toggle archive/unarchive
                 await toggleArchiveClass();
-              } 
+              }
               else {
                 // warn about relationships and records
                 setRelationshipCount(relationships);
@@ -926,14 +933,13 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
             <select
               className="select select-bordered"
               value={relationshipDraft.originId ?? ""}
-              onChange={(event) =>
+              onChange={(event) => {
+                const newValue = event.target.value ? Number(event.target.value) : null;
                 setRelationshipDraft((previous) => ({
                   ...previous,
-                  originId: event.target.value
-                    ? Number(event.target.value)
-                    : null,
-                }))
-              }
+                  originId: newValue,
+                }));
+              }}
             >
               <option value="">Unassigned</option>
               {classes.map((item) => (
@@ -950,14 +956,13 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
             <select
               className="select select-bordered"
               value={relationshipDraft.destinationId ?? ""}
-              onChange={(event) =>
+              onChange={(event) => {
+                const newValue = event.target.value ? Number(event.target.value) : null;
                 setRelationshipDraft((previous) => ({
                   ...previous,
-                  destinationId: event.target.value
-                    ? Number(event.target.value)
-                    : null,
-                }))
-              }
+                  destinationId: newValue,
+                }));
+              }}
             >
               <option value="">Unassigned</option>
               {classes.map((item) => (
@@ -1054,54 +1059,53 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           {filteredRelationships.length === 0
             ? emptyState("No relationship flows are available.")
             : filteredRelationships.map((item) => {
-                const isSelected =
-                  selection?.kind === "relationship" &&
-                  selection.id === item.id;
+              const isSelected =
+                selection?.kind === "relationship" &&
+                selection.id === item.id;
 
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`w-full rounded-xl border p-4 text-left transition ${
-                      isSelected
-                        ? "border-primary bg-primary/10"
-                        : "border-base-300/50 bg-base-100 hover:border-primary/40 hover:bg-base-200/40"
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`w-full rounded-xl border p-4 text-left transition ${isSelected
+                    ? "border-primary bg-primary/10"
+                    : "border-base-300/50 bg-base-100 hover:border-primary/40 hover:bg-base-200/40"
                     }`}
-                    onClick={() => focusRelationship(item.id)}
-                  >
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <div className="font-semibold text-base-content">
-                          {item.name}
-                        </div>
-                        <div className="mt-1 text-sm text-base-content/60">
-                          {item.description}
-                        </div>
-                      </div>
-                      <span className={statusClass(item.isArchived)}>
-                        {item.isArchived ? "Archived" : "Active"}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-                      <span className="badge badge-outline">
-                        {(item.originId && classLookup.get(item.originId)) ||
-                          "Origin"}
-                      </span>
-                      <ArrowsRightLeftIcon className="h-4 w-4 text-base-content/50" />
-                      <span className="badge badge-primary badge-outline">
+                  onClick={() => focusRelationship(item.id)}
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="font-semibold text-base-content">
                         {item.name}
-                      </span>
-                      <ArrowsRightLeftIcon className="h-4 w-4 text-base-content/50" />
-                      <span className="badge badge-outline">
-                        {(item.destinationId &&
-                          classLookup.get(item.destinationId)) ||
-                          "Destination"}
-                      </span>
+                      </div>
+                      <div className="mt-1 text-sm text-base-content/60">
+                        {item.description}
+                      </div>
                     </div>
-                  </button>
-                );
-              })}
+                    <span className={statusClass(item.isArchived)}>
+                      {item.isArchived ? "Archived" : "Active"}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="badge badge-outline">
+                      {(item.originId && classLookup.get(item.originId)) ||
+                        "Origin"}
+                    </span>
+                    <ArrowsRightLeftIcon className="h-4 w-4 text-base-content/50" />
+                    <span className="badge badge-primary badge-outline">
+                      {item.name}
+                    </span>
+                    <ArrowsRightLeftIcon className="h-4 w-4 text-base-content/50" />
+                    <span className="badge badge-outline">
+                      {(item.destinationId &&
+                        classLookup.get(item.destinationId)) ||
+                        "Destination"}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
         </div>
       </div>
     </div>
@@ -1182,7 +1186,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       <section className="mx-auto w-full max-w-7xl space-y-6 px-3 py-5 sm:px-6 lg:px-8">
         {contentByMode[mode]}
       </section>
-      
+
       {isCreateClassModalOpen ? (
         <ModalShell
           title="Create Class"
