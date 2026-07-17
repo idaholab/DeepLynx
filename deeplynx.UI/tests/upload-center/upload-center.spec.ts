@@ -121,7 +121,12 @@ test.describe("Upload Center", () => {
     return parseRecordFromUrl(page.url());
   }
 
-  async function clickToBrowse({ page }: { page: Page }, baseFileName: string, filePath: string): Promise<{ recordId: string; projectId: string } | null> {
+  async function clickToBrowse(
+    { page }: { page: Page },
+    baseFileName: string,
+    filePath: string,
+    uploadTimeoutMs?: number
+  ): Promise<{ recordId: string; projectId: string } | null> {
     await checkDataSourcesAndStorageDestinations({ page });
 
     await page.getByText('click to browse').click();
@@ -129,12 +134,11 @@ test.describe("Upload Center", () => {
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(filePath);
 
-
     await page.getByRole('button', { name: 'Upload' }).click();
 
     await expect(
       page.getByText('File uploaded successfully!')
-    ).toBeVisible();
+    ).toBeVisible(uploadTimeoutMs ? { timeout: uploadTimeoutMs } : undefined);
 
     await page.getByRole('link', { name: 'Project Dashboard' }).click();
 
@@ -524,6 +528,7 @@ test.describe("Upload Center", () => {
 
   test.describe('Large file upload', () => {
     let filePath: string;
+    let createdRecord: { recordId: string; projectId: string } | null = null;
 
     test.beforeAll(async () => {
       filePath = path.join(os.tmpdir(), 'ten-gb-test-file.bin');
@@ -570,23 +575,17 @@ test.describe("Upload Center", () => {
       }
     });
 
-    test('Upload a 10 GB file and verify completion in < 20 minutes', async ({ page }) => {
-      await checkDataSourcesAndStorageDestinations({ page });
+    test.afterEach(async ({ request }) => {
+      await deleteRecordIfExists({ request }, createdRecord);
+      createdRecord = null;
+    });
 
+    test('Upload a 10 GB file and verify completion in < 20 minutes', async ({ page }) => {
       test.setTimeout(TWENTY_MIN_MS + 60_000); // budget + buffer for setup/assertions
 
       const start = Date.now();
 
-      await page.getByText('click to browse').click();
-
-      const fileInput = page.locator('input[type="file"]');
-      await fileInput.setInputFiles(filePath);
-
-      await page.getByRole('button', { name: 'Upload' }).click();
-
-      await expect(page.getByText('File uploaded successfully!')).toBeVisible({
-        timeout: TWENTY_MIN_MS,
-      });
+      createdRecord = await clickToBrowse({ page }, 'ten-gb-test-file.bin', filePath, TWENTY_MIN_MS);
 
       const elapsedMs = Date.now() - start;
       console.log(`Upload completed in ${(elapsedMs / 1000 / 60).toFixed(2)} minutes`);
