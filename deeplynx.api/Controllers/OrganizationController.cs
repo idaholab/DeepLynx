@@ -1,10 +1,10 @@
+using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Asp.Versioning;
 using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
@@ -68,23 +68,15 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpGet(Name = "api_get_all_organizations")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizationsV2(
         [FromQuery] bool hideArchived = true)
     {
-        try
-        {
-            var userId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var organizations = await _organizationBusiness
-                .GetAllOrganizations(userId, hideArchived, isSysAdmin);
-            return Ok(organizations);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while listing organizations: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+        var userId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var organizations = await _organizationBusiness
+            .GetAllOrganizations(userId, hideArchived, isSysAdmin);
+        return Ok(organizations);
     }
 
     /// <summary>
@@ -121,23 +113,15 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpGet("user", Name = "api_get_organizations_for_user")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizationsForUserV2(
         [FromQuery] bool hideArchived = true)
     {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var organizations = await _organizationBusiness
-                .GetAllOrganizationsForUser(currentUserId, hideArchived, isSysAdmin);
-            return Ok(organizations);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while listing organizations: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var organizations = await _organizationBusiness
+            .GetAllOrganizationsForUser(currentUserId, hideArchived, isSysAdmin);
+        return Ok(organizations);
     }
 
 
@@ -174,21 +158,13 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpGet("{organizationId:long}", Name = "api_get_organization")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "organization")]
     public async Task<ActionResult<OrganizationResponseDto>> GetOrganizationV2(
         long organizationId, [FromQuery] bool hideArchived = true)
     {
-        try
-        {
-            var organization = await _organizationBusiness.GetOrganization(organizationId, hideArchived);
-            return Ok(organization);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while retrieving organization {organizationId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+        var organization = await _organizationBusiness.GetOrganization(organizationId, hideArchived);
+        return Ok(organization);
     }
 
     /// <summary>
@@ -223,22 +199,14 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpPost(Name = "api_create_organization")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [SysAdmin]
     public async Task<ActionResult<OrganizationResponseDto>> CreateOrganizationV2(
         [FromBody] CreateOrganizationRequestDto dto)
     {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var organization = await _organizationBusiness.CreateOrganization(currentUserId, dto);
-            return Ok(organization);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while creating organization: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+        var currentUserId = UserContextStorage.UserId;
+        var organization = await _organizationBusiness.CreateOrganization(currentUserId, dto);
+        return Ok(organization);
     }
 
     /// <summary>
@@ -276,23 +244,15 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpPut("{organizationId:long}", Name = "api_update_organization")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "organization")]
     public async Task<ActionResult<OrganizationResponseDto>> UpdateOrganizationV2(
         long organizationId,
         [FromBody] UpdateOrganizationRequestDto dto)
     {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var organization = await _organizationBusiness.UpdateOrganization(currentUserId, organizationId, dto);
-            return Ok(organization);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while updating organization {organizationId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+        var currentUserId = UserContextStorage.UserId;
+        var organization = await _organizationBusiness.UpdateOrganization(currentUserId, organizationId, dto);
+        return Ok(organization);
     }
 
     /// <summary>
@@ -325,20 +285,12 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpDelete("{organizationId:long}", Name = "api_delete_organization")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [SysAdmin]
     public async Task<ActionResult> DeleteOrganizationV2(long organizationId)
     {
-        try
-        {
-            await _organizationBusiness.DeleteOrganization(organizationId);
-            return Ok(new { message = $"Deleted organization {organizationId}" });
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while deleting organization {organizationId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+        await _organizationBusiness.DeleteOrganization(organizationId);
+        return Ok(new { message = $"Deleted organization {organizationId}" });
     }
 
     /// <summary>
@@ -383,30 +335,22 @@ public class OrganizationController : ControllerBase
     /// <returns>A message stating the organization was successfully archived or unarchived.</returns>
     [HttpPatch("{organizationId:long}", Name = "api_archive_organization")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "organization", true)]
     public async Task<IActionResult> ArchiveOrganizationV2(
         long organizationId,
         [FromQuery] bool archive)
     {
-        try
-        {
-            var userId = UserContextStorage.UserId;
-            if (archive)
-            {
-                await _organizationBusiness.ArchiveOrganization(userId, organizationId);
-                return Ok(new { message = $"Archived organization {organizationId}" });
-            }
+        var userId = UserContextStorage.UserId;
 
-            await _organizationBusiness.UnarchiveOrganization(userId, organizationId);
-            return Ok(new { message = $"Unarchived organization {organizationId}" });
-        }
-        catch (Exception exc)
+        if (archive)
         {
-            var action = archive ? "archiving" : "unarchiving";
-            var message = $"An error occurred while {action} organization {organizationId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            await _organizationBusiness.ArchiveOrganization(userId, organizationId);
+            return Ok(new { message = $"Archived organization {organizationId}" });
         }
+
+        await _organizationBusiness.UnarchiveOrganization(userId, organizationId);
+        return Ok(new { message = $"Unarchived organization {organizationId}" });
     }
 
     /// <summary>
@@ -446,23 +390,15 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [OrgAdmin]
     public async Task<ActionResult> AddUserToOrganizationV2(
         long organizationId,
         [FromQuery] long userId,
         [FromQuery] bool isAdmin = false)
     {
-        try
-        {
-            await _organizationBusiness.AddUserToOrganization(organizationId, userId, isAdmin);
-            return Ok(new { message = $"Added user {userId} to organization {organizationId}" });
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while adding user {userId} to organization {organizationId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+        await _organizationBusiness.AddUserToOrganization(organizationId, userId, isAdmin);
+        return Ok(new { message = $"Added user {userId} to organization {organizationId}" });
     }
 
     /// <summary>
@@ -505,6 +441,7 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpPut("{organizationId:long}/admin", Name = "api_update_organization_admin_status")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [OrgAdmin]
     [Auth("update", "organization")]
     [Auth("update", "user")]
@@ -513,18 +450,8 @@ public class OrganizationController : ControllerBase
         [FromQuery] long userId,
         [FromQuery] bool isAdmin)
     {
-        try
-        {
-            await _organizationBusiness.SetOrganizationAdminStatus(organizationId, userId, isAdmin);
-            return Ok(new { message = $"Adjusted admin status for user {userId} in organization {organizationId}" });
-        }
-        catch (Exception exc)
-        {
-            var message =
-                $"An error occurred while setting admin status for user {userId} in organization {organizationId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+        await _organizationBusiness.SetOrganizationAdminStatus(organizationId, userId, isAdmin);
+        return Ok(new { message = $"Adjusted admin status for user {userId} in organization {organizationId}" });
     }
 
     /// <summary>
@@ -563,6 +490,7 @@ public class OrganizationController : ControllerBase
     /// <returns></returns>
     [HttpDelete("{organizationId:long}/user", Name = "api_remove_user_from_organization")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [OrgAdmin]
     [Auth("update", "organization")]
     [Auth("update", "user")]
@@ -570,17 +498,8 @@ public class OrganizationController : ControllerBase
         long organizationId,
         [FromQuery] long userId)
     {
-        try
-        {
-            await _organizationBusiness.RemoveUserFromOrganization(organizationId, userId);
-            return Ok(new { message = $"Removed user {userId} from organization {organizationId}" });
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while removing user {userId} from organization {organizationId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+        await _organizationBusiness.RemoveUserFromOrganization(organizationId, userId);
+        return Ok(new { message = $"Removed user {userId} from organization {organizationId}" });
     }
 
     /// <summary>
@@ -588,7 +507,7 @@ public class OrganizationController : ControllerBase
     /// </summary>
     /// <param name="organizationId"></param>
     /// <param name="userEmail"></param>
-    /// <param name="userName"></param>
+    /// <param name="userId"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
     [MapToApiVersion(1)]
@@ -620,30 +539,21 @@ public class OrganizationController : ControllerBase
     /// </summary>
     /// <param name="organizationId"></param>
     /// <param name="userEmail"></param>
-    /// <param name="userName"></param>
+    /// <param name="userId"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
     [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [ProjectAdmin(unscoped: true)]
     public async Task<ActionResult> InviteUserToOrganizationV2(
         long organizationId,
         [FromQuery] string? userEmail,
         [FromQuery] long? userId)
     {
-        try
+        await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, userId, userEmail);
+        return Ok(new
         {
-            await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, userId, userEmail);
-            return Ok(new
-            {
-                message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}"
-            });
-        }
-        catch (Exception exc)
-        {
-            var message =
-                $"An error occurred while adding user with email {userEmail} to organization {organizationId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+            message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}"
+        });
     }
 }
