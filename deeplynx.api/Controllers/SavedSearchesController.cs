@@ -5,6 +5,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
@@ -62,6 +63,25 @@ public class SavedSearchController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Save search
+    /// </summary>
+    /// <param name="filterArray">Array of QueryComponent dtos</param>
+    /// <param name="textSearch">Full text search phrase</param>
+    /// <param name="alias">Name for saved search</param>
+    /// <returns>True if successfully saved</returns>
+    [HttpPost(Name = "api_save_search")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    public async Task<ActionResult<bool>> SaveSearchV2(
+        [FromQuery] string? textSearch, [FromQuery] string? alias,
+        [FromBody] CustomQueryDtos.CustomQueryRequestDto[] filterArray)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var result = await _savedSearchBusiness.SaveSearch(currentUserId, alias, textSearch, filterArray);
+        return Ok(result);
+    }
 
     /// <summary>
     ///     Get Saved Searches
@@ -87,6 +107,22 @@ public class SavedSearchController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get Saved Searches
+    /// </summary>
+    /// <param name="searchFilters">Optional filters to narrow results of saved searches query</param>
+    /// <returns>A list of saved searches belonging to the user.</returns>
+    [HttpPost("search", Name = "api_query_get_saved_searches")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    public async Task<ActionResult<PaginatedResponse<SavedSearchResponseDto>>> GetSavedSearchesV2(
+        [FromBody] SavedSearchRequestDtos.FilterSavedQueryRequestDto? searchFilters = null)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var savedSearches = await _savedSearchBusiness.GetSavedSearches(currentUserId, searchFilters);
+        return Ok(savedSearches);
+    }
 
     /// <summary>
     ///     Get a saved search by ID
@@ -111,6 +147,23 @@ public class SavedSearchController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    ///     Get a saved search by ID
+    /// </summary>
+    /// <param name="savedSearchId">The ID of the saved search to be fetched</param>
+    /// <returns>The saved search with the matching user and ID</returns>
+    [HttpGet(Name = "api_query_get_saved_search_by_id")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    public async Task<ActionResult<SavedSearchResponseDto>> GetSavedSearchByIdV2(
+        [FromQuery] long savedSearchId
+    )
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var savedSearch = await _savedSearchBusiness.GetSavedSearchById(currentUserId, savedSearchId);
+        return Ok(savedSearch);
     }
 
     /// <summary>
@@ -143,6 +196,29 @@ public class SavedSearchController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Execute a saved search
+    /// </summary>
+    /// <param name="savedSearchId">The ID of the saved search that will be executed</param>
+    /// <param name="organizationId">The ID of organization</param>
+    /// <param name="projectIds">List of project ID's that the query will take place in</param>
+    /// <returns>List of records retrieved by the query</returns>
+    [HttpGet("organizations/{organizationId:long}", Name = "api_query_execute_saved_search")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> ExecuteSavedSearchV2(
+        long organizationId, [FromQuery] long[] projectIds, [FromQuery] long savedSearchId)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var records = await _savedSearchBusiness.ExecuteSavedSearch(
+            savedSearchId, currentUserId, organizationId, projectIds, isSysAdmin, isOrgAdmin, isProjectAdmin);
+        return Ok(records);
+    }
 
     /// <summary>
     ///     Delete a saved Search
@@ -167,5 +243,22 @@ public class SavedSearchController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    ///     Delete a saved Search
+    /// </summary>
+    /// <param name="savedSearchId">The ID of the saved search that will be deleted</param>
+    /// <returns>True if successful</returns>
+    [HttpDelete(Name = "api_query_delete_saved_search")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    public async Task<ActionResult<bool>> DeleteSavedSearchV2(
+        [FromQuery] long savedSearchId)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var result = await _savedSearchBusiness.DeleteSavedSearch(
+            currentUserId, savedSearchId);
+        return Ok(result);
     }
 }
