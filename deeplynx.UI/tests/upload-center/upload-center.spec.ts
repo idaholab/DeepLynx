@@ -319,9 +319,7 @@ test.describe("Upload Center", () => {
   test.describe("Upload bulk records", () => {
     let filePath: string;
 
-    test.beforeEach(async ({ page }) => {
-      await seedAndNavigateToProject(page);
-
+    test.beforeEach(async ({}) => {
       // Create the file locally
       filePath = path.join(os.tmpdir(), 'bulk-upload.csv');
 
@@ -348,9 +346,6 @@ test.describe("Upload Center", () => {
       const start = Date.now();
 
       // Upload the csv file
-      await page.locator("aside a", { hasText: "Upload Center" }).click();
-      await page.waitForURL(/\/upload_center/);
-      await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
       await page.getByText('Bulk Metadata').click();
 
       await checkDataSourcesAndStorageDestinations({ page });
