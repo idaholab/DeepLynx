@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page, APIRequestContext } from "@playwright/test";
 import { seedAndNavigateToProject } from "../helpers/seed";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -8,32 +8,63 @@ import * as zlib from 'zlib';
 const TEN_GB = 10 * 1024 * 1024 * 1024;
 const TWENTY_MIN_MS = 20 * 60 * 1000;
 
+type DataSource = {
+  id: string;
+  name: string;
+  default?: boolean;
+};
+
+let projectId: string;
 
 test.describe("Upload Center", () => {
+  async function checkDataSources(page: Page) {
+    const dataSourceSelect = page.getByLabel('Data sourceData Sources');
+    const selectedText = await dataSourceSelect.locator('option:checked').textContent();
 
+    if (selectedText === 'Data Sources') {
+      await dataSourceSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
+    }
+  }
+
+  async function checkStorageDestinations(page: Page) {
+    const storageSelect = page.getByLabel('Storage DestinationObject');
+    const selectedText = await storageSelect.locator('option:checked').textContent();
+
+    if (selectedText === 'Object storages') {
+      await storageSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
+    }
+  }
   async function checkDataSourcesAndStorageDestinations({ page }: { page: Page }) {
-    async function checkDataSources(page: Page) {
-      const dataSourceSelect = page.getByLabel('Data sourceData Sources');
-      const selectedText = await dataSourceSelect.locator('option:checked').textContent();
-
-      if (selectedText === 'Data Sources') {
-        await dataSourceSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
-      }
-    }
-
-    async function checkStorageDestinations(page: Page) {
-      const storageSelect = page.getByLabel('Storage DestinationObject');
-      const selectedText = await storageSelect.locator('option:checked').textContent();
-
-      if (selectedText === 'Object storages') {
-        await storageSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
-      }
-    }
-
     await checkDataSources(page);
     await checkStorageDestinations(page);
   }
 
+  async function getNonDefaultDataSource(
+    request : APIRequestContext, projectId: string 
+  ){
+    if (!projectId) return;
+    const getAllUrl = `http://localhost:5095/api/v1/projects/${projectId}/datasources?hideArchived=true`;
+    const createNewUrl = `http://localhost:5095/api/v1/projects/${projectId}/datasources`;
+    try {
+      let res = await request.fetch(getAllUrl);
+      if (!res.ok()) throw new Error(`Failed to fetch data sources: ${res.status()}`);
+      let dataSources = await res.json();
+      if (dataSources.length === 1) {
+        // create new data source
+        const postRes = await request.post(createNewUrl, { data: { name: "Second data source for playwright tests" }});
+        if (!postRes.ok()) throw new Error(`Failed to create new data source: ${postRes.status()}`);
+        res = await request.get(getAllUrl);
+        if (!res.ok()) throw new Error(`Failed to refecth data sources: ${res.status()}`);
+        dataSources = await res.json();
+      }
+      // return non default
+      return (dataSources.find((ds: DataSource) => ds.name !== 'Default Data Source')).name;
+    } catch(err) {
+      console.warn('Error getting different data source.', err);
+      return undefined;
+    }
+  }
+  
   // Record page URLs look like: http://localhost:3000/record?recordId=955&projectId=213
   function parseRecordFromUrl(url: string): { recordId: string; projectId: string } | null {
     try {
@@ -385,6 +416,11 @@ test.describe("Upload Center", () => {
 
   test.beforeEach(async ({ page }) => {
     await seedAndNavigateToProject(page);
+    // Extract project ID from the URL (e.g. /project/42)
+    const url = page.url();
+    const match = url.match(/\/project\/(\d+)/);
+    expect(match).not.toBeNull();
+    projectId = match![1];
     // Navigate to Upload Center via sidebar
     await page.locator("aside a", { hasText: "Upload Center" }).click();
     await page.waitForURL(/\/upload_center/);
@@ -1032,5 +1068,53 @@ startxref
       const elapsedMs = Date.now() - start;
       expect(elapsedMs).toBeLessThan(60_000);
     });
+  });
+  
+  test.describe("Data Source and Storage uploads", () => {
+    let filePaths: [string, string];
+
+    test.beforeEach(async ({}) => {
+      // Create the file to use locally
+      filePaths = [
+        path.join(os.tmpdir(), 'upload-different-datasource-click'),
+        path.join(os.tmpdir(), 'upload-different-datasource-drag'),
+      ];
+
+      for (const filePath in filePaths) {
+        if (!fs.existsSync(filePath)) {
+          await fs.promises.writeFile(filePath, Buffer.alloc(1));
+        }
+      }
+    });
+
+    test.afterAll(async () => {
+      for (const filePath in filePaths) {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+    });
+
+    test("default project and storage, nondefault data source, click to browse, successfully uploads file", async ({ page, request }) => {
+      // set datasource and storage destination
+      await checkStorageDestinations(page);
+      const nondefaultDs = await getNonDefaultDataSource(request, projectId);
+      await page.getByLabel('Data sourceData').click();
+      await page.getByText(nondefaultDs).click();
+
+      // click to browse
+      await clickToBrowse({ page }, 'upload-different-datasource-click', filePaths[0]);
+    })
+
+    test("default project and storage, nondefault data source, drag and drop, successfully uploads file", async ({ page, request }) => {
+      // set datasource and storage destination
+      await checkStorageDestinations(page);
+      const nondefaultDs = await getNonDefaultDataSource(request, projectId);
+      await page.getByLabel('Data sourceData').click();
+      await page.getByText(nondefaultDs).click();
+
+      // click to browse
+      await dragAndDrop({ page }, 'upload-different-datasource-browse', filePaths[1], 'txt');
+    })
   });
 });
