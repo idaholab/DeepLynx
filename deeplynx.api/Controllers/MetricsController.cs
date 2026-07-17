@@ -3,6 +3,7 @@ using deeplynx.helpers;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
@@ -58,6 +59,20 @@ public class MetricsController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get Bytes Ingested
+    /// </summary>
+    /// <returns>The total number of bytes of file data stored in Nexus-registered object storages.</returns>
+    [HttpGet("storage/size", Name = "api_storage_size_system")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [SysAdmin]
+    public async Task<IActionResult> GetSystemStorageSizeV2()
+    {
+            var byteSum = await _metricsBusiness.GetSystemStorageSize();
+            return Ok(byteSum);
+    }
 
     /// <summary>
     ///     Get System Data Source Count 
@@ -80,6 +95,21 @@ public class MetricsController : ControllerBase
             _logger.LogError(exc.Message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    ///     Get System Data Source Count 
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>A count of data sources for the given project.</returns>
+    [HttpGet("datasources/count", Name = "api_datasource_count_system")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [SysAdmin]
+    public async Task<IActionResult> GetSystemDataSourceCountV2(bool hideArchived = true)
+    {
+            var byteSum = await _metricsBusiness.GetSystemDataSourceCount(hideArchived);
+            return Ok(byteSum);
     }
 
     /// <summary>
@@ -104,6 +134,21 @@ public class MetricsController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get record count for system
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>The record count for the given scope</returns>
+    [HttpGet("records/count", Name = "api_record_count_system")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [SysAdmin]
+    public async Task<IActionResult> GetSystemRecordCountV2(bool hideArchived = true)
+    {
+       var count = await _metricsBusiness.GetRecordCount(organizationId: null, projectIds: null, hideArchived: false);
+            return Ok(count);
+    }
 
     /// <summary>
     ///     Get file count for system
@@ -126,5 +171,20 @@ public class MetricsController : ControllerBase
             _logger.LogError(exc.Message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    ///     Get file count for system
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
+    /// <returns>The file count for the given scope</returns>
+    [HttpGet("files/count", Name = "api_file_count_system")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [SysAdmin]
+    public async Task<IActionResult> GetSystemFileCountV2(bool hideArchived = true)
+    {
+       var count = await _metricsBusiness.GetFileCount(organizationId: null, projectIds: null, hideArchived: false);
+            return Ok(count);
     }
 }
