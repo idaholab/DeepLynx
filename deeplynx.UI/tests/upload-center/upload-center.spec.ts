@@ -13,6 +13,11 @@ type DataSource = {
   name: string;
   default?: boolean;
 };
+type ObjectStorage = {
+  id: string;
+  name: string;
+  default?: boolean;
+};
 
 let projectId: string;
 
@@ -61,6 +66,33 @@ test.describe("Upload Center", () => {
       return (dataSources.find((ds: DataSource) => ds.name !== 'Default Data Source')).name;
     } catch(err) {
       console.warn('Error getting different data source.', err);
+      return undefined;
+    }
+  }
+
+  async function getNonDefaultStorageDestination(
+    request : APIRequestContext, projectId: string 
+  ){
+    if (!projectId) return;
+    const getAllUrl = `http://localhost:5095/api/v1/organizations/1/projects/${projectId}/storages?hideArchived=true`;
+    const createNewUrl = `http://localhost:5095/api/v1/organizations/1/projects/${projectId}/storages?makeDefault=false`;
+    try {
+      let res = await request.fetch(getAllUrl);
+      if (!res.ok()) throw new Error(`Failed to fetch object storages: ${res.status()}`);
+      let storages = await res.json();
+      if (storages.length === 1) {
+        // create new data source
+        const postRes = await request.post(createNewUrl, { data: { name: "Second storage for playwright tests", config: {mountPath: `../data/duckdb/org_1/project_${projectId}`} }});
+        if (!postRes.ok()) throw new Error(`Failed to create new object storage: ${postRes.status()}`);
+        res = await request.get(getAllUrl);
+        if (!res.ok()) throw new Error(`Failed to refecth object storages: ${res.status()}`);
+        storages = await res.json();
+      }
+      // return non default
+      console.log(`Storage Name: ${(storages.find((os: ObjectStorage) => os.default !== true)).name}`);
+      return (storages.find((os: ObjectStorage) => os.default !== true)).name;
+    } catch(err) {
+      console.warn('Error getting different object storage.', err);
       return undefined;
     }
   }
@@ -1071,16 +1103,18 @@ startxref
   });
   
   test.describe("Data Source and Storage uploads", () => {
-    let filePaths: [string, string];
+    let filePaths: [string, string, string, string];
 
-    test.beforeEach(async ({}) => {
-      // Create the file to use locally
+    test.beforeAll(async ({}) => {
+      // Create the files to use locally
       filePaths = [
         path.join(os.tmpdir(), 'upload-different-datasource-click'),
         path.join(os.tmpdir(), 'upload-different-datasource-drag'),
+        path.join(os.tmpdir(), 'upload-different-storage-click'),
+        path.join(os.tmpdir(), 'upload-different-storage-drag'),
       ];
 
-      for (const filePath in filePaths) {
+      for (const filePath of filePaths) {
         if (!fs.existsSync(filePath)) {
           await fs.promises.writeFile(filePath, Buffer.alloc(1));
         }
@@ -1088,7 +1122,7 @@ startxref
     });
 
     test.afterAll(async () => {
-      for (const filePath in filePaths) {
+      for (const filePath of filePaths) {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }
@@ -1114,7 +1148,29 @@ startxref
       await page.getByText(nondefaultDs).click();
 
       // click to browse
-      await dragAndDrop({ page }, 'upload-different-datasource-browse', filePaths[1], 'txt');
-    })
+      await dragAndDrop({ page }, 'upload-different-datasource-drag', filePaths[1], 'txt');
+    });
+
+    test("default project and data source, nondefault storage, click to browse, successfully uploads file", async ({ page, request }) => {      
+      // set datasource and storage destination
+      await checkDataSources(page);
+      const nondefaultOs = await getNonDefaultStorageDestination(request, projectId);
+      await page.getByLabel('Storage DestinationObject').click();
+      await page.getByText(nondefaultOs).click();
+
+      // click to browse
+      await clickToBrowse({ page }, 'upload-different-storage-click', filePaths[2]);
+    });
+
+    test("default project and data source, nondefault storage, drag and drop, successfully uploads file", async ({ page, request }) => {      
+      // set datasource and storage destination
+      await checkDataSources(page);
+      const nondefaultOs = await getNonDefaultStorageDestination(request, projectId);
+      await page.getByLabel('Storage DestinationObject').click();
+      await page.getByText(nondefaultOs).click();
+
+      // click to browse
+      await dragAndDrop({ page }, 'upload-different-storage-drag', filePaths[3], 'txt');
+    });
   });
 });
