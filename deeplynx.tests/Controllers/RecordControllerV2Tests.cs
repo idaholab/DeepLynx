@@ -19,7 +19,7 @@ namespace deeplynx.tests.Controllers;
 ///     Implements IDisposable to reset UserContextStorage statics after every test,
 ///     preventing static state leaking across classes when the runner reuses threads.
 /// </summary>
-public class RecordControllerTestsV2 : IDisposable
+public class RecordControllerV2Tests : IDisposable
 {
     private readonly Mock<IRecordBusiness> _mockBusiness;
     private readonly Mock<IGraphBusiness> _mockGraph;
@@ -36,7 +36,7 @@ public class RecordControllerTestsV2 : IDisposable
     private const long LabelId = 50L;
     private const long NotFoundId = 99L;
 
-    public RecordControllerTestsV2()
+    public RecordControllerV2Tests()
     {
         _mockBusiness = new Mock<IRecordBusiness>();
         _mockGraph = new Mock<IGraphBusiness>();
