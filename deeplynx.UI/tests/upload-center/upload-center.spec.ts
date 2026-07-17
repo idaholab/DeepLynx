@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as zlib from 'zlib';
+import { Project } from "@/app/(home)/types/types";
 
 const TEN_GB = 10 * 1024 * 1024 * 1024;
 const TWENTY_MIN_MS = 20 * 60 * 1000;
@@ -34,7 +35,7 @@ test.describe("Upload Center", () => {
       await storageSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
     }
   }
-  async function checkDataSourcesAndStorageDestinations({ page }: { page: Page }) {
+  async function checkDataSourcesAndStorageDestinations(page: Page) {
     await checkDataSources(page);
     await checkStorageDestinations(page);
   }
@@ -77,6 +78,46 @@ test.describe("Upload Center", () => {
       return undefined;
     }
   }
+
+  async function getNonDefaultProject(
+    request : APIRequestContext, projectId: string
+  ){
+    if (!projectId) return;
+    const BASE_URL = 'http://localhost:5095/api/v1';
+    const getAllUrl = `${BASE_URL}/organizations/1/projects`;
+    const createNewUrl = `${BASE_URL}/organizations/1/projects`;
+
+    try {
+      let res = await request.fetch(getAllUrl);
+      if (!res.ok()) throw new Error(`Failed to fetch projects: ${res.status()}`);
+      let projects = await res.json();
+      if (projects.length === 1) {
+        // create new of type
+        const postRes = await request.post(createNewUrl, { data: { name: "New Project for playwright testing" }});
+        if (!postRes.ok()) throw new Error(`Failed to create new project: ${postRes.status()}`);
+        res = await request.get(getAllUrl);
+        if (!res.ok()) throw new Error(`Failed to refecth project: ${res.status()}`);
+        projects = await res.json();
+      }
+      // return non default
+      return (projects.find((project: Project) => project.id !== projectId)).name;
+    } catch(err) {
+      console.warn(`Error getting different project.`, err);
+      return undefined;
+    }
+  }
+
+  async function getProjectName(request: APIRequestContext, projectId: string) {
+    const url = `http://localhost:5095/api/v1/organizations/1/projects/${projectId}`;
+    try {
+      const res = await request.fetch(url);
+      const project = await res.json();
+      return project.name;
+    } catch(err) {
+      console.warn('Error getting project name.', err);
+      return undefined;
+    }
+  }
   
   // Record page URLs look like: http://localhost:3000/record?recordId=955&projectId=213
   function parseRecordFromUrl(url: string): { recordId: string; projectId: string } | null {
@@ -109,7 +150,7 @@ test.describe("Upload Center", () => {
   }
 
   async function dragAndDrop({ page }: { page: Page }, baseFileName: string, filePath: string, type: string): Promise<{ recordId: string; projectId: string } | null> {
-    await checkDataSourcesAndStorageDestinations({ page });
+    await checkDataSourcesAndStorageDestinations(page);
 
     const buffer = fs.readFileSync(filePath);
     const fileName = path.basename(filePath);
@@ -171,7 +212,7 @@ test.describe("Upload Center", () => {
     filePath: string,
     uploadTimeoutMs?: number
   ): Promise<{ recordId: string; projectId: string } | null> {
-    await checkDataSourcesAndStorageDestinations({ page });
+    await checkDataSourcesAndStorageDestinations(page);
 
     await page.getByText('click to browse').click();
 
@@ -630,6 +671,8 @@ test.describe("Upload Center", () => {
     });
 
     test('Upload a 10 GB file and verify completion in < 20 minutes', async ({ page }) => {
+      await checkDataSourcesAndStorageDestinations(page);
+
       test.setTimeout(TWENTY_MIN_MS + 60_000); // budget + buffer for setup/assertions
 
       const start = Date.now();
@@ -866,7 +909,7 @@ startxref
       await page.waitForURL(/\/upload_center/);
       await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
 
-      await checkDataSourcesAndStorageDestinations({ page });
+      await checkDataSourcesAndStorageDestinations(page);
 
       await page.getByText('click to browse').click();
       const fileInput = page.locator('input[type="file"]');
@@ -994,7 +1037,7 @@ startxref
       // Upload the csv file
       await page.getByText('Bulk Metadata').click();
 
-      await checkDataSourcesAndStorageDestinations({ page });
+      await checkDataSourcesAndStorageDestinations(page);
 
       await page.getByRole('button', { name: 'Step 2: Upload Your CSV' }).click();
       const fileInput = page.locator('input[type="file"]');
@@ -1050,7 +1093,7 @@ startxref
       await page.waitForURL(/\/upload_center/);
       await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
 
-      await checkDataSourcesAndStorageDestinations({ page });
+      await checkDataSourcesAndStorageDestinations(page);
 
       await page.getByText('click to browse').click();
       const fileInput = page.locator('input[type="file"]');
@@ -1084,7 +1127,7 @@ startxref
   });
   
   test.describe("Data Source and Storage uploads", () => {
-    let filePaths: [string, string, string, string];
+    let filePaths: [string, string, string, string, string, string];
 
     test.beforeAll(async ({}) => {
       // Create the files to use locally
@@ -1093,6 +1136,8 @@ startxref
         path.join(os.tmpdir(), 'upload-different-datasource-drag'),
         path.join(os.tmpdir(), 'upload-different-storage-click'),
         path.join(os.tmpdir(), 'upload-different-storage-drag'),
+        path.join(os.tmpdir(), 'upload-different-project-click'),
+        path.join(os.tmpdir(), 'upload-different-project-drag')
       ];
 
       for (const filePath of filePaths) {
@@ -1152,6 +1197,20 @@ startxref
 
       // click to browse
       await dragAndDrop({ page }, 'upload-different-storage-drag', filePaths[3], 'txt');
+    });
+
+    test("default data source and storage, nondefault project, click to browse, successfully uploads file", async ({ page, request }) => {      
+      // project setup
+      const nondefaultProj = await getNonDefaultProject(request, projectId);
+      const currentProjName = await getProjectName(request, projectId);
+      await page.getByText(currentProjName).click();
+      await page.getByText(nondefaultProj).click();
+      
+      // set datasource and storage destination
+      await checkDataSourcesAndStorageDestinations(page);
+
+      // click to browse
+      await clickToBrowse({ page }, 'upload-different-storage-click', filePaths[4]);
     });
   });
 });
