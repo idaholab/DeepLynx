@@ -902,7 +902,6 @@ startxref
         page.getByText(emptyFileName)
       ).not.toBeVisible();
 
-      // File should still be visible in the Data Catalog
       await page.getByRole('link', { name: 'Visit' }).first().click();
       await page.getByRole('textbox', { name: 'Search' }).click();
       await page.getByRole('textbox', { name: 'Search' }).fill(emptyFileName);
