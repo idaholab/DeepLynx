@@ -1,4 +1,4 @@
-import { test, expect, Page, APIRequestContext } from "@playwright/test";
+import { test, expect, Page, APIRequestContext, APIResponse } from "@playwright/test";
 import { seedAndNavigateToProject } from "../helpers/seed";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -8,12 +8,7 @@ import * as zlib from 'zlib';
 const TEN_GB = 10 * 1024 * 1024 * 1024;
 const TWENTY_MIN_MS = 20 * 60 * 1000;
 
-type DataSource = {
-  id: string;
-  name: string;
-  default?: boolean;
-};
-type ObjectStorage = {
+type DataSourceOrStorage = {
   id: string;
   name: string;
   default?: boolean;
@@ -44,55 +39,41 @@ test.describe("Upload Center", () => {
     await checkStorageDestinations(page);
   }
 
-  async function getNonDefaultDataSource(
-    request : APIRequestContext, projectId: string 
+  async function getNonDefault(
+    request : APIRequestContext, projectId: string, type: string 
   ){
     if (!projectId) return;
-    const getAllUrl = `http://localhost:5095/api/v1/projects/${projectId}/datasources?hideArchived=true`;
-    const createNewUrl = `http://localhost:5095/api/v1/projects/${projectId}/datasources`;
-    try {
-      let res = await request.fetch(getAllUrl);
-      if (!res.ok()) throw new Error(`Failed to fetch data sources: ${res.status()}`);
-      let dataSources = await res.json();
-      if (dataSources.length === 1) {
-        // create new data source
-        const postRes = await request.post(createNewUrl, { data: { name: "Second data source for playwright tests" }});
-        if (!postRes.ok()) throw new Error(`Failed to create new data source: ${postRes.status()}`);
-        res = await request.get(getAllUrl);
-        if (!res.ok()) throw new Error(`Failed to refecth data sources: ${res.status()}`);
-        dataSources = await res.json();
-      }
-      // return non default
-      return (dataSources.find((ds: DataSource) => ds.name !== 'Default Data Source')).name;
-    } catch(err) {
-      console.warn('Error getting different data source.', err);
-      return undefined;
+    const BASE_URL = 'http://localhost:5095/api/v1';
+    let getAllUrl: string;
+    let createNewUrl: string;
+    if (type === 'data source') {
+      getAllUrl = `${BASE_URL}/projects/${projectId}/datasources?hideArchived=true`;
+      createNewUrl = `${BASE_URL}/projects/${projectId}/datasources`;
+    } else {
+      getAllUrl = `${BASE_URL}/organizations/1/projects/${projectId}/storages?hideArchived=true`;
+      createNewUrl = `${BASE_URL}/organizations/1/projects/${projectId}/storages?makeDefault=false`;
     }
-  }
-
-  async function getNonDefaultStorageDestination(
-    request : APIRequestContext, projectId: string 
-  ){
-    if (!projectId) return;
-    const getAllUrl = `http://localhost:5095/api/v1/organizations/1/projects/${projectId}/storages?hideArchived=true`;
-    const createNewUrl = `http://localhost:5095/api/v1/organizations/1/projects/${projectId}/storages?makeDefault=false`;
     try {
       let res = await request.fetch(getAllUrl);
-      if (!res.ok()) throw new Error(`Failed to fetch object storages: ${res.status()}`);
-      let storages = await res.json();
-      if (storages.length === 1) {
-        // create new data source
-        const postRes = await request.post(createNewUrl, { data: { name: "Second storage for playwright tests", config: {mountPath: `../data/duckdb/org_1/project_${projectId}`} }});
-        if (!postRes.ok()) throw new Error(`Failed to create new object storage: ${postRes.status()}`);
+      if (!res.ok()) throw new Error(`Failed to fetch ${type}s: ${res.status()}`);
+      let allOfType = await res.json();
+      if (allOfType.length === 1) {
+        // create new of type
+        let postRes: APIResponse;
+        if (type === 'data source') {
+          postRes = await request.post(createNewUrl, { data: { name: "Second data source for playwright tests" }});
+        } else {
+          postRes = await request.post(createNewUrl, { data: { name: `Second storage for playwright tests`, config: {mountPath: `../data/duckdb/org_1/project_${projectId}`} }});
+        }
+        if (!postRes.ok()) throw new Error(`Failed to create new ${type}: ${postRes.status()}`);
         res = await request.get(getAllUrl);
-        if (!res.ok()) throw new Error(`Failed to refecth object storages: ${res.status()}`);
-        storages = await res.json();
+        if (!res.ok()) throw new Error(`Failed to refecth ${type}: ${res.status()}`);
+        allOfType = await res.json();
       }
       // return non default
-      console.log(`Storage Name: ${(storages.find((os: ObjectStorage) => os.default !== true)).name}`);
-      return (storages.find((os: ObjectStorage) => os.default !== true)).name;
+      return (allOfType.find((singleType: DataSourceOrStorage) => singleType.default !== true)).name;
     } catch(err) {
-      console.warn('Error getting different object storage.', err);
+      console.warn(`Error getting different ${type}.`, err);
       return undefined;
     }
   }
@@ -1132,7 +1113,7 @@ startxref
     test("default project and storage, nondefault data source, click to browse, successfully uploads file", async ({ page, request }) => {
       // set datasource and storage destination
       await checkStorageDestinations(page);
-      const nondefaultDs = await getNonDefaultDataSource(request, projectId);
+      const nondefaultDs = await getNonDefault(request, projectId, 'data source');
       await page.getByLabel('Data sourceData').click();
       await page.getByText(nondefaultDs).click();
 
@@ -1143,7 +1124,7 @@ startxref
     test("default project and storage, nondefault data source, drag and drop, successfully uploads file", async ({ page, request }) => {
       // set datasource and storage destination
       await checkStorageDestinations(page);
-      const nondefaultDs = await getNonDefaultDataSource(request, projectId);
+      const nondefaultDs = await getNonDefault(request, projectId, 'data source');
       await page.getByLabel('Data sourceData').click();
       await page.getByText(nondefaultDs).click();
 
@@ -1154,7 +1135,7 @@ startxref
     test("default project and data source, nondefault storage, click to browse, successfully uploads file", async ({ page, request }) => {      
       // set datasource and storage destination
       await checkDataSources(page);
-      const nondefaultOs = await getNonDefaultStorageDestination(request, projectId);
+      const nondefaultOs = await getNonDefault(request, projectId, 'storage');
       await page.getByLabel('Storage DestinationObject').click();
       await page.getByText(nondefaultOs).click();
 
@@ -1165,7 +1146,7 @@ startxref
     test("default project and data source, nondefault storage, drag and drop, successfully uploads file", async ({ page, request }) => {      
       // set datasource and storage destination
       await checkDataSources(page);
-      const nondefaultOs = await getNonDefaultStorageDestination(request, projectId);
+      const nondefaultOs = await getNonDefault(request, projectId, 'storage');
       await page.getByLabel('Storage DestinationObject').click();
       await page.getByText(nondefaultOs).click();
 
