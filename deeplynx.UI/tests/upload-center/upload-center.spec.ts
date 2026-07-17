@@ -850,4 +850,65 @@ startxref
 
     });
   });
+
+  test.describe("Upload timeseries file", () => {
+    let filePath: string;
+
+    test.beforeEach(async () => {
+      // Create the file locally
+      filePath = path.join(os.tmpdir(), 'timeseries-test-file.csv');
+      const csvContent = 'Date, Candy Eaten\n20050101, 5\n20050102, 6\n20050103, 3\n20050104, 15\n20050105, 3\n20050106, 5\n20050107, 9\n20050108, 12\n20050109, 6\n20050110, 9\n20050111, 6\n20050112, 3\n20050113, 2';
+
+      if (!fs.existsSync(filePath)) {
+        await fs.promises.writeFile(filePath, csvContent, 'utf8');
+      }
+    });
+
+    test.afterAll(async () => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
+    test("uploads a timeseries file", async ({ page }) => {
+      test.setTimeout(120_000); // two minutes buffer time
+      const start = Date.now();
+
+      // Upload the files
+      await page.locator("aside a", { hasText: "Upload Center" }).click();
+      await page.waitForURL(/\/upload_center/);
+      await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
+
+      await checkDataSourcesAndStorageDestinations({ page });
+
+      await page.getByText('click to browse').click();
+      const fileInput = page.locator('input[type="file"]');
+      await fileInput.setInputFiles(filePath);
+      await page.getByRole('button', { name: 'Upload' }).click();
+      await expect(page.getByText('File uploaded successfully!')).toBeVisible({
+      timeout: 120_000,
+      });
+
+      // Navigate to Project Page
+      await page.locator("aside a", { hasText: "Project Dashboard" }).click();
+      await page.waitForURL(/\/project/);
+      await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+      await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
+      await page.getByText('timeseries-test-file').first().click();
+      await expect(page.getByText('Timeseries', { exact: true })).toBeVisible();
+
+      // Check that it shows up on the timeseries page
+      await page.locator("aside a", { hasText: "Timeseries Viewer" }).click();
+      await page.waitForURL(/\/timeseries_viewer/);
+      await expect(page.getByRole("heading", { name: "Timeseries Viewer" })).toBeVisible();
+      await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
+      await page.getByText('timeseries-test-file').first().click();
+
+      await expect(page.locator('canvas')).toBeVisible();
+      await expect(page.locator('span').filter({ hasText: 'timeseries-test-file' })).toBeVisible();
+
+      const elapsedMs = Date.now() - start;
+      expect(elapsedMs).toBeLessThan(60_000);
+    });
+  });
 });
