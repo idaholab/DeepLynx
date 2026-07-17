@@ -201,7 +201,7 @@ public class RelationshipBusiness : IRelationshipBusiness
         };
 
         _context.Relationships.Add(relationship);
-
+        
         try
         {
             await _context.SaveChangesAsync();
@@ -285,7 +285,7 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         ArgumentNullException.ThrowIfNull(relationships);
 
-
+        
         var classIds = relationships
             .SelectMany(r => new long?[] { r.OriginId, r.DestinationId })
             .Where(id => id.HasValue)
@@ -314,27 +314,27 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         }
 
-        var withOriginDestination = relationships.Where(r => r.OriginId.HasValue && r.DestinationId.HasValue).ToList();
-        var woOriginDestination = relationships.Where(r => !r.OriginId.HasValue && !r.DestinationId.HasValue).ToList();
+       var withOriginDestination = relationships.Where(r => r.OriginId.HasValue && r.DestinationId.HasValue).ToList();
+       var woOriginDestination = relationships.Where(r => !r.OriginId.HasValue && !r.DestinationId.HasValue).ToList();
+        
+       var results = new List<RelationshipResponseDto>();
 
-        var results = new List<RelationshipResponseDto>();
+       if (withOriginDestination.Count > 0)
+       {
+           results.AddRange(await ExecuteUpsertBatch(
+               withOriginDestination, organizationId, currentUserId,
+               conflictColumns: "organization_id, project_id, origin_id, name, destination_id",
+               conflictFilter: "project_id IS NOT NULL AND origin_id IS NOT NULL AND destination_id IS NOT NULL", projectId));
+       }
 
-        if (withOriginDestination.Count > 0)
-        {
-            results.AddRange(await ExecuteUpsertBatch(
-                withOriginDestination, organizationId, currentUserId,
-                conflictColumns: "organization_id, project_id, origin_id, name, destination_id",
-                conflictFilter: "project_id IS NOT NULL AND origin_id IS NOT NULL AND destination_id IS NOT NULL", projectId));
-        }
-
-        if (woOriginDestination.Count > 0)
-        {
-            results.AddRange(await ExecuteUpsertBatch(
-                woOriginDestination, organizationId, currentUserId,
-                conflictColumns: "organization_id, project_id, name",
-                conflictFilter: "project_id IS NOT NULL AND origin_id IS NULL AND destination_id IS NULL", projectId));
-        }
-
+       if (woOriginDestination.Count > 0)
+       {
+           results.AddRange(await ExecuteUpsertBatch(
+               woOriginDestination, organizationId, currentUserId,
+               conflictColumns: "organization_id, project_id, name",
+               conflictFilter: "project_id IS NOT NULL AND origin_id IS NULL AND destination_id IS NULL", projectId));
+       }
+       
         var createEvent = new CreateEventRequestDto
         {
             Operation = "create",
@@ -344,8 +344,8 @@ public class RelationshipBusiness : IRelationshipBusiness
 
         return results;
     }
-
-    private async Task<List<RelationshipResponseDto>> ExecuteUpsertBatch(List<CreateRelationshipRequestDto> batch, long organizationId, long currentUserId,
+    
+    private async Task<List<RelationshipResponseDto>> ExecuteUpsertBatch(List<CreateRelationshipRequestDto> batch, long organizationId, long currentUserId, 
         string conflictColumns, string conflictFilter, long? projectId)
     {
         var sql = $@"
@@ -414,8 +414,8 @@ public class RelationshipBusiness : IRelationshipBusiness
         if (relationship is null || relationship.IsArchived)
             throw new KeyNotFoundException($"Relationship with ID {relationshipId} not found.");
 
-        var originId = dto.OriginId;
-        var destinationId = dto.DestinationId;
+        var originId = dto.OriginId ?? relationship.OriginId;
+        var destinationId = dto.DestinationId ?? relationship.DestinationId;
 
         if (originId.HasValue)
         {
@@ -447,8 +447,8 @@ public class RelationshipBusiness : IRelationshipBusiness
         relationship.Description = dto.Description ?? relationship.Description;
         relationship.Properties = dto.Properties != null ? dto.Properties.ToString() : relationship.Properties;
         relationship.Uuid = dto.Uuid ?? relationship.Uuid;
-        relationship.OriginId = dto.OriginId;
-        relationship.DestinationId = dto.DestinationId;
+        relationship.OriginId = dto.OriginId ?? relationship.OriginId;
+        relationship.DestinationId = dto.DestinationId ?? relationship.DestinationId;
         relationship.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         relationship.LastUpdatedBy = currentUserId;
         _context.Relationships.Update(relationship);

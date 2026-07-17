@@ -244,8 +244,8 @@ export type UpdateRelationshipRequestDto = {
   name?: string;
   description?: string;
   uuid?: string;
-  origin_id: number | null;
-  destination_id: number | null;
+  origin_id?: number;
+  destination_id?: number;
 };
 
 export type UpdateRoleRequestDto = {
