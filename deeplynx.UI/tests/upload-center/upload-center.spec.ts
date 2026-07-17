@@ -770,18 +770,19 @@ startxref
 
   test.describe("Upload multiple files", () => {
     let filePaths: [string, string, string, string, string];
+    const fileBaseNames = [
+      'upload-test-file-one.bin',
+      'upload-test-file-two.bin',
+      'upload-test-file-three.bin',
+      'upload-test-file-four.bin',
+      'upload-test-file-five.bin',
+    ] as const;
+    let createdRecords: ({ recordId: string; projectId: string } | null)[] = [];
 
     test.beforeEach(async ({ page }) => {
-      await seedAndNavigateToProject(page);
 
       // Create the files locally
-      filePaths = [
-        path.join(os.tmpdir(), 'upload-test-file-one'),
-        path.join(os.tmpdir(), 'upload-test-file-two'),
-        path.join(os.tmpdir(), 'upload-test-file-three'),
-        path.join(os.tmpdir(), 'upload-test-file-four'),
-        path.join(os.tmpdir(), 'upload-test-file-five')
-      ]
+      filePaths = fileBaseNames.map((name) => path.join(os.tmpdir(), name)) as [string, string, string, string, string];
 
       for (const filePath of filePaths) {
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size !== 400 * 1024 * 1024) {
@@ -789,6 +790,8 @@ startxref
           await fs.promises.truncate(filePath, 400 * 1024 * 1024);
         }
       }
+
+      createdRecords = [];
     });
 
     test.afterAll(async () => {
@@ -796,6 +799,12 @@ startxref
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }
+      }
+    });
+
+    test.afterEach(async ({ request }) => {
+      for (const record of createdRecords) {
+        await deleteRecordIfExists({ request }, record);
       }
     });
 
@@ -823,15 +832,32 @@ startxref
       await page.waitForURL(/\/project/);
       await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
 
-      await expect(page.getByText('upload-test-file-one')).toBeVisible();
-      await expect(page.getByText('upload-test-file-two')).toBeVisible();
-      await expect(page.getByText('upload-test-file-three')).toBeVisible();
-      await expect(page.getByText('upload-test-file-four')).toBeVisible();
-      await expect(page.getByText('upload-test-file-five')).toBeVisible();
+      for (const baseName of fileBaseNames) {
+        await expect(page.getByText(baseName)).toBeVisible();
+      }
 
       const elapsedMs = Date.now() - start;
-
       expect(elapsedMs).toBeLessThan(60_000);
+
+      // Visit the data catalog and resolve each uploaded file to its
+      // recordId/projectId so we can clean them up afterward.
+      await page.getByRole('link', { name: 'Visit' }).first().click();
+
+      for (const baseName of fileBaseNames) {
+        await page.getByRole('textbox', { name: 'Search' }).click();
+        await page.getByRole('textbox', { name: 'Search' }).fill(baseName);
+        await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+
+        const recordLink = page.getByRole('link', { name: baseName, exact: true }).first();
+        await expect(recordLink).toBeVisible();
+
+        await recordLink.click();
+        await page.waitForURL(/\/record\?/);
+        createdRecords.push(parseRecordFromUrl(page.url()));
+
+        // Go back to the catalog to search for the next file
+        await page.goBack();
+      }
     });
   });
 });
