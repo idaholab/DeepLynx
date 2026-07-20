@@ -6,6 +6,6 @@ export default {
   deeplynx: {
     title: "Back to DeepLynx",
     type: "page",
-    href: process.env.NEXT_PUBLIC_HOSTED_LINK || "http://localhost:3000",
+    href: process.env.HOSTED_LINK || "http://localhost:3000",
   },
 };
