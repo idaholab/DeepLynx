@@ -157,21 +157,38 @@ export default function BulkUploadSection(props: BulkUploadSectionProps) {
               <span className="label-text font-semibold">
                 {t.translations.STEP_2_UPLOAD_YOUR_CSV}
               </span>
-              <input
-                type="file"
-                accept=".csv"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleCsvUpload(file);
-                }}
-                className="file-input file-input-bordered file-input-primary w-full max-w-xs"
-                disabled={
-                  props.isParsing ||
-                  props.isValidating ||
-                  !props.projectId ||
-                  !props.dataSourceId
-                }
-              />
+              <div className="flex items-center">
+                <label
+                  className={`btn btn-primary rounded-r-none ${props.isParsing ||
+                    props.isValidating ||
+                    !props.projectId ||
+                    !props.dataSourceId
+                    ? "btn-disabled"
+                    : ""
+                    }`}
+                >
+                  {t.translations.CHOOSE_FILE}
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleCsvUpload(file);
+                    }}
+                    className="hidden"
+                    disabled={
+                      props.isParsing ||
+                      props.isValidating ||
+                      !props.projectId ||
+                      !props.dataSourceId
+                    }
+                  />
+                </label>
+
+                <div className="input input-bordered input-primary rounded-l-none w-48">
+                  {props.csvFile?.name ?? t.translations.NO_FILE_CHOSEN}
+                </div>
+              </div>
             </label>
             {props.csvFile && (
               <div className="mt-2 text-sm text-base-content/70 flex items-center gap-2">
