@@ -4,8 +4,8 @@ import path from "path";
 import * as os from 'os';
 import * as fs from 'fs';
 
-const ONE_GB = 1 * 1024 * 1024;
-const TEN_GB = 10 * 1024 * 1024;
+const ONE_GB = 1 * 1024 * 1024 * 1024;
+const TEN_GB = 10 * 1024 * 1024 * 1024;
 const FIVE_MIN_MS = 5 * 60 * 1000;
 const TWENTY_MIN_MS = 20 * 60 * 1000;
 
