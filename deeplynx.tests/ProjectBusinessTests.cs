@@ -85,7 +85,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
     }
 
     #region GetProjectStats Tests
@@ -611,6 +611,32 @@ public class ProjectBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetAllProjects_OrgAdmin_ReturnsAllOrganizationProjects()
+    {
+        // Arrange - LonelyUser is only a member of Lone Project, but org admin should see the whole org.
+        Context.OrganizationUsers.Add(new OrganizationUser
+        {
+            OrganizationId = oid,
+            UserId = uid3,
+            IsOrgAdmin = true
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var listForOrgAdmin = (await _projectBusiness.GetAllProjects(uid3, oid)).ToList();
+
+        // Assert
+        Assert.NotNull(listForOrgAdmin);
+        Assert.NotEmpty(listForOrgAdmin);
+        Assert.Equal(4, listForOrgAdmin.Count);
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Test Project");
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Other Project");
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Lone Project");
+        Assert.Contains(listForOrgAdmin, p => p.Name == "Other Project 2");
+        Assert.DoesNotContain(listForOrgAdmin, p => p.Name == "Archived Project");
+    }
+
+    [Fact]
     public async Task GetAllProjects_SysAdmin_IncludesArchivedWhenSpecified()
     {
         // Arrange - Mark TestUser as sys admin
@@ -973,6 +999,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotEmpty(members);
         Assert.Single(members);
+        Assert.All(members, m => Assert.Equal("user", m.Type));
         Assert.Contains(members, m => m.Name == "Test User" && m.Email == "test@example.com" && m.Role == "Test Role");
     }
 
@@ -986,7 +1013,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotEmpty(members);
         Assert.Single(members);
-        Assert.All(members, m => Assert.Empty(m.Email)); // All should have empty emails (groups only)
+        Assert.All(members, m => Assert.Equal("group", m.Type));
         Assert.Contains(members, m => m.Name == "Test Group" && m.Email == string.Empty && m.Role == "Test Role");
     }
 
@@ -1010,6 +1037,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Verify mix of emails (users have emails, groups don't)
         var usersWithEmails = members.Where(m => !string.IsNullOrEmpty(m.Email)).ToList();
         var groupsWithoutEmails = members.Where(m => string.IsNullOrEmpty(m.Email)).ToList();
+        Assert.All(usersWithEmails, m => Assert.Equal("user", m.Type));
+        Assert.All(groupsWithoutEmails, m => Assert.Equal("group", m.Type));
         Assert.Single(usersWithEmails);
         Assert.Single(groupsWithoutEmails);
     }

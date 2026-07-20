@@ -16,6 +16,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organizations/{organizationId:long}/storages")]
 [Authorize]
+[ForbidServiceAccounts]
 [Tags("Organization - Object Storage")]
 public class ObjectStorageOrganizationController : ControllerBase
 {

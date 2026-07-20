@@ -5,23 +5,12 @@
  *
  * This is the primary client component for the cross-project record browser.
  * It is responsible for:
- *  1. Fetching records from the API when the user changes the project selection.
- *  2. Running full-text search when the user enters search terms.
- *  3. Applying local facet filters (status, class, tags) on top of the fetched
- *     data without triggering additional API calls.
- *  4. Paginating the filtered result set client-side.
+ *  1. Keeping project/search/filter/page state in sync with the UI.
+ *  2. Sending that state to the advanced paginated records endpoint.
+ *  3. Rendering the single page of records returned by the API.
  *
- * Data flow overview:
- *   API fetch (project change) → tableData
- *   Full-text search           → tableData  (replaces browse results)
- *   Project scope filter       → projectScopedRecords  (subset of tableData)
- *   Facet filters              → scopedRecords          (subset of projectScopedRecords)
- *   Pagination                 → currentRecords         (one page of scopedRecords)
- *
- * The two-stage scoping (projectScopedRecords then scopedRecords) exists
- * because search results arrive pre-scoped from the API while browse results
- * may contain records for all projects and need to be re-filtered when the
- * dropdown selection changes client-side.
+ * Record filtering and pagination are intentionally server-side. tableData is
+ * only the current API page, not a full in-memory catalog result set.
  */
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -31,10 +20,7 @@ import SearchBar from "@/app/(home)/components/SearchBar";
 import { RecordTableRow } from "@/app/(home)/types/types";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import {
-  fullTextSearch,
-  getMultiProjectRecords,
-} from "@/app/lib/client_service/query_services.client";
+import { queryBuilderPaginated } from "@/app/lib/client_service/query_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
 import { QueryRecordViewResponseDto } from "@/app/(home)/types/responseDTOs";
 import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
@@ -47,18 +33,68 @@ import {
 } from "@heroicons/react/24/outline";
 
 import ActiveFiltersBar from "./components/ActiveFiltersBar";
-import FilterSidebar, {
-  RecordStatusFilter,
-} from "./components/FilterSidebar";
+import FilterSidebar, { RecordStatusFilter } from "./components/FilterSidebar";
 import RecordCard from "./components/RecordCard";
 import ManageTagsCard from "./components/ManageTagsCard";
-import { countFacet, parseRecordTags } from "./components/utils";
+import { parseRecordTags } from "./components/utils";
 
 import {
   bulkAttachTagsToRecords,
   bulkUnattachTagsFromRecords,
 } from "@/app/lib/client_service/record_services.client";
 import Skeleton from "react-loading-skeleton";
+import { CustomQueryRequestDto } from "../../types/requestDTOs";
+import { getAllClassesOrg } from "@/app/lib/client_service/class_services.client";
+
+type BuildRecordQueryFiltersParams = {
+  statusFilter: RecordStatusFilter;
+  selectedClassFilters: string[];
+  selectedTagFilters: string[];
+  selectedUpdatedByFilters: string[];
+};
+
+function appendQueryGroup(
+  filters: CustomQueryRequestDto[],
+  filterName: string,
+  values: string[],
+  operator: string = "=",
+) {
+  values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .forEach((value, index) => {
+      filters.push({
+        connector: filters.length === 0 ? "" : index === 0 ? "AND" : "OR",
+        filter: filterName,
+        operator,
+        value,
+      });
+    });
+}
+
+function buildRecordQueryFilters({
+  statusFilter,
+  selectedClassFilters,
+  selectedTagFilters,
+  selectedUpdatedByFilters,
+}: BuildRecordQueryFiltersParams): CustomQueryRequestDto[] {
+  const filters: CustomQueryRequestDto[] = [];
+
+  if (statusFilter !== "all") {
+    filters.push({
+      connector: "",
+      filter: "is_archived",
+      operator: "=",
+      value: statusFilter === "archived" ? "true" : "false",
+    });
+  }
+
+  appendQueryGroup(filters, "class_name", selectedClassFilters);
+  appendQueryGroup(filters, "tags", selectedTagFilters);
+  appendQueryGroup(filters, "last_updated_by", selectedUpdatedByFilters);
+
+  return filters;
+}
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
 type Props = {
@@ -68,13 +104,11 @@ type Props = {
   initialSelectedProjects: string[];
   /** Search term pre-populated from the URL query string on the server. */
   initialSearchTerm: string;
-  /** Records fetched server-side for the initial render to avoid a loading flash. */
-  initialRecords: RecordTableRow[];
 };
 
 /**
  * Represents how a tag applies across the currently selected records.
- * 
+ *
  * checked - Every selected record already has the tag, or the tag is pending attach
  * unchecked - No selected records have the tag, or the tag is pending unattach
  * indeterminate - Only some selected records currently have the tag
@@ -83,7 +117,7 @@ type BulkTagState = "checked" | "unchecked" | "indeterminate";
 
 /**
  * Tag returned for the current project scope.
- * 
+ *
  * projectId is null for organization-level tags.
  * projectId is set when the tag belongs to a specific project.
  */
@@ -91,7 +125,7 @@ type AvailableTag = {
   id: number;
   name: string;
   projectId: number | null;
-}
+};
 
 /** Number of records shown per page in the paginated list. */
 const RECORDS_PER_PAGE = 12;
@@ -105,7 +139,6 @@ export default function DataCatalogClient({
   initialProjects,
   initialSelectedProjects,
   initialSearchTerm,
-  initialRecords,
 }: Props) {
   const { t } = useLanguage();
   const router = useRouter();
@@ -121,10 +154,8 @@ export default function DataCatalogClient({
     initialSelectedProjects,
   );
 
-  // tableData is the raw result from the most recent API call (browse or search).
-  const [tableData, setTableData] = useState<RecordTableRow[]>(
-    initialRecords ?? [],
-  );
+  // tableData is the current page returned by the server-side paginated query.
+  const [tableData, setTableData] = useState<RecordTableRow[]>([]);
 
   // searchTerm is the live value of the search input field.
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
@@ -146,11 +177,20 @@ export default function DataCatalogClient({
   const [nextFilterId, setNextFilterId] = useState(1);
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(RECORDS_PER_PAGE);
+  const [totalCount, setTotalCount] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [hasPreviousPage, setHasPreviousPage] = useState(false);
+  const [hasNextPage, setHasNextPage] = useState(false);
 
   // Facet filter state — all local, no API calls.
-  const [selectedClassFilters, setSelectedClassFilters] = useState<string[]>([]);
+  const [selectedClassFilters, setSelectedClassFilters] = useState<string[]>(
+    [],
+  );
   const [selectedTagFilters, setSelectedTagFilters] = useState<string[]>([]);
-  const [selectedUpdatedByFilters, setSelectedUpdatedByFilters] = useState<string[]>([]);
+  const [selectedUpdatedByFilters, setSelectedUpdatedByFilters] = useState<
+    string[]
+  >([]);
   const [statusFilter, setStatusFilter] = useState<RecordStatusFilter>("all");
 
   // Local search queries inside the facet sidebar (filter the list of options,
@@ -160,9 +200,9 @@ export default function DataCatalogClient({
 
   /**
    * Bulk tag management state.
-   * 
+   *
    * selectedRecordKeys stores selected records as `${projectId}-${recordId}`, so selections remain unique.
-   * 
+   *
    * tagsToAttach and tagsToUnattach store pending tag IDs only. Actual API call happens when the user clicks apply.
    */
   const [selectedRecordKeys, setSelectedRecordKeys] = useState<string[]>([]);
@@ -172,6 +212,7 @@ export default function DataCatalogClient({
   const [isApplyingBulkTags, setIsApplyingBulkTags] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [availableTags, setAvailableTags] = useState<AvailableTag[]>([]);
+  const [availableClassNames, setAvailableClassNames] = useState<string[]>([]);
 
   /**
    * Guard ref that prevents the initial URL search term from being re-submitted
@@ -179,9 +220,9 @@ export default function DataCatalogClient({
    * storing the applied term does not itself trigger a re-render.
    */
   const initialSearchAppliedRef = useRef<string | null>(null);
-  const [isInitialSearchPending, setIsInitialSearchPending] = useState(
-    !!initialSearchTerm,
-  );
+  const [isInitialSearchPending, setIsInitialSearchPending] =
+    useState(!!initialSearchTerm);
+
   // Pre-compute lowercase search terms once for use in getHighlightedContent
   // across all record cards, avoiding repeated toLowerCase calls per field.
   const activeSearchTerms = useMemo(
@@ -199,6 +240,35 @@ export default function DataCatalogClient({
   const selectedProjectsToken = useMemo(
     () => selectedProjects.join("|"),
     [selectedProjects],
+  );
+
+  const submittedSearchText = useMemo(
+    () =>
+      activeFilters
+        .map((filter) => filter.term)
+        .join(" ")
+        .trim(),
+    [activeFilters],
+  );
+
+  const recordsQueryToken = useMemo(
+    () =>
+      JSON.stringify({
+        selectedProjectsToken,
+        submittedSearchText,
+        selectedClassFilters,
+        selectedTagFilters,
+        selectedUpdatedByFilters,
+        statusFilter,
+      }),
+    [
+      selectedProjectsToken,
+      submittedSearchText,
+      selectedClassFilters,
+      selectedTagFilters,
+      selectedUpdatedByFilters,
+      statusFilter,
+    ],
   );
 
   /**
@@ -226,26 +296,9 @@ export default function DataCatalogClient({
     return selectedProjects.map(String);
   }, [projects, selectedProjects]);
 
-  /**
-   * Fetches all records for the currently selected projects and stores them
-   * in tableData. Used for browse mode (no active search terms). Does not
-   * accept a search term — search results come from runSearchTerms instead.
-   */
-  const fetchRecordsForSelection = useCallback(async () => {
-    setLoading(true);
-    const idsNum = effectiveProjectIds.map(Number).filter(Number.isFinite);
-    if (idsNum.length === 0) {
-      setTableData([]);
-      setLoading(false);
-      return;
-    }
-    const data = await getMultiProjectRecords(
-      organization?.organizationId as number,
-      idsNum,
-      false, // archived records will be marked as archived
-    );
-
-    const transformedData: RecordTableRow[] = data.map((record) => ({
+  const transformRecord = useCallback(
+    (record: QueryRecordViewResponseDto): RecordTableRow => ({
+      ...record,
       id: record.id || 0,
       name: record.name,
       description: record.description ?? undefined,
@@ -258,24 +311,111 @@ export default function DataCatalogClient({
       classId: record.classId ?? undefined,
       className: record.className ?? undefined,
       dataSourceId: record.dataSourceId ?? undefined,
-      dataSourceName: "",
+      dataSourceName: record.dataSourceName ?? "",
       projectId: record.projectId ?? undefined,
-      // Resolve project name locally from the projects list since the API
-      // does not include it in the list endpoint response.
       projectName:
-        projects.find((p) => Number(p.id) === record.projectId)?.name || "",
+        record.projectName ??
+        projects.find((p) => Number(p.id) === record.projectId)?.name ??
+        "",
       tags:
         typeof record.tags === "string"
           ? record.tags
           : JSON.stringify(record.tags),
+      labels:
+        typeof record.labels === "string"
+          ? record.labels
+          : JSON.stringify(record.labels),
       lastUpdatedAt: record.lastUpdatedAt || "",
       lastUpdatedBy: record.lastUpdatedBy ?? undefined,
       isArchived: record.isArchived || false,
-      fileType: "",
-    }));
-    setTableData(transformedData);
-    setLoading(false);
-  }, [effectiveProjectIds, organization?.organizationId, projects]);
+      fileType: record.fileType ?? "",
+      fileSize: record.fileSize ?? undefined,
+      archivedAt: record.isArchived ? (record.lastUpdatedAt ?? null) : null,
+      timeseries: undefined,
+      select: false,
+      associatedRecords: undefined,
+    }),
+    [projects],
+  );
+
+  const requestIdRef = useRef(0);
+
+  /**
+   * Fetches a single page using server-side project, text search, facet filter,
+   * and pagination state.
+   */
+  const fetchRecordsPage = useCallback(
+    async (pageNumber = currentPage) => {
+      if (!organization?.organizationId) return;
+
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
+      setLoading(true);
+
+      const idsNum = effectiveProjectIds.map(Number).filter(Number.isFinite);
+      const queryFilters = buildRecordQueryFilters({
+        statusFilter,
+        selectedClassFilters,
+        selectedTagFilters,
+        selectedUpdatedByFilters,
+      });
+
+      if (idsNum.length === 0) {
+        setTableData([]);
+        setTotalCount(0);
+        setServerTotalPages(1);
+        setHasPreviousPage(false);
+        setHasNextPage(false);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const result = await queryBuilderPaginated(
+          Number(organization.organizationId),
+          queryFilters,
+          idsNum,
+          pageNumber,
+          pageSize,
+          submittedSearchText || null,
+        );
+
+        if (requestId !== requestIdRef.current) return;
+
+        setTableData(result.items.map(transformRecord));
+        setCurrentPage(result.pageNumber);
+        setTotalCount(result.totalCount);
+        setServerTotalPages(Math.max(1, result.totalPages));
+        setHasPreviousPage(result.hasPrevious);
+        setHasNextPage(result.hasNext);
+      } catch (error) {
+        if (requestId !== requestIdRef.current) return;
+
+        console.error("Failed to fetch records page:", error);
+        setTableData([]);
+        setTotalCount(0);
+        setServerTotalPages(1);
+        setHasPreviousPage(false);
+        setHasNextPage(false);
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [
+      currentPage,
+      effectiveProjectIds,
+      organization?.organizationId,
+      pageSize,
+      selectedClassFilters,
+      selectedTagFilters,
+      selectedUpdatedByFilters,
+      statusFilter,
+      submittedSearchText,
+      transformRecord,
+    ],
+  );
 
   /**
    * Removes the `search` query parameter from the URL so that a page refresh
@@ -292,87 +432,9 @@ export default function DataCatalogClient({
   const clearAllFilters = useCallback(() => {
     setActiveFilters([]);
     setSearchTerm("");
+    setCurrentPage(1);
     clearSearchQueryFromUrl();
-
-    fetchRecordsForSelection().catch((e: unknown) => {
-      console.error("Clear all fetch failed:", e);
-    });
-  }, [clearSearchQueryFromUrl, fetchRecordsForSelection]);
-
-  /**
-   * Executes a full-text search for each unique term and merges the results
-   * into a single deduplicated list keyed by `projectId-id`.
-   *
-   * Deduplication is needed because multiple search terms may return the same
-   * record. We want to show it once, not once per matching term.
-   *
-   * If terms is empty, falls back to fetchRecordsForSelection so that removing
-   * the last active filter restores the full browse view automatically.
-   *
-   * Results are scoped to the currently selected projects when search returns
-   * records from all projects in the organisation.
-   */
-  const runSearchTerms = useCallback(
-    async (terms: string[]) => {
-      const uniqueTerms = Array.from(
-        new Set(terms.map((term) => term.trim()).filter(Boolean)),
-      );
-
-      if (uniqueTerms.length === 0) {
-        await fetchRecordsForSelection();
-        return;
-      }
-
-      const searchResults = await Promise.all(
-        uniqueTerms.map((term) =>
-          fullTextSearch(
-            organization?.organizationId as number,
-            term,
-            projects.map((p) => Number(p.id)),
-            false // keep archived ones showing, but will be flagged as archived
-          ),
-        ),
-      );
-
-      const recordsByKey = new Map<string, RecordTableRow>();
-
-      searchResults.flat().forEach((dto: QueryRecordViewResponseDto) => {
-        const record: RecordTableRow = {
-          ...dto,
-          fileType: "",
-          timeseries: undefined,
-          fileSize: undefined,
-          select: false,
-          associatedRecords: undefined,
-          // archivedAt is not a dedicated API field; we derive it from
-          // lastUpdatedAt when the record is marked archived.
-          archivedAt: dto.isArchived ? dto.lastUpdatedAt : null,
-        };
-
-        recordsByKey.set(`${record.projectId ?? "none"}-${record.id}`, record);
-      });
-
-      const selectedNums = effectiveProjectIds.map(Number);
-      const convertedResults = Array.from(recordsByKey.values());
-
-      // When all projects are selected we skip the filter — no point iterating
-      // a potentially large list just to confirm everything passes.
-      const scoped =
-        selectedNums.length === projects.length
-          ? convertedResults
-          : convertedResults.filter((record) =>
-            selectedNums.includes(Number(record.projectId)),
-          );
-
-      setTableData(scoped);
-    },
-    [
-      effectiveProjectIds,
-      fetchRecordsForSelection,
-      organization?.organizationId,
-      projects,
-    ],
-  );
+  }, [clearSearchQueryFromUrl]);
 
   /**
    * Removes a single search filter by id, re-runs the search with the
@@ -388,14 +450,9 @@ export default function DataCatalogClient({
         setSearchTerm("");
         clearSearchQueryFromUrl();
       }
-
-      runSearchTerms(nextFilters.map((filter) => filter.term)).catch(
-        (e: unknown) => {
-          console.error("Fetch after filter removal failed:", e);
-        },
-      );
+      setCurrentPage(1);
     },
-    [activeFilters, clearSearchQueryFromUrl, runSearchTerms],
+    [activeFilters, clearSearchQueryFromUrl],
   );
 
   /**
@@ -418,12 +475,12 @@ export default function DataCatalogClient({
       const newFilter = { id: nextFilterId, term: trimmed };
       const nextFilters = [...activeFilters, newFilter];
 
-      await runSearchTerms(nextFilters.map((filter) => filter.term));
       setActiveFilters(nextFilters);
       setNextFilterId((n) => n + 1);
       setSearchTerm("");
+      setCurrentPage(1);
     },
-    [activeFilters, nextFilterId, runSearchTerms],
+    [activeFilters, nextFilterId],
   );
 
   /**
@@ -447,48 +504,50 @@ export default function DataCatalogClient({
     });
   }, [hasLoaded, initialSearchTerm, handleSearch]);
 
-  /**
-   * Re-fetch records whenever the project dropdown selection changes.
-   * Search takes precedence: if there are active search filters we do NOT
-   * re-fetch here because runSearchTerms already scopes its results to the
-   * currently selected projects via effectiveProjectIds.
-   */
+  const lastRecordsQueryTokenRef = useRef(recordsQueryToken);
+
+  /** Fetch records whenever server-side query state changes. */
   useEffect(() => {
     if (!hasLoaded) return;
-    if (isInitialSearchPending) return; // ← now correctly blocks until search resolves
-    if (activeFilters.length > 0) return;
+    if (isInitialSearchPending) return;
 
-    fetchRecordsForSelection().catch((e: unknown) => {
-      console.error("Fetch on selection change failed:", e);
+    if (lastRecordsQueryTokenRef.current !== recordsQueryToken) {
+      lastRecordsQueryTokenRef.current = recordsQueryToken;
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+        return;
+      }
+    }
+
+    fetchRecordsPage().catch((e: unknown) => {
+      console.error("Fetch records page failed:", e);
     });
   }, [
     hasLoaded,
-    activeFilters.length,
-    selectedProjectsToken,
-    fetchRecordsForSelection,
+    currentPage,
+    recordsQueryToken,
+    fetchRecordsPage,
     isInitialSearchPending,
   ]);
 
-  /**
-   * Fetches tags available to the current project scope.
-   * 
-   * The organization tag endpoint returns organization-level tags by default.
-   * When projectIds are provided, it also includes tags scoped to those projects.
-   */
+  /** Fetches class/tag metadata available to the current project scope. */
   useEffect(() => {
     if (!hasLoaded) return;
     if (!organization?.organizationId) return;
 
-    const fetchTagsForProjectScope = async () => {
+    const fetchMetadataForProjectScope = async () => {
       const organizationId = Number(organization.organizationId);
       const projectIds = effectiveProjectIds
         .map(Number)
         .filter(Number.isFinite);
 
-      const tags = await getAllTagsOrg(
-        organizationId,
-        projectIds,
-        true,
+      const [classes, tags] = await Promise.all([
+        getAllClassesOrg(organizationId, projectIds, true),
+        getAllTagsOrg(organizationId, projectIds, true),
+      ]);
+
+      setAvailableClassNames(
+        Array.from(new Set(classes.map((item) => item.name).filter(Boolean))),
       );
 
       setAvailableTags(
@@ -500,8 +559,8 @@ export default function DataCatalogClient({
       );
     };
 
-    fetchTagsForProjectScope().catch((error) => {
-      console.error("Failed to fetch available tags:", error);
+    fetchMetadataForProjectScope().catch((error) => {
+      console.error("Failed to fetch available record metadata:", error);
     });
   }, [hasLoaded, organization?.organizationId, selectedProjectsToken]);
 
@@ -509,7 +568,6 @@ export default function DataCatalogClient({
   const handleSubmit = useCallback(
     async ({ query }: { query: string }) => {
       try {
-        console.log("query from bar", query)
         await handleSearch(query);
       } catch (error) {
         console.error("Failed to send query", error);
@@ -520,42 +578,14 @@ export default function DataCatalogClient({
 
   /* ─── Derived data ──────────────────────────────────────────────────────── */
 
-  /**
-   * First stage of filtering: constrain tableData to the selected projects.
-   * This is a no-op when all projects are selected (returns tableData as-is)
-   * to avoid an unnecessary array allocation on every render.
-   */
-  const projectScopedRecords = useMemo(() => {
-    if (effectiveProjectIds.length === projects.length) return tableData;
-    // console.log("table data", tableData)
-
-    const selected = new Set(effectiveProjectIds.map(Number));
-    return tableData.filter(
-      (record) =>
-        record.projectId !== undefined &&
-        selected.has(Number(record.projectId)),
-    );
-  }, [effectiveProjectIds, projects.length, tableData]);
-
-  // Build facet option lists from the project-scoped records before applying
-  // any facet filters. This keeps sidebar counts accurate regardless of which
-  // filters are active.
   const classFacetOptions = useMemo(
-    () =>
-      countFacet(
-        projectScopedRecords.map(
-          (record) => record.className || t.translations.NO_CLASS,
-        ),
-      ),
-    [projectScopedRecords, t.translations.NO_CLASS],
+    () => availableClassNames.map((label) => ({ label })),
+    [availableClassNames],
   );
 
   const tagFacetOptions = useMemo(
-    () =>
-      countFacet(
-        projectScopedRecords.flatMap((record) => parseRecordTags(record.tags)),
-      ),
-    [projectScopedRecords],
+    () => availableTags.map((tag) => ({ label: tag.name })),
+    [availableTags],
   );
 
   // Filter and cap the facet option lists based on the sidebar search queries.
@@ -579,70 +609,14 @@ export default function DataCatalogClient({
     [tagFacetOptions, tagFacetQuery],
   );
 
-  /**
-   * Second stage of filtering: apply all active sidebar facet filters to the
-   * project-scoped records. All filters within a group are AND-combined across
-   * groups (a record must pass every group's condition), but within the tag
-   * group OR semantics apply (a record only needs one matching tag).
-   */
-  const scopedRecords = useMemo(() => {
-    return projectScopedRecords.filter((record) => {
-      const className = record.className || t.translations.NO_CLASS;
-      const tags = parseRecordTags(record.tags);
-      const updatedBy = record.lastUpdatedBy || "Unknown";
-      if (
-        selectedClassFilters.length > 0 &&
-        !selectedClassFilters.includes(className)
-      ) {
-        return false;
-      }
-
-      // Tag filter uses OR: record is included if it has ANY of the selected tags.
-      if (
-        selectedTagFilters.length > 0 &&
-        !selectedTagFilters.some((tag) => tags.includes(tag))
-      ) {
-        return false;
-      }
-
-      if (
-        selectedUpdatedByFilters.length > 0 &&
-        !selectedUpdatedByFilters.includes(String(updatedBy))
-      ) {
-        return false;
-      }
-
-      if (statusFilter === "active" && record.isArchived) return false;
-      if (statusFilter === "archived" && !record.isArchived) return false;
-
-      return true;
-    });
-  }, [
-    projectScopedRecords,
-    selectedClassFilters,
-    selectedTagFilters,
-    selectedUpdatedByFilters,
-    statusFilter,
-    t.translations.NO_CLASS,
-  ]);
-
   /* ─── Pagination ────────────────────────────────────────────────────────── */
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(scopedRecords.length / RECORDS_PER_PAGE),
-  );
-  const firstRecordIndex = (currentPage - 1) * RECORDS_PER_PAGE;
-  const currentRecords = scopedRecords.slice(
-    firstRecordIndex,
-    firstRecordIndex + RECORDS_PER_PAGE,
-  );
+  const totalPages = serverTotalPages;
+  const currentRecords = tableData;
   const selectedRecords = useMemo(() => {
     const selected = new Set(selectedRecordKeys);
 
-    return tableData.filter((record) =>
-      selected.has(getRecordKey(record)),
-    );
+    return tableData.filter((record) => selected.has(getRecordKey(record)));
   }, [getRecordKey, tableData, selectedRecordKeys]);
   const visibleAvailableTags = useMemo(() => {
     if (effectiveProjectIds.length === 1) {
@@ -655,20 +629,10 @@ export default function DataCatalogClient({
     return availableTags.filter((tag) => tag.projectId === null);
   }, [availableTags, effectiveProjectIds]);
   const selectedRecordCount = selectedRecords.length;
-  const hasPendingBulkTagChanges = tagsToAttach.length > 0 || tagsToUnattach.length > 0;
-  const pageStart = scopedRecords.length === 0 ? 0 : firstRecordIndex + 1;
-  const pageEnd = Math.min(
-    firstRecordIndex + RECORDS_PER_PAGE,
-    scopedRecords.length,
-  );
-
-  // Derive stats from the final filtered set for the summary badges.
-  const catalogStats = useMemo(() => {
-    const archivedCount = scopedRecords.filter(
-      (record) => record.isArchived,
-    ).length;
-    return { archivedCount };
-  }, [scopedRecords]);
+  const hasPendingBulkTagChanges =
+    tagsToAttach.length > 0 || tagsToUnattach.length > 0;
+  const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const pageEnd = Math.min(currentPage * pageSize, totalCount);
 
   // Total number of active facet selections, used to show/hide the "Clear" button.
   const activeFacetCount =
@@ -710,7 +674,7 @@ export default function DataCatalogClient({
 
   /**
    * Calculates the visual checkbox state for a tag across selected records.
-   * 
+   *
    * Checked tags are marked for unattach. Unchecked or indeterminate tags are
    * marked for attach so all selected records will receive the tag on Apply.
    */
@@ -749,7 +713,7 @@ export default function DataCatalogClient({
 
   /**
    * Tracks pending bulk tag changes.
-   * 
+   *
    * Pending attach/unattach changes are checked first so the UI immediately
    * reflects what will happen on apply, even before the records are refreshed.
    */
@@ -806,54 +770,47 @@ export default function DataCatalogClient({
       });
 
       await Promise.all(
-        Array.from(recordsByProject.entries()).flatMap(([projectId, records]) => {
-          const requests: Promise<unknown>[] = [];
+        Array.from(recordsByProject.entries()).flatMap(
+          ([projectId, records]) => {
+            const requests: Promise<unknown>[] = [];
 
-          // API expects one record/tag pair per operation, using keys.
-          const attachDtos = records.flatMap((record) =>
-            tagsToAttach.map((tagId) => ({
-              record_id: Number(record.id),
-              tag_id: tagId,
-            })),
-          );
-
-          const unattachDtos = records.flatMap((record) =>
-            tagsToUnattach.map((tagId) => ({
-              record_id: Number(record.id),
-              tag_id: tagId,
-            })),
-          );
-
-          if (attachDtos.length > 0) {
-            requests.push(
-              bulkAttachTagsToRecords(
-                organizationId,
-                projectId,
-                attachDtos,
-              ),
+            // API expects one record/tag pair per operation, using keys.
+            const attachDtos = records.flatMap((record) =>
+              tagsToAttach.map((tagId) => ({
+                record_id: Number(record.id),
+                tag_id: tagId,
+              })),
             );
-          }
 
-          if (unattachDtos.length > 0) {
-            requests.push(
-              bulkUnattachTagsFromRecords(
-                organizationId,
-                projectId,
-                unattachDtos,
-              ),
+            const unattachDtos = records.flatMap((record) =>
+              tagsToUnattach.map((tagId) => ({
+                record_id: Number(record.id),
+                tag_id: tagId,
+              })),
             );
-          }
 
-          return requests;
-        }),
+            if (attachDtos.length > 0) {
+              requests.push(
+                bulkAttachTagsToRecords(organizationId, projectId, attachDtos),
+              );
+            }
+
+            if (unattachDtos.length > 0) {
+              requests.push(
+                bulkUnattachTagsFromRecords(
+                  organizationId,
+                  projectId,
+                  unattachDtos,
+                ),
+              );
+            }
+
+            return requests;
+          },
+        ),
       );
 
-      // Refresh whichever data mode the page is currently in.
-      if (activeFilters.length > 0) {
-        await runSearchTerms(activeFilters.map((filter) => filter.term));
-      } else {
-        await fetchRecordsForSelection();
-      }
+      await fetchRecordsPage();
 
       // Only clear selection and staged changes after every API request succeeds.
       handleCancelBulkTags();
@@ -863,12 +820,10 @@ export default function DataCatalogClient({
       setIsApplyingBulkTags(false);
     }
   }, [
-    activeFilters,
-    fetchRecordsForSelection,
+    fetchRecordsPage,
     handleCancelBulkTags,
     hasPendingBulkTagChanges,
     organization?.organizationId,
-    runSearchTerms,
     selectedRecords,
     tagsToAttach,
     tagsToUnattach,
@@ -883,20 +838,6 @@ export default function DataCatalogClient({
     setClassFacetQuery("");
     setTagFacetQuery("");
   }, []);
-
-  // Reset to page 1 whenever anything changes that could shrink the result set
-  // so the user is never left on a page that no longer exists.
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [
-    activeFilters.length,
-    selectedProjectsToken,
-    tableData.length,
-    selectedClassFilters,
-    selectedTagFilters,
-    selectedUpdatedByFilters,
-    statusFilter,
-  ]);
 
   // Clamp currentPage if totalPages shrinks below it (edge case when filters
   // reduce the result set to fewer pages than the user was on).
@@ -945,7 +886,7 @@ export default function DataCatalogClient({
               activeFilters={activeFilters}
               onRemoveFilter={handleRemoveFilter}
               onClearAll={clearAllFilters}
-              resultCount={scopedRecords.length}
+              resultCount={totalCount}
               showResultsMessage={activeFilters.length > 0}
               className="w-full lg:max-w-xl"
             />
@@ -958,7 +899,7 @@ export default function DataCatalogClient({
         {/* Result count and action badges */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-base-content/70">
-            {pageStart}-{pageEnd} {t.translations.OF} {scopedRecords.length}
+            {pageStart}-{pageEnd} {t.translations.OF} {totalCount}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -998,10 +939,10 @@ export default function DataCatalogClient({
                 {t.translations.CLEAR_SEARCH}
               </button>
             )}
-            {catalogStats.archivedCount > 0 && (
+            {statusFilter === "archived" && totalCount > 0 && (
               <span className="badge badge-warning badge-outline">
                 <ArchiveBoxIcon className="size-3" />
-                {catalogStats.archivedCount}
+                {totalCount}
               </span>
             )}
           </div>
@@ -1017,7 +958,6 @@ export default function DataCatalogClient({
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
           <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
             <FilterSidebar
-              projectScopedRecords={projectScopedRecords}
               statusFilter={statusFilter}
               onStatusFilterChange={setStatusFilter}
               selectedClassFilters={selectedClassFilters}
@@ -1050,38 +990,46 @@ export default function DataCatalogClient({
           {/* Record list */}
           <div className="min-w-0">
             {loading === true ? (
-              <div className="card border border-base-300/50 bg-base-100 shadow-sm p-1">
-                <ul className="list mt-0">
-                  {times(5).map((i) => (
-                    <li
+              <div className="divide-y divide-base-200 overflow-hidden rounded-box border border-base-300/50 bg-base-100 shadow-sm">
+                {times(6).map((i) => (
+                  <article
                       key={i}
-                      className="border-b border-base-200 hover:bg-base-200/30 p-2 pl-0 rounded-sm"
+                    className={`grid grid-cols-1 gap-3 p-4 ${
+                      isBulkMode
+                        ? "md:grid-cols-[auto_minmax(0,1fr)_auto]"
+                        : "md:grid-cols-[minmax(0,1fr)_auto]"
+                    }`}
                     >
-                      <div className="text-accent-content mb-1">
-                        <Skeleton width="55%" />
+                    {isBulkMode && (
+                      <div className="flex items-start pt-1">
+                        <Skeleton width={20} height={20} />
                       </div>
-                      <div className="text-sm text-base-300 space-x-2 flex flex-wrap items-center">
-                        <span>
-                          {t.translations.CLASS}{" "}
-                          <span className="badge badge-info badge-sm text-xs">
-                            <Skeleton width={60} />
-                          </span>
-                        </span>
-                        <span className="ml-4">
-                          {t.translations.LAST_EDIT} <Skeleton width={80} />
-                        </span>
-                        <span className="ml-4">
-                          {t.translations.PROJECT} <Skeleton width={120} />
-                        </span>
-                        <span className="ml-4">
-                          {t.translations.DATA_SOURCE} <Skeleton width={100} />
-                        </span>
+                    )}
+
+                    <div className="min-w-0">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <Skeleton width={54} height={24} />
+                        <Skeleton width={128} height={24} />
+                        {i % 4 === 0 && <Skeleton width={92} height={24} />}
                       </div>
-                    </li>
-                  ))}
-                </ul>
+                      <Skeleton height={20} width="48%" />
+                      <div className="mt-1">
+                        <Skeleton height={16} width="76%" />
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <Skeleton height={14} width={132} />
+                        <Skeleton height={14} width={156} />
+                        <Skeleton height={14} width={118} />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end">
+                      <Skeleton width={40} height={32} />
+                    </div>
+                  </article>
+                ))}
               </div>
-            ) : scopedRecords.length === 0 ? (
+            ) : currentRecords.length === 0 ? (
               <div className="card border border-base-300/50 bg-base-100 shadow-sm">
                 <div className="card-body items-center py-16 text-center">
                   <DocumentTextIcon className="size-12 text-base-content/30" />
@@ -1101,7 +1049,9 @@ export default function DataCatalogClient({
                     record={record}
                     activeSearchTerms={activeSearchTerms}
                     isBulkMode={isBulkMode}
-                    isSelected={selectedRecordKeys.includes(getRecordKey(record))}
+                    isSelected={selectedRecordKeys.includes(
+                      getRecordKey(record),
+                    )}
                     onToggleSelected={toggleRecordSelection}
                   />
                 ))}
@@ -1115,7 +1065,7 @@ export default function DataCatalogClient({
           <div className="join justify-end">
             <button
               className="btn join-item btn-sm"
-              disabled={currentPage === 1}
+              disabled={!hasPreviousPage}
               onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
             >
               <ChevronLeftIcon className="size-4" />
@@ -1126,7 +1076,7 @@ export default function DataCatalogClient({
             </button>
             <button
               className="btn join-item btn-sm"
-              disabled={currentPage === totalPages}
+              disabled={!hasNextPage}
               onClick={() =>
                 setCurrentPage((prev) => Math.min(totalPages, prev + 1))
               }

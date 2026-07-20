@@ -15,6 +15,7 @@ import {
 
 import AvatarCell from "../../components/Avatar";
 import { GroupResponseDto, UserResponseDto } from "../../types/responseDTOs";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -114,6 +115,7 @@ const GroupsTable: React.FC<GroupsTableProps> = ({
   onChangeMemberSearch,
   onArchiveGroup,
 }) => {
+  const { t } = useLanguage();
   return (
     <div className="rounded-lg shadow-xl overflow-hidden border-2 border-primary">
       <table className="table w-full">
@@ -129,9 +131,9 @@ const GroupsTable: React.FC<GroupsTableProps> = ({
                 onChange={onToggleSelectAll}
               />
             </th>
-            <th>Group Name</th>
-            <th>Description</th>
-            <th>Members</th>
+            <th>{t.translations.GROUP_NAME}</th>
+            <th>{t.translations.DESCRIPTION}</th>
+            <th>{t.translations.MEMBERS}</th>
             <th className="w-32">
               {selectedGroups.size > 0 && (
                 <button
@@ -140,7 +142,7 @@ const GroupsTable: React.FC<GroupsTableProps> = ({
                   disabled={loading}
                 >
                   <TrashIcon className="size-6" />
-                  Delete ({selectedGroups.size})
+                  {t.translations.DELETE} ({selectedGroups.size})
                 </button>
               )}
             </th>
@@ -151,7 +153,7 @@ const GroupsTable: React.FC<GroupsTableProps> = ({
           {groups.length === 0 ? (
             <tr>
               <td colSpan={6} className="text-center py-8 text-base-content/70">
-                No groups found. Create your first group to get started.
+                {t.translations.NO_GROUPS_FOUND_CREATE_FIRST_GROUP}
               </td>
             </tr>
           ) : (
@@ -230,6 +232,7 @@ const GroupRow: React.FC<GroupRowProps> = ({
   onChangeMemberSearch,
   onArchiveGroup,
 }) => {
+  const { t } = useLanguage();
   return (
     <>
       {/* Main Row */}
@@ -251,7 +254,7 @@ const GroupRow: React.FC<GroupRowProps> = ({
         </td>
         <td className="font-semibold">{group.name}</td>
         <td className="text-base-content/70">
-          {group.description || "No description"}
+          {group.description || t.translations.NO_DESCRIPTION}
         </td>
         <td>
           <div className="flex items-center gap-2">
@@ -303,14 +306,14 @@ const GroupRow: React.FC<GroupRowProps> = ({
               {isEditing ? (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-bold text-lg">Edit Group Details</h4>
+                    <h4 className="font-bold text-lg">  {t.translations.EDIT_GROUP_DETAILS}</h4>
                     <div className="flex gap-2">
                       <button
                         className="btn btn-sm btn-ghost"
                         onClick={onCancelEdit}
                         disabled={loading}
                       >
-                        Cancel
+                        {t.translations.CANCEL}
                       </button>
                       <button
                         className="btn btn-sm btn-primary"
@@ -322,7 +325,7 @@ const GroupRow: React.FC<GroupRowProps> = ({
                         ) : (
                           <>
                             <CheckIcon className="w-4 h-4" />
-                            Save Changes
+                            {t.translations.SAVE_CHANGES}
                           </>
                         )}
                       </button>
@@ -333,7 +336,7 @@ const GroupRow: React.FC<GroupRowProps> = ({
                     <div className="form-control">
                       <label className="label">
                         <span className="label-text font-semibold">
-                          Group Name
+                          {t.translations.GROUP_NAME}
                         </span>
                       </label>
                       <input
@@ -347,7 +350,7 @@ const GroupRow: React.FC<GroupRowProps> = ({
                     <div className="form-control">
                       <label className="label">
                         <span className="label-text font-semibold">
-                          Description
+                          {t.translations.DESCRIPTION}
                         </span>
                       </label>
                       <input
@@ -367,7 +370,7 @@ const GroupRow: React.FC<GroupRowProps> = ({
                   <div>
                     <h4 className="font-bold text-lg">{group.name}</h4>
                     <p className="text-base-content/70">
-                      {group.description || "No description"}
+                      {group.description || t.translations.NO_DESCRIPTION}
                     </p>
                   </div>
                   <button
@@ -376,13 +379,13 @@ const GroupRow: React.FC<GroupRowProps> = ({
                     disabled={loading}
                   >
                     <PencilIcon className="w-4 h-4" />
-                    Edit Details
+                    {t.translations.EDIT_DETAILS}
                   </button>
                 </div>
               )}
 
               {/* Member Management Section */}
-              <div className="divider my-4">Member Management</div>
+              <div className="divider my-4">{t.translations.MEMBER_MANAGEMENT}</div>
 
               {isLoadingMembers ? (
                 <div className="flex justify-center items-center py-8">
@@ -395,13 +398,13 @@ const GroupRow: React.FC<GroupRowProps> = ({
                     <div className="flex justify-between items-center mb-3">
                       <h5 className="font-semibold flex items-center gap-2">
                         <UserGroupIcon className="w-5 h-5" />
-                        Current Members ({currentMembers.length})
+                        {t.translations.CURRENT_MEMBERS} ({currentMembers.length})
                       </h5>
                     </div>
                     <div className="space-y-2 max-h-80 overflow-y-auto">
                       {currentMembers.length === 0 ? (
                         <div className="text-center py-4 text-base-content/60">
-                          No members in this group yet
+                          {t.translations.NO_MEMBERS_IN_THIS_GROUP_YET}
                         </div>
                       ) : (
                         currentMembers.map((user) => (
@@ -434,14 +437,14 @@ const GroupRow: React.FC<GroupRowProps> = ({
                   {/* Add Members */}
                   <div className="flex flex-col">
                     <div className="flex justify-between items-center mb-3">
-                      <h5 className="font-semibold">Add Members</h5>
+                      <h5 className="font-semibold">{t.translations.ADD_MEMBERS}</h5>
                     </div>
                     <div className="form-control mb-3">
                       <div className="input-group">
                         <span className="bg-base-300" />
                         <input
                           type="text"
-                          placeholder="Search users..."
+                          placeholder={t.translations.SEARCH_USERS}
                           className="input input-bordered w-full"
                           value={memberSearchTerm}
                           onChange={(e) => onChangeMemberSearch(e.target.value)}
@@ -452,8 +455,8 @@ const GroupRow: React.FC<GroupRowProps> = ({
                       {filteredAvailable.length === 0 ? (
                         <div className="text-center py-4 text-base-content/60">
                           {availableUsersForGroup.length === 0
-                            ? "All users are already in this group"
-                            : "No users found"}
+                            ? t.translations.ALL_USERS_ALREADY_IN_THIS_GROUP
+                            : t.translations.NO_USERS_FOUND}
                         </div>
                       ) : (
                         filteredAvailable.map((user) => (

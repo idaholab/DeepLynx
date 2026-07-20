@@ -12,7 +12,7 @@ export const formatLocalDateTime = (dateString: string): string => {
     day: "numeric",
     year: "numeric",
     hour: "numeric",
-    minute: "numeric",
+    minute: "2-digit",
     hour12: true,
     timeZoneName: "short",
   });

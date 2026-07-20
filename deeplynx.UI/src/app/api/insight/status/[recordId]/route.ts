@@ -45,12 +45,12 @@ export async function GET(
 
     if (!upstreamResponse.ok) {
       return NextResponse.json(
-        {
-          message: "Insight status check failed",
-          status: upstreamResponse.status,
-          details: upstreamResponseBody,
-        },
-        { status: upstreamResponse.status },
+          {
+            message: "Insight status check failed",
+            status: upstreamResponse.status,
+            details: upstreamResponseBody,
+          },
+          { status: upstreamResponse.status },
       );
     }
 

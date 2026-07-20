@@ -375,9 +375,10 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <param name="organizationId">The ID of the org to add the user to</param>
     /// <param name="userId">The ID of the user to add</param>
     /// <param name="isAdmin">Whether user should be org admin or not</param>
+    /// <param name="allowServiceAccounts">(Internal Use only) Allows service users to be added to an organization</param>
     /// <returns>False if user is already in org, True upon successfully adding user</returns>
     /// <exception cref="KeyNotFoundException">Returned if user or org does not exist</exception>
-    public async Task<bool> AddUserToOrganization(long organizationId, long userId, bool isAdmin = false)
+    public async Task<bool> AddUserToOrganization(long organizationId, long userId, bool isAdmin = false, bool allowServiceAccounts = false)
     {
         // check if the user is already in the organization
         var existingOrgUser = await _context.OrganizationUsers
@@ -391,7 +392,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             throw new KeyNotFoundException($"User with id {userId} not found");
 
         // service users are restricted to project scope. Cannot be added only to an org
-        if (user.AccountType == AccountType.Service)
+        if (user.AccountType == AccountType.Service && !allowServiceAccounts)
             throw new InvalidOperationException("Service accounts must be added directly to a project");
 
         var organization = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId);

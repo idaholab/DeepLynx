@@ -29,6 +29,7 @@ public class ProjectBusiness : IProjectBusiness
 
     private readonly ILogger<ProjectBusiness> _logger;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly INotificationBusiness _notificationBusiness;
     private readonly IOrganizationBusiness _organizationBusiness;
     private readonly IRoleBusiness _roleBusiness;
     private readonly TimeSpan cacheTTL = TimeSpan.FromHours(1);
@@ -41,6 +42,8 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="classBusiness">Used to create default classes automatically on project creation.</param>
     /// <param name="roleBusiness">Used to create default roles automatically on project creation.</param>
     /// <param name="dataSourceBusiness">Used to create a default datasource on project creation.</param>
+    /// <param name="notificationBusiness">The business logic interface for handling notification operations.</param>
+    /// <param name="organizationBusiness">The business logic interface for handling organization operations.</param>
     /// <param name="eventBusiness">Used for logging events during create and update Operations.</param>
     /// <param name="logger">Used for uniformity in logging</param>
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
@@ -48,13 +51,14 @@ public class ProjectBusiness : IProjectBusiness
         DeeplynxContext context, ILogger<ProjectBusiness> logger,
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
-        IOrganizationBusiness organizationBusiness)
+        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness)
     {
         _context = context;
         _logger = logger;
         _classBusiness = classBusiness;
         _roleBusiness = roleBusiness;
         _dataSourceBusiness = dataSourceBusiness;
+        _notificationBusiness = notificationBusiness;
         _objectStorageBusiness = objectStorageBusiness;
         _eventBusiness = eventBusiness;
         _organizationBusiness = organizationBusiness;
@@ -75,11 +79,16 @@ public class ProjectBusiness : IProjectBusiness
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null) throw new ArgumentException($"User with id {userId} not found.");
 
+        var isOrgAdmin = await _context.OrganizationUsers
+            .AnyAsync(ou => ou.UserId == userId
+                            && ou.OrganizationId == organizationId
+                            && ou.IsOrgAdmin);
+
         var projectQuery = _context.Projects
             .Where(p => p.OrganizationId == organizationId
                         && (!hideArchived || !p.IsArchived));
 
-        if (!user.IsSysAdmin)
+        if (!user.IsSysAdmin && !isOrgAdmin)
             projectQuery = projectQuery.Where(p =>
                 p.ProjectMembers.Any(pm =>
                     pm.UserId == userId ||
@@ -580,6 +589,7 @@ public class ProjectBusiness : IProjectBusiness
                 MemberId = pm.UserId,
                 Email = pm.User.Email,
                 Role = pm.Role.Name,
+                Type = "user",
                 RoleId = pm.Role.Id,
                 IsProjectAdmin = pm.IsProjectAdmin
             });
@@ -592,6 +602,7 @@ public class ProjectBusiness : IProjectBusiness
                 MemberId = pm.GroupId,
                 Email = string.Empty,
                 Role = pm.Role.Name,
+                Type = "group",
                 RoleId = pm.Role.Id,
                 IsProjectAdmin = pm.IsProjectAdmin
             });
@@ -633,7 +644,7 @@ public class ProjectBusiness : IProjectBusiness
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (userId.HasValue && (user == null || user.IsArchived))
             throw new KeyNotFoundException($"User with id {userId} not found");
-        
+
         // Service accounts cannot be invited to other projects. Limited to the project where they are created.
         if (userId.HasValue && user.AccountType == AccountType.Service && !allowServiceAccount)
             throw new InvalidOperationException("Service accounts cannot be added to a project directly. Use CreateAndAddServiceAccountToProject.");
@@ -662,6 +673,24 @@ public class ProjectBusiness : IProjectBusiness
 
         _context.ProjectMembers.Add(projMember);
         await _context.SaveChangesAsync();
+
+        if (userId.HasValue)
+        {
+            user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user != null)
+            {
+                try
+                {
+                    await _notificationBusiness!.SendEmail(user.Email, user.Name, false, null, projectId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to send notification email to user {user.Email} after adding to project {projectId}");
+                }
+
+                return true;
+            }
+        }
 
         return true;
     }
@@ -768,7 +797,7 @@ public class ProjectBusiness : IProjectBusiness
             throw new ArgumentException("One of either User ID or Group ID must be provided");
         if (userId.HasValue && groupId.HasValue)
             throw new ArgumentException("Please provide only one of User ID or Group ID, not both");
-        
+
         // Service Users should not exist without scope. Must Archive or Delete
         if (userId.HasValue)
         {
@@ -889,5 +918,4 @@ public class ProjectBusiness : IProjectBusiness
         // ===============================
         await AddMemberToProject(projectId, null, currentUserId, null, makeProjectAdmin: true);
     }
-} 
-
+}

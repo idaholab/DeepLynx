@@ -14,6 +14,7 @@ namespace deeplynx.api.Controllers;
 /// </remarks>
 [ApiController]
 [Route("organizations/{organizationId:long}/permissions")]
+[ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Organization - Permission")]
 public class PermissionOrganizationController : ControllerBase
 {
@@ -30,7 +31,7 @@ public class PermissionOrganizationController : ControllerBase
         _permissionBusiness = permissionBusiness;
         _logger = logger;
     }
-    
+
     /// <summary>
     ///     Get All Permissions 
     /// </summary>
@@ -49,7 +50,7 @@ public class PermissionOrganizationController : ControllerBase
         {
             var permissions =
                 await _permissionBusiness.GetAllPermissions(
-                    labelId, null, organizationId, hideArchived); 
+                    labelId, null, organizationId, hideArchived);
             return Ok(permissions);
         }
         catch (Exception exc)
