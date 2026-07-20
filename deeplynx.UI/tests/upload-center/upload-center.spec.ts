@@ -860,6 +860,7 @@ startxref
       }
     });
   });
+
   test.describe('Empty file upload', () => {
     const emptyFileName = 'empty-test-file.txt';
     let filePath: string;
@@ -910,6 +911,126 @@ startxref
       await expect(
         page.getByRole('link', { name: emptyFileName, exact: true }).first()
       ).not.toBeVisible();
+    });
+  });
+
+  test.describe("Upload bulk records", () => {
+    let filePath: string;
+
+    test.beforeEach(async ({ }) => {
+      // Create the file locally
+      filePath = path.join(os.tmpdir(), 'bulk-upload.csv');
+
+      const fileContent = [
+        'name (required),description (required),original_id (required),properties (required - JSON format),uri (optional),object_storage_id (optional),class_id (optional),class_name (optional),file_type (optional),tags (optional - comma-separated),sensitivity_labels (optional - comma-separated)',
+        'Bulk test 1,A test file for bulk upload testing,bt1,"{""created"":""June 2026"",""candy"":""smarties"",""color"":""red""}",,,,,txt,,',
+        'Bulk test 2,A test file for bulk upload testing,bt2,"{""created"":""July 2026"",""candy"":""M&Ms"",""color"":""yellow""}",,,,,pdf,,',
+        'Bulk test 3,A test file for bulk upload testing,bt3,"{""created"":""July 2026"",""candy"":""skittles"",""color"":""purple""}",,,,,docx,,',
+        'Bulk test 4,A test file for bulk upload testing,bt4,"{""created"":""July 2026"",""chips"":""takis"",""spice"":""extreme""}",,,,,txt,,',
+        'Bulk test 5,A test file for bulk upload testing,btS,"{""created"":""July 2026"",""cookies"":""oreos"",""type"":""birthday cake""}",,,,,json,,'
+      ].join('\n');
+
+      await fs.promises.writeFile(filePath, fileContent, 'utf8');
+    });
+
+    test.afterAll(async () => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+    test("uploads bulk records via a CSV", async ({ page }) => {
+      test.setTimeout(120_000); // buffer time
+      const start = Date.now();
+
+      // Upload the csv file
+      await page.getByText('Bulk Metadata').click();
+
+      await checkDataSourcesAndStorageDestinations({ page });
+
+      await page.getByRole('button', { name: 'Step 2: Upload Your CSV' }).click();
+      const fileInput = page.locator('input[type="file"]');
+      await fileInput.setInputFiles(filePath);
+      await expect(page.getByText('Validation Successful!')).toBeVisible();
+      await page.getByRole('button', { name: 'Upload 5 Records' }).click();
+      await page.getByRole('button', { name: 'Confirm Upload' }).click();
+      await expect(page.getByText('Successfully uploaded 5 Records!')).toBeVisible({
+        timeout: 60_000,
+      });
+
+      // Verify the new files appear
+      await page.locator("aside a", { hasText: "Project Dashboard" }).click();
+      await page.waitForURL(/\/project/);
+      await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+      await expect(page.getByText('Bulk test 1')).toBeVisible();
+      await expect(page.getByText('Bulk test 2')).toBeVisible();
+      await expect(page.getByText('Bulk test 3')).toBeVisible();
+      await expect(page.getByText('Bulk test 4')).toBeVisible();
+      await expect(page.getByText('Bulk test 5')).toBeVisible();
+
+      const elapsedMs = Date.now() - start;
+      expect(elapsedMs).toBeLessThan(120_000);
+
+    });
+  });
+
+  test.describe("Upload timeseries file", () => {
+    let filePath: string;
+
+    test.beforeEach(async () => {
+      // Create the file locally
+      filePath = path.join(os.tmpdir(), 'timeseries-test-file.csv');
+      const csvContent = 'Date, Candy Eaten\n20050101, 5\n20050102, 6\n20050103, 3\n20050104, 15\n20050105, 3\n20050106, 5\n20050107, 9\n20050108, 12\n20050109, 6\n20050110, 9\n20050111, 6\n20050112, 3\n20050113, 2';
+
+      if (!fs.existsSync(filePath)) {
+        await fs.promises.writeFile(filePath, csvContent, 'utf8');
+      }
+    });
+
+    test.afterAll(async () => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
+    test("uploads a timeseries file", async ({ page }) => {
+      test.setTimeout(120_000); // two minutes buffer time
+      const start = Date.now();
+
+      // Upload the files
+      await page.locator("aside a", { hasText: "Upload Center" }).click();
+      await page.waitForURL(/\/upload_center/);
+      await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
+
+      await checkDataSourcesAndStorageDestinations({ page });
+
+      await page.getByText('click to browse').click();
+      const fileInput = page.locator('input[type="file"]');
+      await fileInput.setInputFiles(filePath);
+      await page.getByRole('button', { name: 'Upload' }).click();
+      await expect(page.getByText('File uploaded successfully!')).toBeVisible({
+        timeout: 120_000,
+      });
+
+      // Navigate to Project Page
+      await page.locator("aside a", { hasText: "Project Dashboard" }).click();
+      await page.waitForURL(/\/project/);
+      await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+      await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
+      await page.getByText('timeseries-test-file').first().click();
+      await expect(page.getByText('Timeseries', { exact: true })).toBeVisible();
+
+      // Check that it shows up on the timeseries page
+      await page.locator("aside a", { hasText: "Timeseries Viewer" }).click();
+      await page.waitForURL(/\/timeseries_viewer/);
+      await expect(page.getByRole("heading", { name: "Timeseries Viewer" })).toBeVisible();
+      await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
+      await page.getByText('timeseries-test-file').first().click();
+
+      await expect(page.locator('canvas')).toBeVisible();
+      await expect(page.locator('span').filter({ hasText: 'timeseries-test-file' })).toBeVisible();
+
+      const elapsedMs = Date.now() - start;
+      expect(elapsedMs).toBeLessThan(60_000);
     });
   });
 });
