@@ -14,6 +14,8 @@ public class DataSourceBusiness : IDataSourceBusiness
 
     // dependants used to trigger downstream soft deletes
     private readonly IEdgeBusiness _edgeBusiness;
+    private readonly IProjectRolePermissionService _projectRolePermissionService;
+    private readonly IAdminService _adminService;
     private readonly IEventBusiness _eventBusiness;
     private readonly IRecordBusiness _recordBusiness;
 
@@ -24,45 +26,99 @@ public class DataSourceBusiness : IDataSourceBusiness
     /// <param name="edgeBusiness">Passed in context for downstream edge objects.</param>
     /// <param name="recordBusiness">Passed in context for downstream record objects.</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
+    /// <param name="projectRolePermissionService">Used to get permissions allowed for a user</param>
+    /// <param name="adminService">Used to check level the user is</param>
     public DataSourceBusiness(
         DeeplynxContext context,
         IEdgeBusiness edgeBusiness,
         IRecordBusiness recordBusiness,
-        IEventBusiness eventBusiness
+        IEventBusiness eventBusiness,
+        IProjectRolePermissionService projectRolePermissionService,
+        IAdminService adminService
     )
     {
         _context = context;
         _edgeBusiness = edgeBusiness;
         _recordBusiness = recordBusiness;
         _eventBusiness = eventBusiness;
+        _projectRolePermissionService = projectRolePermissionService;
+        _adminService = adminService;
     }
 
     /// <summary>
     ///     Retrieves all data sources for a specific organization or project.
     /// </summary>
     /// <param name="organizationId">The ID of the organization for which the data source belongs to</param>
+    /// <param name="currentUserId">The ID of the current user for which the data source belongs to</param>
     /// <param name="projectIds">ID's of the projects whose data sources are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result</param>
     /// <returns>A list of data sources within the given project.</returns>
     public async Task<List<DataSourceResponseDto>> GetAllDataSources(
+        long currentUserId,
         long organizationId,
         long[]? projectIds,
         bool hideArchived = true)
     {
-        var dsQuery = _context.DataSources
-            .Where(d => d.OrganizationId == organizationId);
+        var userProjectAdminStatus = new Dictionary<long, bool>();
 
-        // hide archived data sources
+        bool isSysAdmin = await _adminService.SysAdminCheck(currentUserId);
+        bool isOrgAdmin = await _adminService.OrgAdminCheck(currentUserId, organizationId);
+
+        if (projectIds != null && projectIds.Length > 0)
+        {
+            foreach (var projectId in projectIds)
+            {
+                var isProjectAdmin = await _context.ProjectMembers
+                    .AnyAsync(pm =>
+                        pm.ProjectId == projectId &&
+                        pm.IsProjectAdmin &&
+                        (
+                            (pm.UserId != null && pm.UserId == currentUserId) ||
+                            pm.Group!.Users.Any(u => u.Id == currentUserId)
+                        )
+                    );
+
+                userProjectAdminStatus[projectId] = isProjectAdmin;
+            }
+        }
+
+        // Determine authorized projects based on admin status or permissions
+        var authorizedProjectIds = new List<long>();
+        foreach (var projectId in projectIds ?? [])
+        {
+            if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId, false))
+            {
+                authorizedProjectIds.Add(projectId);
+                continue;
+            }
+
+            var hasPermission = await _projectRolePermissionService.PermissionInProject(
+                currentUserId, projectId, "read", "data_source");
+
+            if (hasPermission)
+                authorizedProjectIds.Add(projectId);
+        }
+
+        if (projectIds != null && authorizedProjectIds.Count == 0)
+        {
+            return [];
+        }
+
+        var dsQuery = _context.DataSources.Where(d => d.OrganizationId == organizationId);
+
         if (hideArchived)
             dsQuery = dsQuery.Where(d => !d.IsArchived);
 
-        // If project ids supplied, inherit org level data sources too 
-        if (projectIds is { Length: > 0 })
+        if (projectIds != null && projectIds.Length > 0)
+        {
             dsQuery = dsQuery.Where(d =>
-                (d.ProjectId.HasValue && projectIds.Contains(d.ProjectId.Value)) || d.ProjectId == null);
+                (d.ProjectId.HasValue && authorizedProjectIds.Contains(d.ProjectId.Value))
+                || d.ProjectId == null);
+        }
         else
-            // If no project ids, only org-level data sources
+        {
             dsQuery = dsQuery.Where(d => d.ProjectId == null);
+        }
 
         var dataSourceList = await dsQuery.ToListAsync();
 
@@ -76,9 +132,7 @@ public class DataSourceBusiness : IDataSourceBusiness
             Abbreviation = d.Abbreviation,
             Type = d.Type,
             BaseUri = d.BaseUri,
-            Config = string.IsNullOrEmpty(d.Config)
-                ? null
-                : JsonNode.Parse(d.Config) as JsonObject,
+            Config = string.IsNullOrEmpty(d.Config) ? null : JsonNode.Parse(d.Config) as JsonObject,
             ProjectId = d.ProjectId,
             LastUpdatedAt = d.LastUpdatedAt,
             LastUpdatedBy = d.LastUpdatedBy,

@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -27,6 +28,9 @@ public class ProjectBusinessTests : IntegrationTestBase
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
+    private IProjectRolePermissionService _permissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
+    private Mock<ILogger<ProjectRolePermissionService>> _logger = null!;
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
@@ -69,6 +73,9 @@ public class ProjectBusinessTests : IntegrationTestBase
         _bulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
+        _mockAdminService = new Mock<IAdminService>();
+        _logger = new Mock<ILogger<ProjectRolePermissionService>>();
+        _permissionService = new ProjectRolePermissionService(Context, _logger.Object);
         _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockEdgeBusiness = new Mock<IEdgeBusiness>();
@@ -78,7 +85,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
         _dataSourceBusiness = new DataSourceBusiness(
             Context, _mockEdgeBusiness.Object,
-            _mockRecordBusiness.Object, _eventBusiness);
+            _mockRecordBusiness.Object, _eventBusiness, _permissionService, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness);
@@ -474,7 +481,7 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.Equal(dto.Name, project.Name);
-        var dataSourceResult = await _dataSourceBusiness.GetAllDataSources(oid, new[] { project.Id });
+        var dataSourceResult = await _dataSourceBusiness.GetAllDataSources(uid, oid, [project.Id]);
         Assert.Single(dataSourceResult);
         Assert.Equal("Default Data Source", dataSourceResult[0].Name);
         Assert.Equal("This data source was created alongside the project for ease of use.",
