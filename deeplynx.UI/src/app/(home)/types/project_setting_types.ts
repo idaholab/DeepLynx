@@ -25,7 +25,6 @@ export interface UploadProjectLogoResponse {
 export interface RemoveProjectLogoRequest {
   organizationId: number;
   projectId: number;
-  fileName: string;
 }
 
 export interface RemoveProjectLogoResponse {

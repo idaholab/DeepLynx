@@ -55,7 +55,6 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCheckingLogo, setIsCheckingLogo] = useState(true);
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? process.env.BACKEND_BASE_URL ?? "https://deeplynx.dev.inl.gov/api/v1";
 
   // Storage states
   const [activeTab, setActiveTab] = useState<StorageTab>("default");
@@ -283,8 +282,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     try {
       await removeProjectLogo({
         organizationId: organization.organizationId as number,
-        projectId: project.id as number,
-        fileName: "logo_1",
+        projectId: project.id as number
       });
 
       // Revoke preview URL and reset preview and file states

@@ -554,7 +554,7 @@ export const removeProjectLogo = async (
   request: RemoveProjectLogoRequest
 ): Promise<RemoveProjectLogoResponse> => {
   try {
-    const response = await api.delete<RemoveProjectLogoResponse>(`/organizations/${request.organizationId}/projects/${request.projectId}/logo/${request.fileName}`);
+    const response = await api.delete<RemoveProjectLogoResponse>(`/organizations/${request.organizationId}/projects/${request.projectId}/logo/delete`);
     return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Failed to remove logo");

@@ -277,13 +277,11 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="organizationId">The ID of the organization to which the project belongs.</param>
     /// <param name="projectId">The ID of the project to which the logo belongs.</param>
     /// <param name="objectStorageId">The ID of the object storage to which the logo belongs.</param>
-    /// <param name="fileName">The name of the logo file to remove.</param>
     /// <returns>True if the file is successfully removed, false otherwise.</returns>
     public async Task<bool> RemoveLogoFileAsync(
         long organizationId,
         long projectId,
-        long? objectStorageId,
-        string fileName)
+        long? objectStorageId)
     {
         var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
@@ -303,32 +301,29 @@ public class ProjectBusiness : IProjectBusiness
             throw new DirectoryNotFoundException($"Logos folder not found for project {projectId}");
         }
 
-        var filePath = Path.Combine(logosFolderPath, fileName);
-
-        if (!File.Exists(filePath))
+        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+        if (!File.Exists(metadataFilePath))
         {
-            var extensions = new[] { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg" };
-            var found = false;
-            foreach (var ext in extensions)
-            {
-                var tryPath = filePath + ext;
-                if (File.Exists(tryPath))
-                {
-                    filePath = tryPath;
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found)
-            {
-                return false;
-            }
+            return false;
         }
 
-        File.Delete(filePath);
+        var activeLogoFileName = await File.ReadAllTextAsync(metadataFilePath);
+        activeLogoFileName = activeLogoFileName?.Trim();
 
-        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+        if (string.IsNullOrEmpty(activeLogoFileName))
+        {
+            return false;
+        }
+
+        var activeLogoFilePath = Path.Combine(logosFolderPath, activeLogoFileName);
+
+        if (!File.Exists(activeLogoFilePath))
+        {
+            return false;
+        }
+
+        File.Delete(activeLogoFilePath);
+
         var remainingFiles = Directory.GetFiles(logosFolderPath).OrderByDescending(File.GetLastWriteTime).ToList();
 
         if (remainingFiles.Count != 0)

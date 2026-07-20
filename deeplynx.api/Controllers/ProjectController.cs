@@ -853,7 +853,6 @@ public class ProjectController : ControllerBase
     /// <returns>File stream of the logo bytes</returns>
     [HttpGet("{projectId}/logo/image", Name = "api_get_project_image")]
     [MapToApiVersion(1)]
-    [ProjectAdmin]
     public async Task<IActionResult> GetProjectLogoImage(
         long organizationId,
         long projectId,
@@ -890,7 +889,6 @@ public class ProjectController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
-    /// <param name="fileName">The fileName to delete</param>
     /// <returns>True if file was sucessfully deleted</returns>
     [HttpDelete("{projectId}/logo/{fileName}", Name = "api_delete_project_logo")]
     [MapToApiVersion(1)]
@@ -899,23 +897,22 @@ public class ProjectController : ControllerBase
     public async Task<IActionResult> RemoveProjectLogo(
         long organizationId,
         long projectId,
-        long? objectStorageId,
-        string fileName)
+        long? objectStorageId)
     {
         try
         {
-            var success = await _projectBusiness.RemoveLogoFileAsync(organizationId, projectId, objectStorageId, fileName);
+            var success = await _projectBusiness.RemoveLogoFileAsync(organizationId, projectId, objectStorageId);
 
             if (!success)
             {
-                return NotFound(new { message = $"Logo file '{fileName}' not found or already deleted." });
+                return NotFound(new { message = "Active logo file not found or already deleted." });
             }
 
-            return Ok(new { message = $"Logo file '{fileName}' successfully removed." });
+            return Ok(new { message = "Active logo file successfully removed." });
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Failed to remove logo file '{fileName}' for project {projectId}: {ex.Message}");
+            _logger.LogError($"Failed to remove active logo file for project {projectId}: {ex.Message}");
             return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
         }
     }
