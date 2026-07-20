@@ -1,5 +1,5 @@
-import { expect, test, Page } from "@playwright/test";
-import { seedAndNavigateToProject } from "../helpers/seed";
+import { test, expect, Page } from "../fixtures";
+import { sysAdmin } from '../deeplynx-config';
 import path from "path";
 import * as os from 'os';
 import * as fs from 'fs';
@@ -9,7 +9,7 @@ const TEN_GB = 10 * 1024 * 1024;
 const FIVE_MIN_MS = 5 * 60 * 1000;
 const TWENTY_MIN_MS = 20 * 60 * 1000;
 
-async function checkDataSourcesAndStorageDestinations({ page }: { page: Page }) {
+async function checkDataSourcesAndStorageDestinations(page: Page) {
   async function checkDataSources(page: Page) {
     const dataSourceSelect = page.getByLabel('Data sourceData Sources');
     const selectedText = await dataSourceSelect.locator('option:checked').textContent();
@@ -33,10 +33,11 @@ async function checkDataSourcesAndStorageDestinations({ page }: { page: Page }) 
 }
 
 test.describe("Download an uploaded file", () => {
+  test.use({ actingUser: sysAdmin, actingOrg: 'PW Org A', actingProject: 'PW Project X' });
   let filePath: string;
 
   test.beforeEach(async ({ page }) => {
-    await seedAndNavigateToProject(page);
+    await page.getByRole('link', { name: 'PW Project X' }).click();
 
     // Create the file locally
     filePath = path.join(os.tmpdir(), 'uploaded-test-file');
@@ -61,7 +62,7 @@ test.describe("Download an uploaded file", () => {
     await page.waitForURL(/\/upload_center/);
     await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
 
-    await checkDataSourcesAndStorageDestinations({ page });
+    await checkDataSourcesAndStorageDestinations(page);
 
     await page.getByText('click to browse').click();
     const fileInput = page.locator('input[type="file"]');
@@ -74,7 +75,7 @@ test.describe("Download an uploaded file", () => {
     // Download the file
     await page.locator("aside a", { hasText: "Project Dashboard" }).click();
     await page.waitForURL(/\/project/);
-    await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "PROJECT Overview" })).toBeVisible();
 
     // go to record page
     await expect(page.getByText('uploaded-test-file').first()).toBeVisible();
@@ -98,10 +99,11 @@ test.describe("Download an uploaded file", () => {
 });
 
 test.describe("Download a 10 GB file", () => {
+  test.use({ actingUser: sysAdmin, actingOrg: 'PW Org A', actingProject: 'PW Project X' });
   let filePath: string;
 
   test.beforeEach(async ({ page }) => {
-    await seedAndNavigateToProject(page);
+    await page.getByRole('link', { name: 'PW Project X' }).click();
 
     // Create the 10GB file locally
     filePath = path.join(os.tmpdir(), 'big-test-file');
@@ -150,7 +152,7 @@ test.describe("Download a 10 GB file", () => {
     await page.waitForURL(/\/upload_center/);
     await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
 
-    await checkDataSourcesAndStorageDestinations({ page });
+    await checkDataSourcesAndStorageDestinations(page);
 
     await page.getByText('click to browse').click();
     const fileInput = page.locator('input[type="file"]');
@@ -163,7 +165,7 @@ test.describe("Download a 10 GB file", () => {
     // Download the file
     await page.locator("aside a", { hasText: "Project Dashboard" }).click();
     await page.waitForURL(/\/project/);
-    await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "PROJECT Overview" })).toBeVisible();
 
     // go to record page
     await expect(page.getByText('big-test-file').first()).toBeVisible();
