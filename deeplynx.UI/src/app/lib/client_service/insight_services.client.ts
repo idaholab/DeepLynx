@@ -1,4 +1,5 @@
 "use client";
+import api from "./api";
 
 export interface InsightSamplingParameters {
   temperature: number;
@@ -191,158 +192,108 @@ function appendOptionalNumberParam(
 export async function queueInsightUpload(
   uploadRequest: QueueInsightUploadArgs,
 ): Promise<InsightUploadResponse> {
-  const queryParams = new URLSearchParams({
-    organizationId: String(uploadRequest.organizationId),
-    projectId: String(uploadRequest.projectId),
-  });
-  appendOptionalNumberParam(
-    queryParams,
-    "vlmModelConfigId",
-    uploadRequest.vlmModelConfigId,
-  );
-  appendOptionalNumberParam(
-    queryParams,
-    "embeddingModelConfigId",
-    uploadRequest.embeddingModelConfigId,
-  );
-
-  const response = await fetch(`/api/insight/upload?${queryParams.toString()}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(toInsightUploadRequestBody(uploadRequest)),
-  });
-
-  const responseText = await response.text();
-  const responseBody = parseJsonOrTextResponseBody(responseText);
-
-  if (!response.ok) {
-    throw new Error(
-      extractInsightErrorMessage(responseBody) ||
-        responseText ||
-        "Insight upload failed",
+  try {
+    const res = await api.post<InsightUploadResponse>(
+      `/organizations/${uploadRequest.organizationId}/projects/${uploadRequest.projectId}/insight/upload`,
+      toInsightUploadRequestBody(uploadRequest),
+      {
+        params: {
+          vlmModelConfigId: uploadRequest.vlmModelConfigId,
+          embeddingModelConfigId: uploadRequest.embeddingModelConfigId,
+        },
+      },
     );
+    return res.data;
+  } catch (error: any) {
+    const message =
+      extractInsightErrorMessage(error?.response?.data) ||
+      error?.message ||
+      "Insight upload failed";
+    throw new Error(message);
   }
-
-  return responseBody as InsightUploadResponse;
 }
+
 
 export async function streamInsightQuery(
   queryRequest: StreamInsightQueryArgs,
   onResponseChunk: (chunk: string) => void,
 ): Promise<string> {
-  const queryParams = new URLSearchParams({
-    organizationId: String(queryRequest.organizationId),
-    projectId: String(queryRequest.projectId),
-  });
-  appendOptionalNumberParam(
-    queryParams,
-    "languageModelConfigId",
-    queryRequest.languageModelConfigId,
-  );
-  appendOptionalNumberParam(
-    queryParams,
-    "embeddingModelConfigId",
-    queryRequest.embeddingModelConfigId,
-  );
+  let lastLength = 0;
 
-  const response = await fetch(`/api/insight/query?${queryParams.toString()}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(toInsightQueryRequestBody(queryRequest)),
-  });
+  try {
+    const res = await api.post<string>(
+      `/organizations/${queryRequest.organizationId}/projects/${queryRequest.projectId}/insight/query`,
+      toInsightQueryRequestBody(queryRequest),
+      {
+        params: {
+          languageModelConfigId: queryRequest.languageModelConfigId,
+          embeddingModelConfigId: queryRequest.embeddingModelConfigId,
+        },
+        responseType: "text",
+        // Browser (XHR) adapter: onDownloadProgress fires as bytes arrive,
+        // and xhr.responseText accumulates everything received so far. We
+        // diff against what's already been emitted to reconstruct chunks,
+        // approximating the old fetch()+ReadableStream behavior. The
+        // controller streams "text/plain" chunks (see Query action), which
+        // this is compatible with.
+        onDownloadProgress: (progressEvent: any) => {
+          const xhr = progressEvent?.event?.target as
+            | XMLHttpRequest
+            | undefined;
+          const responseText: string = xhr?.responseText ?? "";
+          if (responseText.length > lastLength) {
+            const chunk = responseText.slice(lastLength);
+            lastLength = responseText.length;
+            onResponseChunk(chunk);
+          }
+        },
+      },
+    );
 
-  if (!response.ok) {
-    const errorResponseText = await response.text();
-    throw new Error(errorResponseText || "Insight query failed");
+    return typeof res.data === "string" ? res.data : String(res.data ?? "");
+  } catch (error: any) {
+    const message =
+      extractInsightErrorMessage(error?.response?.data) ||
+      error?.message ||
+      "Insight query failed";
+    throw new Error(message);
   }
-
-  if (!response.body) {
-    throw new Error("Insight response stream is unavailable");
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let fullText = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-
-    const chunk = decoder.decode(value, { stream: true });
-    if (!chunk) continue;
-
-    fullText += chunk;
-    onResponseChunk(chunk);
-  }
-
-  const trailing = decoder.decode();
-  if (trailing) {
-    fullText += trailing;
-    onResponseChunk(trailing);
-  }
-
-  return fullText;
 }
 
 export async function fetchInsightIngestionStatus(
   statusRequest: FetchInsightStatusArgs,
 ): Promise<InsightIngestionStatusResponse> {
-  const response = await fetch(
-    `/api/insight/status/${statusRequest.fileId}?organizationId=${statusRequest.organizationId}&projectId=${statusRequest.projectId}`,
-    {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    },
-  );
-
-  const responseText = await response.text();
-  const responseBody = parseJsonOrTextResponseBody(responseText);
-
-  if (!response.ok) {
-    throw new Error(
-      extractInsightErrorMessage(responseBody) ||
-        responseText ||
-        "Insight status check failed",
+  try {
+    const res = await api.get<InsightIngestionStatusResponse>(
+      `/organizations/${statusRequest.organizationId}/projects/${statusRequest.projectId}/insight/ingestion_status/${statusRequest.fileId}`,
     );
+    return res.data;
+  } catch (error: any) {
+    const message =
+      extractInsightErrorMessage(error?.response?.data) ||
+      error?.message ||
+      "Insight status check failed";
+    throw new Error(message);
   }
-
-  return responseBody as InsightIngestionStatusResponse;
 }
 
 export async function fetchInsightEndpointHealth(
-    healthRequest: FetchInsightEndpointHealthArgs,
+  healthRequest: FetchInsightEndpointHealthArgs,
 ): Promise<InsightEndpointHealthResponse> {
-  const queryParams = new URLSearchParams({
-    organizationId: String(healthRequest.organizationId),
-    projectId: String(healthRequest.projectId),
-  });
-  
-  const response = await fetch(
-      `/api/insight/endpoint-health?${queryParams.toString()}`,
+  try {
+    const res = await api.post<InsightEndpointHealthResponse>(
+      `/organizations/${healthRequest.organizationId}/projects/${healthRequest.projectId}/insight/endpoint_health`,
       {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        cache: "no-store",
-        body: JSON.stringify({
-          modelConfigId: healthRequest.modelConfigId ?? null,
-          modelType: healthRequest.modelType,
-        }),
+        modelConfig: healthRequest.modelConfigId ?? null,
+        modelType: healthRequest.modelType,
       },
-  );
-  
-  const responseText = await response.text();
-  const responseBody = parseJsonOrTextResponseBody(responseText);
-  
-  if (!response.ok) {
-    throw new Error(
-        extractInsightErrorMessage(responseBody) ||
-        responseText ||
-        "Insight endpoint health check failed",
     );
+    return res.data;
+  } catch (error: any) {
+    const message =
+      extractInsightErrorMessage(error?.response?.data) ||
+      error?.message ||
+      "Insight endpoint health check failed";
+    throw new Error(message);
   }
-  
-  return responseBody as InsightEndpointHealthResponse;
 }
-

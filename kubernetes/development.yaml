@@ -930,7 +930,7 @@ spec:
                 name: deeplynxv3-service
                 port:
                   number: 80
-          - path: /api/v1
+          - path: /api
             pathType: Prefix
             backend:
               service:
@@ -956,5 +956,12 @@ spec:
             backend:
               service:
                 name: deeplynxv3-mcp-service
+                port:
+                  number: 80
+          - path: /api/oauth
+            pathType: Prefix
+            backend:
+              service:
+                name: deeplynx-service
                 port:
                   number: 80

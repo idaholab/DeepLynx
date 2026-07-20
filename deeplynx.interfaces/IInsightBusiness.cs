@@ -25,6 +25,12 @@ public interface IInsightBusiness
 
     Task<InsightIngestionStatusResponseDto> FetchInsightIngestionStatus(long recordId);
 
+    Task<InsightPipelineStatusResponseDto> FetchInsightPipelineStatus(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId);
+    
     Task<InsightEndpointHealthResponseDto> CheckEndpointHealth(
         long currentUserId,
         long organizationId,

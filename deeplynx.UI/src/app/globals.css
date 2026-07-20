@@ -54,8 +54,8 @@
   --color-base-200: oklch(29% 0.01 258);
   --color-base-300: oklch(35% 0.012 256);
   --color-base-content: oklch(92% 0.004 260);
-  --color-primary: oklch(30% 0.17 254.3);
-  --color-primary-content: oklch(95% 0.004 251);
+  --color-primary: oklch(50% 0.15 254.3);
+  --color-primary-content: oklch(98% 0.005 251);
   --color-secondary: oklch(45% 0.14 255.19);
   --color-secondary-content: oklch(94% 0.004 255);
   --color-accent: oklch(100% 0.02 70);
@@ -452,28 +452,22 @@ html {
 }
 
 .app-header {
-  background: linear-gradient(
-    180deg,
-    var(--header-gradient-start),
-    var(--header-gradient-end)
-  );
+  background: linear-gradient(180deg,
+      var(--header-gradient-start),
+      var(--header-gradient-end));
 }
 
 .app-header-inverted {
-  background: linear-gradient(
-    180deg,
-    var(--header-gradient-end),
-    var(--header-gradient-start)
-  );
+  background: linear-gradient(180deg,
+      var(--header-gradient-end),
+      var(--header-gradient-start));
 }
 
 .login {
   background: #152230;
-  background: linear-gradient(
-    180deg,
-    rgba(34, 41, 51, 1) 0%,
-    rgba(57, 82, 108, 1) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(34, 41, 51, 1) 0%,
+      rgba(57, 82, 108, 1) 100%);
 }
 
 .grayed-out {

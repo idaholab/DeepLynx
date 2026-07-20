@@ -1,11 +1,9 @@
-import { test, expect } from "@playwright/test";
-import { seedSession } from "../helpers/seed";
+import { sysAdmin } from "../deeplynx-config";
+import { test, expect } from "../fixtures";
+
+test.use({ actingUser: sysAdmin, actingOrg: 'PW Org A' })
 
 test.describe("Organizations", () => {
-  test.beforeEach(async ({ page }) => {
-    await seedSession(page);
-    await page.goto("/", { waitUntil: "domcontentloaded" });
-  });
 
   test("user is automatically assigned an organization on startup", async ({
     page,
@@ -60,8 +58,19 @@ test.describe("Organizations", () => {
   test('Clicking the View All Organizations button opens Select Org', async ({ 
     page 
   }) => {
+    const dropdownTrigger = page.locator(
+      'header .dropdown [role="button"]',
+    );
+    await dropdownTrigger.click();
+
+    const dropdownContent = page.locator(
+      "header .dropdown .dropdown-content",
+    );
+    await expect(
+      dropdownContent.getByText("View All Organizations"),
+    ).toBeVisible();
+
     await page.getByRole('link', { name: 'View All Organizations' }).click();
     await expect(page).toHaveURL('/select-org'); 
   });
-
 });

@@ -4,12 +4,16 @@ namespace deeplynx.api;
 
 internal static class NexusApiVersions
 {
-    public static ApiVersion Default { get; } = new(1);
+    public static ApiVersion V1 { get; } = new(1);
+
+    public static ApiVersion V2 { get; } = new(2);
+
+    public static ApiVersion Default => V1;
 
     public static IReadOnlyList<ApiVersion> Supported { get; } =
     [
-        new(1),
-        new(2)
+        V1,
+        V2
     ];
 
     public static string DefaultOpenApiDocumentName => "v1";
