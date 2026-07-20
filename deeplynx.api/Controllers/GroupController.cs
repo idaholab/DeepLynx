@@ -1,13 +1,17 @@
+using Asp.Versioning;
+using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
-using Microsoft.AspNetCore.Mvc;
-using deeplynx.helpers;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/groups")]
 [Authorize]
 [ForbidServiceAccounts] // Service accounts can only act on the project level
@@ -32,8 +36,9 @@ public class GroupController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the groups belong</param>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived groups</param>
-    /// <returns></returns>
+    /// <returns>A list of groups in the organization.</returns>
     [HttpGet(Name = "api_get_all_groups")]
+    [MapToApiVersion(1)]
     [Auth("read", "group")]
     public async Task<ActionResult<IEnumerable<GroupResponseDto>>> GetAllGroups(
         long organizationId,
@@ -53,13 +58,32 @@ public class GroupController : ControllerBase
     }
 
     /// <summary>
+    ///     Get All Groups Within an Organization
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the groups belong</param>
+    /// <param name="hideArchived">Flag indicating whether to hide or show archived groups</param>
+    /// <returns>A list of groups in the organization.</returns>
+    [HttpGet(Name = "api_get_all_groups")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "group")]
+    public async Task<ActionResult<IEnumerable<GroupResponseDto>>> GetAllGroupsV2(
+        long organizationId,
+        [FromQuery] bool hideArchived = true)
+    {
+        var groups = await _groupBusiness.GetAllGroups(organizationId, hideArchived);
+        return Ok(groups);
+    }
+
+    /// <summary>
     ///     Fetch Group by ID
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="groupId">ID of group</param>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived groups</param>
-    /// <returns></returns>
+    /// <returns>The requested group.</returns>
     [HttpGet("{groupId:long}", Name = "api_get_group")]
+    [MapToApiVersion(1)]
     [Auth("read", "group")]
     public async Task<ActionResult<GroupResponseDto>> GetGroup(
         long organizationId,
@@ -80,12 +104,33 @@ public class GroupController : ControllerBase
     }
 
     /// <summary>
+    ///     Fetch Group by ID
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the group belongs</param>
+    /// <param name="groupId">ID of group</param>
+    /// <param name="hideArchived">Flag indicating whether to hide or show archived groups</param>
+    /// <returns>The requested group.</returns>
+    [HttpGet("{groupId:long}", Name = "api_get_group")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "group")]
+    public async Task<ActionResult<GroupResponseDto>> GetGroupV2(
+        long organizationId,
+        long groupId,
+        [FromQuery] bool hideArchived = true)
+    {
+        var group = await _groupBusiness.GetGroup(organizationId, groupId, hideArchived);
+        return Ok(group);
+    }
+
+    /// <summary>
     ///     Get All Members of a Group
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="groupId">ID of the group</param>
     /// <returns>List of users in the group</returns>
     [HttpGet("{groupId:long}/users", Name = "api_get_group_members")]
+    [MapToApiVersion(1)]
     [Auth("read", "group")]
     public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetGroupMembers(
         long organizationId,
@@ -105,12 +150,31 @@ public class GroupController : ControllerBase
     }
 
     /// <summary>
+    ///     Get All Members of a Group
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the group belongs</param>
+    /// <param name="groupId">ID of the group</param>
+    /// <returns>A list of users in the group.</returns>
+    [HttpGet("{groupId:long}/users", Name = "api_get_group_members")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "group")]
+    public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetGroupMembersV2(
+        long organizationId,
+        long groupId)
+    {
+        var members = await _groupBusiness.GetGroupMembers(organizationId, groupId);
+        return Ok(members);
+    }
+
+    /// <summary>
     ///     Create a Group
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="dto">Data structure of group to create</param>
-    /// <returns></returns>
+    /// <returns>The newly created group.</returns>
     [HttpPost(Name = "api_create_group")]
+    [MapToApiVersion(1)]
     [Auth("write", "group")]
     public async Task<ActionResult<GroupResponseDto>> CreateGroup(
         long organizationId,
@@ -131,13 +195,33 @@ public class GroupController : ControllerBase
     }
 
     /// <summary>
+    ///     Create a Group
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the group belongs</param>
+    /// <param name="dto">Data structure of group to create</param>
+    /// <returns>The newly created group.</returns>
+    [HttpPost(Name = "api_create_group")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "group")]
+    public async Task<ActionResult<GroupResponseDto>> CreateGroupV2(
+        long organizationId,
+        [FromBody] CreateGroupRequestDto dto)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var group = await _groupBusiness.CreateGroup(currentUserId, organizationId, dto);
+        return Ok(group);
+    }
+
+    /// <summary>
     ///     Update a Group
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="groupId">ID of the group</param>
     /// <param name="dto">Fields to update</param>
-    /// <returns></returns>
+    /// <returns>The updated group.</returns>
     [HttpPut("{groupId:long}", Name = "api_update_group")]
+    [MapToApiVersion(1)]
     [Auth("update", "group")]
     public async Task<ActionResult<GroupResponseDto>> UpdateGroup(
         long organizationId,
@@ -159,12 +243,34 @@ public class GroupController : ControllerBase
     }
 
     /// <summary>
+    ///     Update a Group
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the group belongs</param>
+    /// <param name="groupId">ID of the group</param>
+    /// <param name="dto">Fields to update</param>
+    /// <returns>The updated group.</returns>
+    [HttpPut("{groupId:long}", Name = "api_update_group")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "group")]
+    public async Task<ActionResult<GroupResponseDto>> UpdateGroupV2(
+        long organizationId,
+        long groupId,
+        [FromBody] UpdateGroupRequestDto dto)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var group = await _groupBusiness.UpdateGroup(currentUserId, organizationId, groupId, dto);
+        return Ok(group);
+    }
+
+    /// <summary>
     ///     Delete a group
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="groupId">ID of the group to hard delete</param>
-    /// <returns></returns>
+    /// <returns>A message confirming the group was deleted.</returns>
     [HttpDelete("{groupId:long}", Name = "api_delete_group")]
+    [MapToApiVersion(1)]
     [Auth("write", "group")]
     public async Task<ActionResult> DeleteGroup(
         long organizationId,
@@ -185,6 +291,25 @@ public class GroupController : ControllerBase
     }
 
     /// <summary>
+    ///     Delete a Group
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the group belongs</param>
+    /// <param name="groupId">ID of the group to hard delete</param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpDelete("{groupId:long}", Name = "api_delete_group")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "group")]
+    public async Task<ActionResult> DeleteGroupV2(
+        long organizationId,
+        long groupId)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _groupBusiness.DeleteGroup(currentUserId, organizationId, groupId);
+        return Ok(response);
+    }
+
+    /// <summary>
     ///     Archive or Unarchive a Group
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the group belongs</param>
@@ -192,6 +317,7 @@ public class GroupController : ControllerBase
     /// <param name="archive">True to archive the group, false to unarchive it.</param>
     /// <returns>A message stating the group was successfully archived or unarchived.</returns>
     [HttpPatch("{groupId:long}", Name = "api_archive_group")]
+    [MapToApiVersion(1)]
     [Auth("update", "group")]
     public async Task<IActionResult> ArchiveGroup(
         long organizationId,
@@ -220,12 +346,41 @@ public class GroupController : ControllerBase
     }
 
     /// <summary>
+    ///     Archive or Unarchive a Group
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the group belongs</param>
+    /// <param name="groupId">The ID of the group to archive or unarchive.</param>
+    /// <param name="archive">True to archive the group, false to unarchive it.</param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpPatch("{groupId:long}", Name = "api_archive_group")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "group")]
+    public async Task<IActionResult> ArchiveGroupV2(
+        long organizationId,
+        long groupId,
+        [FromQuery] bool archive)
+    {
+        var userId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var archiveResponse = await _groupBusiness.ArchiveGroup(userId, organizationId, groupId);
+            return Ok(archiveResponse);
+        }
+
+        var response = await _groupBusiness.UnarchiveGroup(userId, organizationId, groupId);
+        return Ok(response);
+    }
+
+    /// <summary>
     ///     Add User to Group
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="groupId">ID of the group</param>
     /// <param name="userId">ID of the user to be added</param>
+    /// <returns>A message confirming the user was added to the group.</returns>
     [HttpPost("{groupId:long}/users", Name = "api_add_user_to_group")]
+    [MapToApiVersion(1)]
     [Auth("update", "group")]
     public async Task<ActionResult> AddUserToGroup(
         long organizationId,
@@ -245,6 +400,26 @@ public class GroupController : ControllerBase
         }
     }
 
+    /// <summary>
+    ///     Add User to Group
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the group belongs</param>
+    /// <param name="groupId">ID of the group</param>
+    /// <param name="userId">ID of the user to be added</param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpPost("{groupId:long}/users", Name = "api_add_user_to_group")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "group")]
+    public async Task<ActionResult> AddUserToGroupV2(
+        long organizationId,
+        long groupId,
+        [FromQuery] long userId)
+    {
+        var response = await _groupBusiness.AddUserToGroup(userId, organizationId, groupId);
+        return Ok(response);
+    }
+
 
     /// <summary>
     ///     Remove User from Group
@@ -252,8 +427,9 @@ public class GroupController : ControllerBase
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="groupId">ID of the group to remove from</param>
     /// <param name="userId">ID of user to be removed</param>
-    /// <returns></returns>
+    /// <returns>A message confirming the user was removed from the group.</returns>
     [HttpDelete("{groupId:long}/users/{userId:long}", Name = "api_remove_user_from_group")]
+    [MapToApiVersion(1)]
     [Auth("update", "group")]
     public async Task<ActionResult> RemoveUserFromGroup(
         long organizationId,
@@ -271,5 +447,25 @@ public class GroupController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+
+    /// <summary>
+    ///     Remove User from Group
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the group belongs</param>
+    /// <param name="groupId">ID of the group to remove from</param>
+    /// <param name="userId">ID of user to be removed</param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpDelete("{groupId:long}/users/{userId:long}", Name = "api_remove_user_from_group")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "group")]
+    public async Task<ActionResult> RemoveUserFromGroupV2(
+        long organizationId,
+        long groupId,
+        long userId)
+    {
+        var response = await _groupBusiness.RemoveUserFromGroup(userId, organizationId, groupId);
+        return Ok(response);
     }
 }
