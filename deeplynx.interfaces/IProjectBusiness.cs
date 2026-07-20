@@ -24,6 +24,6 @@ public interface IProjectBusiness
     Task<bool> SetProjectAdminStatus(long projectId, long? userId, long? groupId, bool isAdmin = false);
     Task<bool> RemoveMemberFromProject(long projectId, long? userId, long? groupId);
     Task<string> UploadProjectLogo(long organizationId, long projectId, long? objectStorageId, IFormFile logoFile);
-    Task<(Stream Stream, string FullPath)?> GetProjectLogoStreamAsync(long organizationId, long projectId);
-    Task<bool> RemoveLogoFileAsync(long organizationId, long projectId, string fileName);
+    Task<(Stream Stream, string FullPath)?> GetProjectLogoStreamAsync(long organizationId, long projectId, long? objectStorageId);
+    Task<bool> RemoveLogoFileAsync(long organizationId, long projectId, long? objectStorageId, string fileName);
 }

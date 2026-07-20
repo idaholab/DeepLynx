@@ -276,14 +276,17 @@ public class ProjectBusiness : IProjectBusiness
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs.</param>
     /// <param name="projectId">The ID of the project to which the logo belongs.</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the logo belongs.</param>
     /// <param name="fileName">The name of the logo file to remove.</param>
     /// <returns>True if the file is successfully removed, false otherwise.</returns>
     public async Task<bool> RemoveLogoFileAsync(
         long organizationId,
         long projectId,
+        long? objectStorageId,
         string fileName)
     {
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(organizationId);
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
         if (objectStorage.Config.MountPath == null)
         {
             throw new Exception("File system mount path not set in object storage");
@@ -350,12 +353,15 @@ public class ProjectBusiness : IProjectBusiness
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
     /// <returns>Record Id of Logo</returns>
     public async Task<(Stream Stream, string FullPath)?> GetProjectLogoStreamAsync(
         long organizationId,
-        long projectId)
+        long projectId,
+        long? objectStorageId)
     {
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(organizationId);
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
         if (objectStorage.Config.MountPath == null)
         {
             throw new Exception("File system mount path not set in object storage");

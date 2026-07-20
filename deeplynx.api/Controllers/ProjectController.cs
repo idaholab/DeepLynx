@@ -849,15 +849,19 @@ public class ProjectController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
     /// <returns>File stream of the logo bytes</returns>
     [HttpGet("{projectId}/logo/image", Name = "api_get_project_image")]
     [MapToApiVersion(1)]
     [ProjectAdmin]
-    public async Task<IActionResult> GetProjectLogoImage(long organizationId, long projectId)
+    public async Task<IActionResult> GetProjectLogoImage(
+        long organizationId,
+        long projectId,
+        long? objectStorageId)
     {
         try
         {
-            var result = await _projectBusiness.GetProjectLogoStreamAsync(organizationId, projectId);
+            var result = await _projectBusiness.GetProjectLogoStreamAsync(organizationId, projectId, objectStorageId);
             if (result == null)
                 return NotFound();
 
@@ -885,6 +889,7 @@ public class ProjectController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
     /// <param name="fileName">The fileName to delete</param>
     /// <returns>True if file was sucessfully deleted</returns>
     [HttpDelete("{projectId}/logo/{fileName}", Name = "api_delete_project_logo")]
@@ -894,11 +899,12 @@ public class ProjectController : ControllerBase
     public async Task<IActionResult> RemoveProjectLogo(
         long organizationId,
         long projectId,
+        long? objectStorageId,
         string fileName)
     {
         try
         {
-            var success = await _projectBusiness.RemoveLogoFileAsync(organizationId, projectId, fileName);
+            var success = await _projectBusiness.RemoveLogoFileAsync(organizationId, projectId, objectStorageId, fileName);
 
             if (!success)
             {
