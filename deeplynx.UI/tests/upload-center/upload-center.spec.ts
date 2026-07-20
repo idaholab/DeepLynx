@@ -106,18 +106,6 @@ test.describe("Upload Center", () => {
       return undefined;
     }
   }
-
-  async function getProjectName(request: APIRequestContext, projectId: string) {
-    const url = `http://localhost:5095/api/v1/organizations/1/projects/${projectId}`;
-    try {
-      const res = await request.fetch(url);
-      const project = await res.json();
-      return project.name;
-    } catch(err) {
-      console.warn('Error getting project name.', err);
-      return undefined;
-    }
-  }
   
   // Record page URLs look like: http://localhost:3000/record?recordId=955&projectId=213
   function parseRecordFromUrl(url: string): { recordId: string; projectId: string } | null {
@@ -149,7 +137,7 @@ test.describe("Upload Center", () => {
     }
   }
 
-  async function dragAndDrop({ page }: { page: Page }, baseFileName: string, filePath: string, type: string): Promise<{ recordId: string; projectId: string } | null> {
+  async function dragAndDrop({ page }: { page: Page }, baseFileName: string, filePath: string, type: string, projectNav?: string): Promise<{ recordId: string; projectId: string } | null> {
     await checkDataSourcesAndStorageDestinations(page);
 
     const buffer = fs.readFileSync(filePath);
@@ -181,6 +169,11 @@ test.describe("Upload Center", () => {
       page.getByText('File uploaded successfully!')
     ).toBeVisible();
 
+    if (projectNav) {
+      await page.getByRole('complementary').filter({ hasText: 'Projects' }).getByRole('button').click();
+      await page.getByRole('button', { name: projectNav }).click();
+    }
+
     await page.getByRole('link', { name: 'Project Dashboard' }).click();
 
     await expect(
@@ -192,8 +185,9 @@ test.describe("Upload Center", () => {
     await page.getByRole('textbox', { name: 'Search' }).click();
 
     await page.getByRole('textbox', { name: 'Search' }).fill(baseFileName);
-
     await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+
+    await expect(page.locator('span').filter({ hasText: baseFileName })).toBeVisible();
 
     const recordLink = page.getByRole('link', { name: baseFileName, exact: true }).first();
     await expect(recordLink).toBeVisible();
@@ -210,7 +204,8 @@ test.describe("Upload Center", () => {
     { page }: { page: Page },
     baseFileName: string,
     filePath: string,
-    uploadTimeoutMs?: number
+    uploadTimeoutMs?: number,
+    projectNav?: string,
   ): Promise<{ recordId: string; projectId: string } | null> {
     await checkDataSourcesAndStorageDestinations(page);
 
@@ -225,6 +220,11 @@ test.describe("Upload Center", () => {
       page.getByText('File uploaded successfully!')
     ).toBeVisible(uploadTimeoutMs ? { timeout: uploadTimeoutMs } : undefined);
 
+    if (projectNav) {
+      await page.getByRole('complementary').filter({ hasText: 'Projects' }).getByRole('button').click();
+      await page.getByRole('button', { name: projectNav }).click();
+    }
+
     await page.getByRole('link', { name: 'Project Dashboard' }).click();
 
     await expect(
@@ -238,6 +238,8 @@ test.describe("Upload Center", () => {
     await page.getByRole('textbox', { name: 'Search' }).fill(baseFileName);
 
     await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+
+    await expect(page.locator('span').filter({ hasText: baseFileName })).toBeVisible();
 
     const recordLink = page.getByRole('link', { name: baseFileName, exact: true }).first();
     await expect(recordLink).toBeVisible();
@@ -1202,15 +1204,29 @@ startxref
     test("default data source and storage, nondefault project, click to browse, successfully uploads file", async ({ page, request }) => {      
       // project setup
       const nondefaultProj = await getNonDefaultProject(request, projectId);
-      const currentProjName = await getProjectName(request, projectId);
-      await page.getByText(currentProjName).click();
-      await page.getByText(nondefaultProj).click();
+      const projectSelect = page.getByRole('combobox', { name: /project/i }).first();
+      await expect(projectSelect).toBeEnabled();
+      await projectSelect.selectOption(nondefaultProj);
       
       // set datasource and storage destination
       await checkDataSourcesAndStorageDestinations(page);
 
       // click to browse
-      await clickToBrowse({ page }, 'upload-different-storage-click', filePaths[4]);
+      await clickToBrowse({ page }, 'upload-different-project-click', filePaths[4], undefined, nondefaultProj);
+    });
+
+    test("default data source and storage, nondefault project, drag and drop, successfully uploads file", async ({ page, request }) => {      
+      // project setup
+      const nondefaultProj = await getNonDefaultProject(request, projectId);
+      const projectSelect = page.getByRole('combobox', { name: /project/i }).first();
+      await expect(projectSelect).toBeEnabled();
+      await projectSelect.selectOption(nondefaultProj);
+      
+      // set datasource and storage destination
+      await checkDataSourcesAndStorageDestinations(page);
+
+      // drag and drop
+      await dragAndDrop({ page }, 'upload-different-project-drag', filePaths[5], 'txt', nondefaultProj);
     });
   });
 });
