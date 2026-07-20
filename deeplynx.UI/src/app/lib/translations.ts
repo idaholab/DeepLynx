@@ -836,7 +836,7 @@ export const translations = {
       LATTICE_ONTOLOGY_NOT_READY:
         "Data schema not fully embedded. Strict mode requires all classes and relationships to be embedded.",
       LATTICE_ONTOLOGY_NO_SCHEMA:
-        "No classes or relationships in this project yet.",
+        "You need atleast 2 user made classes and 1 user made relationship to start an extraction. User made meaning other than the default classes: File, Report, and Timeseries",
       LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS: "Queue Data Schema Embeddings",
       LATTICE_ONTOLOGY_QUEUED_SUCCESS: "Data schema embeddings queued.",
       LATTICE_ONTOLOGY_QUEUE_FAILED: "Failed to queue data schema embeddings.",
@@ -3008,7 +3008,7 @@ export const translations = {
       LATTICE_ONTOLOGY_NOT_READY:
         "El esquema de datos no está completamente incrustado. El modo estricto requiere que todas las clases y relaciones estén incrustadas.",
       LATTICE_ONTOLOGY_NO_SCHEMA:
-        "Aún no hay clases ni relaciones en este proyecto.",
+        "Necesitas al menos 2 clases creadas por el usuario y 1 relación creada por el usuario para comenzar una extracción. Por creadas por el usuario se entiende que son diferentes de las clases predeterminadas: Archivo, Informe y Series Temporales.",
       LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS:
         "Poner en cola las incrustaciones del esquema de datos",
       LATTICE_ONTOLOGY_QUEUED_SUCCESS:
