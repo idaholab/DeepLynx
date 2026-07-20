@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -12,6 +13,8 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to populate the DeepLynx metrics pages for Nexus org admins.
 /// </remarks>
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("organization/{organizationId:long}/metrics")]
 [Authorize]
 [ForbidServiceAccounts] // service accounts can only act on the project level
@@ -40,6 +43,7 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="organizationId">The organization from which to retrieve the summary statistic</param>
     /// <returns>The total number of bytes of file data stored in this org's registered object storages.</returns>
     [HttpGet("storage/size", Name = "api_storage_size_organization")]
+    [MapToApiVersion(1)]
     public async Task<IActionResult> GetOrganizationStorageSize(long organizationId)
     {
         try
@@ -63,6 +67,7 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
     /// <returns>A count of data sources for the given organization and its projects.</returns>
     [HttpGet("count", Name = "api_count_data_sources_for_organization")]
+    [MapToApiVersion(1)]
     public async Task<ActionResult<int>> GetDataSourceCount(
         long organizationId,
         [FromQuery] long[]? projectIds,
@@ -90,6 +95,7 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <returns>The record count for the given scope</returns>
     [HttpGet("records/count", Name = "api_record_count_organization")]
+    [MapToApiVersion(1)]
     public async Task<IActionResult> GetOrganizationRecordCount(
         long organizationId,
         [FromQuery] long[]? projectIds,
@@ -116,6 +122,7 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived files from the result</param>
     /// <returns>The file count for the given scope</returns>
     [HttpGet("files/count", Name = "api_file_count_organization")]
+    [MapToApiVersion(1)]
     public async Task<IActionResult> GetOrganizationFileCount(
         long organizationId,
         [FromQuery] long[]? projectIds,
@@ -140,6 +147,7 @@ public class MetricsOrganizationController : ControllerBase
     /// <param name="organizationId"></param>
     /// <returns></returns>
     [HttpGet("modalities/count", Name = "api_count_data_modality_for_organization")]
+    [MapToApiVersion(1)]
     [Auth("read", "data_source")]
     public async Task<ActionResult<int>> GetOrganizationDataModalityCount(
         long organizationId)
