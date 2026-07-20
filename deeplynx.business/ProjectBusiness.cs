@@ -217,8 +217,14 @@ public class ProjectBusiness : IProjectBusiness
 
         var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
-        if (objectStorage.Config.MountPath == null)
-            throw new Exception("File system mount path not set in object storage");
+        if (objectStorage == null)
+            throw new Exception("Object storage not found or failed to decrypt.");
+
+        if (objectStorage.Config == null)
+            throw new Exception("Object storage config is null.");
+
+        if (string.IsNullOrEmpty(objectStorage.Config.MountPath))
+            throw new Exception("File system mount path not set in object storage.");
 
         var logosFolderPath = Path.Combine(
             objectStorage.Config.MountPath,
