@@ -1,4 +1,5 @@
 "use client";
+import api from "./api";
 
 export interface InsightSamplingParameters {
   temperature: number;
@@ -300,31 +301,22 @@ export async function fetchInsightIngestionStatus(
 }
 
 export async function fetchInsightEndpointHealth(
-    healthRequest: FetchInsightEndpointHealthArgs,
+  healthRequest: FetchInsightEndpointHealthArgs,
 ): Promise<InsightEndpointHealthResponse> {
-  const response = await fetch(
-      `/api/v1/organizations/${healthRequest.organizationId}/projects/${healthRequest.projectId}/insight/endpoint_health`,
+  try {
+    const res = await api.post<InsightEndpointHealthResponse>(
+      `/organizations/${healthRequest.organizationId}/projects/${healthRequest.projectId}/insight/endpoint_health`,
       {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        cache: "no-store",
-        body: JSON.stringify({
-          modelConfig: healthRequest.modelConfigId ?? null,
-          modelType: healthRequest.modelType,
-        }),
+        modelConfig: healthRequest.modelConfigId ?? null,
+        modelType: healthRequest.modelType,
       },
-  );
-
-  const responseText = await response.text();
-  const responseBody = parseJsonOrTextResponseBody(responseText);
-
-  if (!response.ok) {
-    throw new Error(
-        extractInsightErrorMessage(responseBody) ||
-        responseText ||
-        "Insight endpoint health check failed",
     );
+    return res.data;
+  } catch (error: any) {
+    const message =
+      extractInsightErrorMessage(error?.response?.data) ||
+      error?.message ||
+      "Insight endpoint health check failed";
+    throw new Error(message);
   }
-
-  return responseBody as InsightEndpointHealthResponse;
 }
