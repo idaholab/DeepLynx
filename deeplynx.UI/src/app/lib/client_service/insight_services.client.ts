@@ -302,27 +302,22 @@ export async function fetchInsightIngestionStatus(
 export async function fetchInsightEndpointHealth(
     healthRequest: FetchInsightEndpointHealthArgs,
 ): Promise<InsightEndpointHealthResponse> {
-  const queryParams = new URLSearchParams({
-    organizationId: String(healthRequest.organizationId),
-    projectId: String(healthRequest.projectId),
-  });
-  
   const response = await fetch(
-      `/api/v1/insight/endpoint_health?${queryParams.toString()}`,
+      `/api/v1/organizations/${healthRequest.organizationId}/projects/${healthRequest.projectId}/insight/endpoint_health`,
       {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         cache: "no-store",
         body: JSON.stringify({
-          modelConfigId: healthRequest.modelConfigId ?? null,
+          modelConfig: healthRequest.modelConfigId ?? null,
           modelType: healthRequest.modelType,
         }),
       },
   );
-  
+
   const responseText = await response.text();
   const responseBody = parseJsonOrTextResponseBody(responseText);
-  
+
   if (!response.ok) {
     throw new Error(
         extractInsightErrorMessage(responseBody) ||
@@ -330,6 +325,6 @@ export async function fetchInsightEndpointHealth(
         "Insight endpoint health check failed",
     );
   }
-  
+
   return responseBody as InsightEndpointHealthResponse;
 }
