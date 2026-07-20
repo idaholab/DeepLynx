@@ -10,7 +10,7 @@ using Scalar.AspNetCore;
 namespace deeplynx.api.Controllers;
 
 [ApiController]
-[ApiVersion(1, Deprecated = true)]
+[ApiVersion(1)]
 [ApiVersion(2)]
 [Route("organizations")]
 [Authorize]
@@ -39,7 +39,7 @@ public class OrganizationController : ControllerBase
     ///     Get All Organizations
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
-    /// <returns></returns>
+    /// <returns>A list of organizations visible to the current user.</returns>
     [HttpGet(Name = "api_get_all_organizations")]
     [MapToApiVersion(1)]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizations(
@@ -65,7 +65,7 @@ public class OrganizationController : ControllerBase
     ///     Get All Organizations
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
-    /// <returns></returns>
+    /// <returns>A list of organizations visible to the current user.</returns>
     [HttpGet(Name = "api_get_all_organizations")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -83,7 +83,7 @@ public class OrganizationController : ControllerBase
     ///     Get Organizations for User
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
-    /// <returns></returns>
+    /// <returns>A list of organizations associated with the current user.</returns>
     [HttpGet("user", Name = "api_get_organizations_for_user")]
     [MapToApiVersion(1)]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizationsForUser(
@@ -110,7 +110,7 @@ public class OrganizationController : ControllerBase
     ///     Get Organizations for User
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
-    /// <returns></returns>
+    /// <returns>A list of organizations associated with the current user.</returns>
     [HttpGet("user", Name = "api_get_organizations_for_user")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -130,7 +130,7 @@ public class OrganizationController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of organization</param>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
-    /// <returns></returns>
+    /// <returns>The requested organization.</returns>
     [HttpGet("{organizationId:long}", Name = "api_get_organization")]
     [MapToApiVersion(1)]
     [Auth("read", "organization")]
@@ -155,7 +155,7 @@ public class OrganizationController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of organization</param>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
-    /// <returns></returns>
+    /// <returns>The requested organization.</returns>
     [HttpGet("{organizationId:long}", Name = "api_get_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -171,7 +171,7 @@ public class OrganizationController : ControllerBase
     ///     Create an Organization
     /// </summary>
     /// <param name="dto">Data structure of organization to create</param>
-    /// <returns></returns>
+    /// <returns>The newly created organization.</returns>
     [HttpPost(Name = "api_create_organization")]
     [MapToApiVersion(1)]
     [SysAdmin]
@@ -196,7 +196,7 @@ public class OrganizationController : ControllerBase
     ///     Create an Organization
     /// </summary>
     /// <param name="dto">Data structure of organization to create</param>
-    /// <returns></returns>
+    /// <returns>The newly created organization.</returns>
     [HttpPost(Name = "api_create_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -214,7 +214,7 @@ public class OrganizationController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization</param>
     /// <param name="dto">Fields to update</param>
-    /// <returns></returns>
+    /// <returns>The updated organization.</returns>
     [HttpPut("{organizationId:long}", Name = "api_update_organization")]
     [MapToApiVersion(1)]
     [Auth("update", "organization")]
@@ -241,7 +241,7 @@ public class OrganizationController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization</param>
     /// <param name="dto">Fields to update</param>
-    /// <returns></returns>
+    /// <returns>The updated organization.</returns>
     [HttpPut("{organizationId:long}", Name = "api_update_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -259,7 +259,7 @@ public class OrganizationController : ControllerBase
     ///     Delete an Organization
     /// </summary>
     /// <param name="organizationId">ID of the organization to hard delete</param>
-    /// <returns></returns>
+    /// <returns>A message confirming that the organization was deleted.</returns>
     [HttpDelete("{organizationId:long}", Name = "api_delete_organization")]
     [MapToApiVersion(1)]
     [SysAdmin]
@@ -282,7 +282,7 @@ public class OrganizationController : ControllerBase
     ///     Delete an Organization
     /// </summary>
     /// <param name="organizationId">ID of the organization to hard delete</param>
-    /// <returns></returns>
+    /// <returns>A 200 OK response with an empty body.</returns>
     [HttpDelete("{organizationId:long}", Name = "api_delete_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -290,7 +290,7 @@ public class OrganizationController : ControllerBase
     public async Task<ActionResult> DeleteOrganizationV2(long organizationId)
     {
         await _organizationBusiness.DeleteOrganization(organizationId);
-        return Ok(new { message = $"Deleted organization {organizationId}" });
+        return Ok();
     }
 
     /// <summary>
@@ -332,7 +332,7 @@ public class OrganizationController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization</param>
     /// <param name="archive">True to archive the organization, false to unarchive it.</param>
-    /// <returns>A message stating the organization was successfully archived or unarchived.</returns>
+    /// <returns>A 200 OK response with an empty body.</returns>
     [HttpPatch("{organizationId:long}", Name = "api_archive_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -346,11 +346,11 @@ public class OrganizationController : ControllerBase
         if (archive)
         {
             await _organizationBusiness.ArchiveOrganization(userId, organizationId);
-            return Ok(new { message = $"Archived organization {organizationId}" });
+            return Ok();
         }
 
         await _organizationBusiness.UnarchiveOrganization(userId, organizationId);
-        return Ok(new { message = $"Unarchived organization {organizationId}" });
+        return Ok();
     }
 
     /// <summary>
@@ -359,7 +359,7 @@ public class OrganizationController : ControllerBase
     /// <param name="organizationId">ID of the organization</param>
     /// <param name="userId">ID of the user to be added</param>
     /// <param name="isAdmin"></param>
-    /// <returns></returns>
+    /// <returns>A message confirming that the user was added to the organization.</returns>
     [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
     [MapToApiVersion(1)]
     [OrgAdmin]
@@ -387,7 +387,7 @@ public class OrganizationController : ControllerBase
     /// <param name="organizationId">ID of the organization</param>
     /// <param name="userId">ID of the user to be added</param>
     /// <param name="isAdmin"></param>
-    /// <returns></returns>
+    /// <returns>A 200 OK response with an empty body.</returns>
     [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -398,7 +398,7 @@ public class OrganizationController : ControllerBase
         [FromQuery] bool isAdmin = false)
     {
         await _organizationBusiness.AddUserToOrganization(organizationId, userId, isAdmin);
-        return Ok(new { message = $"Added user {userId} to organization {organizationId}" });
+        return Ok();
     }
 
     /// <summary>
@@ -407,7 +407,7 @@ public class OrganizationController : ControllerBase
     /// <param name="organizationId">ID of the organization</param>
     /// <param name="userId">ID of the user</param>
     /// <param name="isAdmin">isAdmin status</param>
-    /// <returns></returns>
+    /// <returns>A message confirming the user's organization administrator status was updated.</returns>
     [HttpPut("{organizationId:long}/admin", Name = "api_update_organization_admin_status")]
     [MapToApiVersion(1)]
     [OrgAdmin]
@@ -438,7 +438,7 @@ public class OrganizationController : ControllerBase
     /// <param name="organizationId">ID of the organization</param>
     /// <param name="userId">ID of the user</param>
     /// <param name="isAdmin">isAdmin status</param>
-    /// <returns></returns>
+    /// <returns>A 200 OK response with an empty body.</returns>
     [HttpPut("{organizationId:long}/admin", Name = "api_update_organization_admin_status")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -451,7 +451,7 @@ public class OrganizationController : ControllerBase
         [FromQuery] bool isAdmin)
     {
         await _organizationBusiness.SetOrganizationAdminStatus(organizationId, userId, isAdmin);
-        return Ok(new { message = $"Adjusted admin status for user {userId} in organization {organizationId}" });
+        return Ok();
     }
 
     /// <summary>
@@ -459,7 +459,7 @@ public class OrganizationController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization to remove from</param>
     /// <param name="userId">ID of user to be removed</param>
-    /// <returns></returns>
+    /// <returns>A message confirming that the user was removed from the organization.</returns>
     [HttpDelete("{organizationId:long}/user", Name = "api_remove_user_from_organization")]
     [MapToApiVersion(1)]
     [OrgAdmin]
@@ -487,7 +487,7 @@ public class OrganizationController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization to remove from</param>
     /// <param name="userId">ID of user to be removed</param>
-    /// <returns></returns>
+    /// <returns>A 200 OK response with an empty body.</returns>
     [HttpDelete("{organizationId:long}/user", Name = "api_remove_user_from_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -499,7 +499,7 @@ public class OrganizationController : ControllerBase
         [FromQuery] long userId)
     {
         await _organizationBusiness.RemoveUserFromOrganization(organizationId, userId);
-        return Ok(new { message = $"Removed user {userId} from organization {organizationId}" });
+        return Ok();
     }
 
     /// <summary>
@@ -508,7 +508,7 @@ public class OrganizationController : ControllerBase
     /// <param name="organizationId"></param>
     /// <param name="userEmail"></param>
     /// <param name="userId"></param>
-    /// <returns></returns>
+    /// <returns>A message confirming that the user was invited to the organization.</returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
     [MapToApiVersion(1)]
     [ProjectAdmin(unscoped: true)]
@@ -540,7 +540,7 @@ public class OrganizationController : ControllerBase
     /// <param name="organizationId"></param>
     /// <param name="userEmail"></param>
     /// <param name="userId"></param>
-    /// <returns></returns>
+    /// <returns>A 200 OK response with an empty body.</returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -551,9 +551,6 @@ public class OrganizationController : ControllerBase
         [FromQuery] long? userId)
     {
         await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, userId, userEmail);
-        return Ok(new
-        {
-            message = $"Invited and added inactive user with email {userEmail} to organization {organizationId}"
-        });
+        return Ok();
     }
 }

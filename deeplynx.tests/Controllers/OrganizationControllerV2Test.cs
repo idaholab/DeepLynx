@@ -192,7 +192,7 @@ public class OrganizationControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteOrganizationV2_ReturnsDeletedMessage()
+    public async Task DeleteOrganizationV2_ReturnsOkAndPassesOrganizationId()
     {
         _mockOrganizationBusiness
             .Setup(b => b.DeleteOrganization(OrgId))
@@ -200,9 +200,8 @@ public class OrganizationControllerV2Tests : IDisposable
 
         var actionResult = await _controller.DeleteOrganizationV2(OrgId);
 
-        var result = Assert.IsType<OkObjectResult>(actionResult);
+        var result = Assert.IsType<OkResult>(actionResult);
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.Equal($"Deleted organization {OrgId}", GetMessage(result.Value));
         _mockOrganizationBusiness.Verify(b => b.DeleteOrganization(OrgId), Times.Once);
     }
 
@@ -217,7 +216,7 @@ public class OrganizationControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task ArchiveOrganizationV2_ArchivesAndReturnsMessage()
+    public async Task ArchiveOrganizationV2_ArchivesAndReturnsOk()
     {
         _mockOrganizationBusiness
             .Setup(b => b.ArchiveOrganization(UserId, OrgId))
@@ -225,8 +224,8 @@ public class OrganizationControllerV2Tests : IDisposable
 
         var actionResult = await _controller.ArchiveOrganizationV2(OrgId, true);
 
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-        Assert.Equal($"Archived organization {OrgId}", GetMessage(result.Value));
+        var result = Assert.IsType<OkResult>(actionResult);
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         _mockOrganizationBusiness.Verify(b => b.ArchiveOrganization(UserId, OrgId), Times.Once);
         _mockOrganizationBusiness.Verify(
             b => b.UnarchiveOrganization(It.IsAny<long>(), It.IsAny<long>()),
@@ -234,7 +233,7 @@ public class OrganizationControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task ArchiveOrganizationV2_UnarchivesAndReturnsMessage()
+    public async Task ArchiveOrganizationV2_UnarchivesAndReturnsOk()
     {
         _mockOrganizationBusiness
             .Setup(b => b.UnarchiveOrganization(UserId, OrgId))
@@ -242,8 +241,8 @@ public class OrganizationControllerV2Tests : IDisposable
 
         var actionResult = await _controller.ArchiveOrganizationV2(OrgId, false);
 
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-        Assert.Equal($"Unarchived organization {OrgId}", GetMessage(result.Value));
+        var result = Assert.IsType<OkResult>(actionResult);
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         _mockOrganizationBusiness.Verify(b => b.UnarchiveOrganization(UserId, OrgId), Times.Once);
         _mockOrganizationBusiness.Verify(
             b => b.ArchiveOrganization(It.IsAny<long>(), It.IsAny<long>()),
@@ -272,7 +271,7 @@ public class OrganizationControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task AddUserToOrganizationV2_ReturnsMessageAndPassesArguments()
+    public async Task AddUserToOrganizationV2_ReturnsOkAndPassesArguments()
     {
         const bool isAdmin = true;
         _mockOrganizationBusiness
@@ -281,8 +280,8 @@ public class OrganizationControllerV2Tests : IDisposable
 
         var actionResult = await _controller.AddUserToOrganizationV2(OrgId, TargetUserId, isAdmin);
 
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-        Assert.Equal($"Added user {TargetUserId} to organization {OrgId}", GetMessage(result.Value));
+        var result = Assert.IsType<OkResult>(actionResult);
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         _mockOrganizationBusiness.Verify(
             b => b.AddUserToOrganization(OrgId, TargetUserId, isAdmin),
             Times.Once);
@@ -300,7 +299,7 @@ public class OrganizationControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task SetOrganizationAdminStatusV2_ReturnsMessageAndPassesArguments()
+    public async Task SetOrganizationAdminStatusV2_ReturnsOkAndPassesArguments()
     {
         const bool isAdmin = true;
         _mockOrganizationBusiness
@@ -309,10 +308,8 @@ public class OrganizationControllerV2Tests : IDisposable
 
         var actionResult = await _controller.SetOrganizationAdminStatusV2(OrgId, TargetUserId, isAdmin);
 
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-        Assert.Equal(
-            $"Adjusted admin status for user {TargetUserId} in organization {OrgId}",
-            GetMessage(result.Value));
+        var result = Assert.IsType<OkResult>(actionResult);
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         _mockOrganizationBusiness.Verify(
             b => b.SetOrganizationAdminStatus(OrgId, TargetUserId, isAdmin),
             Times.Once);
@@ -330,7 +327,7 @@ public class OrganizationControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task RemoveUserFromOrganizationV2_ReturnsMessageAndPassesArguments()
+    public async Task RemoveUserFromOrganizationV2_ReturnsOkAndPassesArguments()
     {
         _mockOrganizationBusiness
             .Setup(b => b.RemoveUserFromOrganization(OrgId, TargetUserId))
@@ -338,8 +335,8 @@ public class OrganizationControllerV2Tests : IDisposable
 
         var actionResult = await _controller.RemoveUserFromOrganizationV2(OrgId, TargetUserId);
 
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-        Assert.Equal($"Removed user {TargetUserId} from organization {OrgId}", GetMessage(result.Value));
+        var result = Assert.IsType<OkResult>(actionResult);
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         _mockOrganizationBusiness.Verify(
             b => b.RemoveUserFromOrganization(OrgId, TargetUserId),
             Times.Once);
@@ -357,7 +354,7 @@ public class OrganizationControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task InviteUserToOrganizationV2_ReturnsMessageAndPassesArguments()
+    public async Task InviteUserToOrganizationV2_ReturnsOkAndPassesArguments()
     {
         _mockInvitationBusiness
             .Setup(b => b.InviteAndAddUserToHierarchy(
@@ -374,10 +371,8 @@ public class OrganizationControllerV2Tests : IDisposable
             UserEmail,
             TargetUserId);
 
-        var result = Assert.IsType<OkObjectResult>(actionResult);
-        Assert.Equal(
-            $"Invited and added inactive user with email {UserEmail} to organization {OrgId}",
-            GetMessage(result.Value));
+        var result = Assert.IsType<OkResult>(actionResult);
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         _mockInvitationBusiness.Verify(
             b => b.InviteAndAddUserToHierarchy(
                 OrgId,
@@ -545,11 +540,4 @@ public class OrganizationControllerV2Tests : IDisposable
             .ToArray();
     }
 
-    private static string GetMessage(object? value)
-    {
-        Assert.NotNull(value);
-        var messageProperty = value.GetType().GetProperty("message");
-        Assert.NotNull(messageProperty);
-        return Assert.IsType<string>(messageProperty.GetValue(value));
-    }
 }
