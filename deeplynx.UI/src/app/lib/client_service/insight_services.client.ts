@@ -308,7 +308,7 @@ export async function fetchInsightEndpointHealth(
   });
   
   const response = await fetch(
-      `/api/insight/endpoint_health?${queryParams.toString()}`,
+      `/api/v1/insight/endpoint_health?${queryParams.toString()}`,
       {
         method: "POST",
         headers: {"Content-Type": "application/json"},
