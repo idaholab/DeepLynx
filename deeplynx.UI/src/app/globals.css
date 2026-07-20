@@ -533,3 +533,107 @@ html {
 .id-tooltip:hover [role="tooltip"] {
   pointer-events: auto;
 }
+
+.insight-markdown-message {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.insight-markdown-message > *:first-child {
+  margin-top: 0;
+}
+
+.insight-markdown-message > *:last-child {
+  margin-bottom: 0;
+}
+
+.insight-markdown-message p {
+  margin: 0.5rem 0;
+}
+
+.insight-markdown-message h1,
+.insight-markdown-message h2,
+.insight-markdown-message h3 {
+  margin: 0.75rem 0 0.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.insight-markdown-message h1 {
+  font-size: 1.25rem;
+}
+
+.insight-markdown-message h2 {
+  font-size: 1.125rem;
+}
+
+.insight-markdown-message h3 {
+  font-size: 1rem;
+}
+
+.insight-markdown-message ul,
+.insight-markdown-message ol {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+.insight-markdown-message ul {
+  list-style: disc;
+}
+
+.insight-markdown-message ol {
+  list-style: decimal;
+}
+
+.insight-markdown-message li {
+  margin: 0.25rem 0;
+}
+
+.insight-markdown-message blockquote {
+  margin: 0.75rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid currentColor;
+  opacity: 0.8;
+}
+
+.insight-markdown-message code {
+  border-radius: 0.375rem;
+  background: color-mix(in oklch, currentColor 10%, transparent);
+  padding: 0.125rem 0.25rem;
+  font-size: 0.85em;
+}
+
+.insight-markdown-message pre {
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, currentColor 8%, transparent);
+  padding: 0.75rem;
+}
+
+.insight-markdown-message pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.insight-markdown-message table {
+  margin: 0.75rem 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.insight-markdown-message th,
+.insight-markdown-message td {
+  border: 1px solid currentColor;
+  padding: 0.4rem 0.5rem;
+}
+
+.insight-markdown-message th {
+  font-weight: 700;
+}
+
+.insight-markdown-message a {
+  text-decoration: underline;
+}
