@@ -620,6 +620,56 @@ export default function UploadCenterClient() {
     }
   };
 
+  useEffect(() => {
+    let cancelling = false;
+
+    const handleCancelUpload = async () => {
+      if (cancelling) return;
+      cancelling = true;
+
+      const latestProgress = fileUploadState.uploadProgress;
+      if (latestProgress?.uploadId) {
+        try {
+          await cancelChunkedUpload({
+            organizationId: organization?.organizationId as number,
+            projectId: projectId,
+            dataSourceId: dataSourceId,
+            objectStorageId: objectStorageId,
+            uploadId: latestProgress.uploadId,
+          });
+        } catch (err) {
+          console.error("Failed to cancel upload on unload/offline:", err);
+        }
+      }
+    };
+
+    const beforeUnloadListener = (event: BeforeUnloadEvent) => {
+      handleCancelUpload();
+
+      event.preventDefault();
+      (event as any).returnValue = "";
+    };
+
+    const offlineListener = () => {
+      handleCancelUpload();
+    };
+
+    window.addEventListener("beforeunload", beforeUnloadListener);
+    window.addEventListener("offline", offlineListener);
+
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnloadListener);
+      window.removeEventListener("offline", offlineListener);
+    };
+  }, [
+    fileUploadState.uploadProgress,
+    organization?.organizationId,
+    projectId,
+    dataSourceId,
+    objectStorageId,
+  ]);
+
+
   return (
     <main className="min-h-screen bg-base-200/30">
       <section className="border-b border-base-300/50 bg-base-100">
