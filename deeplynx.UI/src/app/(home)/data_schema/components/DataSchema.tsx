@@ -250,13 +250,15 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
     [classes, selection],
   );
 
-  const selectedRelationship = useMemo(
-    () =>
+  const selectedRelationship = useMemo(() => {
+
+    const foundRelationship =
       selection?.kind === "relationship"
         ? relationships.find((item) => item.id === selection.id) ?? null
-        : null,
-    [relationships, selection],
-  );
+        : null;
+
+    return foundRelationship;
+  }, [relationships, selection]);
 
   useEffect(() => {
     if (!selectedClass) return;
@@ -269,15 +271,25 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
   }, [selectedClass]);
 
   useEffect(() => {
-    if (!selectedRelationship) return;
+    if (!selectedRelationship) {
+      setRelationshipDraft({
+        name: "Unassigned",
+        description: "",
+        uuid: "",
+        originId: null,
+        destinationId: null,
+      });
+      return;
+    }
 
     setRelationshipDraft({
-      name: selectedRelationship.name,
+      name: selectedRelationship.name ?? "Unassigned",
       description: selectedRelationship.description ?? "",
       uuid: selectedRelationship.uuid ?? "",
       originId: selectedRelationship.originId ?? null,
       destinationId: selectedRelationship.destinationId ?? null,
     });
+
   }, [selectedRelationship]);
 
   const classLookup = useMemo(
@@ -533,8 +545,8 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           description:
             relationshipDraft.description.trim() ||
             (selectedRelationship.description ?? ""),
-          origin_id: relationshipDraft.originId ?? undefined,
-          destination_id: relationshipDraft.destinationId ?? undefined,
+          origin_id: relationshipDraft.originId ?? null,
+          destination_id: relationshipDraft.destinationId ?? null,
         },
       );
 
@@ -929,14 +941,13 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
             <select
               className="select select-bordered"
               value={relationshipDraft.originId ?? ""}
-              onChange={(event) =>
+              onChange={(event) => {
+                const newValue = event.target.value ? Number(event.target.value) : null;
                 setRelationshipDraft((previous) => ({
                   ...previous,
-                  originId: event.target.value
-                    ? Number(event.target.value)
-                    : null,
-                }))
-              }
+                  originId: newValue,
+                }));
+              }}
             >
               <option value="">{t.translations.UNASSIGNED}</option>
               {classes.map((item) => (
@@ -953,14 +964,13 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
             <select
               className="select select-bordered"
               value={relationshipDraft.destinationId ?? ""}
-              onChange={(event) =>
+              onChange={(event) => {
+                const newValue = event.target.value ? Number(event.target.value) : null;
                 setRelationshipDraft((previous) => ({
                   ...previous,
-                  destinationId: event.target.value
-                    ? Number(event.target.value)
-                    : null,
-                }))
-              }
+                  destinationId: newValue,
+                }));
+              }}
             >
               <option value="">{t.translations.UNASSIGNED}</option>
               {classes.map((item) => (
