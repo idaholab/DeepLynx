@@ -289,8 +289,8 @@ public class OrganizationController : ControllerBase
     [SysAdmin]
     public async Task<ActionResult> DeleteOrganizationV2(long organizationId)
     {
-        await _organizationBusiness.DeleteOrganization(organizationId);
-        return Ok();
+        var response = await _organizationBusiness.DeleteOrganization(organizationId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -345,12 +345,12 @@ public class OrganizationController : ControllerBase
 
         if (archive)
         {
-            await _organizationBusiness.ArchiveOrganization(userId, organizationId);
-            return Ok();
+            var archiveResponse = await _organizationBusiness.ArchiveOrganization(userId, organizationId);
+            return Ok(archiveResponse);
         }
 
-        await _organizationBusiness.UnarchiveOrganization(userId, organizationId);
-        return Ok();
+        var response = await _organizationBusiness.UnarchiveOrganization(userId, organizationId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -397,8 +397,8 @@ public class OrganizationController : ControllerBase
         [FromQuery] long userId,
         [FromQuery] bool isAdmin = false)
     {
-        await _organizationBusiness.AddUserToOrganization(organizationId, userId, isAdmin);
-        return Ok();
+        var response = await _organizationBusiness.AddUserToOrganization(organizationId, userId, isAdmin);
+        return Ok(response);
     }
 
     /// <summary>
@@ -450,8 +450,8 @@ public class OrganizationController : ControllerBase
         [FromQuery] long userId,
         [FromQuery] bool isAdmin)
     {
-        await _organizationBusiness.SetOrganizationAdminStatus(organizationId, userId, isAdmin);
-        return Ok();
+        var response = await _organizationBusiness.SetOrganizationAdminStatus(organizationId, userId, isAdmin);
+        return Ok(response);
     }
 
     /// <summary>
@@ -498,8 +498,8 @@ public class OrganizationController : ControllerBase
         long organizationId,
         [FromQuery] long userId)
     {
-        await _organizationBusiness.RemoveUserFromOrganization(organizationId, userId);
-        return Ok();
+        var response = await _organizationBusiness.RemoveUserFromOrganization(organizationId, userId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -550,7 +550,7 @@ public class OrganizationController : ControllerBase
         [FromQuery] string? userEmail,
         [FromQuery] long? userId)
     {
-        await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, userId, userEmail);
-        return Ok();
+        var response = await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, userId, userEmail);
+        return Ok(response);
     }
 }
