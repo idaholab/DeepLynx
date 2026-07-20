@@ -231,11 +231,10 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                     <li key={org.id} className="w-full">
                       <a
                         onClick={() => handleOrganizationSwitch(org)}
-                        className={`flex items-center gap-2 w-full max-w-full ${
-                          organization?.organizationId === org.id
-                            ? "active bg-info/60"
-                            : ""
-                        }`}
+                        className={`flex items-center gap-2 w-full max-w-full ${organization?.organizationId === org.id
+                          ? "active bg-info/60"
+                          : ""
+                          }`}
                       >
                         <div className="min-w-0 flex-1 overflow-hidden">
                           <div className=" font-medium truncate">
@@ -290,9 +289,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
         )}
         {/* Side Menu */}
         <div
-          className={`fixed top-20 bottom-0 hidden lg:flex ${
-            isUserDropdownOpen ? "z-[70]" : "z-[55]"
-          }`}
+          className={`fixed top-20 bottom-0 hidden lg:flex ${isUserDropdownOpen ? "z-[70]" : "z-[55]"
+            }`}
         >
           <aside
             className={
@@ -449,9 +447,8 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
           onMobileClose={() => setIsMobileNavOpen(false)}
         />
         <main
-          className={`transition-all duration-300 min-w-[750px] flex-1 w-full mt-20 ml-0 ${
-            isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
-          }`}
+          className={`transition-all duration-300 min-w-[750px] flex-1 w-full mt-20 ml-0 ${isMenuCollapsed ? "lg:ml-40" : "lg:ml-82"
+            }`}
         >
           {/* Organization Banner */}
           <div className="sticky top-25 z-20">
