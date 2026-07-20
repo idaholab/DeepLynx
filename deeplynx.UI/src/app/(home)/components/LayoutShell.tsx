@@ -317,7 +317,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
               )}
               <OrgAdminRoute>
                 <li className="mt-5">
-                  <Link href="/organization_management">
+                  <Link href="/organization_management" aria-label="Organization Settings">
                     <AdjustmentsHorizontalIcon className="size-10" />
                   </Link>
                 </li>
@@ -328,10 +328,10 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
             <ul className="mt-auto">
               <li className="mt-5">
                 <SysAdminRoute>
-                  <Link href={"/site_management"} prefetch={false}>
-                    <Cog6ToothIcon className="size-10" />
-                  </Link>
-                </SysAdminRoute>
+                <Link href={"/site_management"} prefetch={false} aria-label="Admin Settings">
+                  <Cog6ToothIcon className="size-10" />
+                </Link>
+              </SysAdminRoute>
               </li>
               <li className="mt-5 id-tooltip group relative">
                 <Link
