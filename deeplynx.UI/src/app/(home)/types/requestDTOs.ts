@@ -354,3 +354,12 @@ export type TriggerDagRunRequestDto = {
   conf?: Record<string, unknown> | null;
   note?: string | null;
 };
+
+export type CreateRecordFileUploadRequestDto = {
+  name: string;
+  description: string;
+  properties: Record<string, unknown>;
+  originalId: string;
+  classId?: number | null;
+  className?: string | null;
+}

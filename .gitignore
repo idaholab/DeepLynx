@@ -3,6 +3,7 @@
 *.log
 *.zip
 dist
+artifacts/
 
 
 ## Mac OS ##
@@ -39,4 +40,3 @@ global.json
 /storage
 
 .continue
-

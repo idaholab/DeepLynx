@@ -98,14 +98,14 @@ export async function queryBuilder(
 export async function queryBuilderPaginated(
     organizationId: number,
     queryObj: CustomQueryRequestDto[],
-    projectIds: number[],
+    projects: number[],
     pageNumber: number,
     pageSize: number,
     textSearch?: string | null,
 ): Promise<PaginatedResponse<QueryRecordViewResponseDto>> {
     try {
         const params = new URLSearchParams();
-        projectIds.forEach((id) => params.append("projectIds", String(id)));
+        projects.forEach((id) => params.append("projects", String(id)));
         params.append("pageNumber", String(pageNumber ?? 1));
         params.append("pageSize", String(pageSize ?? 25));
         if (textSearch) params.append("textSearch", textSearch);

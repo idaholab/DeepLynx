@@ -13,6 +13,12 @@ public interface IFileBusiness
         Guid guid);
 
     Task<FileStreamResult> DownloadFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig);
+
+    Task<FileStreamResult> DownloadAppendedFile(
+        RecordResponseDto record,
+        ObjectStorageConfigDto objectStorageConfig,
+        CancellationToken cancellationToken = default);
+    
     Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig);
 
     Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,

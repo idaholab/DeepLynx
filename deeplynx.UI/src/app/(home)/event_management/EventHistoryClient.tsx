@@ -15,13 +15,14 @@ import {
   queryAuthorizedEvents,
 } from "@/app/lib/client_service/event_services.client";
 import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
+import { useLanguage } from "@/app/contexts/Language";
 
 type Props = {
   initialProjects: { id: string; name: string }[];
   initialSelectedProjects: string[];
 };
 
-const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) => {
+const EventsHistoryClient = ({ initialProjects, initialSelectedProjects }: Props) => {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [projects] = useState(initialProjects);
   const [selectedProjects, setSelectedProjects] = useState<string[]>(
@@ -45,6 +46,7 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
     startDate: getThirtyDaysAgo(),
   });
   const { organization, hasLoaded: orgLoaded } = useOrganizationSession();
+  const { t } = useLanguage();
 
   type FilterConfig = {
     key: string;
@@ -55,37 +57,37 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
   };
 
   const filterConfig: FilterConfig[] = [
-    { key: "startDate", label: "Start Date", type: "date" },
-    { key: "endDate", label: "End Date", type: "date" },
+    { key: "startDate", label: t.translations.START_DATE, type: "date" },
+    { key: "endDate", label: t.translations.END_DATE, type: "date" },
     {
       key: "projectName",
-      label: "Project Name",
-      placeholder: "Filter by project name...",
+      label: t.translations.PROJECT_NAME,
+      placeholder: t.translations.FILTER_BY_PROJECT_NAME,
     },
     {
       key: "lastUpdatedBy",
-      label: "Last Updated By",
-      placeholder: "Filter by user...",
+      label: t.translations.LAST_UPDATED_BY,
+      placeholder: t.translations.FILTER_BY_USER,
     },
     {
       key: "operation",
-      label: "Operation",
-      placeholder: "Filter by operation...",
+      label: t.translations.OPERATION,
+      placeholder: t.translations.FILTER_BY_OPERATION,
     },
     {
       key: "entityType",
-      label: "Entity Type",
-      placeholder: "Filter by entity type...",
+      label: t.translations.ENTITY_TYPE,
+      placeholder: t.translations.FILTER_BY_ENTITY_TYPE,
     },
     {
       key: "entityName",
-      label: "Entity Name",
-      placeholder: "Filter by entity name...",
+      label: t.translations.ENTITY_NAME,
+      placeholder: t.translations.FILTER_BY_ENTITY_NAME,
     },
     {
       key: "dataSourceName",
-      label: "Data Source",
-      placeholder: "Filter by data source...",
+      label: t.translations.DATA_SOURCE,
+      placeholder: t.translations.FILTER_BY_DATA_SOURCE,
     },
   ];
 
@@ -117,13 +119,13 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
       try {
         const organizationId = Number(organization.organizationId);
         const isAllSelected = selectedProjects.length === initialProjects.length;
-        
+
         const projectIds = isAllSelected
           ? []
           : selectedProjects.map(Number);
 
         const result: PaginatedEventsResponseDto = await queryAuthorizedEvents(
-          organizationId,         
+          organizationId,
           projectIds,
           {
             pageNumber,
@@ -160,14 +162,14 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
   );
 
   const getCleanFilters = (filters: EventFilterParams): Record<string, string | number | number[] | undefined> => {
-  const cleaned: Record<string, string | number | number[] | undefined> = {};
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value !== null && value !== undefined) {
-      cleaned[key] = value;
-    }
-  });
-  return cleaned;
-};
+    const cleaned: Record<string, string | number | number[] | undefined> = {};
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        cleaned[key] = value;
+      }
+    });
+    return cleaned;
+  };
 
   // Fetch when selectedProjects changes
   useEffect(() => {
@@ -207,9 +209,24 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
     fetchEvents(1, pageSize);
   };
 
+  const operationMap: Record<string, string> = {
+    create: "Crear",
+    update: "Actualizar",
+    delete: "Eliminar",
+  };
+
+  const entityTypeMap: Record<string, string> = {
+    class: "Clase",
+    project: "Proyecto",
+    record: "Registro",
+    relationship: "Relación",
+    edge: "Arista",
+    data_source: "Fuente de datos",
+  };
+
   const columns: Column<EventResponseDto>[] = [
     {
-      header: "Time Stamp",
+      header: t.translations.TIME_STAMP,
       data: "lastUpdatedAt",
       sortable: false,
       cell: (row) => {
@@ -218,7 +235,7 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
       },
     },
     {
-      header: "User",
+      header: t.translations.USER,
       data: "lastUpdatedByUserName",
       sortable: false,
       cell: (row) => (
@@ -231,7 +248,7 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
       ),
     },
     {
-      header: "Project",
+      header: t.translations.PROJECT,
       data: "projectName",
       sortable: false,
       cell: (row) => (
@@ -244,17 +261,20 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
       ),
     },
     {
-      header: "Operation",
+      header: t.translations.OPERATION,
       data: "operation",
       sortable: false,
+      cell: (row) => operationMap[row.operation] ?? row.operation,
     },
     {
-      header: "Entity Type",
+      header: t.translations.ENTITY_TYPE,
       data: "entityType",
       sortable: false,
+      cell: (row) =>
+        entityTypeMap[row.entityType] ?? row.entityType,
     },
     {
-      header: "Entity Name",
+      header: t.translations.ENTITY_NAME,
       data: "entityName",
       sortable: false,
       cell: (row) => {
@@ -272,7 +292,7 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
       },
     },
     {
-      header: "Data Source",
+      header: t.translations.DATA_SOURCE,
       data: "dataSourceName",
       sortable: false,
     },
@@ -285,10 +305,10 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
           <div className="space-y-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-                Events
+                {t.translations.EVENTS}
               </p>
               <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
-                Event History
+                {t.translations.EVENT_HISTORY}
               </h1>
             </div>
             <ProjectDropdown
@@ -331,7 +351,7 @@ const EventsHistoryClient = ({initialProjects, initialSelectedProjects}: Props) 
             onPageSizeChange={handlePageSizeChange}
             bordered={false}
             searchBar={true}
-            filterPlaceholder="Search this page..."
+            filterPlaceholder={t.translations.SEARCH_THIS_PAGE}
             rowsPerPage={rowsPerPage}
             setRowsPerPage={setRowsPerPage}
             filters={filterConfig}

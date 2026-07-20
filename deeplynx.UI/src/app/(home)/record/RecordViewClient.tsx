@@ -75,10 +75,12 @@ import {
 } from "@/app/lib/client_service/lattice_services.client";
 import { EmbeddingStatusResponseDTO } from "@/app/(home)/types/latticeDTOs";
 import {
+  fetchInsightEndpointHealth,
   fetchInsightIngestionStatus,
   queueInsightUpload,
 } from "@/app/lib/client_service/insight_services.client";
 import { isInsightHidden } from "@/app/lib/feature_flags";
+import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -147,7 +149,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const { t } = useLanguage();
   const { organization, hasLoaded } = useOrganizationSession();
   const router = useRouter();
-
+  
+  const organizationId =
+      organization?.organizationId !== undefined
+        ? Number(organization.organizationId)
+        : null;
+  
+  const { selectedInsightModels, setSelectedInsightModels } = useInsightModelSelection(
+      organizationId,
+      projectId,
+  );
+          
   // ============= STATE MANAGEMENT =============
   // Record & Tags State
   const [record, setRecord] = useState<HistoricalRecordResponseDto | null>(
@@ -180,6 +192,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
+  const [isQueryModelUnavailable, setIsQueryModelUnavailable] = useState(false);
+  const [isUploadModelUnavailable, setIsUploadModelUnavailable] = useState(false);
+  const [isEmbeddingModelUnavailable, setIsEmbeddingModelUnavailable] = useState(false);
+  const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
+  const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;
+  const [hasCheckedInsightHealth, setHasCheckedInsightHealth] = useState(false);
   const [isQueuingInsightUpload, setIsQueuingInsightUpload] = useState(false);
   const [latticeMode, setLatticeMode] = useState<"strict" | "discovery">(
     "discovery",
@@ -269,6 +287,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const resetAllState = useCallback(() => {
     setRecord(null);
     setRecordFileType(null);
+    setIsQueryModelUnavailable(false);
+    setIsUploadModelUnavailable(false);
+    setIsEmbeddingModelUnavailable(false);
+    setHasCheckedInsightHealth(false);
     setSelectedTags([]);
     setSelectedIds([]);
     setSelectedLabels([]);
@@ -771,6 +793,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   ]);
 
   const handleQueueInsightUpload = useCallback(async () => {
+    if (isIngestionUnavailable) return;
+    
     const uri = record?.uri?.trim();
     if (!uri || !organization?.organizationId) return;
     setIsQueuingInsightUpload(true);
@@ -779,6 +803,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         organizationId: organization.organizationId as number,
         projectId,
         fileInfo: [{ fileId: recordId, fileUri: uri }],
+        vlmModelConfigId: selectedInsightModels.uploadModelConfigId ?? undefined,
+        embeddingModelConfigId: selectedInsightModels.embeddingModelConfigId ?? undefined,
       });
       toast.success(t.translations.LATTICE_QUEUED_SUCCESS);
     } catch {
@@ -786,9 +812,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     } finally {
       setIsQueuingInsightUpload(false);
     }
-  }, [organization?.organizationId, projectId, record?.uri, recordId]);
+  }, [organization?.organizationId, projectId, record?.uri, recordId, isIngestionUnavailable, selectedInsightModels.uploadModelConfigId, selectedInsightModels.embeddingModelConfigId,]);
 
   const handleQueueOntologyEmbeddings = useCallback(async () => {
+    if (isEmbeddingModelUnavailable) return;
+    
     if (!organization?.organizationId) return;
     setIsQueuingOntologyEmbeddings(true);
     try {
@@ -808,6 +836,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     projectId,
     t.translations.LATTICE_ONTOLOGY_QUEUED_SUCCESS,
     t.translations.LATTICE_ONTOLOGY_QUEUE_FAILED,
+    isEmbeddingModelUnavailable,
   ]);
 
   const recordEmbedPollRef = useRef<ReturnType<typeof setInterval> | null>(
@@ -825,24 +854,100 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       try {
         if (isInitial) setIsCheckingLatticeReadiness(true);
 
+        const [queryHealth, uploadHealth, embeddingHealth] =
+            await Promise.allSettled([
+              fetchInsightEndpointHealth({
+                organizationId: organization.organizationId as number,
+                projectId,
+                modelConfigId: selectedInsightModels.queryModelConfigId,
+                modelType: "llm",
+              }),
+              fetchInsightEndpointHealth({
+                organizationId: organization.organizationId as number,
+                projectId,
+                modelConfigId: selectedInsightModels.uploadModelConfigId,
+                modelType: "vlm",
+              }),
+              fetchInsightEndpointHealth({
+                organizationId: organization.organizationId as number,
+                projectId,
+                modelConfigId: selectedInsightModels.embeddingModelConfigId,
+                modelType: "embedding",
+              }),
+            ]);
+
+        const queryUnavailable =
+            queryHealth.status === "rejected" ||
+            !queryHealth.value.reachable ||
+            !queryHealth.value.model_available;
+
+        const uploadUnavailable =
+            uploadHealth.status === "rejected" ||
+            !uploadHealth.value.reachable ||
+            !uploadHealth.value.model_available;
+
+        const embeddingUnavailable =
+            embeddingHealth.status === "rejected" ||
+            !embeddingHealth.value.reachable ||
+            !embeddingHealth.value.model_available;
+
+        if (cancelled) return;
+
+        setHasCheckedInsightHealth(true);
+        setIsQueryModelUnavailable(queryUnavailable);
+        setIsUploadModelUnavailable(uploadUnavailable);
+        setIsEmbeddingModelUnavailable(embeddingUnavailable);
+
+        if (embeddingUnavailable) {
+          setIsRecordInsightEmbedded(false);
+
+          if (recordEmbedPollRef.current) {
+            clearInterval(recordEmbedPollRef.current);
+            recordEmbedPollRef.current = null;
+          }
+
+          return;
+        }
+        
         const status = await fetchInsightIngestionStatus({
           organizationId: organization.organizationId as number,
           projectId,
           fileId: recordId,
         });
-
+        
         if (cancelled) return;
 
+        setHasCheckedInsightHealth(true);
         setIsRecordInsightEmbedded(status.indexed);
 
-        if (status.indexed && recordEmbedPollRef.current) {
-          clearInterval(recordEmbedPollRef.current);
-          recordEmbedPollRef.current = null;
+        if (status.indexed) {
+          if (recordEmbedPollRef.current) {
+            clearInterval(recordEmbedPollRef.current);
+            recordEmbedPollRef.current = null;
+          }
+          return;
+        }
+        
+        if (!recordEmbedPollRef.current) {
+          recordEmbedPollRef.current = setInterval(() => {
+            void checkLatticeReadiness();
+          }, POLL_INTERVAL_MS);
         }
       } catch (error) {
         if (cancelled) return;
-        console.error("Failed to check Insight embedding status:", error);
-        if (isInitial) setIsRecordInsightEmbedded(false);
+
+        setHasCheckedInsightHealth(true);
+        setIsQueryModelUnavailable(true);
+        setIsUploadModelUnavailable(true);
+        setIsEmbeddingModelUnavailable(true);
+        setIsRecordInsightEmbedded(false);
+
+        if (recordEmbedPollRef.current) {
+          clearInterval(recordEmbedPollRef.current);
+          recordEmbedPollRef.current = null;
+        }
+        
+        console.error("Failed to check Insight status:", error);
       } finally {
         if (!cancelled && isInitial) {
           setIsCheckingLatticeReadiness(false);
@@ -853,10 +958,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
     void checkLatticeReadiness();
 
-    recordEmbedPollRef.current = setInterval(() => {
-      void checkLatticeReadiness();
-    }, POLL_INTERVAL_MS);
-
     return () => {
       cancelled = true;
       if (recordEmbedPollRef.current) {
@@ -864,7 +965,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         recordEmbedPollRef.current = null;
       }
     };
-  }, [organization?.organizationId, projectId, recordId]);
+  }, [organization?.organizationId, projectId, recordId, selectedInsightModels.queryModelConfigId, selectedInsightModels.uploadModelConfigId, selectedInsightModels.embeddingModelConfigId]);
 
   useEffect(() => {
     if (!organization?.organizationId || !projectId) return;
@@ -1013,6 +1114,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 recordName={record.name}
                 recordUri={record.uri}
                 onEmbeddingStatusChange={setIsRecordInsightEmbedded}
+                isChatUnavailable={!hasCheckedInsightHealth || isChatUnavailable}
+                isIngestionUnavailable={!hasCheckedInsightHealth || isIngestionUnavailable}
+                selectedInsightModels={selectedInsightModels}
+                onSelectedInsightModelsChange={setSelectedInsightModels}
               />
             ) : null}
 
@@ -1174,7 +1279,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                             type="button"
                             className="btn btn-warning btn-sm shrink-0"
                             onClick={handleQueueInsightUpload}
-                            disabled={isQueuingInsightUpload}
+                            disabled={isQueuingInsightUpload || isIngestionUnavailable}
                           >
                             {isQueuingInsightUpload ? (
                               <span className="loading loading-spinner loading-sm" />
@@ -1274,7 +1379,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                               type="button"
                               className="btn btn-outline btn-xs shrink-0 ml-auto"
                               onClick={handleQueueOntologyEmbeddings}
-                              disabled={isQueuingOntologyEmbeddings}
+                              disabled={isQueuingOntologyEmbeddings || isEmbeddingModelUnavailable}
                             >
                               {isQueuingOntologyEmbeddings ? (
                                 <span className="loading loading-spinner loading-xs" />
@@ -1387,9 +1492,26 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
               <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
                 {t.translations.RECORD}
               </p>
-              <h1 className="break-words text-2xl font-bold text-base-content sm:text-3xl">
-                {record.name}
-              </h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="break-words text-2xl font-bold text-base-content sm:text-3xl">
+                  {record.name}
+                </h1>
+                {isQueryModelUnavailable && (
+                    <span className="badge badge-warning badge-sm">
+                      Query model unavailable
+                    </span>
+                )}
+                {isUploadModelUnavailable && (
+                    <span className="badge badge-warning badge-sm">
+                      Upload/OCR model unavailable
+                    </span>
+                )}
+                {isEmbeddingModelUnavailable && (
+                    <span className="badge badge-warning badge-sm">
+                      Embedding model unavailable
+                    </span>
+                )}
+              </div>
               {record.classId ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <span className="badge badge-primary h-auto min-h-6 whitespace-normal break-words px-3 py-1 text-center leading-tight">

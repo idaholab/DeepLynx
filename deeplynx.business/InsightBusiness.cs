@@ -22,6 +22,7 @@ public class InsightBusiness : IInsightBusiness
     private readonly DeeplynxContext _context;
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IAiModelConfigBusiness _aiModelConfigBusiness;
+    private readonly IProvenanceBusiness _provenanceBusiness;
     private readonly ILogger<InsightBusiness> _logger;
 
     private readonly ISensitivityLabelService _sensitivityLabelService;
@@ -30,12 +31,14 @@ public class InsightBusiness : IInsightBusiness
         DeeplynxContext context,
         InsightServiceClient insightServiceClient,
         IAiModelConfigBusiness aiModelConfigBusiness,
+        IProvenanceBusiness provenanceBusiness,
         ILogger<InsightBusiness> logger,
         ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
         _insightServiceClient = insightServiceClient;
         _aiModelConfigBusiness = aiModelConfigBusiness;
+        _provenanceBusiness = provenanceBusiness;
         _logger = logger;
         _sensitivityLabelService = sensitivityLabelService;
     }
@@ -115,6 +118,7 @@ public class InsightBusiness : IInsightBusiness
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="recordId">The ID of the record to embed.</param>
     /// <param name="uri">The URI of the file to embed.</param>
+    /// <param name="currentUserId">The ID of the user making the request.</param>
     /// <param name="vlmConfig">Optional explicit VLM model config ID. If null, the project/org default is used.</param>
     /// <param name="embeddingConfig">Optional explicit embedding model config ID. If null, the project/org default is used.</param>
     /// <param name="userJwt">The requesting user's JWT used for forwarding to Insight</param>
@@ -123,6 +127,7 @@ public class InsightBusiness : IInsightBusiness
         long projectId,
         long recordId,
         string uri,
+        long currentUserId,
         AiModelConfigResponseDto.WithToken vlmConfig,
         AiModelConfigResponseDto.WithToken embeddingConfig,
         string? userJwt = null,
@@ -148,6 +153,17 @@ public class InsightBusiness : IInsightBusiness
                     _logger.LogError(t.Exception,
                         "Insight enqueue failed for record {RecordId} in project {ProjectId}",
                         recordId, projectId);
+            }, TaskContinuationOptions.None);
+
+        _ = _provenanceBusiness.CreateProvenanceRecord(recordId, "request-embedding", currentUserId, embeddingConfig.Id)
+            .ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    _logger.LogError(t.Exception,
+                        "Provenance record creation threw for embedding trigger on record {RecordId}", recordId);
+                else if (!t.Result)
+                    _logger.LogWarning(
+                        "Failed to create provenance record for embedding trigger on record {RecordId}", recordId);
             }, TaskContinuationOptions.None);
     }
 
@@ -206,6 +222,103 @@ public class InsightBusiness : IInsightBusiness
     public Task<InsightIngestionStatusResponseDto> FetchInsightIngestionStatus(long recordId)
     {
         return _insightServiceClient.GetIngestionStatus(recordId);
+    }
+
+    /// <summary>
+    ///     Fetches the persistent upload pipeline status for a record from Insight
+    ///     after validating that the record belongs to the requested organization/project
+    ///     and that the current user is authorized to read it.
+    ///     Maps to GET /pipeline_status/{recordId}.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request.</param>
+    /// <param name="organizationId">The ID of the organization to which the record belongs.</param>
+    /// <param name="projectId">The ID of the project to which the record belongs.</param>
+    /// <param name="recordId">The Insight file ID to check.</param>
+    /// <returns>The parsed pipeline status from Insight.</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when the record is not found in the requested organization/project or is archived.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when the current user is not authorized to read the record.</exception>
+    /// <exception cref="InsightServiceException">Thrown when Insight returns a non-success status.</exception>
+    public async Task<InsightPipelineStatusResponseDto> FetchInsightPipelineStatus(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        var recordExists = await _context.Records.AnyAsync(r =>
+            r.Id == recordId &&
+            r.OrganizationId == organizationId &&
+            r.ProjectId == projectId &&
+            !r.IsArchived);
+
+        if (!recordExists)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        var authorizedIds = await _sensitivityLabelService.FilterAuthorizedRecordIds(
+            currentUserId,
+            organizationId,
+            projectId,
+            [recordId],
+            _context);
+
+        if (!authorizedIds.Contains(recordId))
+            throw new UnauthorizedAccessException($"User is not authorized to access record {recordId}");
+
+        return await _insightServiceClient.GetPipelineStatus(recordId);
+    }
+
+    /// <summary>
+    ///     Checks the health of the requested model endpoint using the resolved model configuration.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
+    /// <param name="organizationId">The ID of the organization. Used to scope model configuration resolution.</param>
+    /// <param name="projectId">The ID of the project. Project-level model configurations take priority over organization-level defaults.</param>
+    /// <param name="modelConfigId">Optional model configuration ID. When null, the default config for modelType is resolved.</param>
+    /// <param name="modelType">The model type string used when falling back to the default (e.g. "llm", "vlm", or "embedding").</param>
+    /// <returns>
+    ///     Returns the endpoint health result, including endpoint reachability,
+    ///     model availability, latency, optional model metadata, and
+    ///     details returned by the Insight service.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">Thrown when the specified model type is invalid.</exception>
+    public async Task<InsightEndpointHealthResponseDto> CheckEndpointHealth(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long? modelConfigId,
+        string modelType)
+    {
+        var normalizedModelType = modelType.Trim().ToLowerInvariant();
+
+        if (normalizedModelType is not ("llm" or "vlm" or "embedding"))
+            throw new InvalidOperationException(
+                "modelType must be one of: llm, vlm, embedding.");
+
+        var config = await ResolveModelConfig(
+            currentUserId,
+            organizationId,
+            projectId,
+            modelConfigId,
+            normalizedModelType);
+
+        var isAllowedLlmCompatibleModel =
+            normalizedModelType == "llm" &&
+            string.Equals(config.ModelType, "vlm", StringComparison.OrdinalIgnoreCase);
+
+        if (!isAllowedLlmCompatibleModel &&
+            !string.Equals(config.ModelType, normalizedModelType, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Model configuration {config.Id} is type '{config.ModelType}' but '{normalizedModelType}' was requested.");
+        }
+
+        var request = new InsightEndpointHealthRequestDto
+        {
+            ServerUrl = config.ServerUrl,
+            ModelName = config.ModelName,
+            AuthToken = config.Token
+        };
+
+        return await _insightServiceClient.EndpointHealth(request);
     }
 
     /// <summary>

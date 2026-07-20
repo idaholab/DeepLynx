@@ -1,13 +1,10 @@
-import React from "react";
-import {
-  ShieldCheckIcon,
-  LockClosedIcon,
-  LockOpenIcon,
-  MagnifyingGlassIcon,
-  InformationCircleIcon,
-} from "@heroicons/react/24/outline";
 import type { SensitivityLabelsDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
+import {
+  MagnifyingGlassIcon,
+  ShieldCheckIcon,
+} from "@heroicons/react/24/outline";
+import React from "react";
 
 interface Props {
   labels: SensitivityLabelsDto[];

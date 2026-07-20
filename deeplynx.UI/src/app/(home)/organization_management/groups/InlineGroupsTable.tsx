@@ -24,6 +24,7 @@ import { GroupResponseDto, UserResponseDto } from "../../types/responseDTOs";
 import GroupArchiveModal from "./GroupArchiveModal";
 import CreateGroupInlineForm from "./CreateGroupInlineForm";
 import GroupsTable from "./GroupsTable";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -96,6 +97,8 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
   );
   const { organization } = useOrganizationSession();
 
+  const { t } = useLanguage();
+
   /* ------------------------------------------------------------------------ */
   /*                           Archive Group Modal                            */
   /* ------------------------------------------------------------------------ */
@@ -119,50 +122,50 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
   useEffect(() => {
     const loadGroupData = async () => {
       const orgId = organization?.organizationId ?? organizationId;
-      
+
       if (!orgId || initialGroups.length === 0) return;
-      
+
       const preloadedGroupMembers = new Map<
-          string | number,
-          UserResponseDto[]
+        string | number,
+        UserResponseDto[]
       >();
-      
+
       // Parallel fetch members from all groups
       const groupsWithCounts = await Promise.all(
-          initialGroups.map(async (group) => {
-            try {
-              // Check current group's member
-              const members = await getGroupMembers(
-                  Number(orgId),
-                  Number(group.id)
-              );
-              
-              preloadedGroupMembers.set(group.id, members);
-              
-              return {
-                ...group,
-                memberCount: members.length,
-              };
-            } catch (err) {
-              console.error(
-                  `Failed to load members for group ${group.id}`,
-                  err
-              );
-              
-              return {
-                ...group,
-                memberCount: group.memberCount ?? 0,
-              };
-            }
-          })
+        initialGroups.map(async (group) => {
+          try {
+            // Check current group's member
+            const members = await getGroupMembers(
+              Number(orgId),
+              Number(group.id)
+            );
+
+            preloadedGroupMembers.set(group.id, members);
+
+            return {
+              ...group,
+              memberCount: members.length,
+            };
+          } catch (err) {
+            console.error(
+              `Failed to load members for group ${group.id}`,
+              err
+            );
+
+            return {
+              ...group,
+              memberCount: group.memberCount ?? 0,
+            };
+          }
+        })
       );
-      
+
       setGroups(groupsWithCounts);
       setGroupMembers(preloadedGroupMembers);
     };
     loadGroupData();
   }, [initialGroups, organization?.organizationId, organizationId]);
-  
+
   const fetchGroupMembers = async (groupId: string | number) => {
     setLoadingMembers((prev) => new Set(prev).add(groupId));
 
@@ -202,7 +205,7 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
     } else {
       setExpandedGroup(groupId);
       setEditingGroup(null);
-      
+
       if (!groupMembers.has(groupId)) {
         await fetchGroupMembers(groupId);
       }
@@ -475,7 +478,7 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
     const memberIds = new Set(currentMembers.map((m) => m.id));
 
     return availableUsers.filter(
-      (u) => !memberIds.has(u.id) && u.isActive && !u.isArchived
+      (u) => !memberIds.has(u.id) && !u.isArchived
     );
   };
 
@@ -502,10 +505,10 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-2xl font-bold text-base-content">
-              Group Management
+              {t.translations.GROUP_MANAGEMENT}
             </h2>
             <p className="text-base-content/70 mt-1">
-              Create and manage user groups for your organization
+              {t.translations.CREATE_AND_MANAGE_USER_GROUPS_FOR_YOUR_ORGANIZATION}
             </p>
           </div>
           <button
@@ -514,7 +517,7 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
             disabled={loading}
           >
             <PlusIcon className="size-6" />
-            Create Group
+            {t.translations.CREATE_GROUP}
           </button>
         </div>
 

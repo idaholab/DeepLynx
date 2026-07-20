@@ -79,6 +79,7 @@ export type ChunkedUploadOptions = {
   objectStorageId?: number | string;
   fileName: string;
   fileSize: number;
+  metadataFile?: File;
 };
 
 export type ChunkUploadOptions = {

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
+import { useLanguage } from "@/app/contexts/Language";
 import {
   archiveOrgRole,
   createOrgRole,
@@ -51,6 +52,7 @@ const RolesAndPermissions = ({
   initialRoles,
   initialPermissions,
 }: RolesAndPermissionsProps) => {
+  const { t } = useLanguage();
   /* ------------------------------------------------------------------------ */
   /*                               Core State                                */
   /* ------------------------------------------------------------------------ */
@@ -145,6 +147,12 @@ const RolesAndPermissions = ({
     name?: string | null,
     description?: string | null,
   ) => {
+    const role = roles.find((r) => r.id === roleId);
+    if (role && isSeededUserRole(role)) {
+      toast.error(t.translations.SEEDED_USER_ROLE_CANNOT_BE_MODIFIED);
+      return;
+    }
+
     try {
       const dto: UpdateRoleRequestDto = { name, description };
       const updatedRole = await updateOrgRole(
@@ -185,6 +193,10 @@ const RolesAndPermissions = ({
 
   const handleDeleteRole = async () => {
     if (!roleToDelete) return;
+    if (isSeededUserRole(roleToDelete)) {
+      toast.error(t.translations.SEEDED_USER_ROLE_CANNOT_BE_ARCHIVED);
+      return;
+    }
 
     try {
       await archiveOrgRole(
@@ -232,6 +244,12 @@ const RolesAndPermissions = ({
 
   const handleStartEditingPermissions = () => {
     if (!currentRole) return;
+    if (isSeededUserRole(currentRole)) {
+      toast.error(
+        t.translations.SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED,
+      );
+      return;
+    }
 
     const currentPermissionIds =
       rolePermissions[currentRole.id]?.map((p) => Number(p.id)) || [];
@@ -254,6 +272,12 @@ const RolesAndPermissions = ({
 
   const handleSavePermissions = async () => {
     if (!currentRole) return;
+    if (isSeededUserRole(currentRole)) {
+      toast.error(
+        t.translations.SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED,
+      );
+      return;
+    }
 
     try {
       await setPermissionsForOrgRole(
@@ -324,6 +348,9 @@ const RolesAndPermissions = ({
     roleId: number,
     permissionId: number,
   ) => {
+    const role = roles.find((r) => r.id === roleId);
+    if (role && isSeededUserRole(role)) return;
+
     const scrollTop = tableContainerRef.current?.scrollTop || 0;
     const scrollLeft = tableContainerRef.current?.scrollLeft || 0;
 
@@ -355,7 +382,8 @@ const RolesAndPermissions = ({
 
   const handleSaveMatrixPermissions = async () => {
     try {
-      const updatePromises = roles.map((role) => {
+      const rolesToUpdate = roles.filter((role) => !isSeededUserRole(role));
+      const updatePromises = rolesToUpdate.map((role) => {
         const newPermissions = Array.from(matrixTempPermissions[role.id] || []);
         return setPermissionsForOrgRole(
           organization?.organizationId as number,
@@ -368,7 +396,7 @@ const RolesAndPermissions = ({
 
       const updatedRolePermissions: Record<number, PermissionResponseDto[]> =
         {};
-      roles.forEach((role) => {
+      rolesToUpdate.forEach((role) => {
         const permIds = matrixTempPermissions[role.id] || new Set();
         updatedRolePermissions[role.id] = permissions.filter((p) =>
           permIds.has(Number(p.id)),
@@ -526,11 +554,8 @@ const RolesAndPermissions = ({
     return hasPermission;
   };
 
-  const isStandardRole = (role: RoleResponseDto): boolean => {
-    return (
-      role.name === "Admin" || role.name === "User" || role.name === "Viewer"
-    );
-  };
+  const isSeededUserRole = (role: RoleResponseDto): boolean =>
+    role.name === "User" && role.projectId == null;
 
   /* ------------------------------------------------------------------------ */
   /*                               Main Render                                */
@@ -541,7 +566,7 @@ const RolesAndPermissions = ({
       {/* Page Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold">Roles & Permissions</h1>
+          <h1 className="text-2xl font-bold">{t.translations.ROLES_AND_PERMISSIONS}</h1>
           {/* Locking Roles (currently disabled) */}
           {/* <button
             onClick={() => setRolesLocked(!rolesLocked)}
@@ -551,8 +576,7 @@ const RolesAndPermissions = ({
           </button> */}
         </div>
         <p className="text-base-content/70">
-          Define and manage organization-level roles and permissions. These
-          settings will propagate to all projects.
+          {t.translations.DEFINE_AND_MANAGE_ORGANIZATION_LEVEL_ROLES_AND_PERMISSIONS}
         </p>
       </div>
 
@@ -572,24 +596,22 @@ const RolesAndPermissions = ({
       {/* Layout Selector */}
       <div className="mb-6">
         <label className="label">
-          <span className="label-text font-medium">View Layout:</span>
+          <span className="label-text font-medium">{t.translations.VIEW_LAYOUT}:</span>
         </label>
         <div className="btn-group">
           <button
             onClick={() => setActiveLayout("split-view")}
-            className={`btn border-2 border-primary mr-3 ${
-              activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
-            }`}
+            className={`btn border-2 border-primary mr-3 ${activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
+              }`}
           >
-            Split View
+            {t.translations.SPLIT_VIEW}
           </button>
           <button
             onClick={() => setActiveLayout("matrix")}
-            className={`btn border-2 border-primary ${
-              activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
-            }`}
+            className={`btn border-2 border-primary ${activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
+              }`}
           >
-            Matrix View
+            {t.translations.MATRIX_VIEW}
           </button>
         </div>
       </div>
@@ -614,7 +636,7 @@ const RolesAndPermissions = ({
           onSavePermissions={handleSavePermissions}
           onTogglePermission={handleTogglePermission}
           roleHasPermission={roleHasPermission}
-          isStandardRole={isStandardRole}
+          isSeededUserRole={isSeededUserRole}
         />
       )}
 
@@ -633,7 +655,7 @@ const RolesAndPermissions = ({
           matrixRoleHasPermission={matrixRoleHasPermission}
           onEditClick={handleEditClick}
           onToggleMatrixPermission={handleToggleMatrixPermission}
-          isStandardRole={isStandardRole}
+          isSeededUserRole={isSeededUserRole}
         />
       )}
 

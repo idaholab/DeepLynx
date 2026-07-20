@@ -9,6 +9,7 @@ import {
   UploadProgressEvent,
 } from "@/app/(home)/types/types";
 import api from "./api";
+import { CreateRecordFileUploadRequestDto } from "@/app/(home)/types/requestDTOs";
 
 // ============================================================================
 // CONSTANTS
@@ -180,6 +181,7 @@ async function uploadFileChunked({
   dataSourceId,
   objectStorageId,
   onProgress,
+  metadataFile
 }: UploadFileArgs) {
   let uploadId: string | null = null;
 
@@ -195,6 +197,7 @@ async function uploadFileChunked({
       objectStorageId,
       fileName: file.name,
       fileSize: file.size,
+      metadataFile
     });
 
     uploadId = session.uploadId;
@@ -230,6 +233,7 @@ async function uploadFileChunked({
       uploadId,
       fileName: file.name,
       totalChunks: session.totalChunks,
+      metadataFile
     });
 
     onProgress?.({
@@ -269,15 +273,18 @@ async function uploadFileChunked({
 async function startChunkedUpload(
   options: ChunkedUploadOptions
 ): Promise<ChunkedUploadSession> {
-  const { organizationId, projectId, fileName, fileSize, dataSourceId, objectStorageId } = options;
+  const { organizationId, projectId, fileName, fileSize, dataSourceId, objectStorageId, metadataFile } = options;
 
   const params: Record<string, number | string> = {};
   if (dataSourceId != null) params.dataSourceId = dataSourceId;
   if (objectStorageId != null) params.objectStorageId = objectStorageId;
+  const metadata = metadataFile
+    ? await parseMetadataFile(metadataFile)
+    : undefined;
 
   const { data } = await api.post<ChunkedUploadSession>(
     `/organizations/${organizationId}/projects/${projectId}/files/upload/start`,
-    { fileName, fileSize },
+    { fileName, fileSize, metadata },
     { params }
   );
 
@@ -405,16 +412,20 @@ async function completeChunkedUpload(options: {
   uploadId: string;
   fileName: string;
   totalChunks: number;
+  metadataFile?: File | undefined;
 }): Promise<RecordResponseDto> {
-  const { organizationId, projectId, dataSourceId, objectStorageId, uploadId, fileName, totalChunks } = options;
+  const { organizationId, projectId, dataSourceId, objectStorageId, uploadId, fileName, totalChunks, metadataFile } = options;
 
   const params: Record<string, number | string> = {};
   if (dataSourceId != null) params.dataSourceId = dataSourceId;
   if (objectStorageId != null) params.objectStorageId = objectStorageId;
+  const metadata = metadataFile
+    ? await parseMetadataFile(metadataFile)
+    : undefined;
 
   const { data } = await api.post<RecordResponseDto>(
     `/organizations/${organizationId}/projects/${projectId}/files/upload/complete`,
-    { uploadId, fileName, totalChunks },
+    { uploadId, fileName, totalChunks, metadata },
     { params }
   );
 
@@ -446,4 +457,19 @@ export async function cancelChunkedUpload(options: {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function parseMetadataFile(file?: File | null): Promise<CreateRecordFileUploadRequestDto | undefined> {
+  if (!file) return undefined;
+
+  const metadataJson = await file.text();
+  if (!metadataJson.trim()) {
+    throw new Error("Metadata file is empty or contains no content.");
+  }
+
+  try {
+    return JSON.parse(metadataJson) as CreateRecordFileUploadRequestDto;
+  } catch {
+    throw new Error("Failed to parse metadata file.")
+  }
 }

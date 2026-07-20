@@ -3,7 +3,6 @@
 import React, { useMemo, useState } from "react";
 import {
   BuildingOfficeIcon,
-  ExclamationCircleIcon,
   CheckIcon,
   ShieldCheckIcon,
   TrashIcon,
@@ -38,10 +37,8 @@ interface SplitViewLayoutProps {
   onTogglePermission: (permissionId: number) => void;
 
   roleHasPermission: (roleId: number, permissionId: number) => boolean;
-  isStandardRole: (role: RoleResponseDto) => boolean;
   isOrganizationRole: (role: RoleResponseDto) => boolean;
   isProjectRole: (role: RoleResponseDto) => boolean;
-  getRoleSource: (role: RoleResponseDto) => string;
 }
 
 const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
@@ -57,9 +54,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   onCreateRole,
   onEditClick,
   onDeleteClick,
-  getRoleSource,
   roleHasPermission,
-  isStandardRole,
   isOrganizationRole,
   isProjectRole,
   onStartEditingPermissions,
@@ -70,7 +65,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   // Determine if current role can be edited
   const canEditRole =
     currentRole &&
-    !isStandardRole(currentRole) &&
     !isOrganizationRole(currentRole);
   const canEditPermissions = canEditRole && !rolesLocked;
   const { t } = useLanguage();
@@ -148,10 +142,9 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
               onClick={onStartEditingPermissions}
               className="btn btn-primary btn-sm gap-2"
               title={
-                isStandardRole(currentRole)
-                  ? "Standard role permissions cannot be modified"
-                  : isOrganizationRole(currentRole)
-                    ? "Organization role permissions cannot be modified at project level"
+                isOrganizationRole(currentRole)
+                    ? t.translations
+                        .ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL
                     : rolesLocked
                       ? "Roles are locked"
                       : "Edit Permissions"
@@ -179,19 +172,8 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
           )}
         </div>
 
-        {/* Info alerts for read-only roles */}
-        {isStandardRole(currentRole) && (
-          <div className="alert alert-info mb-4">
-            <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
-            <span className="text-sm">
-              {t.translations.THIS_IS_A_STANDARD_ROLE}
-            </span>
-          </div>
-        )}
-
         {isOrganizationRole(currentRole) && (
           <div className="alert alert-warning mb-4">
-            <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
             <span className="text-sm">
               {t.translations.THIS_ROLE_IS_INHERITED}
             </span>
@@ -344,11 +326,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                       />
                       <span className="font-medium text-sm">{role.name}</span>
                     </div>
-                    {isStandardRole(role) && (
-                      <div className="badge badge-info badge-sm">
-                        {t.translations.STD}
-                      </div>
-                    )}
                     {isOrganizationRole(role) && (
                       <div className="badge badge-secondary badge-sm flex gap-1">
                         <BuildingOfficeIcon className="w-3 h-3" />
@@ -366,9 +343,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                       {role.description}
                     </p>
                   )}
-                  <p className="text-xs text-base-content/50 mt-1 ml-6">
-                    {t.translations.SOURCE} {getRoleSource(role)}
-                  </p>
                 </button>
               ))}
             </div>
@@ -386,11 +360,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                 <div>
                   <div className="flex items-center gap-3">
                     <h2 className="card-title">{currentRole.name}</h2>
-                    {isStandardRole(currentRole) && (
-                      <div className="badge badge-info">
-                        {t.translations.STANDARD_ROLE}
-                      </div>
-                    )}
                     {isOrganizationRole(currentRole) && (
                       <div className="badge badge-secondary gap-1">
                         <BuildingOfficeIcon className="w-4 h-4" />
@@ -409,8 +378,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                     </p>
                   )}
                   <p className="text-xs text-base-content/60 mt-2">
-                    {t.translations.SOURCE}
-                    {getRoleSource(currentRole)} • {t.translations.LAST_UPDATED}{" "}
+                    {t.translations.LAST_UPDATED}{" "}
                     {new Date(currentRole.lastUpdatedAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -420,9 +388,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                     onClick={() => onEditClick(currentRole)}
                     className="btn btn-ghost btn-sm btn-circle"
                     title={
-                      isStandardRole(currentRole)
-                        ? "Standard roles cannot be edited"
-                        : isOrganizationRole(currentRole)
+                      isOrganizationRole(currentRole)
                           ? "Organization roles cannot be edited at project level"
                           : "Edit Role"
                     }

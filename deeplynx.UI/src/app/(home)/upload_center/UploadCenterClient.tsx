@@ -279,10 +279,18 @@ export default function UploadCenterClient() {
         originalIdAlreadyInUse: t.translations.ORIGINAL_ID_ALREADY_IN_USE,
         originalIdAlreadyInUseSuggestion:
           t.translations.ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION,
+        classIdClassNameMismatch:
+          t.translations.CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH,
+        classIdClassNameMismatchSuggestion:
+          t.translations.CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION,
         classIdNotFoundInProject:
           t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT,
         classIdNotFoundSuggestion:
           t.translations.CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        jsonDepthExceeded:
+          t.translations.JSON_DEPTH_EXCEEDED,
+        jsonDepthExceededSuggestion:
+          t.translations.JSON_DEPTH_EXCEEDED_SUGGESTION,
         duplicateSuggestion: t.translations.DUPLICATE_RECORD_SUGGESTION,
         permissionSuggestion: t.translations.PERMISSION_REQUIRED_SUGGESTION,
         validationSuggestion: t.translations.VALIDATION_ERROR_SUGGESTION,
@@ -578,10 +586,18 @@ export default function UploadCenterClient() {
         originalIdAlreadyInUse: t.translations.ORIGINAL_ID_ALREADY_IN_USE,
         originalIdAlreadyInUseSuggestion:
           t.translations.ORIGINAL_ID_ALREADY_IN_USE_SUGGESTION,
+        classIdClassNameMismatch:
+          t.translations.CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH,
+        classIdClassNameMismatchSuggestion:
+          t.translations.CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION,
         classIdNotFoundInProject:
           t.translations.CLASS_ID_DOES_NOT_EXIST_IN_PROJECT,
         classIdNotFoundSuggestion:
           t.translations.CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION,
+        jsonDepthExceeded:
+          t.translations.JSON_DEPTH_EXCEEDED,
+        jsonDepthExceededSuggestion:
+          t.translations.JSON_DEPTH_EXCEEDED_SUGGESTION,
         duplicateSuggestion: t.translations.DUPLICATE_RECORD_SUGGESTION,
         permissionSuggestion: t.translations.PERMISSION_REQUIRED_SUGGESTION,
         validationSuggestion: t.translations.VALIDATION_ERROR_SUGGESTION,

@@ -1,5 +1,6 @@
 using deeplynx.business;
 using deeplynx.helpers;
+using deeplynx.interfaces;
 using deeplynx.helpers.Context;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
@@ -18,7 +19,7 @@ namespace deeplynx.api.Controllers;
 [Authorize]
 public class FileController : ControllerBase
 {
-    private readonly FileBusiness _fileBusiness;
+    private readonly IFileControllerBusiness _fileBusiness;
     private readonly ILogger<FileController> _logger;
 
     /// <summary>
@@ -26,7 +27,7 @@ public class FileController : ControllerBase
     /// </summary>
     /// <param name="fileBusiness">The business logic interface for handling file operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
-    public FileController(FileBusiness fileBusiness, ILogger<FileController> logger)
+    public FileController(IFileControllerBusiness fileBusiness, ILogger<FileController> logger)
     {
         _fileBusiness = fileBusiness;
         _logger = logger;
@@ -66,9 +67,12 @@ public class FileController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var userJwt = UserContextStorage.Token;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var fileUploadInfo =
                 await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt);
+                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(fileUploadInfo);
         }
         catch (Exception exc)
@@ -118,11 +122,46 @@ public class FileController : ControllerBase
     }
 
     /// <summary>
+    ///     Download Appended File
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="cancellationToken">The ID of the record that contains file information</param>
+    /// <returns>The file stream for download</returns>
+    [HttpGet("{recordId:long}/appended", Name = "api_download_appended_file")]
+    [Auth("read", "file")]
+    [Sensitivity("download file")]
+    public async Task<IActionResult> DownloadAppendedFile(
+        long organizationId,
+        long projectId,
+        long recordId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var fileStreamResult = await _fileBusiness.DownloadAppendedFile(currentUserId, organizationId, projectId, recordId, isSysAdmin, isOrgAdmin, isProjectAdmin, cancellationToken);
+            return fileStreamResult;
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while downloading file in record {recordId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Download a File
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="cancellationToken">The ID of the record that contains file information</param>
     /// <returns>The file stream for download</returns>
     [HttpGet("{recordId:long}", Name = "api_download_file")]
     [Auth("read", "file")]
@@ -228,7 +267,7 @@ public class FileController : ControllerBase
         try
         {
             var uploadSession = await _fileBusiness.StartUpload(
-                organizationId, projectId, dataSourceId, objectStorageId, request);
+                organizationId, projectId, dataSourceId, objectStorageId, request, request.Metadata);
             return Ok(uploadSession);
         }
         catch (Exception exc)

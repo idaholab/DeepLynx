@@ -20,8 +20,11 @@ public class EmbeddingLogs
     [Column("id")]
     public required long Id { get; set; }
 
+    [Column("record_id")]
+    public required long RecordId { get; set; }
+
     [Column("job_id")]
-    public required long JobId { get; set; }
+    public required string JobId { get; set; }
 
     [Column("stage")]
     public required string Stage { get; set; }

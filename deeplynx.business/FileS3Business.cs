@@ -28,6 +28,19 @@ public class FileS3Business : IFileBusiness
         };
     }
 
+    public async Task<FileStreamResult> DownloadAppendedFile(
+        RecordResponseDto record,
+        ObjectStorageConfigDto objectStorageConfig,
+        CancellationToken cancellationToken = default)
+    {
+        // Create a simple stub with empty content
+        var emptyStream = new MemoryStream();
+        return new FileStreamResult(emptyStream, "application/octet-stream")
+        {
+            FileDownloadName = "stub-file.txt"
+        };
+    }
+
     public async Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig)
     {
         return true;

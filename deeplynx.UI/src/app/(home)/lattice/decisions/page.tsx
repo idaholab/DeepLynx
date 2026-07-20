@@ -443,14 +443,13 @@ function ExtractionDetailPanel({
       )),
     }));
   };
+  const requestIdRef = useRef(0);
 
   const fetchStaging = useCallback(async () => {
+    const myRequestId = ++requestIdRef.current;
     try {
-      const data = await getExtractionStaging(
-        organizationId,
-        projectId,
-        extractionId,
-      );
+      const data = await getExtractionStaging(organizationId, projectId, extractionId);
+      if (requestIdRef.current !== myRequestId) return; // stale — drop it
       setStaging(data);
       setApproved((prev) => ({
         records: new Set([...prev.records].filter((id) =>
@@ -483,9 +482,10 @@ function ExtractionDetailPanel({
       }));
       setError(null);
     } catch {
+      if (requestIdRef.current !== myRequestId) return;
       setError(t.translations.LATTICE_FAILED_LOAD_EXTRACTION);
     } finally {
-      setIsLoading(false);
+      if (requestIdRef.current === myRequestId) setIsLoading(false);
     }
   }, [
     organizationId,
@@ -893,7 +893,10 @@ export default function LatticeDecisionsPage() {
     if (saved) router.replace(`/lattice/decisions?extractionId=${saved}`);
   }, [insightHidden, projId, selectedId, router]);
 
+  const [pendingId, setPendingId] = useState<number | null>(null);
+
   const handleSelect = (id: number) => {
+    setPendingId(id);
     if (projId) localStorage.setItem(storageKey(projId), String(id));
     router.replace(`/lattice/decisions?extractionId=${id}`);
   };
