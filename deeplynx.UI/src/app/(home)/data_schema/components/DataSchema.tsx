@@ -30,6 +30,8 @@ import {
   getAllRelationships,
   updateRelationship,
 } from "@/app/lib/client_service/relationship_services.client";
+import { useLanguage } from "@/app/contexts/Language";
+
 import ArchiveClassModal from "./ArchiveClassModal";
 import { queryBuilder } from "@/app/lib/client_service/query_services.client";
 
@@ -44,11 +46,6 @@ interface DataSchemaProps {
   mode: LayoutMode;
   organizationId: number | undefined;
 }
-
-const modeDescriptions: Record<LayoutMode, string> = {
-  tabs:
-    "Creation and management of classes and relationships to assign to records and edges",
-};
 
 function statusClass(isArchived: boolean) {
   return isArchived
@@ -100,6 +97,7 @@ function ModalShell({
 
 export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
   const { project } = useProjectSession();
+  const { t } = useLanguage();
 
   const [classes, setClasses] = useState<ClassResponseDto[]>([]);
   const [relationships, setRelationships] = useState<RelationshipResponseDto[]>(
@@ -384,7 +382,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         uuid: "",
       });
       setIsCreateClassModalOpen(false);
-      toast.success("Class created.");
+      toast.success(t.translations.CLASS_CREATED);
     } catch (error) {
       console.error("Failed to create class from data schema:", error);
       toast.error("Failed to create class.");
@@ -409,7 +407,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           item.id === selectedClass.id ? updatedClass : item,
         ),
       );
-      toast.success("Class updated.");
+      toast.success(t.translations.CLASS_UPDATED_SUCCESSFULLY);
     } catch (error) {
       console.error("Failed to update class from data schema:", error);
       toast.error("Failed to update class.");
@@ -462,7 +460,11 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
             : item,
         ),
       );
-      toast.success(shouldArchive ? "Class archived." : "Class restored.");
+      toast.success(
+        shouldArchive
+          ? t.translations.CLASS_ARCHIVED
+          : t.translations.CLASS_RESTORED
+      );
     } catch (error) {
       console.error("Failed to archive class from data schema:", error);
       toast.error("Failed to update class archive state.");
@@ -521,7 +523,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         destinationId: null,
       });
       setIsCreateRelationshipModalOpen(false);
-      toast.success("Relationship created.");
+      toast.success(t.translations.RELATIONSHIP_CREATED);
     } catch (error) {
       console.error("Failed to create relationship from data schema:", error);
       toast.error("Failed to create relationship.");
@@ -553,7 +555,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           item.id === selectedRelationship.id ? updatedRelationship : item,
         ),
       );
-      toast.success("Relationship updated.");
+      toast.success(t.translations.RELATIONSHIP_UPDATED);
     } catch (error) {
       console.error("Failed to update relationship from data schema:", error);
       toast.error("Failed to update relationship.");
@@ -583,7 +585,9 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         ),
       );
       toast.success(
-        shouldArchive ? "Relationship archived." : "Relationship restored.",
+        shouldArchive
+          ? t.translations.RELATIONSHIP_ARCHIVED
+          : t.translations.RELATIONSHIP_RESTORED
       );
     } catch (error) {
       console.error("Failed to archive relationship from data schema:", error);
@@ -598,15 +602,15 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       <div className="card-body gap-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-base-content">Classes</h2>
+            <h2 className="text-lg font-semibold text-base-content">{t.translations.CLASSES}</h2>
             <p className="text-sm text-base-content/60">
-              Create, review, archive, and refine record classes.
+              {t.translations.CREATE_REVIEW_ARCHIVE_AND_REFINE_RECORD_CLASSES}
             </p>
           </div>
           <div className="flex gap-2">
             <input
               className="input input-bordered input-sm w-full xl:w-60"
-              placeholder="Search classes"
+              placeholder={t.translations.SEARCH_CLASSES}
               value={classSearch}
               onChange={(event) => setClassSearch(event.target.value)}
             />
@@ -615,7 +619,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               onClick={openCreateClassModal}
             >
               <PlusIcon className="h-4 w-4" />
-              New
+              {t.translations.NEW}
             </button>
           </div>
         </div>
@@ -623,8 +627,8 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         {filteredClasses.length === 0 ? (
           emptyState(
             classSearch.trim()
-              ? "No classes match the current filter."
-              : "No classes were found in the database.",
+              ? t.translations.NO_CLASSES_MATCH_CURRENT_FILTER
+              : t.translations.NO_CLASSES_FOUND_IN_DATABASE,
           )
         ) : (
           <div
@@ -634,9 +638,9 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
             <table className="table">
               <thead className="bg-base-200">
                 <tr>
-                  <th className="sticky top-0 z-10 bg-base-200">Name</th>
-                  <th className="sticky top-0 z-10 bg-base-200">Status</th>
-                  <th className="sticky top-0 z-10 bg-base-200">Updated</th>
+                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.NAME}</th>
+                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.STATUS}</th>
+                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.UPDATED}</th>
                 </tr>
               </thead>
               <tbody>
@@ -656,7 +660,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
                       </td>
                       <td>
                         <span className={statusClass(item.isArchived)}>
-                          {item.isArchived ? "Archived" : "Active"}
+                          {item.isArchived ? t.translations.ARCHIVED : t.translations.ACTIVE}
                         </span>
                       </td>
                       <td className="text-sm text-base-content/70">
@@ -679,16 +683,16 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-base-content">
-              Relationships
+              {t.translations.RELATIONSHIPS}
             </h2>
             <p className="text-sm text-base-content/60">
-              Define which classes can connect and how that edge should read.
+              {t.translations.DEFINE_WHICH_CLASSES_CAN_CONNECT_AND_HOW_EDGE_SHOULD_READ}
             </p>
           </div>
           <div className="flex gap-2">
             <input
               className="input input-bordered input-sm w-full xl:w-60"
-              placeholder="Search relationships"
+              placeholder={t.translations.SEARCH_RELATIONSHIPS}
               value={relationshipSearch}
               onChange={(event) => setRelationshipSearch(event.target.value)}
             />
@@ -698,7 +702,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               disabled={classes.length === 0}
             >
               <PlusIcon className="h-4 w-4" />
-              New
+              {t.translations.NEW}
             </button>
           </div>
         </div>
@@ -706,8 +710,8 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         {filteredRelationships.length === 0 ? (
           emptyState(
             relationshipSearch.trim()
-              ? "No relationships match the current filter."
-              : "No relationships were found in the database.",
+              ? t.translations.NO_RELATIONSHIPS_MATCH_CURRENT_FILTER
+              : t.translations.NO_RELATIONSHIPS_FOUND_IN_DATABASE,
           )
         ) : (
           <div
@@ -719,9 +723,9 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
             <table className="table">
               <thead className="bg-base-200">
                 <tr>
-                  <th className="sticky top-0 z-10 bg-base-200">Name</th>
-                  <th className="sticky top-0 z-10 bg-base-200">Direction</th>
-                  <th className="sticky top-0 z-10 bg-base-200">Status</th>
+                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.NAME}</th>
+                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.DIRECTION}</th>
+                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.STATUS}</th>
                 </tr>
               </thead>
               <tbody>
@@ -742,15 +746,15 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
                       </td>
                       <td className="text-sm text-base-content/70">
                         {(item.originId && classLookup.get(item.originId)) ||
-                          "Unassigned"}
+                          t.translations.UNASSIGNED}
                         {" -> "}
                         {(item.destinationId &&
                           classLookup.get(item.destinationId)) ||
-                          "Unassigned"}
+                          t.translations.UNASSIGNED}
                       </td>
                       <td>
                         <span className={statusClass(item.isArchived)}>
-                          {item.isArchived ? "Archived" : "Active"}
+                          {item.isArchived ? t.translations.ARCHIVED_BADGE : t.translations.ACTIVE}
                         </span>
                       </td>
                     </tr>
@@ -770,21 +774,23 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-base-content">
-              Class Inspector
+              {t.translations.CLASS_INSPECTOR}
             </h3>
             <p className="text-sm text-base-content/60">
-              Edit the selected class, then compare its linked relationships.
+              {t.translations.EDIT_SELECTED_CLASS_COMPARE_LINKED_RELATIONSHIPS}
             </p>
           </div>
           <span className={statusClass(selectedClass.isArchived)}>
-            {selectedClass.isArchived ? "Archived" : "Active"}
+            {selectedClass.isArchived
+              ? t.translations.ARCHIVED_BADGE
+              : t.translations.ACTIVE}
           </span>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="form-control">
             <span className="mb-2 block text-sm font-medium text-base-content">
-              Name
+              {t.translations.NAME}
             </span>
             <input
               className="input input-bordered"
@@ -811,7 +817,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
 
         <label className="form-control">
           <span className="mb-2 block text-sm font-medium text-base-content">
-            Description
+            {t.translations.DESCRIPTION}
           </span>
           <textarea
             className="textarea textarea-bordered min-h-28"
@@ -828,7 +834,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         <div className="grid gap-3">
           <div className="rounded-lg border border-base-300/50 bg-base-200/50 p-3">
             <div className="text-xs uppercase tracking-wide text-base-content/60">
-              Last Updated
+              {t.translations.LAST_UPDATED}
             </div>
             <div className="mt-1 text-sm font-medium">
               {formatLocalDateTime(
@@ -845,7 +851,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
             disabled={isUpdatingClass}
           >
             <PencilSquareIcon className="h-4 w-4" />
-            {isUpdatingClass ? "Updating..." : "Update"}
+            {isUpdatingClass ? t.translations.UPDATING : t.translations.UPDATE}
           </button>
           <button
             className="btn btn-outline btn-warning btn-sm"
@@ -868,16 +874,16 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           >
             <ArchiveBoxIcon className="h-4 w-4" />
             {isArchivingClass
-              ? "Updating..."
+              ? t.translations.UPDATING
               : selectedClass.isArchived
-                ? "Restore"
-                : "Archive"}
+                ? t.translations.RESTORE
+                : t.translations.ARCHIVE}
           </button>
         </div>
       </div>
     </div>
   ) : (
-    emptyState("Select a class to inspect and edit it.")
+    emptyState(t.translations.SELECT_CLASS_TO_INSPECT_AND_EDIT)
   );
 
   const relationshipInspector = selectedRelationship ? (
@@ -886,21 +892,23 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-base-content">
-              Relationship Inspector
+              {t.translations.RELATIONSHIP_INSPECTOR}
             </h3>
             <p className="text-sm text-base-content/60">
-              Mirror the add-edge workflow by defining which classes the edge can span.
+              {t.translations.MIRROR_ADD_EDGE_WORKFLOW}
             </p>
           </div>
           <span className={statusClass(selectedRelationship.isArchived)}>
-            {selectedRelationship.isArchived ? "Archived" : "Active"}
+            {selectedRelationship.isArchived
+              ? t.translations.ARCHIVED_BADGE
+              : t.translations.ACTIVE}
           </span>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="form-control">
             <span className="mb-2 block text-sm font-medium text-base-content">
-              Name
+              {t.translations.NAME}
             </span>
             <input
               className="input input-bordered"
@@ -915,7 +923,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           </label>
           <label className="form-control">
             <span className="mb-2 block text-sm font-medium text-base-content">
-              UUID
+              {t.translations.UUID}
             </span>
             <input
               className="input input-bordered bg-base-200/50"
@@ -928,7 +936,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <label className="form-control">
             <span className="mb-2 block text-sm font-medium text-base-content">
-              Origin Class
+              {t.translations.ORIGIN_CLASS}
             </span>
             <select
               className="select select-bordered"
@@ -941,7 +949,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
                 }));
               }}
             >
-              <option value="">Unassigned</option>
+              <option value="">{t.translations.UNASSIGNED}</option>
               {classes.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
@@ -951,7 +959,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           </label>
           <label className="form-control">
             <span className="mb-2 block text-sm font-medium text-base-content">
-              Destination Class
+              {t.translations.DESTINATION_CLASS}
             </span>
             <select
               className="select select-bordered"
@@ -964,7 +972,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
                 }));
               }}
             >
-              <option value="">Unassigned</option>
+              <option value="">{t.translations.UNASSIGNED}</option>
               {classes.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
@@ -976,7 +984,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
 
         <label className="form-control">
           <span className="mb-2 block text-sm font-medium text-base-content">
-            Description
+            {t.translations.DESCRIPTION}
           </span>
           <textarea
             className="textarea textarea-bordered min-h-28"
@@ -993,21 +1001,21 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-lg border border-base-300/50 bg-base-200/50 p-3">
             <div className="text-xs uppercase tracking-wide text-base-content/60">
-              Origin to Destination
+              {t.translations.ORIGIN_TO_DESTINATION}
             </div>
             <div className="mt-1 text-sm font-medium">
               {(relationshipDraft.originId &&
                 classLookup.get(relationshipDraft.originId)) ||
-                "Unassigned"}
+                t.translations.UNASSIGNED}
               {" -> "}
               {(relationshipDraft.destinationId &&
                 classLookup.get(relationshipDraft.destinationId)) ||
-                "Unassigned"}
+                t.translations.UNASSIGNED}
             </div>
           </div>
           <div className="rounded-lg border border-base-300/50 bg-base-200/50 p-3">
             <div className="text-xs uppercase tracking-wide text-base-content/60">
-              Last Updated
+              {t.translations.LAST_UPDATED}
             </div>
             <div className="mt-1 text-sm font-medium">
               {formatLocalDateTime(selectedRelationship.lastUpdatedAt)}
@@ -1022,7 +1030,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
             disabled={isUpdatingRelationship}
           >
             <PencilSquareIcon className="h-4 w-4" />
-            {isUpdatingRelationship ? "Updating..." : "Update"}
+            {isUpdatingRelationship ? t.translations.UPDATING : t.translations.UPDATE}
           </button>
           <button
             className="btn btn-outline btn-warning btn-sm"
@@ -1031,16 +1039,16 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           >
             <ArchiveBoxIcon className="h-4 w-4" />
             {isArchivingRelationship
-              ? "Updating..."
+              ? t.translations.UPDATING
               : selectedRelationship.isArchived
-                ? "Restore"
-                : "Archive"}
+                ? t.translations.RESTORE
+                : t.translations.ARCHIVE}
           </button>
         </div>
       </div>
     </div>
   ) : (
-    emptyState("Select a relationship to inspect and edit it.")
+    emptyState(t.translations.SELECT_RELATIONSHIP_TO_INSPECT_AND_EDIT)
   );
 
   const boardPanel = (
@@ -1048,16 +1056,16 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       <div className="card-body gap-4">
         <div>
           <h2 className="text-lg font-semibold text-base-content">
-            Relationship Flow
+            {t.translations.RELATIONSHIP_FLOW}
           </h2>
           <p className="text-sm text-base-content/60">
-            A more visual alternative for defining allowed class-to-class edges.
+            {t.translations.RELATIONSHIP_FLOW_DESCRIPTION}
           </p>
         </div>
 
         <div className="space-y-3">
           {filteredRelationships.length === 0
-            ? emptyState("No relationship flows are available.")
+            ? emptyState(t.translations.NO_RELATIONSHIP_FLOWS_AVAILABLE)
             : filteredRelationships.map((item) => {
               const isSelected =
                 selection?.kind === "relationship" &&
@@ -1083,14 +1091,16 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
                       </div>
                     </div>
                     <span className={statusClass(item.isArchived)}>
-                      {item.isArchived ? "Archived" : "Active"}
+                      {item.isArchived
+                        ? t.translations.ARCHIVED_BADGE
+                        : t.translations.ACTIVE}
                     </span>
                   </div>
 
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
                     <span className="badge badge-outline">
                       {(item.originId && classLookup.get(item.originId)) ||
-                        "Origin"}
+                        t.translations.ORIGIN}
                     </span>
                     <ArrowsRightLeftIcon className="h-4 w-4 text-base-content/50" />
                     <span className="badge badge-primary badge-outline">
@@ -1100,7 +1110,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
                     <span className="badge badge-outline">
                       {(item.destinationId &&
                         classLookup.get(item.destinationId)) ||
-                        "Destination"}
+                        t.translations.DESTINATION}
                     </span>
                   </div>
                 </button>
@@ -1126,11 +1136,17 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
 
   const tabContent = (
     <Tabs
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
+      activeTab={
+        activeTab === "Classes"
+          ? t.translations.CLASSES
+          : t.translations.RELATIONSHIPS
+      }
+      onTabChange={(tab) =>
+        setActiveTab(tab === t.translations.CLASSES ? "Classes" : "Relationships")
+      }
       tabs={[
         {
-          label: "Classes",
+          label: t.translations.CLASSES,
           content: (
             <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_1fr]">
               {classesPanel}
@@ -1139,7 +1155,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
           ),
         },
         {
-          label: "Relationships",
+          label: t.translations.RELATIONSHIPS,
           content: (
             <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_1fr]">
               {relationshipsPanel}
@@ -1171,13 +1187,13 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-              Data Schema
+              {t.translations.DATA_SCHEMA}
             </p>
             <h1 className="break-words text-2xl font-bold text-base-content sm:text-3xl">
-              Data Schema
+              {t.translations.DATA_SCHEMA}
             </h1>
             <p className="mt-3 max-w-4xl text-base-content/70">
-              {modeDescriptions[mode]}
+              {t.translations.DATA_SCHEMA_DESCRIPTION}
             </p>
           </div>
         </div>
@@ -1189,19 +1205,19 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
 
       {isCreateClassModalOpen ? (
         <ModalShell
-          title="Create Class"
-          description="Capture the core class definition."
+          title={t.translations.CREATE_CLASS}
+          description={t.translations.CAPTURE_CORE_CLASS_DEFINITION}
           onClose={() => setIsCreateClassModalOpen(false)}
         >
           <div className="space-y-5 px-6 py-5">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="form-control">
                 <span className="label-text mb-2 text-sm font-medium">
-                  Class Name
+                  {t.translations.CLASS_NAME}
                 </span>
                 <input
                   className="input input-bordered"
-                  placeholder="Example: Asset"
+                  placeholder={t.translations.EXAMPLE_ASSET}
                   value={newClassDraft.name}
                   onChange={(event) =>
                     setNewClassDraft((previous) => ({
@@ -1213,11 +1229,11 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               </label>
               <label className="form-control">
                 <span className="label-text mb-2 text-sm font-medium">
-                  UUID
+                  {t.translations.UUID}
                 </span>
                 <input
                   className="input input-bordered"
-                  placeholder="Optional, auto-generated if left blank"
+                  placeholder={t.translations.OPTIONAL_AUTO_GENERATED_IF_LEFT_BLANK}
                   value={newClassDraft.uuid}
                   onChange={(event) =>
                     setNewClassDraft((previous) => ({
@@ -1231,11 +1247,11 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
 
             <label className="form-control">
               <span className="mb-2 block text-sm font-medium text-base-content">
-                Description
+                {t.translations.DESCRIPTION}
               </span>
               <textarea
                 className="textarea textarea-bordered min-h-28"
-                placeholder="Explain what records belong to this class and how teams will use it."
+                placeholder={t.translations.CLASS_DESCRIPTION_HELP}
                 value={newClassDraft.description}
                 onChange={(event) =>
                   setNewClassDraft((previous) => ({
@@ -1255,7 +1271,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               onClick={() => setIsCreateClassModalOpen(false)}
               disabled={isCreatingClass}
             >
-              Cancel
+              {t.translations.CANCEL}
             </button>
             <button
               type="button"
@@ -1263,7 +1279,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               onClick={handleCreateClass}
               disabled={!newClassDraft.name.trim() || isCreatingClass}
             >
-              {isCreatingClass ? "Creating..." : "Create Class"}
+              {isCreatingClass ? t.translations.CREATING : t.translations.CREATE_CLASS}
             </button>
           </div>
         </ModalShell>
@@ -1271,19 +1287,19 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
 
       {isCreateRelationshipModalOpen ? (
         <ModalShell
-          title="Create Relationship"
-          description="Set the edge label and choose the classes it connects."
+          title={t.translations.CREATE_RELATIONSHIP}
+          description={t.translations.CREATE_RELATIONSHIP_DESCRIPTION}
           onClose={() => setIsCreateRelationshipModalOpen(false)}
         >
           <div className="space-y-5 px-6 py-5">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="form-control">
                 <span className="label-text mb-2 text-sm font-medium">
-                  Relationship Name
+                  {t.translations.RELATIONSHIP_NAME}
                 </span>
                 <input
                   className="input input-bordered"
-                  placeholder="Example: Installed In"
+                  placeholder={t.translations.EXAMPLE_INSTALLED_IN}
                   value={newRelationshipDraft.name}
                   onChange={(event) =>
                     setNewRelationshipDraft((previous) => ({
@@ -1295,11 +1311,11 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               </label>
               <label className="form-control">
                 <span className="label-text mb-2 text-sm font-medium">
-                  UUID
+                  {t.translations.UUID}
                 </span>
                 <input
                   className="input input-bordered"
-                  placeholder="Optional, auto-generated if left blank"
+                  placeholder={t.translations.OPTIONAL_AUTO_GENERATED_IF_LEFT_BLANK}
                   value={newRelationshipDraft.uuid}
                   onChange={(event) =>
                     setNewRelationshipDraft((previous) => ({
@@ -1314,7 +1330,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
             <div className="grid gap-4 md:grid-cols-2">
               <label className="form-control">
                 <span className="label-text mb-2 text-sm font-medium">
-                  Origin Class
+                  {t.translations.ORIGIN_CLASS}
                 </span>
                 <select
                   className="select select-bordered"
@@ -1328,7 +1344,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
                     }))
                   }
                 >
-                  <option value="">Select a class</option>
+                  <option value="">{t.translations.SELECT_CLASS}</option>
                   {classes.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
@@ -1338,7 +1354,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               </label>
               <label className="form-control">
                 <span className="label-text mb-2 text-sm font-medium">
-                  Destination Class
+                  {t.translations.DESTINATION_CLASS}
                 </span>
                 <select
                   className="select select-bordered"
@@ -1352,7 +1368,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
                     }))
                   }
                 >
-                  <option value="">Select a class</option>
+                  <option value="">{t.translations.SELECT_CLASS}</option>
                   {classes.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
@@ -1364,11 +1380,11 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
 
             <label className="form-control">
               <span className="mb-2 block text-sm font-medium text-base-content">
-                Description
+                {t.translations.DESCRIPTION}
               </span>
               <textarea
                 className="textarea textarea-bordered min-h-28 mb-4"
-                placeholder="Describe when this relationship should be assigned between records."
+                placeholder={t.translations.RELATIONSHIP_DESCRIPTION_HELP}
                 value={newRelationshipDraft.description}
                 onChange={(event) =>
                   setNewRelationshipDraft((previous) => ({
@@ -1379,18 +1395,18 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               />
             </label>
 
-            <div className="rounded-xl border border-base-300/50 bg-base-200/40 p-4 text-sm text-base-content/70">
-              Preview:
+            <div className="rounded-xl border border-base-300 bg-base-200/40 p-4 text-sm text-base-content/70">
+              {t.translations.PREVIEW}:
               <span className="ml-2 font-medium text-base-content">
                 {(newRelationshipDraft.originId &&
                   classLookup.get(newRelationshipDraft.originId)) ||
-                  "Origin"}
+                  t.translations.ORIGIN}
                 {" -> "}
-                {newRelationshipDraft.name.trim() || "Relationship"}
+                {newRelationshipDraft.name.trim() || t.translations.RELATIONSHIP}
                 {" -> "}
                 {(newRelationshipDraft.destinationId &&
                   classLookup.get(newRelationshipDraft.destinationId)) ||
-                  "Destination"}
+                  t.translations.DESTINATION}
               </span>
             </div>
           </div>
@@ -1402,7 +1418,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               onClick={() => setIsCreateRelationshipModalOpen(false)}
               disabled={isCreatingRelationship}
             >
-              Cancel
+              {t.translations.CANCEL}
             </button>
             <button
               type="button"
@@ -1414,8 +1430,8 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               }
             >
               {isCreatingRelationship
-                ? "Creating..."
-                : "Create Relationship"}
+                ? t.translations.CREATING
+                : t.translations.CREATE_RELATIONSHIP}
             </button>
           </div>
         </ModalShell>
