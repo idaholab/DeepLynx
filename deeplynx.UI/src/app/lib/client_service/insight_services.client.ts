@@ -284,7 +284,7 @@ export async function fetchInsightEndpointHealth(
     const res = await api.post<InsightEndpointHealthResponse>(
       `/organizations/${healthRequest.organizationId}/projects/${healthRequest.projectId}/insight/endpoint_health`,
       {
-        modelConfig: healthRequest.modelConfigId ?? null,
+        modelConfigId: healthRequest.modelConfigId ?? null,
         modelType: healthRequest.modelType,
       },
     );
