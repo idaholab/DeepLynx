@@ -181,7 +181,7 @@ public class EdgeBusiness : IEdgeBusiness
         if (dto.OriginId == dto.DestinationId)
             throw new ValidationException("Destination and origin IDs cannot be the same");
 
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId);
 
         var originRecordExists = _context.Records.Any(r => r.Id == dto.OriginId);
         if (!originRecordExists) throw new KeyNotFoundException($"Origin record with id {dto.OriginId} not found");
@@ -296,7 +296,7 @@ public class EdgeBusiness : IEdgeBusiness
         if (invalidEdges.Any())
             throw new ArgumentException("All edges must have valid OriginId and DestinationId before bulk creation.");
 
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId);
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
         await using var tx = await conn.BeginTransactionAsync();
