@@ -327,7 +327,7 @@ public class ClassProjectController : ControllerBase
     /// </summary>
     /// <param name="projectId">The ID of the project to which the class belongs</param>
     /// <param name="classId">The ID of the class to delete.</param>
-    /// <returns>The result of deleting the class.</returns>
+    /// <returns>True if the class was successfully deleted.</returns>
     [HttpDelete("{classId:long}", Name = "api_delete_a_class_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -386,7 +386,7 @@ public class ClassProjectController : ControllerBase
     /// <param name="projectId">The ID of the project to which the class belongs</param>
     /// <param name="classId">The ID of the class to archive or unarchive.</param>
     /// <param name="archive">True to archive the class, false to unarchive it.</param>
-    /// <returns>The result of archiving or unarchiving the class.</returns>
+    /// <returns>True if the class was successfully archived or unarchived.</returns>
     [HttpPatch("{classId:long}", Name = "api_archive_class_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
