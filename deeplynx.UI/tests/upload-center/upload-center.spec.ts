@@ -90,7 +90,7 @@ test.describe("Upload Center", () => {
     await dropZone.dispatchEvent('dragover', { dataTransfer });
     await dropZone.dispatchEvent('drop', { dataTransfer });
 
-    await page.getByRole('button', { name: 'Upload' }).click();
+    await page.getByRole('button', { name: 'Upload', exact: true }).click();
 
     await expect(
       page.getByText('File uploaded successfully!')
@@ -129,12 +129,12 @@ test.describe("Upload Center", () => {
   ): Promise<{ recordId: string; projectId: string } | null> {
     await checkDataSourcesAndStorageDestinations({ page });
 
-    await page.getByText('click to browse').click();
+    await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
 
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(filePath);
 
-    await page.getByRole('button', { name: 'Upload' }).click();
+    await page.getByRole('button', { name: 'Upload', exact: true }).click();
 
     await expect(
       page.getByText('File uploaded successfully!')
@@ -386,7 +386,7 @@ test.describe("Upload Center", () => {
   test.beforeEach(async ({ page }) => {
     await seedAndNavigateToProject(page);
     // Navigate to Upload Center via sidebar
-    await page.locator("aside a", { hasText: "Upload Center" }).click();
+    await page.getByRole('link', { name: "Upload Center", exact: true }).click();
     await page.waitForURL(/\/upload_center/);
     // Wait for the Upload Center heading to confirm client-side render is done
     await expect(
@@ -446,7 +446,7 @@ test.describe("Upload Center", () => {
 
   test("Select a project dropdown is visible", async ({ page }) => {
     await expect(
-      page.getByLabel("Select a")
+      page.getByLabel("Select a").first()
     ).toBeVisible();
   });
 
@@ -522,7 +522,7 @@ test.describe("Upload Center", () => {
       page.getByText("Step 2: Upload Your CSV"),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Step 2: Upload Your CSV" }),
+      page.getByRole("button", { name: 'Choose File Button' }),
     ).toBeVisible();
   });
 
@@ -813,22 +813,22 @@ startxref
       const start = Date.now();
 
       // Upload the files
-      await page.locator("aside a", { hasText: "Upload Center" }).click();
+      await page.getByRole('link', { name: "Upload Center", exact: true }).click();
       await page.waitForURL(/\/upload_center/);
       await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
 
       await checkDataSourcesAndStorageDestinations({ page });
 
-      await page.getByText('click to browse').click();
+      await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
       const fileInput = page.locator('input[type="file"]');
       await fileInput.setInputFiles(filePaths);
-      await page.getByRole('button', { name: 'Upload' }).click();
+      await page.getByRole('button', { name: 'Upload', exact: true }).click();
       await expect(page.getByText('Uploaded 5 file(s)')).toBeVisible({
         timeout: 120_000,
       });
 
       // Navigate to Project Page
-      await page.locator("aside a", { hasText: "Project Dashboard" }).click();
+      await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
       await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
 
@@ -880,12 +880,12 @@ startxref
       // Keep default Project/Data Source settings — do not call
       await checkDataSourcesAndStorageDestinations({ page });
 
-      await page.getByText('click to browse').click();
+      await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
 
       const fileInput = page.locator('input[type="file"]');
       await fileInput.setInputFiles(filePath);
 
-      await page.getByRole('button', { name: 'Upload' }).click();
+      await page.getByRole('button', { name: 'Upload', exact: true }).click();
 
       // TODO: replace with the actual failure notification text/selector
       await expect(
@@ -916,6 +916,7 @@ startxref
 
   test.describe("Upload bulk records", () => {
     let filePath: string;
+    let createdRecords: ({ recordId: string; projectId: string } | null)[] = [];
 
     test.beforeEach(async ({ }) => {
       // Create the file locally
@@ -931,6 +932,7 @@ startxref
       ].join('\n');
 
       await fs.promises.writeFile(filePath, fileContent, 'utf8');
+      createdRecords = [];
     });
 
     test.afterAll(async () => {
@@ -938,16 +940,31 @@ startxref
         fs.unlinkSync(filePath);
       }
     });
+
+    test.afterEach(async ({ request }) => {
+      for (const record of createdRecords) {
+        await deleteRecordIfExists({ request }, record);
+      }
+    });
+
     test("uploads bulk records via a CSV", async ({ page }) => {
       test.setTimeout(120_000); // buffer time
       const start = Date.now();
 
+      const bulkFileNames = [
+        'Bulk test 1',
+        'Bulk test 2',
+        'Bulk test 3',
+        'Bulk test 4',
+        'Bulk test 5',
+      ];
+
       // Upload the csv file
-      await page.getByText('Bulk Metadata').click();
+      await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
 
       await checkDataSourcesAndStorageDestinations({ page });
 
-      await page.getByRole('button', { name: 'Step 2: Upload Your CSV' }).click();
+      await page.getByRole('button', { name: 'Choose File Button' }).click();
       const fileInput = page.locator('input[type="file"]');
       await fileInput.setInputFiles(filePath);
       await expect(page.getByText('Validation Successful!')).toBeVisible();
@@ -958,23 +975,41 @@ startxref
       });
 
       // Verify the new files appear
-      await page.locator("aside a", { hasText: "Project Dashboard" }).click();
+      await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
       await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
-      await expect(page.getByText('Bulk test 1')).toBeVisible();
-      await expect(page.getByText('Bulk test 2')).toBeVisible();
-      await expect(page.getByText('Bulk test 3')).toBeVisible();
-      await expect(page.getByText('Bulk test 4')).toBeVisible();
-      await expect(page.getByText('Bulk test 5')).toBeVisible();
+      for (const name of bulkFileNames) {
+        await expect(page.getByText(name)).toBeVisible();
+      }
 
       const elapsedMs = Date.now() - start;
       expect(elapsedMs).toBeLessThan(120_000);
 
+      // Visit the data catalog and resolve each created record's
+      // recordId/projectId so we can clean them up afterward.
+      await page.getByRole('link', { name: 'Visit' }).first().click();
+
+      for (const name of bulkFileNames) {
+        await page.getByRole('textbox', { name: 'Search' }).click();
+        await page.getByRole('textbox', { name: 'Search' }).fill(name);
+        await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+
+        const recordLink = page.getByRole('link', { name, exact: true }).first();
+        await expect(recordLink).toBeVisible();
+
+        await recordLink.click();
+        await page.waitForURL(/\/record\?/);
+        createdRecords.push(parseRecordFromUrl(page.url()));
+
+        // Go back to the catalog to search for the next record
+        await page.goBack();
+      }
     });
   });
 
   test.describe("Upload timeseries file", () => {
     let filePath: string;
+    let createdRecord: { recordId: string; projectId: string } | null = null;
 
     test.beforeEach(async () => {
       // Create the file locally
@@ -984,6 +1019,7 @@ startxref
       if (!fs.existsSync(filePath)) {
         await fs.promises.writeFile(filePath, csvContent, 'utf8');
       }
+      createdRecord = null;
     });
 
     test.afterAll(async () => {
@@ -992,39 +1028,48 @@ startxref
       }
     });
 
+    test.afterEach(async ({ request }) => {
+      await deleteRecordIfExists({ request }, createdRecord);
+      createdRecord = null;
+    });
+
     test("uploads a timeseries file", async ({ page }) => {
       test.setTimeout(120_000); // two minutes buffer time
       const start = Date.now();
 
       // Upload the files
-      await page.locator("aside a", { hasText: "Upload Center" }).click();
+      await page.getByRole("link", { name: "Upload Center" }).click();
       await page.waitForURL(/\/upload_center/);
       await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
 
       await checkDataSourcesAndStorageDestinations({ page });
 
-      await page.getByText('click to browse').click();
+      await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
       const fileInput = page.locator('input[type="file"]');
       await fileInput.setInputFiles(filePath);
-      await page.getByRole('button', { name: 'Upload' }).click();
+      await page.getByRole('button', { name: 'Upload', exact: true }).click();
       await expect(page.getByText('File uploaded successfully!')).toBeVisible({
         timeout: 120_000,
       });
 
       // Navigate to Project Page
-      await page.locator("aside a", { hasText: "Project Dashboard" }).click();
+      await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
       await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
       await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
-      await page.getByText('timeseries-test-file').first().click();
-      await expect(page.getByText('Timeseries', { exact: true })).toBeVisible();
+      await page.getByRole('link', { name: 'timeseries-test-file.csv' }).first().click();
+      await page.waitForURL(/\/record/);
+      await expect(page.getByText('Timeseries', { exact: true }).first()).toBeVisible();
+
+      // Capture recordId/projectId from the current record page URL for cleanup
+      createdRecord = parseRecordFromUrl(page.url());
 
       // Check that it shows up on the timeseries page
-      await page.locator("aside a", { hasText: "Timeseries Viewer" }).click();
+      await page.getByRole("link", { name: "Timeseries Viewer" }).click();
       await page.waitForURL(/\/timeseries_viewer/);
       await expect(page.getByRole("heading", { name: "Timeseries Viewer" })).toBeVisible();
       await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
-      await page.getByText('timeseries-test-file').first().click();
+      await page.getByRole('link', { name: 'timeseries-test-file.csv' }).first().click();
 
       await expect(page.locator('canvas')).toBeVisible();
       await expect(page.locator('span').filter({ hasText: 'timeseries-test-file' })).toBeVisible();
