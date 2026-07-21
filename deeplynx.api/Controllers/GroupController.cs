@@ -295,7 +295,7 @@ public class GroupController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="groupId">ID of the group to hard delete</param>
-    /// <returns>A 200 OK response with an empty body.</returns>
+    /// <returns>A 200 OK response containing a boolean indicating whether the group was deleted.</returns>
     [HttpDelete("{groupId:long}", Name = "api_delete_group")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -351,7 +351,7 @@ public class GroupController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the group belongs</param>
     /// <param name="groupId">The ID of the group to archive or unarchive.</param>
     /// <param name="archive">True to archive the group, false to unarchive it.</param>
-    /// <returns>A 200 OK response with an empty body.</returns>
+    /// <returns>A 200 OK response containing a boolean indicating whether the archive operation succeeded.</returns>
     [HttpPatch("{groupId:long}", Name = "api_archive_group")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -406,7 +406,7 @@ public class GroupController : ControllerBase
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="groupId">ID of the group</param>
     /// <param name="userId">ID of the user to be added</param>
-    /// <returns>A 200 OK response with an empty body.</returns>
+    /// <returns>A 200 OK response containing a boolean indicating whether the user was added to the group.</returns>
     [HttpPost("{groupId:long}/users", Name = "api_add_user_to_group")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -455,7 +455,7 @@ public class GroupController : ControllerBase
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="groupId">ID of the group to remove from</param>
     /// <param name="userId">ID of user to be removed</param>
-    /// <returns>A 200 OK response with an empty body.</returns>
+    /// <returns>A 200 OK response containing a boolean indicating whether the user was removed from the group.</returns>
     [HttpDelete("{groupId:long}/users/{userId:long}", Name = "api_remove_user_from_group")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
