@@ -861,10 +861,63 @@ startxref
     });
   });
 
+  test.describe('Empty file upload', () => {
+    const emptyFileName = 'empty-test-file.txt';
+    let filePath: string;
+
+    test.beforeEach(async () => {
+      filePath = path.join(os.tmpdir(), emptyFileName);
+      await fs.promises.writeFile(filePath, Buffer.alloc(0)); // zero-byte file
+    });
+
+    test.afterEach(async () => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
+    test('Uploading an empty file fails with a notification and no record is created', async ({ page }) => {
+      // Keep default Project/Data Source settings — do not call
+      await checkDataSourcesAndStorageDestinations({ page });
+
+      await page.getByText('click to browse').click();
+
+      const fileInput = page.locator('input[type="file"]');
+      await fileInput.setInputFiles(filePath);
+
+      await page.getByRole('button', { name: 'Upload' }).click();
+
+      // TODO: replace with the actual failure notification text/selector
+      await expect(
+        page.getByText('Upload failed')
+      ).toBeVisible();
+
+      // No success notification should appear
+      await expect(
+        page.getByText('File uploaded successfully!')
+      ).not.toBeVisible();
+
+      // No folder/record should show on the Project Dashboard
+      await page.getByRole('link', { name: 'Project Dashboard' }).click();
+      await expect(
+        page.getByText(emptyFileName)
+      ).not.toBeVisible();
+
+      await page.getByRole('link', { name: 'Visit' }).first().click();
+      await page.getByRole('textbox', { name: 'Search' }).click();
+      await page.getByRole('textbox', { name: 'Search' }).fill(emptyFileName);
+      await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+
+      await expect(
+        page.getByRole('link', { name: emptyFileName, exact: true }).first()
+      ).not.toBeVisible();
+    });
+  });
+
   test.describe("Upload bulk records", () => {
     let filePath: string;
 
-    test.beforeEach(async ({}) => {
+    test.beforeEach(async ({ }) => {
       // Create the file locally
       filePath = path.join(os.tmpdir(), 'bulk-upload.csv');
 
@@ -885,7 +938,6 @@ startxref
         fs.unlinkSync(filePath);
       }
     });
-
     test("uploads bulk records via a CSV", async ({ page }) => {
       test.setTimeout(120_000); // buffer time
       const start = Date.now();
@@ -895,14 +947,14 @@ startxref
 
       await checkDataSourcesAndStorageDestinations({ page });
 
-      await page.getByRole('button', {name: 'Step 2: Upload Your CSV'}).click();
+      await page.getByRole('button', { name: 'Step 2: Upload Your CSV' }).click();
       const fileInput = page.locator('input[type="file"]');
       await fileInput.setInputFiles(filePath);
       await expect(page.getByText('Validation Successful!')).toBeVisible();
       await page.getByRole('button', { name: 'Upload 5 Records' }).click();
       await page.getByRole('button', { name: 'Confirm Upload' }).click();
       await expect(page.getByText('Successfully uploaded 5 Records!')).toBeVisible({
-      timeout: 60_000,
+        timeout: 60_000,
       });
 
       // Verify the new files appear
@@ -956,7 +1008,7 @@ startxref
       await fileInput.setInputFiles(filePath);
       await page.getByRole('button', { name: 'Upload' }).click();
       await expect(page.getByText('File uploaded successfully!')).toBeVisible({
-      timeout: 120_000,
+        timeout: 120_000,
       });
 
       // Navigate to Project Page

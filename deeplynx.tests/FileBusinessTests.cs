@@ -2632,7 +2632,7 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert: Upload directory should be deleted
         Assert.False(Directory.Exists(uploadPath));
     }
-
+    
     [Fact]
     public async Task CompleteUpload_WithAzureBlobObjectStorage_GetsFileSizeFromStorageBusiness()
     {
@@ -2723,7 +2723,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         _fileBusinessFactory.Verify(x => x.CreateFileBusiness("azure_object"), Times.Once);
     }
-
+    
     [Fact]
     public async Task CompleteUpload_MetadataNoClassInformation_ReturnsDefault()
     {
