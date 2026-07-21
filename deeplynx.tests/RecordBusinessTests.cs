@@ -56,6 +56,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public long lid; // sensitivity label ID
     public long uid;
     public long roleId;
+    public long eid; // embedding id for rid
 
     public RecordBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -275,7 +276,8 @@ public class RecordBusinessTests : IntegrationTestBase
                 LastUpdatedBy = uid,
                 Uri = "localhost:8090",
                 FileType = "pdf",
-                OrganizationId = organizationId
+                OrganizationId = organizationId,
+                Embedded = true,
             },
             new Record
             {
@@ -326,6 +328,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.Records.AddRange(testRecords);
         Context.Tags.Add(testTag);
         Context.SensitivityLabels.Add(testLabel);
+
         await Context.SaveChangesAsync();
 
         var testRole = new Role
@@ -361,6 +364,13 @@ public class RecordBusinessTests : IntegrationTestBase
         rdesc = testRecords[0].Description;
         ruri = testRecords[0].Uri;
         rfiletype = testRecords[0].FileType;
+
+        // For testing record embedding status with rid
+        // Must remain after Context.SaveChangesAsync() for rid to exist and satisfy foreign key constraints.
+        eid = await Context.Database.ExecuteSqlInterpolatedAsync($@"
+            INSERT INTO dl_vector.embeddings (record_id, page_number, text_chunk, vector, last_updated_at)
+            VALUES ({rid}, {0}, {""}, {"[0]"}::vector, {DateTime.UtcNow})");
+        await Context.SaveChangesAsync();
     }
 
     #region GetRecordsCountByDataSource Tests
@@ -842,6 +852,58 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal("original-123", result.OriginalId);
         Assert.Equal(cid, result.ClassId);
         Assert.Equal("png", result.FileType);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(uid, result.LastUpdatedBy);
+
+        // Verify record was actually created in database
+        var createdRecord = await Context.Records.FindAsync(result.Id);
+        Assert.NotNull(createdRecord);
+        Assert.Equal("New Test Record", createdRecord.Name);
+
+        // Ensure that record create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Single(eventList);
+
+        var actualEvent = eventList[0];
+
+        Assert.Equal(createdRecord.ProjectId, actualEvent.ProjectId);
+        Assert.Equal("create", actualEvent.Operation);
+        Assert.Equal("record", actualEvent.EntityType);
+        Assert.Equal(createdRecord.Id, actualEvent.EntityId);
+    }
+
+    [Fact]
+    public async Task CreateRecord_EmptyStringTag_DoesNotCreateTag()
+    {
+        // Arrange
+
+        var now = DateTime.UtcNow;
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "New Test Record",
+            Description = "Test Record Description",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            Uri = "test://uri",
+            OriginalId = "original-123",
+            ClassId = cid,
+            FileType = "png",
+            Tags = [""]
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("New Test Record", result.Name);
+        Assert.Equal("Test Record Description", result.Description);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.Equal(did, result.DataSourceId);
+        Assert.Equal("test://uri", result.Uri);
+        Assert.Equal("original-123", result.OriginalId);
+        Assert.Equal(cid, result.ClassId);
+        Assert.Equal("png", result.FileType);
+        Assert.Empty(result.Tags);
         Assert.True(result.LastUpdatedAt >= now);
         Assert.Equal(uid, result.LastUpdatedBy);
 
@@ -4869,10 +4931,8 @@ public class RecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task SearchPaginated_EmbeddedFilter_ReturnsOnlyEmbeddedRecords()
     {
-        // Arrange - mark rid as embedded, leave the rest as not embedded
+        // Arrange - rid should already be marked as embedded from its initialization
         var record = await Context.Records.FindAsync(rid);
-        record!.Embedded = true;
-        await Context.SaveChangesAsync();
 
         var search = DefaultSearch();
         search.Embedding = "embedded";
@@ -4896,10 +4956,8 @@ public class RecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task SearchPaginated_NotEmbeddedFilter_ReturnsOnlyNotEmbeddedRecords()
     {
-        // Arrange - mark rid as embedded so we can confirm it is excluded
+        // Arrange - rid should already be marked as embedded from its initialization
         var record = await Context.Records.FindAsync(rid);
-        record!.Embedded = true;
-        await Context.SaveChangesAsync();
 
         var search = DefaultSearch();
         search.Embedding = "pending";

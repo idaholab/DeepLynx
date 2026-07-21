@@ -21,6 +21,9 @@ namespace deeplynx.helpers.ExceptionHandlers;
 /// fall through to the <see cref="InternalServerErrorExceptionHandler"/>, where the message is sanitized in non-Development
 /// environments. Once the audit is cleared, add <see cref="ArgumentException"/> back to the type guard below.
 ///
+/// This handler is effectively used by v2 and later APIs. Legacy v1 controllers catch exceptions and return
+/// their established controller-specific responses before an exception can reach the global handler.
+///
 /// See: <see href="https://nstinl.atlassian-us-gov-mod.net/wiki/spaces/DeepLynx/pages/5341621/Backend+Architecture+Review#ArgumentException-Misuse" />
 /// </remarks>
 public class BadRequestExceptionHandler : IExceptionHandler

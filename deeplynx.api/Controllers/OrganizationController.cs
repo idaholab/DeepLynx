@@ -1,13 +1,18 @@
+using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("organizations")]
 [Authorize]
 public class OrganizationController : ControllerBase
@@ -35,8 +40,9 @@ public class OrganizationController : ControllerBase
     ///     Get All Organizations
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
-    /// <returns></returns>
+    /// <returns>A list of organizations visible to the current user.</returns>
     [HttpGet(Name = "api_get_all_organizations")]
+    [MapToApiVersion(1)]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizations(
         [FromQuery] bool hideArchived = true)
     {
@@ -57,11 +63,30 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Get All Organizations
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
+    /// <returns>A list of organizations visible to the current user.</returns>
+    [HttpGet(Name = "api_get_all_organizations")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizationsV2(
+        [FromQuery] bool hideArchived = true)
+    {
+        var userId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var organizations = await _organizationBusiness
+            .GetAllOrganizations(userId, hideArchived, isSysAdmin);
+        return Ok(organizations);
+    }
+
+    /// <summary>
     ///     Get Organizations for User
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
-    /// <returns></returns>
+    /// <returns>A list of organizations associated with the current user.</returns>
     [HttpGet("user", Name = "api_get_organizations_for_user")]
+    [MapToApiVersion(1)]
     public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizationsForUser(
         [FromQuery] bool hideArchived = true)
     {
@@ -83,12 +108,32 @@ public class OrganizationController : ControllerBase
 
 
     /// <summary>
+    ///     Get Organizations for User
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
+    /// <returns>A list of organizations associated with the current user.</returns>
+    [HttpGet("user", Name = "api_get_organizations_for_user")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizationsForUserV2(
+        [FromQuery] bool hideArchived = true)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var organizations = await _organizationBusiness
+            .GetAllOrganizationsForUser(currentUserId, hideArchived, isSysAdmin);
+        return Ok(organizations);
+    }
+
+
+    /// <summary>
     ///     Fetch Organization by ID
     /// </summary>
     /// <param name="organizationId">ID of organization</param>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
-    /// <returns></returns>
+    /// <returns>The requested organization.</returns>
     [HttpGet("{organizationId:long}", Name = "api_get_organization")]
+    [MapToApiVersion(1)]
     [Auth("read", "organization")]
     public async Task<ActionResult<OrganizationResponseDto>> GetOrganization(
         long organizationId, [FromQuery] bool hideArchived = true)
@@ -107,11 +152,29 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Fetch Organization by ID
+    /// </summary>
+    /// <param name="organizationId">ID of organization</param>
+    /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
+    /// <returns>The requested organization.</returns>
+    [HttpGet("{organizationId:long}", Name = "api_get_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "organization")]
+    public async Task<ActionResult<OrganizationResponseDto>> GetOrganizationV2(
+        long organizationId, [FromQuery] bool hideArchived = true)
+    {
+        var organization = await _organizationBusiness.GetOrganization(organizationId, hideArchived);
+        return Ok(organization);
+    }
+
+    /// <summary>
     ///     Create an Organization
     /// </summary>
     /// <param name="dto">Data structure of organization to create</param>
-    /// <returns></returns>
+    /// <returns>The newly created organization.</returns>
     [HttpPost(Name = "api_create_organization")]
+    [MapToApiVersion(1)]
     [SysAdmin]
     public async Task<ActionResult<OrganizationResponseDto>> CreateOrganization(
         [FromBody] CreateOrganizationRequestDto dto)
@@ -131,12 +194,30 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Create an Organization
+    /// </summary>
+    /// <param name="dto">Data structure of organization to create</param>
+    /// <returns>The newly created organization.</returns>
+    [HttpPost(Name = "api_create_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [SysAdmin]
+    public async Task<ActionResult<OrganizationResponseDto>> CreateOrganizationV2(
+        [FromBody] CreateOrganizationRequestDto dto)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var organization = await _organizationBusiness.CreateOrganization(currentUserId, dto);
+        return Ok(organization);
+    }
+
+    /// <summary>
     ///     Update an Organization
     /// </summary>
     /// <param name="organizationId">ID of the organization</param>
     /// <param name="dto">Fields to update</param>
-    /// <returns></returns>
+    /// <returns>The updated organization.</returns>
     [HttpPut("{organizationId:long}", Name = "api_update_organization")]
+    [MapToApiVersion(1)]
     [Auth("update", "organization")]
     public async Task<ActionResult<OrganizationResponseDto>> UpdateOrganization(
         long organizationId,
@@ -157,11 +238,31 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Update an Organization
+    /// </summary>
+    /// <param name="organizationId">ID of the organization</param>
+    /// <param name="dto">Fields to update</param>
+    /// <returns>The updated organization.</returns>
+    [HttpPut("{organizationId:long}", Name = "api_update_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "organization")]
+    public async Task<ActionResult<OrganizationResponseDto>> UpdateOrganizationV2(
+        long organizationId,
+        [FromBody] UpdateOrganizationRequestDto dto)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var organization = await _organizationBusiness.UpdateOrganization(currentUserId, organizationId, dto);
+        return Ok(organization);
+    }
+
+    /// <summary>
     ///     Delete an Organization
     /// </summary>
     /// <param name="organizationId">ID of the organization to hard delete</param>
-    /// <returns></returns>
+    /// <returns>A message confirming that the organization was deleted.</returns>
     [HttpDelete("{organizationId:long}", Name = "api_delete_organization")]
+    [MapToApiVersion(1)]
     [SysAdmin]
     public async Task<ActionResult> DeleteOrganization(long organizationId)
     {
@@ -179,12 +280,28 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Delete an Organization
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to hard delete</param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpDelete("{organizationId:long}", Name = "api_delete_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [SysAdmin]
+    public async Task<ActionResult> DeleteOrganizationV2(long organizationId)
+    {
+        var response = await _organizationBusiness.DeleteOrganization(organizationId);
+        return Ok(response);
+    }
+
+    /// <summary>
     ///     Archive or Unarchive an Organization
     /// </summary>
     /// <param name="organizationId">The ID of the organization</param>
     /// <param name="archive">True to archive the organization, false to unarchive it.</param>
     /// <returns>A message stating the organization was successfully archived or unarchived.</returns>
     [HttpPatch("{organizationId:long}", Name = "api_archive_organization")]
+    [MapToApiVersion(1)]
     [Auth("update", "organization", true)]
     public async Task<IActionResult> ArchiveOrganization(
         long organizationId,
@@ -212,13 +329,40 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Archive or Unarchive an Organization
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization</param>
+    /// <param name="archive">True to archive the organization, false to unarchive it.</param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpPatch("{organizationId:long}", Name = "api_archive_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "organization", true)]
+    public async Task<IActionResult> ArchiveOrganizationV2(
+        long organizationId,
+        [FromQuery] bool archive)
+    {
+        var userId = UserContextStorage.UserId;
+
+        if (archive)
+        {
+            var archiveResponse = await _organizationBusiness.ArchiveOrganization(userId, organizationId);
+            return Ok(archiveResponse);
+        }
+
+        var response = await _organizationBusiness.UnarchiveOrganization(userId, organizationId);
+        return Ok(response);
+    }
+
+    /// <summary>
     ///     Add User to Organization
     /// </summary>
     /// <param name="organizationId">ID of the organization</param>
     /// <param name="userId">ID of the user to be added</param>
     /// <param name="isAdmin"></param>
-    /// <returns></returns>
+    /// <returns>A message confirming that the user was added to the organization.</returns>
     [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
+    [MapToApiVersion(1)]
     [OrgAdmin]
     public async Task<ActionResult> AddUserToOrganization(
         long organizationId,
@@ -239,13 +383,34 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Add User to Organization
+    /// </summary>
+    /// <param name="organizationId">ID of the organization</param>
+    /// <param name="userId">ID of the user to be added</param>
+    /// <param name="isAdmin"></param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpPost("{organizationId:long}/user", Name = "api_add_user_to_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [OrgAdmin]
+    public async Task<ActionResult> AddUserToOrganizationV2(
+        long organizationId,
+        [FromQuery] long userId,
+        [FromQuery] bool isAdmin = false)
+    {
+        var response = await _organizationBusiness.AddUserToOrganization(organizationId, userId, isAdmin);
+        return Ok(response);
+    }
+
+    /// <summary>
     ///     Set Admin Status for Organization User
     /// </summary>
     /// <param name="organizationId">ID of the organization</param>
     /// <param name="userId">ID of the user</param>
     /// <param name="isAdmin">isAdmin status</param>
-    /// <returns></returns>
+    /// <returns>A message confirming the user's organization administrator status was updated.</returns>
     [HttpPut("{organizationId:long}/admin", Name = "api_update_organization_admin_status")]
+    [MapToApiVersion(1)]
     [OrgAdmin]
     [Auth("update", "organization")]
     [Auth("update", "user")]
@@ -269,12 +434,35 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Set Admin Status for Organization User
+    /// </summary>
+    /// <param name="organizationId">ID of the organization</param>
+    /// <param name="userId">ID of the user</param>
+    /// <param name="isAdmin">isAdmin status</param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpPut("{organizationId:long}/admin", Name = "api_update_organization_admin_status")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [OrgAdmin]
+    [Auth("update", "organization")]
+    [Auth("update", "user")]
+    public async Task<ActionResult> SetOrganizationAdminStatusV2(
+        long organizationId,
+        [FromQuery] long userId,
+        [FromQuery] bool isAdmin)
+    {
+        var response = await _organizationBusiness.SetOrganizationAdminStatus(organizationId, userId, isAdmin);
+        return Ok(response);
+    }
+
+    /// <summary>
     ///     Remove User from Organization
     /// </summary>
     /// <param name="organizationId">ID of the organization to remove from</param>
     /// <param name="userId">ID of user to be removed</param>
-    /// <returns></returns>
+    /// <returns>A message confirming that the user was removed from the organization.</returns>
     [HttpDelete("{organizationId:long}/user", Name = "api_remove_user_from_organization")]
+    [MapToApiVersion(1)]
     [OrgAdmin]
     [Auth("update", "organization")]
     [Auth("update", "user")]
@@ -296,14 +484,34 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Remove User from Organization
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to remove from</param>
+    /// <param name="userId">ID of user to be removed</param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpDelete("{organizationId:long}/user", Name = "api_remove_user_from_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [OrgAdmin]
+    [Auth("update", "organization")]
+    [Auth("update", "user")]
+    public async Task<ActionResult> RemoveUserFromOrganizationV2(
+        long organizationId,
+        [FromQuery] long userId)
+    {
+        var response = await _organizationBusiness.RemoveUserFromOrganization(organizationId, userId);
+        return Ok(response);
+    }
+
+    /// <summary>
     ///     Invite/Add User to Organization
     /// </summary>
     /// <param name="organizationId"></param>
     /// <param name="userEmail"></param>
-    /// <param name="userName"></param>
-    /// <returns></returns>
+    /// <param name="userId"></param>
+    /// <returns>A message confirming that the user was invited to the organization.</returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
-    [ProjectAdmin(unscoped: true)] 
+    [ProjectAdmin(unscoped: true)]
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
         [FromQuery] string? userEmail,
@@ -324,5 +532,113 @@ public class OrganizationController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+
+    /// <summary>
+    ///     Upload a Organization Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="file">The file to upload</param>
+    /// <returns>File path for the logo</returns>
+    [HttpPost("{organizationId}/logo", Name = "api_upload_organization_logo")]
+    [OrgAdmin]
+    [Sensitivity("upload file")]
+    public async Task<IActionResult> UploadProjectLogo(
+        long organizationId,
+        IFormFile file)
+    {
+        try
+        {
+            var logoUri = await _organizationBusiness.UploadOrganizationLogo(organizationId, file);
+
+            return Ok(new { message = "Logo uploaded successfully", logoUri });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to upload project logo for organization {organizationId}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
+    }
+
+    /// <summary>
+    ///     Get an Organization Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <returns>File stream of the logo bytes</returns>
+    [HttpGet("{organizationId}/logo/image", Name = "api_get_organization_image")]
+    public async Task<IActionResult> GetProjectLogoImage(
+        long organizationId)
+    {
+        try
+        {
+            var result = await _organizationBusiness.GetOrganizationLogoStreamAsync(organizationId);
+            if (result == null)
+                return NotFound();
+
+            var (logoStream, fullPath) = result.Value;
+
+
+            var provider = new FileExtensionContentTypeProvider();
+            if (!provider.TryGetContentType(fullPath, out var contentType))
+            {
+                contentType = "application/octet-stream";
+            }
+
+            return File(logoStream, contentType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error retrieving logo image for organization {organizationId}");
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    /// <summary>
+    ///     Delete a Organization Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <returns>True if file was sucessfully deleted</returns>
+    [HttpDelete("{organizationId}/logo/delete", Name = "api_delete_organization_logo")]
+    [OrgAdmin]
+    [Sensitivity("delete file")]
+    public async Task<IActionResult> RemoveProjectLogo(
+        long organizationId)
+    {
+        try
+        {
+            var success = await _organizationBusiness.RemoveLogoFileAsync(organizationId);
+
+            if (!success)
+            {
+                return NotFound(new { message = "Active logo file not found or already deleted." });
+            }
+
+            return Ok(new { message = "Active logo file successfully removed." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to remove active logo file for organization {organizationId}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
+    }
+
+    /// <summary>
+    ///     Invite/Add User to Organization
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="userEmail"></param>
+    /// <param name="userId"></param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin(unscoped: true)]
+    public async Task<ActionResult> InviteUserToOrganizationV2(
+        long organizationId,
+        [FromQuery] string? userEmail,
+        [FromQuery] long? userId)
+    {
+        var response = await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, userId, userEmail);
+        return Ok(response);
     }
 }

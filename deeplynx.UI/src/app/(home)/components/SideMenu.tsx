@@ -433,7 +433,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
           {/* Project Settings (Admin only) */}
           <ProjectAdminRoute>
             <li className="mt-2">
-              <Link
+              <Link aria-label="Project Settings"
                 href={`/project_management/${project?.projectId || ""}`}
                 onClick={(e) =>
                   handleItemClick(

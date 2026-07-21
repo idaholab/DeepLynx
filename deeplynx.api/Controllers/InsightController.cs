@@ -203,6 +203,87 @@ public class InsightController : ControllerBase
     }
 
     /// <summary>
+    ///     Get the persistent upload pipeline status for a record.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project.</param>
+    /// <param name="recordId">The record ID whose Insight pipeline status should be checked.</param>
+    /// <returns>Persistent pipeline status including stage, worker, progress, and error details.</returns>
+    [HttpGet("pipeline_status/{recordId:long}", Name = "api_insight_pipeline_status")]
+    [Auth("read", "insight")]
+    [Sensitivity("read record")]
+    [InsightEnabled]
+    public async Task<ActionResult<InsightPipelineStatusResponseDto>> PipelineStatus(
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        if (recordId <= 0)
+            return BadRequest("recordId must be a positive integer.");
+
+        try
+        {
+            var userId = UserContextStorage.UserId;
+            
+            var status = await _insightBusiness.FetchInsightPipelineStatus(
+                userId,
+                organizationId,
+                projectId,
+                recordId);
+            
+            return Ok(status);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Record not found while checking Insight pipeline status for record {RecordId} in project {ProjectId}",
+                recordId,
+                projectId);
+
+            return NotFound(exc.Message);
+        }
+        catch (UnauthorizedAccessException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Unauthorized pipeline status check for record {RecordId} in project {ProjectId}",
+                recordId,
+                projectId);
+
+            return Forbid();
+        }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight pipeline status request failed for record {RecordId} in project {ProjectId}: {Error}",
+                recordId,
+                projectId,
+                exc.Message);
+
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "insight_pipeline_status_failed",
+                    message = exc.Message
+                });
+        }
+        catch (Exception exc)
+        {
+            var message =
+                $"An unexpected error occurred while checking Insight pipeline status for record {recordId}: {exc}";
+            _logger.LogError(message);
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
     ///     Check the health of a configured model endpoint through the Insight service.
     /// </summary>
     /// <param name="organizationId">ID of the organization.</param>

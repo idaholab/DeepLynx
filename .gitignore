@@ -40,3 +40,5 @@ global.json
 /storage
 
 .continue
+
+playwright
