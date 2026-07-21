@@ -165,8 +165,6 @@ spec:
               value: ${INSIGHT_FASTAPI_URL}
             - name: TENANT_MODE
               value: ${TENANT_MODE}
-            - name: NEXT_PUBLIC_HIDE_INSIGHT
-              value: ${NEXT_PUBLIC_HIDE_INSIGHT}
             # Runtime environment variables from secrets (sensitive)
             - name: OKTA_CLIENT_SECRET
               valueFrom:
@@ -339,8 +337,6 @@ spec:
               value: ${AIRFLOW_BASE_URL}
             - name: AIRFLOW_JWT
               value: ${AIRFLOW_JWT}
-            - name: HIDE_INSIGHT
-              value: ${HIDE_INSIGHT}
             # Backend may also need these environment variables
             - name: OKTA_CLIENT_SECRET
               valueFrom:

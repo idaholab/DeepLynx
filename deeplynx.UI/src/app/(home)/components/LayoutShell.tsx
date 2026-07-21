@@ -6,8 +6,8 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useSafeSession } from "@/app/hooks/useSafeSession";
 import {
+  fetchOrganizationLogo,
   getAllOrganizationsForUser,
-  getOrganizationLogoUrl,
 } from "@/app/lib/client_service/organization_services.client";
 import { isRunHidden } from "@/app/lib/feature_flags";
 import {
@@ -93,10 +93,15 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        const logoUrl = await getOrganizationLogoUrl(
+        const { blobUrl } = await fetchOrganizationLogo(
           organization.organizationId as number,
         );
-        setOrgLogoUrl(logoUrl);
+
+        setOrganization({
+          ...organization,
+          logoUrl: blobUrl!,
+        });
+
       } catch (error) {
         console.error("Failed to load organization logo:", error);
         setOrgLogoUrl(null);
@@ -139,6 +144,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
       organizationId: org.id,
       organizationName: org.name,
       banner: org.banner ?? null,
+      logoUrl: org.logoUrl,
       themeName: org.theme ?? "default",
     });
 
@@ -179,18 +185,20 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
               className="flex items-center gap-3 min-w-0 cursor-pointer py-2"
             >
               {/* Organization Logo (if exists) */}
-              {orgLogoUrl ? (
+              {organization?.logoUrl ? (
                 <div className="avatar">
                   <div className="w-10 h-10 rounded-lg overflow-hidden bg-base-100 flex items-center justify-center relative">
                     <Image
-                      src={orgLogoUrl}
+                      src={organization!.logoUrl}
                       alt={organization?.organizationName ?? "No Organization"}
                       fill
                       sizes="40px"
                       className="object-contain p-1"
                       onError={() => {
-                        // If image fails to load, hide it
-                        setOrgLogoUrl(null);
+                        setOrganization({
+                          ...organization,
+                          logoUrl: undefined, // Clear the logo URL in the context
+                        });
                       }}
                     />
                   </div>
@@ -317,7 +325,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
               )}
               <OrgAdminRoute>
                 <li className="mt-5">
-                  <Link href="/organization_management">
+                  <Link href="/organization_management" aria-label="Organization Settings">
                     <AdjustmentsHorizontalIcon className="size-10" />
                   </Link>
                 </li>
@@ -328,10 +336,10 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
             <ul className="mt-auto">
               <li className="mt-5">
                 <SysAdminRoute>
-                  <Link href={"/site_management"} prefetch={false}>
-                    <Cog6ToothIcon className="size-10" />
-                  </Link>
-                </SysAdminRoute>
+                <Link href={"/site_management"} prefetch={false} aria-label="Admin Settings">
+                  <Cog6ToothIcon className="size-10" />
+                </Link>
+              </SysAdminRoute>
               </li>
               <li className="mt-5 id-tooltip group relative">
                 <Link
@@ -437,7 +445,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                   <QuestionMarkCircleIcon className="size-10" />
                 </Link>
               </li>
-              <span className="text-xs font-bold text-base-200/50">v0.6.1</span>
+              <span className="text-xs font-bold text-base-200/50">v0.7.1</span>
             </ul>
           </aside>
         </div>
