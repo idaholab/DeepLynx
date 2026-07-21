@@ -91,7 +91,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetAllEdgesV2_Returns500_OnUnexpectedException()
+    public async Task GetAllEdgesV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         _mockEdgeBusiness.Setup(b => b.GetAllEdges(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
@@ -136,7 +136,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetEdgeByIdV2_Returns500_OnUnexpectedException()
+    public async Task GetEdgeByIdV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         _mockEdgeBusiness.Setup(b => b.GetEdge(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(),
@@ -183,7 +183,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetEdgeByRelationshipV2_Returns500_OnUnexpectedException()
+    public async Task GetEdgeByRelationshipV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         _mockEdgeBusiness.Setup(b => b.GetEdge(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(),
@@ -231,7 +231,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task CreateEdgeV2_Returns500_OnUnexpectedException()
+    public async Task CreateEdgeV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         var request = new CreateEdgeRequestDto();
 
@@ -297,7 +297,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task BulkCreateEdgesV2_Returns500_OnUnexpectedException()
+    public async Task BulkCreateEdgesV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         _mockEdgeBusiness.Setup(b => b.BulkCreateEdges(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
@@ -346,7 +346,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task UpdateEdgeByIdV2_Returns500_OnUnexpectedException()
+    public async Task UpdateEdgeByIdV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         var dto = new UpdateEdgeRequestDto();
 
@@ -397,7 +397,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task UpdateEdgeByRelationshipV2_Returns500_OnUnexpectedException()
+    public async Task UpdateEdgeByRelationshipV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         var dto = new UpdateEdgeRequestDto();
 
@@ -445,7 +445,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task DeleteEdgeByIdV2_Returns500_OnUnexpectedException()
+    public async Task DeleteEdgeByIdV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         _mockEdgeBusiness.Setup(b => b.DeleteEdge(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
@@ -488,7 +488,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task DeleteEdgeByRelationshipV2_Returns500_OnUnexpectedException()
+    public async Task DeleteEdgeByRelationshipV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         _mockEdgeBusiness.Setup(b => b.DeleteEdge(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
@@ -544,7 +544,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task ArchiveEdgeByIdV2_Returns500_OnUnexpectedException()
+    public async Task ArchiveEdgeByIdV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         _mockEdgeBusiness.Setup(b => b.ArchiveEdge(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
@@ -603,7 +603,7 @@ public class EdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task ArchiveEdgeByRelationshipV2_Returns500_OnUnexpectedException()
+    public async Task ArchiveEdgeByRelationshipV2_ThrowsException_WhenEdgeBusinessThrows()
     {
         _mockEdgeBusiness.Setup(b => b.ArchiveEdge(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),

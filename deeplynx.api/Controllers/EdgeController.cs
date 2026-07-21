@@ -680,7 +680,7 @@ public class EdgeController : ControllerBase
     /// <param name="originId">The origin ID of the edge to archive or unarchive</param>
     /// <param name="destinationId">The destination ID of the edge to archive or unarchive</param>
     /// <param name="archive">True to archive the edge, false to unarchive it.</param>
-    /// <returns>The result of archiving or unarchiving the edge.</returns>
+    /// <returns>The ID of the edge that was archived or unarched.</returns>
     [HttpPatch("by-relationship", Name = "api_archive_edge_by_relationship")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
