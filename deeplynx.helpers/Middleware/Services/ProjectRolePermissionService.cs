@@ -74,7 +74,6 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
 
     public async Task<List<long>> GetPermittedProjectIdsAsync(long userId, string action, string resource)
     {
-        // Using raw SQL for example; adjust table/column names as needed
         var permittedProjectIds = await _dbContext.ProjectMembers
             .FromSqlInterpolated($@"
                 SELECT DISTINCT pm.project_id
