@@ -1,0 +1,14 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "BLOB_HASH_CONTAINER": "nexus-files",
+    "NEXUS_BASE_URL": "http://localhost:5000/api/v1",
+    "NEXUS_API_KEY": "",
+    "NEXUS_API_SECRET": "",
+    "NEXUS_TOKEN_EXPIRATION_MINUTES": "55",
+    "NEXUS_CALLBACK_MAX_ATTEMPTS": "5",
+    "NEXUS_CALLBACK_BASE_DELAY_SECONDS": "2"
+  }
+}

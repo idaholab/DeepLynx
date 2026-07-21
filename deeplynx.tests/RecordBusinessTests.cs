@@ -119,6 +119,7 @@ public class RecordBusinessTests : IntegrationTestBase
             LastUpdatedBy = uid,
             IsArchived = false,
             FileType = "pdf",
+            FileContentHash = "abc123",
             Tags = tags
         };
 
@@ -137,8 +138,266 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal(uid, dto.LastUpdatedBy);
         Assert.False(dto.IsArchived);
         Assert.Equal("pdf", dto.FileType);
+        Assert.Equal("abc123", dto.FileContentHash);
         Assert.Single(dto.Tags);
         Assert.Equal("Test Tag", dto.Tags.First().Name);
+    }
+
+    #endregion
+
+    #region Blob Hash Callback Tests
+
+    [Fact]
+    public async Task UpdateFileContentHashFromBlob_WithMatchingAzureRecord_StoresSha256Hash()
+    {
+        var objectStorageId = await CreateAzureObjectStorage();
+        var blobName = $"organization_{organizationId}/project_{pid}/datasource_{did}/{Guid.NewGuid()}_file.pdf";
+        var recordId = await CreateAzureRecord(objectStorageId, blobName, fileSize: 1234);
+        var hash = new string('a', 64);
+
+        var result = await _recordBusiness.UpdateFileContentHashFromBlob(
+            uid,
+            organizationId,
+            pid,
+            new BlobHashCallbackRequestDto
+            {
+                ObjectStorageType = "azure_object",
+                ContainerName = "test-container",
+                BlobName = blobName,
+                HashAlgorithm = "SHA-256",
+                HashHex = hash.ToUpperInvariant(),
+                ContentLength = 1234
+            });
+
+        var storedRecord = await Context.Records.FindAsync(recordId);
+
+        Assert.Equal(recordId, result.RecordId);
+        Assert.Equal(hash, result.HashHex);
+        Assert.True(result.Updated);
+        Assert.Equal(hash, storedRecord!.FileContentHash);
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHashFromBlob_WithWrongContainer_ThrowsKeyNotFoundException()
+    {
+        var objectStorageId = await CreateAzureObjectStorage("expected-container");
+        var blobName = $"organization_{organizationId}/project_{pid}/datasource_{did}/{Guid.NewGuid()}_file.pdf";
+        await CreateAzureRecord(objectStorageId, blobName);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordBusiness.UpdateFileContentHashFromBlob(
+                uid,
+                organizationId,
+                pid,
+                new BlobHashCallbackRequestDto
+                {
+                    ObjectStorageType = "azure_object",
+                    ContainerName = "different-container",
+                    BlobName = blobName,
+                    HashAlgorithm = "SHA-256",
+                    HashHex = new string('e', 64)
+                }));
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHashFromBlob_WithSameBlobInDifferentContainers_UpdatesMatchingRecord()
+    {
+        var matchingStorageId = await CreateAzureObjectStorage("matching-container");
+        var otherStorageId = await CreateAzureObjectStorage("other-container");
+        var blobName = $"organization_{organizationId}/project_{pid}/datasource_{did}/{Guid.NewGuid()}_file.pdf";
+        var matchingRecordId = await CreateAzureRecord(matchingStorageId, blobName);
+        var otherRecordId = await CreateAzureRecord(otherStorageId, blobName);
+        var hash = new string('f', 64);
+
+        var result = await _recordBusiness.UpdateFileContentHashFromBlob(
+            uid,
+            organizationId,
+            pid,
+            new BlobHashCallbackRequestDto
+            {
+                ObjectStorageType = "azure_object",
+                ContainerName = "matching-container",
+                BlobName = blobName,
+                HashAlgorithm = "SHA-256",
+                HashHex = hash
+            });
+
+        var matchingRecord = await Context.Records.FindAsync(matchingRecordId);
+        var otherRecord = await Context.Records.FindAsync(otherRecordId);
+
+        Assert.Equal(matchingRecordId, result.RecordId);
+        Assert.Equal(hash, matchingRecord!.FileContentHash);
+        Assert.Null(otherRecord!.FileContentHash);
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHashFromBlob_WithMismatchedContentLength_ThrowsInvalidOperationException()
+    {
+        var objectStorageId = await CreateAzureObjectStorage();
+        var blobName = $"organization_{organizationId}/project_{pid}/datasource_{did}/{Guid.NewGuid()}_file.pdf";
+        await CreateAzureRecord(objectStorageId, blobName, fileSize: 100);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _recordBusiness.UpdateFileContentHashFromBlob(
+                uid,
+                organizationId,
+                pid,
+                new BlobHashCallbackRequestDto
+                {
+                    ObjectStorageType = "azure_object",
+                    ContainerName = "test-container",
+                    BlobName = blobName,
+                    HashAlgorithm = "SHA-256",
+                    HashHex = new string('1', 64),
+                    ContentLength = 101
+                }));
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHashFromBlob_WithExistingSameHash_IsIdempotent()
+    {
+        var objectStorageId = await CreateAzureObjectStorage();
+        var blobName = $"organization_{organizationId}/project_{pid}/datasource_{did}/{Guid.NewGuid()}_file.pdf";
+        var hash = new string('b', 64);
+        await CreateAzureRecord(objectStorageId, blobName, hash);
+
+        var result = await _recordBusiness.UpdateFileContentHashFromBlob(
+            uid,
+            organizationId,
+            pid,
+            new BlobHashCallbackRequestDto
+            {
+                ObjectStorageType = "azure_object",
+                ContainerName = "test-container",
+                BlobName = blobName,
+                HashAlgorithm = "SHA-256",
+                HashHex = hash
+            });
+
+        Assert.False(result.Updated);
+        Assert.Equal(hash, result.HashHex);
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHashFromBlob_WhenNoRecordMatches_ThrowsKeyNotFoundException()
+    {
+        await CreateAzureObjectStorage();
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordBusiness.UpdateFileContentHashFromBlob(
+                uid,
+                organizationId,
+                pid,
+                new BlobHashCallbackRequestDto
+                {
+                    ObjectStorageType = "azure_object",
+                    ContainerName = "test-container",
+                    BlobName = "organization_1/project_2/datasource_3/missing.pdf",
+                    HashAlgorithm = "SHA-256",
+                    HashHex = new string('c', 64)
+                }));
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHashFromBlob_WhenMultipleRecordsMatch_ThrowsInvalidOperationException()
+    {
+        var objectStorageId = await CreateAzureObjectStorage();
+        var blobName = $"organization_{organizationId}/project_{pid}/datasource_{did}/{Guid.NewGuid()}_file.pdf";
+        await CreateAzureRecord(objectStorageId, blobName);
+        await CreateAzureRecord(objectStorageId, blobName);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _recordBusiness.UpdateFileContentHashFromBlob(
+                uid,
+                organizationId,
+                pid,
+                new BlobHashCallbackRequestDto
+                {
+                    ObjectStorageType = "azure_object",
+                    ContainerName = "test-container",
+                    BlobName = blobName,
+                    HashAlgorithm = "SHA-256",
+                    HashHex = new string('d', 64)
+                }));
+    }
+
+    [Theory]
+    [InlineData("MD5", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("SHA-256", "not-a-sha")]
+    public async Task UpdateFileContentHashFromBlob_WithInvalidHashRequest_ThrowsArgumentException(
+        string algorithm,
+        string hashHex)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _recordBusiness.UpdateFileContentHashFromBlob(
+                uid,
+                organizationId,
+                pid,
+                new BlobHashCallbackRequestDto
+                {
+                    ObjectStorageType = "azure_object",
+                    ContainerName = "test-container",
+                    BlobName = "organization_1/project_2/datasource_3/file.pdf",
+                    HashAlgorithm = algorithm,
+                    HashHex = hashHex
+                }));
+    }
+
+    private async Task<long> CreateAzureObjectStorage(string containerName = "test-container")
+    {
+        var objectStorage = new ObjectStorage
+        {
+            Name = $"Azure Storage {Guid.NewGuid()}",
+            Type = "azure_object",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(new ObjectStorageConfigDto
+            {
+                AzureObjectConfig = new AzureObjectConfigDto
+                {
+                    AzureConnectionString = "UseDevelopmentStorage=true",
+                    AzureContainerName = containerName
+                }
+            }),
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = organizationId
+        };
+
+        Context.ObjectStorages.Add(objectStorage);
+        await Context.SaveChangesAsync();
+
+        return objectStorage.Id;
+    }
+
+    private async Task<long> CreateAzureRecord(
+        long objectStorageId,
+        string blobName,
+        string? fileContentHash = null,
+        long? fileSize = null)
+    {
+        var record = new Record
+        {
+            Name = $"Blob Record {Guid.NewGuid()}",
+            Description = "Blob hash callback test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = blobName,
+            FileType = "pdf",
+            FileSize = fileSize,
+            FileContentHash = fileContentHash,
+            ObjectStorageId = objectStorageId,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        return record.Id;
     }
 
     #endregion

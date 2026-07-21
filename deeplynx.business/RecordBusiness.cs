@@ -1,6 +1,7 @@
 using System.Data;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.exceptions;
@@ -16,6 +17,8 @@ namespace deeplynx.business;
 
 public class RecordBusiness : IRecordBusiness
 {
+    private static readonly Regex Sha256HexRegex = new("^[a-fA-F0-9]{64}$", RegexOptions.Compiled);
+
     private readonly IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
@@ -136,6 +139,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = r.IsArchived,
             FileType = r.FileType,
             FileSize = r.FileSize,
+            FileContentHash = r.FileContentHash,
             Tags = r.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -367,6 +371,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = r.IsArchived,
             FileType = r.FileType,
             FileSize = r.FileSize,
+            FileContentHash = r.FileContentHash,
             Tags = [.. r.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -514,6 +519,7 @@ public class RecordBusiness : IRecordBusiness
                 IsArchived = r.IsArchived,
                 FileType = r.FileType,
                 FileSize = r.FileSize,
+                FileContentHash = r.FileContentHash,
                 Tags = r.Tags.Select(t => new RecordTagDto
                 {
                     Id = t.Id,
@@ -587,6 +593,7 @@ public class RecordBusiness : IRecordBusiness
             FileType = record.FileType,
             FileSize = record.FileSize,
             Embedded = record.Embedded,
+            FileContentHash = record.FileContentHash,
             Tags = record.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -1145,6 +1152,7 @@ public class RecordBusiness : IRecordBusiness
                 IsArchived = record.IsArchived,
                 FileType = record.FileType,
                 FileSize = record.FileSize,
+                FileContentHash = record.FileContentHash,
                 Tags = tags,
                 Labels = record.Labels.Select(l => new RecordLabelDto
                 {
@@ -1291,7 +1299,7 @@ public class RecordBusiness : IRecordBusiness
               file_size         = COALESCE(EXCLUDED.file_size, records.file_size),
               last_updated_by   = EXCLUDED.last_updated_by
         RETURNING id, organization_id, project_id, data_source_id, original_id, name, class_id, 
-            object_storage_id, file_type, file_size, last_updated_by, description, properties, uri;";
+            object_storage_id, file_type, file_size, file_content_hash, last_updated_by, description, properties, uri;";
 
         var inserted = await _bulkCopyUpsertExecutor.CopyUpsertAsync(
             conn, tx,
@@ -1830,12 +1838,137 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = returnedRecord.IsArchived,
             FileType = returnedRecord.FileType,
             FileSize = returnedRecord.FileSize,
+            FileContentHash = returnedRecord.FileContentHash,
             Tags = new List<RecordTagDto>(),
             Labels = returnedRecord.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
             }).ToList()
+        };
+    }
+
+    /// <summary>
+    ///     Updates the stored whole-file content hash for a Nexus-managed Azure blob.
+    /// </summary>
+    public async Task<BlobHashCallbackResponseDto> UpdateFileContentHashFromBlob(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        BlobHashCallbackRequestDto dto)
+    {
+        ValidationHelper.ValidateModel(dto);
+
+        if (!string.Equals(dto.ObjectStorageType, "azure_object", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Only azure_object storage hash callbacks are supported.");
+
+        if (!string.Equals(dto.HashAlgorithm, "SHA-256", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Only SHA-256 hash callbacks are supported.");
+
+        if (!Sha256HexRegex.IsMatch(dto.HashHex))
+            throw new ArgumentException("HashHex must be a 64-character hexadecimal SHA-256 value.");
+
+        var normalizedHash = dto.HashHex.ToLowerInvariant();
+        var normalizedBlobName = dto.BlobName.Trim();
+        var normalizedContainerName = dto.ContainerName.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedBlobName))
+            throw new ArgumentException("BlobName cannot be empty.");
+
+        if (string.IsNullOrWhiteSpace(normalizedContainerName))
+            throw new ArgumentException("ContainerName cannot be empty.");
+
+        if (dto.ContentLength is < 0)
+            throw new ArgumentException("ContentLength cannot be negative.");
+
+        var candidateRecords = await _context.Records
+            .Include(r => r.ObjectStorage)
+            .Where(r => r.OrganizationId == organizationId
+                        && r.ProjectId == projectId
+                        && !r.IsArchived
+                        && r.Uri == normalizedBlobName
+                        && r.ObjectStorageId != null
+                        && r.ObjectStorage != null
+                        && !r.ObjectStorage.IsArchived
+                        && r.ObjectStorage.Type == "azure_object")
+            .ToListAsync();
+
+        if (candidateRecords.Count == 0)
+            throw new KeyNotFoundException(
+                $"No active Azure record found for blob '{normalizedBlobName}' in container '{normalizedContainerName}'.");
+
+        var objectStorageIds = candidateRecords
+            .Select(r => r.ObjectStorageId!.Value)
+            .Distinct()
+            .ToList();
+
+        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
+            organizationId,
+            projectId,
+            objectStorageIds);
+
+        var matchingObjectStorageIds = objectStorages
+            .Where(storage => string.Equals(
+                storage.Config.AzureObjectConfig?.AzureContainerName?.Trim(),
+                normalizedContainerName,
+                StringComparison.Ordinal))
+            .Select(storage => storage.Id)
+            .ToHashSet();
+
+        var matchingRecords = candidateRecords
+            .Where(record => matchingObjectStorageIds.Contains(record.ObjectStorageId!.Value))
+            .ToList();
+
+        if (matchingRecords.Count == 0)
+            throw new KeyNotFoundException(
+                $"No active Azure record found for blob '{normalizedBlobName}' in container '{normalizedContainerName}'.");
+
+        if (matchingRecords.Count > 1)
+            throw new InvalidOperationException(
+                $"Multiple active Azure records found for blob '{normalizedBlobName}' in container " +
+                $"'{normalizedContainerName}' and project {projectId}.");
+
+        var record = matchingRecords[0];
+
+        if (dto.ContentLength.HasValue
+            && record.FileSize.HasValue
+            && dto.ContentLength.Value != record.FileSize.Value)
+            throw new InvalidOperationException(
+                $"Blob content length {dto.ContentLength.Value} does not match record file size {record.FileSize.Value}.");
+
+        var updated = !string.Equals(record.FileContentHash, normalizedHash, StringComparison.Ordinal);
+
+        if (updated)
+        {
+            record.FileContentHash = normalizedHash;
+            record.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            record.LastUpdatedBy = currentUserId;
+
+            _context.Records.Update(record);
+            await _context.SaveChangesAsync();
+
+            await _eventBusiness.CreateEvent(
+                currentUserId,
+                organizationId,
+                projectId,
+                new CreateEventRequestDto
+                {
+                    EntityType = "record",
+                    EntityId = record.Id,
+                    EntityName = record.Name,
+                    Operation = "update",
+                    Properties = "{\"fileContentHash\":\"updated\"}",
+                    DataSourceId = record.DataSourceId
+                });
+        }
+
+        return new BlobHashCallbackResponseDto
+        {
+            RecordId = record.Id,
+            BlobName = normalizedBlobName,
+            HashAlgorithm = "SHA-256",
+            HashHex = normalizedHash,
+            Updated = updated
         };
     }
 
@@ -1971,6 +2104,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = r.IsArchived,
             FileType = r.FileType,
             FileSize = r.FileSize,
+            FileContentHash = r.FileContentHash,
             Tags = r.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -2253,6 +2387,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = record.IsArchived,
             FileType = record.FileType,
             FileSize = record.FileSize,
+            FileContentHash = record.FileContentHash,
             Tags = record.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -2281,6 +2416,7 @@ public class RecordBusiness : IRecordBusiness
         var iObj = r.GetOrdinal("object_storage_id");
         var iType = r.GetOrdinal("file_type");
         var iSize = r.GetOrdinal("file_size");
+        var iHash = r.GetOrdinal("file_content_hash");
         var iUser = r.GetOrdinal("last_updated_by");
         var iDesc = r.GetOrdinal("description");
         var iProp = r.GetOrdinal("properties");
@@ -2297,6 +2433,7 @@ public class RecordBusiness : IRecordBusiness
             ObjectStorageId = r.IsDBNull(iObj) ? null : r.GetInt64(iObj),
             FileType = r.IsDBNull(iType) ? null : r.GetString(iType),
             FileSize = r.IsDBNull(iSize) ? null : r.GetInt64(iSize),
+            FileContentHash = r.IsDBNull(iHash) ? null : r.GetString(iHash),
             LastUpdatedBy = r.IsDBNull(iUser) ? null : r.GetInt64(iUser),
             Description = r.IsDBNull(iDesc) ? null : r.GetString(iDesc),
             Properties = r.IsDBNull(iProp) ? null : r.GetString(iProp),
