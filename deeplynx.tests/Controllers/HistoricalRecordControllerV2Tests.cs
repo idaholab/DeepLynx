@@ -93,7 +93,7 @@ public class HistoricalRecordControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetAllHistoricalRecordsV2_Returns500_OnUnexpectedException()
+    public async Task GetAllHistoricalRecordsV2_ThrowsException_WhenBusinessThrows()
     {
         _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecords(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(),
@@ -148,7 +148,7 @@ public class HistoricalRecordControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetHistoricalRecordV2_Returns500_OnUnexpectedException()
+    public async Task GetHistoricalRecordV2_ThrowsException_WhenBusinessThrows()
     {
         _mockHistoricalRecordBusiness.Setup(b => b.GetHistoricalRecord(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
@@ -221,7 +221,7 @@ public class HistoricalRecordControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetRecordHistoryV2_Returns500_OnUnexpectedException()
+    public async Task GetRecordHistoryV2_ThrowsException_WhenBusinessThrows()
     {
         _mockHistoricalRecordBusiness.Setup(b => b.GetHistoryForRecord(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
