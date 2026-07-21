@@ -30,11 +30,11 @@ interface ProjectLogoSectionProps {
 interface informationTableProps {
   organization: OrganizationSession | null;
   project: ProjectResponseDto | null;
-  t: { translations: Record<string, string> }; 
+  t: { translations: Record<string, string> };
   setProject: React.Dispatch<React.SetStateAction<ProjectResponseDto | null>>;
 }
 
-function projectInformationTable({ organization, project, t, setProject }: informationTableProps) {  
+function projectInformationTable({ organization, project, t, setProject }: informationTableProps) {
   const handleUpdateProject = useCallback(
     async (field: string, value: string, successMessage: string) => {
       if (!organization?.organizationId) return;
@@ -71,19 +71,19 @@ function projectInformationTable({ organization, project, t, setProject }: infor
       t.translations.FAILED_TO_UPDATE,
     ],
   );
-  
+
   const projectInfoRows = useMemo(() => {
     if (!project) return [];
     return [
       { key: t.translations.PROJECT_ID, value: project.id },
-      { 
+      {
         key: t.translations.PROJECT_NAME,
-        value: project.name, 
-        editable: true, 
-        onEdit: (value: string) => 
+        value: project.name,
+        editable: true,
+        onEdit: (value: string) =>
           handleUpdateProject(
-            "name", 
-            value, 
+            "name",
+            value,
             t.translations.PROJECT_NAME_UPDATED),
         maxCharacters: 50,
       },
@@ -91,12 +91,12 @@ function projectInformationTable({ organization, project, t, setProject }: infor
         key: t.translations.PROJECT_DESCRIPTION,
         value: project.description,
         editable: true,
-        onEdit: (value: string) => 
+        onEdit: (value: string) =>
           handleUpdateProject(
-            "description", 
-            value, 
+            "description",
+            value,
             t.translations.PROJECT_DESCRIPTION_UPDATED),
-          maxCharacters: 250,
+        maxCharacters: 250,
       },
       {
         key: t.translations.LAST_UPDATED_AT,
@@ -105,7 +105,7 @@ function projectInformationTable({ organization, project, t, setProject }: infor
     ];
   }, [project, handleUpdateProject, t.translations])
   return (
-    <ProjectSettingsTable projectRows={ projectInfoRows }/>
+    <ProjectSettingsTable projectRows={projectInfoRows} />
   );
 }
 
@@ -164,7 +164,7 @@ const ProjectSettingsLeftColumn = ({
 
           <div className="flex flex-wrap gap-2">
             <label className="btn btn-sm btn-primary">
-              {logoFile ? "Change Logo" : "Select Logo"}
+              {logoFile ? t.translations.CHANGE_LOGO : t.translations.SELECT_LOGO}
               <input
                 type="file"
                 accept=".png,.jpg,.jpeg,.svg,.webp"
@@ -222,10 +222,10 @@ const ProjectSettingsLeftColumn = ({
       {/* Main Project Settings */}
       <div className="border-t border-base-300/50 pt-6 pb-6">
         <h3 className="card-title text-lg mb-4">
-          {t.translations.MAIN_PROJECT_SETTINGS} 
+          {t.translations.MAIN_PROJECT_SETTINGS}
         </h3>
         <div>
-          {projectInformationTable({organization, project, t, setProject})}
+          {projectInformationTable({ organization, project, t, setProject })}
         </div>
       </div>
 
@@ -237,8 +237,8 @@ const ProjectSettingsLeftColumn = ({
           onConfirm={onArchiveProject}
         />
       </div>
-    </div> 
-    
+    </div>
+
   </div>
 );
 

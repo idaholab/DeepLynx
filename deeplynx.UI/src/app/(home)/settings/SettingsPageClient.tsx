@@ -37,12 +37,10 @@ const SettingsPageClient = () => {
       const secretStr = "Secret: " + res.apiSecret;
       setUserKeys((prev) => [res.apiKey, ...prev]);
       toast.success(
-        (t) => (
+        (toastInstance) => (
           <ToastInfoModal
-            title={
-              "API Keypair created successfully! Keep these somewhere safe:"
-            }
-            toastId={t.id}
+            title={t.translations.API_KEYPAIR_CREATED_SUCCESS}
+            toastId={toastInstance.id}
             infoDisplay={[keyStr, secretStr]}
           />
         ),
@@ -55,7 +53,7 @@ const SettingsPageClient = () => {
       );
     } catch (error) {
       console.error("Error creating keypair:", error);
-      toast.error("API Keypair creation failed.");
+      toast.error(t.translations.API_KEYPAIR_CREATION_FAILED);
     } finally {
       setCreating(false);
     }
@@ -66,10 +64,10 @@ const SettingsPageClient = () => {
       setDeleting(true);
       const res = await deleteApiKey(key);
       setUserKeys((prev) => prev.filter((x) => x !== key));
-      toast.success("API Keypair deleted successfully!");
+      toast.success(t.translations.API_KEYPAIR_DELETED_SUCCESS);
     } catch (error) {
       console.error("Error deleteing keypair:", error);
-      toast.error("API Keypair deletion failed.");
+      toast.error(t.translations.API_KEYPAIR_DELETION_FAILED);
     } finally {
       setDeleting(false);
     }
@@ -150,7 +148,7 @@ const SettingsPageClient = () => {
                       {t.translations.DARK_MODE ?? "Dark Mode"}
                     </span>
                     <span className="text-xs text-base-content/60">
-                      Toggle between light and dark themes
+                      {t.translations.DARK_MODE_DESCRIPTION}
                     </span>
                   </div>
                   <ThemeToggle />
@@ -162,7 +160,7 @@ const SettingsPageClient = () => {
                       {t.translations.LANGUAGE ?? "Language"}
                     </span>
                     <span className="text-xs text-base-content/60">
-                      Choose your preferred language
+                      {t.translations.LANGUAGE_DESCRIPTION}
                     </span>
                   </div>
                   <select
@@ -187,7 +185,7 @@ const SettingsPageClient = () => {
                     {t.translations.API_KEYPAIRS ?? "API Keypairs"}
                   </h2>
                   <p className="text-sm text-base-content/60 mt-1">
-                    Manage your API authentication keys
+                    {t.translations.API_KEYS_DESCRIPTION}
                   </p>
                 </div>
                 <button
@@ -197,7 +195,7 @@ const SettingsPageClient = () => {
                   disabled={creating}
                 >
                   <PlusIcon className="size-5" />
-                  <span>{creating ? "Generating…" : "Generate New"}</span>
+                  <span>{creating ? "Generating..." : t.translations.GENERATE_NEW}</span>
                 </button>
               </div>
 
@@ -234,10 +232,10 @@ const SettingsPageClient = () => {
                         <PlusIcon className="size-8 text-base-content/40" />
                       </div>
                       <p className="text-base-content/60">
-                        No API keypairs configured
+                        {t.translations.NO_API_KEYS_CONFIGURED}
                       </p>
                       <p className="text-sm text-base-content/40 mt-1">
-                        Generate your first keypair to get started
+                        {t.translations.GENERATE_FIRST_KEYPAIR}
                       </p>
                     </div>
                   )}

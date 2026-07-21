@@ -5,6 +5,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
@@ -63,7 +64,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get all projects
     /// </summary>
@@ -78,11 +79,11 @@ public class ProjectController : ControllerBase
         long organizationId,
         [FromQuery] bool hideArchived = true)
     {
-            // get user ID from the middleware context
-            var currentUserId = UserContextStorage.UserId;
-            var projects = await _projectBusiness
-                .GetAllProjects(currentUserId, organizationId, hideArchived);
-            return Ok(projects);
+        // get user ID from the middleware context
+        var currentUserId = UserContextStorage.UserId;
+        var projects = await _projectBusiness
+            .GetAllProjects(currentUserId, organizationId, hideArchived);
+        return Ok(projects);
     }
 
     /// <summary>
@@ -113,7 +114,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get all user projects
     /// </summary>
@@ -130,9 +131,9 @@ public class ProjectController : ControllerBase
         [FromQuery] long userId,
         [FromQuery] bool hideArchived = true)
     {
-            var projects = await _projectBusiness
-                .GetAllProjects(userId, organizationId, hideArchived);
-            return Ok(projects);
+        var projects = await _projectBusiness
+            .GetAllProjects(userId, organizationId, hideArchived);
+        return Ok(projects);
     }
 
     /// <summary>
@@ -162,7 +163,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get a Project
     /// </summary>
@@ -179,8 +180,8 @@ public class ProjectController : ControllerBase
         long projectId,
         [FromQuery] bool hideArchived = true)
     {
-            var project = await _projectBusiness.GetProject(organizationId, projectId, hideArchived);
-            return Ok(project);
+        var project = await _projectBusiness.GetProject(organizationId, projectId, hideArchived);
+        return Ok(project);
     }
 
     /// <summary>
@@ -210,7 +211,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Create a Project
     /// </summary>
@@ -226,9 +227,9 @@ public class ProjectController : ControllerBase
         long organizationId,
         [FromBody] CreateProjectRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var project = await _projectBusiness.CreateProject(currentUserId, organizationId, dto);
-            return Ok(project);
+        var currentUserId = UserContextStorage.UserId;
+        var project = await _projectBusiness.CreateProject(currentUserId, organizationId, dto);
+        return Ok(project);
     }
 
     /// <summary>
@@ -259,7 +260,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Update a Project
     /// </summary>
@@ -276,9 +277,9 @@ public class ProjectController : ControllerBase
         long projectId,
         [FromBody] UpdateProjectRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var project = await _projectBusiness.UpdateProject(currentUserId, organizationId, projectId, dto);
-            return Ok(project);
+        var currentUserId = UserContextStorage.UserId;
+        var project = await _projectBusiness.UpdateProject(currentUserId, organizationId, projectId, dto);
+        return Ok(project);
     }
 
     /// <summary>
@@ -305,7 +306,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Delete a Project
     /// </summary>
@@ -318,9 +319,9 @@ public class ProjectController : ControllerBase
     [ProjectAdmin]
     public async Task<IActionResult> DeleteProjectV2(long organizationId, long projectId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _projectBusiness.DeleteProject(currentUserId, organizationId, projectId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _projectBusiness.DeleteProject(currentUserId, organizationId, projectId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -358,7 +359,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Archive or Unarchive a Project
     /// </summary>
@@ -375,15 +376,15 @@ public class ProjectController : ControllerBase
         long projectId,
         [FromQuery] bool archive)
     {
-            var userId = UserContextStorage.UserId;
-            if (archive)
-            {
-                var responseA = await _projectBusiness.ArchiveProject(userId, organizationId, projectId);
-                return Ok(responseA);
-            }
+        var userId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var responseA = await _projectBusiness.ArchiveProject(userId, organizationId, projectId);
+            return Ok(responseA);
+        }
 
-            var response = await _projectBusiness.UnarchiveProject(userId, organizationId, projectId);
-            return Ok(response);
+        var response = await _projectBusiness.UnarchiveProject(userId, organizationId, projectId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -409,7 +410,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get Project Stats
     /// </summary>
@@ -422,8 +423,8 @@ public class ProjectController : ControllerBase
     [ProjectAdmin]
     public async Task<ActionResult<ProjectStatResponseDto>> ProjectStatsV2(long organizationId, long projectId)
     {
-       var stats = await _projectBusiness.GetProjectStats(organizationId, projectId);
-            return Ok(stats);
+        var stats = await _projectBusiness.GetProjectStats(organizationId, projectId);
+        return Ok(stats);
     }
 
     /// <summary>
@@ -450,7 +451,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get Project Members
     /// </summary>
@@ -464,8 +465,8 @@ public class ProjectController : ControllerBase
     [Auth("read", "user")]
     public async Task<ActionResult<IEnumerable<ProjectMemberResponseDto>>> GetProjectMembersV2(long organizationId, long projectId)
     {
-            var members = await _projectBusiness.GetProjectMembers(projectId);
-            return Ok(members);
+        var members = await _projectBusiness.GetProjectMembers(projectId);
+        return Ok(members);
     }
 
     /// <summary>
@@ -499,7 +500,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Add User or Group to Project
     /// </summary>
@@ -554,7 +555,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Update Member Role in Project
     /// </summary>
@@ -574,7 +575,7 @@ public class ProjectController : ControllerBase
         [FromQuery] long roleId, [FromQuery] long? userId, [FromQuery] long? groupId,
         [FromQuery] bool? isProjectAdmin = null)
     {
-      var response = await _projectBusiness.UpdateProjectMemberRole(projectId, roleId, userId, groupId, isProjectAdmin);
+        var response = await _projectBusiness.UpdateProjectMemberRole(projectId, roleId, userId, groupId, isProjectAdmin);
         return Ok(response);
     }
 
@@ -607,7 +608,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Set Project Admin Status for a Project Member
     /// </summary>
@@ -625,8 +626,8 @@ public class ProjectController : ControllerBase
         long organizationId, long projectId,
         [FromQuery] long? userId, [FromQuery] long? groupId, [FromQuery] bool isAdmin)
     {
-       var response = await _projectBusiness.SetProjectAdminStatus(projectId, userId, groupId, isAdmin);
-            return Ok(response);
+        var response = await _projectBusiness.SetProjectAdminStatus(projectId, userId, groupId, isAdmin);
+        return Ok(response);
     }
 
     /// <summary>
@@ -658,7 +659,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Remove User or Group from Project
     /// </summary>
@@ -678,7 +679,7 @@ public class ProjectController : ControllerBase
         [FromQuery] long? groupId)
     {
         var response = await _projectBusiness.RemoveMemberFromProject(projectId, userId, groupId);
-            return Ok(response);
+        return Ok(response);
     }
 
     /// <summary>
@@ -720,7 +721,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Invite/Add User to Project
     /// </summary>
@@ -744,9 +745,9 @@ public class ProjectController : ControllerBase
         [FromQuery] long? groupId,
         [FromQuery] long? roleId)
     {
-       var response = await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, projectId, groupId, roleId, userId,
-                userEmail);
-            return Ok(response);
+        var response = await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, projectId, groupId, roleId, userId,
+                 userEmail);
+        return Ok(response);
     }
 
     /// <summary>
@@ -783,7 +784,7 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     /// Create and add service account to project
     /// </summary>
@@ -806,8 +807,113 @@ public class ProjectController : ControllerBase
         [FromQuery] long? roleId,
         [FromQuery] bool makeProjectAdmin = false)
     {
-        
+
         var response = await _invitationBusiness.CreateAndAddServiceAccountToProject(organizationId, projectId, name, roleId, makeProjectAdmin);
-            return Ok(response);
+        return Ok(response);
+    }
+
+    /// <summary>
+    ///     Upload a Project Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
+    /// <param name="file">The file to upload</param>
+    /// <returns>File path for the logo</returns>
+    [HttpPost("{projectId}/logo", Name = "api_upload_project_logo")]
+    [MapToApiVersion(1)]
+    [ProjectAdmin]
+    [Sensitivity("upload file")]
+    public async Task<IActionResult> UploadProjectLogo(
+        long organizationId,
+        long projectId,
+        long? objectStorageId,
+        IFormFile file)
+    {
+        try
+        {
+            var logoUri = await _projectBusiness.UploadProjectLogo(organizationId, projectId, objectStorageId, file);
+
+            return Ok(new { message = "Logo uploaded successfully", logoUri });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to upload project logo for project {projectId}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
+    }
+
+
+    /// <summary>
+    ///     Get a Project Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
+    /// <returns>File stream of the logo bytes</returns>
+    [HttpGet("{projectId}/logo/image", Name = "api_get_project_image")]
+    [MapToApiVersion(1)]
+    public async Task<IActionResult> GetProjectLogoImage(
+        long organizationId,
+        long projectId,
+        long? objectStorageId)
+    {
+        try
+        {
+            var result = await _projectBusiness.GetProjectLogoStreamAsync(organizationId, projectId, objectStorageId);
+            if (result == null)
+                return NotFound();
+
+            var (logoStream, fullPath) = result.Value;
+
+
+            var provider = new FileExtensionContentTypeProvider();
+            if (!provider.TryGetContentType(fullPath, out var contentType))
+            {
+                contentType = "application/octet-stream";
+            }
+
+            return File(logoStream, contentType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error retrieving logo image for project {projectId}");
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
+    }
+
+
+    /// <summary>
+    ///     Delete a Project Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
+    /// <returns>True if file was sucessfully deleted</returns>
+    [HttpDelete("{projectId}/logo/{fileName}", Name = "api_delete_project_logo")]
+    [MapToApiVersion(1)]
+    [ProjectAdmin]
+    [Sensitivity("delete file")]
+    public async Task<IActionResult> RemoveProjectLogo(
+        long organizationId,
+        long projectId,
+        long? objectStorageId)
+    {
+        try
+        {
+            var success = await _projectBusiness.RemoveLogoFileAsync(organizationId, projectId, objectStorageId);
+
+            if (!success)
+            {
+                return NotFound(new { message = "Active logo file not found or already deleted." });
+            }
+
+            return Ok(new { message = "Active logo file successfully removed." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to remove active logo file for project {projectId}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
     }
 }

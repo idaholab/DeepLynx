@@ -4,6 +4,7 @@ import "react-loading-skeleton/dist/skeleton.css";
 import "shepherd.js/dist/css/shepherd.css";
 import "../../styles/shepherd-theme.css";
 import ClientProviders from "./contexts/ClientProviders";
+import "katex/dist/katex.min.css";
 
 export default function RootLayout({
   children,
