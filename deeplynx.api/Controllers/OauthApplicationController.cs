@@ -230,7 +230,7 @@ public class OauthApplicationController : ControllerBase
     ///     Delete an OAuth Application
     /// </summary>
     /// <param name="applicationId">ID of the OAuth application to hard delete</param>
-    /// <returns>A 200 OK response with an empty body.</returns>
+    /// <returns>A 200 OK response containing a boolean indicating whether the OAuth application was deleted.</returns>
     [HttpDelete("{applicationId:long}", Name = "api_delete_oauth_application")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -279,7 +279,7 @@ public class OauthApplicationController : ControllerBase
     /// </summary>
     /// <param name="applicationId">ID of the OAuth Application to archive or unarchive</param>
     /// <param name="archive">True to archive the application, false to unarchive it</param>
-    /// <returns>A 200 OK response with an empty body.</returns>
+    /// <returns>A 200 OK response containing a boolean indicating whether the archive operation succeeded.</returns>
     [HttpPatch("{applicationId:long}", Name = "api_archive_oauth_application")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
