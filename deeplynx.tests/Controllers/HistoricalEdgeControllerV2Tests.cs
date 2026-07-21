@@ -96,7 +96,7 @@ public class HistoricalEdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetAllHistoricalEdgesV2_Returns500_OnUnexpectedException()
+    public async Task GetAllHistoricalEdgesV2_ThrowsException_WhenBusinessThrows()
     {
         _mockHistoricalEdgeBusiness.Setup(b => b.GetAllHistoricalEdges(
                          It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<DateTime?>(), It.IsAny<bool>()))
@@ -146,7 +146,7 @@ public class HistoricalEdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetHistoricalEdgeByIdV2_Returns500_OnUnexpectedException()
+    public async Task GetHistoricalEdgeByIdV2_ThrowsException_WhenBusinessThrows()
     {
         _mockHistoricalEdgeBusiness.Setup(b => b.GetHistoricalEdge(
                          It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<long?>(),
@@ -199,7 +199,7 @@ public class HistoricalEdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetHistoricalEdgeByRelationshipV2_Returns500_OnUnexpectedException()
+    public async Task GetHistoricalEdgeByRelationshipV2_ThrowsException_WhenBusinessThrows()
     {
         _mockHistoricalEdgeBusiness.Setup(b => b.GetHistoricalEdge(
                          It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<long?>(),
@@ -266,7 +266,7 @@ public class HistoricalEdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetEdgeHistoryByIdV2_Returns500_OnUnexpectedException()
+    public async Task GetEdgeHistoryByIdV2_ThrowsException_WhenBusinessThrows()
     {
         _mockHistoricalEdgeBusiness.Setup(b => b.GetHistoryForEdge(
                          It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<long?>()))
@@ -314,7 +314,7 @@ public class HistoricalEdgeControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetEdgeHistoryByRelationshipV2_Returns500_OnUnexpectedException()
+    public async Task GetEdgeHistoryByRelationshipV2_ThrowsException_WhenBusinessThrows()
     {
         _mockHistoricalEdgeBusiness.Setup(b => b.GetHistoryForEdge(
                          It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<long?>()))
