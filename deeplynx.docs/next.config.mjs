@@ -6,9 +6,7 @@ const withNextra = nextra({
 
 export default withNextra({
   // Add regular Next.js options here
-  /*env: {
-    NEXT_PUBLIC_HOSTED_LINK: process.env.HOSTED_LINK,
-  },*/
+
   basePath: '/docs',
   reactStrictMode: true,
 
