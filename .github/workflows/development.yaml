@@ -117,6 +117,7 @@ jobs:
           az acr build --registry $ACR_REGISTRY \
             --image $ACR_PATH:deeplynxv3-docs-$GITHUB_RUN_NUMBER \
             --file Dockerfiles/docs/Dockerfile.public \
+            --build-arg HOSTED_LINK=${{ vars.HOSTED_LINK }} \
             .
 
   build-mcp:
