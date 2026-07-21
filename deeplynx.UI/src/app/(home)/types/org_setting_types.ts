@@ -12,7 +12,7 @@ export interface UploadLogoRequest {
 
 export interface UploadLogoResponse {
   success: boolean;
-  logoUrl: string;
+  blobUrl: string;
   message: string;
 }
 
@@ -23,5 +23,10 @@ export interface RemoveLogoRequest {
 export interface RemoveLogoResponse {
   success: boolean;
   message: string;
+}
+
+export interface FetchOrganizationLogoResponse {
+  blobUrl: string | null;
+  fileName?: string;
 }
 

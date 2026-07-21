@@ -95,7 +95,13 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
 
     public override async Task InitializeAsync()
     {
+        // Generate valid keys once and reuse them
+        // These are pre-generated valid AES-256 keys for testing
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
+        
         _encryptionHelper = new EncryptionHelper();
+        
         await base.InitializeAsync();
 
         _connectionString = _azuriteFixture.AzuriteConnectionString;

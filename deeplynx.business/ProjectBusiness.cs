@@ -7,6 +7,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.Configuration;
 using DotNetEnv;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -182,6 +183,231 @@ public class ProjectBusiness : IProjectBusiness
 
         return projectResponseDto;
     }
+
+
+    /// <summary>
+    ///     Uploads a Project Logo to the logos folder without creating a record
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
+    /// <param name="logoFile">The file to upload</param>
+    /// <returns>The full path of the uploaded logo file</returns>
+    public async Task<string> UploadProjectLogo(
+        long organizationId,
+        long projectId,
+        long? objectStorageId,
+        IFormFile logoFile)
+    {
+        if (logoFile == null || logoFile.Length == 0)
+            throw new ArgumentException("Logo file is required and cannot be empty.");
+
+        var allowedExtensions = new HashSet<string> { "png", "jpeg", "jpg", "webp", "gif", "svg" };
+        var fileExtension = Path.GetExtension(logoFile.FileName).TrimStart('.').ToLower();
+
+        if (!allowedExtensions.Contains(fileExtension))
+            throw new ArgumentException($"Invalid file type. Allowed formats are: {string.Join(", ", allowedExtensions)}");
+
+        if (!logoFile.ContentType.StartsWith("image/"))
+            throw new ArgumentException("Invalid file type. Please upload a valid image.");
+
+        const long maxFileSize = 5 * 1024 * 1024;
+        if (logoFile.Length > maxFileSize)
+            throw new ArgumentException("File size exceeds the 5MB limit.");
+
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+        if (objectStorage == null)
+            throw new Exception("Object storage not found or failed to decrypt.");
+
+        if (objectStorage.Config == null)
+            throw new Exception("Object storage config is null.");
+
+        if (string.IsNullOrEmpty(objectStorage.Config.MountPath))
+            throw new Exception("File system mount path not set in object storage.");
+
+        var logosFolderPath = Path.Combine(
+            objectStorage.Config.MountPath,
+            $"org_{organizationId}",
+            $"project_{projectId}",
+            "logos");
+
+        Directory.CreateDirectory(logosFolderPath);
+
+        var existingFiles = Directory.GetFiles(logosFolderPath)
+            .OrderByDescending(File.GetLastWriteTime)
+            .ToList();
+
+        string mostRecentFileId = "logo_0";
+
+        if (existingFiles.Count > 0)
+        {
+            var mostRecentFileName = Path.GetFileNameWithoutExtension(existingFiles.First());
+
+            var parts = mostRecentFileName.Split('_');
+            if (parts.Length == 2 && parts[0] == "logo" && int.TryParse(parts[1], out int num))
+            {
+                mostRecentFileId = mostRecentFileName;
+            }
+            else
+            {
+                mostRecentFileId = "logo_0";
+            }
+        }
+
+        int baseNumber = 0;
+        var idParts = mostRecentFileId.Split('_');
+        if (idParts.Length == 2 && int.TryParse(idParts[1], out int parsedNumber))
+        {
+            baseNumber = parsedNumber;
+        }
+
+        var newLogoFileId = $"logo_{baseNumber + 1}";
+        var fileName = $"{newLogoFileId}.{fileExtension}";
+        var logoFilePath = Path.Combine(logosFolderPath, fileName);
+
+        await using (var stream = new FileStream(logoFilePath, FileMode.Create))
+        {
+            await logoFile.CopyToAsync(stream);
+        }
+
+        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+        File.WriteAllText(metadataFilePath, fileName);
+
+        return logoFilePath;
+    }
+
+    /// <summary>
+    ///     Removes a logo file and updates the active logo metadata.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs.</param>
+    /// <param name="projectId">The ID of the project to which the logo belongs.</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the logo belongs.</param>
+    /// <returns>True if the file is successfully removed, false otherwise.</returns>
+    public async Task<bool> RemoveLogoFileAsync(
+        long organizationId,
+        long projectId,
+        long? objectStorageId)
+    {
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+        if (objectStorage.Config.MountPath == null)
+        {
+            throw new Exception("File system mount path not set in object storage");
+        }
+
+        var logosFolderPath = Path.Combine(
+            objectStorage.Config.MountPath,
+            $"org_{organizationId}",
+            $"project_{projectId}",
+            "logos");
+
+        if (!Directory.Exists(logosFolderPath))
+        {
+            throw new DirectoryNotFoundException($"Logos folder not found for project {projectId}");
+        }
+
+        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+        if (!File.Exists(metadataFilePath))
+        {
+            return false;
+        }
+
+        var activeLogoFileName = await File.ReadAllTextAsync(metadataFilePath);
+        activeLogoFileName = activeLogoFileName?.Trim();
+
+        if (string.IsNullOrEmpty(activeLogoFileName))
+        {
+            return false;
+        }
+
+        var activeLogoFilePath = Path.Combine(logosFolderPath, activeLogoFileName);
+
+        if (!File.Exists(activeLogoFilePath))
+        {
+            return false;
+        }
+
+        File.Delete(activeLogoFilePath);
+
+        var remainingFiles = Directory.GetFiles(logosFolderPath).OrderByDescending(File.GetLastWriteTime).ToList();
+
+        if (remainingFiles.Count != 0)
+        {
+            var newActiveLogoFile = Path.GetFileName(remainingFiles.First());
+            File.WriteAllText(metadataFilePath, newActiveLogoFile);
+        }
+        else
+        {
+            if (File.Exists(metadataFilePath))
+            {
+                File.Delete(metadataFilePath);
+            }
+        }
+
+        return true;
+    }
+
+
+    /// <summary>
+    ///     Get a Project Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
+    /// <returns>Record Id of Logo</returns>
+    public async Task<(Stream Stream, string FullPath)?> GetProjectLogoStreamAsync(
+        long organizationId,
+        long projectId,
+        long? objectStorageId)
+    {
+        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+        if (objectStorage.Config.MountPath == null)
+        {
+            throw new Exception("File system mount path not set in object storage");
+        }
+
+        var logosFolderPath = Path.Combine(
+            objectStorage.Config.MountPath,
+            $"org_{organizationId}",
+            $"project_{projectId}",
+            "logos");
+
+        if (!Directory.Exists(logosFolderPath))
+        {
+            return null;
+        }
+
+        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+        if (File.Exists(metadataFilePath))
+        {
+            var activeLogoFileName = await File.ReadAllTextAsync(metadataFilePath);
+            activeLogoFileName = activeLogoFileName?.Trim();
+
+            if (!string.IsNullOrEmpty(activeLogoFileName))
+            {
+                var activeLogoFilePath = Path.Combine(logosFolderPath, activeLogoFileName);
+                if (File.Exists(activeLogoFilePath))
+                {
+                    var activeFileStream = new FileStream(activeLogoFilePath, FileMode.Open, FileAccess.Read);
+                    return (activeFileStream, activeLogoFilePath);
+                }
+            }
+        }
+
+        var files = Directory.GetFiles(logosFolderPath).OrderByDescending(File.GetLastWriteTime).ToList();
+        if (files.Count == 0)
+        {
+            return null;
+        }
+
+        var mostRecentFile = files.First();
+        var fileStream = new FileStream(mostRecentFile, FileMode.Open, FileAccess.Read);
+
+        return (fileStream, mostRecentFile);
+    }
+
 
     /// <summary>
     ///     Retrieves a specific project by ID
@@ -917,5 +1143,18 @@ public class ProjectBusiness : IProjectBusiness
         // Add current user as admin to project
         // ===============================
         await AddMemberToProject(projectId, null, currentUserId, null, makeProjectAdmin: true);
+    }
+
+    private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
+    {
+        if (objectStorageId.HasValue)
+        {
+            // object storage could be org-level so just return object storage, don't check for project existence
+            return objectStorageId.Value;
+        }
+
+        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
+            ?? throw new KeyNotFoundException("Default object storage not found");
+        return defaultObjectStorage.Id;
     }
 }

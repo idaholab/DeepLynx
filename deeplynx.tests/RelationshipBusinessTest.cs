@@ -245,6 +245,46 @@ public class RelationshipBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateRelationshipNullOriginAndDestination_Success_ReturnsIdAndCreatedAt()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        var dto = new CreateRelationshipRequestDto
+        {
+            Name = $"Test Relationship {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Test Description",
+            Uuid = $"test-uuid-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OriginId = null,
+            DestinationId = null
+        };
+
+        // Act
+        var result = await _relationshipBusiness.CreateRelationship(uid, oid, pid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(dto.Name, result.Name);
+        Assert.Equal(dto.Description, result.Description);
+        Assert.Null(result.OriginId);
+        Assert.Null(result.DestinationId);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.Equal(dto.Uuid, result.Uuid);
+        Assert.Equal(uid, result.LastUpdatedBy);
+
+        // Ensure that relationship create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Single(eventList);
+
+        var actualEvent = eventList[0];
+
+        Assert.Equal("create", actualEvent.Operation);
+        Assert.Equal("relationship", actualEvent.EntityType);
+        Assert.Equal(result.Id, actualEvent.EntityId);
+        Assert.Equal(result.ProjectId, actualEvent.ProjectId);
+    }
+
+    [Fact]
     public async Task CreateRelationship_Success_WithNullOriginId()
     {
         // Arrange

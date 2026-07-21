@@ -1,4 +1,5 @@
 using deeplynx.models;
+using Microsoft.AspNetCore.Http;
 
 namespace deeplynx.interfaces;
 
@@ -19,4 +20,7 @@ public interface IOrganizationBusiness
     Task<bool> AddUserToOrganization(long organizationId, long userId, bool isAdmin = false, bool allowServiceAccounts = false);
     Task<bool> SetOrganizationAdminStatus(long organizationId, long userId, bool isAdmin = false);
     Task<bool> RemoveUserFromOrganization(long organizationId, long userId);
+    Task<bool> RemoveLogoFileAsync(long organizationId);
+    Task<string> UploadOrganizationLogo(long organizationId, IFormFile logoFile);
+    Task<(Stream Stream, string FullPath)?> GetOrganizationLogoStreamAsync(long organizationId);
 }
