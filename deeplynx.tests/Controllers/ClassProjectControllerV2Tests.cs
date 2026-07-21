@@ -89,7 +89,7 @@ public class ClassProjectControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetAllClassesV2_Returns500_OnUnexpectedException()
+    public async Task GetAllClassesV2_ThrowsException_WhenBusinessThrows()
     {
         _mockClassBusiness.Setup(b => b.GetAllClasses(
                          It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
@@ -136,7 +136,7 @@ public class ClassProjectControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task GetClassV2_Returns500_OnUnexpectedException()
+    public async Task GetClassV2_ThrowsException_WhenBusinessThrows()
     {
         _mockClassBusiness.Setup(b => b.GetClass(
                          It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long>(), It.IsAny<bool>()))
@@ -184,7 +184,7 @@ public class ClassProjectControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task CreateClassV2_Returns500_OnUnexpectedException()
+    public async Task CreateClassV2_ThrowsException_WhenBusinessThrows()
     {
         var request = new CreateClassRequestDto();
 
@@ -249,7 +249,7 @@ public class ClassProjectControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task BulkCreateClassesV2_Returns500_OnUnexpectedException()
+    public async Task BulkCreateClassesV2_ThrowsException_WhenBusinessThrows()
     {
         _mockClassBusiness.Setup(b => b.BulkCreateClasses(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(),
@@ -299,7 +299,7 @@ public class ClassProjectControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task UpdateClassV2_Returns500_OnUnexpectedException()
+    public async Task UpdateClassV2_ThrowsException_WhenBusinessThrows()
     {
         var dto = new UpdateClassRequestDto();
 
@@ -348,7 +348,7 @@ public class ClassProjectControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task DeleteClassV2_Returns500_OnUnexpectedException()
+    public async Task DeleteClassV2_ThrowsException_WhenBusinessThrows()
     {
         _mockClassBusiness.Setup(b => b.DeleteClass(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long>()))
@@ -405,7 +405,7 @@ public class ClassProjectControllerTestsV2 : IDisposable
     }
 
     [Fact]
-    public async Task ArchiveClassV2_Returns500_OnUnexpectedException()
+    public async Task ArchiveClassV2_ThrowsException_WhenBusinessThrows()
     {
         _mockClassBusiness.Setup(b => b.ArchiveClass(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long>()))
