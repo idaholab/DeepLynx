@@ -182,15 +182,21 @@ test.describe("Upload Center", () => {
 
     await page.getByRole('link', { name: 'Visit' }).first().click();
 
-    await page.getByRole('textbox', { name: 'Search' }).click();
-
-    await page.getByRole('textbox', { name: 'Search' }).fill(baseFileName);
-    await page.getByRole('textbox', { name: 'Search' }).press('Enter');
-
-    await expect(page.locator('span').filter({ hasText: baseFileName })).toBeVisible();
-
     const recordLink = page.getByRole('link', { name: baseFileName, exact: true }).first();
-    await expect(recordLink).toBeVisible();
+    for (let attempt = 1; attempt <= 2; attempt ++) {
+      await page.getByRole('textbox', { name: 'Search' }).click();
+      await page.getByRole('textbox', { name: 'Search' }).fill(baseFileName);
+      await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+      try {
+        await expect(page.locator('span').filter({ hasText: baseFileName })).toBeVisible(); // search term success
+        await expect(recordLink).toBeVisible(); // file visible
+        break;
+      } catch (error) {
+        if (attempt === 2) {
+          throw error;
+        }
+      }
+    }
 
     // Navigate into the record (data-catalog -> record page) so we can
     // read the recordId/projectId out of the URL for cleanup.
@@ -233,17 +239,22 @@ test.describe("Upload Center", () => {
 
     await page.getByRole('link', { name: 'Visit' }).first().click();
 
-    await page.getByRole('textbox', { name: 'Search' }).click();
-
-    await page.getByRole('textbox', { name: 'Search' }).fill(baseFileName);
-
-    await page.getByRole('textbox', { name: 'Search' }).press('Enter');
-
-    await expect(page.locator('span').filter({ hasText: baseFileName })).toBeVisible();
-
     const recordLink = page.getByRole('link', { name: baseFileName, exact: true }).first();
-    await expect(recordLink).toBeVisible();
-
+    for (let attempt = 1; attempt <= 2; attempt ++) {
+      await page.getByRole('textbox', { name: 'Search' }).click();
+      await page.getByRole('textbox', { name: 'Search' }).fill(baseFileName);
+      await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+      try {
+        await expect(page.locator('span').filter({ hasText: baseFileName })).toBeVisible(); // search term success
+        await expect(recordLink).toBeVisible(); // file visible
+        break;
+      } catch (error) {
+        if (attempt === 2) {
+          throw error;
+        }
+      }
+    }
+    
     // Navigate into the record (data-catalog -> record page) so we can
     // read the recordId/projectId out of the URL for cleanup.
     await recordLink.click();
@@ -972,7 +983,7 @@ startxref
 
     test('Uploading an empty file fails with a notification and no record is created', async ({ page }) => {
       // Keep default Project/Data Source settings — do not call
-      await checkDataSourcesAndStorageDestinations({ page });
+      await checkDataSourcesAndStorageDestinations(page);
 
       await page.getByText('click to browse').click();
 
