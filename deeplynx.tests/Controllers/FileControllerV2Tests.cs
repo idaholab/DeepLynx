@@ -573,7 +573,7 @@ public class FileControllerTestsV2 : IDisposable
         var actionResult = await _fileController.StartUploadV2(OrgId, ProjectId, DataSourceId, ObjectStorageId, request);
 
         // Assert
-        var result = Assert.IsType<OkObjectResult>(actionResult);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
 
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         Assert.Equal(expected, result.Value);
@@ -659,9 +659,9 @@ public class FileControllerTestsV2 : IDisposable
 
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
 
-        var statusProperty = result.Value!.GetType().GetProperty("ChunkUploadStatus");
+        var statusProperty = result.Value;
         Assert.NotNull(statusProperty);
-        Assert.Equal(expectedStatus, statusProperty.GetValue(result.Value));
+        Assert.Equal(expectedStatus, statusProperty);
     }
 
     [Fact]

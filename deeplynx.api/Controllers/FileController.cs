@@ -410,7 +410,7 @@ public class FileController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
-    /// <returns>The result of deleting the record and its file.</returns>
+    /// <returns>True if the file was successfully deleted.</returns>
     [HttpDelete("{recordId:long}", Name = "api_delete_file")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -467,12 +467,12 @@ public class FileController : ControllerBase
     /// <param name="dataSourceId">The ID of the data source to which the file belongs</param>
     /// <param name="objectStorageId">The ID of the object storage method</param>
     /// <param name="request">File upload initialization request DTO</param>
-    /// <returns>{UploadId, ChunkSize}</returns>
+    /// <returns>A file upload session response DTO</returns>
     [HttpPost("upload/start", Name = "api_start_file_upload")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "file")]
-    public async Task<IActionResult> StartUploadV2(
+    public async Task<ActionResult<FileUploadSessionResponseDto>> StartUploadV2(
         long organizationId,
         long projectId,
         [FromQuery] long? dataSourceId,
@@ -532,7 +532,7 @@ public class FileController : ControllerBase
     /// <param name="chunk">File chunk from form</param>
     /// <param name="uploadId">ID of upload session</param>
     /// <param name="chunkNumber">Chunk number (0-indexed)</param>
-    /// <returns>{ChunkUploadStatus}</returns>
+    /// <returns>"success" if the chunk was successfully uploaded</returns>
     [HttpPost("upload/chunk", Name = "api_upload_file_chunk")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -547,9 +547,9 @@ public class FileController : ControllerBase
         [FromForm] string uploadId,
         [FromForm] int chunkNumber)
     {
-            var chunkUploadStatus = await _fileBusiness.UploadChunk(
+            var response = await _fileBusiness.UploadChunk(
                 organizationId, projectId, dataSourceId, objectStorageId, chunk, uploadId, chunkNumber);
-            return Ok(new { ChunkUploadStatus = chunkUploadStatus });
+            return Ok(response);
     }
 
     /// <summary>
