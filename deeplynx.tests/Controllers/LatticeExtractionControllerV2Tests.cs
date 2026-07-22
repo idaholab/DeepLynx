@@ -91,7 +91,8 @@ public class LatticeExtractionControllerV2Tests : IDisposable
 
         var actionResult = await _controller.EmbedOntologyV2(OrgId, ProjectId, 22L);
 
-        Assert.IsType<AcceptedResult>(actionResult);
+        var accepted = Assert.IsType<AcceptedResult>(actionResult);
+        Assert.Null(accepted.Value);
         _mockInsightBusiness.Verify(
             b => b.QueueInsightEmbedStrings(UserId, OrgId, ProjectId, 22L),
             Times.Once);
@@ -108,7 +109,8 @@ public class LatticeExtractionControllerV2Tests : IDisposable
         var actionResult = await _controller.InsightExtractionFailureV2(
             OrgId, ProjectId, ExtractionId, errorMessage);
 
-        Assert.IsType<AcceptedResult>(actionResult);
+        var accepted = Assert.IsType<AcceptedResult>(actionResult);
+        Assert.Null(accepted.Value);
         _mockBusiness.Verify(
             b => b.MarkExtractionFailed(ExtractionId, OrgId, ProjectId, errorMessage),
             Times.Once);
@@ -193,9 +195,7 @@ public class LatticeExtractionControllerV2Tests : IDisposable
             OrgId, ProjectId, RecordId, "strict");
 
         var result = Assert.IsType<AcceptedResult>(actionResult);
-        Assert.Equal(
-            ExtractionId,
-            result.Value?.GetType().GetProperty("extraction_id")?.GetValue(result.Value));
+        Assert.Equal(ExtractionId, Assert.IsType<long>(result.Value));
     }
 
     [Fact]

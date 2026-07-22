@@ -19,7 +19,7 @@ namespace deeplynx.api.Controllers;
 ///     Once approved, they are promoted into the deeplynx schema.
 /// </remarks>
 [ApiController]
-[ApiVersion(1, Deprecated = true)]
+[ApiVersion(1)]
 [ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/extractions")]
 [Authorize]
@@ -143,7 +143,7 @@ public class LatticeExtractionController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
-    /// <returns>A list of extractions belonging to the project.</returns>
+    /// <returns>200 OK with a list of extractions belonging to the project.</returns>
     [HttpGet(Name = "api_list_extractions")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -182,7 +182,7 @@ public class LatticeExtractionController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
-    /// <returns>The ontology embedding status for the project.</returns>
+    /// <returns>200 OK with the ontology embedding status for the project.</returns>
     [HttpGet("embedding-status", Name = "api_get_embedding_status")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -261,7 +261,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="embeddingModelConfigId">
     ///     Optional embedding model config ID. If omitted, the project/org default is used.
     /// </param>
-    /// <returns>A 202 Accepted response with an empty body.</returns>
+    /// <returns>202 Accepted with an empty response body once ontology embedding has been queued.</returns>
     [HttpPost("embed-ontology", Name = "api_embed_ontology")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -332,7 +332,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="extractionId">The extraction ID returned by the trigger endpoint.</param>
     /// <param name="errorMessage">Optional error message from Insight describing the failure.</param>
-    /// <returns>202 Accepted with the failed extraction ID and failure message.</returns>
+    /// <returns>202 Accepted with an empty response body once the extraction has been marked as failed.</returns>
     [AllowAnonymous]
     [HttpPost("{extractionId:long}/failure", Name = "api_insight_extraction_failure")]
     [MapToApiVersion(2)]
@@ -350,12 +350,7 @@ public class LatticeExtractionController : ControllerBase
             organizationId,
             projectId,
             failureMessage);
-        return Accepted(new
-        {
-            status = "failed",
-            extraction_id = extractionId,
-            message = failureMessage
-        });
+        return Accepted();
     }
 
     /// <summary>
@@ -435,7 +430,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="extractionId">The extraction ID returned by the trigger endpoint.</param>
     /// <param name="dataSourceId">The data source the staged records and edges will belong to.</param>
-    /// <returns>The staged extraction result.</returns>
+    /// <returns>200 OK with the staged extraction result.</returns>
     [AllowAnonymous]
     [HttpPost("{extractionId:long}/callback", Name = "api_insight_extraction_callback")]
     [MapToApiVersion(2)]
@@ -501,7 +496,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="extractionId">The extraction to retrieve staging data for.</param>
-    /// <returns>All staged classes, records, relationships, and edges for the extraction.</returns>
+    /// <returns>200 OK with all staged classes, records, relationships, and edges for the extraction.</returns>
     [HttpGet("{extractionId:long}/staging", Name = "api_get_extraction_staging")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -567,7 +562,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="extractionId">The extraction to promote.</param>
     /// <param name="request">The selection of staged items to promote.</param>
-    /// <returns>The updated extraction after the selected items are promoted.</returns>
+    /// <returns>200 OK with the updated extraction after the selected items are promoted.</returns>
     [HttpPost("{extractionId:long}/promote", Name = "api_promote_extraction")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -635,7 +630,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="extractionId">The extraction to reject items from.</param>
     /// <param name="request">The selection of staged items to reject.</param>
-    /// <returns>The updated extraction after the selected items are rejected.</returns>
+    /// <returns>200 OK with the updated extraction after the selected items are rejected.</returns>
     [HttpPost("{extractionId:long}/reject", Name = "api_reject_extraction")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -717,7 +712,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="recordId">The ID of the document record to extract from.</param>
     /// <param name="mode">Extraction mode: strict or discovery.</param>
-    /// <returns>202 Accepted with the extraction ID.</returns>
+    /// <returns>202 Accepted with the extraction ID in the response body.</returns>
     [HttpPost("/organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/trigger",
         Name = "api_trigger_extraction")]
     [MapToApiVersion(2)]
@@ -736,6 +731,6 @@ public class LatticeExtractionController : ControllerBase
             projectId,
             recordId,
             mode);
-        return Accepted(new { extraction_id = extractionId });
+        return Accepted(extractionId);
     }
 }
