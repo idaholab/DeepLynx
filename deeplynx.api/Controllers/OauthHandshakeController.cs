@@ -140,12 +140,9 @@ public class OauthHandshakeController : ControllerBase
         [FromQuery] string state)
     {
         var userId = UserContextStorage.UserId;
-        _logger.LogInformation($"Generating auth code for application {clientId} on behalf of user {userId}");
 
         var authCode = await _oauthBusiness.GenerateAuthCode(clientId, userId, redirectUri, state);
         var callbackUrl = BuildCallbackUrl(redirectUri, authCode, state);
-        _logger.LogInformation(
-            $"Auth code generated successfully for application {clientId}, user {userId}. Redirecting to {callbackUrl}");
 
         return Redirect(callbackUrl);
     }
@@ -256,7 +253,7 @@ public class OauthHandshakeController : ControllerBase
     /// <param name="redirectUri">The same redirect URI used in the authorize request</param>
     /// <param name="state">The same CSRF state used in the authorize request</param>
     /// <param name="expiration">Optional token expiration time in minutes; defaults to 480.</param>
-    /// <returns>An OAuth token response containing the access token, token type, expiration, and state.</returns>
+    /// <returns>An OAuth token response containing the access token.</returns>
     /// <remarks>
     ///     This endpoint does not require user authentication. It uses client credentials
     ///     to authenticate the OAuth application.
@@ -273,7 +270,6 @@ public class OauthHandshakeController : ControllerBase
         [FromQuery] string state,
         [FromQuery] double? expiration)
     {
-        _logger.LogInformation($"Exchanging auth code for token for application {clientId}");
         var token = await _oauthBusiness.ExchangeAuthCodeForToken(
             code,
             clientId,
@@ -281,15 +277,8 @@ public class OauthHandshakeController : ControllerBase
             redirectUri,
             state,
             expiration);
-        _logger.LogInformation($"Token generated successfully for application {clientId}");
 
-        return Ok(new
-        {
-            access_token = token,
-            token_type = "Bearer",
-            expires_in = (expiration ?? 480) * 60,
-            state
-        });
+        return Ok(token);
     }
 
     private string BuildCallbackUrl(string baseUrl, string code, string state)
