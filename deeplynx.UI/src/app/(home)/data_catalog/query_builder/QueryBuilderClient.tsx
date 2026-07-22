@@ -141,11 +141,10 @@ function SearchBar({
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleFilters}
-            className={`btn btn-sm gap-2 ${
-              showFilters
-                ? "btn-primary"
-                : "btn-ghost border border-base-content/20 hover:border-base-content/40"
-            }`}
+            className={`btn btn-sm gap-2 ${showFilters
+              ? "btn-primary"
+              : "btn-ghost border border-base-content/20 hover:border-base-content/40"
+              }`}
           >
             <FunnelIcon className="w-4 h-4" />
             {t.translations.ADDITIONAL_FILTERS}
@@ -262,7 +261,7 @@ function FilterRow({
   const { t } = useLanguage();
 
   const handleEnterSearch = (
-      e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     if (e.key === "Enter" && !e.nativeEvent.isComposing) {
       e.preventDefault();
@@ -407,14 +406,14 @@ function ValueInput({
   const { t } = useLanguage();
 
   const handleEnterSearch = (
-      e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     if (e.key === "Enter" && !e.nativeEvent.isComposing) {
       e.preventDefault();
       onSearch();
     }
   };
-  
+
   if (row.query.filter === "last_updated_at") {
     return (
       <div className="col-span-5">
@@ -700,8 +699,7 @@ export default function QueryBuilderClient({
   organizationId,
   savedSearchId,
 }: Props) {
-  const locale = "en";
-  const t = translations[locale].translations;
+  const { t } = useLanguage();
 
   // ---- State ----------------------------------------------------------------
   const [projects] = useState(initialProjects);
@@ -744,8 +742,8 @@ export default function QueryBuilderClient({
   const selectedProjectIds = useMemo(
     () =>
       selectedProjects.length === 0 ||
-      selectedProjects.includes("ALL") ||
-      selectedProjects.length === projects.length
+        selectedProjects.includes("ALL") ||
+        selectedProjects.length === projects.length
         ? projects.map((p) => Number(p.id))
         : selectedProjects.map(Number).filter(Number.isFinite),
     [projects, selectedProjects]
@@ -942,22 +940,22 @@ export default function QueryBuilderClient({
   };
 
   const handleSaveSearch = async () => {
-  if (!saveAlias.trim()) return;
-  try {
-    setIsSaving(true);
-    const queryDtos = rows
-      .filter((r) => r.query.filter !== "")
-      .map((r) => r.query);
-    await saveSearch(queryDtos, searchTerm || undefined, saveAlias.trim());
-    setSaveModalOpen(false);
-    setSaveAlias("");
-    setSavedSearchesKey((k) => k + 1); // 👈 add this
-  } catch (error) {
-    console.error("Failed to save search:", error);
-  } finally {
-    setIsSaving(false);
-  }
-};
+    if (!saveAlias.trim()) return;
+    try {
+      setIsSaving(true);
+      const queryDtos = rows
+        .filter((r) => r.query.filter !== "")
+        .map((r) => r.query);
+      await saveSearch(queryDtos, searchTerm || undefined, saveAlias.trim());
+      setSaveModalOpen(false);
+      setSaveAlias("");
+      setSavedSearchesKey((k) => k + 1); // 👈 add this
+    } catch (error) {
+      console.error("Failed to save search:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // ---- Render ---------------------------------------------------------------
   return (
@@ -968,10 +966,10 @@ export default function QueryBuilderClient({
           <div className="space-y-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-                {t.DATA_CATALOG}
+                {t.translations.DATA_CATALOG}
               </p>
               <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
-                {t.SEARCH_RECORDS}
+                {t.translations.SEARCH_RECORDS}
               </h1>
             </div>
             <ProjectDropdown
@@ -1003,23 +1001,21 @@ export default function QueryBuilderClient({
               <div className="flex items-center gap-2">
                 <BookmarkIcon className="w-4 h-4" />
                 <span className="font-semibold tracking-wide text-xs uppercase">
-                  Saved Searches
+                  {t.translations.SAVED_SEARCHES}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-base-content/40 text-xs">
-                <span>{savedSearchesOpen ? "Hide" : "Show"}</span>
+                <span>{savedSearchesOpen ? t.translations.HIDE : t.translations.SHOW}</span>
                 <ChevronDownIcon
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    savedSearchesOpen ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 transition-transform duration-200 ${savedSearchesOpen ? "rotate-180" : ""
+                    }`}
                 />
               </div>
             </button>
 
             <div
-              className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                savedSearchesOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
-              }`}
+              className={`transition-all duration-300 ease-in-out overflow-hidden ${savedSearchesOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
+                }`}
             >
               <div className="px-6 py-4 border border-t-0 border-base-content/10 rounded-b-lg bg-base-100 h-full">
                 <SavedSearchesWidget key={savedSearchesKey} scope="catalog" projects={[]} />
@@ -1054,11 +1050,9 @@ export default function QueryBuilderClient({
               <div className="rounded-b-lg border border-t-0 border-base-content/10 bg-base-200 p-6 mt-0">
                 <div className="mb-4">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-base-content mb-1">
-                    {t.SELECT_FILTERS}
+                    {t.translations.SELECT_FILTERS}
                   </h3>
-                  <p className="text-xs text-base-content/50">
-                    Build complex queries by combining multiple conditions
-                  </p>
+                  {t.translations.BUILD_COMPLEX_QUERIES_BY_COMBINING_MULTIPLE_CONDITIONS}
                 </div>
 
                 <div className="space-y-3">
@@ -1091,7 +1085,7 @@ export default function QueryBuilderClient({
                     className="btn btn-sm btn-ghost border border-base-content/20 hover:border-base-content/40 gap-2"
                   >
                     <PlusIcon className="w-4 h-4" />
-                    {t.FILTER}
+                    {t.translations.FILTER}
                   </button>
                 </div>
               </div>
