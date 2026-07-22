@@ -343,7 +343,7 @@ public class TokenController : ControllerBase
     /// <summary>
     ///     Revoke All Active Tokens for the Current User
     /// </summary>
-    /// <returns>A success message and the number of tokens revoked.</returns>
+    /// <returns>The number of tokens revoked.</returns>
     [HttpDelete("tokens/revoke", Name = "api_revoke_all_user_tokens")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -352,10 +352,6 @@ public class TokenController : ControllerBase
         var currentUserId = UserContextStorage.UserId;
         var revokedCount = await _tokenBusiness.RevokeAllUserTokens(currentUserId);
 
-        return Ok(new
-        {
-            message = $"Successfully revoked {revokedCount} token(s)",
-            revokedCount
-        });
+        return Ok(revokedCount);
     }
 }
