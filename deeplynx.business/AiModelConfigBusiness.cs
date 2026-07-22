@@ -440,73 +440,124 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             .AsQueryable();
 
         if (projectId.HasValue)
-            query = query.Where(x => x.ProjectId == projectId);
-        else
-            query = query.Where(x => x.ProjectId == null);
+            query = query.Where(x => x.ProjectId == projectId || x.ProjectId == null);
 
         var returnedModelConfig = await query.FirstOrDefaultAsync();
         if (returnedModelConfig == null)
             throw new KeyNotFoundException($"Ai Model Config with id {aiModelConfigId} not found");
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
-
-        try
+        // If updating an org-level template for a project, create a new project-level copy instead
+        if (projectId.HasValue && returnedModelConfig.ProjectId == null)
         {
-            if (dto.Default != null)
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
             {
-                if (returnedModelConfig.Default && !dto.Default.Value)
+                var newProjectConfig = new AiModelConfig
                 {
-                    throw new InvalidOperationException(
-                        "Must assign another AI Model Configuration to be the new default before unassigning.");
-                }
+                    OrganizationId = organizationId,
+                    ProjectId = projectId,
+                    ModelName = dto.ModelName ?? returnedModelConfig.ModelName,
+                    ModelType = dto.ModelType ?? returnedModelConfig.ModelType,
+                    ServerUrl = dto.ServerUrl ?? returnedModelConfig.ServerUrl,
+                    RequiresToken = dto.RequiresToken ?? returnedModelConfig.RequiresToken,
+                    ModelProvider = returnedModelConfig.ModelProvider,
+                    IsArchived = false,
+                    Default = dto.Default ?? false,
+                    LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                    LastUpdatedBy = currentUserId
+                };
 
-                if (!returnedModelConfig.Default && dto.Default.Value)
+                _context.AiModelConfigs.Add(newProjectConfig);
+                await _context.SaveChangesAsync();
+
+                if (newProjectConfig.Default)
+                    await ResetProjectDefaults(projectId.Value, newProjectConfig.Id, newProjectConfig.ModelType);
+
+                await transaction.CommitAsync();
+
+                return new AiModelConfigResponseDto
                 {
-                    // Use the incoming ModelType if it's being updated, otherwise use the existing one.
-                    // This ensures we reset defaults only among configs of the same model type.
-                    var modelType = dto.ModelType ?? returnedModelConfig.ModelType;
-
-                    if (projectId.HasValue)
-                        await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id, modelType);
-                    else
-                        await ResetOrganizationDefaults(organizationId, returnedModelConfig.Id, modelType);
-                }
+                    Id = newProjectConfig.Id,
+                    OrganizationId = newProjectConfig.OrganizationId,
+                    ProjectId = newProjectConfig.ProjectId,
+                    ServerUrl = newProjectConfig.ServerUrl,
+                    ModelProvider = newProjectConfig.ModelProvider,
+                    ModelName = newProjectConfig.ModelName,
+                    ModelType = newProjectConfig.ModelType,
+                    RequiresToken = newProjectConfig.RequiresToken,
+                    Default = newProjectConfig.Default,
+                    LastUpdatedAt = newProjectConfig.LastUpdatedAt,
+                    LastUpdatedBy = newProjectConfig.LastUpdatedBy,
+                    IsArchived = newProjectConfig.IsArchived
+                };
             }
-
-            returnedModelConfig.ModelName = dto.ModelName ?? returnedModelConfig.ModelName;
-            returnedModelConfig.ModelType = dto.ModelType ?? returnedModelConfig.ModelType;
-            returnedModelConfig.ServerUrl = dto.ServerUrl ?? returnedModelConfig.ServerUrl;
-            returnedModelConfig.RequiresToken = dto.RequiresToken ?? returnedModelConfig.RequiresToken;
-            returnedModelConfig.Default = dto.Default ?? returnedModelConfig.Default;
-
-            returnedModelConfig.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-            returnedModelConfig.LastUpdatedBy = currentUserId;
-
-            await _context.SaveChangesAsync();
-
-            await transaction.CommitAsync();
-
-            return new AiModelConfigResponseDto
+            catch (Exception)
             {
-                Id = returnedModelConfig.Id,
-                OrganizationId = returnedModelConfig.OrganizationId,
-                ProjectId = returnedModelConfig.ProjectId,
-                ServerUrl = returnedModelConfig.ServerUrl,
-                ModelProvider = returnedModelConfig.ModelProvider,
-                ModelName = returnedModelConfig.ModelName,
-                ModelType = returnedModelConfig.ModelType,
-                RequiresToken = returnedModelConfig.RequiresToken,
-                Default = returnedModelConfig.Default,
-                LastUpdatedAt = returnedModelConfig.LastUpdatedAt,
-                LastUpdatedBy = returnedModelConfig.LastUpdatedBy,
-                IsArchived = returnedModelConfig.IsArchived
-            };
-
+                await transaction.RollbackAsync();
+                throw new Exception("Failed to create project-level AI Model Configuration");
+            }
         }
-        catch (Exception ex) when (ex is not InvalidOperationException and not KeyNotFoundException)
+        else
         {
-            await transaction.RollbackAsync();
-            throw new Exception("Failed to update Ai Model Configuration");
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                if (dto.Default != null)
+                {
+                    if (returnedModelConfig.Default && !dto.Default.Value)
+                    {
+                        throw new InvalidOperationException(
+                            "Must assign another AI Model Configuration to be the new default before unassigning.");
+                    }
+
+                    if (!returnedModelConfig.Default && dto.Default.Value)
+                    {
+                        var modelType = dto.ModelType ?? returnedModelConfig.ModelType;
+
+                        if (projectId.HasValue)
+                            await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id, modelType);
+                        else
+                            await ResetOrganizationDefaults(organizationId, returnedModelConfig.Id, modelType);
+                    }
+                }
+
+                returnedModelConfig.ModelName = dto.ModelName ?? returnedModelConfig.ModelName;
+                returnedModelConfig.ModelType = dto.ModelType ?? returnedModelConfig.ModelType;
+                returnedModelConfig.ServerUrl = dto.ServerUrl ?? returnedModelConfig.ServerUrl;
+                returnedModelConfig.RequiresToken = dto.RequiresToken ?? returnedModelConfig.RequiresToken;
+                returnedModelConfig.Default = dto.Default ?? returnedModelConfig.Default;
+
+                returnedModelConfig.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                returnedModelConfig.LastUpdatedBy = currentUserId;
+
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+
+                return new AiModelConfigResponseDto
+                {
+                    Id = returnedModelConfig.Id,
+                    OrganizationId = returnedModelConfig.OrganizationId,
+                    ProjectId = returnedModelConfig.ProjectId,
+                    ServerUrl = returnedModelConfig.ServerUrl,
+                    ModelProvider = returnedModelConfig.ModelProvider,
+                    ModelName = returnedModelConfig.ModelName,
+                    ModelType = returnedModelConfig.ModelType,
+                    RequiresToken = returnedModelConfig.RequiresToken,
+                    Default = returnedModelConfig.Default,
+                    LastUpdatedAt = returnedModelConfig.LastUpdatedAt,
+                    LastUpdatedBy = returnedModelConfig.LastUpdatedBy,
+                    IsArchived = returnedModelConfig.IsArchived
+                };
+            }
+            catch (Exception ex) when (ex is not InvalidOperationException and not KeyNotFoundException)
+            {
+                await transaction.RollbackAsync();
+                throw new Exception("Failed to update Ai Model Configuration");
+            }
         }
     }
 

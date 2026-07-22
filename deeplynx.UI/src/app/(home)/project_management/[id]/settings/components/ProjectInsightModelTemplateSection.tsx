@@ -56,11 +56,11 @@ const MODEL_PROVIDER_OPTIONS: Array<{
   label: string;
   value: AiModelProvider;
 }> = [
-  { label: "OpenAI", value: "openai" },
-  { label: "Anthropic", value: "anthropic" },
-  { label: "HPC", value: "hpc" },
-  { label: "Ollama", value: "ollama" },
-];
+    { label: "OpenAI", value: "openai" },
+    { label: "Anthropic", value: "anthropic" },
+    { label: "HPC", value: "hpc" },
+    { label: "Ollama", value: "ollama" },
+  ];
 
 const DEFAULT_MODEL_TEMPLATE_FORM_STATE: ModelTemplateFormState = {
   modelName: "",
@@ -81,11 +81,16 @@ function buildProjectDefaultSelectionState(
           !modelConfig.isArchived &&
           modelConfig.default &&
           modelConfig.modelType === "llm",
+      )?.id ??
+      allModelConfigs.find(
+        (modelConfig) =>
+          !modelConfig.isArchived &&
+          modelConfig.default &&
+          modelConfig.modelType === "llm",
       )?.id ?? null,
     upload:
       allModelConfigs.find(
         (modelConfig) =>
-          modelConfig.projectId &&
           !modelConfig.isArchived &&
           modelConfig.default &&
           modelConfig.modelType === "vlm",
@@ -93,7 +98,6 @@ function buildProjectDefaultSelectionState(
     embedding:
       allModelConfigs.find(
         (modelConfig) =>
-          modelConfig.projectId &&
           !modelConfig.isArchived &&
           modelConfig.default &&
           modelConfig.modelType === "embedding",
@@ -112,11 +116,24 @@ function createEmptyModelTemplateFormState(
 
 function buildModelTemplateOptionLabel(
   modelConfig: AiModelConfigResponseDto,
-  labels: { defaultLabel: string },
+  labels: { defaultLabel: string, projectDefaultLabel: string, orgDefaultLabel: string },
+  currentProjectId: number
 ): string {
-  const defaultLabel = modelConfig.default ? ` • ${labels.defaultLabel}` : "";
+  let label = modelConfig.modelName;
 
-  return `${modelConfig.modelName} (${modelConfig.modelProvider})${defaultLabel}`;
+  if (modelConfig.default) {
+    if (modelConfig.projectId === currentProjectId) {
+      label += ` - ${labels.projectDefaultLabel}`;
+    } else if (modelConfig.projectId === null) {
+      label += ` - ${labels.orgDefaultLabel}`;
+    } else {
+      label += ` - ${labels.defaultLabel}`;
+    }
+  } else if (modelConfig.projectId === null) {
+    label += ` - ${labels.orgDefaultLabel}`;
+  }
+
+  return label;
 }
 
 function getRoleModelType(projectDefaultRole: ProjectDefaultRole): AiModelType {
@@ -140,10 +157,17 @@ function buildActiveModelConfigForRole(
   return (
     projectModelConfigs.find(
       (modelConfig) =>
-        modelConfig.projectId &&
         !modelConfig.isArchived &&
         modelConfig.default &&
-        modelConfig.modelType === modelType,
+        modelConfig.modelType === modelType &&
+        modelConfig.projectId
+    ) ??
+    projectModelConfigs.find(
+      (modelConfig) =>
+        !modelConfig.isArchived &&
+        modelConfig.default &&
+        modelConfig.modelType === modelType &&
+        modelConfig.projectId === null
     ) ?? null
   );
 }
@@ -185,6 +209,8 @@ export default function ProjectInsightModelTemplateSection({
   const modelTemplateOptionLabels = useMemo(
     () => ({
       defaultLabel: t.translations.DEFAULT_BADGE,
+      projectDefaultLabel: t.translations.DEFAULT_PROJECT_BADGE,
+      orgDefaultLabel: t.translations.DEFAULT_ORGANIZATION_BADGE,
     }),
     [t.translations.DEFAULT_BADGE],
   );
@@ -194,13 +220,6 @@ export default function ProjectInsightModelTemplateSection({
         Boolean(modelConfig.projectId),
       ),
     [availableModelConfigs],
-  );
-  const activeProjectScopedModelConfigs = useMemo(
-    () =>
-      projectScopedModelConfigs.filter(
-        (modelConfig) => !modelConfig.isArchived,
-      ),
-    [projectScopedModelConfigs],
   );
   const orderedProjectModelConfigs = useMemo(
     () =>
@@ -269,6 +288,10 @@ export default function ProjectInsightModelTemplateSection({
     t.translations.INSIGHT_PROJECT_TEMPLATES_LOAD_FAILED,
   ]);
 
+  useEffect(() => {
+    console.log("availableModelConfigs changed:", availableModelConfigs);
+  }, [availableModelConfigs]);
+
   async function refreshProjectModelTemplates() {
     if (!organizationId || !projectId) {
       return [] as AiModelConfigResponseDto[];
@@ -327,7 +350,7 @@ export default function ProjectInsightModelTemplateSection({
       (projectDefaultRole) =>
         selectedProjectDefaultIds[projectDefaultRole] !== null &&
         selectedProjectDefaultIds[projectDefaultRole] !==
-          activeProjectDefaultIds[projectDefaultRole],
+        activeProjectDefaultIds[projectDefaultRole],
     );
 
     if (changedProjectDefaultIds.length === 0) {
@@ -484,15 +507,27 @@ export default function ProjectInsightModelTemplateSection({
     ] as const
   ).map(({ roleKey, title, description }) => {
     const modelType = getRoleModelType(roleKey);
-    const availableProjectTemplatesForRole =
-      activeProjectScopedModelConfigs.filter(
-        (modelConfig) => modelConfig.modelType === modelType,
-      );
+    const allTemplatesForRole = availableModelConfigs.filter(
+      (modelConfig) => modelConfig.modelType === modelType && !modelConfig.isArchived
+    );
+
+    const projectTemplatesForRole = allTemplatesForRole.filter(
+      (modelConfig) => Boolean(modelConfig.projectId)
+    );
+
+    const availableTemplatesForRole = [
+      ...projectTemplatesForRole,
+      ...allTemplatesForRole.filter((modelConfig) => modelConfig.projectId === null),
+    ];
     const activeModelConfig = buildActiveModelConfigForRole(
-      projectScopedModelConfigs,
+      projectScopedModelConfigs.length > 0
+        ? projectScopedModelConfigs
+        : availableModelConfigs,
       roleKey,
     );
+    console.log("activeModelConfig: ", activeModelConfig)
     const selectedProjectDefaultId = selectedProjectDefaultIds[roleKey];
+
 
     return (
       <div
@@ -528,7 +563,7 @@ export default function ProjectInsightModelTemplateSection({
             </span>
           </div>
 
-          {availableProjectTemplatesForRole.length === 0 ? (
+          {availableTemplatesForRole.length === 0 ? (
             <div className="alert alert-warning">
               <ExclamationTriangleIcon className="size-5" />
               <span>
@@ -555,11 +590,12 @@ export default function ProjectInsightModelTemplateSection({
                 <option value="" disabled>
                   {t.translations.INSIGHT_SELECT_PROJECT_TEMPLATE}
                 </option>
-                {availableProjectTemplatesForRole.map((modelConfig) => (
+                {availableTemplatesForRole.map((modelConfig) => (
                   <option key={modelConfig.id} value={modelConfig.id}>
                     {buildModelTemplateOptionLabel(
                       modelConfig,
                       modelTemplateOptionLabels,
+                      projectId as number
                     )}
                   </option>
                 ))}
@@ -597,11 +633,10 @@ export default function ProjectInsightModelTemplateSection({
           orderedProjectModelConfigs.map((modelConfig) => (
             <div
               key={modelConfig.id}
-              className={`card border bg-base-100 shadow-sm ${
-                modelConfig.isArchived
-                  ? "border-warning/30 opacity-60"
-                  : "border-base-300/50"
-              }`}
+              className={`card border bg-base-100 shadow-sm ${modelConfig.isArchived
+                ? "border-warning/30 opacity-60"
+                : "border-base-300/50"
+                }`}
             >
               <div className="card-body p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -610,7 +645,11 @@ export default function ProjectInsightModelTemplateSection({
                       <h4 className="font-semibold">{modelConfig.modelName}</h4>
                       {modelConfig.default ? (
                         <span className="badge badge-primary badge-sm">
-                          {t.translations.DEFAULT_BADGE}
+                          {modelConfig.projectId === projectId
+                            ? t.translations.DEFAULT_PROJECT_BADGE
+                            : modelConfig.projectId === null
+                              ? t.translations.DEFAULT_ORGANIZATION_BADGE
+                              : t.translations.DEFAULT_BADGE}
                         </span>
                       ) : null}
                       {modelConfig.requiresToken ? (
@@ -646,7 +685,7 @@ export default function ProjectInsightModelTemplateSection({
                         title={
                           modelConfig.isArchived
                             ? t.translations
-                                .INSIGHT_ARCHIVED_TEMPLATE_CANNOT_BE_EDITED
+                              .INSIGHT_ARCHIVED_TEMPLATE_CANNOT_BE_EDITED
                             : t.translations.INSIGHT_EDIT_TEMPLATE
                         }
                       >
@@ -666,7 +705,7 @@ export default function ProjectInsightModelTemplateSection({
                             ? t.translations.UNARCHIVE
                             : modelConfig.default
                               ? t.translations
-                                  .INSIGHT_DEFAULT_TEMPLATE_CANNOT_BE_ARCHIVED
+                                .INSIGHT_DEFAULT_TEMPLATE_CANNOT_BE_ARCHIVED
                               : t.translations.ARCHIVE
                         }
                       >
@@ -886,7 +925,7 @@ export default function ProjectInsightModelTemplateSection({
     (projectDefaultRole) =>
       selectedProjectDefaultIds[projectDefaultRole] !== null &&
       selectedProjectDefaultIds[projectDefaultRole] !==
-        activeProjectDefaultIds[projectDefaultRole],
+      activeProjectDefaultIds[projectDefaultRole],
   );
 
   if (!organizationId || !projectId) {
