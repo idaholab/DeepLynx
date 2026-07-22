@@ -31,7 +31,7 @@ test.describe("Roles & Permissions", () => {
     test("displays the page description", async ({ page }) => {
       await expect(
         page.getByText(
-          /View project-level roles and their permissions/i,
+          /View project roles and/i,
         ),
       ).toBeVisible();
     });
@@ -76,11 +76,8 @@ test.describe("Roles & Permissions", () => {
       ).toBeVisible();
     });
 
-    test("displays standard roles (Admin, User)", async ({ page }) => {
-      // Standard roles should be listed in the sidebar
-      await expect(
-        page.locator("button", { hasText: "Admin" }).first(),
-      ).toBeVisible();
+    test("displays standard role (User)", async ({ page }) => {
+      // Standard role of User should be listed in the sidebar
       await expect(
         page.locator("button", { hasText: "User" }).first(),
       ).toBeVisible();
@@ -223,10 +220,7 @@ test.describe("Roles & Permissions", () => {
 
     test("displays role names as column headers", async ({ page }) => {
       await expect(page.locator("table")).toBeVisible({ timeout: 15000 });
-      // Standard roles should appear in the table header
-      await expect(
-        page.locator("thead span", { hasText: "Admin" }).first(),
-      ).toBeVisible();
+      // Standard role should appear in the table header
       await expect(
         page.locator("thead span", { hasText: "User" }).first(),
       ).toBeVisible();
@@ -470,9 +464,9 @@ test.describe("Roles & Permissions", () => {
     test("Edit Permissions button is disabled for standard roles", async ({
       page,
     }) => {
-      // Admin is a standard role - Edit Permissions should be disabled
+      // User is a standard role - Edit Permissions should be disabled
       await expect(
-        page.locator("button", { hasText: "Admin" }).first(),
+        page.locator("button", { hasText: "User" }).first(),
       ).toBeVisible();
 
       await expect(

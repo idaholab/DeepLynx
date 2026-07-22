@@ -6,27 +6,37 @@ import * as fs from 'fs';
 
 const ONE_GB = 1 * 1024 * 1024 * 1024;
 
+async function checkDataSources(page: Page) {
+  const dataSourceSelect = page.getByLabel('Data sourceData Sources');
+  const selectedText = await dataSourceSelect.locator('option:checked').textContent();
+
+  if (selectedText === 'Data Sources') {
+    await dataSourceSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
+  }
+}
+
+async function checkStorageDestinations(page: Page) {
+  const storageSelect = page.getByLabel('Storage DestinationObject');
+  const selectedText = await storageSelect.locator('option:checked').textContent();
+
+  if (selectedText === 'Object storages') {
+    await storageSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
+  }
+}
+
 async function checkDataSourcesAndStorageDestinations(page: Page) {
-  async function checkDataSources(page: Page) {
-    const dataSourceSelect = page.getByLabel('Data sourceData Sources');
-    const selectedText = await dataSourceSelect.locator('option:checked').textContent();
-
-    if (selectedText === 'Data Sources') {
-      await dataSourceSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
-    }
+  const dataSourceBox = page.locator('span').filter({ hasText: 'Data source' }).first();
+  const storageDestinationBox = page.locator('span').filter({ hasText: 'Storage Destination' }).first();
+  try {
+    await expect(dataSourceBox.locator('.size-6.text-success')).toBeVisible({ timeout: 3000 });
+  } catch {
+    await checkDataSources(page);
   }
-
-  async function checkStorageDestinations(page: Page) {
-    const storageSelect = page.getByLabel('Storage DestinationObject');
-    const selectedText = await storageSelect.locator('option:checked').textContent();
-
-    if (selectedText === 'Object storages') {
-      await storageSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
-    }
+  try {
+    await expect(storageDestinationBox.locator('.size-6.text-success')).toBeVisible({ timeout: 3000 });
+  } catch {
+    await checkStorageDestinations(page);
   }
-
-  await checkDataSources(page);
-  await checkStorageDestinations(page);
 }
 
 test.describe("Download an uploaded file", () => {

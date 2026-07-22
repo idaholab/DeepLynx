@@ -28,7 +28,7 @@ test.describe("Data Catalog - All Records", () => {
   test("project dropdown is visible", async ({ page }) => {
     // The project dropdown shows "All Your Projects" with a count
     await expect(
-      page.getByText(/All Your Projects/),
+      page.getByRole('button', { name: /All your Projects/i }),
     ).toBeVisible();
   });
 });

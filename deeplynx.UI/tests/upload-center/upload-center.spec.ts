@@ -36,8 +36,18 @@ test.describe("Upload Center", () => {
     }
   }
   async function checkDataSourcesAndStorageDestinations(page: Page) {
-    await checkDataSources(page);
-    await checkStorageDestinations(page);
+    const dataSourceBox = page.locator('span').filter({ hasText: 'Data source' }).first();
+    const storageDestinationBox = page.locator('span').filter({ hasText: 'Storage Destination' }).first();
+    try {
+      await expect(dataSourceBox.locator('.size-6.text-success')).toBeVisible({ timeout: 3000 });
+    } catch {
+      await checkDataSources(page);
+    }
+    try {
+      await expect(storageDestinationBox.locator('.size-6.text-success')).toBeVisible({ timeout: 3000 });
+    } catch {
+      await checkStorageDestinations(page);
+    }
   }
 
   async function getNonDefault(
@@ -935,7 +945,7 @@ startxref
       // Navigate to Project Page
       await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
-      await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
 
       for (const baseName of fileBaseNames) {
         await expect(page.getByText(baseName)).toBeVisible();
@@ -1082,7 +1092,7 @@ startxref
       // Verify the new files appear
       await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
-      await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
       for (const name of bulkFileNames) {
         await expect(page.getByText(name)).toBeVisible();
       }
@@ -1160,7 +1170,7 @@ startxref
       // Navigate to Project Page
       await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
-      await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
       await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
       await page.getByRole('link', { name: 'timeseries-test-file.csv' }).first().click();
       await page.waitForURL(/\/record/);
