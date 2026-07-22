@@ -176,8 +176,9 @@ public class UserModelTokenControllerV2Tests : IDisposable
 
         Assert.Equal("model-tokens", route.Template);
         Assert.Equal(2, versions.Count);
-        Assert.Contains(versions, version => version.Deprecated);
-        Assert.Contains(versions, version => !version.Deprecated);
+        Assert.All(versions, version => Assert.False(version.Deprecated));
+        Assert.Contains(versions, version => version.Versions.Any(apiVersion => apiVersion.MajorVersion == 1));
+        Assert.Contains(versions, version => version.Versions.Any(apiVersion => apiVersion.MajorVersion == 2));
         Assert.NotNull(controller.GetCustomAttribute<AuthorizeAttribute>());
         Assert.Contains(controller.GetCustomAttributes<TagsAttribute>(), tags =>
             tags.Tags.Contains("User Model Token"));

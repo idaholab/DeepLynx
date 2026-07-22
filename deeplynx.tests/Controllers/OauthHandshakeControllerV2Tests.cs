@@ -88,10 +88,7 @@ public class OauthHandshakeControllerV2Tests : IDisposable
             expirationMinutes);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.Equal(token, GetResponseProperty<string>(ok.Value, "access_token"));
-        Assert.Equal("Bearer", GetResponseProperty<string>(ok.Value, "token_type"));
-        Assert.Equal(expirationMinutes * 60, GetResponseProperty<double>(ok.Value, "expires_in"));
-        Assert.Equal(State, GetResponseProperty<string>(ok.Value, "state"));
+        Assert.Equal(token, Assert.IsType<string>(ok.Value));
         _mockBusiness.Verify(
             business => business.ExchangeAuthCodeForToken(
                 Code,
@@ -104,7 +101,7 @@ public class OauthHandshakeControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task ExchangeV2_WhenExpirationIsNull_UsesDefaultExpiration()
+    public async Task ExchangeV2_WhenExpirationIsNull_ReturnsToken()
     {
         _mockBusiness
             .Setup(business => business.ExchangeAuthCodeForToken(
@@ -125,7 +122,7 @@ public class OauthHandshakeControllerV2Tests : IDisposable
             null);
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.Equal(480D * 60, GetResponseProperty<double>(ok.Value, "expires_in"));
+        Assert.Equal("access-token", Assert.IsType<string>(ok.Value));
     }
 
     [Fact]
@@ -201,8 +198,9 @@ public class OauthHandshakeControllerV2Tests : IDisposable
 
         Assert.Equal("oauth", route.Template);
         Assert.Equal(2, versions.Count);
-        Assert.Contains(versions, version => version.Deprecated);
-        Assert.Contains(versions, version => !version.Deprecated);
+        Assert.All(versions, version => Assert.False(version.Deprecated));
+        Assert.Contains(versions, version => version.Versions.Any(apiVersion => apiVersion.MajorVersion == 1));
+        Assert.Contains(versions, version => version.Versions.Any(apiVersion => apiVersion.MajorVersion == 2));
         Assert.NotNull(controller.GetCustomAttribute<AuthorizeAttribute>());
     }
 
@@ -225,14 +223,6 @@ public class OauthHandshakeControllerV2Tests : IDisposable
         Assert.NotNull(v1.GetCustomAttribute<AllowAnonymousAttribute>());
         Assert.NotNull(v2.GetCustomAttribute<AllowAnonymousAttribute>());
         Assert.Equal(GetHttpMetadata(v1), GetHttpMetadata(v2));
-    }
-
-    private static T GetResponseProperty<T>(object? response, string propertyName)
-    {
-        Assert.NotNull(response);
-        var property = response.GetType().GetProperty(propertyName);
-        Assert.NotNull(property);
-        return Assert.IsType<T>(property.GetValue(response));
     }
 
     private static MethodInfo GetAction(string name)
