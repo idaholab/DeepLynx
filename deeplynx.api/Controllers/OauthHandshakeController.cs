@@ -1,13 +1,17 @@
 using System.Security;
 using System.Web;
+using Asp.Versioning;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.controllers;
 
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Authorize]
 [Route("oauth")]
 [Tags("OauthHandshake")]
@@ -43,6 +47,7 @@ public class OauthHandshakeController : ControllerBase
     /// </remarks>
     [AllowAnonymous]
     [HttpGet("authorize", Name = "api_oauth_authorize")]
+    [MapToApiVersion(1)]
     public async Task<IActionResult> Authorize(
         [FromQuery(Name = "client_id")] string clientId,
         [FromQuery(Name = "redirect_uri")] string redirectUri,
@@ -115,6 +120,34 @@ public class OauthHandshakeController : ControllerBase
     }
 
     /// <summary>
+    ///     Oauth 2.0 Authorization Endpoint
+    /// </summary>
+    /// <param name="clientId">The known client ID of the requesting application</param>
+    /// <param name="redirectUri">The callback URL of the requesting application</param>
+    /// <param name="state">CSRF protection token</param>
+    /// <returns>A redirect to the callback URL containing the authorization code and state.</returns>
+    /// <remarks>
+    ///     This endpoint requires authentication. The Next.js proxy ensures the user
+    ///     is authenticated before forwarding the request here.
+    /// </remarks>
+    [AllowAnonymous]
+    [HttpGet("authorize", Name = "api_oauth_authorize")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    public async Task<IActionResult> AuthorizeV2(
+        [FromQuery(Name = "client_id")] string clientId,
+        [FromQuery(Name = "redirect_uri")] string redirectUri,
+        [FromQuery] string state)
+    {
+        var userId = UserContextStorage.UserId;
+
+        var authCode = await _oauthBusiness.GenerateAuthCode(clientId, userId, redirectUri, state);
+        var callbackUrl = BuildCallbackUrl(redirectUri, authCode, state);
+
+        return Redirect(callbackUrl);
+    }
+
+    /// <summary>
     ///     Oauth 2.0 Token Endpoint
     /// </summary>
     /// <param name="code">The authorization code received from the authorize endpoint</param>
@@ -130,6 +163,7 @@ public class OauthHandshakeController : ControllerBase
     /// </remarks>
     [AllowAnonymous]
     [HttpPost("exchange", Name = "api_oauth_exchange")]
+    [MapToApiVersion(1)]
     public async Task<IActionResult> Exchange(
         [FromQuery] string code,
         [FromQuery(Name = "client_id")] string clientId,
@@ -208,6 +242,43 @@ public class OauthHandshakeController : ControllerBase
 #endif
             });
         }
+    }
+
+    /// <summary>
+    ///     Oauth 2.0 Token Endpoint
+    /// </summary>
+    /// <param name="code">The authorization code received from the authorize endpoint</param>
+    /// <param name="clientId">The Oauth application's client ID</param>
+    /// <param name="clientSecret">The Oauth application's client secret</param>
+    /// <param name="redirectUri">The same redirect URI used in the authorize request</param>
+    /// <param name="state">The same CSRF state used in the authorize request</param>
+    /// <param name="expiration">Optional token expiration time in minutes; defaults to 480.</param>
+    /// <returns>An OAuth token response containing the access token.</returns>
+    /// <remarks>
+    ///     This endpoint does not require user authentication. It uses client credentials
+    ///     to authenticate the OAuth application.
+    /// </remarks>
+    [AllowAnonymous]
+    [HttpPost("exchange", Name = "api_oauth_exchange")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    public async Task<IActionResult> ExchangeV2(
+        [FromQuery] string code,
+        [FromQuery(Name = "client_id")] string clientId,
+        [FromQuery(Name = "client_secret")] string clientSecret,
+        [FromQuery(Name = "redirect_uri")] string redirectUri,
+        [FromQuery] string state,
+        [FromQuery] double? expiration)
+    {
+        var token = await _oauthBusiness.ExchangeAuthCodeForToken(
+            code,
+            clientId,
+            clientSecret,
+            redirectUri,
+            state,
+            expiration);
+
+        return Ok(token);
     }
 
     private string BuildCallbackUrl(string baseUrl, string code, string state)

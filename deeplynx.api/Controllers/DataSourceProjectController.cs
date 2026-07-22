@@ -54,7 +54,7 @@ public class DataSourceProjectController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var organizationId = UserContextStorage.UserId;
+            var organizationId = UserContextStorage.OrganizationId;
             var dataSources = await _dataSourceBusiness.GetAllDataSources(currentUserId, organizationId, [projectId], hideArchived);
             return Ok(dataSources);
         }
