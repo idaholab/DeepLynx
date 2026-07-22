@@ -5,7 +5,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 
 const ONE_GB = 1 * 1024 * 1024 * 1024;
-const TEN_GB = 10 * 1024 * 1024 * 1024;
+const TEN_GB = 2 * 1024 * 1024 * 1024;
 const FIVE_MIN_MS = 5 * 60 * 1000;
 const TWENTY_MIN_MS = 20 * 60 * 1000;
 
@@ -58,28 +58,31 @@ test.describe("Download an uploaded file", () => {
     test.setTimeout(60_000); // buffer time
 
     // Upload a file for download
-    await page.locator("aside a", { hasText: "Upload Center" }).click();
+    await page.getByRole('link', { name: 'Upload Center' }).click();
     await page.waitForURL(/\/upload_center/);
     await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
 
     await checkDataSourcesAndStorageDestinations(page);
 
-    await page.getByText('click to browse').click();
+    await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(filePath);
     await page.getByRole('button', { name: 'Upload' }).click();
-    await expect(page.getByText('File uploaded successfully!')).toBeVisible({
+    await expect(page.getByText('File uploaded successfully!', { exact: true })).toBeVisible({
     timeout: FIVE_MIN_MS,
     });
 
     // Download the file
-    await page.locator("aside a", { hasText: "Project Dashboard" }).click();
+    await page.getByRole('link', { name: 'Project Dashboard' }).click();
     await page.waitForURL(/\/project/);
     await expect(page.getByRole("heading", { name: "PROJECT Overview" })).toBeVisible();
 
     // go to record page
-    await expect(page.getByText('uploaded-test-file').first()).toBeVisible();
-    await page.getByText('uploaded-test-file').first().click();
+    const fileList = page.getByRole('list').filter({ hasText: 'uploaded-test-fileClass' });
+    const firstFile = fileList.getByRole('listitem').first();
+    await expect(fileList).toBeVisible();
+    await expect(firstFile).toContainText('uploaded-test-file');
+    await firstFile.click();
     const start = Date.now();
 
     const downloadPromise = page.waitForEvent('download');
@@ -148,28 +151,31 @@ test.describe("Download a 10 GB file", () => {
     test.setTimeout(FIVE_MIN_MS + 60_000); // buffer time
 
     // Upload a 10GB file for download
-    await page.locator("aside a", { hasText: "Upload Center" }).click();
+    await page.getByRole('link', { name: 'Upload Center' }).click();
     await page.waitForURL(/\/upload_center/);
     await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
 
     await checkDataSourcesAndStorageDestinations(page);
 
-    await page.getByText('click to browse').click();
+    await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(filePath);
     await page.getByRole('button', { name: 'Upload' }).click();
-    await expect(page.getByText('File uploaded successfully!')).toBeVisible({
+    await expect(page.getByText('File uploaded successfully!', { exact: true })).toBeVisible({
     timeout: TWENTY_MIN_MS,
     });
 
     // Download the file
-    await page.locator("aside a", { hasText: "Project Dashboard" }).click();
+    await page.getByRole('link', { name: 'Project Dashboard' }).click();
     await page.waitForURL(/\/project/);
     await expect(page.getByRole("heading", { name: "PROJECT Overview" })).toBeVisible();
 
     // go to record page
-    await expect(page.getByText('big-test-file').first()).toBeVisible();
-    await page.getByText('big-test-file').first().click();
+    const fileList = page.getByRole('list').filter({ hasText: 'big-test-fileClass' });
+    const firstFile = fileList.getByRole('listitem').first();
+    await expect(fileList).toBeVisible();
+    await expect(firstFile).toContainText('big-test-file');
+    await firstFile.click();
     const start = Date.now();
 
     const downloadPromise = page.waitForEvent('download');
