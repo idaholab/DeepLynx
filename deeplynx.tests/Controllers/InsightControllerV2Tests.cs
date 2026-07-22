@@ -185,7 +185,7 @@ public class InsightControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public void Controller_DeclaresDeprecatedV1AndV2()
+    public void Controller_DeclaresV1AndV2()
     {
         AssertControllerVersions(typeof(InsightController));
     }
@@ -258,11 +258,10 @@ public class InsightControllerV2Tests : IDisposable
             .ToArray();
 
         Assert.Equal(2, attributes.Length);
-        Assert.Contains(attributes, attribute =>
-            GetVersion(attribute) == "1" &&
-            attribute.NamedArguments.Any(argument =>
-                argument.MemberName == "Deprecated" && Equals(argument.TypedValue.Value, true)));
+        Assert.Contains(attributes, attribute => GetVersion(attribute) == "1");
         Assert.Contains(attributes, attribute => GetVersion(attribute) == "2");
+        Assert.DoesNotContain(attributes, attribute => attribute.NamedArguments.Any(argument =>
+            argument.MemberName == "Deprecated" && Equals(argument.TypedValue.Value, true)));
     }
 
     private static void AssertMappedToVersion(MethodInfo method, string expectedVersion)

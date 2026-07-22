@@ -178,10 +178,7 @@ public class TokenControllerV2Tests : IDisposable
         var result = await _controller.RevokeAllUserTokensV2();
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.Equal(expectedCount, GetResponseProperty<int>(ok.Value, "revokedCount"));
-        Assert.Equal(
-            $"Successfully revoked {expectedCount} token(s)",
-            GetResponseProperty<string>(ok.Value, "message"));
+        Assert.Equal(expectedCount, Assert.IsType<int>(ok.Value));
         _mockTokenBusiness.Verify(
             business => business.RevokeAllUserTokens(UserId),
             Times.Once);
@@ -254,8 +251,9 @@ public class TokenControllerV2Tests : IDisposable
 
         Assert.Equal("oauth", route.Template);
         Assert.Equal(2, versions.Count);
-        Assert.Contains(versions, version => version.Deprecated);
-        Assert.Contains(versions, version => !version.Deprecated);
+        Assert.All(versions, version => Assert.False(version.Deprecated));
+        Assert.Contains(versions, version => version.Versions.Any(apiVersion => apiVersion.MajorVersion == 1));
+        Assert.Contains(versions, version => version.Versions.Any(apiVersion => apiVersion.MajorVersion == 2));
         Assert.NotNull(controller.GetCustomAttribute<AuthorizeAttribute>());
     }
 
@@ -297,14 +295,6 @@ public class TokenControllerV2Tests : IDisposable
             apiKey = ApiKey,
             apiSecret = "api-secret"
         };
-    }
-
-    private static T GetResponseProperty<T>(object? response, string propertyName)
-    {
-        Assert.NotNull(response);
-        var property = response.GetType().GetProperty(propertyName);
-        Assert.NotNull(property);
-        return Assert.IsType<T>(property.GetValue(response));
     }
 
     private static MethodInfo GetAction(string name)
