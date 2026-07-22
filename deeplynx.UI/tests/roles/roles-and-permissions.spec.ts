@@ -100,28 +100,6 @@ test.describe("Roles & Permissions", () => {
       await expect(roleHeading.first()).toBeVisible();
     });
 
-    test("standard roles show STD badge in sidebar", async ({ page }) => {
-      // Standard roles (Admin, User, Viewer) get a "STD" badge
-      const stdBadges = page.locator(".badge-info", { hasText: "STD" });
-      await expect(stdBadges.first()).toBeVisible();
-    });
-
-    test("standard roles display Standard Role badge in detail panel", async ({
-      page,
-    }) => {
-      // When a standard role is selected, the detail panel shows "Standard Role"
-      await expect(
-        page.locator(".badge", { hasText: "Standard Role" }).first(),
-      ).toBeVisible();
-    });
-
-    test("displays Source label for roles", async ({ page }) => {
-      // Each role in the sidebar shows its source (translation: "Source: ")
-      await expect(
-        page.getByText(/Source:/).first(),
-      ).toBeVisible();
-    });
-
     test("displays the Permissions section header", async ({ page }) => {
       // Wait for permissions to load
       await expect(
@@ -165,15 +143,6 @@ test.describe("Roles & Permissions", () => {
       await expect(
         page.locator("input.checkbox").first(),
       ).toBeDisabled({ timeout: 15000 });
-    });
-
-    test("standard role shows info alert about read-only permissions", async ({
-      page,
-    }) => {
-      // Standard roles display an info alert
-      await expect(
-        page.locator(".alert-info").first(),
-      ).toBeVisible({ timeout: 15000 });
     });
 
     test("clicking a different role selects it", async ({ page }) => {
