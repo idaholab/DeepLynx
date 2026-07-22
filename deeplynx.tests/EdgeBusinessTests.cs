@@ -32,6 +32,8 @@ public class EdgeBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     public long destinationRecordId;
     public long destinationRecordId2;
@@ -60,6 +62,8 @@ public class EdgeBusinessTests : IntegrationTestBase
         _mockObjectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
@@ -70,7 +74,7 @@ public class EdgeBusinessTests : IntegrationTestBase
 
         _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _sensitivityLabelService);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness, _mockRecordBusiness.Object,
-            _eventBusiness);
+            _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness);
