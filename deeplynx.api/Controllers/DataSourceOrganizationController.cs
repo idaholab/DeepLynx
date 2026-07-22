@@ -48,7 +48,6 @@ public class DataSourceOrganizationController : ControllerBase
     /// <returns>A list of data sources for the given project.</returns>
     [HttpGet(Name = "api_get_all_data_sources_organization")]
     [MapToApiVersion(1)]
-    [Auth("read", "data_source")]
     public async Task<ActionResult<IEnumerable<DataSourceResponseDto>>> GetAllDataSources(
         long organizationId,
         [FromQuery] long[]? projectIds,
