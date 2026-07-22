@@ -6,8 +6,6 @@ test.use({ actingUser: sysAdmin, actingOrg: 'PW Org A', actingProject: 'PW Proje
 
 test.describe("Add Record Modal", () => {
   test.beforeEach(async ({ page }) => {
-    await seedSession(page);
-    await page.goto("/", { waitUntil: "domcontentloaded" });
     // Open the "Add a Record" modal from the landing page
     await page.getByRole('button', { name: 'Record' }).click();
     const modal = page.getByRole('dialog');
