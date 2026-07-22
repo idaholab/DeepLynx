@@ -22,6 +22,8 @@ public class RelationshipBusinessTests : IntegrationTestBase
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _mockOrganizationBusiness = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
@@ -53,6 +55,8 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockAdminService = new Mock<IAdminService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
@@ -66,7 +70,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
             Context, _mockEdgeBusiness.Object, _eventBusiness);
 
         _dataSourceBusiness = new DataSourceBusiness(
-            Context, _mockEdgeBusiness.Object, _mockRecordBusiness.Object, _eventBusiness);
+            Context, _mockEdgeBusiness.Object, _mockRecordBusiness.Object, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
 
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,

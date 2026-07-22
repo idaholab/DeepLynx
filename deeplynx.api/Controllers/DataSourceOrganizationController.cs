@@ -56,7 +56,8 @@ public class DataSourceOrganizationController : ControllerBase
     {
         try
         {
-            var dataSources = await _dataSourceBusiness.GetAllDataSources(organizationId, projectIds, hideArchived);
+            var currentUserId = UserContextStorage.UserId;
+            var dataSources = await _dataSourceBusiness.GetAllDataSources(currentUserId, organizationId, projectIds, hideArchived);
             return Ok(dataSources);
         }
         catch (Exception exc)
