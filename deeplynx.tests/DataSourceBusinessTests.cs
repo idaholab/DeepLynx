@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -17,7 +18,11 @@ public class DataSourceBusinessTests : IntegrationTestBase
     private readonly IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private readonly EventBusiness _eventBusiness;
     private readonly Mock<IEdgeBusiness> _mockEdgeBusiness;
+    private readonly Mock<ILogger<ProjectRolePermissionService>> _projectServiceLogger;
+    private readonly Mock<ILogger<AdminService>> _adminServiceLogger;
+    private IAdminService _adminService = null!;
     private readonly Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
+    private IProjectRolePermissionService _permissionService = null!;
     private readonly Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private readonly Mock<IRecordBusiness> _mockRecordBusiness;
     private readonly INotificationBusiness _notificationBusiness = null!;
@@ -35,11 +40,16 @@ public class DataSourceBusinessTests : IntegrationTestBase
         _mockEdgeBusiness = new Mock<IEdgeBusiness>();
         _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _projectServiceLogger = new Mock<ILogger<ProjectRolePermissionService>>();
+        _adminServiceLogger = new Mock<ILogger<AdminService>>();
+        _permissionService = new ProjectRolePermissionService(Context, _projectServiceLogger.Object);
+        _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
+
     }
 
     public override async Task InitializeAsync()
@@ -49,7 +59,9 @@ public class DataSourceBusinessTests : IntegrationTestBase
             Context,
             _mockEdgeBusiness.Object,
             _mockRecordBusiness.Object,
-            _eventBusiness);
+            _eventBusiness,
+            _permissionService,
+            _adminService);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -60,6 +72,8 @@ public class DataSourceBusinessTests : IntegrationTestBase
             Name = "John Smith",
             Email = "john.smith@company.com",
             Password = "test_password",
+            IsActive = true,
+            IsSysAdmin = true,
             IsArchived = false
         };
         Context.Users.Add(testUser);
@@ -132,6 +146,42 @@ public class DataSourceBusinessTests : IntegrationTestBase
         did = dataSource.Id;
         did2 = dataSource2.Id;
         did3 = dataSource3.Id;
+
+        var projectMember = new ProjectMember
+        {
+            ProjectId = pid,
+            UserId = uid
+        };
+        Context.ProjectMembers.Add(projectMember);
+        await Context.SaveChangesAsync();
+
+        var orgUser1 = new OrganizationUser
+        {
+            OrganizationId = oid,
+            UserId = uid
+        };
+        Context.OrganizationUsers.AddRange(orgUser1);
+        await Context.SaveChangesAsync();
+
+        var label = new SensitivityLabel { Name = "Test Label", OrganizationId = oid };
+        Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+        var lid = label.Id;
+
+        var permission1 = new Permission
+        {
+            Name = "read data source",
+            Action = "read",
+            LabelId = lid,
+            Resource = "data source",
+            OrganizationId = oid,
+            IsDefault = false,
+            ProjectId = pid,
+        };
+
+        Context.Permissions.Add(permission1);
+        await Context.SaveChangesAsync();
+
     }
 
     #region GetDefaultDataSource Tests
@@ -476,7 +526,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
     public async Task GetAllDataSources_ValidProjectId_ReturnsActiveDataSources()
     {
         // Act
-        var result = await _dataSourceBusiness.GetAllDataSources(oid, new[] { pid });
+        var result = await _dataSourceBusiness.GetAllDataSources(uid, oid, [pid]);
         var dataSources = result.ToList();
 
         // Assert
@@ -493,11 +543,11 @@ public class DataSourceBusinessTests : IntegrationTestBase
     {
         // Arrange
         Context.DataSources.Add(new DataSource
-            { Name = "Project 2 Data Source", OrganizationId = oid, ProjectId = pid2 });
+        { Name = "Project 2 Data Source", OrganizationId = oid, ProjectId = pid2 });
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _dataSourceBusiness.GetAllDataSources(oid, new[] { pid });
+        var result = await _dataSourceBusiness.GetAllDataSources(uid, oid, [pid]);
         var dataSources = result.ToList();
 
         // Assert
@@ -510,7 +560,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
     public async Task GetAllDataSources_ConfigParsing_ReturnsValidJsonObject()
     {
         // Act
-        var result = await _dataSourceBusiness.GetAllDataSources(oid, new[] { pid }, false);
+        var result = await _dataSourceBusiness.GetAllDataSources(uid, oid, [pid], false);
         var dataSource = result.First(ds => ds.Id == did);
 
         // Assert
@@ -542,7 +592,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Act
-        var result = await _dataSourceBusiness.GetAllDataSources(oid, new[] { pid }, false);
+        var result = await _dataSourceBusiness.GetAllDataSources(uid, oid, [pid], false);
         var dataSource = result.First(ds => ds.Name == "Null Config Test");
 
         // Assert
@@ -553,7 +603,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
     public async Task GetAllDataSources_NoProjectIds_ReturnsOnlyOrgLevel()
     {
         // Act - Request org-level data sources only (no projectIds)
-        var result = await _dataSourceBusiness.GetAllDataSources(oid, null);
+        var result = await _dataSourceBusiness.GetAllDataSources(uid, oid, null);
 
         // Assert - Should only return org-level data source (did2)
         Assert.Single(result);
@@ -565,7 +615,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
     public async Task GetAllDataSources_WithProjectIds_ReturnsProjectAndOrgLevel()
     {
         // Act - Request data sources for specific project (includes org-level inheritance)
-        var result = await _dataSourceBusiness.GetAllDataSources(oid, new[] { pid });
+        var result = await _dataSourceBusiness.GetAllDataSources(uid, oid, [pid]);
 
         // Assert - Should return project-level (did) and org-level (did2)
         Assert.Equal(2, result.Count);
@@ -1391,11 +1441,11 @@ public class DataSourceBusinessTests : IntegrationTestBase
     public async Task ArchiveDataSource_ArchivedDataSourceNotReturnedInGetAll()
     {
         // Arrange
-        var initialCount = (await _dataSourceBusiness.GetAllDataSources(oid, new[] { pid })).Count();
+        var initialCount = (await _dataSourceBusiness.GetAllDataSources(uid, oid, [pid])).Count();
 
         // Act
         await _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, did);
-        var finalCount = (await _dataSourceBusiness.GetAllDataSources(oid, new[] { pid })).Count();
+        var finalCount = (await _dataSourceBusiness.GetAllDataSources(uid, oid, [pid])).Count();
 
         // Assert
         Assert.Equal(initialCount - 1, finalCount);

@@ -208,13 +208,8 @@ function useRecordSearchGeneric(
   const [status, setStatus] = useState<Record<number, ProjectInsightStatus>>(
     {},
   );
+
   const [error, setError] = useState("");
-
-  const [reloadKey, setReloadKey] = useState(0);
-
-  function forceReload() {
-    setReloadKey((prev) => prev + 1);
-  }
 
   function reset() {
     setRecords([]);
@@ -286,7 +281,6 @@ function useRecordSearchGeneric(
     sources,
     filters,
     fetchRecords,
-    reloadKey,
   ]);
 
   return {
@@ -294,9 +288,7 @@ function useRecordSearchGeneric(
     setFilters,
     records,
     status,
-    setStatus,
     error,
-    forceReload,
   };
 }
 

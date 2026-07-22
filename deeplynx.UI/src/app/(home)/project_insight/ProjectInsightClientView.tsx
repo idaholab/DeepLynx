@@ -21,7 +21,7 @@ import {
   AdjustmentsHorizontalIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
 import ProjectInsightChat from "./components/ProjectInsightChat";
 import ProjectInsightFilters from "./components/ProjectInsightFilters";
@@ -66,11 +66,26 @@ export default function ProjectInsightClientView() {
   // View state
   const [classOptions, setClassOptions] = useState<NamedInsightOption[]>([]);
   const [tagOptions, setTagOptions] = useState<NamedInsightOption[]>([]);
+  const [statusMap, setStatusMap] = useState<
+    Record<number, ProjectInsightStatus>
+  >({});
   const [isQueryModelUnavailable, setIsQueryModelUnavailable] = useState(false);
   const [isUploadModelUnavailable, setIsUploadModelUnavailable] = useState(false);
   const [isEmbeddingModelUnavailable, setIsEmbeddingModelUnavailable] = useState(false);
   const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
   const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;  
+  const pollingKey = useMemo(
+      () =>
+          Object.entries(statusMap)
+              .filter(
+                  ([, status]) =>
+                      status.state === "queued" || status.state === "processing",
+              )
+              .map(([recordId]) => Number(recordId))
+              .sort((a, b) => a - b)
+              .join(","),
+      [statusMap],
+  );
   const [isLoadingRecords, setIsLoadingRecords] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [activeTabKey, setActiveTabKey] = useState<"library" | "pending">(
@@ -124,7 +139,6 @@ export default function ProjectInsightClientView() {
     total: embeddedTotal,
     found: embeddedFound,
     error: embeddedError,
-    forceReload: embeddedForceReload,
   } = useRecordSearch("embedded", classes, sources);
 
   const {
@@ -137,12 +151,14 @@ export default function ProjectInsightClientView() {
     setFilters: setPendingState,
     records: pending,
     status: pendingStatus,
-    setStatus: setPendingStatus,
     total: pendingTotal,
     found: pendingFound,
     error: pendingError,
-    forceReload: pendingForceReload,
   } = useRecordSearchPaginated(pageSize, "pending", classes, sources);
+
+  useEffect(() => {
+    setStatusMap({...embeddedStatus, ...pendingStatus});
+  }, [embeddedStatus, pendingStatus]);
 
   // Tab state helpers
   const {
@@ -156,17 +172,22 @@ export default function ProjectInsightClientView() {
     setPendingState,
   });
 
-  function forceReload() {
-    pendingForceReload();
-    embeddedForceReload();
+  function retryRecordSearch() {
+    // Hacky solution that refreshes the search because the filters have "changed"
+    setLibraryState((state) => ({...state}));
+    setPendingState((state) => ({...state}));
   }
 
-  async function continuouslyPollStatus(queue: Set<number>) {
-    if (!organizationId || !projectId || isEmbeddingModelUnavailable || !queue.size) return;
+  useEffect(() => {
+    if (!organizationId || !projectId || !pollingKey || isEmbeddingModelUnavailable) return;
+
+    const pollingIds = pollingKey.split(",").map(Number);
+
+    let cancelled = false;
 
     const pollStatuses = async () => {
       const updatedStatuses: Array<[number, ProjectInsightStatus]> = await Promise.all(
-        [...queue].map(async (recordId) => {
+        pollingIds.map(async (recordId) => {
           try {
             const ingestionStatus = await fetchInsightIngestionStatus({
               organizationId,
@@ -189,16 +210,12 @@ export default function ProjectInsightClientView() {
         }),
       );
 
-      setPendingStatus((current) => {
+      if (cancelled) return;
+
+      setStatusMap((current) => {
         let next: typeof current | undefined;
 
         for (const [recordId, newStatus] of updatedStatuses) {
-          if (newStatus.state !== "queued" && newStatus.state !== "processing")
-            queue.delete(recordId);
-
-          if (newStatus.state === "embedded")
-            forceReload(); // Embedded records need to be moved to the embedded section
-
           const oldStatus = current[recordId];
 
           const changed =
@@ -210,18 +227,26 @@ export default function ProjectInsightClientView() {
 
           next ??= { ...current };
           next[recordId] = newStatus;
+
+          if (newStatus.state === "embedded")
+            retryRecordSearch(); // Embedded records need to be moved to the embedded section
         }
 
         return next ?? current;
       });
+        
     };
 
     void pollStatuses();
     const interval = window.setInterval(() => {
       void pollStatuses();
-      if (!queue.size) window.clearInterval(interval); // no more, all done
     }, STATUS_POLL_INTERVAL_MS);
-  }
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [organizationId, projectId, pollingKey, isEmbeddingModelUnavailable]);
 
   // Derived tab datasets
   const projectName = project?.projectName ?? "";
@@ -237,11 +262,11 @@ export default function ProjectInsightClientView() {
   useEffect(() => {
     setSelectedPendingIds((current) =>
       new Map([...current].filter(([recordId, _]) => {
-        const status = pendingStatus[recordId];
+        const status = statusMap[recordId];
         return status?.state !== "embedded";
       })),
     );
-  }, [pendingStatus]);
+  }, [statusMap]);
 
   useEffect(() => {
     setSelectedPendingIds(new Map());
@@ -296,7 +321,7 @@ export default function ProjectInsightClientView() {
     if (uploadFileInfo.length === 0) return;
 
     setIsQueueing(true);
-    setPendingStatus((current) => ({
+    setStatusMap((current) => ({
       ...current,
       ...Object.fromEntries(
         uploadFileInfo.map((file) => [file.fileId, { state: "queued" }]),
@@ -313,8 +338,6 @@ export default function ProjectInsightClientView() {
         embeddingModelConfigId:
           selectedInsightModels.embeddingModelConfigId ?? undefined,
       });
-      continuouslyPollStatus(new Set(selectedPendingIds.keys()));
-
       toast.success(
         withTokens(t.translations.PROJECT_INSIGHT_QUEUED_SUMMARY, {
           count: uploadFileInfo.length,
@@ -322,7 +345,7 @@ export default function ProjectInsightClientView() {
       );
     } catch (error) {
       console.error("Failed to queue project Insight uploads:", error);
-      setPendingStatus((current) => ({
+      setStatusMap((current) => ({
         ...current,
         ...Object.fromEntries(
           uploadFileInfo.map((file) => [
@@ -391,7 +414,7 @@ export default function ProjectInsightClientView() {
             key={record.id}
             projectId={projectId ?? 0}
             record={record}
-            status={getProjectInsightStatus(record, embeddedStatus)}
+            status={getProjectInsightStatus(record, statusMap)}
           />
         ))}
       </div>
@@ -445,9 +468,9 @@ export default function ProjectInsightClientView() {
         ) : undefined
       }
     >
-      <div className="space-y-2">
+      <div className="space-y-1">
         {pending.map((record) => {
-          const status = getProjectInsightStatus(record, pendingStatus);
+          const status = getProjectInsightStatus(record, statusMap);
           const isSelectable =
             Boolean(record.uri) &&
             (status.state === "not_embedded" || status.state === "error");
@@ -549,8 +572,8 @@ export default function ProjectInsightClientView() {
           </section>
 
           <aside className="card card-border bg-base-100 shadow-md shadow-base-content/10 xl:h-full xl:min-h-0">
-            <div className="card-body h-full min-h-0 gap-2 p-4 sm:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="card-body h-full min-h-0 gap-1 p-4 sm:p-5">
+              {/* <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex gap-3 items-center">
                     <h2 className="card-title text-base-content">
@@ -566,12 +589,12 @@ export default function ProjectInsightClientView() {
                     </p>
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               <div className="inline-flex w-fit rounded-full border border-base-300/60 bg-base-200/60 p-1">
                 <button
                   type="button"
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${
                     activeTabKey === "library"
                       ? "bg-base-100 text-base-content shadow-sm"
                       : "text-base-content/70 hover:text-base-content"
@@ -579,10 +602,13 @@ export default function ProjectInsightClientView() {
                   onClick={() => setActiveTabKey("library")}
                 >
                   {tabLabels.library}
+                  <span className="badge badge-secondary badge-sm shrink-0">
+                    {embeddedTotal}
+                  </span>
                 </button>
                 <button
                   type="button"
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${
                     activeTabKey === "pending"
                       ? "bg-base-100 text-base-content shadow-sm"
                       : "text-base-content/70 hover:text-base-content"
@@ -590,6 +616,9 @@ export default function ProjectInsightClientView() {
                   onClick={() => setActiveTabKey("pending")}
                 >
                   {tabLabels.pending}
+                  <span className="badge badge-secondary badge-sm shrink-0">
+                    {pendingTotal}
+                  </span>
                 </button>
               </div>
 
@@ -621,36 +650,31 @@ export default function ProjectInsightClientView() {
                     </button>
                   </div>
 
+                  {(activeFilterPills.length !== 0 || activeSearchError) &&
                   <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {activeFilterPills.length === 0 ? (
-                        <span className="text-sm text-base-content/60">
-                          {activeTabKey === "library"
-                            ? t.translations.PROJECT_INSIGHT_SCOPE_HINT
-                            : t.translations
-                                .PROJECT_INSIGHT_PENDING_SEARCH_HINT}
-                        </span>
-                      ) : (
-                        activeFilterPills.map((pill) => (
-                          <button
-                            key={pill.id}
-                            type="button"
-                            className="btn btn-xs btn-outline gap-1"
-                            onClick={() => removeActiveFilterPill(pill)}
-                          >
-                            {pill.label}
-                            <XMarkIcon className="size-3.5" />
-                          </button>
-                        ))
+                      {activeFilterPills.length === 0 ?
+                      null : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {activeFilterPills.map((pill) => (
+                            <button
+                              key={pill.id}
+                              type="button"
+                              className="btn btn-xs btn-outline gap-1"
+                              onClick={() => removeActiveFilterPill(pill)}
+                            >
+                              {pill.label}
+                              <XMarkIcon className="size-3.5" />
+                            </button>
+                          ))}
+                        </div>
                       )}
-                    </div>
 
                     {activeSearchError && (
                       <span className="text-sm text-warning">
                         {activeSearchError}
                       </span>
                     )}
-                  </div>
+                  </div>}
                 </div>
               </div>
 

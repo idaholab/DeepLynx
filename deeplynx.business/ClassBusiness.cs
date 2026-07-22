@@ -56,7 +56,9 @@ public class ClassBusiness : IClassBusiness
 
         // Filter by projectIds if provided and not empty
         if (projectIds is { Length: > 0 })
-            query = query.Where(c => c.ProjectId.HasValue && projectIds.Contains(c.ProjectId.Value));
+            query = query.Where(c =>
+            (c.ProjectId.HasValue && projectIds.Contains(c.ProjectId.Value)) ||
+            !c.ProjectId.HasValue);
 
         // Optionally hide archived classes
         if (hideArchived)

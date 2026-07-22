@@ -21,9 +21,9 @@ export default function ProjectInsightRecordSection({
 }: ProjectInsightRecordSectionProps) {
   return (
     <>
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+    {actions && <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
       {actions}
-    </div>
+    </div>}
     <div className="min-h-0 flex-1 overflow-y-auto pr-1">
       <section className="bg-base-100">
         <div className="flex flex-col gap-5 p-4 sm:p-5">
