@@ -60,7 +60,8 @@ public class InsightControllerV2Tests : IDisposable
 
         var result = await _controller.UploadV2(OrgId, ProjectId, 11L, 12L, dto);
 
-        Assert.IsType<AcceptedResult>(result);
+        var accepted = Assert.IsType<AcceptedResult>(result);
+        Assert.Null(accepted.Value);
         _mockInsightBusiness.Verify(
             b => b.QueueInsightUpload(UserId, OrgId, ProjectId, 11L, 12L, dto, UserToken),
             Times.Once);
@@ -146,7 +147,8 @@ public class InsightControllerV2Tests : IDisposable
 
         var result = await _controller.EmbedStringsV2(OrgId, ProjectId, 22L);
 
-        Assert.IsType<AcceptedResult>(result);
+        var accepted = Assert.IsType<AcceptedResult>(result);
+        Assert.Null(accepted.Value);
         _mockInsightBusiness.Verify(
             b => b.QueueInsightEmbedStrings(UserId, OrgId, ProjectId, 22L),
             Times.Once);

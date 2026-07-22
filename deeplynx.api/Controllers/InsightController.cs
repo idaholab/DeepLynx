@@ -10,7 +10,7 @@ using Scalar.AspNetCore;
 namespace deeplynx.api.Controllers;
 
 [ApiController]
-[ApiVersion(1, Deprecated = true)]
+[ApiVersion(1)]
 [ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/insight")]
 [Authorize]
@@ -105,7 +105,7 @@ public class InsightController : ControllerBase
     /// <param name="vlmModelConfigId">Optional explicit VLM model config ID. Defaults to the project/org default.</param>
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default.</param>
     /// <param name="dto">Upload payload containing file info.</param>
-    /// <returns>202 Accepted once Insight has acknowledged the request.</returns>
+    /// <returns>202 Accepted with an empty response body once Insight has acknowledged the request.</returns>
     [HttpPost("upload", Name = "api_insight_upload")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -128,7 +128,7 @@ public class InsightController : ControllerBase
             embeddingModelConfigId,
             dto,
             userJwt);
-        return Accepted(new { message = "Upload queued. Poll /ingestion_status/{fileId} to track progress." });
+        return Accepted();
     }
 
     /// <summary>
@@ -221,7 +221,7 @@ public class InsightController : ControllerBase
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default.</param>
     /// <param name="dto">Query payload containing the question, file IDs, and sampling parameters.</param>
     /// <param name="cancellationToken">Propagated from the HTTP request lifecycle.</param>
-    /// <returns>A streamed plain-text response containing the Insight query result.</returns>
+    /// <returns>200 OK with a streamed plain-text response containing the Insight query result.</returns>
     [HttpPost("query", Name = "api_insight_query")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -296,7 +296,7 @@ public class InsightController : ControllerBase
     /// <param name="organizationId">ID of the organization.</param>
     /// <param name="projectId">ID of the project.</param>
     /// <param name="fileId">The Insight file ID to check.</param>
-    /// <returns>Ingestion status including chunk count and page count.</returns>
+    /// <returns>200 OK with the ingestion status, including chunk count and page count.</returns>
     [HttpGet("ingestion_status/{fileId:long}", Name = "api_insight_ingestion_status")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -306,9 +306,6 @@ public class InsightController : ControllerBase
         long projectId,
         long fileId)
     {
-        if (fileId <= 0)
-            return BadRequest("fileId must be a positive integer.");
-
         var status = await _insightBusiness.FetchInsightIngestionStatus(fileId);
         return Ok(status);
     }
@@ -336,13 +333,13 @@ public class InsightController : ControllerBase
         try
         {
             var userId = UserContextStorage.UserId;
-            
+
             var status = await _insightBusiness.FetchInsightPipelineStatus(
                 userId,
                 organizationId,
                 projectId,
                 recordId);
-            
+
             return Ok(status);
         }
         catch (KeyNotFoundException exc)
@@ -401,7 +398,7 @@ public class InsightController : ControllerBase
     /// <param name="organizationId">ID of the organization.</param>
     /// <param name="projectId">ID of the project.</param>
     /// <param name="recordId">The record ID whose Insight pipeline status should be checked.</param>
-    /// <returns>Persistent pipeline status including stage, worker, progress, and error details.</returns>
+    /// <returns>200 OK with the persistent pipeline status, including stage, worker, progress, and error details.</returns>
     [HttpGet("pipeline_status/{recordId:long}", Name = "api_insight_pipeline_status")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -413,9 +410,6 @@ public class InsightController : ControllerBase
         long projectId,
         long recordId)
     {
-        if (recordId <= 0)
-            return BadRequest("recordId must be a positive integer.");
-
         var userId = UserContextStorage.UserId;
         var status = await _insightBusiness.FetchInsightPipelineStatus(
             userId,
@@ -453,7 +447,7 @@ public class InsightController : ControllerBase
                 projectId,
                 dto.ModelConfigId,
                 dto.ModelType);
-            
+
             return Ok(result);
         }
         catch (KeyNotFoundException exc)
@@ -504,7 +498,7 @@ public class InsightController : ControllerBase
     /// <param name="organizationId">ID of the organization.</param>
     /// <param name="projectId">ID of the project.</param>
     /// <param name="dto">Endpoint health request containing the model configuration ID and model type.</param>
-    /// <returns>Endpoint health information for the requested model endpoint.</returns>
+    /// <returns>200 OK with endpoint health information for the requested model endpoint.</returns>
     [HttpPost("endpoint_health", Name = "api_insight_endpoint_health")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -524,7 +518,7 @@ public class InsightController : ControllerBase
             dto.ModelType);
         return Ok(result);
     }
-    
+
     /// <summary>
     ///     Queue embedding jobs for all class and relationship descriptions in the project.
     /// </summary>
@@ -589,7 +583,7 @@ public class InsightController : ControllerBase
     /// <param name="organizationId">ID of the organization.</param>
     /// <param name="projectId">ID of the project whose ontology strings will be embedded.</param>
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default. If no default is configured, Insight falls back to its own environment defaults.</param>
-    /// <returns>202 Accepted once all items have been queued.</returns>
+    /// <returns>202 Accepted with an empty response body once all items have been queued.</returns>
     [HttpPost("embed_strings", Name = "api_insight_embed_strings")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -605,6 +599,6 @@ public class InsightController : ControllerBase
             organizationId,
             projectId,
             embeddingModelConfigId);
-        return Accepted(new { message = "Ontology embedding queued." });
+        return Accepted();
     }
 }
