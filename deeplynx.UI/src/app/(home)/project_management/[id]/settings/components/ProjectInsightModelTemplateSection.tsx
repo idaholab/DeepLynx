@@ -288,10 +288,6 @@ export default function ProjectInsightModelTemplateSection({
     t.translations.INSIGHT_PROJECT_TEMPLATES_LOAD_FAILED,
   ]);
 
-  useEffect(() => {
-    console.log("availableModelConfigs changed:", availableModelConfigs);
-  }, [availableModelConfigs]);
-
   async function refreshProjectModelTemplates() {
     if (!organizationId || !projectId) {
       return [] as AiModelConfigResponseDto[];
@@ -525,7 +521,6 @@ export default function ProjectInsightModelTemplateSection({
         : availableModelConfigs,
       roleKey,
     );
-    console.log("activeModelConfig: ", activeModelConfig)
     const selectedProjectDefaultId = selectedProjectDefaultIds[roleKey];
 
 
