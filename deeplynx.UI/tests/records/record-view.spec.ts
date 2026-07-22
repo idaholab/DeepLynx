@@ -1,5 +1,8 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures";
+import { sysAdmin } from '../deeplynx-config';
 import { seedSession } from "../helpers/seed";
+
+test.use({ actingUser: sysAdmin, actingOrg: 'PW Org A', actingProject: 'PW Project X' });
 
 test.describe("Add Record Modal", () => {
   test.beforeEach(async ({ page }) => {
