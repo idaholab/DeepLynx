@@ -1,9 +1,11 @@
+using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
@@ -14,6 +16,8 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to create, update, delete, and retrieve data source information.
 /// </remarks>
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("projects/{projectId:long}/datasources")]
 [Authorize]
 [Tags("Project - DataSource")]
@@ -35,12 +39,14 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get All Data Sources 
+    ///     Get All Data Sources
     /// </summary>
     /// <param name="projectId">The ID of the project whose data sources are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
     /// <returns>A list of data sources for the given project.</returns>
     [HttpGet(Name = "api_get_all_data_sources_for_project")]
+    [MapToApiVersion(1)]
+    [Auth("read", "data_source")]
     public async Task<ActionResult<IEnumerable<DataSourceResponseDto>>> GetAllDataSources(
         long projectId,
         [FromQuery] bool hideArchived = true)
@@ -48,7 +54,7 @@ public class DataSourceProjectController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var organizationId = UserContextStorage.UserId;
+            var organizationId = UserContextStorage.OrganizationId;
             var dataSources = await _dataSourceBusiness.GetAllDataSources(currentUserId, organizationId, [projectId], hideArchived);
             return Ok(dataSources);
         }
@@ -61,13 +67,34 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get a Data Source 
+    ///     Get All Data Sources
+    /// </summary>
+    /// <param name="projectId">The ID of the project whose data sources are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>A list of data sources for the given project.</returns>
+    [HttpGet(Name = "api_get_all_data_sources_for_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "data_source")]
+    public async Task<ActionResult<IEnumerable<DataSourceResponseDto>>> GetAllDataSourcesV2(
+        long projectId,
+        [FromQuery] bool hideArchived = true)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var organizationId = UserContextStorage.OrganizationId;
+        var dataSources = await _dataSourceBusiness.GetAllDataSources(currentUserId, organizationId, [projectId], hideArchived);
+        return Ok(dataSources);
+    }
+
+    /// <summary>
+    ///     Get a Data Source
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dataSourceId">The ID whereby to fetch the data source</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
     /// <returns>The data source associated with the given ID</returns>
     [HttpGet("{dataSourceId:long}", Name = "api_get_a_data_source_for_project")]
+    [MapToApiVersion(1)]
     [Auth("read", "data_source")]
     public async Task<ActionResult<DataSourceResponseDto>> GetDataSource(
         long projectId,
@@ -90,11 +117,34 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Get Default Data Source 
+    ///     Get a Data Source
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the data source belongs</param>
+    /// <param name="dataSourceId">The ID whereby to fetch the data source</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>The data source associated with the given ID</returns>
+    [HttpGet("{dataSourceId:long}", Name = "api_get_a_data_source_for_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "data_source")]
+    public async Task<ActionResult<DataSourceResponseDto>> GetDataSourceV2(
+        long projectId,
+        long dataSourceId,
+        [FromQuery] bool hideArchived = true)
+    {
+        var organizationId = UserContextStorage.OrganizationId;
+        var dataSource =
+            await _dataSourceBusiness.GetDataSource(organizationId, projectId, dataSourceId, hideArchived);
+        return Ok(dataSource);
+    }
+
+    /// <summary>
+    ///     Get Default Data Source
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <returns>The default data source for the project</returns>
     [HttpGet("default", Name = "api_get_default_data_source_for_project")]
+    [MapToApiVersion(1)]
     [Auth("read", "data_source")]
     public async Task<ActionResult<DataSourceResponseDto>> GetDefaultDataSource(
         long projectId)
@@ -114,12 +164,30 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Create a Data Source 
+    ///     Get Default Data Source
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the data source belongs</param>
+    /// <returns>The default data source for the project</returns>
+    [HttpGet("default", Name = "api_get_default_data_source_for_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "data_source")]
+    public async Task<ActionResult<DataSourceResponseDto>> GetDefaultDataSourceV2(
+        long projectId)
+    {
+        var organizationId = UserContextStorage.OrganizationId;
+        var dataSource = await _dataSourceBusiness.GetDefaultDataSource(organizationId, projectId);
+        return Ok(dataSource);
+    }
+
+    /// <summary>
+    ///     Create a Data Source
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dto">The data transfer object containing data source details</param>
     /// <returns>The created data source</returns>
     [HttpPost(Name = "api_create_a_data_source_for_project")]
+    [MapToApiVersion(1)]
     [ProjectAdmin]
     public async Task<ActionResult<DataSourceResponseDto>> CreateDataSource(
         long projectId,
@@ -141,13 +209,34 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Update a Data Source 
+    ///     Create a Data Source
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the data source belongs</param>
+    /// <param name="dto">The data transfer object containing data source details</param>
+    /// <returns>The created data source</returns>
+    [HttpPost(Name = "api_create_a_data_source_for_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin]
+    public async Task<ActionResult<DataSourceResponseDto>> CreateDataSourceV2(
+        long projectId,
+        [FromBody] CreateDataSourceRequestDto dto)
+    {
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var dataSource = await _dataSourceBusiness.CreateDataSource(organizationId, projectId, currentUserId, dto);
+        return Ok(dataSource);
+    }
+
+    /// <summary>
+    ///     Update a Data Source
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dataSourceId">The ID of the data source to update</param>
     /// <param name="dto">The data transfer object containing updated data source details</param>
     /// <returns>The newly updated data source</returns>
     [HttpPut("{dataSourceId:long}", Name = "api_update_a_data_source_for_project")]
+    [MapToApiVersion(1)]
     [ProjectAdmin]
     public async Task<ActionResult<DataSourceResponseDto>> UpdateDataSource(
         long projectId,
@@ -171,12 +260,36 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Data Source 
+    ///     Update a Data Source
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the data source belongs</param>
+    /// <param name="dataSourceId">The ID of the data source to update</param>
+    /// <param name="dto">The data transfer object containing updated data source details</param>
+    /// <returns>The newly updated data source</returns>
+    [HttpPut("{dataSourceId:long}", Name = "api_update_a_data_source_for_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin]
+    public async Task<ActionResult<DataSourceResponseDto>> UpdateDataSourceV2(
+        long projectId,
+        long dataSourceId,
+        [FromBody] UpdateDataSourceRequestDto dto)
+    {
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var dataSource =
+            await _dataSourceBusiness.UpdateDataSource(organizationId, projectId, currentUserId, dataSourceId, dto);
+        return Ok(dataSource);
+    }
+
+    /// <summary>
+    ///     Delete a Data Source
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dataSourceId">The ID of the data source to delete</param>
     /// <returns>A message stating the data source was successfully deleted.</returns>
     [HttpDelete("{dataSourceId:long}", Name = "api_delete_a_data_source_for_project")]
+    [MapToApiVersion(1)]
     [ProjectAdmin]
     public async Task<IActionResult> DeleteDataSource(
         long projectId,
@@ -197,13 +310,33 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Archive or Unarchive a Data Source 
+    ///     Delete a Data Source
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the data source belongs</param>
+    /// <param name="dataSourceId">The ID of the data source to delete</param>
+    /// <returns>True if the data source was successfully deleted.</returns>
+    [HttpDelete("{dataSourceId:long}", Name = "api_delete_a_data_source_for_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin]
+    public async Task<IActionResult> DeleteDataSourceV2(
+        long projectId,
+        long dataSourceId)
+    {
+        var organizationId = UserContextStorage.OrganizationId;
+        var response = await _dataSourceBusiness.DeleteDataSource(organizationId, projectId, dataSourceId);
+        return Ok(response);
+    }
+
+    /// <summary>
+    ///     Archive or Unarchive a Data Source
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dataSourceId">The ID of the data source to archive or unarchive</param>
     /// <param name="archive">True to archive the data source, false to unarchive it.</param>
     /// <returns>A message stating the data source was successfully archived or unarchived.</returns>
     [HttpPatch("{dataSourceId:long}", Name = "api_archive_data_source_for_project")]
+    [MapToApiVersion(1)]
     [ProjectAdmin]
     public async Task<IActionResult> ArchiveDataSource(
         long projectId,
@@ -234,13 +367,44 @@ public class DataSourceProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Set Default Data Source 
+    ///     Archive or Unarchive a Data Source
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the data source belongs</param>
+    /// <param name="dataSourceId">The ID of the data source to archive or unarchive</param>
+    /// <param name="archive">True to archive the data source, false to unarchive it.</param>
+    /// <returns>True if the data source was successfully archived or unarchived.</returns>
+    [HttpPatch("{dataSourceId:long}", Name = "api_archive_data_source_for_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin]
+    public async Task<IActionResult> ArchiveDataSourceV2(
+        long projectId,
+        long dataSourceId,
+        [FromQuery] bool archive)
+    {
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var responseA =
+                await _dataSourceBusiness.ArchiveDataSource(organizationId, projectId, currentUserId, dataSourceId);
+            return Ok(responseA);
+        }
+
+        var responseB =
+            await _dataSourceBusiness.UnarchiveDataSource(organizationId, projectId, currentUserId, dataSourceId);
+        return Ok(responseB);
+    }
+
+    /// <summary>
+    ///     Set Default Data Source
     /// </summary>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <param name="dataSourceId">The ID of the data source to set as default</param>
     /// <param name="isDefault">True to set as default, false to unset as default.</param>
     /// <returns>The updated data source</returns>
     [HttpPatch("{dataSourceId:long}/default", Name = "api_set_default_data_source_for_project")]
+    [MapToApiVersion(1)]
     [Auth("update", "data_source")]
     public async Task<ActionResult<DataSourceResponseDto>> SetDefaultDataSource(
         long projectId,
@@ -261,5 +425,28 @@ public class DataSourceProjectController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+
+    /// <summary>
+    ///     Set Default Data Source
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the data source belongs</param>
+    /// <param name="dataSourceId">The ID of the data source to set as default</param>
+    /// <param name="isDefault">True to set as default, false to unset as default.</param>
+    /// <returns>The updated data source</returns>
+    [HttpPatch("{dataSourceId:long}/default", Name = "api_set_default_data_source_for_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "data_source")]
+    public async Task<ActionResult<DataSourceResponseDto>> SetDefaultDataSourceV2(
+        long projectId,
+        long dataSourceId,
+        [FromQuery] bool isDefault = true)
+    {
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var dataSource =
+            await _dataSourceBusiness.SetDefaultDataSource(organizationId, projectId, currentUserId, dataSourceId);
+        return Ok(dataSource);
     }
 }
