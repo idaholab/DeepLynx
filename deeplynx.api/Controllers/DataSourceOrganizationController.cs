@@ -84,7 +84,8 @@ public class DataSourceOrganizationController : ControllerBase
         [FromQuery] long[]? projectIds,
         [FromQuery] bool hideArchived = true)
     {
-        var dataSources = await _dataSourceBusiness.GetAllDataSources(organizationId, projectIds, hideArchived);
+        var currentUserId = UserContextStorage.UserId;
+        var dataSources = await _dataSourceBusiness.GetAllDataSources(currentUserId, organizationId, projectIds, hideArchived);
         return Ok(dataSources);
     }
 

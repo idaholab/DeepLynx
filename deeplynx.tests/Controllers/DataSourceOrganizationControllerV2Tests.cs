@@ -101,7 +101,7 @@ public class DataSourceOrganizationControllerTestsV2 : IDisposable
         var expected = new List<DataSourceResponseDto> { new(), new() };
 
         _mockBusiness.Setup(b => b.GetAllDataSources(
-                OrgId, It.Is<long[]>(x => x.SequenceEqual(projectIds)), true))
+                UserId, OrgId,  It.Is<long[]>(x => x.SequenceEqual(projectIds)), true))
             .ReturnsAsync(expected);
 
         var result = (await _controller.GetAllDataSourcesV2(OrgId, projectIds)).Result as OkObjectResult;
@@ -115,7 +115,7 @@ public class DataSourceOrganizationControllerTestsV2 : IDisposable
     public async Task GetAllDataSourcesV2_Returns200_WithEmptyList()
     {
         _mockBusiness.Setup(b => b.GetAllDataSources(
-                It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>()))
+                It.IsAny<long>(),It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>()))
             .ReturnsAsync([]);
 
         var result = (await _controller.GetAllDataSourcesV2(OrgId, null)).Result as OkObjectResult;
@@ -129,7 +129,7 @@ public class DataSourceOrganizationControllerTestsV2 : IDisposable
     public async Task GetAllDataSourcesV2_ThrowsException_WhenBusinessThrows()
     {
         _mockBusiness.Setup(b => b.GetAllDataSources(
-                It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>()))
+                It.IsAny<long>(),It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>()))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _controller.GetAllDataSourcesV2(OrgId, null));
@@ -140,13 +140,13 @@ public class DataSourceOrganizationControllerTestsV2 : IDisposable
     {
         var projectIds = new[] { ProjectIdA };
         _mockBusiness.Setup(b => b.GetAllDataSources(
-                OrgId, It.Is<long[]>(x => x.SequenceEqual(projectIds)), false))
+                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(projectIds)), false))
             .ReturnsAsync([]);
 
         await _controller.GetAllDataSourcesV2(OrgId, projectIds, false);
 
         _mockBusiness.Verify(b => b.GetAllDataSources(
-            OrgId, It.Is<long[]>(x => x.SequenceEqual(projectIds)), false), Times.Once);
+            UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(projectIds)), false), Times.Once);
     }
 
     [Fact]
