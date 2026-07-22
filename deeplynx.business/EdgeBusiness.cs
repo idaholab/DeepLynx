@@ -214,6 +214,15 @@ public class EdgeBusiness : IEdgeBusiness
             };
         }
 
+        if (!dto.RelationshipId.HasValue && !string.IsNullOrEmpty(dto.RelationshipName))
+        {
+            var relationship = await _context.Relationships
+                .FirstOrDefaultAsync(r =>
+                    r.OrganizationId == organizationId &&
+                    r.Name.ToLower() == dto.RelationshipName.ToLower()) ?? throw new ValidationException($"Relationship with name '{dto.RelationshipName}' not found in organization {organizationId}");
+            dto.RelationshipId = relationship.Id;
+        }
+
         edge = new Edge
         {
             Properties = dto.Properties?.ToString(),
