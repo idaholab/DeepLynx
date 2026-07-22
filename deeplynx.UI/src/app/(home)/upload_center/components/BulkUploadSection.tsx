@@ -166,6 +166,8 @@ export default function BulkUploadSection(props: BulkUploadSectionProps) {
                     ? "btn-disabled"
                     : ""
                     }`}
+                  role='button'
+                  aria-label='Choose File Button'
                 >
                   {t.translations.CHOOSE_FILE}
                   <input

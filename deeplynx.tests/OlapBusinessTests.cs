@@ -78,11 +78,13 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     private Mock<IInsightBusiness> _insightBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private long _organizationId;
     private long _projectId;
     private RecordBusiness _recordBusiness = null!;
     private RelationshipBusiness _relationshipBusiness = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
@@ -115,11 +117,13 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _edgeBusiness = new Mock<IEdgeBusiness>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
         _mockServiceScopeFactory = new Mock<IServiceScopeFactory>();
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockAdminService = new Mock<IAdminService>();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
 
         // Set up service scope factory mock
@@ -136,7 +140,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
-        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness,
+            _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);

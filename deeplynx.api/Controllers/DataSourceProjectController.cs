@@ -41,15 +41,15 @@ public class DataSourceProjectController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
     /// <returns>A list of data sources for the given project.</returns>
     [HttpGet(Name = "api_get_all_data_sources_for_project")]
-    [Auth("read", "data_source")]
     public async Task<ActionResult<IEnumerable<DataSourceResponseDto>>> GetAllDataSources(
         long projectId,
         [FromQuery] bool hideArchived = true)
     {
         try
         {
-            var organizationId = UserContextStorage.OrganizationId;
-            var dataSources = await _dataSourceBusiness.GetAllDataSources(organizationId, [projectId], hideArchived);
+            var currentUserId = UserContextStorage.UserId;
+            var organizationId = UserContextStorage.UserId;
+            var dataSources = await _dataSourceBusiness.GetAllDataSources(currentUserId, organizationId, [projectId], hideArchived);
             return Ok(dataSources);
         }
         catch (Exception exc)

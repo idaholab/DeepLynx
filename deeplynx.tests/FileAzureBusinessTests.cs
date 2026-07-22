@@ -71,6 +71,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
     private NotificationBusiness _notificationBusiness = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
@@ -99,9 +101,9 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         // These are pre-generated valid AES-256 keys for testing
         Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
         Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
-        
+
         _encryptionHelper = new EncryptionHelper();
-        
+
         await base.InitializeAsync();
 
         _connectionString = _azuriteFixture.AzuriteConnectionString;
@@ -119,6 +121,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
@@ -167,7 +171,12 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _userBusiness = new UserBusiness(Context);
-        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _dataSourceBusiness = new DataSourceBusiness(Context,
+            _edgeBusiness.Object,
+            _recordBusiness,
+            _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
         _fileAzureBusiness = new FileAzureBusiness();
