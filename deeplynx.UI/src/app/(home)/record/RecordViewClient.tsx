@@ -635,6 +635,16 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       //   label: t.translations.FILE_SIZE,
       //   value: formatFileSize(record.fileSize)
       // },
+
+      ...(recordFileType
+        ? [
+          {
+            label: t.translations.FILE_TYPE || "File Type",
+            value: recordFileType,
+          },
+        ]
+        : []),
+
       ...(isDownloadable
         ? [
           {
@@ -660,7 +670,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         value: record.objectStorageId,
       },
     ];
-  }, [record, handleUpdateRecord, t.translations]);
+  }, [record, recordFileType, handleUpdateRecord, t.translations]);
 
   const additionalPropertiesRows = useMemo(() => {
     if (!record?.properties) return [];

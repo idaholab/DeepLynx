@@ -914,7 +914,7 @@ export default function DataCatalogClient({
                 }
               }}
             >
-              {isBulkMode ? "Cancel Selection" : "Select Records"}
+              {isBulkMode ? t.translations.CANCEL_SELECTION : t.translations.SELECTED_RECORDS}
             </button>
             {isBulkMode && (
               <button
@@ -993,13 +993,12 @@ export default function DataCatalogClient({
               <div className="divide-y divide-base-200 overflow-hidden rounded-box border border-base-300/50 bg-base-100 shadow-sm">
                 {times(6).map((i) => (
                   <article
-                      key={i}
-                    className={`grid grid-cols-1 gap-3 p-4 ${
-                      isBulkMode
+                    key={i}
+                    className={`grid grid-cols-1 gap-3 p-4 ${isBulkMode
                         ? "md:grid-cols-[auto_minmax(0,1fr)_auto]"
                         : "md:grid-cols-[minmax(0,1fr)_auto]"
-                    }`}
-                    >
+                      }`}
+                  >
                     {isBulkMode && (
                       <div className="flex items-start pt-1">
                         <Skeleton width={20} height={20} />
