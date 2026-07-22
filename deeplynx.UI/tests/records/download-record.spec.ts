@@ -67,7 +67,7 @@ test.describe("Download an uploaded file", () => {
     await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(filePath);
-    await page.getByRole('button', { name: 'Upload' }).click();
+    await page.getByRole('button', { name: 'Upload' }).last().click();
     await expect(page.getByText('File uploaded successfully!', { exact: true })).toBeVisible({
     timeout: FIVE_MIN_MS,
     });
@@ -160,7 +160,7 @@ test.describe("Download a 10 GB file", () => {
     await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(filePath);
-    await page.getByRole('button', { name: 'Upload' }).click();
+    await page.getByRole('button', { name: 'Upload' }).last().click();
     await expect(page.getByText('File uploaded successfully!', { exact: true })).toBeVisible({
     timeout: TWENTY_MIN_MS,
     });
