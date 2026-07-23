@@ -43,10 +43,12 @@ public class FileBusinessTests : IntegrationTestBase
     private RecordBusiness _recordBusiness = null!;
     private OlapBusiness _olapBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
 
@@ -78,6 +80,8 @@ public class FileBusinessTests : IntegrationTestBase
         _edgeBusiness = new Mock<IEdgeBusiness>();
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
@@ -90,8 +94,8 @@ public class FileBusinessTests : IntegrationTestBase
 
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
 
-        _dataSourceBusiness =
-            new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness,
+            _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
 
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
@@ -108,8 +112,6 @@ public class FileBusinessTests : IntegrationTestBase
             _provenanceBusiness.Object,
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
 
-        _dataSourceBusiness =
-            new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);

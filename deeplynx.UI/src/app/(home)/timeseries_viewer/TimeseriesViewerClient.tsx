@@ -266,19 +266,19 @@ export default function TimeseriesViewerClient({
               {availableTimeseriesFiles.map((file, index) => (
                 <div
                   key={index}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                    activeFile?.id === file.id
-                      ? "border-primary bg-primary/10"
-                      : "border-base-300/50 hover:border-primary/50 hover:bg-base-200"
-                  }`}
+                  className={`p-3 rounded-lg border cursor-pointer transition-all ${activeFile?.id === file.id
+                    ? "border-primary bg-primary/10"
+                    : "border-base-300/50 hover:border-primary/50 hover:bg-base-200"
+                    }`}
                   onClick={() => setActiveFile(file)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`text-sm font-medium truncate ${
-                          activeFile?.id === file.id ? "text-primary" : ""
-                        }`}
+                        className={`text-sm font-medium truncate ${activeFile?.id === file.id ? "text-primary" : ""
+                          }`}
+                        role='link'
+                        aria-label={file.name ?? "Unnamed file"}
                       >
                         {file.name}
                       </p>

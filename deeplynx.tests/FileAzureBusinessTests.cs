@@ -71,6 +71,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
     private NotificationBusiness _notificationBusiness = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
@@ -83,6 +85,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
     private long _oid;
     private long _pid;
     private long _dsid;
+    private long _dsid2;
     private long _uid;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private long _recordId;
@@ -99,9 +102,9 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         // These are pre-generated valid AES-256 keys for testing
         Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
         Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
-        
+
         _encryptionHelper = new EncryptionHelper();
-        
+
         await base.InitializeAsync();
 
         _connectionString = _azuriteFixture.AzuriteConnectionString;
@@ -119,6 +122,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
@@ -167,7 +172,12 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _userBusiness = new UserBusiness(Context);
-        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _dataSourceBusiness = new DataSourceBusiness(Context,
+            _edgeBusiness.Object,
+            _recordBusiness,
+            _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
         _fileAzureBusiness = new FileAzureBusiness();
@@ -247,9 +257,19 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = _uid
         };
-        Context.DataSources.Add(dataSource);
+        var dataSource2 = new DataSource
+        {
+            Name = "Test Datasource",
+            ProjectId = null,
+            OrganizationId = _oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _uid
+        };
+        Context.DataSources.AddRange(dataSource, dataSource2);
         await Context.SaveChangesAsync();
         _dsid = dataSource.Id;
+        _dsid2 = dataSource.Id;
+
 
         // Create class
         var testClass = new Class
@@ -462,6 +482,32 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         // Assert
         Assert.NotNull(result);
         Assert.Equal($"organization_{_oid}/project_{_pid}/datasource_{_dsid}/{guid}_{fileName}", result);
+
+        // Verify file exists in Azure
+        var exists = await BlobExistsAsync(result);
+        Assert.True(exists);
+
+        // Verify content
+        var storedContent = await GetBlobContentAsync(result);
+        Assert.Equal(fileContent, storedContent);
+    }
+
+    [Fact]
+    public async Task UploadFileOrgDataSource_Success_CreatesFileInAzure()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "test-file.txt";
+        var fileContent = "This is test content";
+        var mockFile = CreateMockFile(fileName, fileContent);
+
+        // Act
+        var result = await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid2, _objectStorageConfig, mockFile, guid);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal($"organization_{_oid}/project_{_pid}/datasource_{_dsid2}/{guid}_{fileName}", result);
 
         // Verify file exists in Azure
         var exists = await BlobExistsAsync(result);

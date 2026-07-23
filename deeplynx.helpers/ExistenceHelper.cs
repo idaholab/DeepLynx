@@ -77,18 +77,30 @@ namespace deeplynx.helpers
             return project;
         }
 
-        public static async Task EnsureDataSourceExistsForProjectAsync(DeeplynxContext context, long dataSourceId, long projectId, bool hideArchived = true)
+        public static async Task EnsureDataSourceExistsForProjectAsync(
+            DeeplynxContext context,
+            long dataSourceId,
+            long projectId,
+            long organizationId,
+            bool hideArchived = true)
         {
             var dataSourceExists = hideArchived
-                ? await context.DataSources.AnyAsync(ds => ds.ProjectId == projectId && ds.Id == dataSourceId && ds.IsArchived == false)
-                : await context.DataSources.AnyAsync(ds => ds.ProjectId == projectId && ds.Id == dataSourceId);
+                ? await context.DataSources.AnyAsync(ds =>
+                    ds.Id == dataSourceId &&
+                    ds.OrganizationId == organizationId &&
+                    (ds.ProjectId == projectId || ds.ProjectId == null) &&
+                    ds.IsArchived == false)
+                : await context.DataSources.AnyAsync(ds =>
+                    ds.Id == dataSourceId &&
+                    ds.OrganizationId == organizationId &&
+                    (ds.ProjectId == projectId || ds.ProjectId == null));
 
             if (!dataSourceExists)
             {
-                throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found in project with id {projectId}");
+                throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found in project with id {projectId} and organization with id {organizationId}");
             }
         }
-        
+
         public static async Task EnsureObjectStorageExistsForProjectAsync(DeeplynxContext context, long objectStorageId, long projectId, bool hideArchived = true)
         {
             var dataSourceExists = hideArchived
