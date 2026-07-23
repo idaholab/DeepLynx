@@ -265,7 +265,7 @@ public class OlapControllerV2Tests : IDisposable
             OrgId,
             ProjectId,
             RecordIdConst,
-            request)) as OkObjectResult;
+            request)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
