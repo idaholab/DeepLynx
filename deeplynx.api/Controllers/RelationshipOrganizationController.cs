@@ -330,7 +330,7 @@ public class RelationshipOrganizationController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "relationship")]
-    public async Task<IActionResult> DeleteRelationshipV2(
+    public async Task<ActionResult<bool>> DeleteRelationshipV2(
         long organizationId,
         long relationshipId)
     {
@@ -387,7 +387,7 @@ public class RelationshipOrganizationController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "relationship")]
-    public async Task<IActionResult> ArchiveRelationshipV2(
+    public async Task<ActionResult<bool>> ArchiveRelationshipV2(
         long organizationId,
         long relationshipId,
         [FromQuery] bool archive)

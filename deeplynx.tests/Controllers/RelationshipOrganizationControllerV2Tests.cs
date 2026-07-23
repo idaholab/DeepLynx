@@ -432,10 +432,10 @@ public class RelationshipOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.DeleteRelationship(UserId, OrgId, null, RelationshipId))
             .ReturnsAsync(true);
 
-        var result = await _relationshipOrganizationController.DeleteRelationshipV2(
-            OrgId, RelationshipId) as OkObjectResult;
+        var actionResult = await _relationshipOrganizationController.DeleteRelationshipV2(
+            OrgId, RelationshipId);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
@@ -491,10 +491,10 @@ public class RelationshipOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.ArchiveRelationship(UserId, OrgId, null, RelationshipId))
             .ReturnsAsync(true);
 
-        var result = await _relationshipOrganizationController.ArchiveRelationshipV2(
-            OrgId, RelationshipId, archive: true) as OkObjectResult;
+        var actionResult = await _relationshipOrganizationController.ArchiveRelationshipV2(
+            OrgId, RelationshipId, archive: true);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockRelationshipBusiness.Verify(
@@ -513,10 +513,10 @@ public class RelationshipOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.UnarchiveRelationship(UserId, OrgId, null, RelationshipId))
             .ReturnsAsync(true);
 
-        var result = await _relationshipOrganizationController.ArchiveRelationshipV2(
-            OrgId, RelationshipId, archive: false) as OkObjectResult;
+        var actionResult = await _relationshipOrganizationController.ArchiveRelationshipV2(
+            OrgId, RelationshipId, archive: false);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockRelationshipBusiness.Verify(
