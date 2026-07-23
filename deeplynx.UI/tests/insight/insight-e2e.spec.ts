@@ -6,32 +6,9 @@ const BACKEND_URL = "http://localhost:5000/api/v1";
 const PDF_PATH = path.resolve(__dirname, "genesis-mission.pdf");
 
 test.describe("Insight E2E", () => {
-  let projectId: string;
 
   test.beforeEach(async ({ page }) => {
     await seedAndCreateProject(page, "Insight E2E Test");
-
-    // Extract project ID from the URL (e.g. /project/42)
-    const url = page.url();
-    const match = url.match(/\/project\/(\d+)/);
-    expect(match).not.toBeNull();
-    projectId = match![1];
-
-    // New projects have a default data source but NO object storage.
-    // The Upload Center requires all three selectors to be filled,
-    // so create one via the backend API.
-    const storageRes = await fetch(
-      `${BACKEND_URL}/organizations/1/projects/${projectId}/storages?makeDefault=true`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Test Storage",
-          config: { MountPath: "/data" },
-        }),
-      },
-    );
-    expect(storageRes.ok).toBe(true);
   });
 
   test("upload file, embed, and query chatbot", async ({ page }) => {
@@ -47,13 +24,6 @@ test.describe("Insight E2E", () => {
     await expect(
       page.getByRole("heading", { name: "Upload Center" }),
     ).toBeVisible();
-
-    // Wait for project and data source to auto-select (they each have 1 option).
-    // Storage Destination may have multiple options from the org, so it won't
-    // auto-select — we need to pick it explicitly.
-    const storageSelect = page.getByLabel("Storage Destination");
-    await expect(storageSelect).toBeEnabled({ timeout: 15000 });
-    await storageSelect.selectOption({ label: "Test Storage" });
 
     // Attach the PDF via the hidden file input inside DropUpload
     const fileInput = page.locator('input[type="file"]');
