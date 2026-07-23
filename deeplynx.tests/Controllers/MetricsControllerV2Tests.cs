@@ -64,7 +64,7 @@ public class MetricsControllerV2Tests : IDisposable
             .ReturnsAsync(StorageSize);
 
         // Act
-        var result = await _metricsController.GetSystemStorageSizeV2() as OkObjectResult;
+        var result = (await _metricsController.GetSystemStorageSizeV2()).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
@@ -125,7 +125,7 @@ public class MetricsControllerV2Tests : IDisposable
             .ReturnsAsync(DataSourceCount);
 
         // Act
-        var result = await _metricsController.GetSystemDataSourceCountV2(true) as OkObjectResult;
+        var result = (await _metricsController.GetSystemDataSourceCountV2(true)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
@@ -203,7 +203,7 @@ public class MetricsControllerV2Tests : IDisposable
             .ReturnsAsync(RecordCount);
 
         // Act
-        var result = await _metricsController.GetSystemRecordCountV2(true) as OkObjectResult;
+        var result = (await _metricsController.GetSystemRecordCountV2(true)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
@@ -270,7 +270,7 @@ public class MetricsControllerV2Tests : IDisposable
             .ReturnsAsync(FileCount);
 
         // Act
-        var result = await _metricsController.GetSystemFileCountV2(true) as OkObjectResult;
+        var result = (await _metricsController.GetSystemFileCountV2(true)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
