@@ -75,7 +75,7 @@ public class MetricsProjectControllerV2Tests : IDisposable
             .ReturnsAsync(StorageSize);
 
         // Act
-        var result = await _metricsProjectController.GetProjectStorageSizeV2(OrgId, ProjectId) as OkObjectResult;
+        var result = (await _metricsProjectController.GetProjectStorageSizeV2(OrgId, ProjectId)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
@@ -217,8 +217,8 @@ public class MetricsProjectControllerV2Tests : IDisposable
             .ReturnsAsync(RecordCount);
 
         // Act
-        var result = await _metricsProjectController.GetProjectRecordCountV2(
-            OrgId, ProjectId, true) as OkObjectResult;
+        var result = (await _metricsProjectController.GetProjectRecordCountV2(
+            OrgId, ProjectId, true)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
@@ -302,8 +302,8 @@ public class MetricsProjectControllerV2Tests : IDisposable
             .ReturnsAsync(FileCount);
 
         // Act
-        var result = await _metricsProjectController.GetProjectFileCountV2(
-            OrgId, ProjectId, true) as OkObjectResult;
+        var result = (await _metricsProjectController.GetProjectFileCountV2(
+            OrgId, ProjectId, true)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
