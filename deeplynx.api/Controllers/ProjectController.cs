@@ -650,14 +650,7 @@ public class ProjectController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-
-            var result = await _projectBusiness.RemoveMemberFromProject(projectId, userId, groupId, currentUserId);
-
-            if (!result)
-            {
-                return BadRequest(new { message = "You cannot remove yourself from a project." });
-            }
-
+            await _projectBusiness.RemoveMemberFromProject(projectId, userId, groupId, currentUserId);
             return Ok(new { message = $"Removed member from project {projectId}" });
         }
         catch (Exception exc)
@@ -671,7 +664,6 @@ public class ProjectController : ControllerBase
     /// <summary>
     ///     Remove User or Group from Project
     /// </summary>
-    /// <param name="organizationId">ID of the organization to which the project belongs</param>
     /// <param name="projectId">ID of the project</param>
     /// <param name="userId">ID of the user if user is member</param>
     /// <param name="groupId">ID of the group if group is member</param>
@@ -681,13 +673,13 @@ public class ProjectController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [ProjectAdmin]
     public async Task<ActionResult> RemoveMemberFromProjectV2(
-        long organizationId,
         long projectId,
         [FromQuery] long? userId,
         [FromQuery] long? groupId)
     {
-        var response = await _projectBusiness.RemoveMemberFromProject(projectId, userId, groupId);
-        return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var result = await _projectBusiness.RemoveMemberFromProject(projectId, userId, groupId, currentUserId);
+        return Ok(result);
     }
 
     /// <summary>
