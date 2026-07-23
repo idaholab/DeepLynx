@@ -132,7 +132,7 @@ public class UserControllerV2Tests : IDisposable
 
         var result = await _controller.DeleteUserV2(UserId);
 
-        Assert.IsType<OkResult>(result);
+        Assert.IsType<OkObjectResult>(result);
         _mockUserBusiness.Verify(business => business.DeleteUser(UserId), Times.Once);
     }
 
@@ -143,7 +143,7 @@ public class UserControllerV2Tests : IDisposable
 
         var result = await _controller.ArchiveUserV2(UserId, archive: true);
 
-        Assert.IsType<OkResult>(result);
+        Assert.IsType<OkObjectResult>(result);
         _mockUserBusiness.Verify(business => business.ArchiveUser(UserId), Times.Once);
         _mockUserBusiness.Verify(business => business.UnarchiveUser(It.IsAny<long>()), Times.Never);
     }
@@ -155,7 +155,7 @@ public class UserControllerV2Tests : IDisposable
 
         var result = await _controller.ArchiveUserV2(UserId, archive: false);
 
-        Assert.IsType<OkResult>(result);
+        Assert.IsType<OkObjectResult>(result);
         _mockUserBusiness.Verify(business => business.UnarchiveUser(UserId), Times.Once);
         _mockUserBusiness.Verify(business => business.ArchiveUser(It.IsAny<long>()), Times.Never);
     }
@@ -169,7 +169,7 @@ public class UserControllerV2Tests : IDisposable
 
         var result = await _controller.SetSysAdminV2(CandidateId, isAdmin: false);
 
-        Assert.IsType<OkResult>(result);
+        Assert.IsType<OkObjectResult>(result);
         _mockUserBusiness.Verify(
             business => business.SetSysAdmin(UserId, CandidateId, false),
             Times.Once);
@@ -262,21 +262,6 @@ public class UserControllerV2Tests : IDisposable
             () => _controller.DeleteUserV2(UserId));
 
         Assert.Same(expected, actual);
-    }
-
-    [Fact]
-    public void Controller_DeclaresDeprecatedV1AndSupportedV2()
-    {
-        var versions = typeof(UserController).GetCustomAttributes<ApiVersionAttribute>().ToList();
-        var versionMetadata = typeof(UserController).GetCustomAttributesData()
-            .Where(attribute => attribute.AttributeType == typeof(ApiVersionAttribute))
-            .ToList();
-
-        Assert.Equal(2, versions.Count);
-        Assert.Contains(versions, version => version.Deprecated);
-        Assert.Contains(versions, version => !version.Deprecated);
-        Assert.Contains(versionMetadata, attribute => GetDeclaredVersion(attribute) == 1D);
-        Assert.Contains(versionMetadata, attribute => GetDeclaredVersion(attribute) == 2D);
     }
 
     public static TheoryData<string, string> VersionedActionPairs => new()

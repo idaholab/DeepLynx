@@ -429,14 +429,6 @@ spec:
         - name: deeplynxv3
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-docs-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          env:
-            - name: NODE_ENV
-              value: "production"
-            - name: HOSTED_LINK
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: hosted-link
           resources:
             requests:
               cpu: "100m"

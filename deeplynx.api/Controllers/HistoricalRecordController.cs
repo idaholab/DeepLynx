@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
+using Asp.Versioning;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
@@ -14,6 +16,8 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to retrieve historical record information and record history.
 /// </remarks>
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/records/historical")]
 [Authorize]
 [Tags("Historical Record")]
@@ -44,6 +48,7 @@ public class HistoricalRecordController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
     /// <returns>A list of historical records based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_historical_records")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetAllHistoricalRecords(
         long organizationId,
@@ -72,6 +77,36 @@ public class HistoricalRecordController : ControllerBase
     }
 
     /// <summary>
+    ///     Get All Historical Records
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose historical records are to be retrieved</param>
+    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
+    /// <param name="pointInTime">(Optional) Find the most current records that existed before this point in time</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <returns>A list of historical records based on the applied filters.</returns>
+    [HttpGet(Name = "api_get_all_historical_records")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetAllHistoricalRecordsV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] long? dataSourceId = null,
+        [FromQuery] DateTime? pointInTime = null,
+        [FromQuery] bool hideArchived = true)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records =
+                await _historicalRecordBusiness.GetAllHistoricalRecords(
+                    currentUserId, projectId, organizationId, dataSourceId, pointInTime, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+    }
+
+    /// <summary>
     ///     Get a Historical Record
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -81,6 +116,7 @@ public class HistoricalRecordController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
     /// <returns>The historical record at the specified point in time</returns>
     [HttpGet("{recordId:long}", Name = "api_get_a_historical_record")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<HistoricalRecordResponseDto>> GetHistoricalRecord(
@@ -111,6 +147,38 @@ public class HistoricalRecordController : ControllerBase
     }
 
     /// <summary>
+    ///     Get a Historical Record
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="recordId">The ID of the record to retrieve</param>
+    /// <param name="pointInTime">(Optional) Find the most current record that existed before this point in time</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <returns>The historical record at the specified point in time</returns>
+    [HttpGet("{recordId:long}", Name = "api_get_a_historical_record")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<HistoricalRecordResponseDto>> GetHistoricalRecordV2(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromQuery] DateTime? pointInTime = null,
+        [FromQuery] bool hideArchived = true)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
+            var record =
+                await _historicalRecordBusiness.GetHistoricalRecord(
+                    currentUserId, recordId, organizationId, pointInTime, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(record);
+    }
+
+    /// <summary>
     ///     Get Record History
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -118,6 +186,7 @@ public class HistoricalRecordController : ControllerBase
     /// <param name="recordId">The ID of the record for which to retrieve history</param>
     /// <returns>A list of all previous versions of the record</returns>
     [HttpGet("{recordId:long}/history", Name = "api_get_record_history")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Sensitivity("read record")]
     public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetRecordHistory(
@@ -143,5 +212,33 @@ public class HistoricalRecordController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+
+    /// <summary>
+    ///     Get Record History
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="recordId">The ID of the record for which to retrieve history</param>
+    /// <returns>A list of all previous versions of the record</returns>
+    [HttpGet("{recordId:long}/history", Name = "api_get_record_history")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetRecordHistoryV2(
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
+            var history = await _historicalRecordBusiness.GetHistoryForRecord(
+                currentUserId, recordId, organizationId, isSysAdmin, isOrgAdmin, isProjectAdmin);
+
+            return Ok(history);
     }
 }

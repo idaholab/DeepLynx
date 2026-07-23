@@ -1,11 +1,13 @@
 using System.Text.Json;
+using Asp.Versioning;
+using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.helpers.json;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using deeplynx.helpers;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
@@ -17,6 +19,8 @@ namespace deeplynx.api.Controllers;
 ///     Once approved, they are promoted into the deeplynx schema.
 /// </remarks>
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/extractions")]
 [Authorize]
 [Tags("Lattice")]
@@ -117,6 +121,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     [HttpGet(Name = "api_list_extractions")]
+    [MapToApiVersion(1)]
     [InsightEnabled]
     public async Task<IActionResult> ListExtractions(long organizationId, long projectId)
     {
@@ -134,11 +139,28 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
+    ///     Returns all extractions for the specified project.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <returns>200 OK with a list of extractions belonging to the project.</returns>
+    [HttpGet(Name = "api_list_extractions")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<IActionResult> ListExtractionsV2(long organizationId, long projectId)
+    {
+        var result = await _latticeExtractionBusiness.ListExtractionsByProject(projectId);
+        return Ok(result);
+    }
+
+    /// <summary>
     ///     Return the ontology embedding status
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     [HttpGet("embedding-status", Name = "api_get_embedding_status")]
+    [MapToApiVersion(1)]
     [InsightEnabled]
     public async Task<IActionResult> GetEmbeddingStatus(long organizationId, long projectId)
     {
@@ -156,6 +178,22 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
+    ///     Return the ontology embedding status.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <returns>200 OK with the ontology embedding status for the project.</returns>
+    [HttpGet("embedding-status", Name = "api_get_embedding_status")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<IActionResult> GetEmbeddingStatusV2(long organizationId, long projectId)
+    {
+        var result = await _latticeExtractionBusiness.GetEmbeddingStatus(projectId);
+        return Ok(result);
+    }
+
+    /// <summary>
     ///     Trigger ontology embedding.
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
@@ -164,6 +202,7 @@ public class LatticeExtractionController : ControllerBase
     ///     Optional embedding model config ID. If omitted, the project/org default is used.
     /// </param>
     [HttpPost("embed-ontology", Name = "api_embed_ontology")]
+    [MapToApiVersion(1)]
     [InsightEnabled]
     public async Task<IActionResult> EmbedOntology(
         long organizationId,
@@ -215,6 +254,33 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
+    ///     Trigger ontology embedding.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project whose ontology will be embedded.</param>
+    /// <param name="embeddingModelConfigId">
+    ///     Optional embedding model config ID. If omitted, the project/org default is used.
+    /// </param>
+    /// <returns>202 Accepted with an empty response body once ontology embedding has been queued.</returns>
+    [HttpPost("embed-ontology", Name = "api_embed_ontology")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<IActionResult> EmbedOntologyV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] long? embeddingModelConfigId = null)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        await _insightBusiness.QueueInsightEmbedStrings(
+            currentUserId,
+            organizationId,
+            projectId,
+            embeddingModelConfigId);
+        return Accepted();
+    }
+
+    /// <summary>
     ///     Mark an extraction as failed
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
@@ -223,6 +289,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="errorMessage">Optional error message from Insight describing the failure.</param>
     [AllowAnonymous]
     [HttpPost("{extractionId:long}/failure", Name = "api_insight_extraction_failure")]
+    [MapToApiVersion(1)]
     [InsightEnabled]
     public async Task<IActionResult> InsightExtractionFailure(
         long organizationId,
@@ -259,6 +326,34 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
+    ///     Mark an extraction as failed.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction ID returned by the trigger endpoint.</param>
+    /// <param name="errorMessage">Optional error message from Insight describing the failure.</param>
+    /// <returns>202 Accepted with an empty response body once the extraction has been marked as failed.</returns>
+    [AllowAnonymous]
+    [HttpPost("{extractionId:long}/failure", Name = "api_insight_extraction_failure")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<IActionResult> InsightExtractionFailureV2(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromQuery] string? errorMessage = null)
+    {
+        var failureMessage = await ReadFailureMessage(errorMessage);
+        await _latticeExtractionBusiness.MarkExtractionFailed(
+            extractionId,
+            organizationId,
+            projectId,
+            failureMessage);
+        return Accepted();
+    }
+
+    /// <summary>
     ///     Receive the LLM extraction result from Insight and stage it.
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
@@ -268,6 +363,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="dto">LLM response payload from Insight.</param>
     [AllowAnonymous]
     [HttpPost("{extractionId:long}/callback", Name = "api_insight_extraction_callback")]
+    [MapToApiVersion(1)]
     [InsightEnabled]
     public async Task<IActionResult> InsightExtractionCallback(
         long organizationId,
@@ -328,12 +424,48 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
+    ///     Receive the LLM extraction result from Insight and stage it.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction ID returned by the trigger endpoint.</param>
+    /// <param name="dataSourceId">The data source the staged records and edges will belong to.</param>
+    /// <returns>200 OK with the staged extraction result.</returns>
+    [AllowAnonymous]
+    [HttpPost("{extractionId:long}/callback", Name = "api_insight_extraction_callback")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<IActionResult> InsightExtractionCallbackV2(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromQuery] long dataSourceId)
+    {
+        string rawBody;
+        using (var reader = new StreamReader(Request.Body))
+        {
+            rawBody = await reader.ReadToEndAsync();
+        }
+
+        var dto = LlmJsonParser.Deserialize<InsightExtractionCallbackDto>(rawBody);
+        var result = await _latticeExtractionBusiness.ProcessInsightCallback(
+            organizationId,
+            projectId,
+            dataSourceId,
+            extractionId,
+            dto);
+        return Ok(result);
+    }
+
+    /// <summary>
     ///     Returns all staged items for an extraction.
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="extractionId">The extraction to retrieve staging data for.</param>
     [HttpGet("{extractionId:long}/staging", Name = "api_get_extraction_staging")]
+    [MapToApiVersion(1)]
     [InsightEnabled]
     public async Task<IActionResult> GetExtractionStaging(
         long organizationId,
@@ -359,6 +491,29 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
+    ///     Returns all staged items for an extraction.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction to retrieve staging data for.</param>
+    /// <returns>200 OK with all staged classes, records, relationships, and edges for the extraction.</returns>
+    [HttpGet("{extractionId:long}/staging", Name = "api_get_extraction_staging")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<IActionResult> GetExtractionStagingV2(
+        long organizationId,
+        long projectId,
+        long extractionId)
+    {
+        var result = await _latticeExtractionBusiness.GetExtractionStaging(
+            extractionId,
+            organizationId,
+            projectId);
+        return Ok(result);
+    }
+
+    /// <summary>
     ///     Promote a selected subset of a completed (or partially promoted) extraction's staged items.
     /// </summary>
     /// <remarks>
@@ -372,6 +527,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="extractionId">The extraction to promote.</param>
     /// <param name="request">The selection of staged items to promote.</param>
     [HttpPost("{extractionId:long}/promote", Name = "api_promote_extraction")]
+    [MapToApiVersion(1)]
     [InsightEnabled]
     public async Task<IActionResult> PromoteExtraction(
         long organizationId,
@@ -400,6 +556,34 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
+    ///     Promote a selected subset of an extraction's staged items.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction to promote.</param>
+    /// <param name="request">The selection of staged items to promote.</param>
+    /// <returns>200 OK with the updated extraction after the selected items are promoted.</returns>
+    [HttpPost("{extractionId:long}/promote", Name = "api_promote_extraction")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<IActionResult> PromoteExtractionV2(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromBody] PromoteExtractionRequestDto request)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var result = await _latticeExtractionBusiness.PromoteExtraction(
+            currentUserId,
+            organizationId,
+            projectId,
+            extractionId,
+            request);
+        return Ok(result);
+    }
+
+    /// <summary>
     ///     Reject a selected subset of an extraction's staged items, or every remaining item when
     ///     <c>reject_all_remaining</c> is set.
     /// </summary>
@@ -414,6 +598,7 @@ public class LatticeExtractionController : ControllerBase
     /// <param name="extractionId">The extraction to reject items from.</param>
     /// <param name="request">The selection of staged items to reject.</param>
     [HttpPost("{extractionId:long}/reject", Name = "api_reject_extraction")]
+    [MapToApiVersion(1)]
     public async Task<IActionResult> RejectExtraction(
         long organizationId,
         long projectId,
@@ -439,6 +624,27 @@ public class LatticeExtractionController : ControllerBase
     }
 
     /// <summary>
+    ///     Reject a selected subset of an extraction's staged items, or every remaining item.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The extraction to reject items from.</param>
+    /// <param name="request">The selection of staged items to reject.</param>
+    /// <returns>200 OK with the updated extraction after the selected items are rejected.</returns>
+    [HttpPost("{extractionId:long}/reject", Name = "api_reject_extraction")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    public async Task<IActionResult> RejectExtractionV2(
+        long organizationId,
+        long projectId,
+        long extractionId,
+        [FromBody] RejectExtractionRequestDto request)
+    {
+        var result = await _latticeExtractionBusiness.RejectExtraction(extractionId, request);
+        return Ok(result);
+    }
+
+    /// <summary>
     ///     Trigger asynchronous Lattice extraction
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
@@ -448,6 +654,7 @@ public class LatticeExtractionController : ControllerBase
     /// <returns>202 Accepted with the extraction_id.</returns>
     [HttpPost("/organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/trigger",
         Name = "api_trigger_extraction")]
+    [MapToApiVersion(1)]
     [InsightEnabled]
     public async Task<IActionResult> TriggerExtraction(
         long organizationId,
@@ -496,5 +703,34 @@ public class LatticeExtractionController : ControllerBase
                 message
             });
         }
+    }
+
+    /// <summary>
+    ///     Trigger asynchronous Lattice extraction.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization.</param>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="recordId">The ID of the document record to extract from.</param>
+    /// <param name="mode">Extraction mode: strict or discovery.</param>
+    /// <returns>202 Accepted with the extraction ID in the response body.</returns>
+    [HttpPost("/organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/trigger",
+        Name = "api_trigger_extraction")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<IActionResult> TriggerExtractionV2(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromQuery] string mode)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var extractionId = await _latticeExtractionBusiness.TriggerLatticeExtraction(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId,
+            mode);
+        return Accepted(extractionId);
     }
 }

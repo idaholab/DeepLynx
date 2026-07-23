@@ -150,6 +150,7 @@ export const translations = {
       CREATE_CLASS: "Create Class",
       CANCEL_INVITATION: "Cancel Invitation?",
       CANCEL_INVITE: "Cancel Invite",
+      CANCEL_SELECTION: "Cancel Selection",
       CONTAINS_TEXT_SEARCH: "Contains text search...",
       CANCELLING_SHORT: "Cancelling...",
       CREATE_AND_MANAGE_USER_GROUPS_FOR_YOUR_ORGANIZATION: "Create and manage user groups for your organization",
@@ -1778,6 +1779,7 @@ export const translations = {
       SELECT_ORGANIZATION_USERS: "Select Organization Users",
       SELECT_PROJECT: "Select project",
       SELECT_ROLE: "Select a role to view details",
+      SELECT_RECORDS: "Select Records",
       SEARCH_ACROSS_ALL_RECORDS: "Search across all records...",
       SELECT_STORAGE_LOCATION: "Select a storage location",
       SELECT_X_AXIS: "Select X axis...",
@@ -2281,6 +2283,7 @@ export const translations = {
       CANCEL_DOWNLOAD: "Cancelar descarga",
       CANCEL_INVITATION: "¿Cancelar invitación?",
       CANCEL_INVITE: "Cancelar invitación",
+      CANCEL_SELECTION: "Cancel Selection",
       CLEAR_ALL_FILTERS: "Borrar todos los filtros",
       CANCELLING_SHORT: "Cancelando...",
       CANNOT_DEFINE_ADDITIONAL_PROJECT_LABELS:
