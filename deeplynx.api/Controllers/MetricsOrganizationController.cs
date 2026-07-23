@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.interfaces;
+using deeplynx.models.MetricsDTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Scalar.AspNetCore;
@@ -69,7 +70,7 @@ public class MetricsOrganizationController : ControllerBase
     [HttpGet("storage/size", Name = "api_storage_size_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<IActionResult> GetOrganizationStorageSizeV2(long organizationId)
+    public async Task<ActionResult<StorageSizeDto>> GetOrganizationStorageSizeV2(long organizationId)
     {
         var byteSum = await _metricsBusiness.GetOrganizationStorageSize(organizationId);
         return Ok(byteSum);
@@ -160,7 +161,7 @@ public class MetricsOrganizationController : ControllerBase
     [HttpGet("records/count", Name = "api_record_count_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<IActionResult> GetOrganizationRecordCountV2(
+    public async Task<ActionResult<int>> GetOrganizationRecordCountV2(
         long organizationId,
         [FromQuery] long[]? projectIds,
         [FromQuery] bool hideArchived = true)
@@ -206,7 +207,7 @@ public class MetricsOrganizationController : ControllerBase
     [HttpGet("files/count", Name = "api_file_count_organization")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<IActionResult> GetOrganizationFileCountV2(
+    public async Task<ActionResult<int>> GetOrganizationFileCountV2(
         long organizationId,
         [FromQuery] long[]? projectIds,
         [FromQuery] bool hideArchived = true)
