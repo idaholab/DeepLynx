@@ -411,10 +411,10 @@ public class PermissionOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.ArchivePermission(OrgId, null, UserId, PermissionId))
             .ReturnsAsync(true);
 
-        var result = await _permissionOrganizationController.ArchivePermissionV2(
-            OrgId, PermissionId, archive: true) as OkObjectResult;
+        var actionResult = await _permissionOrganizationController.ArchivePermissionV2(
+            OrgId, PermissionId, archive: true);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockPermissionBusiness.Verify(
@@ -432,10 +432,10 @@ public class PermissionOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.UnarchivePermission(OrgId, null, UserId, PermissionId))
             .ReturnsAsync(true);
 
-        var result = await _permissionOrganizationController.ArchivePermissionV2(
-            OrgId, PermissionId, archive: false) as OkObjectResult;
+        var actionResult = await _permissionOrganizationController.ArchivePermissionV2(
+            OrgId, PermissionId, archive: false);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockPermissionBusiness.Verify(

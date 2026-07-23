@@ -412,10 +412,10 @@ public class PermissionProjectControllerTestsV2 : IDisposable
             .Setup(b => b.ArchivePermission(OrgId, ProjectId, UserId, PermissionId))
             .ReturnsAsync(true);
 
-        var result = await _permissionProjectController.ArchivePermissionV2(
-            OrgId, ProjectId, PermissionId, archive: true) as OkObjectResult;
+        var actionResult = await _permissionProjectController.ArchivePermissionV2(
+            OrgId, ProjectId, PermissionId, archive: true);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockPermissionBusiness.Verify(
@@ -425,7 +425,7 @@ public class PermissionProjectControllerTestsV2 : IDisposable
             b => b.UnarchivePermission(OrgId, ProjectId, UserId, PermissionId),
             Times.Never);
     }
-
+    
     [Fact]
     public async Task ArchivePermissionV2_WhenArchiveFalse_CallsUnarchiveBusinessAndReturns200()
     {
@@ -433,10 +433,10 @@ public class PermissionProjectControllerTestsV2 : IDisposable
             .Setup(b => b.UnarchivePermission(OrgId, ProjectId, UserId, PermissionId))
             .ReturnsAsync(true);
 
-        var result = await _permissionProjectController.ArchivePermissionV2(
-            OrgId, ProjectId, PermissionId, archive: false) as OkObjectResult;
+        var actionResult = await _permissionProjectController.ArchivePermissionV2(
+            OrgId, ProjectId, PermissionId, archive: false);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockPermissionBusiness.Verify(

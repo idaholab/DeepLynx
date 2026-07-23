@@ -353,7 +353,7 @@ public class PermissionProjectController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "permission")]
-    public async Task<IActionResult> ArchivePermissionV2(
+    public async Task<ActionResult<bool>> ArchivePermissionV2(
         long organizationId,
         long projectId,
         long permissionId,
