@@ -1,4 +1,5 @@
 using deeplynx.api.Controllers;
+using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -27,7 +28,7 @@ public class ClassOrganizationControllerTestsV2 : IDisposable
     private const long OrgId = 1L;
     private const long UserId = 10L;
     private const long ClassIdConst = 20L;
-    private static readonly long[] ProjectIdsConst = { 13L, 14L };
+    private static readonly long[] ProjectIdsConst = [13L, 14L];
 
     public ClassOrganizationControllerTestsV2()
     {
@@ -62,7 +63,7 @@ public class ClassOrganizationControllerTestsV2 : IDisposable
     {
         var expected = new List<ClassResponseDto> { new(), new() };
 
-        _mockClassBusiness.Setup(b => b.GetAllClasses(OrgId, ProjectIdsConst, true))
+        _mockClassBusiness.Setup(b => b.GetAllClasses(UserId, OrgId, ProjectIdsConst, true))
                      .ReturnsAsync(expected);
 
         var result = (await _classOrganizationController.GetAllClassesV2(
@@ -77,7 +78,7 @@ public class ClassOrganizationControllerTestsV2 : IDisposable
     public async Task GetAllClassesV2_Returns200_WithEmptyList()
     {
         _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
                      .ReturnsAsync([]);
 
         var result = (await _classOrganizationController.GetAllClassesV2(
@@ -92,7 +93,7 @@ public class ClassOrganizationControllerTestsV2 : IDisposable
     public async Task GetAllClassesV2_ThrowsException_WhenBusinessThrows()
     {
         _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _classOrganizationController.GetAllClassesV2(
@@ -102,12 +103,12 @@ public class ClassOrganizationControllerTestsV2 : IDisposable
     [Fact]
     public async Task GetAllClassesV2_PassesIdsAndHideArchivedToBusinessLayer()
     {
-        _mockClassBusiness.Setup(b => b.GetAllClasses(OrgId, ProjectIdsConst, false))
+        _mockClassBusiness.Setup(b => b.GetAllClasses(UserId, OrgId, ProjectIdsConst, false))
                      .ReturnsAsync([]);
 
         await _classOrganizationController.GetAllClassesV2(OrgId, ProjectIdsConst, hideArchived: false);
 
-        _mockClassBusiness.Verify(b => b.GetAllClasses(OrgId, ProjectIdsConst, false), Times.Once);
+        _mockClassBusiness.Verify(b => b.GetAllClasses(UserId, OrgId, ProjectIdsConst, false), Times.Once);
     }
 
     #endregion

@@ -140,7 +140,12 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             _objectStorageBusiness,
             _fileBusinessFactory.Object);
 
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
+        _classBusiness = new ClassBusiness(Context,
+        _recordBusiness,
+        _mockRelationshipBusiness.Object,
+        _eventBusiness,
+        _mockPermissionService.Object,
+        _mockAdminService.Object);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object,

@@ -114,7 +114,12 @@ public class FileBusinessTests : IntegrationTestBase
 
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
+        _classBusiness = new ClassBusiness(Context,
+        _recordBusiness,
+        _relationshipBusiness.Object,
+        _eventBusiness,
+        _mockPermissionService.Object,
+        _mockAdminService.Object);
 
         var realFileFilesystemBusiness =
             new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
@@ -2634,7 +2639,7 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert: Upload directory should be deleted
         Assert.False(Directory.Exists(uploadPath));
     }
-    
+
     [Fact]
     public async Task CompleteUpload_WithAzureBlobObjectStorage_GetsFileSizeFromStorageBusiness()
     {
@@ -2725,7 +2730,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         _fileBusinessFactory.Verify(x => x.CreateFileBusiness("azure_object"), Times.Once);
     }
-    
+
     [Fact]
     public async Task CompleteUpload_MetadataNoClassInformation_ReturnsDefault()
     {

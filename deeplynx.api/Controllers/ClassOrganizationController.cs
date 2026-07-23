@@ -42,21 +42,22 @@ public class ClassOrganizationController : ControllerBase
     ///     Get All Classes
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the class's project belongs</param>
-    /// <param name="projectIds">(Optional)An array of project IDs within the organization to filter by</param>
+    /// <param name="projects">(Optional)An array of project IDs within the organization to filter by</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived classes from the result (Default true)</param>
     /// <returns>List of class response DTOs</returns>
     [HttpGet(Name = "api_get_all_classes_organization")]
-    [MapToApiVersion(1)]
     [Auth("read", "class")]
+    [MapToApiVersion(1)]
     public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetAllClasses(
         long organizationId,
-        [FromQuery] long[]? projectIds,
+        [FromQuery] long[]? projects,
         [FromQuery] bool hideArchived = true)
     {
         try
         {
+            var currentUserId = UserContextStorage.UserId;
             var classes = await _classBusiness.GetAllClasses(
-                organizationId, projectIds, hideArchived);
+                currentUserId, organizationId, projects, hideArchived);
             return Ok(classes);
         }
         catch (Exception exc)
@@ -83,9 +84,10 @@ public class ClassOrganizationController : ControllerBase
         [FromQuery] long[]? projectIds,
         [FromQuery] bool hideArchived = true)
     {
-            var classes = await _classBusiness.GetAllClasses(
-                organizationId, projectIds, hideArchived);
-            return Ok(classes);
+        var currentUserId = UserContextStorage.UserId;
+        var classes = await _classBusiness.GetAllClasses(
+            currentUserId, organizationId, projectIds, hideArchived);
+        return Ok(classes);
     }
 
     /// <summary>
@@ -133,9 +135,9 @@ public class ClassOrganizationController : ControllerBase
         long classId,
         [FromQuery] bool hideArchived = true)
     {
-            var classes = await _classBusiness.GetClass(
-                organizationId, null, classId, hideArchived);
-            return Ok(classes);
+        var classes = await _classBusiness.GetClass(
+            organizationId, null, classId, hideArchived);
+        return Ok(classes);
     }
 
     /// <summary>
@@ -180,10 +182,10 @@ public class ClassOrganizationController : ControllerBase
         long organizationId,
         [FromBody] CreateClassRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var newClass = await _classBusiness.CreateClass(
-                currentUserId, organizationId, null, dto);
-            return Ok(newClass);
+        var currentUserId = UserContextStorage.UserId;
+        var newClass = await _classBusiness.CreateClass(
+            currentUserId, organizationId, null, dto);
+        return Ok(newClass);
     }
 
     /// <summary>
@@ -228,10 +230,10 @@ public class ClassOrganizationController : ControllerBase
         long organizationId,
         [FromBody] List<CreateClassRequestDto> classes)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var newClasses = await _classBusiness.BulkCreateClasses(
-                currentUserId, organizationId, null, classes);
-            return Ok(newClasses);
+        var currentUserId = UserContextStorage.UserId;
+        var newClasses = await _classBusiness.BulkCreateClasses(
+            currentUserId, organizationId, null, classes);
+        return Ok(newClasses);
     }
 
     /// <summary>
@@ -282,10 +284,10 @@ public class ClassOrganizationController : ControllerBase
         long classId,
         [FromBody] UpdateClassRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var updatedClass = await _classBusiness.UpdateClass(
-                currentUserId, organizationId, null, classId, dto);
-            return Ok(updatedClass);
+        var currentUserId = UserContextStorage.UserId;
+        var updatedClass = await _classBusiness.UpdateClass(
+            currentUserId, organizationId, null, classId, dto);
+        return Ok(updatedClass);
     }
 
     /// <summary>
@@ -330,10 +332,10 @@ public class ClassOrganizationController : ControllerBase
         long organizationId,
         long classId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _classBusiness.DeleteClass(
-                currentUserId, organizationId, null, classId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _classBusiness.DeleteClass(
+            currentUserId, organizationId, null, classId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -388,14 +390,14 @@ public class ClassOrganizationController : ControllerBase
         long classId,
         [FromQuery] bool archive)
     {
-            var userId = UserContextStorage.UserId;
-            if (archive)
-            {
-                var responseA = await _classBusiness.ArchiveClass(userId, organizationId, null, classId);
-                return Ok(responseA);
-            }
+        var userId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var responseA = await _classBusiness.ArchiveClass(userId, organizationId, null, classId);
+            return Ok(responseA);
+        }
 
-            var responseB = await _classBusiness.UnarchiveClass(userId, organizationId, null, classId);
-            return Ok(responseB);
+        var responseB = await _classBusiness.UnarchiveClass(userId, organizationId, null, classId);
+        return Ok(responseB);
     }
 }
