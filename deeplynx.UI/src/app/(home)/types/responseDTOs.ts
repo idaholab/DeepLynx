@@ -181,6 +181,7 @@ export type OrganizationResponseDto = {
   lastUpdatedAt?: Date;
   lastUpdatedBy?: string | null;
   isArchived: boolean;
+  logoUrl: string | undefined
   defaultOrg?: boolean;
   banner?: string;
   theme?: string;

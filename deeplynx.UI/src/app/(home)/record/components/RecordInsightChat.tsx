@@ -6,7 +6,7 @@ import {
   buildInsightModelBadges,
   formatInsightTimestamp,
 } from "@/app/(home)/components/insight/insightChat.utils";
-import type { InsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";import {
+import type { InsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection"; import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
   streamInsightQuery,
@@ -22,6 +22,7 @@ import {
   CloudArrowUpIcon,
   PaperAirplaneIcon,
 } from "@heroicons/react/24/outline";
+import InsightMarkdownMessage from "@/app/(home)/components/insight/InsightMarkdownMessage";
 
 type InsightRole = "assistant" | "user";
 type IngestionState =
@@ -67,7 +68,7 @@ function playAudio(audioRef: React.RefObject<HTMLAudioElement | null>) {
   audio.currentTime = 0;
   const playPromise = audio.play();
   if (playPromise) {
-    void playPromise.catch(() => {});
+    void playPromise.catch(() => { });
   }
 }
 
@@ -96,7 +97,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   isChatUnavailable = false,
   isIngestionUnavailable = false,
   selectedInsightModels,
-  onSelectedInsightModelsChange,  
+  onSelectedInsightModelsChange,
 }) => {
   const { t } = useLanguage();
   const trimmedRecordName = recordName?.trim() ?? "";
@@ -389,7 +390,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
       setIngestionState("error");
       return;
     }
-    
+
     if (!organizationId || !projectId || !recordId) {
       setIngestionState("error");
       return;
@@ -446,19 +447,23 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
     <div className="card mt-4 border border-base-300/50 bg-base-100 p-2 shadow-sm">
       <div className="flex items-center justify-between gap-3 px-4 py-1">
         <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
-            <ChatBubbleLeftRightIcon className="size-6 text-secondary shrink-0" />
-            <h3 className="text-xl font-bold text-base-content">
-              {t.translations.INSIGHT}
-            </h3>
-            <span className="badge badge-outline badge-sm">
-              {t.translations.INSIGHT_FILE_SCOPED}
-            </span>
-            <span
-              className={`badge badge-sm ${INGESTION_BADGE_CLASS[ingestionState]}`}
-            >
-              {ingestionBadgeLabel}
-            </span>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <ChatBubbleLeftRightIcon className="size-6 text-secondary shrink-0" />
+              <h3 className="text-xl font-bold text-base-content">
+                {t.translations.INSIGHT}
+              </h3>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="badge badge-outline badge-sm">
+                {t.translations.INSIGHT_FILE_SCOPED}
+              </span>
+              <span
+                className={`badge badge-sm ${INGESTION_BADGE_CLASS[ingestionState]}`}
+              >
+                {ingestionBadgeLabel}
+              </span>
+            </div>
           </div>
           {selectedModelBadges.length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-2">
@@ -470,7 +475,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
             </div>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <button
             type="button"
             className="btn btn-ghost btn-sm gap-2"
@@ -549,9 +554,8 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
                     {visibleMessages.map((message) => (
                       <div
                         key={message.id}
-                        className={`chat ${
-                          message.role === "user" ? "chat-end" : "chat-start"
-                        }`}
+                        className={`chat ${message.role === "user" ? "chat-end" : "chat-start"
+                          }`}
                       >
                         <div className="chat-header text-xs text-base-content/60 mb-1">
                           {message.role === "user"
@@ -560,13 +564,18 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
                           <time className="ml-2">{message.timestamp}</time>
                         </div>
                         <div
-                          className={`chat-bubble whitespace-pre-wrap ${
-                            message.role === "user"
-                              ? "bg-primary text-primary-content"
-                              : "border border-base-300/50 bg-base-100 text-base-content"
-                          }`}
+                          className={`chat-bubble ${message.role === "user"
+                            ? "whitespace-pre-wrap bg-primary text-primary-content"
+                            : "border border-base-300/50 bg-base-100 text-base-content"
+                            }`}
                         >
-                          {message.content || (
+                          {message.content ? (
+                            message.role === "assistant" ? (
+                              <InsightMarkdownMessage content={message.content} />
+                            ) : (
+                              message.content
+                            )
+                          ) : (
                             <span className="loading loading-dots loading-sm" />
                           )}
                         </div>

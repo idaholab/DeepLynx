@@ -1,4 +1,5 @@
 // src/app/(home)/project_management/[id]/data_source/DataSourceHeader.tsx
+import { useLanguage } from "@/app/contexts/Language";
 
 type HeaderProps = {
   hideArchived: boolean;
@@ -6,12 +7,13 @@ type HeaderProps = {
 };
 
 const DataSourceHeader = ({ hideArchived, setHideArchived }: HeaderProps) => {
+  const { t } = useLanguage();
   return (
     <div className="mb-6 flex items-center justify-between border-b border-base-300/50 pb-4">
       <div>
-        <h2 className="text-2xl font-bold mb-2">Data Sources</h2>
+        <h2 className="text-2xl font-bold mb-2">{t.translations.DATA_SOURCES}</h2>
         <p className="text-base-content/70">
-          Manage catalog data sources for this project
+          {t.translations.MANAGE_CATALOG_DATA_SOURCES_FOR_THIS_PROJECT}
         </p>
       </div>
       <label className="flex items-center gap-2 cursor-pointer">
@@ -21,7 +23,7 @@ const DataSourceHeader = ({ hideArchived, setHideArchived }: HeaderProps) => {
           checked={hideArchived}
           onChange={() => setHideArchived((s) => !s)}
         />
-        <span className="text-sm">Hide archived</span>
+        <span className="text-sm">{t.translations.HIDE_ARCHIVED}</span>
       </label>
     </div>
   );
