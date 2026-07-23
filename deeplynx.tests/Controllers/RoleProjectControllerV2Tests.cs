@@ -352,9 +352,9 @@ public class RoleProjectControllerTestsV2 : IDisposable
             .Setup(b => b.DeleteRole(UserId, RoleId, OrgId, ProjectId))
             .ReturnsAsync(true);
 
-        var result = await _roleProjectController.DeleteRoleV2(OrgId, ProjectId, RoleId) as OkObjectResult;
+        var actionResult = await _roleProjectController.DeleteRoleV2(OrgId, ProjectId, RoleId);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
@@ -599,10 +599,10 @@ public class RoleProjectControllerTestsV2 : IDisposable
             .Setup(b => b.AddPermissionToRole(RoleId, PermissionId, OrgId, ProjectId))
             .ReturnsAsync(true);
 
-        var result = await _roleProjectController.AddPermissionToRoleV2(
-            OrgId, ProjectId, RoleId, PermissionId) as OkObjectResult;
+        var actionResult = await _roleProjectController.AddPermissionToRoleV2(
+            OrgId, ProjectId, RoleId, PermissionId);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
@@ -659,10 +659,10 @@ public class RoleProjectControllerTestsV2 : IDisposable
             .Setup(b => b.RemovePermissionFromRole(RoleId, PermissionId, OrgId, ProjectId))
             .ReturnsAsync(true);
 
-        var result = await _roleProjectController.RemovePermissionFromRoleV2(
-            OrgId, ProjectId, RoleId, PermissionId) as OkObjectResult;
+        var actionResult = await _roleProjectController.RemovePermissionFromRoleV2(
+            OrgId, ProjectId, RoleId, PermissionId);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
@@ -719,10 +719,10 @@ public class RoleProjectControllerTestsV2 : IDisposable
             .Setup(b => b.SetPermissionsForRole(RoleId, PermissionList, OrgId, ProjectId))
             .ReturnsAsync(true);
 
-        var result = await _roleProjectController.SetPermissionsForRoleV2(
-            OrgId, ProjectId, RoleId, PermissionList) as OkObjectResult;
+        var actionResult = await _roleProjectController.SetPermissionsForRoleV2(
+            OrgId, ProjectId, RoleId, PermissionList);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }

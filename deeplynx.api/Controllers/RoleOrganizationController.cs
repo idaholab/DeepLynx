@@ -263,7 +263,7 @@ public class RoleOrganizationController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "role")]
-    public async Task<ActionResult> DeleteRoleV2(
+    public async Task<ActionResult<bool>> DeleteRoleV2(
         long organizationId,
         long roleId)
     {
@@ -319,7 +319,7 @@ public class RoleOrganizationController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "role")]
-    public async Task<IActionResult> ArchiveRoleV2(
+    public async Task<ActionResult<bool>> ArchiveRoleV2(
         long organizationId,
         long roleId,
         [FromQuery] bool archive)
@@ -424,7 +424,7 @@ public class RoleOrganizationController : ControllerBase
     [Auth("update", "role")]
     [Auth("read", "permission")]
     [Auth("update", "user")]
-    public async Task<ActionResult> AddPermissionToRoleV2(
+    public async Task<ActionResult<bool>> AddPermissionToRoleV2(
         long organizationId,
         long roleId,
         long permissionId)
@@ -476,7 +476,7 @@ public class RoleOrganizationController : ControllerBase
     [Auth("update", "role")]
     [Auth("read", "permission")]
     [Auth("update", "user")]
-    public async Task<ActionResult> RemovePermissionFromRoleV2(
+    public async Task<ActionResult<bool>> RemovePermissionFromRoleV2(
         long organizationId,
         long roleId,
         long permissionId)
@@ -526,7 +526,7 @@ public class RoleOrganizationController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "role")]
     [Auth("read", "permission")]
-    public async Task<ActionResult> SetPermissionsForRoleV2(
+    public async Task<ActionResult<bool>> SetPermissionsForRoleV2(
         long organizationId,
         long roleId,
         [FromBody] long[] permissionIds)

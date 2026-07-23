@@ -281,7 +281,7 @@ public class RoleProjectController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "role")]
-    public async Task<ActionResult> DeleteRoleV2(
+    public async Task<ActionResult<bool>> DeleteRoleV2(
         long organizationId,
         long projectId,
         long roleId)
@@ -452,7 +452,7 @@ public class RoleProjectController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "role")]
     [Auth("read", "permission")]
-    public async Task<ActionResult> AddPermissionToRoleV2(
+    public async Task<ActionResult<bool>> AddPermissionToRoleV2(
         long organizationId,
         long projectId,
         long roleId,
@@ -506,7 +506,7 @@ public class RoleProjectController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "role")]
     [Auth("read", "permission")]
-    public async Task<ActionResult> RemovePermissionFromRoleV2(
+    public async Task<ActionResult<bool>> RemovePermissionFromRoleV2(
         long organizationId,
         long projectId,
         long roleId,
@@ -560,7 +560,7 @@ public class RoleProjectController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "role")]
     [Auth("read", "permission")]
-    public async Task<ActionResult> SetPermissionsForRoleV2(
+    public async Task<ActionResult<bool>> SetPermissionsForRoleV2(
         long organizationId,
         long projectId,
         long roleId,

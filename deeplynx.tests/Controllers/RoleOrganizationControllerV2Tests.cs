@@ -343,9 +343,9 @@ public class RoleOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.DeleteRole(UserId, RoleId, OrgId, null))
             .ReturnsAsync(true);
 
-        var result = await _roleOrganizationController.DeleteRoleV2(OrgId, RoleId) as OkObjectResult;
+        var actionResult = await _roleOrganizationController.DeleteRoleV2(OrgId, RoleId);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
@@ -400,10 +400,10 @@ public class RoleOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.ArchiveRole(UserId, RoleId, OrgId, null))
             .ReturnsAsync(true);
 
-        var result = await _roleOrganizationController.ArchiveRoleV2(
-            OrgId, RoleId, archive: true) as OkObjectResult;
+        var actionResult = await _roleOrganizationController.ArchiveRoleV2(
+            OrgId, RoleId, archive: true);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockRoleBusiness.Verify(
@@ -421,10 +421,10 @@ public class RoleOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.UnarchiveRole(UserId, RoleId, OrgId, null))
             .ReturnsAsync(true);
 
-        var result = await _roleOrganizationController.ArchiveRoleV2(
-            OrgId, RoleId, archive: false) as OkObjectResult;
+        var actionResult = await _roleOrganizationController.ArchiveRoleV2(
+            OrgId, RoleId, archive: false);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockRoleBusiness.Verify(
@@ -590,10 +590,10 @@ public class RoleOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.AddPermissionToRole(RoleId, PermissionId, OrgId, null))
             .ReturnsAsync(true);
 
-        var result = await _roleOrganizationController.AddPermissionToRoleV2(
-            OrgId, RoleId, PermissionId) as OkObjectResult;
+        var actionResult = await _roleOrganizationController.AddPermissionToRoleV2(
+            OrgId, RoleId, PermissionId);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
@@ -651,10 +651,10 @@ public class RoleOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.RemovePermissionFromRole(RoleId, PermissionId, OrgId, null))
             .ReturnsAsync(true);
 
-        var result = await _roleOrganizationController.RemovePermissionFromRoleV2(
-            OrgId, RoleId, PermissionId) as OkObjectResult;
+        var actionResult = await _roleOrganizationController.RemovePermissionFromRoleV2(
+            OrgId, RoleId, PermissionId);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
@@ -712,10 +712,10 @@ public class RoleOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.SetPermissionsForRole(RoleId, PermissionList, OrgId, null))
             .ReturnsAsync(true);
 
-        var result = await _roleOrganizationController.SetPermissionsForRoleV2(
-            OrgId, RoleId, PermissionList) as OkObjectResult;
+        var actionResult = await _roleOrganizationController.SetPermissionsForRoleV2(
+            OrgId, RoleId, PermissionList);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
