@@ -55,8 +55,8 @@ public class MetricsOrganizationControllerV2Tests : IDisposable
             .ReturnsAsync(StorageSize);
 
         // Act
-        var result = await _metricsOrganizationController.GetOrganizationStorageSizeV2(OrgId) as OkObjectResult;
-
+        var result = (await _metricsOrganizationController.GetOrganizationStorageSizeV2(OrgId)).Result as OkObjectResult;
+        
         // Assert
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -201,8 +201,8 @@ public class MetricsOrganizationControllerV2Tests : IDisposable
             .ReturnsAsync(RecordCount);
 
         // Act
-        var result = await _metricsOrganizationController.GetOrganizationRecordCountV2(
-            OrgId, ProjectIds, true) as OkObjectResult;
+        var result = (await _metricsOrganizationController.GetOrganizationRecordCountV2(
+            OrgId, ProjectIds, true)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
@@ -287,8 +287,8 @@ public class MetricsOrganizationControllerV2Tests : IDisposable
             .ReturnsAsync(FileCount);
 
         // Act
-        var result = await _metricsOrganizationController.GetOrganizationFileCountV2(
-            OrgId, ProjectIds, true) as OkObjectResult;
+        var result = (await _metricsOrganizationController.GetOrganizationFileCountV2(
+            OrgId, ProjectIds, true)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
