@@ -4,6 +4,8 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using deeplynx.helpers;
+using Asp.Versioning;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
@@ -14,6 +16,8 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to create, update, delete, and retrieve relationship information.
 /// </remarks>
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("projects/{projectId:long}/relationships")]
 [Authorize]
 [Tags("Project - Relationship")]
@@ -41,6 +45,7 @@ public class RelationshipProjectController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived relationships from the result (Default true)</param>
     /// <returns>A list of relationships for the given project.</returns>
     [HttpGet(Name = "api_get_all_relationships_project")]
+    [MapToApiVersion(1)]
     [Auth("read", "relationship")]
     public async Task<ActionResult<IEnumerable<RelationshipResponseDto>>> GetAllRelationships(
         long projectId,
@@ -62,6 +67,26 @@ public class RelationshipProjectController : ControllerBase
     }
 
     /// <summary>
+    ///     Get All Relationships 
+    /// </summary>
+    /// <param name="projectId">The ID of the project whose relationships are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived relationships from the result (Default true)</param>
+    /// <returns>A list of relationships for the given project.</returns>
+    [HttpGet(Name = "api_get_all_relationships_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "relationship")]
+    public async Task<ActionResult<IEnumerable<RelationshipResponseDto>>> GetAllRelationshipsV2(
+        long projectId,
+        [FromQuery] bool hideArchived = true)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var relationships =
+                await _relationshipBusiness.GetAllRelationships(organizationId, [projectId], hideArchived);
+            return Ok(relationships);
+    }
+
+    /// <summary>
     ///     Get a Relationship 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the relationship belongs</param>
@@ -69,6 +94,7 @@ public class RelationshipProjectController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived relationships from the result (Default true)</param>
     /// <returns>The relationship associated with the given ID</returns>
     [HttpGet("{relationshipId:long}", Name = "api_get_a_relationship_project")]
+    [MapToApiVersion(1)]
     [Auth("read", "relationship")]
     public async Task<ActionResult<RelationshipResponseDto>> GetRelationship(
         long projectId,
@@ -95,12 +121,35 @@ public class RelationshipProjectController : ControllerBase
     }
 
     /// <summary>
+    ///     Get a Relationship 
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the relationship belongs</param>
+    /// <param name="relationshipId">The ID of the relationship to retrieve</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived relationships from the result (Default true)</param>
+    /// <returns>The relationship associated with the given ID</returns>
+    [HttpGet("{relationshipId:long}", Name = "api_get_a_relationship_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "relationship")]
+    public async Task<ActionResult<RelationshipResponseDto>> GetRelationshipV2(
+        long projectId,
+        long relationshipId,
+        [FromQuery] bool hideArchived = true)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var relationship =
+                await _relationshipBusiness.GetRelationship(organizationId, projectId, relationshipId, hideArchived);
+            return Ok(relationship);
+    }
+
+    /// <summary>
     ///     Create a Relationship 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the relationship belongs</param>
     /// <param name="dto">The relationship request data transfer object containing relationship details</param>
     /// <returns>The created relationship</returns>
     [HttpPost(Name = "api_create_a_relationship_project")]
+    [MapToApiVersion(1)]
     [Auth("write", "relationship")]
     public async Task<ActionResult<RelationshipResponseDto>> CreateRelationship(
         long projectId,
@@ -122,12 +171,33 @@ public class RelationshipProjectController : ControllerBase
     }
 
     /// <summary>
+    ///     Create a Relationship 
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the relationship belongs</param>
+    /// <param name="dto">The relationship request data transfer object containing relationship details</param>
+    /// <returns>The created relationship</returns>
+    [HttpPost(Name = "api_create_a_relationship_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "relationship")]
+    public async Task<ActionResult<RelationshipResponseDto>> CreateRelationshipV2(
+        long projectId,
+        [FromBody] CreateRelationshipRequestDto dto)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
+            var created = await _relationshipBusiness.CreateRelationship(currentUserId, organizationId, projectId, dto);
+            return Ok(created);
+    }
+
+    /// <summary>
     ///     Bulk Create Relationships 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the relationships belong</param>
     /// <param name="relationships">List of relationship request data transfer objects containing relationship details</param>
     /// <returns>The created relationships</returns>
     [HttpPost("bulk", Name = "api_create_many_relationships_project")]
+    [MapToApiVersion(1)]
     [Auth("write", "relationship")]
     public async Task<ActionResult<List<RelationshipResponseDto>>> BulkCreateRelationships(
         long projectId,
@@ -151,6 +221,28 @@ public class RelationshipProjectController : ControllerBase
     }
 
     /// <summary>
+    ///     Bulk Create Relationships 
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the relationships belong</param>
+    /// <param name="relationships">List of relationship request data transfer objects containing relationship details</param>
+    /// <returns>The created relationships</returns>
+    [HttpPost("bulk", Name = "api_create_many_relationships_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "relationship")]
+    public async Task<ActionResult<List<RelationshipResponseDto>>> BulkCreateRelationshipsV2(
+        long projectId,
+        [FromBody] List<CreateRelationshipRequestDto> relationships)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
+            var created =
+                await _relationshipBusiness.BulkCreateRelationships(currentUserId, organizationId, projectId,
+                    relationships);
+            return Ok(created);
+    }
+
+    /// <summary>
     ///     Update a Relationship 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the relationship belongs</param>
@@ -158,6 +250,7 @@ public class RelationshipProjectController : ControllerBase
     /// <param name="dto">The relationship request data transfer object containing updated relationship details</param>
     /// <returns>The updated relationship</returns>
     [HttpPut("{relationshipId:long}", Name = "api_update_a_relationship_project")]
+    [MapToApiVersion(1)]
     [Auth("update", "relationship")]
     public async Task<ActionResult<RelationshipResponseDto>> UpdateRelationship(
         long projectId,
@@ -182,12 +275,37 @@ public class RelationshipProjectController : ControllerBase
     }
 
     /// <summary>
+    ///     Update a Relationship 
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the relationship belongs</param>
+    /// <param name="relationshipId">The ID of the relationship to update</param>
+    /// <param name="dto">The relationship request data transfer object containing updated relationship details</param>
+    /// <returns>The updated relationship</returns>
+    [HttpPut("{relationshipId:long}", Name = "api_update_a_relationship_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "relationship")]
+    public async Task<ActionResult<RelationshipResponseDto>> UpdateRelationshipV2(
+        long projectId,
+        long relationshipId,
+        [FromBody] UpdateRelationshipRequestDto dto)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
+            var result =
+                await _relationshipBusiness.UpdateRelationship(currentUserId, organizationId, projectId, relationshipId,
+                    dto);
+            return Ok(result);
+    }
+
+    /// <summary>
     ///     Delete a Relationship 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the relationship belongs</param>
     /// <param name="relationshipId">The ID of the relationship to delete</param>
     /// <returns>A message stating the relationship was successfully deleted.</returns>
     [HttpDelete("{relationshipId:long}", Name = "api_delete_a_relationship_project")]
+    [MapToApiVersion(1)]
     [Auth("write", "relationship")]
     public async Task<IActionResult> DeleteRelationship(
         long projectId,
@@ -209,6 +327,26 @@ public class RelationshipProjectController : ControllerBase
     }
 
     /// <summary>
+    ///     Delete a Relationship 
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the relationship belongs</param>
+    /// <param name="relationshipId">The ID of the relationship to delete</param>
+    /// <returns>True if the relationship was successfully deleted.</returns>
+    [HttpDelete("{relationshipId:long}", Name = "api_delete_a_relationship_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "relationship")]
+    public async Task<ActionResult<bool>> DeleteRelationshipV2(
+        long projectId,
+        long relationshipId)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var organizationId = UserContextStorage.OrganizationId;
+            var response = await _relationshipBusiness.DeleteRelationship(currentUserId, organizationId, projectId, relationshipId);
+            return Ok(response);
+    }
+
+    /// <summary>
     ///     Archive or Unarchive a Relationship 
     /// </summary>
     /// <param name="projectId">The ID of the project to which the relationship belongs</param>
@@ -216,6 +354,7 @@ public class RelationshipProjectController : ControllerBase
     /// <param name="archive">True to archive the relationship, false to unarchive it.</param>
     /// <returns>A message stating the relationship was successfully archived or unarchived.</returns>
     [HttpPatch("{relationshipId:long}", Name = "api_archive_relationship_project")]
+    [MapToApiVersion(1)]
     [Auth("update", "relationship")]
     public async Task<IActionResult> ArchiveRelationship(
         long projectId,
@@ -243,5 +382,34 @@ public class RelationshipProjectController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+
+    /// <summary>
+    ///     Archive or Unarchive a Relationship 
+    /// </summary>
+    /// <param name="projectId">The ID of the project to which the relationship belongs</param>
+    /// <param name="relationshipId">The ID of the relationship to archive or unarchive</param>
+    /// <param name="archive">True to archive the relationship, false to unarchive it.</param>
+    /// <returns>True if the relationship was successfully archived or unarchived.</returns>
+    [HttpPatch("{relationshipId:long}", Name = "api_archive_relationship_project")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "relationship")]
+    public async Task<ActionResult<bool>> ArchiveRelationshipV2(
+        long projectId,
+        long relationshipId,
+        [FromQuery] bool archive)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
+            if (archive)
+            {
+                var responseA = await _relationshipBusiness.ArchiveRelationship(currentUserId, organizationId, projectId,
+                    relationshipId);
+                return Ok(responseA);
+            }
+
+            var responseB = await _relationshipBusiness.UnarchiveRelationship(currentUserId, organizationId, projectId, relationshipId);
+            return Ok(responseB);
     }
 }
