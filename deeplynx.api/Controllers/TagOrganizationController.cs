@@ -32,17 +32,18 @@ public class TagOrganizationController : ControllerBase
     ///     Get All Tags 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectIds">(Optional)An array of project IDs within the organization to filter by</param>
+    /// <param name="projects">(Optional)An array of project IDs within the organization to filter by</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
     /// <returns>A list of tags belonging to the project.</returns>
     [HttpGet(Name = "api_get_all_tags_organization")]
     [Auth("read", "tag")]
     public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetAllTags(
-        long organizationId, [FromQuery] long[]? projectIds, [FromQuery] bool hideArchived = true)
+        long organizationId, [FromQuery] long[]? projects, [FromQuery] bool hideArchived = true)
     {
         try
         {
-            var tags = await _tagBusiness.GetAllTags(organizationId, projectIds, hideArchived);
+            var currentUserId = UserContextStorage.UserId;
+            var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, projects, hideArchived);
             return Ok(tags);
         }
         catch (Exception exception)

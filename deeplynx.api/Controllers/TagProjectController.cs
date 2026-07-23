@@ -40,8 +40,9 @@ public class TagProjectController : ControllerBase
     {
         try
         {
+            var currentUserId = UserContextStorage.UserId;
             var organizationId = UserContextStorage.OrganizationId;
-            var tags = await _tagBusiness.GetAllTags(organizationId, [projectId], hideArchived);
+            var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, [projectId], hideArchived);
             return Ok(tags);
         }
         catch (Exception exception)
@@ -51,7 +52,7 @@ public class TagProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
     /// <summary>
     ///     Get Tags By Name
     /// </summary>
@@ -61,7 +62,7 @@ public class TagProjectController : ControllerBase
     [HttpPost("by-name", Name = "api_get_tags_by_name_project")]
     [Auth("read", "tag")]
     public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetTagsByName(
-        long projectId, 
+        long projectId,
         [FromBody] List<string> tagNames,
         [FromQuery] bool hideArchived = true)
     {
@@ -123,7 +124,7 @@ public class TagProjectController : ControllerBase
         {
             var organizationId = UserContextStorage.OrganizationId;
             var currentUserId = UserContextStorage.UserId;
-            var createdTag = await _tagBusiness.CreateTag(organizationId,currentUserId, projectId, tagRequestDto);
+            var createdTag = await _tagBusiness.CreateTag(organizationId, currentUserId, projectId, tagRequestDto);
             return Ok(createdTag);
         }
         catch (Exception exception)

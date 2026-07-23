@@ -66,6 +66,7 @@ public class TagProjectControllerTests : IDisposable
 
         _mockTagBusiness
             .Setup(b => b.GetAllTags(
+                UserId,
                 OrgId,
                 It.Is<long[]?>(ids =>
                     ids != null &&
@@ -91,6 +92,7 @@ public class TagProjectControllerTests : IDisposable
         UserContextStorage.OrganizationId = OrgId;
         _mockTagBusiness
             .Setup(b => b.GetAllTags(
+                UserId,
                 OrgId,
                 It.Is<long[]?>(ids =>
                     ids != null &&
@@ -120,6 +122,7 @@ public class TagProjectControllerTests : IDisposable
 
         _mockTagBusiness
             .Setup(b => b.GetAllTags(
+                UserId,
                 OrgId,
                 It.Is<long[]?>(ids =>
                     ids != null &&
@@ -149,6 +152,7 @@ public class TagProjectControllerTests : IDisposable
 
         _mockTagBusiness
             .Setup(b => b.GetAllTags(
+                UserId,
                 OrgId,
                 It.Is<long[]?>(ids =>
                     ids != null &&
@@ -163,6 +167,7 @@ public class TagProjectControllerTests : IDisposable
         // Assert
         _mockTagBusiness.Verify(
             b => b.GetAllTags(
+                UserId,
                 OrgId,
                 It.Is<long[]?>(ids =>
                     ids != null &&

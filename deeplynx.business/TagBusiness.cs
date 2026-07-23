@@ -13,41 +13,97 @@ public class TagBusiness : ITagBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
+    private readonly IProjectRolePermissionService _projectRolePermissionService;
+    private readonly IAdminService _adminService;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="TagBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for tag operations.</param>
     /// <param name="eventBusiness">Used to access event operations</param>
-    public TagBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
+    /// <param name="projectRolePermissionService">Used to get permissions allowed for a user</param>
+    /// <param name="adminService">Used to check level the user is</param>
+    public TagBusiness(DeeplynxContext context, IEventBusiness eventBusiness, IProjectRolePermissionService projectRolePermissionService,
+        IAdminService adminService)
     {
         _context = context;
         _eventBusiness = eventBusiness;
+        _projectRolePermissionService = projectRolePermissionService;
+        _adminService = adminService;
+
     }
 
     /// <summary>
     ///     Retrieves all tags for a specified project.
     /// </summary>
+    /// <param name="currentUserId">The ID of the current user for which the data source belongs to</param>
     /// <param name="projectIds">The IDs of the project whose tags are to be retrieved.</param>
     /// <param name="organizationId">The ID of the organization whose tags are to be retrieved.</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result</param>
     /// <returns>A list of tags belonging to the project.</returns>
-    public async Task<List<TagResponseDto>> GetAllTags(long organizationId, long[]? projectIds, bool hideArchived)
+    public async Task<List<TagResponseDto>> GetAllTags(
+        long currentUserId,
+        long organizationId,
+        long[]? projectIds,
+        bool hideArchived)
     {
-        var tagQuery = _context.Tags
-            .Where(t => t.OrganizationId == organizationId
-                        && (!hideArchived || !t.IsArchived));
+        var userProjectAdminStatus = new Dictionary<long, bool>();
 
-        // Filter by projectIds if provided and not empty
-        if (projectIds is { Length: > 0 })
+        bool isSysAdmin = await _adminService.SysAdminCheck(currentUserId);
+        bool isOrgAdmin = await _adminService.OrgAdminCheck(currentUserId, organizationId);
+
+        if (projectIds?.Length > 0)
         {
-            //grab project tags and inherit org tags
-            tagQuery = tagQuery.Where(c =>
-                (c.ProjectId.HasValue && projectIds.Contains(c.ProjectId.Value)) || c.ProjectId == null);
+            foreach (var projectId in projectIds)
+            {
+                var isProjectAdmin = await _context.ProjectMembers
+                    .AnyAsync(pm =>
+                        pm.ProjectId == projectId &&
+                        pm.IsProjectAdmin &&
+                        (
+                            (pm.UserId != null && pm.UserId == currentUserId) ||
+                            pm.Group!.Users.Any(u => u.Id == currentUserId)
+                        )
+                    );
+
+                userProjectAdminStatus[projectId] = isProjectAdmin;
+            }
+        }
+
+        var authorizedProjectIds = new List<long>();
+        foreach (var projectId in projectIds ?? [])
+        {
+            if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId, false))
+            {
+                authorizedProjectIds.Add(projectId);
+                continue;
+            }
+
+            var hasPermission = await _projectRolePermissionService.PermissionInProject(
+                currentUserId, projectId, "read", "tag");
+
+            if (hasPermission)
+            {
+                authorizedProjectIds.Add(projectId);
+            }
+        }
+
+        if (projectIds != null && authorizedProjectIds.Count == 0)
+        {
+            return [];
+        }
+
+        var tagQuery = _context.Tags
+            .Where(t => t.OrganizationId == organizationId && (!hideArchived || !t.IsArchived));
+
+        if (authorizedProjectIds.Count > 0)
+        {
+            tagQuery = tagQuery.Where(t =>
+                (t.ProjectId.HasValue && authorizedProjectIds.Contains(t.ProjectId.Value)) || t.ProjectId == null);
         }
         else
-        {   // only return org level tags
-            tagQuery = tagQuery.Where(c => c.ProjectId == null);
+        {
+            tagQuery = tagQuery.Where(t => t.ProjectId == null);
         }
 
         return await tagQuery.Select(t => new TagResponseDto
@@ -59,8 +115,7 @@ public class TagBusiness : ITagBusiness
             LastUpdatedAt = t.LastUpdatedAt,
             OrganizationId = t.OrganizationId,
             IsArchived = t.IsArchived
-        })
-            .ToListAsync();
+        }).ToListAsync();
     }
 
     /// <summary>
