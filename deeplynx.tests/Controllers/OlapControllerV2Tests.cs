@@ -328,7 +328,7 @@ public class OlapControllerV2Tests : IDisposable
         var result = (await _olapController.GetHighestPartNumberV2(
             OrgId,
             ProjectId,
-            RecordIdConst)) as OkObjectResult;
+            RecordIdConst)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
