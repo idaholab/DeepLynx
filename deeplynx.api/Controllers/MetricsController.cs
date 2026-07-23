@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.interfaces;
+using deeplynx.models.MetricsDTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Scalar.AspNetCore;
@@ -68,7 +69,7 @@ public class MetricsController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [SysAdmin]
-    public async Task<IActionResult> GetSystemStorageSizeV2()
+    public async Task<ActionResult<StorageSizeDto>> GetSystemStorageSizeV2()
     {
             var byteSum = await _metricsBusiness.GetSystemStorageSize();
             return Ok(byteSum);
@@ -106,7 +107,7 @@ public class MetricsController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [SysAdmin]
-    public async Task<IActionResult> GetSystemDataSourceCountV2(bool hideArchived = true)
+    public async Task<ActionResult<int>> GetSystemDataSourceCountV2(bool hideArchived = true)
     {
             var byteSum = await _metricsBusiness.GetSystemDataSourceCount(hideArchived);
             return Ok(byteSum);
@@ -144,7 +145,7 @@ public class MetricsController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [SysAdmin]
-    public async Task<IActionResult> GetSystemRecordCountV2(bool hideArchived = true)
+    public async Task<ActionResult<int>> GetSystemRecordCountV2(bool hideArchived = true)
     {
        var count = await _metricsBusiness.GetRecordCount(organizationId: null, projectIds: null, hideArchived: false);
             return Ok(count);
@@ -182,7 +183,7 @@ public class MetricsController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [SysAdmin]
-    public async Task<IActionResult> GetSystemFileCountV2(bool hideArchived = true)
+    public async Task<ActionResult<int>> GetSystemFileCountV2(bool hideArchived = true)
     {
        var count = await _metricsBusiness.GetFileCount(organizationId: null, projectIds: null, hideArchived: false);
             return Ok(count);
