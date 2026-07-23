@@ -1,5 +1,6 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, APIRequestContext, APIResponse } from "@playwright/test";
 import { seedAndNavigateToProject } from "../helpers/seed";
+import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
 
 test.describe("Roles & Permissions", () => {
   test.beforeEach(async ({ page }) => {
@@ -16,6 +17,33 @@ test.describe("Roles & Permissions", () => {
       page.locator("a.tab.tab-active", { hasText: "Roles & Permissions" }),
     ).toBeVisible();
   });
+
+  async function getNonUserRole(
+    request : APIRequestContext, projectId: string | undefined
+  ){
+    if (!projectId) return;
+    const BASE_URL = 'http://localhost:5095/api/v1';
+    const getAllUrl = `${BASE_URL}/organizations/1/projects/${projectId}/roles?hideArchived=true`;
+    const createNewUrl = `${BASE_URL}/organizations/1/projects/${projectId}/roles`;
+    try {
+      let res = await request.fetch(getAllUrl);
+      if (!res.ok()) throw new Error(`Failed to fetch roles: ${res.status()}`);
+      let roles = await res.json();
+      if (roles.length === 1) {
+        // create new role
+        const postRes = await request.post(createNewUrl, { data: { name: "Playwright Role", description: "Role created via playwright testing" }});
+        if (!postRes.ok()) throw new Error(`Failed to create new role: ${postRes.status()}`);
+        res = await request.get(getAllUrl);
+        if (!res.ok()) throw new Error(`Failed to refecth roles: ${res.status()}`);
+        roles = await res.json();
+      }
+      // return non user
+      return (roles.find((role: RoleResponseDto) => role.name !== "User")).name;
+    } catch(err) {
+      console.warn(`Error getting different role.`, err);
+      return undefined;
+    }
+  }
 
   /* ------------------------------------------------------------------------ */
   /*                         Page Rendering                                   */
@@ -142,18 +170,19 @@ test.describe("Roles & Permissions", () => {
       ).toBeDisabled({ timeout: 15000 });
     });
 
-    test("clicking a different role selects it", async ({ page }) => {
-      // Click the "User" role in the sidebar (role buttons contain Source: text)
-      await page
-        .locator("button", { hasText: /Source:/ })
-        .filter({ hasText: "User" })
-        .first()
-        .click();
-      // The right panel heading (h2) should now show "User"
+    test("clicking a different role selects it", async ({ page, request }) => {
+      // make sure a second role is set up
+      const url = new URL(page.url());
+      const projectId = url.pathname.split('/').pop();
+      // Click a different role than "User" in the sidebar (role buttons contain Source: text)
+      const nonUserRole = await getNonUserRole(request, projectId);
+      await page.getByRole('button', { name: nonUserRole }).click();
+      // The right panel heading (h2) should not show "User"
       const detailPanel = page.locator(".flex-1.card");
       await expect(
         detailPanel.locator("h2.card-title", { hasText: "User" }),
-      ).toBeVisible();
+      ).not.toBeVisible();
+      await expect(detailPanel.locator("h2.card-title")).toBeVisible();
     });
 
     test("switching between Sensitivity Labels and Resource Permissions tabs works", async ({
