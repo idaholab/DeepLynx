@@ -23,7 +23,7 @@ public static class PgvectorExtensionValidator
             {
                 WriteSuccess(
                     $"pgvector extension {extensionInfo.InstalledVersion} " +
-                    $"is already enabled in database '{extensionInfo.DatabaseName}'.");
+                    $"is enabled in database '{extensionInfo.DatabaseName}'");
 
                 return extensionInfo.InstalledVersion;
             }
@@ -37,7 +37,7 @@ public static class PgvectorExtensionValidator
                 cancellationToken);
 
             WriteSuccess(
-                $"pgvector extension {enabledVersion} was enabled successfully " +
+                $"pgvector extension {enabledVersion} was successfully enabled  " +
                 $"in database '{extensionInfo.DatabaseName}'.");
 
             return enabledVersion;
