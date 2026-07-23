@@ -12,6 +12,7 @@ using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -31,6 +32,10 @@ public class RecordBusinessTests : IntegrationTestBase
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private SensitivityLabelService _sensitivityLabelService = null!;
     private EncryptionHelper _encryptionHelper = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     public long cid; // class ID
     public long did; // datasource ID
     public long did2;
@@ -51,6 +56,7 @@ public class RecordBusinessTests : IntegrationTestBase
     public long lid; // sensitivity label ID
     public long uid;
     public long roleId;
+    public long eid; // embedding id for rid
 
     public RecordBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -63,6 +69,8 @@ public class RecordBusinessTests : IntegrationTestBase
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _sensitivityLabelService = new SensitivityLabelService(Context);
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
@@ -70,8 +78,17 @@ public class RecordBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
     }
 
     #region RecordResponseDto Tests
@@ -259,7 +276,8 @@ public class RecordBusinessTests : IntegrationTestBase
                 LastUpdatedBy = uid,
                 Uri = "localhost:8090",
                 FileType = "pdf",
-                OrganizationId = organizationId
+                OrganizationId = organizationId,
+                Embedded = true,
             },
             new Record
             {
@@ -310,6 +328,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.Records.AddRange(testRecords);
         Context.Tags.Add(testTag);
         Context.SensitivityLabels.Add(testLabel);
+
         await Context.SaveChangesAsync();
 
         var testRole = new Role
@@ -345,6 +364,13 @@ public class RecordBusinessTests : IntegrationTestBase
         rdesc = testRecords[0].Description;
         ruri = testRecords[0].Uri;
         rfiletype = testRecords[0].FileType;
+
+        // For testing record embedding status with rid
+        // Must remain after Context.SaveChangesAsync() for rid to exist and satisfy foreign key constraints.
+        eid = await Context.Database.ExecuteSqlInterpolatedAsync($@"
+            INSERT INTO dl_vector.embeddings (record_id, page_number, text_chunk, vector, last_updated_at)
+            VALUES ({rid}, {0}, {""}, {"[0]"}::vector, {DateTime.UtcNow})");
+        await Context.SaveChangesAsync();
     }
 
     #region GetRecordsCountByDataSource Tests
@@ -826,6 +852,58 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal("original-123", result.OriginalId);
         Assert.Equal(cid, result.ClassId);
         Assert.Equal("png", result.FileType);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(uid, result.LastUpdatedBy);
+
+        // Verify record was actually created in database
+        var createdRecord = await Context.Records.FindAsync(result.Id);
+        Assert.NotNull(createdRecord);
+        Assert.Equal("New Test Record", createdRecord.Name);
+
+        // Ensure that record create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Single(eventList);
+
+        var actualEvent = eventList[0];
+
+        Assert.Equal(createdRecord.ProjectId, actualEvent.ProjectId);
+        Assert.Equal("create", actualEvent.Operation);
+        Assert.Equal("record", actualEvent.EntityType);
+        Assert.Equal(createdRecord.Id, actualEvent.EntityId);
+    }
+
+    [Fact]
+    public async Task CreateRecord_EmptyStringTag_DoesNotCreateTag()
+    {
+        // Arrange
+
+        var now = DateTime.UtcNow;
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "New Test Record",
+            Description = "Test Record Description",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            Uri = "test://uri",
+            OriginalId = "original-123",
+            ClassId = cid,
+            FileType = "png",
+            Tags = [""]
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("New Test Record", result.Name);
+        Assert.Equal("Test Record Description", result.Description);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.Equal(did, result.DataSourceId);
+        Assert.Equal("test://uri", result.Uri);
+        Assert.Equal("original-123", result.OriginalId);
+        Assert.Equal(cid, result.ClassId);
+        Assert.Equal("png", result.FileType);
+        Assert.Empty(result.Tags);
         Assert.True(result.LastUpdatedAt >= now);
         Assert.Equal(uid, result.LastUpdatedBy);
 
@@ -4853,10 +4931,8 @@ public class RecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task SearchPaginated_EmbeddedFilter_ReturnsOnlyEmbeddedRecords()
     {
-        // Arrange - mark rid as embedded, leave the rest as not embedded
+        // Arrange - rid should already be marked as embedded from its initialization
         var record = await Context.Records.FindAsync(rid);
-        record!.Embedded = true;
-        await Context.SaveChangesAsync();
 
         var search = DefaultSearch();
         search.Embedding = "embedded";
@@ -4880,10 +4956,8 @@ public class RecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task SearchPaginated_NotEmbeddedFilter_ReturnsOnlyNotEmbeddedRecords()
     {
-        // Arrange - mark rid as embedded so we can confirm it is excluded
+        // Arrange - rid should already be marked as embedded from its initialization
         var record = await Context.Records.FindAsync(rid);
-        record!.Embedded = true;
-        await Context.SaveChangesAsync();
 
         var search = DefaultSearch();
         search.Embedding = "pending";
@@ -5177,6 +5251,307 @@ public class RecordBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(record.Uri, adminResult.Items.Single(r => r.Id == record.Id).Uri);
         Assert.Null(restrictedResult.Items.Single(r => r.Id == record.Id).Uri);
+    }
+
+    #endregion
+
+    #region ProvenanceRecord Creation Tests
+
+    [Fact]
+    public async Task CreateRecord_TriggersCreateProvenanceRecord_WithExpectedArguments()
+    {
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Provenance Record",
+            Description = "Provenance Description",
+            OriginalId = "prov-1",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!
+        };
+
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        _provenanceBusiness.Verify(
+            p => p.CreateProvenanceRecord(result.Id, "create-record", uid, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateRecord_LogsWarning_WhenProvenanceRecordCreationFails()
+    {
+        _provenanceBusiness
+            .Setup(p => p.CreateProvenanceRecord(It.IsAny<long>(), "create-record", uid, null))
+            .ReturnsAsync(false);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Provenance Failure Record",
+            Description = "Provenance Description",
+            OriginalId = "prov-fail-1",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!
+        };
+
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        Assert.NotNull(result);
+        _mockRecordLogger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Failed to create provenance record for record creation")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_TriggersBulkCreateProvenanceRecords_WithAllInsertedRecordIds()
+    {
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Prov Record 1",
+                Description = "Description 1",
+                OriginalId = "bpr1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "Bulk Prov Record 2",
+                Description = "Description 2",
+                OriginalId = "bpr2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+
+        var result = await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+        var insertedIds = result.Select(r => r.Id).ToList();
+
+        _provenanceBusiness.Verify(
+            p => p.BulkCreateProvenanceRecords(
+                It.Is<List<long>>(ids => ids.Count == insertedIds.Count && insertedIds.All(ids.Contains)),
+                "create-record",
+                uid,
+                null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateRecord_TriggersCreateProvenanceRecord_WithExpectedArguments()
+    {
+        var dto = new UpdateRecordRequestDto
+        {
+            Name = "Updated Name",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "NewValue" }))!
+        };
+
+        await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
+
+        _provenanceBusiness.Verify(
+            p => p.CreateProvenanceRecord(rid, "update-record", uid, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_TriggersCreateProvenanceRecord_WithExpectedArguments()
+    {
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+
+        _provenanceBusiness.Verify(
+            p => p.CreateProvenanceRecord(rid, "archive-record", uid, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_LogsWarning_WhenProvenanceRecordCreationFails()
+    {
+        _provenanceBusiness
+            .Setup(p => p.CreateProvenanceRecord(rid, "archive-record", uid, null))
+            .ReturnsAsync(false);
+
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+
+        _mockRecordLogger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Failed to create provenance record for archive")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UnarchiveRecord_TriggersCreateProvenanceRecord_WithExpectedArguments()
+    {
+        var record = await Context.Records.FindAsync(rid);
+        record!.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        await _recordBusiness.UnarchiveRecord(uid, organizationId, pid, rid);
+
+        _provenanceBusiness.Verify(
+            p => p.CreateProvenanceRecord(rid, "unarchive-record", uid, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteRecord_TriggersCreateProvenanceRecord_WithExpectedArguments()
+    {
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid);
+
+        _provenanceBusiness.Verify(
+            p => p.CreateProvenanceRecord(rid, "delete-record", uid, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task AttachTag_TriggersCreateProvenanceRecord_WithExpectedArguments()
+    {
+        var record = await Context.Records.Include(r => r.Tags).FirstAsync(r => r.Id == rid);
+        record.Tags.Clear();
+        await Context.SaveChangesAsync();
+
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+
+        _provenanceBusiness.Verify(
+            p => p.CreateProvenanceRecord(rid, "attach-tag", uid, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UnattachTag_TriggersCreateProvenanceRecord_WithExpectedArguments()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        Context.ChangeTracker.Clear();
+
+        await _recordBusiness.UnattachTag(uid, organizationId, pid, rid, tid);
+
+        _provenanceBusiness.Verify(
+            p => p.CreateProvenanceRecord(rid, "detach-tag", uid, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task AttachLabel_TriggersCreateProvenanceRecord_WithExpectedArguments()
+    {
+        var record = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid);
+        record.Labels.Clear();
+        await Context.SaveChangesAsync();
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, lid);
+
+        _provenanceBusiness.Verify(
+            p => p.CreateProvenanceRecord(rid, "attach-label", uid, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UnattachLabel_TriggersCreateProvenanceRecord_WithExpectedArguments()
+    {
+        var record = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid);
+        record.Labels.Clear();
+        await Context.SaveChangesAsync();
+
+        await _recordBusiness.AttachLabel(uid, organizationId, pid, rid, lid);
+        Context.ChangeTracker.Clear();
+
+        await _recordBusiness.UnattachLabel(uid, organizationId, pid, rid, lid);
+
+        _provenanceBusiness.Verify(
+            p => p.CreateProvenanceRecord(rid, "detach-label", uid, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task BulkAttachLabels_TriggersBulkCreateProvenanceRecords_WithDistinctRecordIds()
+    {
+        var record1 = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid);
+        var record2 = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid2);
+        record1.Labels.Clear();
+        record2.Labels.Clear();
+        await Context.SaveChangesAsync();
+
+        await _recordBusiness.BulkAttachLabels(uid, organizationId, pid, [rid, rid2, rid], [lid]);
+
+        _provenanceBusiness.Verify(
+            p => p.BulkCreateProvenanceRecords(
+                It.Is<List<long>>(ids => ids.Count == 2 && ids.Contains(rid) && ids.Contains(rid2)),
+                "attach-label",
+                uid,
+                null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task BulkAttachTags_TriggersBulkCreateProvenanceRecords_WithExpectedRecordIds()
+    {
+        var record = await Context.Records.Include(r => r.Tags).FirstAsync(r => r.Id == rid);
+        record.Tags.Clear();
+        await Context.SaveChangesAsync();
+
+        var dtos = new List<RecordTagLinkDto>
+        {
+            new() { RecordId = rid, TagId = tid }
+        };
+
+        await _recordBusiness.BulkAttachTags(uid, organizationId, pid, dtos);
+
+        _provenanceBusiness.Verify(
+            p => p.BulkCreateProvenanceRecords(
+                It.Is<List<long>>(ids => ids.Count == 1 && ids.Contains(rid)),
+                "attach-tag",
+                uid,
+                null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task BulkAttachTags_LogsWarning_WhenProvenanceRecordCreationFails()
+    {
+        var record = await Context.Records.Include(r => r.Tags).FirstAsync(r => r.Id == rid);
+        record.Tags.Clear();
+        await Context.SaveChangesAsync();
+
+        _provenanceBusiness
+            .Setup(p => p.BulkCreateProvenanceRecords(It.IsAny<List<long>>(), "attach-tag", uid, null))
+            .ReturnsAsync(false);
+
+        var dtos = new List<RecordTagLinkDto>
+        {
+            new() { RecordId = rid, TagId = tid }
+        };
+
+        await _recordBusiness.BulkAttachTags(uid, organizationId, pid, dtos);
+
+        _mockRecordLogger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Failed to create provenance records for bulk tag attach")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task BulkUnattachTags_TriggersBulkCreateProvenanceRecords_WithExpectedRecordIds()
+    {
+        var dtos = new List<RecordTagLinkDto>
+        {
+            new() { RecordId = rid, TagId = tid }
+        };
+        await _recordBusiness.BulkAttachTags(uid, organizationId, pid, dtos);
+
+        await _recordBusiness.BulkUnattachTags(uid, organizationId, pid, dtos);
+
+        _provenanceBusiness.Verify(
+            p => p.BulkCreateProvenanceRecords(
+                It.Is<List<long>>(ids => ids.Count == 1 && ids.Contains(rid)),
+                "detach-tag",
+                uid,
+                null),
+            Times.Once);
     }
 
     #endregion

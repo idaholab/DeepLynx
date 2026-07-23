@@ -7,7 +7,7 @@ import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
   archiveProject,
-  getProjectLogoUrl,
+  fetchProjectLogo,
   removeProjectLogo,
   uploadProjectLogo,
 } from "@/app/lib/client_service/projects_services.client";
@@ -94,27 +94,40 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   // Load existing logo on mount
   useEffect(() => {
     const loadExistingLogo = async () => {
-      if (!project?.id) {
+      if (!project?.id || !organization?.organizationId) {
         setIsCheckingLogo(false);
+        setLogoPreview(null);
         return;
       }
 
       try {
         setIsCheckingLogo(true);
-        const logoUrl = await getProjectLogoUrl(project.id as number);
 
-        if (logoUrl) {
-          setLogoPreview(logoUrl);
-        }
+        const { blobUrl } = await fetchProjectLogo(
+          organization.organizationId as number,
+          project.id as number
+        );
+
+        setLogoPreview(blobUrl);
+
       } catch (error) {
         console.error("Error checking for existing logo:", error);
+        setLogoPreview(null);
       } finally {
         setIsCheckingLogo(false);
       }
     };
 
     loadExistingLogo();
-  }, [project?.id]);
+
+    // Cleanup to revoke blob URL on unmount
+    return () => {
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+    };
+  }, [project?.id, organization?.organizationId]);
+
 
   // Load available storages and default storage
   const loadStorages = useCallback(async () => {
@@ -132,7 +145,6 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         project.id as number,
         false, // Don't hide archived storages
       );
-      setAvailableStorages(storages);
 
       // Fetch the current default storage
       try {
@@ -140,11 +152,28 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
           organization.organizationId as number,
           project.id as number,
         );
-        setDefaultStorage(defaultStorageData);
-        setSelectedStorageId(defaultStorageData.id as number);
+        const projectDefaultStorage =
+          storages.find(
+            (storage) =>
+              storage.default &&
+              Number(storage.projectId) === Number(project.id),
+          ) ?? null;
+        const effectiveDefaultStorage =
+          projectDefaultStorage ?? defaultStorageData;
+
+        setDefaultStorage(effectiveDefaultStorage);
+        setSelectedStorageId(effectiveDefaultStorage.id as number);
+        setAvailableStorages(
+          storages.map((storage) => ({
+            ...storage,
+            default:
+              String(storage.id) === String(effectiveDefaultStorage.id),
+          })),
+        );
       } catch (error) {
         setDefaultStorage(null);
         setSelectedStorageId(null);
+        setAvailableStorages(storages);
       }
     } catch (error) {
       console.error("Error loading storages:", error);
@@ -162,27 +191,53 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     loadStorages();
   }, [loadStorages]);
 
-  const handleLogoChange = (fileList: FileList | null) => {
+  const handleLogoChange = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
 
     const file = fileList[0];
 
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
+    const allowedTypes = [
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "image/webp",
+      "image/gif",
+      "image/svg+xml",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
       toast.error(t.translations.PLEASE_UPLOAD_VALID_IMAGE);
       return;
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       toast.error(t.translations.FILE_SIZE_MUST_BE_5MB);
       return;
     }
 
-    setLogoFile(file);
-    const previewUrl = URL.createObjectURL(file);
-    setLogoPreview(previewUrl);
+    if (!organization?.organizationId || !project?.id) {
+      toast.error("Organization or project is not loaded.");
+      return;
+    }
+
+    try {
+      // Revoke the previous object URL if it exists
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+
+      // Create and set new preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setLogoPreview(previewUrl);
+      setLogoFile(file);
+
+      toast.success(t.translations.LOGO_SELECTED_SUCCESSFULLY);
+
+    } catch (error) {
+      console.error("Failed to process selected logo:", error);
+      toast.error(t.translations.FAILED_TO_UPLOAD_LOGO);
+    }
   };
 
   const handleUploadLogo = async () => {
@@ -194,14 +249,18 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     try {
       setIsUploading(true);
 
-      const result = await uploadProjectLogo({
+      await uploadProjectLogo({
         organizationId: organization.organizationId as number,
         projectId: project.id as number,
         file: logoFile,
       });
 
-      // Add timestamp to force browser to reload the image
-      setLogoPreview(`${result.logoUrl}?t=${Date.now()}`);
+      const { blobUrl } = await fetchProjectLogo(
+        organization.organizationId as number,
+        project.id as number
+      );
+
+      setLogoPreview(blobUrl);
       setLogoFile(null);
       toast.success(t.translations.LOGO_UPLOADED_SUCCESSFULLY);
     } catch (error) {
@@ -209,12 +268,13 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       toast.error(
         error instanceof Error
           ? error.message
-          : t.translations.FAILED_TO_UPLOAD_LOGO,
+          : t.translations.FAILED_TO_UPLOAD_LOGO
       );
     } finally {
       setIsUploading(false);
     }
   };
+
 
   const handleRemoveLogo = async () => {
     if (!organization?.organizationId || !project?.id) return;
@@ -222,11 +282,16 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     try {
       await removeProjectLogo({
         organizationId: organization.organizationId as number,
-        projectId: project.id as number,
+        projectId: project.id as number
       });
 
-      setLogoFile(null);
+      // Revoke preview URL and reset preview and file states
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
       setLogoPreview(null);
+      setLogoFile(null);
+
       toast.success(t.translations.LOGO_REMOVED_SUCCESSFULLY);
     } catch (error) {
       console.error("Failed to remove logo:", error);
@@ -235,16 +300,30 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   };
 
   const handleCancelSelection = async () => {
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+    }
+
     setLogoFile(null);
 
-    // Restore previous logo if it exists
-    if (project?.id) {
-      const logoUrl = await getProjectLogoUrl(project.id as number);
-      setLogoPreview(logoUrl);
-    } else {
+    if (!project?.id || !organization?.organizationId) {
+      setLogoPreview(null);
+      return;
+    }
+
+    try {
+      const { blobUrl } = await fetchProjectLogo(
+        organization.organizationId as number,
+        project.id as number
+      )
+
+      setLogoPreview(blobUrl);
+    } catch (error) {
+      console.error("Failed to restore previous logo:", error);
       setLogoPreview(null);
     }
   };
+
 
   const handleSaveDefaultStorage = async () => {
     if (!organization?.organizationId || !project?.id || !selectedStorageId) {
@@ -252,7 +331,6 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       return;
     }
 
-    // Check if the selected storage is already the default
     if (defaultStorage?.id === selectedStorageId) {
       toast.error(t.translations.THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT);
       return;
@@ -272,7 +350,13 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         (s) => s.id === selectedStorageId,
       );
       if (updatedDefault) {
-        setDefaultStorage(updatedDefault);
+        setDefaultStorage({ ...updatedDefault, default: true });
+        setAvailableStorages((currentStorages) =>
+          currentStorages.map((storage) => ({
+            ...storage,
+            default: String(storage.id) === String(selectedStorageId),
+          })),
+        );
       }
 
       toast.success(
@@ -338,19 +422,50 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       const dto: CreateObjectStorageRequestDto = {
         name: storageFormData.name,
         config: config,
+        default: storageFormData.default,
       };
 
-      await createProjectObjectStorage(
+      const createdStorage = await createProjectObjectStorage(
         organization.organizationId as number,
         project.id as number,
         dto,
         storageFormData.default,
       );
+      const storageForList = {
+        ...createdStorage,
+        default: storageFormData.default || createdStorage.default,
+      };
+
+      setAvailableStorages((currentStorages) => {
+        const existingStorage = currentStorages.some(
+          (storage) => String(storage.id) === String(storageForList.id),
+        );
+        const nextStorages = existingStorage
+          ? currentStorages.map((storage) =>
+            String(storage.id) === String(storageForList.id)
+              ? storageForList
+              : storage,
+          )
+          : [...currentStorages, storageForList];
+
+        if (!storageForList.default) {
+          return nextStorages;
+        }
+
+        return nextStorages.map((storage) => ({
+          ...storage,
+          default: String(storage.id) === String(storageForList.id),
+        }));
+      });
+
+      if (storageForList.default) {
+        setDefaultStorage(storageForList);
+        setSelectedStorageId(storageForList.id as number);
+      }
 
       toast.success(t.translations.STORAGE_CREATED_SUCCESSFULLY);
       setIsCreateModalOpen(false);
       resetStorageForm();
-      loadStorages();
     } catch (error) {
       console.error("Failed to create storage:", error);
       console.error("Error details:", error);
@@ -532,6 +647,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
             <StorageSettingsSection
               activeTab={activeTab}
               onChangeTab={setActiveTab}
+              projectId={project.id}
               availableStorages={availableStorages}
               selectedStorageId={selectedStorageId}
               onSelectStorage={setSelectedStorageId}

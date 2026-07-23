@@ -163,3 +163,21 @@ export async function queueInsightEmbedStrings(
     responseBody: await parseJsonOrTextResponseBody(upstreamResponse.clone()),
   };
 }
+
+export async function fetchInsightEndpointHealth(
+    organizationId: number,
+    projectId: number,
+    requestBody: unknown,
+): Promise<InsightJsonResult> {
+  const upstreamResponse = await fetch(
+      buildInsightUrl(organizationId, projectId, "/endpoint_health"),
+      {
+        method: "POST", headers: await getAuthHeaders(), body: JSON.stringify(requestBody), cache: "no-store",
+      },
+  );
+  
+  return {
+    upstreamResponse,
+    responseBody: await parseJsonOrTextResponseBody(upstreamResponse.clone()),
+  };
+}

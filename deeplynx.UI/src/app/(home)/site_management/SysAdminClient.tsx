@@ -117,7 +117,7 @@ const SysAdminClient = ({
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-              Site
+              {t.translations.SITE}
             </p>
             <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
               {t.translations.SITE_MANAGEMENT}

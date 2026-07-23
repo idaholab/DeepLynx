@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
@@ -7,6 +9,7 @@ using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.Configuration;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -24,7 +27,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<OrganizationBusiness>> _mockLoggerOrg = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
-    private ObjectStorageBusiness _mockObjectStorage = null!;
+    private ObjectStorageBusiness _objectStorageBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
     private RoleBusiness _roleBusiness = null!;
@@ -33,6 +36,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     public long oid; // organization ID
     public long oid2; // second organization ID
     public long uid; // user IDs
+    public long os1;
     public long uid2;
 
     public OrganizationBusinessTests(TestSuiteFixture fixture) : base(fixture)
@@ -45,6 +49,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         // These are pre-generated valid AES-256 keys for testing
         Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
         Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
+        _encryptionHelper = new EncryptionHelper();
+
         await base.InitializeAsync();
 
         // used in multiple contexts
@@ -55,13 +61,12 @@ public class OrganizationBusinessTests : IntegrationTestBase
         _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
-        _encryptionHelper = new EncryptionHelper();
-        _mockObjectStorage = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
 
         // org business and dependencies
         _mockLoggerOrg = new Mock<ILogger<OrganizationBusiness>>();
         _organizationBusiness = new OrganizationBusiness(
-            Context, _eventBusiness, _roleBusiness, _mockLoggerOrg.Object, _mockObjectStorage);
+            Context, _eventBusiness, _roleBusiness, _mockLoggerOrg.Object, _objectStorageBusiness);
     }
 
     #region OrganizationResponseDto Tests
@@ -153,6 +158,25 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Context.OrganizationUsers.Add(testOrgUser);
         Context.OrganizationUsers.Add(testOrg2User);
         await Context.SaveChangesAsync();
+
+        // Add object storage
+        var os1Config = new JsonObject
+        {
+            ["MountPath"] = "../data/duckdb"
+        };
+        var objectStorage = new ObjectStorage
+        {
+            Name = "Test Object Storage 1",
+            ProjectId = null,
+            OrganizationId = oid,
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
+            Default = true
+        };
+
+        Context.ObjectStorages.Add(objectStorage);
+        await Context.SaveChangesAsync();
+        os1 = objectStorage.Id;
     }
 
     private void AssertRolePermissions(
@@ -1093,6 +1117,76 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.Contains("Organization with id 99999 not found", exception.Message);
     }
 
+    [Fact]
+    public async Task AddUser_Fails_IfServiceAccount_AndNotAllowed()
+    {
+        // Arrange - create a service account user
+        var serviceUser = new User
+        {
+            AccountType = AccountType.Service,
+            Name = "test Service Account",
+            Email = "asdfasdfasdfasdf"
+        };
+        Context.Users.Add(serviceUser);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert - default is allowServiceAccounts: false
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _organizationBusiness.AddUserToOrganization(oid, serviceUser.Id));
+
+        Assert.Contains("Service accounts must be added directly to a project", exception.Message);
+
+        // Verify nothing was saved to DB
+        var orgUser = await Context.OrganizationUsers
+            .FirstOrDefaultAsync(ou => ou.OrganizationId == oid && ou.UserId == serviceUser.Id);
+        Assert.Null(orgUser);
+    }
+
+    [Fact]
+    public async Task AddUser_Succeeds_IfServiceAccount_AndAllowed()
+    {
+        // Arrange - create a service account user
+        var serviceUser = new User
+        {
+            AccountType = AccountType.Service,
+            Name = "test Service Account",
+            Email = "asdfasdfasdfasdf"
+        };
+        Context.Users.Add(serviceUser);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _organizationBusiness.AddUserToOrganization(
+            oid, serviceUser.Id, allowServiceAccounts: true);
+
+        // Assert
+        Assert.True(result);
+
+        var orgUser = await Context.OrganizationUsers
+            .FirstOrDefaultAsync(ou => ou.OrganizationId == oid && ou.UserId == serviceUser.Id);
+        Assert.NotNull(orgUser);
+        Assert.False(orgUser.IsOrgAdmin);
+    }
+
+    [Fact]
+    public async Task AddUser_Fails_IfServiceAccountExplicitlyDisallowed()
+    {
+        // Arrange
+        var serviceUser = new User
+        {
+            AccountType = AccountType.Service,
+            Name = "test Service Account",
+            Email = "asdfasdfasdfasdf"
+        };
+        Context.Users.Add(serviceUser);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert - explicitly passing false behaves the same as the default
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _organizationBusiness.AddUserToOrganization(
+                oid, serviceUser.Id, allowServiceAccounts: false));
+    }
+
     #endregion
 
     #region UpdateUserAdmin Tests
@@ -1267,4 +1361,106 @@ public class OrganizationBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region OrganizationLogo Tests
+
+    [Fact]
+    public async Task RemoveLogoFileAsync_RemovesLogoFileSuccessfully()
+    {
+        // Arrange
+        var testFileName = "test-logo.png";
+        var testFileContent = "Fake image content for testing";
+
+        var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
+
+        // Act
+        await _organizationBusiness.UploadOrganizationLogo(oid, testFormFile);
+        var result = await _organizationBusiness.RemoveLogoFileAsync(oid);
+
+        // Assert
+        Assert.True(result);
+
+        // Additional asserts to confirm the logo file is removed
+        var logosFolderPath = Path.Combine("/data/duckdb", $"org_{oid}", "logos");
+        var filePath = Path.Combine(logosFolderPath, testFileName);
+
+        Assert.False(File.Exists(filePath), "Logo file should have been deleted.");
+    }
+
+    [Fact]
+    public async Task UploadOrganizationLogo_UploadsFileSuccessfully()
+    {
+        // Arrange
+        var testFileName = "test-logo.png";
+        var testFileContent = "Fake image content for testing";
+
+        var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
+
+        // Act
+        string uploadedFilePath = await _organizationBusiness.UploadOrganizationLogo(oid, testFormFile);
+
+        // Assert
+        Assert.False(string.IsNullOrEmpty(uploadedFilePath));
+        Assert.True(File.Exists(uploadedFilePath), "Uploaded file should exist at returned path.");
+
+        // Cleanup if necessary
+        if (File.Exists(uploadedFilePath))
+        {
+            File.Delete(uploadedFilePath);
+        }
+    }
+
+    [Fact]
+    public async Task GetOrganizationLogoStreamAsync_ReturnsActiveLogoStreamSuccessfully()
+    {
+        // Arrange
+        var testFileName = "test-logo.png";
+        var testFileContent = "Fake image content for testing";
+
+        var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
+
+        // Upload a logo so there is an active logo file
+        string uploadedFilePath = await _organizationBusiness.UploadOrganizationLogo(oid, testFormFile);
+
+        // Act
+        var result = await _organizationBusiness.GetOrganizationLogoStreamAsync(oid);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result?.Stream);
+        Assert.NotNull(result?.FullPath);
+        Assert.True(File.Exists(result?.FullPath), "Returned logo file path should exist");
+
+        var logosFolderPath = Path.Combine(
+            Path.GetDirectoryName(uploadedFilePath) ?? "",
+            "");
+
+        var activeLogoFileName = await File.ReadAllTextAsync(Path.Combine(logosFolderPath, "active_logo.txt"));
+        Assert.Equal(Path.GetFileName(result?.FullPath), activeLogoFileName.Trim());
+
+        // Cleanup
+        result?.Stream.Dispose();
+        if (File.Exists(uploadedFilePath))
+        {
+            File.Delete(uploadedFilePath);
+        }
+        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+        if (File.Exists(metadataFilePath))
+        {
+            File.Delete(metadataFilePath);
+        }
+    }
+
+    #endregion
+
+    // Helper method to create an IFormFile from a string or byte array
+    private IFormFile CreateTestFormFile(string fileName, string content, string contentType = "image/png")
+    {
+        var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        return new FormFile(stream, 0, stream.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
+    }
 }

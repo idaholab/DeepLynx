@@ -1,13 +1,17 @@
+using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/insight")]
 [Authorize]
 public class InsightController : ControllerBase
@@ -38,6 +42,7 @@ public class InsightController : ControllerBase
     /// <param name="dto">Upload payload containing file info.</param>
     /// <returns>202 Accepted once Insight has acknowledged the request.</returns>
     [HttpPost("upload", Name = "api_insight_upload")]
+    [MapToApiVersion(1)]
     [Auth("write", "insight")]
     [InsightEnabled]
     public async Task<IActionResult> Upload(
@@ -91,6 +96,42 @@ public class InsightController : ControllerBase
     }
 
     /// <summary>
+    ///     Queue a document upload for embedding via Insight.
+    ///     Insight manages ingestion internally via RabbitMQ.
+    ///     Poll the ingestion status endpoint to track progress after this returns 202.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project.</param>
+    /// <param name="vlmModelConfigId">Optional explicit VLM model config ID. Defaults to the project/org default.</param>
+    /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default.</param>
+    /// <param name="dto">Upload payload containing file info.</param>
+    /// <returns>202 Accepted with an empty response body once Insight has acknowledged the request.</returns>
+    [HttpPost("upload", Name = "api_insight_upload")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "insight")]
+    [InsightEnabled]
+    public async Task<IActionResult> UploadV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] long? vlmModelConfigId,
+        [FromQuery] long? embeddingModelConfigId,
+        [FromBody] InsightUploadApiRequestDto dto)
+    {
+        var userId = UserContextStorage.UserId;
+        var userJwt = UserContextStorage.Token;
+        await _insightBusiness.QueueInsightUpload(
+            userId,
+            organizationId,
+            projectId,
+            vlmModelConfigId,
+            embeddingModelConfigId,
+            dto,
+            userJwt);
+        return Accepted();
+    }
+
+    /// <summary>
     ///     Stream a RAG query response from Insight as plain text chunks.
     ///     The response body is streamed directly. Consume it as a readable stream on the client.
     /// </summary>
@@ -104,6 +145,7 @@ public class InsightController : ControllerBase
     /// <param name="dto">Query payload containing the question, file IDs, and sampling parameters.</param>
     /// <param name="cancellationToken">Propagated from the HTTP request lifecycle.</param>
     [HttpPost("query", Name = "api_insight_query")]
+    [MapToApiVersion(1)]
     [Auth("read", "insight")]
     [Sensitivity("read record")]
     [InsightEnabled]
@@ -167,6 +209,51 @@ public class InsightController : ControllerBase
     }
 
     /// <summary>
+    ///     Stream a RAG query response from Insight as plain text chunks.
+    ///     The response body is streamed directly. Consume it as a readable stream on the client.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project.</param>
+    /// <param name="languageModelConfigId">
+    ///     Optional explicit language model config ID. Language Model Type can be LLM or VLM.
+    ///     Defaults to the project/org LLM default, or VLM default if no LLM configured.
+    /// </param>
+    /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default.</param>
+    /// <param name="dto">Query payload containing the question, file IDs, and sampling parameters.</param>
+    /// <param name="cancellationToken">Propagated from the HTTP request lifecycle.</param>
+    /// <returns>200 OK with a streamed plain-text response containing the Insight query result.</returns>
+    [HttpPost("query", Name = "api_insight_query")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "insight")]
+    [Sensitivity("read record")]
+    [InsightEnabled]
+    public async Task QueryV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] long? languageModelConfigId,
+        [FromQuery] long? embeddingModelConfigId,
+        [FromBody] InsightQueryApiRequestDto dto,
+        CancellationToken cancellationToken)
+    {
+        var userId = UserContextStorage.UserId;
+        Response.ContentType = "text/plain; charset=utf-8";
+
+        await foreach (var chunk in _insightBusiness.StreamInsightQuery(
+                           userId,
+                           organizationId,
+                           projectId,
+                           languageModelConfigId,
+                           embeddingModelConfigId,
+                           dto,
+                           cancellationToken))
+        {
+            await Response.WriteAsync(chunk, cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
     ///     Get the ingestion status for a previously uploaded file.
     /// </summary>
     /// <param name="organizationId">ID of the organization.</param>
@@ -174,6 +261,7 @@ public class InsightController : ControllerBase
     /// <param name="fileId">The Insight file ID to check.</param>
     /// <returns>Ingestion status including chunk count and page count.</returns>
     [HttpGet("ingestion_status/{fileId:long}", Name = "api_insight_ingestion_status")]
+    [MapToApiVersion(1)]
     [InsightEnabled]
     public async Task<ActionResult<InsightIngestionStatusResponseDto>> IngestionStatus(
         long organizationId,
@@ -203,6 +291,135 @@ public class InsightController : ControllerBase
     }
 
     /// <summary>
+    ///     Get the ingestion status for a previously uploaded file.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project.</param>
+    /// <param name="fileId">The Insight file ID to check.</param>
+    /// <returns>200 OK with the ingestion status, including chunk count and page count.</returns>
+    [HttpGet("ingestion_status/{fileId:long}", Name = "api_insight_ingestion_status")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<ActionResult<InsightIngestionStatusResponseDto>> IngestionStatusV2(
+        long organizationId,
+        long projectId,
+        long fileId)
+    {
+        var status = await _insightBusiness.FetchInsightIngestionStatus(fileId);
+        return Ok(status);
+    }
+
+    /// <summary>
+    ///     Get the persistent upload pipeline status for a record.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project.</param>
+    /// <param name="recordId">The record ID whose Insight pipeline status should be checked.</param>
+    /// <returns>Persistent pipeline status including stage, worker, progress, and error details.</returns>
+    [HttpGet("pipeline_status/{recordId:long}", Name = "api_insight_pipeline_status")]
+    [MapToApiVersion(1)]
+    [Auth("read", "insight")]
+    [Sensitivity("read record")]
+    [InsightEnabled]
+    public async Task<ActionResult<InsightPipelineStatusResponseDto>> PipelineStatus(
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        if (recordId <= 0)
+            return BadRequest("recordId must be a positive integer.");
+
+        try
+        {
+            var userId = UserContextStorage.UserId;
+
+            var status = await _insightBusiness.FetchInsightPipelineStatus(
+                userId,
+                organizationId,
+                projectId,
+                recordId);
+
+            return Ok(status);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Record not found while checking Insight pipeline status for record {RecordId} in project {ProjectId}",
+                recordId,
+                projectId);
+
+            return NotFound(exc.Message);
+        }
+        catch (UnauthorizedAccessException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Unauthorized pipeline status check for record {RecordId} in project {ProjectId}",
+                recordId,
+                projectId);
+
+            return Forbid();
+        }
+        catch (InsightServiceException exc)
+        {
+            _logger.LogError(
+                exc,
+                "Insight pipeline status request failed for record {RecordId} in project {ProjectId}: {Error}",
+                recordId,
+                projectId,
+                exc.Message);
+
+            return StatusCode(
+                exc.StatusCode.HasValue
+                    ? (int)exc.StatusCode.Value
+                    : StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "insight_pipeline_status_failed",
+                    message = exc.Message
+                });
+        }
+        catch (Exception exc)
+        {
+            var message =
+                $"An unexpected error occurred while checking Insight pipeline status for record {recordId}: {exc}";
+            _logger.LogError(message);
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Get the persistent upload pipeline status for a record.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project.</param>
+    /// <param name="recordId">The record ID whose Insight pipeline status should be checked.</param>
+    /// <returns>200 OK with the persistent pipeline status, including stage, worker, progress, and error details.</returns>
+    [HttpGet("pipeline_status/{recordId:long}", Name = "api_insight_pipeline_status")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "insight")]
+    [Sensitivity("read record")]
+    [InsightEnabled]
+    public async Task<ActionResult<InsightPipelineStatusResponseDto>> PipelineStatusV2(
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        var userId = UserContextStorage.UserId;
+        var status = await _insightBusiness.FetchInsightPipelineStatus(
+            userId,
+            organizationId,
+            projectId,
+            recordId);
+        return Ok(status);
+    }
+
+    /// <summary>
     ///     Check the health of a configured model endpoint through the Insight service.
     /// </summary>
     /// <param name="organizationId">ID of the organization.</param>
@@ -212,6 +429,7 @@ public class InsightController : ControllerBase
     ///     Endpoint health information for the requested model endpoint.
     /// </returns>
     [HttpPost("endpoint_health", Name = "api_insight_endpoint_health")]
+    [MapToApiVersion(1)]
     [Auth("read", "insight")]
     [InsightEnabled]
     public async Task<ActionResult<InsightEndpointHealthResponseDto>> EndpointHealth(
@@ -229,7 +447,7 @@ public class InsightController : ControllerBase
                 projectId,
                 dto.ModelConfigId,
                 dto.ModelType);
-            
+
             return Ok(result);
         }
         catch (KeyNotFoundException exc)
@@ -273,7 +491,34 @@ public class InsightController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
+    /// <summary>
+    ///     Check the health of a configured model endpoint through the Insight service.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project.</param>
+    /// <param name="dto">Endpoint health request containing the model configuration ID and model type.</param>
+    /// <returns>200 OK with endpoint health information for the requested model endpoint.</returns>
+    [HttpPost("endpoint_health", Name = "api_insight_endpoint_health")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "insight")]
+    [InsightEnabled]
+    public async Task<ActionResult<InsightEndpointHealthResponseDto>> EndpointHealthV2(
+        long organizationId,
+        long projectId,
+        [FromBody] InsightEndpointHealthApiRequestDto dto)
+    {
+        var userId = UserContextStorage.UserId;
+        var result = await _insightBusiness.CheckEndpointHealth(
+            userId,
+            organizationId,
+            projectId,
+            dto.ModelConfigId,
+            dto.ModelType);
+        return Ok(result);
+    }
+
     /// <summary>
     ///     Queue embedding jobs for all class and relationship descriptions in the project.
     /// </summary>
@@ -282,6 +527,7 @@ public class InsightController : ControllerBase
     /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default. If no default is configured, Insight falls back to its own environment defaults.</param>
     /// <returns>202 Accepted once all items have been queued.</returns>
     [HttpPost("embed_strings", Name = "api_insight_embed_strings")]
+    [MapToApiVersion(1)]
     [InsightEnabled]
     public async Task<IActionResult> EmbedStrings(
         long organizationId,
@@ -329,5 +575,30 @@ public class InsightController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+
+    /// <summary>
+    ///     Queue embedding jobs for all class and relationship descriptions in the project.
+    /// </summary>
+    /// <param name="organizationId">ID of the organization.</param>
+    /// <param name="projectId">ID of the project whose ontology strings will be embedded.</param>
+    /// <param name="embeddingModelConfigId">Optional explicit embedding model config ID. Defaults to the project/org default. If no default is configured, Insight falls back to its own environment defaults.</param>
+    /// <returns>202 Accepted with an empty response body once all items have been queued.</returns>
+    [HttpPost("embed_strings", Name = "api_insight_embed_strings")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<IActionResult> EmbedStringsV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] long? embeddingModelConfigId)
+    {
+        var userId = UserContextStorage.UserId;
+        await _insightBusiness.QueueInsightEmbedStrings(
+            userId,
+            organizationId,
+            projectId,
+            embeddingModelConfigId);
+        return Accepted();
     }
 }

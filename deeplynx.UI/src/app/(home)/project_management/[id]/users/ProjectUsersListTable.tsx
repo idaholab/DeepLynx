@@ -6,6 +6,7 @@ import {
   ProjectMemberTableRow,
   MemberType,
 } from "../../types/projectUsersTypes";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                          Users & Groups Data Table                         */
@@ -34,17 +35,16 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
   onViewGroupMembers,
   onOpenRemoveModal,
 }) => {
+  const { t } = useLanguage();
   return (
     <div className="overflow-x-auto">
       <table className="table min-w-full">
         <thead>
           <tr>
-            <th>Member</th>
-            <th>Type</th>
-            <th>Email</th>
-            <th className={`${ACTIONS_COLUMN_CLASS} z-30 text-left`}>
-              Actions
-            </th>
+            <th>{t.translations.MEMBER}</th>
+            <th>{t.translations.TYPE}</th>
+            <th>{t.translations.EMAIL}</th>
+            <th>{t.translations.ACTIONS}</th>
           </tr>
         </thead>
         <tbody>
@@ -74,19 +74,23 @@ const ProjectUsersListTable: React.FC<ProjectUsersListTableProps> = ({
                   )}
                 </td>
 
-                <td className="capitalize">{row.memberType}</td>
+                <td className="capitalize">
+                  {row.memberType === "user"
+                    ? t.translations.USER
+                    : t.translations.GROUP}
+                </td>
                 <td className="text-base-content/70">{row.email || "—"}</td>
                 <td className={ACTIONS_COLUMN_CLASS}>
                   <div className="flex items-center justify-start gap-0.5 whitespace-nowrap">
                     {row.memberType === "group" ? (
-                        <button
-                          className={ACTION_BUTTON_CLASS}
-                          disabled={loading}    
-                          onClick={() => onViewGroupMembers(row)}
-                          title={"View group members"}
-                        >
-                          <UserGroupIcon className="size-5" />
-                        </button>
+                      <button
+                        className={ACTION_BUTTON_CLASS}
+                        disabled={loading}
+                        onClick={() => onViewGroupMembers(row)}
+                        title={"View group members"}
+                      >
+                        <UserGroupIcon className="size-5" />
+                      </button>
                     ) : null}
                     <button
                       className={ACTION_BUTTON_CLASS}

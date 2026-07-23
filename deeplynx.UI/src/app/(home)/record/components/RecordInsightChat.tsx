@@ -6,8 +6,7 @@ import {
   buildInsightModelBadges,
   formatInsightTimestamp,
 } from "@/app/(home)/components/insight/insightChat.utils";
-import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
-import {
+import type { InsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection"; import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
   streamInsightQuery,
@@ -23,6 +22,7 @@ import {
   CloudArrowUpIcon,
   PaperAirplaneIcon,
 } from "@heroicons/react/24/outline";
+import InsightMarkdownMessage from "@/app/(home)/components/insight/InsightMarkdownMessage";
 
 type InsightRole = "assistant" | "user";
 type IngestionState =
@@ -46,6 +46,10 @@ interface RecordInsightChatProps {
   recordUri?: string | null;
   recordName?: string | null;
   onEmbeddingStatusChange?: (isEmbedded: boolean) => void;
+  isChatUnavailable?: boolean;
+  isIngestionUnavailable?: boolean;
+  selectedInsightModels: InsightModelSelection;
+  onSelectedInsightModelsChange: (nextSelection: InsightModelSelection) => void;
 }
 
 const STATUS_POLL_INTERVAL_MS = 5000;
@@ -64,7 +68,7 @@ function playAudio(audioRef: React.RefObject<HTMLAudioElement | null>) {
   audio.currentTime = 0;
   const playPromise = audio.play();
   if (playPromise) {
-    void playPromise.catch(() => {});
+    void playPromise.catch(() => { });
   }
 }
 
@@ -90,6 +94,10 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   recordUri,
   recordName,
   onEmbeddingStatusChange,
+  isChatUnavailable = false,
+  isIngestionUnavailable = false,
+  selectedInsightModels,
+  onSelectedInsightModelsChange,
 }) => {
   const { t } = useLanguage();
   const trimmedRecordName = recordName?.trim() ?? "";
@@ -112,8 +120,6 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   const [ingestionState, setIngestionState] =
     useState<IngestionState>("not_queued");
   const [messages, setMessages] = useState<InsightMessage[]>([]);
-  const { selectedInsightModels, setSelectedInsightModels } =
-    useInsightModelSelection(organizationId, projectId);
   const selectedModelBadges = buildInsightModelBadges(
     selectedInsightModels,
     t.translations.INSIGHT_NEXUS_MODEL,
@@ -255,7 +261,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   }, [ingestionState]);
 
   useEffect(() => {
-    if (!organizationId || !projectId || !recordId) return;
+    if (isIngestionUnavailable || !organizationId || !projectId || !recordId) return;
 
     let cancelled = false;
 
@@ -279,10 +285,10 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [organizationId, projectId, recordId]);
+  }, [organizationId, projectId, recordId, isIngestionUnavailable]);
 
   useEffect(() => {
-    if (!organizationId || !projectId || !recordId) return;
+    if (isIngestionUnavailable || !organizationId || !projectId || !recordId) return;
     if (ingestionState !== "queued" && ingestionState !== "processing") return;
 
     let cancelled = false;
@@ -317,7 +323,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [organizationId, projectId, recordId, ingestionState]);
+  }, [organizationId, projectId, recordId, ingestionState, isIngestionUnavailable]);
 
   async function handleSend(input: string) {
     const prompt = input.trim();
@@ -380,6 +386,11 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   }
 
   async function handleQueueUpload() {
+    if (isIngestionUnavailable) {
+      setIngestionState("error");
+      return;
+    }
+
     if (!organizationId || !projectId || !recordId) {
       setIngestionState("error");
       return;
@@ -436,19 +447,23 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
     <div className="card mt-4 border border-base-300/50 bg-base-100 p-2 shadow-sm">
       <div className="flex items-center justify-between gap-3 px-4 py-1">
         <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
-            <ChatBubbleLeftRightIcon className="size-6 text-secondary shrink-0" />
-            <h3 className="text-xl font-bold text-base-content">
-              {t.translations.INSIGHT}
-            </h3>
-            <span className="badge badge-outline badge-sm">
-              {t.translations.INSIGHT_FILE_SCOPED}
-            </span>
-            <span
-              className={`badge badge-sm ${INGESTION_BADGE_CLASS[ingestionState]}`}
-            >
-              {ingestionBadgeLabel}
-            </span>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <ChatBubbleLeftRightIcon className="size-6 text-secondary shrink-0" />
+              <h3 className="text-xl font-bold text-base-content">
+                {t.translations.INSIGHT}
+              </h3>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="badge badge-outline badge-sm">
+                {t.translations.INSIGHT_FILE_SCOPED}
+              </span>
+              <span
+                className={`badge badge-sm ${INGESTION_BADGE_CLASS[ingestionState]}`}
+              >
+                {ingestionBadgeLabel}
+              </span>
+            </div>
           </div>
           {selectedModelBadges.length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-2">
@@ -460,14 +475,14 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
             </div>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <button
             type="button"
             className="btn btn-ghost btn-sm gap-2"
             onClick={() => {
               void handleQueueUpload();
             }}
-            disabled={isQueueingUpload || isResponding}
+            disabled={isIngestionUnavailable || isQueueingUpload || isResponding}
           >
             <CloudArrowUpIcon className="size-5" />
             {isQueueingUpload
@@ -539,9 +554,8 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
                     {visibleMessages.map((message) => (
                       <div
                         key={message.id}
-                        className={`chat ${
-                          message.role === "user" ? "chat-end" : "chat-start"
-                        }`}
+                        className={`chat ${message.role === "user" ? "chat-end" : "chat-start"
+                          }`}
                       >
                         <div className="chat-header text-xs text-base-content/60 mb-1">
                           {message.role === "user"
@@ -550,13 +564,18 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
                           <time className="ml-2">{message.timestamp}</time>
                         </div>
                         <div
-                          className={`chat-bubble whitespace-pre-wrap ${
-                            message.role === "user"
-                              ? "bg-primary text-primary-content"
-                              : "border border-base-300/50 bg-base-100 text-base-content"
-                          }`}
+                          className={`chat-bubble ${message.role === "user"
+                            ? "whitespace-pre-wrap bg-primary text-primary-content"
+                            : "border border-base-300/50 bg-base-100 text-base-content"
+                            }`}
                         >
-                          {message.content || (
+                          {message.content ? (
+                            message.role === "assistant" ? (
+                              <InsightMarkdownMessage content={message.content} />
+                            ) : (
+                              message.content
+                            )
+                          ) : (
                             <span className="loading loading-dots loading-sm" />
                           )}
                         </div>
@@ -584,12 +603,12 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
                     placeholder={t.translations.INSIGHT_ASK_PLACEHOLDER}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    disabled={isResponding}
+                    disabled={isResponding || isChatUnavailable}
                   />
                   <button
                     type="submit"
                     className="btn btn-primary btn-sm gap-2"
-                    disabled={!draft.trim() || isResponding}
+                    disabled={!draft.trim() || isResponding || isChatUnavailable}
                     aria-label={t.translations.INSIGHT_SEND_PROMPT_ARIA}
                   >
                     <PaperAirplaneIcon className="size-5" />
@@ -611,7 +630,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
         projectId={projectId}
         selectedInsightModels={selectedInsightModels}
         onClose={() => setIsSettingsModalOpen(false)}
-        onSaveSelection={setSelectedInsightModels}
+        onSaveSelection={onSelectedInsightModelsChange}
       />
     </div>
   );

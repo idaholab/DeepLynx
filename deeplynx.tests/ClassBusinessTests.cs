@@ -79,7 +79,7 @@ public class ClassBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -198,7 +198,16 @@ public class ClassBusinessTests : IntegrationTestBase
             LastUpdatedBy = uid,
             IsArchived = false
         };
-        Context.Classes.AddRange(class1, class2, class3, class4, class5);
+        var class6 = new Class
+        {
+            Name = "Class 5",
+            ProjectId = null,
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+        Context.Classes.AddRange(class1, class2, class3, class4, class5, class6);
         await Context.SaveChangesAsync();
         cid1 = class1.Id;
         cid2 = class2.Id;
@@ -340,6 +349,28 @@ public class ClassBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateClass_Success_GeneratesUuid_WhenUuidNotProvided()
+    {
+        // Arrange
+        var dto = new CreateClassRequestDto
+        {
+            Name = $"New Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "New Description"
+            // Intentionally leave Uuid null
+        };
+
+        // Act
+        var result = await _classBusiness.CreateClass(uid, oid, pid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.False(string.IsNullOrWhiteSpace(result.Uuid));
+        Assert.True(Guid.TryParse(result.Uuid, out _));
+        Assert.Equal(dto.Name, result.Name);
+        Assert.Equal(dto.Description, result.Description);
+    }
+
+    [Fact]
     public async Task CreateClasses_Success_OnBulkCreate()
     {
         // Arrange
@@ -470,7 +501,7 @@ public class ClassBusinessTests : IntegrationTestBase
         var list = await _classBusiness.GetAllClasses(oid, new[] { pid }, true);
 
         // Assert - Should get class1 and class5 (not class2 which is archived, not class4 which is in pid2)
-        Assert.Equal(2, list.Count);
+        Assert.Equal(3, list.Count);
         Assert.Contains(list, c => c.Id == cid1);
         Assert.Contains(list, c => c.Id == cid5);
         Assert.DoesNotContain(list, c => c.Id == cid2);
@@ -495,7 +526,7 @@ public class ClassBusinessTests : IntegrationTestBase
         var result = await _classBusiness.GetAllClasses(oid, new[] { pid, pid2 }, true);
 
         // Assert - Should get class1, class4, class5 (not class2 which is archived)
-        Assert.Equal(3, result.Count);
+        Assert.Equal(4, result.Count);
         Assert.Contains(result, c => c.Id == cid1 && c.ProjectId == pid);
         Assert.Contains(result, c => c.Id == cid4 && c.ProjectId == pid2);
         Assert.Contains(result, c => c.Id == cid5 && c.ProjectId == pid);
@@ -508,7 +539,7 @@ public class ClassBusinessTests : IntegrationTestBase
         var result = await _classBusiness.GetAllClasses(oid, new long[] { 999, 998 }, true);
 
         // Assert
-        Assert.Empty(result);
+        Assert.Single(result);
     }
 
     [Fact]

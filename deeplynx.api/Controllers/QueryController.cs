@@ -1,9 +1,11 @@
+using Asp.Versioning;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
@@ -14,6 +16,8 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to create, update, delete, and retrieve class information.
 /// </remarks>
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/query")]
 [Authorize]
 public class QueryController : ControllerBase
@@ -40,6 +44,7 @@ public class QueryController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <returns>List of record response DTOs from the query_record view</returns>
     [HttpGet("records", Name = "api_filter_records")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> SearchRecords(
         long organizationId,
@@ -65,6 +70,34 @@ public class QueryController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Full Text Search for Records
+    /// </summary>
+    /// <param name="organizationId">The organization to which the records/projects belong</param>
+    /// <param name="userQuery">String phrase entered by user</param>
+    /// <param name="projectIds">Project IDs in the organization to search across</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>List of record response DTOs from the query_record view</returns>
+    [HttpGet("records", Name = "api_filter_records")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> SearchRecordsV2(
+        long organizationId,
+        [FromQuery] string userQuery,
+        [FromQuery] long[] projectIds,
+        [FromQuery] bool hideArchived)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.Search(
+                currentUserId, userQuery, organizationId, projectIds,
+                hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+    }
 
     /// <summary>
     ///     Build a Query for Records
@@ -75,6 +108,7 @@ public class QueryController : ControllerBase
     /// <param name="projectIds">Project IDs in the organization to search across</param>
     /// <returns>List of record response DTOs from the query_record view</returns>
     [HttpPost("records/advanced", Name = "api_query_builder_records")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> QueryBuilder(
         long organizationId, [FromQuery] string? textSearch, [FromQuery] long[] projectIds,
@@ -97,6 +131,31 @@ public class QueryController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Build a Query for Records
+    /// </summary>
+    /// <param name="organizationId">The organization to which the records/projects belong</param>
+    /// <param name="filterArray">Array of QueryComponent dtos</param>
+    /// <param name="textSearch">Full text search phrase</param>
+    /// <param name="projectIds">Project IDs in the organization to search across</param>
+    /// <returns>List of record response DTOs from the query_record view</returns>
+    [HttpPost("records/advanced", Name = "api_query_builder_records")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> QueryBuilderV2(
+        long organizationId, [FromQuery] string? textSearch, [FromQuery] long[] projectIds,
+        [FromBody] CustomQueryDtos.CustomQueryRequestDto[] filterArray)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.QueryBuilder(currentUserId, filterArray, organizationId, projectIds,
+                textSearch, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+    }
 
     /// <summary>
     ///     Build a Paginated Query for Records
@@ -104,13 +163,14 @@ public class QueryController : ControllerBase
     /// <param name="organizationId">The organization to which the records/projects belong</param>
     /// <param name="filterArray">Array of QueryComponent dtos</param>
     /// <param name="textSearch">Full text search phrase</param>
-    /// <param name="projectIds">Project IDs in the organization to search across</param>
+    /// <param name="projects">Project IDs in the organization to search across</param>
     /// <param name="paginatedDto">Pagination details</param>
     /// <returns>Paginated record response DTOs from the query_record view</returns>
     [HttpPost("records/advanced/paginated", Name = "api_query_builder_records_paginated")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> QueryBuilderPaginated(
-        long organizationId, [FromQuery] string? textSearch, [FromQuery] long[] projectIds,
+        long organizationId, [FromQuery] string? textSearch, [FromQuery] long[] projects,
         [FromQuery] PaginatedRequestDto paginatedDto,
         [FromBody] CustomQueryDtos.CustomQueryRequestDto[] filterArray)
     {
@@ -125,12 +185,11 @@ public class QueryController : ControllerBase
                 currentUserId,
                 filterArray,
                 organizationId,
-                projectIds,
+                projects,
                 paginatedDto,
                 textSearch,
                 isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin);
+                isOrgAdmin);
             return Ok(records);
         }
         catch (Exception exc)
@@ -140,6 +199,41 @@ public class QueryController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Build a Paginated Query for Records
+    /// </summary>
+    /// <param name="organizationId">The organization to which the records/projects belong</param>
+    /// <param name="filterArray">Array of QueryComponent dtos</param>
+    /// <param name="textSearch">Full text search phrase</param>
+    /// <param name="projects">Project IDs in the organization to search across</param>
+    /// <param name="paginatedDto">Pagination details</param>
+    /// <returns>Paginated record response DTOs from the query_record view</returns>
+    [HttpPost("records/advanced/paginated", Name = "api_query_builder_records_paginated")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> QueryBuilderPaginatedV2(
+        long organizationId, [FromQuery] string? textSearch, [FromQuery] long[] projects,
+        [FromQuery] PaginatedRequestDto paginatedDto,
+        [FromBody] CustomQueryDtos.CustomQueryRequestDto[] filterArray)
+    {
+            paginatedDto ??= new PaginatedRequestDto();
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.QueryBuilderPaginated(
+                currentUserId,
+                filterArray,
+                organizationId,
+                projects,
+                paginatedDto,
+                textSearch,
+                isSysAdmin,
+                isOrgAdmin);
+            return Ok(records);
+    }
 
     /// <summary>
     ///     Get Recent Records
@@ -148,6 +242,7 @@ public class QueryController : ControllerBase
     /// <param name="projectIds">Array of project ids</param>
     /// <returns>List of record response DTOs from the query_record view sorted by most recent</returns>
     [HttpGet("recent", Name = "api_get_recent_records")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> GetRecentlyAddedRecords(
         long organizationId, [FromQuery] long[] projectIds)
@@ -169,6 +264,28 @@ public class QueryController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get Recent Records
+    /// </summary>
+    /// <param name="organizationId"> Organization Id of projects</param>
+    /// <param name="projectIds">Array of project ids</param>
+    /// <returns>List of record response DTOs from the query_record view sorted by most recent</returns>
+    [HttpGet("recent", Name = "api_get_recent_records")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> GetRecentlyAddedRecordsV2(
+        long organizationId, [FromQuery] long[] projectIds)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.GetRecentlyAddedRecords(currentUserId, organizationId, projectIds,
+                isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+    }
 
     /// <summary>
     ///     Get Recent Records Paginated
@@ -179,6 +296,7 @@ public class QueryController : ControllerBase
     /// <param name="paginatedDto">Pagination details</param>
     /// <returns>Paginated records response DTO from the query_record view sorted by specified method</returns>
     [HttpGet("records/paginated", Name = "api_get_records_paginated")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> GetRecordsPaginated(
         long organizationId, [FromQuery] long[] projectIds, [FromQuery] SortRecordsRequestDto sortBy, [FromQuery] PaginatedRequestDto paginatedDto)
@@ -200,6 +318,30 @@ public class QueryController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Get Recent Records Paginated
+    /// </summary>
+    /// <param name="organizationId"> Organization Id of projects</param>
+    /// <param name="projectIds">Array of project ids</param>
+    /// <param name="sortBy">Sorting method before paginating</param>
+    /// <param name="paginatedDto">Pagination details</param>
+    /// <returns>Paginated records response DTO from the query_record view sorted by specified method</returns>
+    [HttpGet("records/paginated", Name = "api_get_records_paginated")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> GetRecordsPaginatedV2(
+        long organizationId, [FromQuery] long[] projectIds, [FromQuery] SortRecordsRequestDto sortBy, [FromQuery] PaginatedRequestDto paginatedDto)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.GetRecordsPaginated(currentUserId, organizationId, sortBy, paginatedDto,
+                projectIds, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+    }
 
 
     /// <summary>
@@ -210,6 +352,7 @@ public class QueryController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <returns>List of record response DTOs from the query_record view</returns>
     [HttpGet("multiproject", Name = "api_multiproject_records")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> GetMultiProjectRecords(
         long organizationId,
@@ -232,5 +375,30 @@ public class QueryController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+    
+    /// <summary>
+    ///     Retrieve All Records for Multiple Projects
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the projects belong</param>
+    /// <param name="projects">Array of project ids whose records are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <returns>List of record response DTOs from the query_record view</returns>
+    [HttpGet("multiproject", Name = "api_multiproject_records")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> GetMultiProjectRecordsV2(
+        long organizationId,
+        [FromQuery] long[] projects,
+        [FromQuery] bool hideArchived = true)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records = await _queryBusiness.GetMultiProjectRecords(currentUserId, organizationId, projects,
+                hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
     }
 }

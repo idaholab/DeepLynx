@@ -1,4 +1,5 @@
 using deeplynx.helpers.Context;
+using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
@@ -82,6 +83,16 @@ public class OrgMemberAttribute : Attribute
     }
 }
 
+/// <summary>
+/// Forbids service accounts from accessing this endpoint regardless of any
+/// role or admin status they hold. Checked before all admin/role bypasses.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
+public class ForbidServiceAccountsAttribute : Attribute
+{
+
+}
+
 public class AuthMiddleware
 {
     private readonly RequestDelegate _next;
@@ -123,6 +134,15 @@ public class AuthMiddleware
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsJsonAsync(new { error = "Unauthorized" });
+            return;
+        }
+
+        // Service accounts are blocked before any admin/role bypass can apply.
+        var forbidServiceAttr = endpoint.Metadata.GetMetadata<ForbidServiceAccountsAttribute>();
+        if (forbidServiceAttr != null && UserContextStorage.AccountType == AccountType.Service)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new { error = "Forbidden: Service accounts cannot perform this action" });
             return;
         }
 
@@ -210,6 +230,45 @@ public class AuthMiddleware
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 await context.Response.WriteAsJsonAsync(new { error = "Forbidden: Organization administrator access required" });
+                return;
+            }
+
+            await _next(context);
+            return;
+        }
+
+        // Handle OrgMember attribute
+        if (orgMemberAttr != null)
+        {
+            if (!organizationId.HasValue)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await context.Response.WriteAsJsonAsync(new { error = "Bad Request: Organization ID required for organization membership check" });
+                return;
+            }
+
+            // Check organization existence
+            capturedOrgId = await organizationService.CheckExistence(
+                null,
+                organizationId,
+                orgMemberAttr.IncludeArchived
+            );
+
+            if (capturedOrgId.HasValue)
+                UserContextStorage.OrganizationId = capturedOrgId.Value;
+
+            // System admins automatically pass
+            if (isSysAdmin)
+            {
+                await _next(context);
+                return;
+            }
+
+            // IsOrgMember (and IsOrgAdmin) are pre-populated by UserContextMiddleware
+            if (!UserContextStorage.IsOrgMember && !UserContextStorage.IsOrgAdmin)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsJsonAsync(new { error = "Forbidden: Organization membership required" });
                 return;
             }
 

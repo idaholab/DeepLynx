@@ -5,7 +5,7 @@ import {
 } from "@/app/(home)/types/requestDTOs";
 import { OrganizationResponseDto } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
-import { UploadLogoRequest, UploadLogoResponse, RemoveLogoRequest, RemoveLogoResponse } from "@/app/(home)/types/org_setting_types";
+import { UploadLogoRequest, UploadLogoResponse, RemoveLogoRequest, RemoveLogoResponse, FetchOrganizationLogoResponse } from "@/app/(home)/types/org_setting_types";
 
 /* -------------------------------------------------------------------------- */
 /*                         Organization CRUD Operations                        */
@@ -348,50 +348,74 @@ export const removeUserFromOrganization = async (
 
 /**
  * Upload organization logo
- * Saves the logo to /public/images/org-{organizationId}-logo.{ext}
  */
 export const uploadOrganizationLogo = async (
     request: UploadLogoRequest
 ): Promise<UploadLogoResponse> => {
-    const formData = new FormData();
-    formData.append("file", request.file);
+    try {
+        const formData = new FormData();
+        formData.append("file", request.file);
 
-    const response = await fetch(
-        `/api/organization/${request.organizationId}/logo`,
-        {
-            method: "POST",
-            body: formData,
-        }
-    );
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to upload logo");
+        const res = await api.post(
+            `/organizations/${request.organizationId}/logo`,
+            formData
+        );
+        return res.data;
+    } catch (error) {
+        console.error(
+            `Failed to upload organization logo for organization ID ${request.organizationId}: ${error}`
+        );
+        throw new Error(`Failed to upload organization logo: ${error}`);
     }
+};
 
-    return response.json();
+/**
+ * Fetch organization logo image as a Blob URL
+ * Returns an object containing the blob URL and filename (if known)
+ */
+export const fetchOrganizationLogo = async (
+    organizationId: number,
+): Promise<FetchOrganizationLogoResponse> => {
+    try {
+        const res = await api.get<Blob>(
+            `/organizations/${organizationId}/logo/image`,
+            { responseType: "blob" }
+        );
+
+        const contentDisposition = res.headers["content-disposition"];
+        let fileName: string | undefined = undefined;
+
+        if (contentDisposition) {
+            const fileNameMatch = contentDisposition.match(/filename="?(.+)"?/);
+            if (fileNameMatch && fileNameMatch.length > 1) {
+                fileName = fileNameMatch[1];
+            }
+        }
+
+        const blobUrl = URL.createObjectURL(res.data);
+        return { blobUrl, fileName };
+    } catch (error) {
+        console.error(
+            `Failed to fetch organization logo for organization ID ${organizationId}:`,
+            error
+        );
+        return { blobUrl: null };
+    }
 };
 
 /**
  * Remove organization logo
- * Deletes the logo file from /public/images
+ * Deletes the logo file from the logos folder and updates the active_logo.txt file.
  */
 export const removeOrganizationLogo = async (
     request: RemoveLogoRequest
 ): Promise<RemoveLogoResponse> => {
-    const response = await fetch(
-        `/api/organization/${request.organizationId}/logo`,
-        {
-            method: "DELETE",
-        }
-    );
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to remove logo");
+    try {
+        const response = await api.delete<RemoveLogoResponse>(`/organizations/${request.organizationId}/logo/delete`);
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Failed to remove logo");
     }
-
-    return response.json();
 };
 
 /**

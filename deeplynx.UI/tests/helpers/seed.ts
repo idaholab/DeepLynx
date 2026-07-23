@@ -1,5 +1,9 @@
 import type { Page } from "@playwright/test";
 
+/************************
+  THIS SEED SCRIPT IS DEPRECATED. When all tests are updated to use the fixture this can be deleted
+ ********************/
+
 /**
  * Seeds localStorage and cookies with an organization session so that
  * OrganizationSessionProvider finds it on mount.  Also suppresses the

@@ -28,7 +28,10 @@ namespace deeplynx.tests
         private string apiKey1;
         private string plaintextSecret1;
         private string hashedSecret1;
-
+        private long serviceAccountId;
+        private long orgId;
+        private long projectId;
+        
         public TokenBusinessTests(TestSuiteFixture fixture) : base(fixture)
         {
         }
@@ -446,6 +449,95 @@ namespace deeplynx.tests
         }
 
         #endregion
+        
+        #region GenerateServiceAccountApiKey Tests
+
+        [Fact]
+        public async Task GenerateServiceAccountApiKey_ReturnsKey_WhenAccountInOrgAndProject()
+        {
+            // Act
+            var dto = await _tokenBusiness.GenerateServiceAccountApiKey(
+                uid1, orgId, projectId, serviceAccountId);
+
+            // Assert - DTO populated
+            Assert.False(string.IsNullOrWhiteSpace(dto.apiKey));
+            Assert.False(string.IsNullOrWhiteSpace(dto.apiSecret));
+
+            // Assert - key persisted against the SERVICE ACCOUNT, not the caller
+            var saved = Context.ApiKeys.SingleOrDefault(k => k.Key == dto.apiKey);
+            Assert.NotNull(saved);
+            Assert.Equal(serviceAccountId, saved!.UserId);
+            Assert.True(_tokenBusiness.VerifyApiSecret(dto.apiSecret, saved.Secret));
+        }
+
+        [Fact]
+        public async Task GenerateServiceAccountApiKey_Throws_WhenAccountNotInProject()
+        {
+            // Arrange - a project the service account is NOT a member of
+            var otherProject = new Project { Name = "Other Project", OrganizationId = orgId };
+            Context.Projects.Add(otherProject);
+            await Context.SaveChangesAsync();
+
+            // Act & Assert
+            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                _tokenBusiness.GenerateServiceAccountApiKey(
+                    uid1, orgId, otherProject.Id, serviceAccountId));
+            Assert.Contains("not found", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task GenerateServiceAccountApiKey_Throws_WhenAccountNotInOrganization()
+        {
+            // Arrange - an org the service account is NOT a member of
+            var otherOrg = new Organization { Name = "Other Org" };
+            Context.Organizations.Add(otherOrg);
+            await Context.SaveChangesAsync();
+
+            // Act & Assert
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                _tokenBusiness.GenerateServiceAccountApiKey(
+                    uid1, otherOrg.Id, projectId, serviceAccountId));
+        }
+
+        [Fact]
+        public async Task GenerateServiceAccountApiKey_Throws_WhenAccountIsNotServiceType()
+        {
+            // Arrange - a regular user with valid org/project memberships
+            var regularUser = new User
+            {
+                Email = "regular@example.com",
+                Name = "Regular User",
+                AccountType = AccountType.Standard
+            };
+            Context.Users.Add(regularUser);
+            await Context.SaveChangesAsync();
+
+            Context.OrganizationUsers.Add(new OrganizationUser
+            {
+                OrganizationId = orgId, UserId = regularUser.Id
+            });
+            Context.ProjectMembers.Add(new ProjectMember
+            {
+                ProjectId = projectId, UserId = regularUser.Id
+            });
+            await Context.SaveChangesAsync();
+
+            // Act & Assert - memberships are valid, but it's not a service account
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                _tokenBusiness.GenerateServiceAccountApiKey(
+                    uid1, orgId, projectId, regularUser.Id));
+        }
+
+        [Fact]
+        public async Task GenerateServiceAccountApiKey_Throws_WhenAccountDoesNotExist()
+        {
+            // Act & Assert
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                _tokenBusiness.GenerateServiceAccountApiKey(
+                    uid1, orgId, projectId, serviceAccountId: 99999));
+        }
+
+        #endregion
 
         #region DeleteApiKey Tests
 
@@ -664,6 +756,43 @@ namespace deeplynx.tests
                 Secret = hashedSecret1, 
                 UserId = uid1,
                 ApplicationId = applicationId
+            });
+            await Context.SaveChangesAsync();
+            
+            // --- Service account test data ---
+
+            // Create org and project
+            var org = new Organization { Name = "SA Test Org" };
+            Context.Organizations.Add(org);
+            await Context.SaveChangesAsync();
+            orgId = org.Id;
+
+            var project = new Project { Name = "SA Test Project", OrganizationId = orgId };
+            Context.Projects.Add(project);
+            await Context.SaveChangesAsync();
+            projectId = project.Id;
+
+            // Create service account user
+            var serviceAccount = new User
+            {
+                Email = "svc@example.com",
+                Name = "Service Account",
+                AccountType = AccountType.Service
+            };
+            Context.Users.Add(serviceAccount);
+            await Context.SaveChangesAsync();
+            serviceAccountId = serviceAccount.Id;
+
+            // Add memberships to org and project
+            Context.OrganizationUsers.Add(new OrganizationUser
+            {
+                OrganizationId = orgId,
+                UserId = serviceAccountId
+            });
+            Context.ProjectMembers.Add(new ProjectMember
+            {
+                ProjectId = projectId,
+                UserId = serviceAccountId
             });
             await Context.SaveChangesAsync();
             

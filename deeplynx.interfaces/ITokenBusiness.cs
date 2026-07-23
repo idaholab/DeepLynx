@@ -11,8 +11,7 @@ public interface ITokenBusiness
     Task<TokenResponseDto> CreateApiKey(long currentUserId, string? clientId = null, long? createdByUserId = null,
         bool allowServiceAccount = false);
     Task<TokenResponseDto> GenerateServiceAccountApiKey(
-        long currentUserId,
-        long serviceAccountId);
+        long currentUserId, long organizationId, long projectId, long serviceAccountId);
     Task<TokenResponseDto> GenerateTestAccountApiKey(long currentUserId, long testAccountId);
     Task<ApiKey> GetApiKey(string apiKey);
     Task<bool> DeleteApiKey(long currentUserId, string key);

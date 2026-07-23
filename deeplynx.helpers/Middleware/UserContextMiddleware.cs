@@ -61,6 +61,8 @@ public class UserContextMiddleware
                             UserContextStorage.UserId = user.Id;
                             _logger.LogInformation($"User found: {user.Email} (ID: {user.Id})");
 
+                            UserContextStorage.AccountType = user.AccountType;
+
                             var adminService = scope.ServiceProvider.GetRequiredService<IAdminService>();
                             UserContextStorage.IsSysAdmin = await adminService.SysAdminCheck(user.Id);
 
@@ -91,6 +93,7 @@ public class UserContextMiddleware
                     _logger.LogWarning("Could not extract email from claims");
                     UserContextStorage.Email = null;
                     UserContextStorage.UserId = 0;
+                    UserContextStorage.IsOrgMember = false;
                 }
             }
             else

@@ -223,7 +223,7 @@ function RecordView({ record, activeClassNames }: RecordViewProps) {
             className="border-b border-base-content/40 cursor-pointer hover:bg-base-100/40 p-3 -mx-1 transition-colors"
             onClick={() => handleRecordClick()}
         >
-            <div className="font-medium text-base-content mb-2 line-clamp-1 overflow-hidden break-all">
+            <div className="font-medium text-base-content mb-2 line-clamp-1 overflow-hidden break-all" role='link' aria-label={record.name}>
                 {record.name}
             </div>
 

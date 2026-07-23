@@ -11,32 +11,31 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 
 import type {
   ProjectResponseDto,
-  TagResponseDto,
   SensitivityLabelsDto,
+  TagResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 
+import {
+  archiveSensitivityLabelProject,
+  createSensitivityLabelProject,
+  updateSensitivityLabelProject,
+} from "@/app/lib/client_service/sensitivity_labels_services.client";
 import {
   archiveTag,
   createTag,
   getAllTags,
   updateTag,
 } from "@/app/lib/client_service/tag_services.client";
-import {
-  archiveSensitivityLabelProject,
-  createSensitivityLabelProject,
-  getAllSensitivityLabelsProject,
-  updateSensitivityLabelProject,
-} from "@/app/lib/client_service/sensitivity_labels_services.client";
 
-import ConfirmArchiveTagModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveTagModal";
-import TagEditModal from "@/app/(home)/organization_management/tag_management/TagEditModal";
 import ConfirmArchiveLabelModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveLabelModal";
+import ConfirmArchiveTagModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveTagModal";
 import LabelEditModal from "@/app/(home)/organization_management/tag_management/LabelEditModal";
+import TagEditModal from "@/app/(home)/organization_management/tag_management/TagEditModal";
 import { useLanguage } from "@/app/contexts/Language";
+import { AxiosError } from "axios";
 import ProjectsSecurityLabels from "./ProjectsSecurityLabels";
 import ProjectTagOverviewStrip from "./ProjectTagOverviewStrip";
 import ProjectTagsPanel from "./ProjectTagsPanel";
-import { AxiosError } from "axios";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -58,7 +57,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   project,
   orgTagsLocked,
   initialLabels,
-  refreshLabels
+  refreshLabels,
 }) => {
   const { organization } = useOrganizationSession();
   const orgId = organization?.organizationId as number | undefined;
@@ -262,9 +261,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     if (!nameInput.trim()) return;
 
     if (!orgId || !projectId) {
-      toast.error(
-        t.translations.MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE,
-      );
+      toast.error(t.translations.MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE);
       return;
     }
 
@@ -318,16 +315,12 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     if (!labelNameInput.trim()) return;
 
     if (!orgId || !projectId) {
-      toast.error(
-        t.translations.MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE,
-      );
+      toast.error(t.translations.MISSING_ORG_OR_PROJECT_CONTEXT_UNABLE_TO_SAVE);
       return;
     }
 
     if (orgLabelsLocked) {
-      toast.error(
-        t.translations.LABELS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT,
-      );
+      toast.error(t.translations.LABELS_LOCKED_CANNOT_CREATE_OR_EDIT_PROJECT);
       return;
     }
 
@@ -422,8 +415,10 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       );
     } catch (error) {
       console.error("Failed to archive label:", error);
-      if (String((error as AxiosError).response?.data).includes("Cannot archive")) {
-        toast.error(t.translations.LABEL_IN_USE)
+      if (
+        String((error as AxiosError).response?.data).includes("Cannot archive")
+      ) {
+        toast.error(t.translations.LABEL_IN_USE);
       } else {
         toast.error(t.translations.FAILED_TO_ARCHIVE_LABEL);
       }
@@ -441,9 +436,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   const inheritedOrganizationTagCount = tags.filter(
     (tag) => !tag.projectId,
   ).length;
-  const projectManagedTagCount = tags.filter(
-    (tag) => !!tag.projectId,
-  ).length;
+  const projectManagedTagCount = tags.filter((tag) => !!tag.projectId).length;
   const totalVisibleTagCount = tags.length;
   const filteredTagCount = filteredTags.length;
 

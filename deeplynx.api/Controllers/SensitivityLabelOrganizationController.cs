@@ -11,6 +11,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [Route("organizations/{organizationId:long}/labels")]
 [Authorize]
+[ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Organization - Sensitivity Label")]
 public class SensitivityLabelOrganizationController : ControllerBase
 {
@@ -47,7 +48,7 @@ public class SensitivityLabelOrganizationController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var labels = await _sensitivityLabelBusiness
-                .GetAllSensitivityLabels(currentUserId,projectIds, organizationId,
+                .GetAllSensitivityLabels(currentUserId, projectIds, organizationId,
                     hideArchived); //setting project ID null for now to circumvent xor logic
             return Ok(labels);
         }
