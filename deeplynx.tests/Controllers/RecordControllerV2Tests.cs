@@ -5,7 +5,6 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Renci.SshNet.Security;
 
 namespace deeplynx.tests.Controllers;
 
@@ -541,7 +540,7 @@ public class RecordControllerV2Tests : IDisposable
                          It.IsAny<List<CreateRecordRequestDto>>(), It.IsAny<List<long>?>()))
                      .ThrowsAsync(new Exception("db error"));
 
-        await Assert.ThrowsAsync<Exception>(() =>_controller.BulkCreateRecordsV2(
+        await Assert.ThrowsAsync<Exception>(() => _controller.BulkCreateRecordsV2(
             OrgId, ProjectId, DataSourceId, records: new List<CreateRecordRequestDto>(), null));
     }
 

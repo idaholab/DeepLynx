@@ -1,11 +1,16 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.Configuration;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -18,7 +23,9 @@ namespace deeplynx.tests;
 public class ProjectBusinessTests : IntegrationTestBase
 {
     private ClassBusiness _classBusiness = null!;
+    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "ProjectBusinessLogoTests");
     private DataSourceBusiness _dataSourceBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
     private EventBusiness _eventBusiness = null!;
     private Mock<IEdgeBusiness> _mockEdgeBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -27,13 +34,17 @@ public class ProjectBusinessTests : IntegrationTestBase
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
-    private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
+    private IProjectRolePermissionService _permissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
+    private Mock<ILogger<ProjectRolePermissionService>> _logger = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private RoleBusiness _roleBusiness = null!;
     private Mock<IBulkCopyUpsertExecutor> _bulkCopyUpsertExecutor = null!;
     private long cid; // class ID
     private long did; // datasource ID
+    private long os1;
     private long gid; // group ID
     private long gid2;
     private long oid; // org IDs
@@ -57,6 +68,10 @@ public class ProjectBusinessTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
+
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
         Environment.SetEnvironmentVariable("FILE_STORAGE_METHOD", "filesystem");
         Environment.SetEnvironmentVariable("STORAGE_DIRECTORY", "./storage/");
@@ -68,7 +83,10 @@ public class ProjectBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
-        _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockAdminService = new Mock<IAdminService>();
+        _logger = new Mock<ILogger<ProjectRolePermissionService>>();
+        _permissionService = new ProjectRolePermissionService(Context, _logger.Object);
         _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockEdgeBusiness = new Mock<IEdgeBusiness>();
@@ -78,14 +96,14 @@ public class ProjectBusinessTests : IntegrationTestBase
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
         _dataSourceBusiness = new DataSourceBusiness(
             Context, _mockEdgeBusiness.Object,
-            _mockRecordBusiness.Object, _eventBusiness);
+            _mockRecordBusiness.Object, _eventBusiness, _permissionService, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness);
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
+            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
     }
 
     #region GetProjectStats Tests
@@ -349,6 +367,25 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         Context.Permissions.AddRange(permissions);
         await Context.SaveChangesAsync();
+
+        // Add object storage
+        var os1Config = new JsonObject
+        {
+            ["MountPath"] = "../data/duckdb"
+        };
+        var objectStorage = new ObjectStorage
+        {
+            Name = "Test Object Storage 1",
+            ProjectId = pid,
+            OrganizationId = oid,
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
+            Default = true
+        };
+
+        Context.ObjectStorages.Add(objectStorage);
+        await Context.SaveChangesAsync();
+        os1 = objectStorage.Id;
     }
 
     private void AssertRolePermissions(
@@ -474,7 +511,7 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.Equal(dto.Name, project.Name);
-        var dataSourceResult = await _dataSourceBusiness.GetAllDataSources(oid, new[] { project.Id });
+        var dataSourceResult = await _dataSourceBusiness.GetAllDataSources(uid, oid, [project.Id]);
         Assert.Single(dataSourceResult);
         Assert.Equal("Default Data Source", dataSourceResult[0].Name);
         Assert.Equal("This data source was created alongside the project for ease of use.",
@@ -1673,4 +1710,116 @@ public class ProjectBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region ProjectLogo Tests
+
+    [Fact]
+    public async Task RemoveLogoFileAsync_RemovesLogoFileSuccessfully()
+    {
+        // Arrange
+        long organizationId = 1;
+        long projectId = 1;
+
+        var testFileName = "test-logo.png";
+        var testFileContent = "Fake image content for testing";
+
+        var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
+
+        // Act
+        await _projectBusiness.UploadProjectLogo(organizationId, projectId, os1, testFormFile);
+        var result = await _projectBusiness.RemoveLogoFileAsync(organizationId, projectId, os1);
+
+        // Assert
+        Assert.True(result);
+
+        // Additional asserts to confirm the logo file is removed
+        var logosFolderPath = Path.Combine("/data/duckdb", $"org_{oid}", "projects", $"proj_{pid}", "logos");
+        var filePath = Path.Combine(logosFolderPath, testFileName);
+
+        Assert.False(File.Exists(filePath), "Logo file should have been deleted.");
+    }
+
+    [Fact]
+    public async Task UploadProjectLogo_UploadsFileSuccessfully()
+    {
+        // Arrange
+        long organizationId = 1;
+        long projectId = 1;
+
+        var testFileName = "test-logo.png";
+        var testFileContent = "Fake image content for testing"; // This can be any string or real binary data
+
+        var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
+
+        // Act
+        string uploadedFilePath = await _projectBusiness.UploadProjectLogo(organizationId, projectId, os1, testFormFile);
+
+        // Assert
+        Assert.False(string.IsNullOrEmpty(uploadedFilePath));
+        Assert.True(File.Exists(uploadedFilePath), "Uploaded file should exist at returned path.");
+
+        // Cleanup if necessary
+        if (File.Exists(uploadedFilePath))
+        {
+            File.Delete(uploadedFilePath);
+        }
+    }
+
+    [Fact]
+    public async Task GetProjectLogoStreamAsync_ReturnsActiveLogoStreamSuccessfully()
+    {
+        // Arrange
+        long organizationId = 1;
+        long projectId = 1;
+
+        var testFileName = "test-logo.png";
+        var testFileContent = "Fake image content for testing";
+
+        var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
+
+        // Upload a logo so there is an active logo file
+        string uploadedFilePath = await _projectBusiness.UploadProjectLogo(organizationId, projectId, os1, testFormFile);
+
+        // Act
+        var result = await _projectBusiness.GetProjectLogoStreamAsync(organizationId, projectId, os1);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result?.Stream);
+        Assert.NotNull(result?.FullPath);
+        Assert.True(File.Exists(result?.FullPath), "Returned logo file path should exist");
+
+        var logosFolderPath = Path.Combine(
+            Path.GetDirectoryName(uploadedFilePath) ?? "",
+            "");
+
+        var activeLogoFileName = await File.ReadAllTextAsync(Path.Combine(logosFolderPath, "active_logo.txt"));
+        Assert.Equal(Path.GetFileName(result?.FullPath), activeLogoFileName.Trim());
+
+        // Cleanup
+        result?.Stream.Dispose();
+        if (File.Exists(uploadedFilePath))
+        {
+            File.Delete(uploadedFilePath);
+        }
+        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+        if (File.Exists(metadataFilePath))
+        {
+            File.Delete(metadataFilePath);
+        }
+    }
+
+    #endregion
+
+    // Helper method to create an IFormFile from a string or byte array
+    private IFormFile CreateTestFormFile(string fileName, string content, string contentType = "image/png")
+    {
+        var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        return new FormFile(stream, 0, stream.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
+    }
+
 }

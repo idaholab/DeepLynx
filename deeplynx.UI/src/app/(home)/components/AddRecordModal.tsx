@@ -414,7 +414,7 @@ const AddRecordModal: React.FC<Props> = ({
             <span className={`text-xs float-right mt-1 ${description.length >= 250 ? "text-error" :
               description.length >= 240 ? "text-warning" :
                 "text-base-content"
-            }`}>
+              }`}>
               {description.length}/250
             </span>
           </div>
@@ -439,8 +439,8 @@ const AddRecordModal: React.FC<Props> = ({
               <button
                 type="button"
                 className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "ids"
-                    ? "bg-base-100 font-semibold border-b-2 border-primary"
-                    : "text-base-content/70"
+                  ? "bg-base-100 font-semibold border-b-2 border-primary"
+                  : "text-base-content/70"
                   }`}
                 onClick={() => setOptionalTab("ids")}
               >
@@ -449,22 +449,22 @@ const AddRecordModal: React.FC<Props> = ({
               <button
                 type="button"
                 className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "meta"
-                    ? "bg-base-100 font-semibold border-b-2 border-primary"
-                    : "text-base-content/70"
+                  ? "bg-base-100 font-semibold border-b-2 border-primary"
+                  : "text-base-content/70"
                   }`}
                 onClick={() => setOptionalTab("meta")}
               >
-                Metadata
+                {t.translations.METADATA}
               </button>
               <button
                 type="button"
                 className={`flex-1 px-3 py-2 text-xs md:text-sm ${optionalTab === "tags"
-                    ? "bg-base-100 font-semibold border-b-2 border-primary"
-                    : "text-base-content/70"
+                  ? "bg-base-100 font-semibold border-b-2 border-primary"
+                  : "text-base-content/70"
                   }`}
                 onClick={() => setOptionalTab("tags")}
               >
-                Tags &amp; Labels
+                {t.translations.TAGS_AND_SECURITY_LABELS}
               </button>
             </div>
 
@@ -476,7 +476,7 @@ const AddRecordModal: React.FC<Props> = ({
                     type="number"
                     inputMode="numeric"
                     className="input input-bordered w-full"
-                    placeholder="object_storage_id"
+                    placeholder={t.translations.OBJECT_STORAGE_ID_PLACEHOLDER}
                     value={objectStorageId}
                     onChange={(e) => setObjectStorageId(e.target.value)}
                   />
@@ -485,7 +485,7 @@ const AddRecordModal: React.FC<Props> = ({
                     type="number"
                     inputMode="numeric"
                     className="input input-bordered w-full"
-                    placeholder="class_id"
+                    placeholder={t.translations.CLASS_ID_PLACEHOLDER}
                     value={classId ?? ""}
                     onChange={(e) =>
                       setClassId(
@@ -503,7 +503,7 @@ const AddRecordModal: React.FC<Props> = ({
                   <input
                     type="text"
                     className="input input-bordered w-full"
-                    placeholder="uri"
+                    placeholder={t.translations.URI_PLACEHOLDER}
                     value={uri}
                     onChange={(e) => setUri(e.target.value)}
                   />
@@ -511,7 +511,7 @@ const AddRecordModal: React.FC<Props> = ({
                   <input
                     type="text"
                     className="input input-bordered w-full"
-                    placeholder="class_name"
+                    placeholder={t.translations.CLASS_NAME_PLACEHOLDER}
                     value={classNameOpt}
                     onChange={(e) => setClassNameOpt(e.target.value)}
                   />
@@ -523,7 +523,7 @@ const AddRecordModal: React.FC<Props> = ({
                   <input
                     type="text"
                     className="input input-bordered w-full"
-                    placeholder="tags (comma-separated)"
+                    placeholder={t.translations.TAGS_COMMA_SEPARATED}
                     value={tagsText}
                     onChange={(e) => setTagsText(e.target.value)}
                   />
@@ -531,7 +531,7 @@ const AddRecordModal: React.FC<Props> = ({
                   <input
                     type="text"
                     className="input input-bordered w-full"
-                    placeholder="sensitivity_labels (comma-separated)"
+                    placeholder={t.translations.SENSITIVITY_LABELS_COMMA_SEPARATED}
                     value={labelsText}
                     onChange={(e) => setLabelsText(e.target.value)}
                   />
