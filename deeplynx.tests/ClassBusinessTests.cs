@@ -349,6 +349,28 @@ public class ClassBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateClass_Success_GeneratesUuid_WhenUuidNotProvided()
+    {
+        // Arrange
+        var dto = new CreateClassRequestDto
+        {
+            Name = $"New Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "New Description"
+            // Intentionally leave Uuid null
+        };
+
+        // Act
+        var result = await _classBusiness.CreateClass(uid, oid, pid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.False(string.IsNullOrWhiteSpace(result.Uuid));
+        Assert.True(Guid.TryParse(result.Uuid, out _));
+        Assert.Equal(dto.Name, result.Name);
+        Assert.Equal(dto.Description, result.Description);
+    }
+
+    [Fact]
     public async Task CreateClasses_Success_OnBulkCreate()
     {
         // Arrange

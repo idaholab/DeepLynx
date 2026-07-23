@@ -249,6 +249,32 @@ public class RelationshipBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateRelationship_Success_GeneratesUuid_WhenUuidNotProvided()
+    {
+        // Arrange
+        var dto = new CreateRelationshipRequestDto
+        {
+            Name = $"Test Relationship {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Test Description",
+            OriginId = cid,
+            DestinationId = cid2
+            // Leave Uuid null
+        };
+
+        // Act
+        var result = await _relationshipBusiness.CreateRelationship(uid, oid, pid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.False(string.IsNullOrWhiteSpace(result.Uuid));
+        Assert.True(Guid.TryParse(result.Uuid, out _));
+        Assert.Equal(dto.Name, result.Name);
+        Assert.Equal(dto.Description, result.Description);
+        Assert.Equal(cid, result.OriginId);
+        Assert.Equal(cid2, result.DestinationId);
+    }
+
+    [Fact]
     public async Task CreateRelationshipNullOriginAndDestination_Success_ReturnsIdAndCreatedAt()
     {
         // Arrange
