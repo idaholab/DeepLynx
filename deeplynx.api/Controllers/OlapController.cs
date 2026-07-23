@@ -209,7 +209,7 @@ public class OlapController : ControllerBase
     [Auth("read", "record")]
     [Auth("read", "file")]
     [Sensitivity("download file")]
-    public async Task<IActionResult> GetPlotDataV2(long organizationId, long projectId, long recordId,
+    public async Task<ActionResult<PlotDataDto>> GetPlotDataV2(long organizationId, long projectId, long recordId,
         [FromQuery] OlapQueryRequestDto request)
     {
         var currentUserId = UserContextStorage.UserId;
