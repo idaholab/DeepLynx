@@ -293,7 +293,7 @@ public class PermissionProjectController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "permission")]
-    public async Task<ActionResult> DeletePermissionV2(
+    public async Task<ActionResult<bool>> DeletePermissionV2(
         long organizationId,
         long projectId,
         long permissionId)

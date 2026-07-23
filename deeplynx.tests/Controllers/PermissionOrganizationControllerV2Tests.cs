@@ -352,10 +352,10 @@ public class PermissionOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.DeletePermission(OrgId, null, UserId, PermissionId))
             .ReturnsAsync(true);
 
-        var result = await _permissionOrganizationController.DeletePermissionV2(
-            OrgId, PermissionId) as OkObjectResult;
+        var actionResult = await _permissionOrganizationController.DeletePermissionV2(
+            OrgId, PermissionId);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
