@@ -122,6 +122,54 @@ public class FileController : ControllerBase
     }
 
     /// <summary>
+    ///     Updates the SHA-256 content hash stored for a file record.
+    /// </summary>
+    [HttpPut("{recordId:long}/hash", Name = "api_update_hash")]
+    [Auth("update", "file")]
+    [Auth("update", "record")]
+    public async Task<ActionResult<RecordResponseDto>> UpdateFileContentHash(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromBody] UpdateFileContentHashRequestDto request)
+    {
+        try
+        {
+            var response = await _fileBusiness.UpdateFileContentHash(
+                UserContextStorage.UserId,
+                organizationId,
+                projectId,
+                recordId,
+                request);
+
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to update the file content hash for record {RecordId}",
+                recordId);
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new { message = "An error occurred while updating the file content hash" });
+        }
+    }
+
+    /// <summary>
     ///     Download Appended File
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>

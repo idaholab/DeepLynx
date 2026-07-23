@@ -1,58 +1,66 @@
 # File content hashing
 
-Nexus records a SHA-256 hash for the complete byte content of files handled by its hashing integrations. The hash supports content identity, integrity verification, traceability, and provenance without depending on a file name, record ID, or storage URI.
+Nexus records a SHA-256 hash for the complete byte content of supported stored files. The hash supports content identity, integrity verification, traceability, and provenance without depending on a file name, record ID, or storage URI.
 
 ## Hash definition
 
-`file_content_hash` is the lowercase hexadecimal SHA-256 digest of the file bytes exactly as stored in object storage. Nexus does not normalize text, parse documents, hash generated chunks, or hash embedding vectors as part of this feature.
+`file_content_hash` is the lowercase hexadecimal SHA-256 digest of the file bytes supplied to the storage provider. Nexus does not normalize text, parse documents, hash generated chunks, or hash embedding vectors as part of this feature.
 
 Two files with identical bytes have the same content hash. Any byte-level difference produces a different hash. The hash is therefore the canonical identity of file content, while comparisons against a recomputed digest provide artifact verification.
 
-SHA-256 digests are stored as 64 lowercase hexadecimal characters. The hash does not include the container name, blob name, metadata, content length, or other record fields.
+SHA-256 digests are stored as 64 lowercase hexadecimal characters. The digest does not include the storage location, file name, metadata, content length, or other record fields.
 
-## Azure hashing flow
+## Upload and update flow
 
-The `deeplynx.blobhash.functions` Azure Function watches the container configured by `BLOB_HASH_CONTAINER`.
+The existing file workflow asks the selected storage provider to calculate a content hash before it stores the file.
 
-1. The blob trigger receives a completed blob as a stream.
-2. Temporary paths containing `/uploads/` and paths outside the Nexus naming convention are ignored.
-3. The function computes SHA-256 incrementally from the blob stream so the entire file does not need to be loaded into memory.
-4. The function authenticates to Nexus with its configured API key and secret.
-5. It posts the digest, container, blob name, and available content length to the internal blob-hash callback.
-6. Nexus matches an active Azure-backed record by organization, project, blob name, and configured Azure container.
-7. When both values are available, Nexus verifies that the callback content length equals the record's stored file size.
-8. Nexus stores the digest in `records.file_content_hash` and records an update event. Repeating a callback with the same digest is idempotent.
+1. `FileBusiness` resolves the configured object-storage provider.
+2. The provider calculates a content hash when hashing is supported.
+3. The provider uploads or replaces the file through its existing implementation.
+4. `FileBusiness` includes the hash when it creates or updates the associated record.
+5. Nexus returns the hash as `fileContentHash` in `RecordResponseDto`.
 
-The container and content length are verification inputs; they are not part of the digest. Container matching prevents a hash from being associated with a same-named blob in another container. Content-length comparison catches callbacks for bytes that do not match the record's expected file size.
+Azure hashing is implemented in `FileAzureBusiness`. It streams the upload through the shared `Sha256HashHelper`, so the entire file does not need to be held in memory. Hash calculation is synchronous and adds one read of the incoming upload stream before the Azure upload begins. It does not reread the completed blob from Azure.
 
-## Callback validation
+For completed chunked Azure uploads, where the original `IFormFile` is no longer available, `FileAzureBusiness` streams the finalized blob once to calculate its digest before the record is created.
 
-The callback accepts only:
+`FileFilesystemBusiness` and `FileS3Business` currently return a null hash from the same provider hook. These placeholders keep the provider contract stable without changing existing filesystem or S3 upload behavior. Their hashing implementations are deferred to provider-specific follow-up tickets.
 
-- object storage type `azure_object`;
-- hash algorithm `SHA-256`;
-- a nonempty container and blob name;
-- a 64-character hexadecimal digest;
-- a nonnegative content length when one is supplied.
+When a file is replaced through a provider that does not yet calculate hashes, Nexus clears the previous hash rather than retaining a digest for bytes that no longer exist.
 
-A missing record or container match returns `404 Not Found`. Ambiguous matches or a content-length mismatch return `409 Conflict`. Invalid callback values return `400 Bad Request`.
+## Updating or backfilling a hash
 
-The Function retries transient callback failures, including temporary authorization failures, rate limiting, server errors, and a record that is not yet visible. Validation and conflict responses are treated as permanent failures.
+An authenticated provider-neutral endpoint can store a hash for a specific file record:
 
-## Configuration
+```text
+PUT /organizations/{organizationId}/projects/{projectId}/files/{recordId}/hash
+```
 
-The Function uses these environment variables:
+The caller must have `update file` and `update record` permissions. The request contains:
 
-- `AzureWebJobsStorage`: Azure Storage connection used by the blob trigger.
-- `BLOB_HASH_CONTAINER`: watched Azure container and the container identity sent to Nexus.
-- `NEXUS_BASE_URL`: Nexus API base URL, including its API version prefix.
-- `NEXUS_API_KEY` and `NEXUS_API_SECRET`: service credentials used to request a Nexus token.
-- `NEXUS_TOKEN_EXPIRATION_MINUTES`: requested token lifetime; defaults to 55 minutes.
-- `NEXUS_CALLBACK_MAX_ATTEMPTS`: maximum callback attempts; defaults to 5.
-- `NEXUS_CALLBACK_BASE_DELAY_SECONDS`: initial exponential retry delay; defaults to 2 seconds.
+- `hashAlgorithm`: must be `SHA-256`;
+- `hashHex`: a 64-character hexadecimal digest;
+- `contentLength`: optional nonnegative file length used for verification.
 
-See `deeplynx.blobhash.functions/local.settings.sample.json` for a local configuration template. Do not commit real credentials.
+The endpoint identifies the record directly from the route and does not depend on a storage-provider type, container, or object path. When both values are available, Nexus verifies that `contentLength` equals the record's stored file size. Hashes are normalized to lowercase.
 
-## Current scope
+Submitting the hash already stored on the record is idempotent. A changed hash updates the record and creates update-event and provenance entries.
 
-The automated hashing worker currently covers Nexus files stored in the configured Azure Blob Storage container. Filesystem and S3 storage providers require equivalent hashing integration before they can provide the same automatic guarantee.
+The endpoint supports future provider integrations and controlled backfill tools, but this change does not include a job that enumerates existing files. Existing records with a null `file_content_hash` remain unhashed until their file is replaced through a supported provider or an external backfill submits a verified digest.
+
+## Validation responses
+
+- Invalid algorithm, digest, or content length: `400 Bad Request`.
+- Missing or archived record: `404 Not Found`.
+- Content-length mismatch: `409 Conflict`.
+- Successful or idempotent update: `200 OK` with `RecordResponseDto`.
+
+## Current provider scope
+
+| Provider | Automatic upload hash | Automatic update hash |
+| --- | --- | --- |
+| Azure Blob Storage | SHA-256 | SHA-256 |
+| Filesystem | Deferred; returns null | Deferred; clears a previous hash |
+| Amazon S3 | Deferred; returns null | Deferred; clears a previous hash |
+
+No database migration is required for this change because `records.file_content_hash` already exists in the current schema.

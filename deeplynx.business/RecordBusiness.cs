@@ -1070,6 +1070,7 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedBy = currentUserId,
                 FileType = dto.FileType,
                 FileSize = dto.FileSize,
+                FileContentHash = dto.FileContentHash,
                 OrganizationId = organizationId,
                 Embedded = embedded
             };
@@ -1792,6 +1793,8 @@ public class RecordBusiness : IRecordBusiness
         returnedRecord.LastUpdatedBy = currentUserId;
         returnedRecord.FileType = dto.FileType ?? returnedRecord.FileType;
         returnedRecord.FileSize = dto.FileSize ?? returnedRecord.FileSize;
+        if (dto.ReplaceFileContentHash)
+            returnedRecord.FileContentHash = dto.FileContentHash;
 
         _context.Records.Update(returnedRecord);
         await _context.SaveChangesAsync();
@@ -1849,93 +1852,42 @@ public class RecordBusiness : IRecordBusiness
     }
 
     /// <summary>
-    ///     Updates the stored whole-file content hash for a Nexus-managed Azure blob.
+    ///     Updates the stored whole-file content hash for a file record.
     /// </summary>
-    public async Task<BlobHashCallbackResponseDto> UpdateFileContentHashFromBlob(
+    public async Task<RecordResponseDto> UpdateFileContentHash(
         long currentUserId,
         long organizationId,
         long projectId,
-        BlobHashCallbackRequestDto dto)
+        long recordId,
+        UpdateFileContentHashRequestDto dto)
     {
         ValidationHelper.ValidateModel(dto);
 
-        if (!string.Equals(dto.ObjectStorageType, "azure_object", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Only azure_object storage hash callbacks are supported.");
-
         if (!string.Equals(dto.HashAlgorithm, "SHA-256", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Only SHA-256 hash callbacks are supported.");
+            throw new ArgumentException("Only SHA-256 file content hashes are supported.");
 
         if (!Sha256HexRegex.IsMatch(dto.HashHex))
             throw new ArgumentException("HashHex must be a 64-character hexadecimal SHA-256 value.");
 
-        var normalizedHash = dto.HashHex.ToLowerInvariant();
-        var normalizedBlobName = dto.BlobName.Trim();
-        var normalizedContainerName = dto.ContainerName.Trim();
-
-        if (string.IsNullOrWhiteSpace(normalizedBlobName))
-            throw new ArgumentException("BlobName cannot be empty.");
-
-        if (string.IsNullOrWhiteSpace(normalizedContainerName))
-            throw new ArgumentException("ContainerName cannot be empty.");
-
         if (dto.ContentLength is < 0)
             throw new ArgumentException("ContentLength cannot be negative.");
 
-        var candidateRecords = await _context.Records
-            .Include(r => r.ObjectStorage)
-            .Where(r => r.OrganizationId == organizationId
-                        && r.ProjectId == projectId
-                        && !r.IsArchived
-                        && r.Uri == normalizedBlobName
-                        && r.ObjectStorageId != null
-                        && r.ObjectStorage != null
-                        && !r.ObjectStorage.IsArchived
-                        && r.ObjectStorage.Type == "azure_object")
-            .ToListAsync();
+        var record = await _context.Records
+            .FirstOrDefaultAsync(r => r.Id == recordId
+                                      && r.OrganizationId == organizationId
+                                      && r.ProjectId == projectId
+                                      && !r.IsArchived);
 
-        if (candidateRecords.Count == 0)
-            throw new KeyNotFoundException(
-                $"No active Azure record found for blob '{normalizedBlobName}' in container '{normalizedContainerName}'.");
-
-        var objectStorageIds = candidateRecords
-            .Select(r => r.ObjectStorageId!.Value)
-            .Distinct()
-            .ToList();
-
-        var objectStorages = await _objectStorageBusiness.GetDecryptedObjectStorages(
-            organizationId,
-            projectId,
-            objectStorageIds);
-
-        var matchingObjectStorageIds = objectStorages
-            .Where(storage => string.Equals(
-                storage.Config.AzureObjectConfig?.AzureContainerName?.Trim(),
-                normalizedContainerName,
-                StringComparison.Ordinal))
-            .Select(storage => storage.Id)
-            .ToHashSet();
-
-        var matchingRecords = candidateRecords
-            .Where(record => matchingObjectStorageIds.Contains(record.ObjectStorageId!.Value))
-            .ToList();
-
-        if (matchingRecords.Count == 0)
-            throw new KeyNotFoundException(
-                $"No active Azure record found for blob '{normalizedBlobName}' in container '{normalizedContainerName}'.");
-
-        if (matchingRecords.Count > 1)
-            throw new InvalidOperationException(
-                $"Multiple active Azure records found for blob '{normalizedBlobName}' in container " +
-                $"'{normalizedContainerName}' and project {projectId}.");
-
-        var record = matchingRecords[0];
+        if (record == null)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
 
         if (dto.ContentLength.HasValue
             && record.FileSize.HasValue
             && dto.ContentLength.Value != record.FileSize.Value)
             throw new InvalidOperationException(
-                $"Blob content length {dto.ContentLength.Value} does not match record file size {record.FileSize.Value}.");
+                $"Content length {dto.ContentLength.Value} does not match record file size {record.FileSize.Value}.");
 
+        var normalizedHash = dto.HashHex.ToLowerInvariant();
         var updated = !string.Equals(record.FileContentHash, normalizedHash, StringComparison.Ordinal);
 
         if (updated)
@@ -1960,16 +1912,23 @@ public class RecordBusiness : IRecordBusiness
                     Properties = "{\"fileContentHash\":\"updated\"}",
                     DataSourceId = record.DataSourceId
                 });
+
+            if (!await _provenanceBusiness.CreateProvenanceRecord(
+                    record.Id,
+                    "update-file-content-hash",
+                    currentUserId,
+                    null))
+                _logger.LogWarning(
+                    "Failed to create provenance record for file content hash update on record {RecordId}",
+                    record.Id);
         }
 
-        return new BlobHashCallbackResponseDto
-        {
-            RecordId = record.Id,
-            BlobName = normalizedBlobName,
-            HashAlgorithm = "SHA-256",
-            HashHex = normalizedHash,
-            Updated = updated
-        };
+        return await GetRecord(
+            currentUserId,
+            organizationId,
+            projectId,
+            record.Id,
+            true);
     }
 
     /// <summary>

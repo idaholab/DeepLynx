@@ -270,6 +270,21 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
 
     [Fact]
+    public async Task CalculateFileContentHash_ReturnsNullPlaceholder()
+    {
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("filesystem placeholder"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "hash.txt");
+
+        var result = await _fileBusiness.CalculateFileContentHash(file);
+        var storedResult = await _fileBusiness.CalculateStoredFileContentHash(
+            "placeholder",
+            new ObjectStorageConfigDto());
+
+        Assert.Null(result);
+        Assert.Null(storedResult);
+    }
+
+    [Fact]
     public async Task UploadFile_ShouldSaveFileAndReturnPath()
     {
         // Arrange

@@ -45,8 +45,9 @@ public interface IRecordBusiness
         long currentUserId, long organizationId, long projectId, long recordId, UpdateRecordRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false,
         bool isProjectAdmin = false);
 
-    Task<BlobHashCallbackResponseDto> UpdateFileContentHashFromBlob(
-        long currentUserId, long organizationId, long projectId, BlobHashCallbackRequestDto dto);
+    Task<RecordResponseDto> UpdateFileContentHash(
+        long currentUserId, long organizationId, long projectId, long recordId,
+        UpdateFileContentHashRequestDto dto);
 
     Task<bool> DeleteRecord(long currentUserId, long organizationId, long projectId, long recordId);
     Task<bool> ArchiveRecord(long currentUserId, long organizationId, long projectId, long recordId);

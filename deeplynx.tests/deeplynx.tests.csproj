@@ -48,7 +48,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\deeplynx.api\deeplynx.api.csproj" />
-      <ProjectReference Include="..\deeplynx.blobhash.functions\deeplynx.blobhash.functions.csproj" />
       <ProjectReference Include="..\deeplynx.business\deeplynx.business.csproj" />
       <ProjectReference Include="..\deeplynx.datalayer\deeplynx.datalayer.csproj" />
       <ProjectReference Include="..\deeplynx.helpers\deeplynx.helpers.csproj" />
