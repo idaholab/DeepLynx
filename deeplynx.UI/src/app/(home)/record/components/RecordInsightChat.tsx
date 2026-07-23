@@ -10,6 +10,7 @@ import type { InsightModelSelection } from "@/app/(home)/components/insight/useI
   fetchInsightIngestionStatus,
   queueInsightUpload,
   streamInsightQuery,
+  type InsightEndpointHealthByRole,
 } from "@/app/lib/client_service/insight_services.client";
 import { useLanguage } from "@/app/contexts/Language";
 import {
@@ -50,6 +51,7 @@ interface RecordInsightChatProps {
   isIngestionUnavailable?: boolean;
   selectedInsightModels: InsightModelSelection;
   onSelectedInsightModelsChange: (nextSelection: InsightModelSelection) => void;
+  endpointHealth?: InsightEndpointHealthByRole;
 }
 
 const STATUS_POLL_INTERVAL_MS = 5000;
@@ -97,7 +99,8 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
   isChatUnavailable = false,
   isIngestionUnavailable = false,
   selectedInsightModels,
-  onSelectedInsightModelsChange,
+  onSelectedInsightModelsChange,  
+  endpointHealth,
 }) => {
   const { t } = useLanguage();
   const trimmedRecordName = recordName?.trim() ?? "";
@@ -631,6 +634,7 @@ const RecordInsightChat: React.FC<RecordInsightChatProps> = ({
         selectedInsightModels={selectedInsightModels}
         onClose={() => setIsSettingsModalOpen(false)}
         onSaveSelection={onSelectedInsightModelsChange}
+        endpointHealth={endpointHealth}
       />
     </div>
   );
