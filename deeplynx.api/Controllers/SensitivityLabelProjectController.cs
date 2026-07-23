@@ -276,7 +276,7 @@ public class SensitivityLabelProjectController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "sensitivity_label")]
-    public async Task<ActionResult> DeleteSensitivityLabelV2(
+    public async Task<ActionResult<bool>> DeleteSensitivityLabelV2(
         long projectId,
         long labelId)
     {
@@ -336,7 +336,7 @@ public class SensitivityLabelProjectController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "sensitivity_label")]
-    public async Task<IActionResult> ArchiveSensitivityLabelV2(
+    public async Task<ActionResult<bool>> ArchiveSensitivityLabelV2(
         long projectId,
         long labelId,
         [FromQuery] bool archive)

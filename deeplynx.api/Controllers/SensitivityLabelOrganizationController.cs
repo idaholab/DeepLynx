@@ -84,7 +84,7 @@ public class SensitivityLabelOrganizationController : ControllerBase
             var currentUserId = UserContextStorage.UserId;
             var labels = await _sensitivityLabelBusiness
                 .GetAllSensitivityLabels(currentUserId, projectIds, organizationId,
-                    hideArchived); //setting project ID null for now to circumvent xor logic
+                    hideArchived);
             return Ok(labels);
     }
 
@@ -273,7 +273,7 @@ public class SensitivityLabelOrganizationController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "sensitivity_label")]
-    public async Task<ActionResult> DeleteSensitivityLabelV2(
+    public async Task<ActionResult<bool>> DeleteSensitivityLabelV2(
         long organizationId,
         long labelId)
     {
@@ -331,7 +331,7 @@ public class SensitivityLabelOrganizationController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "sensitivity_label")]
-    public async Task<IActionResult> ArchiveSensitivityLabelV2(
+    public async Task<ActionResult<bool>> ArchiveSensitivityLabelV2(
         long organizationId,
         long labelId,
         [FromQuery] bool archive)

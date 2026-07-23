@@ -358,10 +358,10 @@ public class SensitivityLabelProjectControllerTestsV2 : IDisposable
             .Setup(b => b.DeleteSensitivityLabel(UserId, LabelId, ProjectId, OrgId))
             .ReturnsAsync(true);
 
-        var result = await _sensitivityLabelProjectController.DeleteSensitivityLabelV2(
-            ProjectId, LabelId) as OkObjectResult;
+        var actionResult = await _sensitivityLabelProjectController.DeleteSensitivityLabelV2(
+            ProjectId, LabelId);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
@@ -417,10 +417,10 @@ public class SensitivityLabelProjectControllerTestsV2 : IDisposable
             .Setup(b => b.ArchiveSensitivityLabel(UserId, LabelId, ProjectId, OrgId))
             .ReturnsAsync(true);
 
-        var result = await _sensitivityLabelProjectController.ArchiveSensitivityLabelV2(
-            ProjectId, LabelId, archive: true) as OkObjectResult;
+        var actionResult = await _sensitivityLabelProjectController.ArchiveSensitivityLabelV2(
+            ProjectId, LabelId, archive: true);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockSensitivityLabelBusiness.Verify(
@@ -438,10 +438,10 @@ public class SensitivityLabelProjectControllerTestsV2 : IDisposable
             .Setup(b => b.UnarchiveSensitivityLabel(UserId, LabelId, ProjectId, OrgId))
             .ReturnsAsync(true);
 
-        var result = await _sensitivityLabelProjectController.ArchiveSensitivityLabelV2(
-            ProjectId, LabelId, archive: false) as OkObjectResult;
+        var actionResult = await _sensitivityLabelProjectController.ArchiveSensitivityLabelV2(
+            ProjectId, LabelId, archive: false);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockSensitivityLabelBusiness.Verify(
