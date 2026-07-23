@@ -262,7 +262,7 @@ public class OlapController : ControllerBase
     [Auth("read", "record")]
     [Auth("read", "file")]
     [Sensitivity("download file")]
-    public async Task<IActionResult> GetHighestPartNumberV2(long organizationId, long projectId, long recordId)
+    public async Task<ActionResult<long>> GetHighestPartNumberV2(long organizationId, long projectId, long recordId)
     {
        var partNumber = await _olapBusiness.GetHighestPartNumber(organizationId, projectId, recordId);
             return Ok(partNumber);
