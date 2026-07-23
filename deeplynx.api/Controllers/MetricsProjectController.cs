@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.interfaces;
+using deeplynx.models.MetricsDTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Scalar.AspNetCore;
@@ -73,7 +74,7 @@ public class MetricsProjectController : ControllerBase
     [HttpGet("storage/size", Name = "api_storage_size_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<IActionResult> GetProjectStorageSizeV2(
+    public async Task<ActionResult<StorageSizeDto>> GetProjectStorageSizeV2(
         long organizationId,
         long projectId
     )
@@ -162,7 +163,7 @@ public class MetricsProjectController : ControllerBase
     [HttpGet("records/count", Name = "api_record_count_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<IActionResult> GetProjectRecordCountV2(
+    public async Task<ActionResult<int>> GetProjectRecordCountV2(
         long organizationId, 
         long projectId, 
         [FromQuery] bool hideArchived = true)
@@ -180,7 +181,7 @@ public class MetricsProjectController : ControllerBase
     /// <returns>The file count for the given scope</returns>
     [HttpGet("files/count", Name = "api_file_count_project")]
     [MapToApiVersion(1)]
-    public async Task<IActionResult> GetProjectFileCount(
+    public async Task<ActionResult> GetProjectFileCount(
         long organizationId, 
         long projectId, 
         [FromQuery] bool hideArchived = true)
@@ -208,7 +209,7 @@ public class MetricsProjectController : ControllerBase
     [HttpGet("files/count", Name = "api_file_count_project")]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<IActionResult> GetProjectFileCountV2(
+    public async Task<ActionResult<int>> GetProjectFileCountV2(
         long organizationId, 
         long projectId, 
         [FromQuery] bool hideArchived = true)
