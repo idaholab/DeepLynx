@@ -22,6 +22,8 @@ public class RelationshipBusinessTests : IntegrationTestBase
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _mockOrganizationBusiness = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
@@ -53,6 +55,8 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockAdminService = new Mock<IAdminService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
@@ -66,7 +70,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
             Context, _mockEdgeBusiness.Object, _eventBusiness);
 
         _dataSourceBusiness = new DataSourceBusiness(
-            Context, _mockEdgeBusiness.Object, _mockRecordBusiness.Object, _eventBusiness);
+            Context, _mockEdgeBusiness.Object, _mockRecordBusiness.Object, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
 
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
@@ -242,6 +246,32 @@ public class RelationshipBusinessTests : IntegrationTestBase
         Assert.Equal("relationship", actualEvent.EntityType);
         Assert.Equal(result.Id, actualEvent.EntityId);
         Assert.Equal(result.ProjectId, actualEvent.ProjectId);
+    }
+
+    [Fact]
+    public async Task CreateRelationship_Success_GeneratesUuid_WhenUuidNotProvided()
+    {
+        // Arrange
+        var dto = new CreateRelationshipRequestDto
+        {
+            Name = $"Test Relationship {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Test Description",
+            OriginId = cid,
+            DestinationId = cid2
+            // Leave Uuid null
+        };
+
+        // Act
+        var result = await _relationshipBusiness.CreateRelationship(uid, oid, pid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.False(string.IsNullOrWhiteSpace(result.Uuid));
+        Assert.True(Guid.TryParse(result.Uuid, out _));
+        Assert.Equal(dto.Name, result.Name);
+        Assert.Equal(dto.Description, result.Description);
+        Assert.Equal(cid, result.OriginId);
+        Assert.Equal(cid2, result.DestinationId);
     }
 
     [Fact]

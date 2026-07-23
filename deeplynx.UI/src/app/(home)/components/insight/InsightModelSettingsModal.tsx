@@ -526,22 +526,11 @@ export default function InsightModelSettingsModal({
 
     // Reset the modal from the persisted selection each time it opens so
     // unsaved edits do not leak between sessions.
-    setDraftInsightModelSelection(
-      syncSelectedModelNames(
-        selectedInsightModels,
-        availableModelConfigs,
-        defaultModelLabel,
-      ),
-    );
+    setDraftInsightModelSelection(selectedInsightModels);
     setActiveTokenEditor(null);
     setIsEditorTokenVisible(false);
     setTokenSaveError("");
-  }, [
-    availableModelConfigs,
-    defaultModelLabel,
-    isOpen,
-    selectedInsightModels,
-  ]);
+  }, [isOpen, selectedInsightModels]);
 
   useEffect(() => {
     if (!isOpen || !resolvedOrganizationId || !resolvedProjectId) {
