@@ -16,6 +16,32 @@ namespace deeplynx.business;
 
 public class FileAzureBusiness : IFileBusiness
 {
+    public async Task<string?> CalculateFileContentHash(
+        IFormFile file,
+        CancellationToken cancellationToken = default)
+    {
+        await using var stream = file.OpenReadStream();
+        return await Sha256HashHelper.ComputeHexAsync(stream, cancellationToken);
+    }
+
+    public async Task<string?> CalculateStoredFileContentHash(
+        string fileUri,
+        ObjectStorageConfigDto objectStorageConfig,
+        CancellationToken cancellationToken = default)
+    {
+        if (objectStorageConfig.AzureObjectConfig == null)
+            throw new ArgumentException("Azure configuration object is null");
+
+        var container = new BlobContainerClient(
+            objectStorageConfig.AzureObjectConfig.AzureConnectionString,
+            objectStorageConfig.AzureObjectConfig.AzureContainerName);
+        var blob = container.GetBlobClient(fileUri);
+        var download = await blob.DownloadStreamingAsync(cancellationToken: cancellationToken);
+
+        await using var stream = download.Value.Content;
+        return await Sha256HashHelper.ComputeHexAsync(stream, cancellationToken);
+    }
+
     /// <summary>
     /// Uploads a file to azure object storage instance specified in the object storage config
     /// </summary>
