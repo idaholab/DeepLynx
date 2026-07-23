@@ -181,7 +181,7 @@ test.describe("Upload Center", () => {
 
     if (projectNav) {
       await page.getByRole('complementary').filter({ hasText: 'Projects' }).getByRole('button').click();
-      await page.getByRole('button', { name: projectNav }).click();
+      await page.getByRole('button', { name: projectNav }).first().click();
     }
 
     await page.getByRole('link', { name: 'Project Dashboard' }).click();
@@ -238,7 +238,7 @@ test.describe("Upload Center", () => {
 
     if (projectNav) {
       await page.getByRole('complementary').filter({ hasText: 'Projects' }).getByRole('button').click();
-      await page.getByRole('button', { name: projectNav }).click();
+      await page.getByRole('button', { name: projectNav }).first().click();
     }
 
     await page.getByRole('link', { name: 'Project Dashboard' }).click();
@@ -1227,8 +1227,9 @@ startxref
       // set datasource and storage destination
       await checkStorageDestinations(page);
       const nondefaultDs = await getNonDefault(request, projectId, 'data source');
-      await page.getByLabel('Data sourceData').click();
-      await page.getByText(nondefaultDs).click();
+      const dataSourceSelect = page.getByLabel('Data sourceData');
+      await expect(dataSourceSelect).toBeEnabled();
+      await dataSourceSelect.selectOption(nondefaultDs);
 
       // click to browse
       await clickToBrowse({ page }, 'upload-different-datasource-click', filePaths[0]);
@@ -1238,8 +1239,9 @@ startxref
       // set datasource and storage destination
       await checkStorageDestinations(page);
       const nondefaultDs = await getNonDefault(request, projectId, 'data source');
-      await page.getByLabel('Data sourceData').click();
-      await page.getByText(nondefaultDs).click();
+      const dataSourceSelect = page.getByLabel('Data sourceData');
+      await expect(dataSourceSelect).toBeEnabled();
+      await dataSourceSelect.selectOption(nondefaultDs);
 
       // click to browse
       await dragAndDrop({ page }, 'upload-different-datasource-drag', filePaths[1], 'txt');
@@ -1249,8 +1251,9 @@ startxref
       // set datasource and storage destination
       await checkDataSources(page);
       const nondefaultOs = await getNonDefault(request, projectId, 'storage');
-      await page.getByLabel('Storage DestinationObject').click();
-      await page.getByText(nondefaultOs).click();
+      const objectStorageSelect = page.getByLabel('Storage DestinationObject');
+      await expect(objectStorageSelect).toBeEnabled();
+      await objectStorageSelect.selectOption(nondefaultOs);
 
       // click to browse
       await clickToBrowse({ page }, 'upload-different-storage-click', filePaths[2]);
@@ -1260,8 +1263,9 @@ startxref
       // set datasource and storage destination
       await checkDataSources(page);
       const nondefaultOs = await getNonDefault(request, projectId, 'storage');
-      await page.getByLabel('Storage DestinationObject').click();
-      await page.getByText(nondefaultOs).click();
+      const objectStorageSelect = page.getByLabel('Storage DestinationObject');
+      await expect(objectStorageSelect).toBeEnabled();
+      await objectStorageSelect.selectOption(nondefaultOs);
 
       // click to browse
       await dragAndDrop({ page }, 'upload-different-storage-drag', filePaths[3], 'txt');
