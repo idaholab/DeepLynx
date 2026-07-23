@@ -60,9 +60,9 @@ export default function PaginationControls({
   const isLastPage = currentPage >= boundedTotalPages;
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-1">
-        <div className="px-3 py-2 text-md font-semibold text-base-content/50">
+    <div className="@container flex flex-row flex-nowrap items-center justify-between gap-1 min-w-0 w-full">
+      <div className="flex items-center gap-1 shrink-0 min-w-0">
+        <div className="hidden @sm:block px-2 py-2 text-md font-semibold text-base-content/50 whitespace-nowrap">
           {t.translations.SHOW}
         </div>
         <div className="relative inline-block">
@@ -80,7 +80,7 @@ export default function PaginationControls({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-1 p-2 border-base-300/30">
+      <div className="flex flex-nowrap items-center justify-end gap-1 py-2 border-base-300/30 shrink-0 min-w-0">
         <button
           type="button"
           aria-label="First page"
@@ -103,7 +103,7 @@ export default function PaginationControls({
         </button>
 
         <div className="flex items-center gap-1 px-1 text-sm font-medium text-base-content/80 whitespace-nowrap">
-          <span>{t.translations.PAGE}</span>
+          <span className="hidden @sm:inline">{t.translations.PAGE}</span>
           <input
             type="number"
             aria-label="Go to page"

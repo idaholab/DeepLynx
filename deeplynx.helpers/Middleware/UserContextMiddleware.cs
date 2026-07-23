@@ -93,6 +93,7 @@ public class UserContextMiddleware
                     _logger.LogWarning("Could not extract email from claims");
                     UserContextStorage.Email = null;
                     UserContextStorage.UserId = 0;
+                    UserContextStorage.IsOrgMember = false;
                 }
             }
             else

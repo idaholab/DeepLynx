@@ -206,6 +206,15 @@ export type UpdateProjectRequestDto = {
   banner?: string | null;
 };
 
+export type RecordSearchRequestDto = {
+  userQuery?: string;
+  tagIds?: number[];
+  classIds?: number[];
+  isInsightEligible?: boolean;
+  embedding?: "embedded" | "pending" | "any";
+  hideArchived?: boolean;
+};
+
 export type CreateRecordRequestDto = {
   name: string;
   description: string;
@@ -244,8 +253,8 @@ export type UpdateRelationshipRequestDto = {
   name?: string;
   description?: string;
   uuid?: string;
-  origin_id?: number;
-  destination_id?: number;
+  origin_id: number | null;
+  destination_id: number | null;
 };
 
 export type UpdateRoleRequestDto = {

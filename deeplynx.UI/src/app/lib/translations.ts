@@ -150,6 +150,7 @@ export const translations = {
       CREATE_CLASS: "Create Class",
       CANCEL_INVITATION: "Cancel Invitation?",
       CANCEL_INVITE: "Cancel Invite",
+      CANCEL_SELECTION: "Cancel Selection",
       CONTAINS_TEXT_SEARCH: "Contains text search...",
       CANCELLING_SHORT: "Cancelling...",
       CREATE_AND_MANAGE_USER_GROUPS_FOR_YOUR_ORGANIZATION: "Create and manage user groups for your organization",
@@ -836,7 +837,7 @@ export const translations = {
       LATTICE_ONTOLOGY_NOT_READY:
         "Data schema not fully embedded. Strict mode requires all classes and relationships to be embedded.",
       LATTICE_ONTOLOGY_NO_SCHEMA:
-        "No classes or relationships in this project yet.",
+        "You need atleast 2 user made classes and 1 user made relationship to start an extraction. User made meaning other than the default classes: File, Report, and Timeseries",
       LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS: "Queue Data Schema Embeddings",
       LATTICE_ONTOLOGY_QUEUED_SUCCESS: "Data schema embeddings queued.",
       LATTICE_ONTOLOGY_QUEUE_FAILED: "Failed to queue data schema embeddings.",
@@ -937,6 +938,7 @@ export const translations = {
       LOGO_GUIDELINES: "Logo Guidelines",
       LOGO_REMOVED_SUCCESSFULLY: "Logo removed successfully!",
       LOGO_UPLOADED_SUCCESSFULLY: "Logo uploaded successfully!",
+      LOGO_SELECTED_SUCCESSFULLY: "Logo selected successfully!",
       LOGOUT: "Logout",
       MAIN_PROJECT_SETTINGS: "Main Project Settings",
       MANAGE_STORAGES_TAB: "Manage Storages",
@@ -1315,7 +1317,7 @@ export const translations = {
         "Ask Insight about the embedded project files in scope...",
       PROJECT_INSIGHT_CLEAR_SELECTION: "Clear Selection",
       PROJECT_INSIGHT_DESCRIPTION:
-        'Ask project-level questions across embedded files in "{projectName}". Search brings the right documents into scope fast, and filters stay available when you need them.',
+        'Ask project-level questions across embedded files in "{projectName}".',
       PROJECT_INSIGHT_EMBED_SELECTED: "Embed Selected",
       PROJECT_INSIGHT_EMBEDDED_EMPTY:
         "No embedded files are currently in scope.",
@@ -1329,7 +1331,7 @@ export const translations = {
       PRIVATE_REQUEST_ACCESS: "Private - request access",
       PROJECT_INSIGHT_LIBRARY_DESCRIPTION:
         "These embedded files are searchable by Insight and available to the chat.",
-      PROJECT_INSIGHT_LIBRARY_TAB: "Embedded Library",
+      PROJECT_INSIGHT_LIBRARY_TAB: "Embedded",
       PROJECT_INSIGHT_LOADING_RECORDS:
         "Loading project records and Insight status...",
       PROJECT_INSIGHT_NO_FILTER_OPTIONS:
@@ -1365,8 +1367,9 @@ export const translations = {
       PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY:
         'No embedded files matched "{query}".',
       PROJECT_INSIGHT_SELECT_ALL_VISIBLE: "Select Visible",
-      PROJECT_INSIGHT_SELECTED_COUNT: "{count} selected",
+      PROJECT_INSIGHT_SELECTED_COUNT: "{count}/{total} selected",
       PROJECT_INSIGHT_STATUS_CHECKING: "Checking Insight status...",
+      PROJECT_INSIGHT_RECORD_DETAILS: "Details",
       STARTING: "Starting",
       CHECKING: "Checking",
       ANALYZE_RECORD: "Analyze Record",
@@ -1770,11 +1773,12 @@ export const translations = {
       SELECT_EXISTING_RECORD: "Select Existing Record",
       SELECT_FILE_TO_BEGIN:
         'Please select a timeseries file from the "Set Up" tab to begin',
-      SELECT_FILTERS: "Select Filters",
+      SELECT_FILTERS: "Filters",
       SELECT_GROUP_TO_VIEW_MEMBERS: "Select a group to view members",
       SELECT_ORGANIZATION_USERS: "Select Organization Users",
       SELECT_PROJECT: "Select project",
       SELECT_ROLE: "Select a role to view details",
+      SELECT_RECORDS: "Select Records",
       SEARCH_ACROSS_ALL_RECORDS: "Search across all records...",
       SELECT_STORAGE_LOCATION: "Select a storage location",
       SELECT_X_AXIS: "Select X axis...",
@@ -2278,6 +2282,7 @@ export const translations = {
       CANCEL_DOWNLOAD: "Cancelar descarga",
       CANCEL_INVITATION: "¿Cancelar invitación?",
       CANCEL_INVITE: "Cancelar invitación",
+      CANCEL_SELECTION: "Cancel Selection",
       CLEAR_ALL_FILTERS: "Borrar todos los filtros",
       CANCELLING_SHORT: "Cancelando...",
       CANNOT_DEFINE_ADDITIONAL_PROJECT_LABELS:
@@ -3008,7 +3013,7 @@ export const translations = {
       LATTICE_ONTOLOGY_NOT_READY:
         "El esquema de datos no está completamente incrustado. El modo estricto requiere que todas las clases y relaciones estén incrustadas.",
       LATTICE_ONTOLOGY_NO_SCHEMA:
-        "Aún no hay clases ni relaciones en este proyecto.",
+        "Necesitas al menos 2 clases creadas por el usuario y 1 relación creada por el usuario para comenzar una extracción. Por creadas por el usuario se entiende que son diferentes de las clases predeterminadas: Archivo, Informe y Series Temporales.",
       LATTICE_QUEUE_ONTOLOGY_EMBEDDINGS:
         "Poner en cola las incrustaciones del esquema de datos",
       LATTICE_ONTOLOGY_QUEUED_SUCCESS:
@@ -3110,6 +3115,7 @@ export const translations = {
       LOGO_GUIDELINES: "Lineamientos del logotipo",
       LOGO_REMOVED_SUCCESSFULLY: "¡El logotipo se eliminó correctamente!",
       LOGO_UPLOADED_SUCCESSFULLY: "¡El logotipo se subió correctamente!",
+      LOGO_SELECTED_SUCCESSFULLY: "¡El logotipo se seleccionó correctamente!",
       LOGOUT: "Cerrar sesión",
       MAIN_PROJECT_SETTINGS: "Configuración principal del proyecto",
       MANAGE_STORAGES_TAB: "Gestionar almacenamientos",
@@ -3501,7 +3507,7 @@ export const translations = {
         "Pregúntale a Insight sobre los archivos incrustados del proyecto dentro del alcance...",
       PROJECT_INSIGHT_CLEAR_SELECTION: "Limpiar selección",
       PROJECT_INSIGHT_DESCRIPTION:
-        'Haz preguntas a nivel de proyecto sobre los archivos incrustados en "{projectName}". La búsqueda te ayuda a llevar rápidamente los documentos correctos al alcance del chat y los filtros siguen disponibles cuando los necesites.',
+        'Haz preguntas a nivel de proyecto sobre los archivos incrustados en "{projectName}".',
       PROJECT_INSIGHT_EMBED_SELECTED: "Incrustar seleccionados",
       PROJECT_INSIGHT_EMBEDDED_EMPTY:
         "Actualmente no hay archivos incrustados dentro del alcance.",
@@ -3515,7 +3521,7 @@ export const translations = {
       PROJECT_INSIGHT_FILTERS_TAB: "Filtros",
       PROJECT_INSIGHT_LIBRARY_DESCRIPTION:
         "Estos archivos incrustados se pueden buscar con Insight y están disponibles para el chat.",
-      PROJECT_INSIGHT_LIBRARY_TAB: "Biblioteca incrustada",
+      PROJECT_INSIGHT_LIBRARY_TAB: "Incrustado",
       PROJECT_INSIGHT_LOADING_RECORDS:
         "Cargando registros del proyecto y el estado de Insight...",
       PROJECT_INSIGHT_NO_FILTER_OPTIONS:
@@ -3552,8 +3558,9 @@ export const translations = {
       PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY:
         'Ningún archivo incrustado coincidió con "{query}".',
       PROJECT_INSIGHT_SELECT_ALL_VISIBLE: "Seleccionar visibles",
-      PROJECT_INSIGHT_SELECTED_COUNT: "{count} seleccionados",
+      PROJECT_INSIGHT_SELECTED_COUNT: "{count}/{total} seleccionados",
       PROJECT_INSIGHT_STATUS_CHECKING: "Comprobando el estado de Insight...",
+      PROJECT_INSIGHT_RECORD_DETAILS: "Detalles",
       STARTING: "Iniciando",
       CHECKING: "Comprobando",
       ANALYZE_RECORD: "Analizar registro",
@@ -3980,7 +3987,7 @@ export const translations = {
       SELECT_EXISTING_RECORD: "Seleccione un registro existente",
       SELECT_FILE_TO_BEGIN:
         'Por favor seleccione un archivo de series temporales desde la pestaña "Configuración" para comenzar',
-      SELECT_FILTERS: "Seleccionar filtros",
+      SELECT_FILTERS: "Filtros",
       SELECT_GROUP_TO_VIEW_MEMBERS: "Selecciona un grupo para ver los miembros",
       SELECT_ORGANIZATION_USERS: "Seleccionar usuarios de la organización",
       SELECT_PROJECT: "Seleccionar proyecto",

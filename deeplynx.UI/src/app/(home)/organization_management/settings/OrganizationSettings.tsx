@@ -10,10 +10,10 @@ import {
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import {
-  getOrganizationLogoUrl,
   uploadOrganizationLogo,
   removeOrganizationLogo,
   updateOrganization,
+  fetchOrganizationLogo,
 } from "@/app/lib/client_service/organization_services.client";
 import { useLanguage } from "@/app/contexts/Language";
 import Image from "next/image";
@@ -64,18 +64,17 @@ const OrganizationSettings = () => {
     const loadExistingLogo = async () => {
       if (!organization?.organizationId) {
         setIsCheckingLogo(false);
+        setLogoPreview(null);
         return;
       }
 
       try {
         setIsCheckingLogo(true);
-        const logoUrl = await getOrganizationLogoUrl(
+        const { blobUrl } = await fetchOrganizationLogo(
           organization.organizationId as number,
         );
 
-        if (logoUrl) {
-          setLogoPreview(logoUrl);
-        }
+        setLogoPreview(blobUrl);
       } catch (error) {
         console.error("Error checking for existing logo:", error);
       } finally {
@@ -84,6 +83,12 @@ const OrganizationSettings = () => {
     };
 
     loadExistingLogo();
+
+    return () => {
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+    };
   }, [organization?.organizationId]);
 
   const handleLogoChange = (fileList: FileList | null) => {
@@ -91,8 +96,16 @@ const OrganizationSettings = () => {
 
     const file = fileList[0];
 
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
+    const allowedTypes = [
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "image/webp",
+      "image/gif",
+      "image/svg+xml",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
       toast.error(t.translations.PLEASE_UPLOAD_VALID_IMAGE);
       return;
     }
@@ -104,9 +117,34 @@ const OrganizationSettings = () => {
       return;
     }
 
-    setLogoFile(file);
-    const previewUrl = URL.createObjectURL(file);
-    setLogoPreview(previewUrl);
+    if (!organization?.organizationId) {
+      toast.error("Organization is not loaded.");
+      return;
+    }
+
+    try {
+      // Revoke the previous object URL if it exists
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+
+      // Create and set new preview URL
+      const previewUrl = URL.createObjectURL(file);
+
+      setOrganization({
+        ...organization,
+        logoUrl: previewUrl!,
+      });
+
+      setLogoPreview(previewUrl);
+      setLogoFile(file);
+
+      toast.success(t.translations.LOGO_SELECTED_SUCCESSFULLY);
+
+    } catch (error) {
+      console.error("Failed to process selected logo:", error);
+      toast.error(t.translations.FAILED_TO_UPLOAD_LOGO);
+    }
   };
 
   const handleUploadLogo = async () => {
@@ -118,13 +156,21 @@ const OrganizationSettings = () => {
     try {
       setIsUploading(true);
 
-      const result = await uploadOrganizationLogo({
+      await uploadOrganizationLogo({
         organizationId: organization.organizationId as number,
         file: logoFile,
       });
 
-      // Add timestamp to force browser to reload the image
-      setLogoPreview(`${result.logoUrl}?t=${Date.now()}`);
+      const { blobUrl } = await fetchOrganizationLogo(
+        organization.organizationId as number,
+      );
+
+      setOrganization({
+        ...organization,
+        logoUrl: blobUrl!,
+      });
+
+      setLogoPreview(blobUrl);
       setLogoFile(null);
       toast.success(t.translations.LOGO_UPLOADED_SUCCESSFULLY);
     } catch (error) {
@@ -144,11 +190,20 @@ const OrganizationSettings = () => {
 
     try {
       await removeOrganizationLogo({
-        organizationId: organization.organizationId as number,
+        organizationId: organization.organizationId as number
       });
 
+      setOrganization({
+        ...organization,
+        logoUrl: undefined,
+      });
+
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
       setLogoFile(null);
       setLogoPreview(null);
+
       toast.success(t.translations.LOGO_REMOVED_SUCCESSFULLY);
     } catch (error) {
       console.error("Failed to remove logo:", error);
@@ -157,15 +212,25 @@ const OrganizationSettings = () => {
   };
 
   const handleCancelSelection = async () => {
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+    }
+
     setLogoFile(null);
 
-    // Restore previous logo if it exists
-    if (organization?.organizationId) {
-      const logoUrl = await getOrganizationLogoUrl(
+    if (!organization?.organizationId) {
+      setLogoPreview(null);
+      return;
+    }
+
+    try {
+      const { blobUrl } = await fetchOrganizationLogo(
         organization.organizationId as number,
-      );
-      setLogoPreview(logoUrl);
-    } else {
+      )
+
+      setLogoPreview(blobUrl);
+    } catch (error) {
+      console.error("Failed to restore previous logo:", error);
       setLogoPreview(null);
     }
   };
@@ -493,11 +558,10 @@ const OrganizationSettings = () => {
                         <button
                           key={theme.id}
                           type="button"
-                          className={`rounded-lg border p-4 text-left transition ${
-                            selected
-                              ? "border-primary bg-primary/10"
-                              : "border-base-300 bg-base-100 hover:border-primary/40 hover:bg-base-200/40"
-                          }`}
+                          className={`rounded-lg border p-4 text-left transition ${selected
+                            ? "border-primary bg-primary/10"
+                            : "border-base-300 bg-base-100 hover:border-primary/40 hover:bg-base-200/40"
+                            }`}
                           onClick={() => setSelectedThemeName(theme.id)}
                           disabled={isSavingTheme}
                         >
