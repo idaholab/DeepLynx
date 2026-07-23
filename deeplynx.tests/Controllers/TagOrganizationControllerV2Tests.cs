@@ -509,9 +509,9 @@ public class TagOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.DeleteTag(OrgId, null, TagId))
             .ReturnsAsync(true);
 
-        var result = await _tagOrganizationController.DeleteTagV2(OrgId, TagId) as OkObjectResult;
+        var actionResult = await _tagOrganizationController.DeleteTagV2(OrgId, TagId);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
     }
@@ -566,10 +566,10 @@ public class TagOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.ArchiveTag(OrgId, UserId, null, TagId))
             .ReturnsAsync(true);
 
-        var result = await _tagOrganizationController.ArchiveTagV2(
-            OrgId, TagId, archive: true) as OkObjectResult;
+        var actionResult = await _tagOrganizationController.ArchiveTagV2(
+            OrgId, TagId, archive: true);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockTagBusiness.Verify(
@@ -587,10 +587,10 @@ public class TagOrganizationControllerTestsV2 : IDisposable
             .Setup(b => b.UnarchiveTag(OrgId, UserId, null, TagId))
             .ReturnsAsync(true);
 
-        var result = await _tagOrganizationController.ArchiveTagV2(
-            OrgId, TagId, archive: false) as OkObjectResult;
+        var actionResult = await _tagOrganizationController.ArchiveTagV2(
+            OrgId, TagId, archive: false);
 
-        Assert.NotNull(result);
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(200, result.StatusCode);
         Assert.Equal(true, result.Value);
         _mockTagBusiness.Verify(

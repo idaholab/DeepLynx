@@ -347,7 +347,7 @@ public class TagOrganizationController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "tag")]
-    public async Task<IActionResult> DeleteTagV2(
+    public async Task<ActionResult<bool>> DeleteTagV2(
         long organizationId, long tagId)
     {
             var response = await _tagBusiness.DeleteTag(organizationId, null, tagId);
@@ -401,7 +401,7 @@ public class TagOrganizationController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "tag")]
-    public async Task<IActionResult> ArchiveTagV2(
+    public async Task<ActionResult<bool>> ArchiveTagV2(
         long organizationId,
         long tagId,
         [FromQuery] bool archive)

@@ -355,7 +355,7 @@ public class TagProjectController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "tag")]
-    public async Task<IActionResult> DeleteTagV2(
+    public async Task<ActionResult<bool>> DeleteTagV2(
         long projectId, long tagId)
     {
             var organizationId = UserContextStorage.OrganizationId;
@@ -411,7 +411,7 @@ public class TagProjectController : ControllerBase
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "tag")]
-    public async Task<IActionResult> ArchiveTagV2(
+    public async Task<ActionResult<bool>> ArchiveTagV2(
         long projectId,
         long tagId,
         [FromQuery] bool archive)
