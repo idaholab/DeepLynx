@@ -280,7 +280,7 @@ try
        ╚════════════════════════════╝ */
     if (isRuntimeStartup)
     {
-        await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
+        await PgvectorExtensionValidator.EnsureExtensionAsync(connectionString);
         EncryptionHelper.CheckEncryptionConfig();
     }
 
