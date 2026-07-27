@@ -11,7 +11,7 @@ import {
   removeMemberFromProject,
   updateProjectMemberRole,
 } from "@/app/lib/client_service/projects_services.client";
-import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import { getAllUsers, getCurrentUser } from "@/app/lib/client_service/user_services.client";
 import { useRBAC } from "@/app/(home)/rbac/useRBAC";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -289,28 +289,28 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     return []; // Return empty while loading
   };
-  
+
   const handleViewGroupMembers = async (row: ProjectMemberTableRow) => {
     if (!organizationId) {
       toast.error(t.translations.NO_ORG_SELECTED);
       return;
     }
-    
+
     setViewGroupMembersModal({
       isOpen: true,
       groupName: row.name,
       members: [],
       loading: true,
     });
-    
+
     try {
       // Use members from cache if it exists, if not fetch API
       const members = groupMembersCache.has(row.memberId)
         ? groupMembersCache.get(row.memberId)!
         : await getGroupMembers(organizationId, row.memberId);
-      
+
       setGroupMembersCache((prev) => new Map(prev).set(row.memberId, members));
-      
+
       setViewGroupMembersModal({
         isOpen: true,
         groupName: row.name,
@@ -320,7 +320,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     } catch (error) {
       console.error(`Failed to load members for group ${row.memberId}:`, error);
       toast.error(t.translations.UNABLE_TO_LOAD_USERS);
-      
+
       setViewGroupMembersModal((prev) => ({
         ...prev,
         loading: false,
@@ -479,7 +479,15 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     try {
       setLoading(true);
 
+      const currentUser = await getCurrentUser(organizationId, projectId);
       const memberId = confirmModal.memberId;
+
+      if (confirmModal.memberType === "user" && currentUser.id === memberId) {
+        toast.error(t.translations.CANNOT_REMOVE_SELF_FROM_PROJECT); // Display a custom error message
+        setLoading(false);
+        return;
+      }
+
 
       if (confirmModal.memberType === "user") {
         await removeMemberFromProject(
@@ -622,48 +630,48 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
           {/* View Group Members Modal*/}
           {viewGroupMembersModal.isOpen && (
-              <dialog className="modal modal-open">
-                <div className="modal-box">
-                  <h3 className="font-bold text-lg">
-                    Users in {viewGroupMembersModal.groupName}
-                  </h3>
+            <dialog className="modal modal-open">
+              <div className="modal-box">
+                <h3 className="font-bold text-lg">
+                  Users in {viewGroupMembersModal.groupName}
+                </h3>
 
-                  {viewGroupMembersModal.loading ? (
-                      <div className="flex justify-center py-8">
-                        <span className="loading loading-spinner loading-lg" />
-                      </div>
-                  ) : viewGroupMembersModal.members.length === 0 ? (
-                      <p className="py-4 text-base-content/70">
-                        No users in this group.
-                      </p>
-                  ) : (
-                      <div className="py-4 space-y-2 max-h-80 overflow-y-auto">
-                        {viewGroupMembersModal.members.map((user) => (
-                            <div key={user.id} className="p-3 rounded-lg bg-base-200">
-                              <p className="font-semibold">{user.name || user.email}</p>
-                              <p className="text-sm text-base-content/70">{user.email}</p>
-                            </div>
-                        ))}
-                      </div>
-                  )}
-                  
-                  <div className="modal-action">
-                    <button
-                      className="btn"
-                      onClick={() =>
-                        setViewGroupMembersModal({
-                          isOpen: false,
-                          groupName: "",
-                          members: [],
-                          loading: false,
-                        })
-                      }
-                    >
-                      Close
-                    </button>
+                {viewGroupMembersModal.loading ? (
+                  <div className="flex justify-center py-8">
+                    <span className="loading loading-spinner loading-lg" />
                   </div>
+                ) : viewGroupMembersModal.members.length === 0 ? (
+                  <p className="py-4 text-base-content/70">
+                    No users in this group.
+                  </p>
+                ) : (
+                  <div className="py-4 space-y-2 max-h-80 overflow-y-auto">
+                    {viewGroupMembersModal.members.map((user) => (
+                      <div key={user.id} className="p-3 rounded-lg bg-base-200">
+                        <p className="font-semibold">{user.name || user.email}</p>
+                        <p className="text-sm text-base-content/70">{user.email}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="modal-action">
+                  <button
+                    className="btn"
+                    onClick={() =>
+                      setViewGroupMembersModal({
+                        isOpen: false,
+                        groupName: "",
+                        members: [],
+                        loading: false,
+                      })
+                    }
+                  >
+                    Close
+                  </button>
                 </div>
-              </dialog>
+              </div>
+            </dialog>
           )}
         </div>
       </div>
