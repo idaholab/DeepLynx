@@ -368,7 +368,6 @@ export default function UploadCenterClient() {
         }
 
         const uploadWorker = async (): Promise<void> => {
-          console.log('uploadWorker started');
           while (true) {
             const currentIndex = nextFileIndex++;
             if (currentIndex >= selectedFiles.length) return;
@@ -376,7 +375,6 @@ export default function UploadCenterClient() {
             const file = selectedFiles[currentIndex];
             const metadata = fileUploadState.filesMetadata[currentIndex] ?? {};
             fileUploadState.cleanUploadError(currentIndex);
-            console.log('Metadata file:', metadata.metadataFile);
             try {
               if ((metadata.recordMode ?? "new") === "update") {
                 if (!metadata.targetRecordId) {
@@ -387,7 +385,6 @@ export default function UploadCenterClient() {
                   Number(projectId),
                   Number(metadata.targetRecordId),
                   file,
-                  metadata.metadataFile
                 );
                 results[currentIndex] = { status: "fulfilled", value };
               } else {
