@@ -1124,7 +1124,7 @@ export const translations = {
         "Ask Insight about the embedded project files in scope...",
       PROJECT_INSIGHT_CLEAR_SELECTION: "Clear Selection",
       PROJECT_INSIGHT_DESCRIPTION:
-        'Ask project-level questions across embedded files in "{projectName}". Search brings the right documents into scope fast, and filters stay available when you need them.',
+        'Ask project-level questions across embedded files in "{projectName}".',
       PROJECT_INSIGHT_EMBED_SELECTED: "Embed Selected",
       PROJECT_INSIGHT_EMBEDDED_EMPTY:
         "No embedded files are currently in scope.",
@@ -1137,7 +1137,7 @@ export const translations = {
       PROJECT_INSIGHT_FILTERS_TAB: "Filters",
       PROJECT_INSIGHT_LIBRARY_DESCRIPTION:
         "These embedded files are searchable by Insight and available to the chat.",
-      PROJECT_INSIGHT_LIBRARY_TAB: "Embedded Library",
+      PROJECT_INSIGHT_LIBRARY_TAB: "Embedded",
       PROJECT_INSIGHT_LOADING_RECORDS:
         "Loading project records and Insight status...",
       PROJECT_INSIGHT_NO_FILTER_OPTIONS:
@@ -1172,8 +1172,9 @@ export const translations = {
       PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY:
         'No embedded files matched "{query}".',
       PROJECT_INSIGHT_SELECT_ALL_VISIBLE: "Select Visible",
-      PROJECT_INSIGHT_SELECTED_COUNT: "{count} selected",
+      PROJECT_INSIGHT_SELECTED_COUNT: "{count}/{total} selected",
       PROJECT_INSIGHT_STATUS_CHECKING: "Checking Insight status...",
+      PROJECT_INSIGHT_RECORD_DETAILS: "Details",
       STARTING: "Starting",
       CHECKING: "Checking",
       ANALYZE_RECORD: "Analyze Record",
@@ -1536,7 +1537,7 @@ export const translations = {
       SELECT_EXISTING_RECORD: "Select Existing Record",
       SELECT_FILE_TO_BEGIN:
         'Please select a timeseries file from the "Set Up" tab to begin',
-      SELECT_FILTERS: "Select Filters",
+      SELECT_FILTERS: "Filters",
       SELECT_GROUP_TO_VIEW_MEMBERS: "Select a group to view members",
       SELECT_ORGANIZATION_USERS: "Select Organization Users",
       SELECT_PROJECT: "Select project",
@@ -3017,7 +3018,7 @@ export const translations = {
         "Pregúntale a Insight sobre los archivos incrustados del proyecto dentro del alcance...",
       PROJECT_INSIGHT_CLEAR_SELECTION: "Limpiar selección",
       PROJECT_INSIGHT_DESCRIPTION:
-        'Haz preguntas a nivel de proyecto sobre los archivos incrustados en "{projectName}". La búsqueda te ayuda a llevar rápidamente los documentos correctos al alcance del chat y los filtros siguen disponibles cuando los necesites.',
+        'Haz preguntas a nivel de proyecto sobre los archivos incrustados en "{projectName}".',
       PROJECT_INSIGHT_EMBED_SELECTED: "Incrustar seleccionados",
       PROJECT_INSIGHT_EMBEDDED_EMPTY:
         "Actualmente no hay archivos incrustados dentro del alcance.",
@@ -3031,7 +3032,7 @@ export const translations = {
       PROJECT_INSIGHT_FILTERS_TAB: "Filtros",
       PROJECT_INSIGHT_LIBRARY_DESCRIPTION:
         "Estos archivos incrustados se pueden buscar con Insight y están disponibles para el chat.",
-      PROJECT_INSIGHT_LIBRARY_TAB: "Biblioteca incrustada",
+      PROJECT_INSIGHT_LIBRARY_TAB: "Incrustado",
       PROJECT_INSIGHT_LOADING_RECORDS:
         "Cargando registros del proyecto y el estado de Insight...",
       PROJECT_INSIGHT_NO_FILTER_OPTIONS:
@@ -3067,8 +3068,9 @@ export const translations = {
       PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY:
         'Ningún archivo incrustado coincidió con "{query}".',
       PROJECT_INSIGHT_SELECT_ALL_VISIBLE: "Seleccionar visibles",
-      PROJECT_INSIGHT_SELECTED_COUNT: "{count} seleccionados",
+      PROJECT_INSIGHT_SELECTED_COUNT: "{count}/{total} seleccionados",
       PROJECT_INSIGHT_STATUS_CHECKING: "Comprobando el estado de Insight...",
+      PROJECT_INSIGHT_RECORD_DETAILS: "Detalles",
       STARTING: "Iniciando",
       CHECKING: "Comprobando",
       ANALYZE_RECORD: "Analizar registro",
@@ -3454,7 +3456,7 @@ export const translations = {
       SELECT_EXISTING_RECORD: "Seleccione un registro existente",
       SELECT_FILE_TO_BEGIN:
         'Por favor seleccione un archivo de series temporales desde la pestaña "Configuración" para comenzar',
-      SELECT_FILTERS: "Seleccionar filtros",
+      SELECT_FILTERS: "Filtros",
       SELECT_GROUP_TO_VIEW_MEMBERS: "Selecciona un grupo para ver los miembros",
       SELECT_ORGANIZATION_USERS: "Seleccionar usuarios de la organización",
       SELECT_PROJECT: "Seleccionar proyecto",

@@ -1,8 +1,17 @@
 // src/app/lib/record_services.client.ts
 "use client";
 
-import { CreateRecordRequestDto, UpdateRecordRequestDto} from "@/app/(home)/types/requestDTOs";
-import { HistoricalRecordResponseDto, PaginatedResponse, RecordResponseDto, RelatedRecordsResponseDto } from "@/app/(home)/types/responseDTOs";
+import {
+  CreateRecordRequestDto,
+  RecordSearchRequestDto,
+  UpdateRecordRequestDto,
+} from "@/app/(home)/types/requestDTOs";
+import {
+  HistoricalRecordResponseDto,
+  PaginatedResponse,
+  RecordResponseDto,
+  RelatedRecordsResponseDto,
+} from "@/app/(home)/types/responseDTOs";
 import { GraphResponse, RecordTagLinkDto } from "@/app/(home)/types/types";
 import api from "./api";
 
@@ -85,6 +94,85 @@ export async function getAllRecordsPaginated(
     throw error;
   }
 }
+
+/**
+ * Paginated search all records for a project
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param dto - The record search parameters
+ * @param pageSize - The number of records to show per page
+ * @param pageNumber - The page number to show
+ * @returns Promise with pagination of RecordResponseDto
+ */
+export async function searchRecordsPaginated(
+  organizationId: number,
+  projectId: number,
+  dto: RecordSearchRequestDto,
+  pageSize: number,
+  pageNumber: number,
+): Promise<PaginatedResponse<RecordResponseDto>> {
+  try {
+    const params = new URLSearchParams();
+    params.append("userQuery", sanitizeSearchQuery(dto.userQuery ?? ""));
+    dto.tagIds?.forEach((id) => params.append("tagIds", id.toString()));
+    dto.classIds?.forEach((id) => params.append("classIds", id.toString()));
+    params.append("isInsightEligible", String(dto.isInsightEligible));
+    params.append("embedding", String(dto.embedding));
+    params.append("hideArchived", String(dto.hideArchived));
+    params.append("pageSize", String(pageSize));
+    params.append("pageNumber", String(pageNumber));
+
+    const res = await api.get<PaginatedResponse<RecordResponseDto>>(
+      `/organizations/${organizationId}/projects/${projectId}/records/search/paginated?${params.toString()}`,
+    );
+    return res.data;
+  } catch (error) {
+    console.error("Error getting all records:", error);
+    throw error;
+  }
+}
+
+/**
+ * Search all records for a project
+ * @param organizationId - The ID of the organization
+ * @param projectId - The ID of the project
+ * @param dto - The record search parameters
+ * @returns Promise with list of RecordResponseDto
+ */
+export async function searchRecords(
+  organizationId: number,
+  projectId: number,
+  dto: RecordSearchRequestDto,
+): Promise<RecordResponseDto[]> {
+  try {
+    const params = new URLSearchParams();
+    params.append("userQuery", sanitizeSearchQuery(dto.userQuery ?? ""));
+    dto.tagIds?.forEach((id) => params.append("tagIds", id.toString()));
+    dto.classIds?.forEach((id) => params.append("classIds", id.toString()));
+    params.append("isInsightEligible", String(dto.isInsightEligible));
+    params.append("embedding", String(dto.embedding));
+    params.append("hideArchived", String(dto.hideArchived));
+
+    const res = await api.get<RecordResponseDto[]>(
+      `/organizations/${organizationId}/projects/${projectId}/records/search?${params.toString()}`,
+    );
+    return res.data;
+  } catch (error) {
+    console.error("Error getting all records:", error);
+    throw error;
+  }
+}
+
+// Returns a sanitized form of the query to prevent syntax errors with special characters.
+function sanitizeSearchQuery(query: string): string {
+  return query
+    .replace(/[^\p{L}\p{N} _-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .filter((token) => token.length > 0)
+    .join(" ");
+}
+
 /**
  * Get records by tags
  * @param organizationId - The ID of the organization
