@@ -64,7 +64,7 @@ public class TagOrganizationControllerTests : IDisposable
             new List<TagResponseDto>();
 
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(UserId, OrgId, null, true))
+            .Setup(b => b.GetAllTags(UserId, OrgId, null, true, false, false))
             .ReturnsAsync(expected);
 
         // Act
@@ -83,7 +83,7 @@ public class TagOrganizationControllerTests : IDisposable
         // Arrange
 
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(It.IsAny<long>(), It.IsAny<long>(), null, It.IsAny<bool>()))
+            .Setup(b => b.GetAllTags(It.IsAny<long>(), It.IsAny<long>(), null, It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ReturnsAsync([]);
 
         // Act
@@ -105,7 +105,7 @@ public class TagOrganizationControllerTests : IDisposable
         UserContextStorage.UserId = UserId;
 
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(UserId, OrgId, null, true))
+            .Setup(b => b.GetAllTags(UserId, OrgId, null, true, false, false))
             .ThrowsAsync(new Exception("db error"));
 
         // Act
@@ -129,7 +129,7 @@ public class TagOrganizationControllerTests : IDisposable
         var expected = new List<TagResponseDto>();
 
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(UserId, OrgId, null, true))
+            .Setup(b => b.GetAllTags(UserId, OrgId, null, true, false, false))
             .ReturnsAsync(expected);
 
         // Act
@@ -137,7 +137,7 @@ public class TagOrganizationControllerTests : IDisposable
 
         // Assert
         _mockTagBusiness.Verify(
-            b => b.GetAllTags(UserId, OrgId, null, true),
+            b => b.GetAllTags(UserId, OrgId, null, true, false, false),
             Times.Once);
     }
 

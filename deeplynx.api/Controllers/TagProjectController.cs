@@ -47,7 +47,9 @@ public class TagProjectController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var organizationId = UserContextStorage.OrganizationId;
-            var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, [projectId], hideArchived);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, [projectId], hideArchived, isSysAdmin, isOrgAdmin);
             return Ok(tags);
         }
         catch (Exception exception)
@@ -73,7 +75,9 @@ public class TagProjectController : ControllerBase
     {
         var organizationId = UserContextStorage.OrganizationId;
         var currentUserId = UserContextStorage.UserId;
-        var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, [projectId], hideArchived);
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, [projectId], hideArchived, isSysAdmin, isOrgAdmin);
         return Ok(tags);
     }
 

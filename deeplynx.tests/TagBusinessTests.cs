@@ -72,8 +72,7 @@ public class TagBusinessTests : IntegrationTestBase
             Name = "Test User",
             Email = "test.user@test.com",
             Password = "test_password",
-            IsArchived = false,
-            IsSysAdmin = true
+            IsArchived = false
         };
         Context.Users.Add(testUser);
         await Context.SaveChangesAsync();
@@ -182,7 +181,7 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task GetAllTags_ValidProjectId_ReturnsActiveProjectAndOrgTags()
     {
         // Act
-        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], true);
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], true, true);
         var tags = result.ToList();
 
         // Assert
@@ -200,7 +199,7 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task GetAllTags_ValidProjectId_ReturnsActiveProjectAndOrgTagsWithArchivedTags()
     {
         // Act
-        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], false);
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], false, true);
         var tags = result.ToList();
 
 
@@ -219,7 +218,7 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task GetAllTags_ProjectWithNoTags_ReturnsOrgInheritedTag()
     {
         // Act
-        var result = await _tagBusiness.GetAllTags(uid, oid, [pid3], true);
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid3], true, true);
         var tags = result.ToList();
 
         // Assert
@@ -230,7 +229,7 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task GetAllTags_DifferentProject_ReturnsOrgInheritedTags()
     {
         // Act
-        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], true);
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], true, true);
         var tags = result.ToList();
 
         // Assert
@@ -874,11 +873,11 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task ArchiveTag_ArchivedTagNotReturnedInGetAll()
     {
         // Arrange
-        var initialCount = (await _tagBusiness.GetAllTags(uid, oid, [pid], true)).Count;
+        var initialCount = (await _tagBusiness.GetAllTags(uid, oid, [pid], true, true)).Count;
 
         // Act
         await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
-        var finalCount = (await _tagBusiness.GetAllTags(uid, oid, [pid], true)).Count;
+        var finalCount = (await _tagBusiness.GetAllTags(uid, oid, [pid], true, true)).Count;
 
         // Assert
         Assert.Equal(initialCount - 1, finalCount);

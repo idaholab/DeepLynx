@@ -72,7 +72,9 @@ public class TagProjectControllerTests : IDisposable
                     ids != null &&
                     ids.Length == 1 &&
                     ids[0] == ProjectId),
-               true))
+               true,
+               false,
+               false))
             .ReturnsAsync(expected);
 
         // Act
@@ -98,7 +100,9 @@ public class TagProjectControllerTests : IDisposable
                     ids != null &&
                     ids.Length == 1 &&
                     ids[0] == ProjectId),
-               true))
+               true,
+               false,
+               false))
             .ReturnsAsync([]);
 
         // Act
@@ -128,7 +132,9 @@ public class TagProjectControllerTests : IDisposable
                     ids != null &&
                     ids.Length == 1 &&
                     ids[0] == ProjectId),
-               true))
+               true,
+               false,
+               false))
             .ThrowsAsync(new Exception("db error"));
 
         // Act
@@ -158,7 +164,9 @@ public class TagProjectControllerTests : IDisposable
                     ids != null &&
                     ids.Length == 1 &&
                     ids[0] == ProjectId),
-               true))
+               true,
+               false,
+               false))
             .ReturnsAsync(expected);
 
         // Act
@@ -173,7 +181,9 @@ public class TagProjectControllerTests : IDisposable
                     ids != null &&
                     ids.Length == 1 &&
                     ids[0] == ProjectId),
-               true),
+               true,
+               false,
+               false),
             Times.Once);
     }
 

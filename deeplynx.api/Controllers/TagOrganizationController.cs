@@ -48,7 +48,9 @@ public class TagOrganizationController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
-            var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, projects, hideArchived);
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, projects, hideArchived, isSysAdmin, isOrgAdmin);
             return Ok(tags);
         }
         catch (Exception exception)
@@ -63,7 +65,7 @@ public class TagOrganizationController : ControllerBase
     ///     Get All Tags 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectIds">(Optional)An array of project IDs within the organization to filter by</param>
+    /// <param name="projects">(Optional)An array of project IDs within the organization to filter by</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
     /// <returns>A list of tags belonging to the project.</returns>
     [HttpGet(Name = "api_get_all_tags_organization")]
@@ -71,11 +73,13 @@ public class TagOrganizationController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "tag")]
     public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetAllTagsV2(
-        long organizationId, [FromQuery] long[]? projectIds, [FromQuery] bool hideArchived = true)
+        long organizationId, [FromQuery] long[]? projects, [FromQuery] bool hideArchived = true)
     {
 
         var currentUserId = UserContextStorage.UserId;
-        var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, projectIds, hideArchived);
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, projects, hideArchived, isSysAdmin, isOrgAdmin);
         return Ok(tags);
     }
 
