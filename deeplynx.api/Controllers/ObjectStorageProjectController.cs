@@ -85,10 +85,10 @@ public class ObjectStorageProjectController : ControllerBase
         long projectId,
         [FromQuery] bool hideArchived = true)
     {
-            var objectStorages = await _objectStorageBusiness.GetAllObjectStorages(
-                organizationId, projectId, hideArchived);
+        var objectStorages = await _objectStorageBusiness.GetAllObjectStorages(
+            organizationId, projectId, hideArchived);
 
-            return Ok(objectStorages);
+        return Ok(objectStorages);
     }
 
     /// <summary>
@@ -141,10 +141,10 @@ public class ObjectStorageProjectController : ControllerBase
         long objectStorageId,
         [FromQuery] bool hideArchived = true)
     {
-            var objectStorage =
-                await _objectStorageBusiness.GetObjectStorage(
-                    organizationId, projectId, objectStorageId, hideArchived);
-            return Ok(objectStorage);
+        var objectStorage =
+            await _objectStorageBusiness.GetObjectStorage(
+                organizationId, projectId, objectStorageId, hideArchived);
+        return Ok(objectStorage);
     }
 
     /// <summary>
@@ -193,10 +193,10 @@ public class ObjectStorageProjectController : ControllerBase
         long projectId,
         [FromBody] CreateObjectStorageRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var objectStorage = await _objectStorageBusiness.CreateObjectStorage(
-                currentUserId, organizationId, projectId, dto);
-            return Ok(objectStorage);
+        var currentUserId = UserContextStorage.UserId;
+        var objectStorage = await _objectStorageBusiness.CreateObjectStorage(
+            currentUserId, organizationId, projectId, dto);
+        return Ok(objectStorage);
     }
 
     /// <summary>
@@ -249,10 +249,66 @@ public class ObjectStorageProjectController : ControllerBase
         long objectStorageId,
         [FromBody] UpdateObjectStorageRequestDto dto)
     {
+        var currentUserId = UserContextStorage.UserId;
+        var objectStorage = await _objectStorageBusiness.UpdateObjectStorage(
+            currentUserId, organizationId, projectId, objectStorageId, dto);
+        return Ok(objectStorage);
+    }
+
+    /// <summary>
+    ///     Update a Project Container
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the object storage belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to update</param>
+    /// <param name="dto">The data transfer object containing updated object storage details</param>
+    /// <returns>The updated object storage</returns>
+    [HttpPut("{objectStorageId:long}/project", Name = "api_update_project_container")]
+    [MapToApiVersion(1)]
+    [Auth("update", "object_storage")]
+    public async Task<ActionResult<ObjectStorageResponseDto>> UpdateProjectContainer(
+        long organizationId,
+        long projectId,
+        long objectStorageId,
+        [FromBody] UpdateObjectStorageRequestDto dto)
+    {
+        try
+        {
             var currentUserId = UserContextStorage.UserId;
-            var objectStorage = await _objectStorageBusiness.UpdateObjectStorage(
+            var objectStorage = await _objectStorageBusiness.UpdateProjectContainerSettings(
                 currentUserId, organizationId, projectId, objectStorageId, dto);
             return Ok(objectStorage);
+        }
+        catch (Exception ex)
+        {
+            var message = $"An error occurred while updating object storage {objectStorageId}: {ex}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+    /// <summary>
+    ///     Update a Project Container
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the object storage belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to update</param>
+    /// <param name="dto">The data transfer object containing updated object storage details</param>
+    /// <returns>The updated object storage</returns>
+    [HttpPut("{objectStorageId:long}/project", Name = "api_update_project_container")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "object_storage")]
+    public async Task<ActionResult<ObjectStorageResponseDto>> UpdateProjectContainerV2(
+        long organizationId,
+        long projectId,
+        long objectStorageId,
+        [FromBody] UpdateObjectStorageRequestDto dto)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var objectStorage = await _objectStorageBusiness.UpdateProjectContainerSettings(
+            currentUserId, organizationId, projectId, objectStorageId, dto);
+        return Ok(objectStorage);
     }
 
     /// <summary>
@@ -301,10 +357,10 @@ public class ObjectStorageProjectController : ControllerBase
         long projectId,
         long objectStorageId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _objectStorageBusiness.DeleteObjectStorage(
-                currentUserId, organizationId, projectId, objectStorageId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _objectStorageBusiness.DeleteObjectStorage(
+            currentUserId, organizationId, projectId, objectStorageId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -365,17 +421,17 @@ public class ObjectStorageProjectController : ControllerBase
         long objectStorageId,
         [FromQuery] bool archive)
     {
-            var currentUserId = UserContextStorage.UserId;
-            if (archive)
-            {
-                var responseA = await _objectStorageBusiness.ArchiveObjectStorage(
-                    currentUserId, organizationId, projectId, objectStorageId);
-                return Ok(responseA);
-            }
-
-            var responseB = await _objectStorageBusiness.UnarchiveObjectStorage(
+        var currentUserId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var responseA = await _objectStorageBusiness.ArchiveObjectStorage(
                 currentUserId, organizationId, projectId, objectStorageId);
-            return Ok(responseB);
+            return Ok(responseA);
+        }
+
+        var responseB = await _objectStorageBusiness.UnarchiveObjectStorage(
+            currentUserId, organizationId, projectId, objectStorageId);
+        return Ok(responseB);
     }
 
     /// <summary>
@@ -420,9 +476,9 @@ public class ObjectStorageProjectController : ControllerBase
         long organizationId,
         long projectId)
     {
-            var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
-                organizationId, projectId);
-            return Ok(defaultObjectStorage);
+        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
+            organizationId, projectId);
+        return Ok(defaultObjectStorage);
     }
 
     /// <summary>
@@ -471,9 +527,9 @@ public class ObjectStorageProjectController : ControllerBase
         long projectId,
         long objectStorageId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _objectStorageBusiness.SetDefaultObjectStorage(
-                currentUserId, organizationId, projectId, objectStorageId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _objectStorageBusiness.SetDefaultObjectStorage(
+            currentUserId, organizationId, projectId, objectStorageId);
+        return Ok(response);
     }
 }
