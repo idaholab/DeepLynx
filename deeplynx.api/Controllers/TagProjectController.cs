@@ -71,9 +71,10 @@ public class TagProjectController : ControllerBase
     public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetAllTagsV2(
         long projectId, [FromQuery] bool hideArchived = true)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var tags = await _tagBusiness.GetAllTags(organizationId, [projectId], hideArchived);
-            return Ok(tags);
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, [projectId], hideArchived);
+        return Ok(tags);
     }
 
     /// <summary>
@@ -115,13 +116,13 @@ public class TagProjectController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "tag")]
     public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetTagsByNameV2(
-        long projectId, 
+        long projectId,
         [FromBody] List<string> tagNames,
         [FromQuery] bool hideArchived = true)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var tags = await _tagBusiness.GetTagsByName(organizationId, projectId, tagNames, hideArchived);
-            return Ok(tags);
+        var organizationId = UserContextStorage.OrganizationId;
+        var tags = await _tagBusiness.GetTagsByName(organizationId, projectId, tagNames, hideArchived);
+        return Ok(tags);
     }
 
     /// <summary>
@@ -169,9 +170,9 @@ public class TagProjectController : ControllerBase
         long tagId,
         [FromQuery] bool hideArchived = true)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var tag = await _tagBusiness.GetTag(organizationId, projectId, tagId, hideArchived);
-            return Ok(tag);
+        var organizationId = UserContextStorage.OrganizationId;
+        var tag = await _tagBusiness.GetTag(organizationId, projectId, tagId, hideArchived);
+        return Ok(tag);
     }
 
     /// <summary>
@@ -216,10 +217,10 @@ public class TagProjectController : ControllerBase
         long projectId,
         [FromBody] CreateTagRequestDto tagRequestDto)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var currentUserId = UserContextStorage.UserId;
-            var createdTag = await _tagBusiness.CreateTag(organizationId, currentUserId, projectId, tagRequestDto);
-            return Ok(createdTag);
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var createdTag = await _tagBusiness.CreateTag(organizationId, currentUserId, projectId, tagRequestDto);
+        return Ok(createdTag);
     }
 
     /// <summary>
@@ -264,10 +265,10 @@ public class TagProjectController : ControllerBase
         long projectId,
         [FromBody] List<CreateTagRequestDto> tagRequestDto)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var currentUserId = UserContextStorage.UserId;
-            var bulkTagResponseDto = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, projectId, tagRequestDto);
-            return Ok(bulkTagResponseDto);
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var bulkTagResponseDto = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, projectId, tagRequestDto);
+        return Ok(bulkTagResponseDto);
     }
 
     /// <summary>
@@ -314,10 +315,10 @@ public class TagProjectController : ControllerBase
         long projectId, long tagId,
         [FromBody] UpdateTagRequestDto tagRequestDto)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var currentUserId = UserContextStorage.UserId;
-            var updatedTag = await _tagBusiness.UpdateTag(organizationId, currentUserId, projectId, tagId, tagRequestDto);
-            return Ok(updatedTag);
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var updatedTag = await _tagBusiness.UpdateTag(organizationId, currentUserId, projectId, tagId, tagRequestDto);
+        return Ok(updatedTag);
     }
 
     /// <summary>
@@ -359,9 +360,9 @@ public class TagProjectController : ControllerBase
     public async Task<ActionResult<bool>> DeleteTagV2(
         long projectId, long tagId)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var response = await _tagBusiness.DeleteTag(organizationId, projectId, tagId);
-            return Ok(response);
+        var organizationId = UserContextStorage.OrganizationId;
+        var response = await _tagBusiness.DeleteTag(organizationId, projectId, tagId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -417,15 +418,15 @@ public class TagProjectController : ControllerBase
         long tagId,
         [FromQuery] bool archive)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var userId = UserContextStorage.UserId;
-            if (archive)
-            {
-                var responseA = await _tagBusiness.ArchiveTag(organizationId, userId, projectId, tagId);
-                return Ok(responseA);
-            }
+        var organizationId = UserContextStorage.OrganizationId;
+        var userId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var responseA = await _tagBusiness.ArchiveTag(organizationId, userId, projectId, tagId);
+            return Ok(responseA);
+        }
 
-            var responseB = await _tagBusiness.UnarchiveTag(organizationId, userId, projectId, tagId);
-            return Ok(responseB);
+        var responseB = await _tagBusiness.UnarchiveTag(organizationId, userId, projectId, tagId);
+        return Ok(responseB);
     }
 }

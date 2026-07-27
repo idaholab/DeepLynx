@@ -73,8 +73,10 @@ public class TagOrganizationController : ControllerBase
     public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetAllTagsV2(
         long organizationId, [FromQuery] long[]? projectIds, [FromQuery] bool hideArchived = true)
     {
-            var tags = await _tagBusiness.GetAllTags(organizationId, projectIds, hideArchived);
-            return Ok(tags);
+
+        var currentUserId = UserContextStorage.UserId;
+        var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, projectIds, hideArchived);
+        return Ok(tags);
     }
 
     /// <summary>
@@ -121,8 +123,8 @@ public class TagOrganizationController : ControllerBase
         [FromBody] List<string> tagNames,
         [FromQuery] bool hideArchived = true)
     {
-            var tags = await _tagBusiness.GetTagsByName(organizationId, null, tagNames, hideArchived);
-            return Ok(tags);
+        var tags = await _tagBusiness.GetTagsByName(organizationId, null, tagNames, hideArchived);
+        return Ok(tags);
     }
 
     /// <summary>
@@ -169,8 +171,8 @@ public class TagOrganizationController : ControllerBase
         long tagId,
         [FromQuery] bool hideArchived = true)
     {
-            var tag = await _tagBusiness.GetTag(organizationId, null, tagId, hideArchived);
-            return Ok(tag);
+        var tag = await _tagBusiness.GetTag(organizationId, null, tagId, hideArchived);
+        return Ok(tag);
     }
 
     /// <summary>
@@ -214,9 +216,9 @@ public class TagOrganizationController : ControllerBase
         long organizationId,
         [FromBody] CreateTagRequestDto tagRequestDto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var createdTag = await _tagBusiness.CreateTag(organizationId, currentUserId, null, tagRequestDto);
-            return Ok(createdTag);
+        var currentUserId = UserContextStorage.UserId;
+        var createdTag = await _tagBusiness.CreateTag(organizationId, currentUserId, null, tagRequestDto);
+        return Ok(createdTag);
     }
 
     /// <summary>
@@ -260,9 +262,9 @@ public class TagOrganizationController : ControllerBase
         long organizationId,
         [FromBody] List<CreateTagRequestDto> tagRequestDto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var bulkTagResponseDto = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, null, tagRequestDto);
-            return Ok(bulkTagResponseDto);
+        var currentUserId = UserContextStorage.UserId;
+        var bulkTagResponseDto = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, null, tagRequestDto);
+        return Ok(bulkTagResponseDto);
     }
 
     /// <summary>
@@ -308,9 +310,9 @@ public class TagOrganizationController : ControllerBase
         long organizationId, long tagId,
         [FromBody] UpdateTagRequestDto tagRequestDto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var updatedTag = await _tagBusiness.UpdateTag(organizationId, currentUserId, null, tagId, tagRequestDto);
-            return Ok(updatedTag);
+        var currentUserId = UserContextStorage.UserId;
+        var updatedTag = await _tagBusiness.UpdateTag(organizationId, currentUserId, null, tagId, tagRequestDto);
+        return Ok(updatedTag);
     }
 
     /// <summary>
@@ -351,8 +353,8 @@ public class TagOrganizationController : ControllerBase
     public async Task<ActionResult<bool>> DeleteTagV2(
         long organizationId, long tagId)
     {
-            var response = await _tagBusiness.DeleteTag(organizationId, null, tagId);
-            return Ok(response);
+        var response = await _tagBusiness.DeleteTag(organizationId, null, tagId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -407,14 +409,14 @@ public class TagOrganizationController : ControllerBase
         long tagId,
         [FromQuery] bool archive)
     {
-            var userId = UserContextStorage.UserId;
-            if (archive)
-            {
-                var responseA = await _tagBusiness.ArchiveTag(organizationId, userId, null, tagId);
-                return Ok(responseA);
-            }
+        var userId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var responseA = await _tagBusiness.ArchiveTag(organizationId, userId, null, tagId);
+            return Ok(responseA);
+        }
 
-            var responseB = await _tagBusiness.UnarchiveTag(organizationId, userId, null, tagId);
-            return Ok(responseB);
+        var responseB = await _tagBusiness.UnarchiveTag(organizationId, userId, null, tagId);
+        return Ok(responseB);
     }
 }
