@@ -45,6 +45,20 @@ interface ProjectSettingsProps {
   setProject: React.Dispatch<React.SetStateAction<ProjectResponseDto | null>>;
 }
 
+interface AzureObjectConfig {
+  AzureFilePath?: string;
+}
+
+interface StorageConfig {
+  AzureObjectConfig?: AzureObjectConfig;
+}
+
+interface StorageFormData {
+  name: string;
+  config: StorageConfig;
+  default: boolean;
+}
+
 type StorageTab = "default" | "manage";
 
 const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
@@ -75,7 +89,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   const [editingStorage, setEditingStorage] =
     useState<ObjectStorageResponseDto | null>(null);
   const [storageType, setStorageType] = useState<string>("filesystem");
-  const [storageFormData, setStorageFormData] = useState({
+  const [storageFormData, setStorageFormData] = useState<StorageFormData>({
     name: "",
     config: {},
     default: false,
@@ -494,6 +508,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       const dto: UpdateObjectStorageRequestDto = {
         name: storageFormData.name,
         default: storageFormData.default,
+        azureFilePath: storageFormData.config.AzureObjectConfig?.AzureFilePath
       };
 
       await updateProjectObjectStorage(

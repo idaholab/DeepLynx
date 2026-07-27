@@ -62,6 +62,7 @@ export type UpdateOrganizationRequestDto = {
   defaultOrg?: boolean | null;
   banner?: string | null;
   theme?: string | null;
+  createContainerPerProject?: boolean | null;
 };
 
 export type CreateOauthApplicationRequestDto = {
@@ -89,6 +90,7 @@ export type CreateObjectStorageRequestDto = {
 export type UpdateObjectStorageRequestDto = {
   name: string;
   default: boolean;
+  azureFilePath?: string;
 };
 
 export type CreateClassRequestDto = {

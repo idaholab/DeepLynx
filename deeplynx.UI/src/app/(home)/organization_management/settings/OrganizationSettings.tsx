@@ -1,7 +1,7 @@
 // src/app/(home)/organization_management/settings/OrganizationSettings.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
@@ -14,6 +14,7 @@ import {
   removeOrganizationLogo,
   updateOrganization,
   fetchOrganizationLogo,
+  getOrganization,
 } from "@/app/lib/client_service/organization_services.client";
 import { useLanguage } from "@/app/contexts/Language";
 import Image from "next/image";
@@ -24,6 +25,10 @@ import {
 } from "@/app/lib/themes/organizationTheme";
 import { applyOrganizationTheme } from "@/app/lib/themes/themeMode";
 import { isInsightHidden } from "@/app/lib/feature_flags";
+import { archiveOrganizationObjectStorage, createOrganizationObjectStorage, deleteOrganizationObjectStorage, getAllOrganizationObjectStorages, getDefaultOrganizationObjectStorage, setDefaultOrganizationObjectStorage, updateOrganizationObjectStorage } from "@/app/lib/client_service/object_storage_services.client";
+import { ObjectStorageResponseDto } from "../../types/responseDTOs";
+import { CreateObjectStorageRequestDto, UpdateObjectStorageRequestDto } from "../../types/requestDTOs";
+
 
 const OrganizationSettings = () => {
   const { organization, setOrganization } = useOrganizationSession();
@@ -57,7 +62,26 @@ const OrganizationSettings = () => {
   } | null>(null);
 
   // Storage states
-  const [storageLocation, setStorageLocation] = useState<string>("org-default");
+  const [isSavingStorage, setIsSavingStorage] = useState(false);
+  const [defaultStorage, setDefaultStorage] =
+    useState<ObjectStorageResponseDto | null>(null);
+
+
+  // Storage config fields based on type
+  const [azureConnectionString, setAzureConnectionString] = useState("");
+  const [createContainerPerProject, setCreateContainerPerProject] = useState(false);
+  const [isTouched, setIsTouched] = useState(false);
+
+  const onAzureConnectionStringChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAzureConnectionString(e.target.value);
+    setIsTouched(true);
+  };
+
+  const onCreateContainerToggle = (checked: boolean) => {
+    setCreateContainerPerProject(checked);
+    setIsTouched(true);
+    console.log("isTouched: " + isTouched)
+  };
 
   // Load existing logo on mount
   useEffect(() => {
@@ -233,6 +257,82 @@ const OrganizationSettings = () => {
       console.error("Failed to restore previous logo:", error);
       setLogoPreview(null);
     }
+  };
+
+  useEffect(() => {
+    async function loadOrgSettings() {
+      if (!organization?.organizationId) return;
+
+      try {
+        const orgData = await getOrganization(organization.organizationId as number);
+        const objectStorage = await getDefaultOrganizationObjectStorage(organization.organizationId as number);
+        setDefaultStorage(objectStorage);
+        setCreateContainerPerProject(orgData.createContainerPerProject ?? false);
+        console.log("orgData.createContainerPerProject: " + orgData.createContainerPerProject)
+        setIsTouched(false);
+      } catch (error) {
+        console.error("Failed to load organization settings", error);
+      }
+    }
+
+    loadOrgSettings();
+  }, [organization?.organizationId]);
+
+
+  const handleSave = async () => {
+    const isCreatingStorage = !defaultStorage;
+
+    if (isCreatingStorage && !azureConnectionString.trim()) {
+      toast.error("Azure connection string is required.");
+      return;
+    }
+
+    try {
+      setIsSavingStorage(true);
+
+      const dto2 = { createContainerPerProject };
+      await updateOrganization(organization?.organizationId as number, dto2);
+
+      if (isCreatingStorage || azureConnectionString.trim()) {
+        const dto = {
+          name: "Default Organization Storage",
+          config: {
+            azureObjectConfig: {
+              azureConnectionString: azureConnectionString.trim(),
+              azureContainerName: "default-container",
+            },
+          },
+          default: true,
+        };
+
+        if (isCreatingStorage) {
+          const created = await createOrganizationObjectStorage(
+            organization?.organizationId as number,
+            dto,
+          );
+          setDefaultStorage(created);
+        } else {
+          const updated = await updateOrganizationObjectStorage(
+            organization?.organizationId as number,
+            defaultStorage.id as number,
+            dto,
+          );
+          setDefaultStorage(updated);
+        }
+      }
+
+      toast.success("Settings saved successfully.");
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      toast.error("Failed to save settings.");
+    } finally {
+      setIsSavingStorage(false);
+    }
+  };
+
+  const handleReset = () => {
+    setAzureConnectionString("");
+    setCreateContainerPerProject(false);
   };
 
   // Syncs Theme from session
@@ -618,54 +718,54 @@ const OrganizationSettings = () => {
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">
-            {/* ============================================================ */}
-            {/*               STORAGE SETTINGS (COMING SOON)                 */}
-            {/* ============================================================ */}
-            <div className="card bg-base-100 border border-base-300/50 shadow-sm opacity-60">
+            <div className="card bg-base-100 border border-base-300/50 shadow-sm">
               <div className="card-body">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="card-title text-lg flex items-center gap-2">
-                    {t.translations.STORAGE_SETTINGS}
-                    <span className="badge badge-warning badge-sm">
-                      {t.translations.COMING_SOON}
-                    </span>
-                  </h3>
-                  <LockClosedIcon className="w-5 h-5 text-warning" />
-                </div>
-                <p className="text-sm text-base-content/70 mb-4">
-                  {t.translations.SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE}
-                </p>
+                <h3 className="card-title text-lg flex items-center gap-2">{t.translations.STORAGE_SETTINGS}</h3>
 
-                <div className="form-control mb-4 pointer-events-none">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      {t.translations.DEFAULT_UNMOUNT_STORAGE}
-                    </span>
-                  </label>
-                  <select
-                    className="select select-bordered"
-                    value={storageLocation}
-                    onChange={(e) => setStorageLocation(e.target.value)}
-                    disabled
+                <div className="form-control mb-6">
+                  <span className="label-text font-semibold">
+                    {t.translations.AZURE_DEFAULT_CONNECTION_STRING}
+                  </span>
+                  <input
+                    id="azureConnectionString"
+                    type="password"
+                    className="input input-bordered w-full"
+                    placeholder={t.translations.ENTER_AZURE_CONNECTION_STRING}
+                    value={azureConnectionString}
+                    onChange={onAzureConnectionStringChange}
+                    disabled={isSavingStorage}
+                  />
+                </div>
+
+                <div className="form-control mb-4">
+                  <span className="text font-semibold mr-2">
+                    {t.translations.CREATE_CONTAINER_PER_PROJECT}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={createContainerPerProject}
+                    onChange={(e) => onCreateContainerToggle(e.target.checked)}
+                    className="toggle toggle-primary"
+                    disabled={isSavingStorage}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-4">
+                  <button
+                    className="btn btn-outline"
+                    onClick={handleReset}
+                    disabled={isSavingStorage}
                   >
-                    <option value="org-default">
-                      {t.translations.ORGANIZATION_DEFAULT}
-                    </option>
-                    <option value="s3-west">
-                      {t.translations.S3_US_WEST_2}
-                    </option>
-                    <option value="s3-east">
-                      {t.translations.S3_US_EAST_1}
-                    </option>
-                    <option value="local-cluster">
-                      {t.translations.LOCAL_CLUSTER_STORAGE}
-                    </option>
-                  </select>
-                  <label className="label">
-                    <span className="label-text-alt text-base-content/60">
-                      {t.translations.USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS}
-                    </span>
-                  </label>
+                    {t.translations.CANCEL}
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleSave}
+                    disabled={isSavingStorage || !isTouched}
+                  >
+                    {isSavingStorage && <span className="loading loading-spinner loading-xs mr-2" />}
+                    {t.translations.SAVE}
+                  </button>
                 </div>
               </div>
             </div>

@@ -302,7 +302,7 @@ export async function updateProjectObjectStorage(
 ): Promise<ObjectStorageResponseDto> {
     try {
         const res = await api.put<ObjectStorageResponseDto>(
-            `/organizations/${organizationId}/projects/${projectId}/storages/${objectStorageId}`,
+            `/organizations/${organizationId}/projects/${projectId}/storages/${objectStorageId}/project`,
             dto
         );
         return res.data;

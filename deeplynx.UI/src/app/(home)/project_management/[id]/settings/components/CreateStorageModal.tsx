@@ -3,10 +3,11 @@
 
 import { useLanguage } from "@/app/contexts/Language";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
 
 interface StorageFormData {
   name: string;
-  config: Record<string, unknown>;
+  config: Record<string, any>;
   default: boolean;
 }
 
@@ -44,6 +45,32 @@ const CreateStorageModal = ({
   onResetForm,
 }: CreateStorageModalProps) => {
   const { t } = useLanguage();
+
+  const getAzureFilePath = () =>
+    storageFormData.config.AzureObjectConfig?.AzureFilePath ?? "";
+
+  const validateAzureFilePath = (filePath: string): boolean => {
+    const filePathRegex = /^[a-zA-Z0-9/]*$/;
+    return filePathRegex.test(filePath);
+  };
+
+  const setAzureFilePath = (value: string) => {
+    if (!validateAzureFilePath(value)) {
+      toast.error(t.translations.INVALID_FILE_PATH);
+      return;
+    }
+    setStorageFormData({
+      ...storageFormData,
+      config: {
+        ...storageFormData.config,
+        AzureObjectConfig: {
+          ...(storageFormData.config.AzureObjectConfig ?? {}),
+          AzureFilePath: value,
+        },
+      },
+    });
+  };
+
   return (
     <>
       <input
@@ -163,6 +190,20 @@ const CreateStorageModal = ({
                   className="input input-bordered w-full"
                   value={azureBucketName}
                   onChange={(e) => setAzureBucketName(e.target.value)}
+                />
+              </div>
+
+              {/* New File Path Input */}
+              <div className="form-control mb-4">
+                <label className="label">
+                  <span className="label-text">{t.translations.FILE_PATH}</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., path/to/container/folder"
+                  className="input input-bordered"
+                  value={getAzureFilePath()}
+                  onChange={(e) => setAzureFilePath(e.target.value)}
                 />
               </div>
             </>
