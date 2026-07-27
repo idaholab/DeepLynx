@@ -489,10 +489,11 @@ public class FileAzureBusiness : IFileBusiness
         }
 
         // Check if the blob client can generate SAS URI
-        // if (!blobClient.CanGenerateSasUri)
-        // {
-        //     throw new InvalidOperationException("BlobClient must be authorized with Shared Key credentials to generate SAS tokens");
-        // }
+        if (!blobClient.CanGenerateSasUri)
+        {
+            await DownloadFile(record, objectStorageConfig);
+            return "Cannot Create SAS URI";
+        }
 
         // Create SAS builder with read permissions
         var sasBuilder = new BlobSasBuilder
