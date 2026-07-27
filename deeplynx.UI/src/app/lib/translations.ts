@@ -315,6 +315,8 @@ export const translations = {
       DELETE_SAVED_SEARCH_WARNING: "will be permanently removed. This cannot be undone.",
       DONE: "Done",
       DEFAULT_BADGE: "Default",
+      DEFAULT_PROJECT_BADGE: "Default (Project)",
+      DEFAULT_ORGANIZATION_BADGE: "Default (Organization)",
       DEFAULT_STORAGE: "Delete Storage",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
         "This will be the default storage for data sources in this project",
@@ -2449,6 +2451,8 @@ export const translations = {
       DEFAULT_DATA_SOURCE: "Fuente de datos predeterminada",
       DEEPLYNX_LOGO: "Logotipo de DeepLynx",
       DEFAULT_BADGE: "Predeterminado",
+      DEFAULT_PROJECT_BADGE: "Predeterminado (Proyecto)",
+      DEFAULT_ORGANIZATION_BADGE: "Predeterminado (Organización)",
       DEFAULT_STORAGE: "Eliminar almacenamiento",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
         "Este será el almacenamiento predeterminado para las fuentes de datos en este proyecto",
