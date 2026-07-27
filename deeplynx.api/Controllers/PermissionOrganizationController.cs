@@ -3,6 +3,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Mvc;
 using deeplynx.helpers;
+using Microsoft.AspNetCore.Authorization;
 using Asp.Versioning;
 using Scalar.AspNetCore;
 
@@ -19,6 +20,7 @@ namespace deeplynx.api.Controllers;
 [ApiVersion(2)]
 [Route("organizations/{organizationId:long}/permissions")]
 [ForbidServiceAccounts] // service accounts can only act on the project level
+[Authorize]
 [Tags("Organization - Permission")]
 public class PermissionOrganizationController : ControllerBase
 {
