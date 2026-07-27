@@ -120,15 +120,15 @@ public class FileController : ControllerBase
         [FromQuery] long? vlmConfigId = null,
         [FromQuery] long? embeddingModelConfigId = null)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var userJwt = UserContextStorage.Token;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var fileUploadInfo =
-                await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                    file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt, isSysAdmin, isOrgAdmin, isProjectAdmin);
-            return Ok(fileUploadInfo);
+        var currentUserId = UserContextStorage.UserId;
+        var userJwt = UserContextStorage.Token;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var fileUploadInfo =
+            await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
+                file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt, isSysAdmin, isOrgAdmin, isProjectAdmin);
+        return Ok(fileUploadInfo);
     }
 
     /// <summary>
@@ -194,11 +194,59 @@ public class FileController : ControllerBase
         [FromQuery] long? vlmConfigId = null,
         [FromQuery] long? embeddingModelConfigId = null)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var userJwt = UserContextStorage.Token;
-            var updatedFileInfo =
-                await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file, vlmConfigId, embeddingModelConfigId, userJwt);
-            return Ok(updatedFileInfo);
+        var currentUserId = UserContextStorage.UserId;
+        var userJwt = UserContextStorage.Token;
+        var updatedFileInfo =
+            await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file, vlmConfigId, embeddingModelConfigId, userJwt);
+        return Ok(updatedFileInfo);
+    }
+
+    /// <summary>
+    ///     Updates the SHA-256 content hash stored for a file record.
+    /// </summary>
+    [HttpPut("{recordId:long}/hash", Name = "api_update_hash")]
+    [Auth("update", "file")]
+    [Auth("update", "record")]
+    public async Task<ActionResult<RecordResponseDto>> UpdateFileContentHash(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromBody] UpdateFileContentHashRequestDto request)
+    {
+        try
+        {
+            var response = await _fileBusiness.UpdateFileContentHash(
+                UserContextStorage.UserId,
+                organizationId,
+                projectId,
+                recordId,
+                request);
+
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to update the file content hash for record {RecordId}",
+                recordId);
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new { message = "An error occurred while updating the file content hash" });
+        }
     }
 
     /// <summary>
@@ -255,12 +303,12 @@ public class FileController : ControllerBase
         long recordId,
         CancellationToken cancellationToken)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var fileStreamResult = await _fileBusiness.DownloadAppendedFile(currentUserId, organizationId, projectId, recordId, isSysAdmin, isOrgAdmin, isProjectAdmin, cancellationToken);
-            return fileStreamResult;
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var fileStreamResult = await _fileBusiness.DownloadAppendedFile(currentUserId, organizationId, projectId, recordId, isSysAdmin, isOrgAdmin, isProjectAdmin, cancellationToken);
+        return fileStreamResult;
     }
 
     /// <summary>
@@ -314,12 +362,12 @@ public class FileController : ControllerBase
         long projectId,
         long recordId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var fileStreamResult = await _fileBusiness.DownloadFile(currentUserId, organizationId, projectId, recordId, isSysAdmin, isOrgAdmin, isProjectAdmin);
-            return fileStreamResult;
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var fileStreamResult = await _fileBusiness.DownloadFile(currentUserId, organizationId, projectId, recordId, isSysAdmin, isOrgAdmin, isProjectAdmin);
+        return fileStreamResult;
     }
 
     /// <summary>
@@ -369,9 +417,9 @@ public class FileController : ControllerBase
         long projectId,
         long recordId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var fileStreamResult = await _fileBusiness.GenerateDownloadURL(currentUserId, organizationId, projectId, recordId);
-            return fileStreamResult;
+        var currentUserId = UserContextStorage.UserId;
+        var fileStreamResult = await _fileBusiness.GenerateDownloadURL(currentUserId, organizationId, projectId, recordId);
+        return fileStreamResult;
     }
 
     /// <summary>
@@ -421,9 +469,9 @@ public class FileController : ControllerBase
         long projectId,
         long recordId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _fileBusiness.DeleteFile(currentUserId, organizationId, projectId, recordId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _fileBusiness.DeleteFile(currentUserId, organizationId, projectId, recordId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -479,9 +527,9 @@ public class FileController : ControllerBase
         [FromQuery] long? objectStorageId,
         [FromBody] FileUploadInitRequestDto request)
     {
-            var uploadSession = await _fileBusiness.StartUpload(
-                organizationId, projectId, dataSourceId, objectStorageId, request, request.Metadata);
-            return Ok(uploadSession);
+        var uploadSession = await _fileBusiness.StartUpload(
+            organizationId, projectId, dataSourceId, objectStorageId, request, request.Metadata);
+        return Ok(uploadSession);
     }
 
     /// <summary>
@@ -547,9 +595,9 @@ public class FileController : ControllerBase
         [FromForm] string uploadId,
         [FromForm] int chunkNumber)
     {
-            var response = await _fileBusiness.UploadChunk(
-                organizationId, projectId, dataSourceId, objectStorageId, chunk, uploadId, chunkNumber);
-            return Ok(response);
+        var response = await _fileBusiness.UploadChunk(
+            organizationId, projectId, dataSourceId, objectStorageId, chunk, uploadId, chunkNumber);
+        return Ok(response);
     }
 
     /// <summary>
@@ -625,11 +673,11 @@ public class FileController : ControllerBase
         [FromQuery] long? vlmConfigId = null,
         [FromQuery] long? embeddingModelConfigId = null)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var fileRecord = await _fileBusiness.CompleteUpload(
-                currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds,
-                request.Metadata, embed, vlmConfigId, embeddingModelConfigId);
-            return Ok(fileRecord);
+        var currentUserId = UserContextStorage.UserId;
+        var fileRecord = await _fileBusiness.CompleteUpload(
+            currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds,
+            request.Metadata, embed, vlmConfigId, embeddingModelConfigId);
+        return Ok(fileRecord);
     }
 
     /// <summary>
@@ -686,10 +734,10 @@ public class FileController : ControllerBase
         [FromQuery] long? objectStorageId,
         string uploadId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            await _fileBusiness.CancelUpload(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
-                uploadId);
-            return Ok();
+        var currentUserId = UserContextStorage.UserId;
+        await _fileBusiness.CancelUpload(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
+            uploadId);
+        return Ok();
     }
 
     /// <summary>
@@ -772,36 +820,36 @@ public class FileController : ControllerBase
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId)
     {
-            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
-            {
-                Response.Headers["Tus-Resumable"] = "1.0.0";
-                return StatusCode(412);
-            }
-
-            if (!Request.Headers.TryGetValue("Upload-Length", out var uploadLengthHeader) ||
-                !long.TryParse(uploadLengthHeader, out var uploadLength))
-                return BadRequest("Missing or invalid Upload-Length header");
-
-            if (!Request.Headers.TryGetValue("Upload-Metadata", out var uploadMetadata))
-                return BadRequest("Missing Upload-Metadata header");
-
-            var fileName = ParseMetadataValue(uploadMetadata, "filename");
-            if (string.IsNullOrEmpty(fileName))
-                return BadRequest("Missing filename in Upload-Metadata header");
-
-            var request = new FileUploadInitRequestDto
-            {
-                FileName = fileName,
-                FileSize = uploadLength
-            };
-
-            var uploadSession = await _fileBusiness.CreateUploadTus(
-                organizationId, projectId, dataSourceId, objectStorageId, request);
-
+        if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+        {
             Response.Headers["Tus-Resumable"] = "1.0.0";
-            Response.Headers["Location"] = $"/api/v2/organizations/{organizationId}/projects/{projectId}/files/res-upload/{uploadSession.UploadId}";
+            return StatusCode(412);
+        }
 
-            return StatusCode(201);
+        if (!Request.Headers.TryGetValue("Upload-Length", out var uploadLengthHeader) ||
+            !long.TryParse(uploadLengthHeader, out var uploadLength))
+            return BadRequest("Missing or invalid Upload-Length header");
+
+        if (!Request.Headers.TryGetValue("Upload-Metadata", out var uploadMetadata))
+            return BadRequest("Missing Upload-Metadata header");
+
+        var fileName = ParseMetadataValue(uploadMetadata, "filename");
+        if (string.IsNullOrEmpty(fileName))
+            return BadRequest("Missing filename in Upload-Metadata header");
+
+        var request = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = uploadLength
+        };
+
+        var uploadSession = await _fileBusiness.CreateUploadTus(
+            organizationId, projectId, dataSourceId, objectStorageId, request);
+
+        Response.Headers["Tus-Resumable"] = "1.0.0";
+        Response.Headers["Location"] = $"/api/v2/organizations/{organizationId}/projects/{projectId}/files/res-upload/{uploadSession.UploadId}";
+
+        return StatusCode(201);
     }
 
     /// <summary>
@@ -869,19 +917,19 @@ public class FileController : ControllerBase
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId)
     {
-            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
-            {
-                Response.Headers["Tus-Resumable"] = "1.0.0";
-                return StatusCode(412);
-            }
-
-            var (offset, uploadLength) = await _fileBusiness.GetUploadOffsetTus(organizationId, projectId, dataSourceId, objectStorageId, uploadId);
-
+        if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+        {
             Response.Headers["Tus-Resumable"] = "1.0.0";
-            Response.Headers["Upload-Offset"] = offset.ToString();
-            Response.Headers["Upload-Length"] = uploadLength.ToString();
-            Response.Headers["Cache-Control"] = "no-store";
-            return NoContent();
+            return StatusCode(412);
+        }
+
+        var (offset, uploadLength) = await _fileBusiness.GetUploadOffsetTus(organizationId, projectId, dataSourceId, objectStorageId, uploadId);
+
+        Response.Headers["Tus-Resumable"] = "1.0.0";
+        Response.Headers["Upload-Offset"] = offset.ToString();
+        Response.Headers["Upload-Length"] = uploadLength.ToString();
+        Response.Headers["Cache-Control"] = "no-store";
+        return NoContent();
     }
 
     /// <summary>
@@ -958,26 +1006,26 @@ public class FileController : ControllerBase
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId)
     {
-            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
-            {
-                Response.Headers["Tus-Resumable"] = "1.0.0";
-                return StatusCode(412);
-            }
-
-            if (!Request.Headers.TryGetValue("Upload-Offset", out var offsetHeader) ||
-                !long.TryParse(offsetHeader, out var uploadOffset))
-                return BadRequest("Missing or invalid Upload-Offset header");
-
-            if (!Request.Headers.TryGetValue("Content-Type", out var contentType) ||
-                contentType != "application/offset+octet-stream")
-                return StatusCode(415);
-
-            var newOffset = await _fileBusiness.UploadPartTus(
-                organizationId, projectId, dataSourceId, objectStorageId, uploadId, uploadOffset, userId, Request.Body, null, null, false, null, null);
-
+        if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+        {
             Response.Headers["Tus-Resumable"] = "1.0.0";
-            Response.Headers["Upload-Offset"] = newOffset.ToString();
-            return NoContent();
+            return StatusCode(412);
+        }
+
+        if (!Request.Headers.TryGetValue("Upload-Offset", out var offsetHeader) ||
+            !long.TryParse(offsetHeader, out var uploadOffset))
+            return BadRequest("Missing or invalid Upload-Offset header");
+
+        if (!Request.Headers.TryGetValue("Content-Type", out var contentType) ||
+            contentType != "application/offset+octet-stream")
+            return StatusCode(415);
+
+        var newOffset = await _fileBusiness.UploadPartTus(
+            organizationId, projectId, dataSourceId, objectStorageId, uploadId, uploadOffset, userId, Request.Body, null, null, false, null, null);
+
+        Response.Headers["Tus-Resumable"] = "1.0.0";
+        Response.Headers["Upload-Offset"] = newOffset.ToString();
+        return NoContent();
     }
 
     /// <summary>
@@ -1043,19 +1091,19 @@ public class FileController : ControllerBase
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId)
     {
-            if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
-            {
-                Response.Headers["Tus-Resumable"] = "1.0.0";
-                return StatusCode(412);
-            }
-
-            var currentUserId = UserContextStorage.UserId;
-            await _fileBusiness.CancelUpload(currentUserId, organizationId, projectId, dataSourceId, objectStorageId, uploadId);
-
+        if (!Request.Headers.TryGetValue("Tus-Resumable", out var tusResumable) || tusResumable != "1.0.0")
+        {
             Response.Headers["Tus-Resumable"] = "1.0.0";
-            return NoContent();
+            return StatusCode(412);
+        }
+
+        var currentUserId = UserContextStorage.UserId;
+        await _fileBusiness.CancelUpload(currentUserId, organizationId, projectId, dataSourceId, objectStorageId, uploadId);
+
+        Response.Headers["Tus-Resumable"] = "1.0.0";
+        return NoContent();
     }
-    
+
     //Private helper
     private string ParseMetadataValue(string uploadMetadata, string key)
     {

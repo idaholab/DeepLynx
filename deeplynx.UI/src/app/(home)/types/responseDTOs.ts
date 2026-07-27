@@ -97,6 +97,7 @@ export type RecordResponseDto = {
   isArchived?: boolean;
   fileType?: string | null;
   fileSize?: number | null;
+  fileContentHash?: string | null;
   tags?: { id: number | null; name: string }[];
   labels?: { id: number | null; name: string }[];
 };

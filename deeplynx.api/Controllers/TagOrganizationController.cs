@@ -4,11 +4,15 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using deeplynx.helpers;
+using Asp.Versioning;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
 [Route("organizations/{organizationId:long}/tags")]
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Authorize]
 [ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Organization - Tag")]
@@ -36,6 +40,7 @@ public class TagOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
     /// <returns>A list of tags belonging to the project.</returns>
     [HttpGet(Name = "api_get_all_tags_organization")]
+    [MapToApiVersion(1)]
     [Auth("read", "tag")]
     public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetAllTags(
         long organizationId, [FromQuery] long[]? projects, [FromQuery] bool hideArchived = true)
@@ -55,6 +60,24 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Get All Tags 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectIds">(Optional)An array of project IDs within the organization to filter by</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
+    /// <returns>A list of tags belonging to the project.</returns>
+    [HttpGet(Name = "api_get_all_tags_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "tag")]
+    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetAllTagsV2(
+        long organizationId, [FromQuery] long[]? projectIds, [FromQuery] bool hideArchived = true)
+    {
+            var tags = await _tagBusiness.GetAllTags(organizationId, projectIds, hideArchived);
+            return Ok(tags);
+    }
+
+    /// <summary>
     ///     Get Tags By Name
     /// </summary>
     /// <param name="organizationId">The ID of the organization whose tags are to be retrieved</param>
@@ -62,6 +85,7 @@ public class TagOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
     /// <returns>A list of tags belonging to the project.</returns>
     [HttpPost("by-name", Name = "api_get_tags_by_name_organization")]
+    [MapToApiVersion(1)]
     [Auth("read", "tag")]
     public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetTagsByName(
         long organizationId,
@@ -82,6 +106,26 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Get Tags By Name
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization whose tags are to be retrieved</param>
+    /// <param name="tagNames">Names of the tags to get</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
+    /// <returns>A list of tags belonging to the project.</returns>
+    [HttpPost("by-name", Name = "api_get_tags_by_name_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "tag")]
+    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetTagsByNameV2(
+        long organizationId,
+        [FromBody] List<string> tagNames,
+        [FromQuery] bool hideArchived = true)
+    {
+            var tags = await _tagBusiness.GetTagsByName(organizationId, null, tagNames, hideArchived);
+            return Ok(tags);
+    }
+
+    /// <summary>
     ///     Get a Tag 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -89,6 +133,7 @@ public class TagOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
     /// <returns>The tag with its details.</returns>
     [HttpGet("{tagId:long}", Name = "api_get_a_tag_organization")]
+    [MapToApiVersion(1)]
     [Auth("read", "tag")]
     public async Task<ActionResult<TagResponseDto>> GetTag(
         long organizationId,
@@ -109,12 +154,33 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Get a Tag 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="tagId">The ID of the tag to retrieve.</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
+    /// <returns>The tag with its details.</returns>
+    [HttpGet("{tagId:long}", Name = "api_get_a_tag_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "tag")]
+    public async Task<ActionResult<TagResponseDto>> GetTagV2(
+        long organizationId,
+        long tagId,
+        [FromQuery] bool hideArchived = true)
+    {
+            var tag = await _tagBusiness.GetTag(organizationId, null, tagId, hideArchived);
+            return Ok(tag);
+    }
+
+    /// <summary>
     ///     Create a Tag 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="tagRequestDto">The tag data transfer object containing tag details.</param>
     /// <returns>The created tag with its details.</returns>
     [HttpPost(Name = "api_create_a_tag_organization")]
+    [MapToApiVersion(1)]
     [Auth("write", "tag")]
     public async Task<ActionResult<TagResponseDto>> CreateTag(
         long organizationId,
@@ -135,12 +201,32 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Create a Tag 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="tagRequestDto">The tag data transfer object containing tag details.</param>
+    /// <returns>The created tag with its details.</returns>
+    [HttpPost(Name = "api_create_a_tag_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "tag")]
+    public async Task<ActionResult<TagResponseDto>> CreateTagV2(
+        long organizationId,
+        [FromBody] CreateTagRequestDto tagRequestDto)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var createdTag = await _tagBusiness.CreateTag(organizationId, currentUserId, null, tagRequestDto);
+            return Ok(createdTag);
+    }
+
+    /// <summary>
     ///     Create Many Tags 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="tagRequestDto">The tag data transfer object containing tag details.</param>
     /// <returns>The created tag with its details.</returns>
     [HttpPost("bulk", Name = "api_create_many_tags_organization")]
+    [MapToApiVersion(1)]
     [Auth("write", "tag")]
     public async Task<ActionResult<List<TagResponseDto>>> BulkCreateTag(
         long organizationId,
@@ -161,6 +247,25 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Create Many Tags 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="tagRequestDto">The tag data transfer object containing tag details.</param>
+    /// <returns>The created tags with their details.</returns>
+    [HttpPost("bulk", Name = "api_create_many_tags_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "tag")]
+    public async Task<ActionResult<List<TagResponseDto>>> BulkCreateTagV2(
+        long organizationId,
+        [FromBody] List<CreateTagRequestDto> tagRequestDto)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var bulkTagResponseDto = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, null, tagRequestDto);
+            return Ok(bulkTagResponseDto);
+    }
+
+    /// <summary>
     /// Update a Tag 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -168,6 +273,7 @@ public class TagOrganizationController : ControllerBase
     /// <param name="tagRequestDto">The tag data transfer object containing updated tag details.</param>
     /// <returns>The updated tag with its details.</returns>
     [HttpPut("{tagId:long}", Name = "api_update_a_tag_organization")]
+    [MapToApiVersion(1)]
     [Auth("update", "tag")]
     public async Task<ActionResult<TagResponseDto>> UpdateTag(
         long organizationId, long tagId,
@@ -188,12 +294,33 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
+    /// Update a Tag 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="tagId">The ID of the tag to update.</param>
+    /// <param name="tagRequestDto">The tag data transfer object containing updated tag details.</param>
+    /// <returns>The updated tag with its details.</returns>
+    [HttpPut("{tagId:long}", Name = "api_update_a_tag_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "tag")]
+    public async Task<ActionResult<TagResponseDto>> UpdateTagV2(
+        long organizationId, long tagId,
+        [FromBody] UpdateTagRequestDto tagRequestDto)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var updatedTag = await _tagBusiness.UpdateTag(organizationId, currentUserId, null, tagId, tagRequestDto);
+            return Ok(updatedTag);
+    }
+
+    /// <summary>
     ///     Delete a Tag 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="tagId">The ID of the tag to delete.</param>
     /// <returns> A message stating the tag was successfully deleted.</returns>
     [HttpDelete("{tagId:long}", Name = "api_delete_a_tag_organization")]
+    [MapToApiVersion(1)]
     [Auth("write", "tag")]
     public async Task<IActionResult> DeleteTag(
         long organizationId, long tagId)
@@ -212,6 +339,23 @@ public class TagOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Delete a Tag 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="tagId">The ID of the tag to delete.</param>
+    /// <returns>True if the tag was successfully deleted.</returns>
+    [HttpDelete("{tagId:long}", Name = "api_delete_a_tag_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "tag")]
+    public async Task<ActionResult<bool>> DeleteTagV2(
+        long organizationId, long tagId)
+    {
+            var response = await _tagBusiness.DeleteTag(organizationId, null, tagId);
+            return Ok(response);
+    }
+
+    /// <summary>
     ///     Archive or Unarchive a Tag 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the tag's project belongs</param>
@@ -219,6 +363,7 @@ public class TagOrganizationController : ControllerBase
     /// <param name="archive">True to archive the tag, false to unarchive it.</param>
     /// <returns>A message stating the tag was successfully archived or unarchived.</returns>
     [HttpPatch("{tagId:long}", Name = "api_archive_tag_organization")]
+    [MapToApiVersion(1)]
     [Auth("update", "tag")]
     public async Task<IActionResult> ArchiveTag(
         long organizationId,
@@ -244,5 +389,32 @@ public class TagOrganizationController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+
+    /// <summary>
+    ///     Archive or Unarchive a Tag 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the tag's project belongs</param>
+    /// <param name="tagId">The ID of the tag to archive or unarchive.</param>
+    /// <param name="archive">True to archive the tag, false to unarchive it.</param>
+    /// <returns>True if the tag was successfully archived or unarchived.</returns>
+    [HttpPatch("{tagId:long}", Name = "api_archive_tag_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "tag")]
+    public async Task<ActionResult<bool>> ArchiveTagV2(
+        long organizationId,
+        long tagId,
+        [FromQuery] bool archive)
+    {
+            var userId = UserContextStorage.UserId;
+            if (archive)
+            {
+                var responseA = await _tagBusiness.ArchiveTag(organizationId, userId, null, tagId);
+                return Ok(responseA);
+            }
+
+            var responseB = await _tagBusiness.UnarchiveTag(organizationId, userId, null, tagId);
+            return Ok(responseB);
     }
 }

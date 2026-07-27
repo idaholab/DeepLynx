@@ -285,19 +285,19 @@
   prefersdark: true;
   color-scheme: "dark";
   --color-base-100: oklch(27.69% 0.033 260.03);
-  --color-base-200: oklch(23.76% 0.026 260.28);
+  --color-base-200: oklch(15.76% 0.026 260.28);
   --color-base-300: oklch(20.32% 0.021 260.39);
   --color-base-content: oklch(86.78% 0.014 263.48);
   --color-primary: oklch(69.65% 0.059 248.69);
   --color-primary-content: oklch(86.78% 0.014 263.48);
-  --color-secondary: oklch(77.46% 0.062 217.47);
+  --color-secondary: oklch(50.46% 0.062 217.47);
   --color-secondary-content: oklch(86.78% 0.014 263.48);
   --color-accent: oklch(76.83% 0.074 131.06);
   --color-accent-content: oklch(20.32% 0.021 260.39);
   --color-neutral: oklch(45.23% 0.035 264.13);
   --color-neutral-content: oklch(89.93% 0.016 262.75);
   --color-info: oklch(69.21% 0.062 332.66);
-  --color-info-content: oklch(20.32% 0.021 260.39);
+  --color-info-content: oklch(50.32% 0.021 260.39);
   --color-success: oklch(76.83% 0.074 131.06);
   --color-success-content: oklch(20.32% 0.021 260.39);
   --color-warning: oklch(85.49% 0.089 84.09);
@@ -533,11 +533,11 @@ html {
   line-height: 1.5;
 }
 
-.insight-markdown-message > *:first-child {
+.insight-markdown-message>*:first-child {
   margin-top: 0;
 }
 
-.insight-markdown-message > *:last-child {
+.insight-markdown-message>*:last-child {
   margin-bottom: 0;
 }
 
