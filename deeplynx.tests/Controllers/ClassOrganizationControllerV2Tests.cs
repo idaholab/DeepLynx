@@ -448,7 +448,7 @@ public class ClassOrganizationControllerTestsV2 : IDisposable
     {
         var method = GetControllerMethod(
             nameof(ClassOrganizationController.GetAllClassesV2),
-            "organizationId", "projectIds", "hideArchived");
+            "organizationId", "projects", "hideArchived");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
         AssertHasAuthAttribute(method, "read", "class");

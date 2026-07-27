@@ -54,8 +54,10 @@ public class ClassProjectController : ControllerBase
         {
             var currentUserId = UserContextStorage.UserId;
             var organizationId = UserContextStorage.OrganizationId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var classes = await _classBusiness.GetAllClasses(
-                currentUserId, organizationId, [projectId], hideArchived);
+                currentUserId, organizationId, [projectId], hideArchived, isSysAdmin, isOrgAdmin);
             return Ok(classes);
         }
         catch (Exception exc)
@@ -82,8 +84,10 @@ public class ClassProjectController : ControllerBase
     {
         var currentUserId = UserContextStorage.UserId;
         var organizationId = UserContextStorage.OrganizationId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
         var classes = await _classBusiness.GetAllClasses(
-            currentUserId, organizationId, [projectId], hideArchived);
+            currentUserId, organizationId, [projectId], hideArchived, isSysAdmin, isOrgAdmin);
         return Ok(classes);
     }
 

@@ -56,8 +56,10 @@ public class ClassOrganizationController : ControllerBase
         try
         {
             var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var classes = await _classBusiness.GetAllClasses(
-                currentUserId, organizationId, projects, hideArchived);
+                currentUserId, organizationId, projects, hideArchived, isSysAdmin, isOrgAdmin);
             return Ok(classes);
         }
         catch (Exception exc)
@@ -72,7 +74,7 @@ public class ClassOrganizationController : ControllerBase
     ///     Get All Classes
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the class's project belongs</param>
-    /// <param name="projectIds">(Optional)An array of project IDs within the organization to filter by</param>
+    /// <param name="projects">(Optional)An array of project IDs within the organization to filter by</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived classes from the result (Default true)</param>
     /// <returns>List of class response DTOs</returns>
     [HttpGet(Name = "api_get_all_classes_organization")]
@@ -81,12 +83,14 @@ public class ClassOrganizationController : ControllerBase
     [Auth("read", "class")]
     public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetAllClassesV2(
         long organizationId,
-        [FromQuery] long[]? projectIds,
+        [FromQuery] long[]? projects,
         [FromQuery] bool hideArchived = true)
     {
         var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
         var classes = await _classBusiness.GetAllClasses(
-            currentUserId, organizationId, projectIds, hideArchived);
+            currentUserId, organizationId, projects, hideArchived, isSysAdmin, isOrgAdmin);
         return Ok(classes);
     }
 

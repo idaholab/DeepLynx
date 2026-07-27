@@ -507,7 +507,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ReturnsOnlyForProjects()
     {
         // Act - Get classes for pid only
-        var list = await _classBusiness.GetAllClasses(uid, oid, [pid], true);
+        var list = await _classBusiness.GetAllClasses(uid, oid, [pid], true, true);
 
         // Assert - Should get class1 and class5 (not class2 which is archived, not class4 which is in pid2)
         Assert.Equal(3, list.Count);
@@ -521,7 +521,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ExcludesSoftDeleted()
     {
         // Act
-        var list = await _classBusiness.GetAllClasses(uid, oid, [pid], true);
+        var list = await _classBusiness.GetAllClasses(uid, oid, [pid], true, true);
 
         // Assert - class2 is archived, should not be returned
         Assert.DoesNotContain(list, c => c.Id == cid2);
@@ -532,7 +532,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ValidProjectIds_ReturnsClassesFromAllProjects()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(uid, oid, [pid, pid2], true);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid, pid2], true, true);
 
         // Assert - Should get class1, class4, class5 (not class2 which is archived)
         Assert.Equal(4, result.Count);
@@ -545,7 +545,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_NonExistentProjectIds_ReturnsEmptyList()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(uid, oid, [999, 998], true);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [999, 998], true, true);
 
         // Assert
         Assert.Single(result);
@@ -555,7 +555,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_HideArchivedFalse_ReturnsArchivedClasses()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], false);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], false, true);
 
         // Assert - Should include archived class2
         Assert.Contains(result, c => c.Id == cid2 && c.IsArchived);
@@ -565,7 +565,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_HideArchivedTrue_ExcludesArchivedClasses()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], true);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], true, true);
 
         // Assert
         Assert.DoesNotContain(result, c => c.Id == cid2);
@@ -576,7 +576,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ReturnsAllProperties_Correctly()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], false);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], false, true);
         var class1Dto = result.First(c => c.Id == cid1);
 
         // Assert

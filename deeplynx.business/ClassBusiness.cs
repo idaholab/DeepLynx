@@ -53,33 +53,38 @@ public class ClassBusiness : IClassBusiness
     /// <param name="currentUserId">The ID of the user</param>
     /// <param name="projectIds">(optional) The ID(s) of the project(s) to filter classes by</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived classes from the result</param>
+    /// <param name="isSysAdmin">Flag indicating whether you are a system admin</param>
+    /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin</param>
     /// <returns>A list of classes</returns>
     public async Task<List<ClassResponseDto>> GetAllClasses(
         long currentUserId,
         long organizationId,
         long[]? projectIds,
-        bool hideArchived = true)
+        bool hideArchived = true,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false)
     {
         var userProjectAdminStatus = new Dictionary<long, bool>();
 
-        bool isSysAdmin = await _adminService.SysAdminCheck(currentUserId);
-        bool isOrgAdmin = await _adminService.OrgAdminCheck(currentUserId, organizationId);
-
-        if (projectIds != null && projectIds.Length > 0)
+        if (projectIds?.Length > 0)
         {
+            var adminProjectIds = await _context.ProjectMembers
+                .Where(pm =>
+                    pm.IsProjectAdmin &&
+                    projectIds.Contains(pm.ProjectId) &&
+                    (
+                    (
+                        (pm.UserId != null && pm.UserId == currentUserId) ||
+                        pm.Group!.Users.Any(u => u.Id == currentUserId)
+                    )
+                    ))
+                    .Select(pm => pm.ProjectId)
+                    .Distinct()
+                    .ToHashSetAsync();
+
             foreach (var projectId in projectIds)
             {
-                var isProjectAdmin = await _context.ProjectMembers
-                    .AnyAsync(pm =>
-                        pm.ProjectId == projectId &&
-                        pm.IsProjectAdmin &&
-                        (
-                            (pm.UserId != null && pm.UserId == currentUserId) ||
-                            pm.Group!.Users.Any(u => u.Id == currentUserId)
-                        )
-                    );
-
-                userProjectAdminStatus[projectId] = isProjectAdmin;
+                userProjectAdminStatus[projectId] = adminProjectIds.Contains(projectId);
             }
         }
 
