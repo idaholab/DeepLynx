@@ -119,6 +119,7 @@ public class RecordBusinessTests : IntegrationTestBase
             LastUpdatedBy = uid,
             IsArchived = false,
             FileType = "pdf",
+            FileContentHash = "abc123",
             Tags = tags
         };
 
@@ -137,8 +138,139 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal(uid, dto.LastUpdatedBy);
         Assert.False(dto.IsArchived);
         Assert.Equal("pdf", dto.FileType);
+        Assert.Equal("abc123", dto.FileContentHash);
         Assert.Single(dto.Tags);
         Assert.Equal("Test Tag", dto.Tags.First().Name);
+    }
+
+    #endregion
+
+    #region File Content Hash Tests
+
+    [Fact]
+    public async Task UpdateFileContentHash_WithMatchingRecord_StoresNormalizedSha256Hash()
+    {
+        var recordId = await CreateFileRecord(fileSize: 1234);
+        var hash = new string('a', 64);
+
+        var result = await _recordBusiness.UpdateFileContentHash(
+            uid,
+            organizationId,
+            pid,
+            recordId,
+            new UpdateFileContentHashRequestDto
+            {
+                HashHex = hash.ToUpperInvariant(),
+                ContentLength = 1234
+            });
+
+        var storedRecord = await Context.Records.FindAsync(recordId);
+
+        Assert.Equal(recordId, result.Id);
+        Assert.Equal(hash, result.FileContentHash);
+        Assert.Equal(hash, storedRecord!.FileContentHash);
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHash_WithMismatchedContentLength_ThrowsInvalidOperationException()
+    {
+        var recordId = await CreateFileRecord(fileSize: 100);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _recordBusiness.UpdateFileContentHash(
+                uid,
+                organizationId,
+                pid,
+                recordId,
+                new UpdateFileContentHashRequestDto
+                {
+                    HashHex = new string('1', 64),
+                    ContentLength = 101
+                }));
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHash_WithExistingSameHash_IsIdempotent()
+    {
+        var hash = new string('b', 64);
+        var recordId = await CreateFileRecord(fileContentHash: hash);
+
+        var result = await _recordBusiness.UpdateFileContentHash(
+            uid,
+            organizationId,
+            pid,
+            recordId,
+            new UpdateFileContentHashRequestDto
+            {
+                HashHex = hash
+            });
+
+        Assert.Equal(hash, result.FileContentHash);
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHash_WhenRecordDoesNotExist_ThrowsKeyNotFoundException()
+    {
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordBusiness.UpdateFileContentHash(
+                uid,
+                organizationId,
+                pid,
+                long.MaxValue,
+                new UpdateFileContentHashRequestDto
+                {
+                    HashHex = new string('c', 64)
+                }));
+    }
+
+    [Theory]
+    [InlineData("MD5", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("SHA-256", "not-a-sha")]
+    public async Task UpdateFileContentHash_WithInvalidHashRequest_ThrowsArgumentException(
+        string algorithm,
+        string hashHex)
+    {
+        var recordId = await CreateFileRecord();
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _recordBusiness.UpdateFileContentHash(
+                uid,
+                organizationId,
+                pid,
+                recordId,
+                new UpdateFileContentHashRequestDto
+                {
+                    HashAlgorithm = algorithm,
+                    HashHex = hashHex
+                }));
+    }
+
+    private async Task<long> CreateFileRecord(
+        string? fileContentHash = null,
+        long? fileSize = null)
+    {
+        var record = new Record
+        {
+            Name = $"File Record {Guid.NewGuid()}",
+            Description = "File content hash test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = $"file-{Guid.NewGuid()}",
+            FileType = "pdf",
+            FileSize = fileSize,
+            FileContentHash = fileContentHash,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        return record.Id;
     }
 
     #endregion

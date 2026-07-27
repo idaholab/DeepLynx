@@ -37,4 +37,10 @@ public class UpdateRecordRequestDto
 
     [JsonPropertyName("file_size")]
     public long? FileSize { get; set; }
+
+    [JsonIgnore]
+    public string? FileContentHash { get; set; }
+
+    [JsonIgnore]
+    public bool ReplaceFileContentHash { get; set; }
 }

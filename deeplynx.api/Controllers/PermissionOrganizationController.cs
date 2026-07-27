@@ -4,6 +4,8 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Mvc;
 using deeplynx.helpers;
 using Microsoft.AspNetCore.Authorization;
+using Asp.Versioning;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
@@ -14,6 +16,8 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to create, update, delete, and retrieve organization permission information.
 /// </remarks>
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/permissions")]
 [ForbidServiceAccounts] // service accounts can only act on the project level
 [Authorize]
@@ -42,6 +46,7 @@ public class PermissionOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived permissions from the result (Default true)</param>
     /// <returns>A list of permissions for the given organization/project.</returns>
     [HttpGet(Name = "api_get_all_organization_permissions")]
+    [MapToApiVersion(1)]
     [Auth("read", "permission")]
     public async Task<ActionResult<IEnumerable<PermissionResponseDto>>> GetAllPermissions(
         long organizationId,
@@ -64,6 +69,28 @@ public class PermissionOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Get All Permissions 
+    /// </summary>
+    /// <param name="organizationId">(Optional)The ID of the organization to which the project belongs. If not supplied, will get all defaults.</param>
+    /// <param name="labelId">Optional sensitivity label ID to filter permissions</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived permissions from the result (Default true)</param>
+    /// <returns>A list of permissions for the given organization/project.</returns>
+    [HttpGet(Name = "api_get_all_organization_permissions")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "permission")]
+    public async Task<ActionResult<IEnumerable<PermissionResponseDto>>> GetAllPermissionsV2(
+        long organizationId,
+        [FromQuery] long? labelId = null,
+        [FromQuery] bool hideArchived = true)
+    {
+            var permissions =
+                await _permissionBusiness.GetAllPermissions(
+                    labelId, null, organizationId, hideArchived);
+            return Ok(permissions);
+    }
+
+    /// <summary>
     ///     Get a Permission 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
@@ -71,6 +98,7 @@ public class PermissionOrganizationController : ControllerBase
     /// <param name="hideArchived">Flag indicating whether to hide archived permissions from the result (Default true)</param>
     /// <returns>The permission associated with the given ID</returns>
     [HttpGet("{permissionId:long}", Name = "api_get_organization_permission")]
+    [MapToApiVersion(1)]
     [Auth("read", "permission")]
     public async Task<ActionResult<PermissionResponseDto>> GetPermission(
         long organizationId,
@@ -91,12 +119,33 @@ public class PermissionOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Get a Permission 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
+    /// <param name="permissionId">The ID of the permission to retrieve</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived permissions from the result (Default true)</param>
+    /// <returns>The permission associated with the given ID</returns>
+    [HttpGet("{permissionId:long}", Name = "api_get_organization_permission")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "permission")]
+    public async Task<ActionResult<PermissionResponseDto>> GetPermissionV2(
+        long organizationId,
+        long permissionId,
+        [FromQuery] bool hideArchived = true)
+    {
+            var permission = await _permissionBusiness.GetPermission(organizationId, null, permissionId, hideArchived);
+            return Ok(permission);
+    }
+
+    /// <summary>
     ///     Create a Permission 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
     /// <param name="dto">The data transfer object containing permission details</param>
     /// <returns>The created permission</returns>
     [HttpPost(Name = "api_create_organization_permission")]
+    [MapToApiVersion(1)]
     [Auth("write", "permission")]
     public async Task<ActionResult<PermissionResponseDto>> CreatePermission(
         long organizationId,
@@ -119,6 +168,27 @@ public class PermissionOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Create a Permission 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
+    /// <param name="dto">The data transfer object containing permission details</param>
+    /// <returns>The created permission</returns>
+    [HttpPost(Name = "api_create_organization_permission")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "permission")]
+    public async Task<ActionResult<PermissionResponseDto>> CreatePermissionV2(
+        long organizationId,
+        [FromBody] CreatePermissionRequestDto dto)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var permission =
+                await _permissionBusiness.CreatePermission(currentUserId, dto, null,
+                    organizationId);
+            return Ok(permission);
+    }
+
+    /// <summary>
     ///     Update a Permission 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
@@ -126,6 +196,7 @@ public class PermissionOrganizationController : ControllerBase
     /// <param name="dto">The data transfer object containing updated permission details</param>
     /// <returns>The updated permission</returns>
     [HttpPut("{permissionId:long}", Name = "api_update_organization_permission")]
+    [MapToApiVersion(1)]
     [Auth("update", "permission")]
     public async Task<ActionResult<PermissionResponseDto>> UpdatePermission(
         long organizationId,
@@ -147,12 +218,34 @@ public class PermissionOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Update a Permission 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
+    /// <param name="permissionId">The ID of the permission to update</param>
+    /// <param name="dto">The data transfer object containing updated permission details</param>
+    /// <returns>The updated permission</returns>
+    [HttpPut("{permissionId:long}", Name = "api_update_organization_permission")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "permission")]
+    public async Task<ActionResult<PermissionResponseDto>> UpdatePermissionV2(
+        long organizationId,
+        long permissionId,
+        [FromBody] UpdatePermissionRequestDto dto)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var permission = await _permissionBusiness.UpdatePermission(organizationId, null, currentUserId, permissionId, dto);
+            return Ok(permission);
+    }
+
+    /// <summary>
     ///     Delete a Permission 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
     /// <param name="permissionId">The ID of the permission to delete</param>
     /// <returns>A message stating the permission was successfully deleted.</returns>
     [HttpDelete("{permissionId:long}", Name = "api_delete_organization_permission")]
+    [MapToApiVersion(1)]
     [Auth("write", "permission")]
     public async Task<ActionResult> DeletePermission(
         long organizationId,
@@ -173,6 +266,25 @@ public class PermissionOrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Delete a Permission 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
+    /// <param name="permissionId">The ID of the permission to delete</param>
+    /// <returns>True if the permission was successfully deleted.</returns>
+    [HttpDelete("{permissionId:long}", Name = "api_delete_organization_permission")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "permission")]
+    public async Task<ActionResult<bool>> DeletePermissionV2(
+        long organizationId,
+        long permissionId)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var response = await _permissionBusiness.DeletePermission(organizationId, null, currentUserId, permissionId);
+            return Ok(response);
+    }
+
+    /// <summary>
     ///     Archive or Unarchive a Permission 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
@@ -180,6 +292,7 @@ public class PermissionOrganizationController : ControllerBase
     /// <param name="archive">True to archive the permission, false to unarchive it.</param>
     /// <returns>A message stating the permission was successfully archived or unarchived.</returns>
     [HttpPatch("{permissionId:long}", Name = "api_archive_organization_permission")]
+    [MapToApiVersion(1)]
     [Auth("update", "permission")]
     public async Task<IActionResult> ArchivePermission(
         long organizationId,
@@ -205,5 +318,32 @@ public class PermissionOrganizationController : ControllerBase
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
+    }
+
+    /// <summary>
+    ///     Archive or Unarchive a Permission 
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the permission belongs</param>
+    /// <param name="permissionId">The ID of the permission to archive or unarchive</param>
+    /// <param name="archive">True to archive the permission, false to unarchive it.</param>
+    /// <returns>True if the permission was successfully archived or unarchived.</returns>
+    [HttpPatch("{permissionId:long}", Name = "api_archive_organization_permission")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "permission")]
+    public async Task<ActionResult<bool>> ArchivePermissionV2(
+        long organizationId,
+        long permissionId,
+        [FromQuery] bool archive)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            if (archive)
+            {
+                var responseA = await _permissionBusiness.ArchivePermission(organizationId, null, currentUserId, permissionId);
+                return Ok(responseA);
+            }
+
+            var responseB = await _permissionBusiness.UnarchivePermission(organizationId, null, currentUserId, permissionId);
+            return Ok(responseB);
     }
 }
