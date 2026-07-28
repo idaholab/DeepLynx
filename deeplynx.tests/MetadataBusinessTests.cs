@@ -34,6 +34,8 @@ public class MetadataBusinessTests : IntegrationTestBase
     private Mock<IAdminService> _mockAdminService = null!;
     private RecordBusiness _recordBusiness = null!;
     private RelationshipBusiness _relationshipBusiness = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
@@ -59,6 +61,8 @@ public class MetadataBusinessTests : IntegrationTestBase
         await base.InitializeAsync();
 
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockAdminService = new Mock<IAdminService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _mockAdminService = new Mock<IAdminService>();
         _mockPermissionService = new Mock<IProjectRolePermissionService>();
@@ -68,7 +72,7 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         // Build leaf dependencies first
         _userBusiness = new UserBusiness(Context);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
         _sensitivityLabelService = new SensitivityLabelService(Context);

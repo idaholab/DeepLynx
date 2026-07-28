@@ -98,7 +98,7 @@ public class FileBusinessTests : IntegrationTestBase
             _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
 
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
@@ -1220,6 +1220,47 @@ public class FileBusinessTests : IntegrationTestBase
 
         var savedContent = await File.ReadAllTextAsync(updatedRecord.Uri);
         Assert.Equal(newContent, savedContent);
+    }
+
+    [Fact]
+    public async Task UpdateFile_WithFilesystemPlaceholder_ClearsPreviousContentHash()
+    {
+        await using var originalStream = new MemoryStream(Encoding.UTF8.GetBytes("original"));
+        var originalFile = new FormFile(
+            originalStream,
+            0,
+            originalStream.Length,
+            "file",
+            "original.txt");
+        var originalRecord = await _fileBusiness.UploadFile(
+            uid,
+            oid,
+            pid,
+            did,
+            osid,
+            originalFile);
+
+        var storedRecord = await Context.Records.FindAsync(originalRecord.Id);
+        storedRecord!.FileContentHash = new string('a', 64);
+        await Context.SaveChangesAsync();
+
+        await using var updatedStream = new MemoryStream(Encoding.UTF8.GetBytes("updated"));
+        var updatedFile = new FormFile(
+            updatedStream,
+            0,
+            updatedStream.Length,
+            "file",
+            "updated.txt");
+
+        var updatedRecord = await _fileBusiness.UpdateFile(
+            uid,
+            oid,
+            pid,
+            originalRecord.Id,
+            updatedFile);
+
+        Assert.Null(updatedRecord.FileContentHash);
+        Assert.Null((await Context.Records.FindAsync(originalRecord.Id))!.FileContentHash);
     }
 
     [Fact]
@@ -2683,6 +2724,13 @@ public class FileBusinessTests : IntegrationTestBase
                 blobUri,
                 It.IsAny<ObjectStorageConfigDto>()))
             .ReturnsAsync(expectedFileSize);
+
+        azureFileBusiness
+            .Setup(x => x.CalculateStoredFileContentHash(
+                blobUri,
+                It.IsAny<ObjectStorageConfigDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
 
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("azure_object"))
@@ -5951,4 +5999,3 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
 }
-

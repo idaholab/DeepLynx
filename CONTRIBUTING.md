@@ -47,6 +47,15 @@ public ClassIntegrationTests(TestSuiteFixture fixture) : base(fixture) {}
 #### Environment Variables
 When a change to environment variables is made, be sure to reflect those changes in both the `.env_sample` file on the backend as well as in GitHub actions. If you do not have access to GitHub actions to add the environment variable, please contact one of the codeowners.
 
+#### UI Testing
+* Our UI tests are run through Playwright (setup can be found in the README.md)
+* Create new Playwright tests inside of the deeplynx.UI/tests folder.
+##### Tips
+* Read the [Playwright Docs](https://playwright.dev/docs/intro) before getting started
+* Use `npx playwright codegen` to assist in the creation of playwright tests. (It will generate playwright code to replicate your recorded actions)
+* Use `npx playwright test --ui` to see a window that will step through the process click by click
+* Use `npx playwright test --workers=n` to have n workers run tests in parallel speeding up the process, however note that some tests rely on being run sequentially. The amount of workers you should use depends on the number of CPU cores you have. Typically, it is good practice to use about half the number of your cores. For example, an 8-core M1 chip should use about 4-6 workers max. A M1 Pro with 10 cores should use 6-8 workers, and a M1 Max can use 8-12. Any more and your tests may slow down as they compete for CPU, memory, and browser resources.
+
 ## Submitting Pull Requests
 When you're ready to submit your changes, follow these steps:
 
