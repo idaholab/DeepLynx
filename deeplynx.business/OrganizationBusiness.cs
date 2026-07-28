@@ -122,7 +122,9 @@ public class OrganizationBusiness : IOrganizationBusiness
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
-            Theme = organization.Theme
+            Theme = organization.Theme,
+            CreateContainerPerProject = organization.CreateContainerPerProject
+
         };
     }
 
@@ -146,7 +148,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = currentUserId,
             Banner = dto.Banner,
             RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false,
-            Theme = "default"
+            Theme = "default",
+            CreateContainerPerProject = dto.CreateContainerPerProject ?? false
         };
 
         _context.Organizations.Add(organization);
@@ -190,7 +193,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
             RequireSensitivityLabel = organization.RequireSensitivityLabel,
-            Theme = organization.Theme
+            Theme = organization.Theme,
+            CreateContainerPerProject = organization.CreateContainerPerProject
         };
     }
 
@@ -234,6 +238,11 @@ public class OrganizationBusiness : IOrganizationBusiness
             organization.Theme = dto.Theme.Value.ToCamelCaseValue();
         }
 
+        if (dto.CreateContainerPerProject != null)
+        {
+            organization.CreateContainerPerProject = dto.CreateContainerPerProject.Value;
+        }
+
         organization.Name = dto.Name ?? organization.Name;
         organization.Description = dto.Description ?? organization.Description;
         organization.DefaultOrg = dto.DefaultOrg ?? organization.DefaultOrg;
@@ -272,7 +281,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
             RequireSensitivityLabel = organization.RequireSensitivityLabel,
-            Theme = organization.Theme
+            Theme = organization.Theme,
+            CreateContainerPerProject = organization.CreateContainerPerProject
         };
     }
 

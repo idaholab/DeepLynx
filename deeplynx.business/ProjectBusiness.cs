@@ -154,6 +154,36 @@ public class ProjectBusiness : IProjectBusiness
             RequireSensitivityLabel = dto.RequireSensitivityLabel
         };
 
+        var organization = await _context.Organizations
+            .Where(org => org.Id == organizationId)
+            .Select(org => new { org.Id, org.CreateContainerPerProject })
+            .FirstOrDefaultAsync() ?? throw new Exception("Organization not found.");
+
+        if (organization.CreateContainerPerProject)
+        {
+            try
+            {
+                var container = await _objectStorageBusiness.CreateProjectContainer(
+                    userId: userId,
+                    organizationId: organizationId,
+                    projectId: projectId,
+                    projectName: dto.Name);
+
+                projectResponseDto.AssociatedObjectStorage = new ObjectStorageResponseDto
+                {
+                    Id = container.Id,
+                    Name = container.Name,
+                    Type = container.Type,
+                    ProjectId = container.ProjectId,
+                    OrganizationId = container.OrganizationId
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create Azure container for project {ProjectId}", projectId);
+            }
+        }
+
         // Update the Project Cache List
         var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
 
