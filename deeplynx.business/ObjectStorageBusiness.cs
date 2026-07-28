@@ -371,11 +371,11 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     /// <param name="dto">A data transfer object with details on object storage fields to be updated</param>
     /// <exception cref="KeyNotFoundException"></exception>
     public async Task<ObjectStorageResponseDto> UpdateProjectContainerSettings(
-    long currentUserId,
-    long organizationId,
-    long projectId,
-    long objectStorageId,
-    UpdateObjectStorageRequestDto dto)
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long objectStorageId,
+        UpdateObjectStorageRequestDto dto)
     {
         ValidationHelper.ValidateModel(dto);
 
@@ -384,20 +384,33 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .FirstOrDefaultAsync();
 
         if (objectStorage == null || objectStorage.IsArchived)
-            throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found for the specified project.");
+        {
+            objectStorage = await _context.ObjectStorages
+                .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId && os.ProjectId == null)
+                .FirstOrDefaultAsync();
 
-        var config = DeserializeAndDecryptConfig(objectStorage.ConfigEncrypted);
+            if (objectStorage == null || objectStorage.IsArchived)
+                throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found for the specified project or organization default.");
+        }
 
-        if (config.AzureObjectConfig == null)
-            throw new InvalidOperationException("Azure configuration missing in the object storage config.");
+        var project = await _context.Projects
+            .Where(p => p.Id == projectId && p.OrganizationId == organizationId)
+            .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Project with id {projectId} not found.");
+        project.FilePath = dto.AzureFilePath;
+        project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        project.LastUpdatedBy = currentUserId;
 
-        config.AzureObjectConfig.AzureFilePath = dto.AzureFilePath;
-
-        objectStorage.ConfigEncrypted = SerializeAndEncryptConfig(config);
-        objectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        objectStorage.LastUpdatedBy = currentUserId;
-
-        await _context.SaveChangesAsync();
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw new Exception("Unable to update project container settings.");
+        }
 
         return new ObjectStorageResponseDto
         {
@@ -412,7 +425,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             IsArchived = objectStorage.IsArchived
         };
     }
-
     /// <summary>
     ///     Delete an object storage by ID
     /// </summary>
