@@ -31,7 +31,7 @@ import { applyOrganizationTheme } from "@/app/lib/themes/themeMode";
 import { isInsightHidden } from "@/app/lib/feature_flags";
 import { archiveOrganizationObjectStorage, createOrganizationObjectStorage, deleteOrganizationObjectStorage, getAllOrganizationObjectStorages, getDefaultOrganizationObjectStorage, setDefaultOrganizationObjectStorage, updateOrganizationObjectStorage } from "@/app/lib/client_service/object_storage_services.client";
 import { ObjectStorageResponseDto } from "../../types/responseDTOs";
-import { CreateObjectStorageRequestDto, UpdateObjectStorageRequestDto } from "../../types/requestDTOs";
+import { CreateObjectStorageRequestDto, UpdateObjectStorageRequestDto, UpdateOrganizationRequestDto } from "../../types/requestDTOs";
 
 
 type StorageTab = "default" | "manage";
@@ -296,7 +296,6 @@ const OrganizationSettings = () => {
         const objectStorage = await getDefaultOrganizationObjectStorage(organization.organizationId as number);
         setDefaultStorage(objectStorage);
         setCreateContainerPerProject(orgData.createContainerPerProject ?? false);
-        console.log("orgData.createContainerPerProject: " + orgData.createContainerPerProject)
       } catch (error) {
         console.error("Failed to load organization settings", error);
       }
@@ -526,11 +525,21 @@ const OrganizationSettings = () => {
         default: storageFormData.default,
       };
 
+      const dto2: UpdateOrganizationRequestDto = {
+        createContainerPerProject: storageFormData.createContainerPerProject,
+      };
+
       await updateOrganizationObjectStorage(
         organization.organizationId as number,
         editingStorage.id as number,
         dto,
       );
+
+      await updateOrganization(
+        organization.organizationId as number,
+        dto2
+      );
+      setCreateContainerPerProject(storageFormData.createContainerPerProject);
 
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditStorageModalOpen(false);
