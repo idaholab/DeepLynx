@@ -16,7 +16,7 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to create JWT tokens, manage API keys, and handle token revocation.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [ApiVersion(2)]
 [Authorize]
 [Route("oauth")]

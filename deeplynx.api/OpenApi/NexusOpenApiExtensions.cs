@@ -67,11 +67,6 @@ internal static class NexusOpenApiExtensions
                     {
                         Url = "https://deeplynx-test.dev.inl.gov",
                         Description = "Test"
-                    },
-                    new()
-                    {
-                        Url = "http://localhost:5095",
-                        Description = "Local Development"
                     }
                 };
                 document.ExternalDocs = new OpenApiExternalDocs

@@ -10,7 +10,7 @@ using Scalar.AspNetCore;
 namespace deeplynx.api.controllers;
 
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [ApiVersion(2)]
 [Authorize]
 [Route("oauth")]

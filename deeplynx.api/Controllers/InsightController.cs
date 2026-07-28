@@ -10,7 +10,7 @@ using Scalar.AspNetCore;
 namespace deeplynx.api.Controllers;
 
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/insight")]
 [Authorize]

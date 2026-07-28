@@ -17,7 +17,7 @@ namespace deeplynx.api.Controllers;
 ///     This mostly entails one-time jobs that cannot be resolved via EF migration.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [ApiVersion(2)]
 [Route("maintenance")]
 [Authorize]

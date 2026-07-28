@@ -17,7 +17,7 @@ namespace deeplynx.api.Controllers;
 ///     This controller provides endpoints to upload, update, download, and delete file information.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/files")]
 [Authorize]

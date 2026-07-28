@@ -19,7 +19,7 @@ namespace deeplynx.api.Controllers;
 ///     Once approved, they are promoted into the deeplynx schema.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/extractions")]
 [Authorize]

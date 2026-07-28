@@ -10,7 +10,7 @@ namespace deeplynx.api.Controllers;
 ///     Controller for managing notifications.
 /// </summary>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [ApiVersion(2)]
 [Route("notifications")]
 [Authorize]

@@ -11,7 +11,7 @@ namespace deeplynx.api.Controllers;
 
 [Route("projects/{projectId:long}/tags")]
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [ApiVersion(2)]
 [Authorize]
 [Tags("Project - Tag")]
