@@ -169,6 +169,7 @@ export type ObjectStorageResponseDto = {
   name: string;
   type: string;
   projectId: number | string;
+  organizationId: number | string;
   default: boolean;
   lastUpdatedAt: string;
   lastUpdatedBy: string;
