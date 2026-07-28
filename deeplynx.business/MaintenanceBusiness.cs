@@ -177,6 +177,8 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <param name="batchSize">Number of files to accumulate before upserting a batch of records</param>
+    /// <param name="cancellationToken">Token used to stop the scrape early. For now this is expected to come from the HTTP request</param>
     /// <returns>The number of files cataloged</returns>
     /// <exception cref="NotSupportedException"></exception>
     public async Task<long> ScrapeObjectStorageToCatalog(
@@ -186,55 +188,67 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         List<long>? sensitivityLabelIds = null,
         bool isSysAdmin = false,
         bool isOrgAdmin = false,
-        bool isProjectAdmin = false)
+        bool isProjectAdmin = false,
+        int batchSize = 500,
+        CancellationToken cancellationToken = default)
     {
         // Retrieve the object storage based on the provided ID
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
-
-        // Scrape files into DTOs based on storage type
-        List<CreateRecordRequestDto> records = objectStorage.Type.ToLowerInvariant() switch
-        {
-            "filesystem" => await Task.FromResult(
-                StorageScrapers.ScrapeFileSystem(
-                    objectStorage.Config.MountPath
-                        ?? throw new InvalidOperationException("File system storage is missing a mount path."),
-                    objectStorage.Id)),
-
-            "azure_object" => await StorageScrapers.ScrapeAzureBlob(
-                objectStorage.Config.AzureObjectConfig
-                    ?? throw new InvalidOperationException("Azure blob storage is missing its config."),
-                objectStorage.Id),
-
-            "aws_s3" => await StorageScrapers.ScrapeS3(
-                objectStorage.Config.AwsConnectionString
-                    ?? throw new InvalidOperationException("S3 storage is missing a connection string."),
-                objectStorage.Id),
-
-            _ => throw new NotSupportedException($"No scraper registered for storage type '{objectStorage.Type}'.")
-        };
-
-        if (records.Count == 0)
-        {
-            return 0;
-        }
 
         // Retrieve non-nullable organization and project IDs from the object storage
         long organizationId = objectStorage.OrganizationId.GetValueOrDefault();
         long projectId = objectStorage.ProjectId.GetValueOrDefault();
 
-        // Create records for each file in the object storage
-        var recordResponseDtos = await _recordBusiness.BulkCreateRecords(
-            currentUserId,
-            organizationId,
-            projectId,
-            dataSourceId,
-            records,
-            sensitivityLabelIds,
-            isSysAdmin,
-            isOrgAdmin,
-            isProjectAdmin);
+        // Scrape files into DTOs based on storage type
+        IAsyncEnumerable<List<CreateRecordRequestDto>> batches = objectStorage.Type.ToLowerInvariant() switch
+        {
+            "filesystem" => StorageScrapers.ScrapeFileSystem(
+                objectStorage.Config.MountPath
+                    ?? throw new InvalidOperationException("File system storage is missing a mount path."),
+                objectStorage.Id,
+                batchSize,
+                cancellationToken),
 
-        return recordResponseDtos.Count;
+            "azure_object" => StorageScrapers.ScrapeAzureBlob(
+                objectStorage.Config.AzureObjectConfig
+                    ?? throw new InvalidOperationException("Azure blob storage is missing its config."),
+                objectStorage.Id,
+                batchSize,
+                cancellationToken),
+
+            "aws_s3" => StorageScrapers.ScrapeS3(
+                objectStorage.Config.AwsConnectionString
+                    ?? throw new InvalidOperationException("S3 storage is missing a connection string."),
+                objectStorage.Id,
+                batchSize,
+                cancellationToken),
+
+            _ => throw new NotSupportedException($"No scraper registered for storage type '{objectStorage.Type}'.")
+        };
+
+        long totalRecordsCataloged = 0;
+
+        // Consume and upsert one batch at a time
+        await foreach (var batch in batches.WithCancellation(cancellationToken))
+        {
+            if (batch.Count == 0)
+                continue;
+
+            var recordResponseDtos = await _recordBusiness.BulkCreateRecords(
+                currentUserId,
+                organizationId,
+                projectId,
+                dataSourceId,
+                batch,
+                sensitivityLabelIds,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
+
+            totalRecordsCataloged += recordResponseDtos.Count;
+        }
+
+        return totalRecordsCataloged;
     }
 
 }

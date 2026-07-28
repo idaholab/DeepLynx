@@ -15,5 +15,7 @@ public interface IMaintenanceBusiness
         List<long>? sensitivityLabelIds = null,
         bool isSysAdmin = false,
         bool isOrgAdmin = false,
-        bool isProjectAdmin = false);
+        bool isProjectAdmin = false,
+        int batchSize = 500,
+        CancellationToken cancellationToken = default);
 }

@@ -2,6 +2,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Azure.Storage.Blobs;
 using deeplynx.models;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 
 namespace deeplynx.helpers;
@@ -13,16 +14,24 @@ public static class StorageScrapers
     /// </summary>
     /// <param name="mountPath">Root path to scan (Config.MountPath)</param>
     /// <param name="objectStorageId">The ID of the object storage being scraped</param>
+    /// <param name="batchSize">Number of records to accumulate before yielding a batch</param>
+    /// <param name="cancellationToken">Token checked periodically during the directory walk</param>
     /// <exception cref="DirectoryNotFoundException"></exception>
-    public static List<CreateRecordRequestDto> ScrapeFileSystem(string mountPath, long objectStorageId)
+    public static async IAsyncEnumerable<List<CreateRecordRequestDto>> ScrapeFileSystem(
+        string mountPath,
+        long objectStorageId,
+        int batchSize,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (!Directory.Exists(mountPath))
             throw new DirectoryNotFoundException($"Mount path '{mountPath}' does not exist.");
 
-        var records = new List<CreateRecordRequestDto>();
+        var batch = new List<CreateRecordRequestDto>(batchSize);
 
         foreach (var filePath in Directory.EnumerateFiles(mountPath, "*", SearchOption.AllDirectories))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var fileInfo = new FileInfo(filePath);
             var relativePath = Path.GetRelativePath(mountPath, filePath);
 
@@ -32,23 +41,30 @@ public static class StorageScrapers
                 ["fullPath"] = filePath
             };
 
-            records.Add(new CreateRecordRequestDto
+            batch.Add(new CreateRecordRequestDto
             {
                 Name = fileInfo.Name,
-                // TODO: no natural source for Description on raw files; defaulting to relative path
-                Description = relativePath,
+                Description = $"Record created for {relativePath} from file system object storage {objectStorageId}",
                 ObjectStorageId = objectStorageId,
                 Uri = relativePath,
                 Properties = properties,
-                // TODO: relative path used as OriginalId; confirm this is stable/unique enough
-                // (e.g. won't collide across re-scrapes, renames, etc.)
                 OriginalId = relativePath,
                 FileType = string.IsNullOrEmpty(fileInfo.Extension) ? null : fileInfo.Extension.TrimStart('.'),
                 FileSize = fileInfo.Length
             });
+
+            if (batch.Count >= batchSize)
+            {
+                yield return batch;
+                batch = new List<CreateRecordRequestDto>(batchSize);
+                await Task.Yield();
+            }
         }
 
-        return records;
+        if (batch.Count > 0)
+        {
+            yield return batch;
+        }
     }
 
     /// <summary>
@@ -56,7 +72,13 @@ public static class StorageScrapers
     /// </summary>
     /// <param name="config">Config.AzureObjectConfig</param>
     /// <param name="objectStorageId">The ID of the object storage being scraped</param>
-    public static async Task<List<CreateRecordRequestDto>> ScrapeAzureBlob(AzureObjectConfigDto config, long objectStorageId)
+    /// <param name="batchSize">Number of records to accumulate before yielding a batch</param>
+    /// <param name="cancellationToken">Token checked between blobs and passed to the Azure SDK enumeration</param>
+    public static async IAsyncEnumerable<List<CreateRecordRequestDto>> ScrapeAzureBlob(
+        AzureObjectConfigDto config,
+        long objectStorageId,
+        int batchSize,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(config.AzureConnectionString))
             throw new InvalidOperationException("AzureObjectConfig is missing a connection string.");
@@ -65,10 +87,12 @@ public static class StorageScrapers
 
         var containerClient = new BlobContainerClient(config.AzureConnectionString, config.AzureContainerName);
 
-        var records = new List<CreateRecordRequestDto>();
+        var batch = new List<CreateRecordRequestDto>(batchSize);
 
-        await foreach (var blobItem in containerClient.GetBlobsAsync())
+        await foreach (var blobItem in containerClient.GetBlobsAsync(cancellationToken: cancellationToken))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var properties = new JsonObject
             {
                 ["lastModified"] = blobItem.Properties.LastModified?.ToString("o"),
@@ -78,22 +102,29 @@ public static class StorageScrapers
 
             var extension = Path.GetExtension(blobItem.Name);
 
-            records.Add(new CreateRecordRequestDto
+            batch.Add(new CreateRecordRequestDto
             {
                 Name = Path.GetFileName(blobItem.Name),
-                // TODO: no natural source for Description; defaulting to blob name (full virtual path)
-                Description = blobItem.Name,
+                Description = $"Record created for {blobItem.Name} from file system object storage {objectStorageId}",
                 ObjectStorageId = objectStorageId,
                 Uri = blobItem.Name,
                 Properties = properties,
-                // TODO: blob name used as OriginalId; confirm this is stable/unique enough
                 OriginalId = blobItem.Name,
                 FileType = string.IsNullOrEmpty(extension) ? null : extension.TrimStart('.'),
                 FileSize = blobItem.Properties.ContentLength ?? 0
             });
+
+            if (batch.Count >= batchSize)
+            {
+                yield return batch;
+                batch = new List<CreateRecordRequestDto>(batchSize);
+            }
         }
 
-        return records;
+        if (batch.Count > 0)
+        {
+            yield return batch;
+        }
     }
 
     /// <summary>
@@ -101,27 +132,37 @@ public static class StorageScrapers
     /// </summary>
     /// <param name="awsConnectionString">Config.AwsConnectionString, e.g. s3://bucket/prefix?region=...&accessKey=...&secretKey=...</param>
     /// <param name="objectStorageId">The ID of the object storage being scraped</param>
-    public static async Task<List<CreateRecordRequestDto>> ScrapeS3(string awsConnectionString, long objectStorageId)
+    /// <param name="batchSize">Number of records to accumulate before yielding a batch</param>
+    /// <param name="cancellationToken">Token checked between objects and passed to the AWS SDK calls</param>
+    public static async IAsyncEnumerable<List<CreateRecordRequestDto>> ScrapeS3(
+        string awsConnectionString,
+        long objectStorageId,
+        int batchSize,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var connection = S3ConnectionInfo.Parse(awsConnectionString);
         var region = Amazon.RegionEndpoint.GetBySystemName(connection.Region);
 
         using var s3Client = new AmazonS3Client(connection.AccessKey, connection.SecretKey, region);
 
-        var records = new List<CreateRecordRequestDto>();
+        var batch = new List<CreateRecordRequestDto>(batchSize);
         string? continuationToken = null;
 
         do
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var response = await s3Client.ListObjectsV2Async(new ListObjectsV2Request
             {
                 BucketName = connection.BucketName,
                 Prefix = connection.Prefix,
                 ContinuationToken = continuationToken
-            });
+            }, cancellationToken);
 
             foreach (var s3Object in response.S3Objects)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 if (s3Object.Key.EndsWith('/') && s3Object.Size == 0)
                     continue;
 
@@ -134,26 +175,33 @@ public static class StorageScrapers
 
                 var extension = Path.GetExtension(s3Object.Key);
 
-                records.Add(new CreateRecordRequestDto
+                batch.Add(new CreateRecordRequestDto
                 {
                     Name = Path.GetFileName(s3Object.Key),
-                    // TODO: no natural source for Description; defaulting to S3 key
-                    Description = s3Object.Key,
+                    Description = $"Record created for {s3Object.Key} from file system object storage {objectStorageId}",
                     ObjectStorageId = objectStorageId,
                     Uri = s3Object.Key,
                     Properties = properties,
-                    // TODO: S3 key used as OriginalId; confirm this is stable/unique enough
                     OriginalId = s3Object.Key,
                     FileType = string.IsNullOrEmpty(extension) ? null : extension.TrimStart('.'),
                     FileSize = s3Object.Size ?? 0
                 });
+
+                if (batch.Count >= batchSize)
+                {
+                    yield return batch;
+                    batch = new List<CreateRecordRequestDto>(batchSize);
+                }
             }
 
             continuationToken = response.IsTruncated == true ? response.NextContinuationToken : null;
         }
         while (continuationToken != null);
 
-        return records;
+        if (batch.Count > 0)
+        {
+            yield return batch;
+        }
     }
 }
 
