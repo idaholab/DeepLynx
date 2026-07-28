@@ -59,26 +59,37 @@ public class UserContextMiddleware
                         if (user != null)
                         {
                             UserContextStorage.UserId = user.Id;
-                            _logger.LogInformation($"User found: {user.Email} (ID: {user.Id})");
-
                             UserContextStorage.AccountType = user.AccountType;
 
                             var adminService = scope.ServiceProvider.GetRequiredService<IAdminService>();
                             UserContextStorage.IsSysAdmin = await adminService.SysAdminCheck(user.Id);
 
-                            var organizationId = ExtractOrganizationId(context);
+                            // 1. Extract project IDs
+                            var projectIds = ExtractProjectIds(context);
+
+                            long? organizationId = null;
+
+                            if (projectIds.Any())
+                            {
+                                var dbContext2 = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
+                                organizationId = await dbContext2.Projects
+                                    .Where(p => projectIds.Contains(p.Id))
+                                    .Select(p => p.OrganizationId)
+                                    .FirstOrDefaultAsync();
+                            }
+                            else
+                            {
+                                organizationId = ExtractOrganizationId(context);
+                            }
+
                             if (organizationId.HasValue)
                             {
-                                UserContextStorage.IsOrgAdmin =
-                                    await adminService.OrgAdminCheck(user.Id, organizationId.Value);
+                                UserContextStorage.OrganizationId = organizationId.Value;
 
-                                UserContextStorage.IsOrgMember =
-                                    await adminService.OrgMemberCheck(user.Id, organizationId.Value);
-
-                                var projectIds = ExtractProjectIds(context);
-                                if (projectIds.Any())
-                                    UserContextStorage.IsProjectAdmin = await adminService.ProjectAdminCheck(
-                                        user.Id, organizationId.Value, projectIds);
+                                UserContextStorage.IsOrgAdmin = await adminService.OrgAdminCheck(user.Id, organizationId.Value);
+                                UserContextStorage.IsOrgMember = await adminService.OrgMemberCheck(user.Id, organizationId.Value);
+                                UserContextStorage.IsProjectAdmin = projectIds.Any() &&
+                                    await adminService.ProjectAdminCheck(user.Id, organizationId.Value, projectIds);
                             }
                         }
                         else
