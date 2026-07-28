@@ -1,5 +1,6 @@
 using deeplynx.business;
 using deeplynx.helpers;
+using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -37,7 +38,7 @@ public class MaintenanceController : ControllerBase
         _fileBusiness = fileBusiness;
         _logger = logger;
     }
-    
+
     /// <summary>
     ///     Backfill file size properties
     /// </summary>
@@ -65,7 +66,7 @@ public class MaintenanceController : ControllerBase
                 afterRecordId,
                 batchSize,
                 maxBatches);
-            
+
             return Ok(result);
         }
         catch (Exception ex)
@@ -114,6 +115,47 @@ public class MaintenanceController : ControllerBase
         catch (Exception exc)
         {
             var message = $"An error occurred while exporting duckdb table to file: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+
+    /// <summary>
+    ///     Scrape Object Storage To Catalog
+    /// </summary>
+    /// <remarks>
+    ///     Scrapes every file in the given object storage and creates a catalog record for each one.
+    /// </remarks>
+    /// <param name="objectStorageId">The ID of the object storage to be scraped.</param>
+    /// <param name="dataSourceId">The ID of the data source under which to create the records.</param>
+    /// <param name="sensitivityLabelIds">Optional IDs of sensitivity labels to attach to each created record.</param>
+    /// <returns>The number of records created.</returns>
+    [HttpPost("object-storages/{objectStorageId:long}/scrape", Name = "api_scrape_object_storage_to_catalog")]
+    [SysAdmin]
+    public async Task<IActionResult> ScrapeObjectStorageToCatalog(
+        long objectStorageId,
+        [FromQuery] long dataSourceId,
+        [FromQuery] List<long>? sensitivityLabelIds = null)
+    {
+        try
+        {
+            long currentUserId = UserContextStorage.UserId;
+
+            var recordCount = await _maintenanceBusiness.ScrapeObjectStorageToCatalog(
+                objectStorageId,
+                currentUserId,
+                dataSourceId,
+                sensitivityLabelIds,
+                isSysAdmin: true,
+                isOrgAdmin: false,
+                isProjectAdmin: false);
+
+            return Ok(recordCount);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while scraping object storage to catalog: {exc}";
             _logger.LogError(message);
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }

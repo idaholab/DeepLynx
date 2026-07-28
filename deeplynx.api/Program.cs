@@ -236,6 +236,7 @@ try
     builder.Services.AddHttpClient<InsightServiceClient>();
     builder.Services.AddHttpClient<AirflowServiceClient>();
     builder.Services.AddSingleton<EncryptionHelper>();
+    builder.Services.AddScoped<RecordBusiness>();
 
     /*
     ╔════════════════════════════╗

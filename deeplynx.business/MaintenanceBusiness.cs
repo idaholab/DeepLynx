@@ -1,5 +1,6 @@
 using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -13,18 +14,26 @@ public class MaintenanceBusiness : IMaintenanceBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly FileAzureBusiness _fileAzureBusiness;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly RecordBusiness _recordBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for database retrieval</param>
     /// <param name="fileBusinessFactory">Factory to create storage-specific file business instances</param>
+    /// <param name="objectStorageBusiness">Business layer service used to retrieve and decrypt object storage configuration</param>
+    /// <param name="recordBusiness">Business layer service used to bulk create records from scraped files</param>
     public MaintenanceBusiness(
         DeeplynxContext context,
-        FileAzureBusiness fileAzureBusiness)
+        FileAzureBusiness fileAzureBusiness,
+        IObjectStorageBusiness objectStorageBusiness,
+        RecordBusiness recordBusiness)
     {
         _context = context;
         _fileAzureBusiness = fileAzureBusiness;
+        _objectStorageBusiness = objectStorageBusiness;
+        _recordBusiness = recordBusiness;
     }
     /// <summary>
     /// Gets the records that have been uploaded using our old timeseries methods,
@@ -157,5 +166,75 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         }
     }
 
+
+    /// <summary>
+    /// Scrapes files from a given object storage and creates records for them. 
+    /// </summary>
+    /// <param name="objectStorageId">The ID of the object storage to be scraped</param>
+    /// <param name="currentUserId">ID of the User executing this method.</param>
+    /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
+    /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>The number of files cataloged</returns>
+    /// <exception cref="NotSupportedException"></exception>
+    public async Task<long> ScrapeObjectStorageToCatalog(
+        long objectStorageId,
+        long currentUserId,
+        long dataSourceId,
+        List<long>? sensitivityLabelIds = null,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
+    {
+        // Retrieve the object storage based on the provided ID
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
+
+        // Scrape files into DTOs based on storage type
+        List<CreateRecordRequestDto> records = objectStorage.Type.ToLowerInvariant() switch
+        {
+            "filesystem" => await Task.FromResult(
+                StorageScrapers.ScrapeFileSystem(
+                    objectStorage.Config.MountPath
+                        ?? throw new InvalidOperationException("File system storage is missing a mount path."),
+                    objectStorage.Id)),
+
+            "azure_object" => await StorageScrapers.ScrapeAzureBlob(
+                objectStorage.Config.AzureObjectConfig
+                    ?? throw new InvalidOperationException("Azure blob storage is missing its config."),
+                objectStorage.Id),
+
+            "aws_s3" => await StorageScrapers.ScrapeS3(
+                objectStorage.Config.AwsConnectionString
+                    ?? throw new InvalidOperationException("S3 storage is missing a connection string."),
+                objectStorage.Id),
+
+            _ => throw new NotSupportedException($"No scraper registered for storage type '{objectStorage.Type}'.")
+        };
+
+        if (records.Count == 0)
+        {
+            return 0;
+        }
+
+        // Retrieve non-nullable organization and project IDs from the object storage
+        long organizationId = objectStorage.OrganizationId.GetValueOrDefault();
+        long projectId = objectStorage.ProjectId.GetValueOrDefault();
+
+        // Create records for each file in the object storage
+        var recordResponseDtos = await _recordBusiness.BulkCreateRecords(
+            currentUserId,
+            organizationId,
+            projectId,
+            dataSourceId,
+            records,
+            sensitivityLabelIds,
+            isSysAdmin,
+            isOrgAdmin,
+            isProjectAdmin);
+
+        return recordResponseDtos.Count;
+    }
 
 }
