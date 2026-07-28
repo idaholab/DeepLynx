@@ -425,50 +425,53 @@ public class AuthMiddleware
             return;
         }
 
-        foreach (var authAttr in authAttributes)
+        if (!isOrgAdmin || !isSysAdmin)
         {
-            var hasPermission = false;
-
-            if (projectIds.Any())
+            foreach (var authAttr in authAttributes)
             {
-                var hasPermissionInAllProjects = true;
+                var hasPermission = false;
 
-                foreach (var projectId in projectIds)
+                if (projectIds.Any())
                 {
-                    var projectPermission = await projectRolePermissionService.PermissionInProject(
+                    var hasPermissionInAllProjects = true;
+
+                    foreach (var projectId in projectIds)
+                    {
+                        var projectPermission = await projectRolePermissionService.PermissionInProject(
+                            userId,
+                            projectId,
+                            authAttr.Action,
+                            authAttr.Resource
+                        );
+
+                        if (!projectPermission)
+                        {
+                            hasPermissionInAllProjects = false;
+                            break;
+                        }
+                    }
+
+                    hasPermission = hasPermissionInAllProjects;
+                }
+                else if (organizationId.HasValue)
+                {
+                    hasPermission = await orgRolePermissionService.PermissionInOrg(
                         userId,
-                        projectId,
+                        organizationId.Value,
                         authAttr.Action,
                         authAttr.Resource
                     );
-
-                    if (!projectPermission)
-                    {
-                        hasPermissionInAllProjects = false;
-                        break;
-                    }
                 }
 
-                hasPermission = hasPermissionInAllProjects;
-            }
-            else if (organizationId.HasValue)
-            {
-                hasPermission = await orgRolePermissionService.PermissionInOrg(
-                    userId,
-                    organizationId.Value,
-                    authAttr.Action,
-                    authAttr.Resource
-                );
-            }
-
-            if (!hasPermission)
-            {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsJsonAsync(new
+                if (!hasPermission)
                 {
-                    error = "Forbidden: User role does not have required permissions in organization or project(s)"
-                });
-                return;
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    await context.Response.WriteAsJsonAsync(new
+                    {
+                        error = "Forbidden: User role does not have required permissions in organization or project(s)"
+                    });
+                    return;
+                }
             }
         }
 
