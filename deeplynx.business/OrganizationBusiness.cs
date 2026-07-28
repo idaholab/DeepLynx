@@ -122,7 +122,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
-            Theme = organization.Theme
+            Theme = organization.Theme,
+
         };
     }
 

@@ -1,7 +1,7 @@
 // src/app/(home)/organization_management/settings/OrganizationSettings.tsx
 "use client";
 
-import { useState, useEffect, useCallback, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
@@ -15,25 +15,9 @@ import {
   fetchOrganizationLogo,
   getOrganization,
 } from "@/app/lib/client_service/organization_services.client";
-import {
-  getAllOrganizationObjectStorages,
-  getDefaultOrganizationObjectStorage,
-  setDefaultOrganizationObjectStorage,
-  createOrganizationObjectStorage,
-  updateOrganizationObjectStorage,
-  deleteOrganizationObjectStorage,
-  archiveOrganizationObjectStorage,
-} from "@/app/lib/client_service/object_storage_services.client";
-import {
-  ObjectStorageResponseDto,
-} from "@/app/(home)/types/responseDTOs";
-import {
-  CreateObjectStorageRequestDto,
-  UpdateObjectStorageRequestDto,
-} from "@/app/(home)/types/requestDTOs";
 import StorageSettingsSection from "@/app/(home)/project_management/[id]/settings/components/StorageSettingsSection";
-import CreateStorageModal from "@/app/(home)/project_management/[id]/settings/components/CreateStorageModal";
-import EditStorageModal from "@/app/(home)/project_management/[id]/settings/components/EditStorageModal";
+import CreateStorageModal from "@/app/(home)/organization_management/settings/components/CreateStorageModal";
+import EditStorageModal from "@/app/(home)/organization_management/settings/components/EditStorageModal";
 import DeleteStorageModal from "@/app/(home)/project_management/[id]/settings/components/DeleteStorageModal";
 import ArchiveStorageModal from "@/app/(home)/project_management/[id]/settings/components/ArchiveStorageModal";
 import { useLanguage } from "@/app/contexts/Language";
@@ -87,18 +71,6 @@ const OrganizationSettings = () => {
   // Storage config fields based on type
   const [azureConnectionString, setAzureConnectionString] = useState("");
   const [createContainerPerProject, setCreateContainerPerProject] = useState(false);
-  const [isTouched, setIsTouched] = useState(false);
-
-  const onAzureConnectionStringChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAzureConnectionString(e.target.value);
-    setIsTouched(true);
-  };
-
-  const onCreateContainerToggle = (checked: boolean) => {
-    setCreateContainerPerProject(checked);
-    setIsTouched(true);
-    console.log("isTouched: " + isTouched)
-  };
 
   const [activeStorageTab, setActiveStorageTab] =
     useState<StorageTab>("default");
@@ -124,6 +96,7 @@ const OrganizationSettings = () => {
     name: "",
     config: {},
     default: false,
+    createContainerPerProject: false
   });
 
   // Storage config fields based on type
@@ -324,7 +297,6 @@ const OrganizationSettings = () => {
         setDefaultStorage(objectStorage);
         setCreateContainerPerProject(orgData.createContainerPerProject ?? false);
         console.log("orgData.createContainerPerProject: " + orgData.createContainerPerProject)
-        setIsTouched(false);
       } catch (error) {
         console.error("Failed to load organization settings", error);
       }
@@ -332,63 +304,6 @@ const OrganizationSettings = () => {
 
     loadOrgSettings();
   }, [organization?.organizationId]);
-
-
-  const handleSave = async () => {
-    const isCreatingStorage = !defaultStorage;
-
-    if (isCreatingStorage && !azureConnectionString.trim()) {
-      toast.error("Azure connection string is required.");
-      return;
-    }
-
-    try {
-      setIsSavingStorage(true);
-
-      const dto2 = { createContainerPerProject };
-      await updateOrganization(organization?.organizationId as number, dto2);
-
-      if (isCreatingStorage || azureConnectionString.trim()) {
-        const dto = {
-          name: "Default Organization Storage",
-          config: {
-            azureObjectConfig: {
-              azureConnectionString: azureConnectionString.trim(),
-              azureContainerName: "default-container",
-            },
-          },
-          default: true,
-        };
-
-        if (isCreatingStorage) {
-          const created = await createOrganizationObjectStorage(
-            organization?.organizationId as number,
-            dto,
-          );
-          setDefaultStorage(created);
-        } else {
-          const updated = await updateOrganizationObjectStorage(
-            organization?.organizationId as number,
-            defaultStorage.id as number,
-            dto,
-          );
-          setDefaultStorage(updated);
-        }
-      }
-
-      toast.success("Settings saved successfully.");
-    } catch (error) {
-      console.error("Failed to save settings:", error);
-      toast.error("Failed to save settings.");
-    } finally {
-      setIsSavingStorage(false);
-    }
-  };
-
-  const handleReset = () => {
-    setAzureConnectionString("");
-    setCreateContainerPerProject(false);
-  };
 
   // Load available storages and default storage for the organization
   const loadStorages = useCallback(async () => {
@@ -493,7 +408,7 @@ const OrganizationSettings = () => {
   };
 
   const resetStorageForm = () => {
-    setStorageFormData({ name: "", config: {}, default: false });
+    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false });
     setStorageType("filesystem");
     setFilesystemPath("");
     setAzureEndpoint("");
@@ -620,7 +535,7 @@ const OrganizationSettings = () => {
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditStorageModalOpen(false);
       setEditingStorage(null);
-      setStorageFormData({ name: "", config: {}, default: false });
+      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false });
       loadStorages();
     } catch (error) {
       console.error("Failed to update organization storage:", error);
@@ -688,6 +603,7 @@ const OrganizationSettings = () => {
       name: storage.name,
       config: {},
       default: storage.default,
+      createContainerPerProject: createContainerPerProject
     });
     setIsEditStorageModalOpen(true);
   };
@@ -1075,26 +991,16 @@ const OrganizationSettings = () => {
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">
-            <div className="card bg-base-100 border border-base-300/50 shadow-sm">
-              <div className="card-body">
-                <h3 className="card-title text-lg flex items-center gap-2">{t.translations.STORAGE_SETTINGS}</h3>
-
-                <div className="form-control mb-6">
-                  <span className="label-text font-semibold">
-                    {t.translations.AZURE_DEFAULT_CONNECTION_STRING}
-                  </span>
-                  <input
-                    id="azureConnectionString"
-                    type="password"
-                    className="input input-bordered w-full"
-                    placeholder={t.translations.ENTER_AZURE_CONNECTION_STRING}
-                    value={azureConnectionString}
-                    onChange={onAzureConnectionStringChange}
-                    disabled={isSavingStorage}
-                  />
+            {/* ============================================================ */}
+            {/*                     STORAGE SETTINGS                        */}
+            {/* ============================================================ */}
+            {isLoadingStorages ? (
+              <div className="card bg-base-100 border border-base-300/50 shadow-sm">
+                <div className="card-body items-center justify-center py-10">
+                  <span className="loading loading-spinner loading-md" />
                 </div>
               </div>
-              ) : (
+            ) : (
               <StorageSettingsSection
                 scope="organization"
                 organizationId={organization?.organizationId ?? undefined}
@@ -1120,37 +1026,13 @@ const OrganizationSettings = () => {
               />
             )}
 
-              <div className="form-control mb-4">
-                <span className="text font-semibold mr-2">
-                  {t.translations.CREATE_CONTAINER_PER_PROJECT}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={createContainerPerProject}
-                  onChange={(e) => onCreateContainerToggle(e.target.checked)}
-                  className="toggle toggle-primary"
-                  disabled={isSavingStorage}
-                />
-              </div>
-
-              <div className="flex justify-end gap-4">
-                <button
-                  className="btn btn-outline"
-                  onClick={handleReset}
-                  disabled={isSavingStorage}
-                >
-                  {t.translations.CANCEL}
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleSave}
-                  disabled={isSavingStorage || !isTouched}
-                >
-                  {isSavingStorage && <span className="loading loading-spinner loading-xs mr-2" />}
-                  {t.translations.SAVE}
-                </button>
-              </div>
-            </div>
+            {!isInsightHidden() && (
+              <OrganizationInsightModelTemplateSection
+                organizationId={
+                  organization?.organizationId as number | undefined
+                }
+              />
+            )}
           </div>
 
           {!isInsightHidden() && (
@@ -1178,9 +1060,8 @@ const OrganizationSettings = () => {
           </div>
         </div>
       </div>
-    </div>
 
-      {/* Remove Logo Modal */ }
+      {/* Remove Logo Modal */}
       <input type="checkbox" id="remove_logo" className="modal-toggle" />
       <div className="modal" role="dialog">
         <div className="modal-box">
@@ -1202,15 +1083,15 @@ const OrganizationSettings = () => {
           </div>
         </div>
       </div>
-  {
-    themeToast && (
-      <div className="toast toast-bottom toast-end">
-        <div className={`alert alert-${themeToast.type}`}>
-          {themeToast.message}
-        </div>
-      </div>
-    )
-  }
+      {
+        themeToast && (
+          <div className="toast toast-bottom toast-end">
+            <div className={`alert alert-${themeToast.type}`}>
+              {themeToast.message}
+            </div>
+          </div>
+        )
+      }
 
       <CreateStorageModal
         isOpen={isCreateStorageModalOpen}
