@@ -34,8 +34,6 @@ public class MetadataBusinessTests : IntegrationTestBase
     private Mock<IAdminService> _mockAdminService = null!;
     private RecordBusiness _recordBusiness = null!;
     private RelationshipBusiness _relationshipBusiness = null!;
-    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
-    private Mock<IAdminService> _mockAdminService = null!;
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
