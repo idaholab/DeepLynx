@@ -41,11 +41,11 @@ const ProjectManagementClient = ({
   const [activeTab, setActiveTab] = useState("");
   const { t } = useLanguage();
   const { project: sessionProject, setProject } = useProjectSession();
-  const [editingProject, setEditingProject] = useState(project); 
+  const [editingProject, setEditingProject] = useState(project);
   const [labels, setLabels] = useState<SensitivityLabelsDto[]>([]);
   const [permissions, setPermissions] = useState(projectPermissions);
 
-  useEffect(() => {    
+  useEffect(() => {
     if (!editingProject?.id || !editingProject?.name) {
       return;
     }
@@ -71,9 +71,9 @@ const ProjectManagementClient = ({
 
   const loadLabels = async () => {
     try {
-      const dtoList: SensitivityLabelsDto[] = await getAllSensitivityLabelsProject(Number(project?.id));
+      const dtoList: SensitivityLabelsDto[] = await getAllSensitivityLabelsProject(project?.organizationId as number, Number(project?.id));
       setLabels(dtoList);
-    } catch(e) {
+    } catch (e) {
       console.error("getAllSensitivityLabels failed: ", e);
     }
   }

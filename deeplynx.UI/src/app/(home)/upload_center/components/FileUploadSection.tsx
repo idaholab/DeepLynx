@@ -27,6 +27,7 @@ interface FileUploadSectionProps {
   onClear: () => void;
   onRemoveAt: (idx: number) => void;
   projectId: number;
+  organizationId: number;
 }
 
 export default function FileUploadSection({
@@ -48,6 +49,7 @@ export default function FileUploadSection({
   onClear,
   onRemoveAt,
   projectId,
+  organizationId,
 }: FileUploadSectionProps) {
   const { t } = useLanguage();
   const isLargeFile = (file: File) => file.size >= CHUNK_THRESHOLD;
@@ -129,6 +131,7 @@ export default function FileUploadSection({
             isLoadingClasses={isLoadingClasses}
             onSearchFiles={onSearchFiles}
             projectId={projectId}
+            organizationId={organizationId}
             uploadError={uploadErrorByFileIndex[index]}
           />
         ))}

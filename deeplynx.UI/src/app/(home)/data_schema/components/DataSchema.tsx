@@ -160,7 +160,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       }
 
       try {
-        const classData = await getAllClasses(projectId, false);
+        const classData = await getAllClasses(organizationId as number, projectId, false);
 
         if (cancelled) return;
 
@@ -190,7 +190,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       }
 
       try {
-        const relationshipData = await getAllRelationships(projectId, false);
+        const relationshipData = await getAllRelationships(organizationId as number, projectId, false);
 
         if (cancelled) return;
 
@@ -371,7 +371,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         uuid: newClassDraft.uuid.trim() || undefined,
       };
 
-      const createdClass = await createClass(projectId, dto);
+      const createdClass = await createClass(organizationId as number, projectId, dto);
 
       setClasses((previous) => [createdClass, ...previous]);
       setSelection({ kind: "class", id: createdClass.id });
@@ -396,7 +396,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
 
     try {
       setIsUpdatingClass(true);
-      const updatedClass = await updateClass(projectId, selectedClass.id, {
+      const updatedClass = await updateClass(organizationId as number, projectId, selectedClass.id, {
         name: classDraft.name.trim() || selectedClass.name,
         description:
           classDraft.description.trim() || (selectedClass.description ?? ""),
@@ -447,7 +447,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
 
     try {
       setIsArchivingClass(true);
-      await archiveClass(projectId, selectedClass.id, shouldArchive);
+      await archiveClass(organizationId as number, projectId, selectedClass.id, shouldArchive);
 
       setClasses((previous) =>
         previous.map((item) =>
@@ -510,7 +510,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
         destination_id: newRelationshipDraft.destinationId ?? undefined,
       };
 
-      const createdRelationship = await createRelationship(projectId, dto);
+      const createdRelationship = await createRelationship(organizationId as number, projectId, dto);
 
       setRelationships((previous) => [createdRelationship, ...previous]);
       setSelection({ kind: "relationship", id: createdRelationship.id });
@@ -538,6 +538,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
     try {
       setIsUpdatingRelationship(true);
       const updatedRelationship = await updateRelationship(
+        organizationId as number,
         projectId,
         selectedRelationship.id,
         {
@@ -571,7 +572,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
 
     try {
       setIsArchivingRelationship(true);
-      await archiveRelationship(projectId, selectedRelationship.id, shouldArchive);
+      await archiveRelationship(organizationId as number, projectId, selectedRelationship.id, shouldArchive);
 
       setRelationships((previous) =>
         previous.map((item) =>

@@ -22,7 +22,7 @@ export const getAllSensitivityLabelsOrg = async (
     try {
         const res = await api.get(
             `/organizations/${organizationId}/labels`,
-            { params: { projectIds, hideArchived }}
+            { params: { projectIds, hideArchived } }
         );
         return res.data;
     } catch (error) {
@@ -69,7 +69,7 @@ export const getSensitivityLabelById = async (
     try {
         const res = await api.get(
             `/organizations/${organizationId}/labels/${labelId}`,
-            { params: { hideArchived}}
+            { params: { hideArchived } }
         );
 
         return res.data;
@@ -158,18 +158,20 @@ export const archiveSensitivityLabelOrg = async (
 // ============================================================================
 
 /**
- * Get all Sensitivity Labels for a project
+ * Get all Sensitivity Labels for a project within an organization
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param hideArchived - Flag to hide archived labels (default: true)
  * @returns Promise with array of SensitivityLabelsDto
  */
 export const getAllSensitivityLabelsProject = async (
+    organizationId: number,
     projectId: number,
     hideArchived: boolean = true
 ): Promise<SensitivityLabelsDto[]> => {
     try {
         const res = await api.get(
-            `/projects/${projectId}/labels`,
+            `/organizations/${organizationId}/projects/${projectId}/labels`,
             { params: { hideArchived } }
         );
         return res.data;
@@ -180,18 +182,20 @@ export const getAllSensitivityLabelsProject = async (
 }
 
 /**
- * Create a new Sensitivity Label at project level
+ * Create a new Sensitivity Label at project level within an organization
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param dto - The label creation request DTO
  * @returns Promise with SensitivityLabelsDto
  */
 export const createSensitivityLabelProject = async (
+    organizationId: number,
     projectId: number,
     dto: CreateSensitivityLabelDto
 ): Promise<SensitivityLabelsDto> => {
     try {
         const res = await api.post(
-            `/projects/${projectId}/labels`,
+            `/organizations/${organizationId}/projects/${projectId}/labels`,
             dto
         );
 
@@ -203,20 +207,22 @@ export const createSensitivityLabelProject = async (
 }
 
 /**
- * Get Sensitivity Label by ID in project
+ * Get Sensitivity Label by ID in project within an organization
+ * @param organizationId - The ID of the organization
  * @param projectId - ID of the project
  * @param labelId - ID of the label
  * @param hideArchived optional - The default is true
  * @returns Promise with SensitivityLabelsDto
  */
 export const getSensitivityLabelByIdProject = async (
+    organizationId: number,
     projectId: number,
     labelId: number,
     hideArchived: boolean = true
 ): Promise<SensitivityLabelsDto> => {
     try {
         const res = await api.get(
-            `/projects/${projectId}/labels/${labelId}`,
+            `/organizations/${organizationId}/projects/${projectId}/labels/${labelId}`,
             { params: { hideArchived } }
         );
 
@@ -228,20 +234,22 @@ export const getSensitivityLabelByIdProject = async (
 }
 
 /**
- * Update a Sensitivity Label at project level
+ * Update a Sensitivity Label at project level within an organization
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param labelId - The ID of the sensitivity label to update
  * @param dto - The sensitivity label update request DTO
  * @returns Promise with SensitivityLabelsDto
  */
 export const updateSensitivityLabelProject = async (
+    organizationId: number,
     projectId: number,
     labelId: number,
     dto: UpdateSensitivityLabelDto
 ): Promise<SensitivityLabelsDto> => {
     try {
         const res = await api.put(
-            `/projects/${projectId}/labels/${labelId}`,
+            `/organizations/${organizationId}/projects/${projectId}/labels/${labelId}`,
             dto
         );
 
@@ -253,18 +261,20 @@ export const updateSensitivityLabelProject = async (
 }
 
 /**
- * Delete a Sensitivity Label at project level
+ * Delete a Sensitivity Label at project level within an organization
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param labelId - The ID of the sensitivity label to delete
  * @returns Promise with success message
  */
 export const deleteSensitivityLabelProject = async (
+    organizationId: number,
     projectId: number,
     labelId: number
 ): Promise<{ message: string }> => {
     try {
         const res = await api.delete(
-            `/projects/${projectId}/labels/${labelId}`
+            `/organizations/${organizationId}/projects/${projectId}/labels/${labelId}`
         );
 
         return res.data;
@@ -275,20 +285,22 @@ export const deleteSensitivityLabelProject = async (
 }
 
 /**
- * Archive or unarchive a Sensitivity Label at project level
+ * Archive or unarchive a Sensitivity Label at project level within an organization
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param labelId - The ID of the sensitivity label to archive/unarchive
  * @param archive - True to archive, false to unarchive
  * @returns Promise with success message
  */
 export const archiveSensitivityLabelProject = async (
+    organizationId: number,
     projectId: number,
     labelId: number,
     archive: boolean
 ): Promise<{ message: string }> => {
     try {
         const res = await api.patch(
-            `/projects/${projectId}/labels/${labelId}`,
+            `/organizations/${organizationId}/projects/${projectId}/labels/${labelId}`,
             null,
             { params: { archive } }
         );

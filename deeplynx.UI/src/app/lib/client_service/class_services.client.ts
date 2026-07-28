@@ -15,12 +15,13 @@ import { CreateClassRequestDto, UpdateClassRequestDto } from '../../(home)/types
  * @returns Promise with array of ClassResponseDto
  */
 export const getAllClasses = async (
+    organizationId: number,
     projectId: number,
     hideArchived: boolean = true
 ): Promise<ClassResponseDto[]> => {
     try {
         const res = await api.get(
-            `/projects/${projectId}/classes`,
+            `/organizations/${organizationId}/projects/${projectId}/classes`,
             { params: { hideArchived } }
         );
         return res.data;
@@ -38,13 +39,14 @@ export const getAllClasses = async (
  * @returns Promise with ClassResponseDto
  */
 export const getClass = async (
+    organizationId: number,
     projectId: number,
     classId: number,
     hideArchived: boolean = true
 ): Promise<ClassResponseDto> => {
     try {
         const res = await api.get(
-            `/projects/${projectId}/classes/${classId}`,
+            `/organizations/${organizationId}/projects/${projectId}/classes/${classId}`,
             { params: { hideArchived } }
         );
         return res.data;
@@ -61,12 +63,13 @@ export const getClass = async (
  * @returns Promise with ClassResponseDto
  */
 export const createClass = async (
+    organizationId: number,
     projectId: number,
     dto: CreateClassRequestDto
 ): Promise<ClassResponseDto> => {
     try {
         const res = await api.post(
-            `/projects/${projectId}/classes`,
+            `/organizations/${organizationId}/projects/${projectId}/classes`,
             dto
         );
         return res.data;
@@ -83,12 +86,13 @@ export const createClass = async (
  * @returns Promise with array of ClassResponseDto
  */
 export const bulkCreateClasses = async (
+    organizationId: number,
     projectId: number,
     classes: CreateClassRequestDto[]
 ): Promise<ClassResponseDto[]> => {
     try {
         const res = await api.post(
-            `/projects/${projectId}/classes/bulk`,
+            `/organizations/${organizationId}/projects/${projectId}/classes/bulk`,
             classes
         );
         return res.data;
@@ -106,13 +110,14 @@ export const bulkCreateClasses = async (
  * @returns Promise with ClassResponseDto
  */
 export const updateClass = async (
+    organizationId: number,
     projectId: number,
     classId: number,
     dto: UpdateClassRequestDto
 ): Promise<ClassResponseDto> => {
     try {
         const res = await api.put(
-            `/projects/${projectId}/classes/${classId}`,
+            `/organizations/${organizationId}/projects/${projectId}/classes/${classId}`,
             dto
         );
         return res.data;
@@ -129,12 +134,13 @@ export const updateClass = async (
  * @returns Promise with success message
  */
 export const deleteClass = async (
+    organizationId: number,
     projectId: number,
     classId: number
 ): Promise<{ message: string }> => {
     try {
         const res = await api.delete(
-            `/projects/${projectId}/classes/${classId}`
+            `/organizations/${organizationId}/projects/${projectId}/classes/${classId}`
         );
         return res.data;
     } catch (error) {
@@ -151,13 +157,14 @@ export const deleteClass = async (
  * @returns Promise with success message
  */
 export const archiveClass = async (
+    organizationId: number,
     projectId: number,
     classId: number,
     archive: boolean
 ): Promise<{ message: string }> => {
     try {
         const res = await api.patch(
-            `/projects/${projectId}/classes/${classId}`,
+            `/organizations/${organizationId}/projects/${projectId}/classes/${classId}`,
             null,
             { params: { archive } }
         );

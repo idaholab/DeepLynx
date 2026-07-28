@@ -15,12 +15,12 @@ export function useProjectResources(organizationId?: number) {
   const [projects, setProjects] = useState<ProjectResponseDto[]>([]);
   const [projectId, setProjectId] = useState<string>("");
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  
+
   // Data Sources
   const [dataSources, setDataSources] = useState<DataSourceResponseDto[]>([]);
   const [dataSourceId, setDataSourceId] = useState<string>("");
   const [isLoadingDataSources, setIsLoadingDataSources] = useState(false);
-  
+
   // Object Storage
   const [objectStorage, setObjectstorage] = useState<ObjectStorageResponseDto[]>([]);
   const [objectStorageId, setObjectstorageId] = useState<string>("");
@@ -71,7 +71,7 @@ export function useProjectResources(organizationId?: number) {
     (async () => {
       // Fetch Data Sources
       try {
-        const dataSource = await getAllDataSources(Number(projectId));
+        const dataSource = await getAllDataSources(organizationId as number, Number(projectId));
         setDataSources(dataSource);
         if (dataSource.length === 1) {
           setDataSourceId(String(dataSource[0].id));
@@ -115,13 +115,13 @@ export function useProjectResources(organizationId?: number) {
     projectId,
     isLoadingProjects,
     setProjectId,
-    
+
     // Data Sources
     dataSources,
     dataSourceId,
     isLoadingDataSources,
     setDataSourceId,
-    
+
     // Object Storage
     objectStorage,
     objectStorageId,

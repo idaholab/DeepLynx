@@ -48,7 +48,8 @@ const GraphClientPage = ({
   const [showAllLabels, setShowAllLabels] = useState(false);
   const { filteredNodes, loading: classesLoading } = useFilteredNodes(
     graphData?.nodes ?? [],
-    projectId
+    projectId,
+    organization?.organizationId as number
   );
 
 

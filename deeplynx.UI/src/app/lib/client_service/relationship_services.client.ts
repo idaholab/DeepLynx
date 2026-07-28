@@ -4,21 +4,21 @@ import { CreateRelationshipRequestDto, UpdateRelationshipRequestDto } from "@/ap
 import { RelationshipResponseDto } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
-
-
 /**
- * Get all relationships for a project
+ * Get all relationships for a project within an organization
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param hideArchived - Flag to hide archived relationships (default: true)
  * @returns Promise with array of RelationshipResponseDto
  */
 export const getAllRelationships = async (
+  organizationId: number,
   projectId: number,
   hideArchived: boolean = true
 ): Promise<RelationshipResponseDto[]> => {
   try {
     const { data } = await api.get(
-      `/projects/${projectId}/relationships`,
+      `/organizations/${organizationId}/projects/${projectId}/relationships`,
       { params: { hideArchived } }
     );
     return data;
@@ -29,20 +29,22 @@ export const getAllRelationships = async (
 };
 
 /**
- * Get a specific relationship by ID
+ * Get a specific relationship by ID within an organization and project
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param relationshipId - The ID of the relationship
  * @param hideArchived - Flag to hide archived relationships (default: true)
  * @returns Promise with RelationshipResponseDto
  */
 export const getRelationship = async (
+  organizationId: number,
   projectId: number,
   relationshipId: number,
   hideArchived: boolean = true
 ): Promise<RelationshipResponseDto> => {
   try {
     const { data } = await api.get(
-      `/projects/${projectId}/relationships/${relationshipId}`,
+      `/organizations/${organizationId}/projects/${projectId}/relationships/${relationshipId}`,
       { params: { hideArchived } }
     );
     return data;
@@ -53,18 +55,20 @@ export const getRelationship = async (
 };
 
 /**
- * Create a new relationship
+ * Create a new relationship within an organization and project
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param dto - The relationship creation request DTO
  * @returns Promise with RelationshipResponseDto
  */
 export const createRelationship = async (
+  organizationId: number,
   projectId: number,
   dto: CreateRelationshipRequestDto
 ): Promise<RelationshipResponseDto> => {
   try {
     const { data } = await api.post(
-      `/projects/${projectId}/relationships`,
+      `/organizations/${organizationId}/projects/${projectId}/relationships`,
       dto
     );
     return data;
@@ -75,18 +79,20 @@ export const createRelationship = async (
 };
 
 /**
- * Bulk create relationships
+ * Bulk create relationships within an organization and project
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param relationships - Array of relationship creation request DTOs
  * @returns Promise with array of RelationshipResponseDto
  */
 export const bulkCreateRelationships = async (
+  organizationId: number,
   projectId: number,
   relationships: CreateRelationshipRequestDto[]
 ): Promise<RelationshipResponseDto[]> => {
   try {
     const { data } = await api.post(
-      `/projects/${projectId}/relationships/bulk`,
+      `/organizations/${organizationId}/projects/${projectId}/relationships/bulk`,
       relationships
     );
     return data;
@@ -97,20 +103,22 @@ export const bulkCreateRelationships = async (
 };
 
 /**
- * Update a relationship
+ * Update a relationship within an organization and project
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param relationshipId - The ID of the relationship to update
  * @param dto - The relationship update request DTO
  * @returns Promise with RelationshipResponseDto
  */
 export const updateRelationship = async (
+  organizationId: number,
   projectId: number,
   relationshipId: number,
   dto: UpdateRelationshipRequestDto
 ): Promise<RelationshipResponseDto> => {
   try {
     const { data } = await api.put(
-      `/projects/${projectId}/relationships/${relationshipId}`,
+      `/organizations/${organizationId}/projects/${projectId}/relationships/${relationshipId}`,
       dto
     );
     return data;
@@ -121,18 +129,20 @@ export const updateRelationship = async (
 };
 
 /**
- * Delete a relationship
+ * Delete a relationship within an organization and project
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param relationshipId - The ID of the relationship to delete
  * @returns Promise with success message
  */
 export const deleteRelationship = async (
+  organizationId: number,
   projectId: number,
   relationshipId: number
 ): Promise<{ message: string }> => {
   try {
     const { data } = await api.delete(
-      `/projects/${projectId}/relationships/${relationshipId}`
+      `/organizations/${organizationId}/projects/${projectId}/relationships/${relationshipId}`
     );
     return data;
   } catch (error) {
@@ -142,20 +152,22 @@ export const deleteRelationship = async (
 };
 
 /**
- * Archive or unarchive a relationship
+ * Archive or unarchive a relationship within an organization and project
+ * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param relationshipId - The ID of the relationship to archive/unarchive
  * @param archive - True to archive, false to unarchive
  * @returns Promise with success message
  */
 export const archiveRelationship = async (
+  organizationId: number,
   projectId: number,
   relationshipId: number,
   archive: boolean
 ): Promise<{ message: string }> => {
   try {
     const { data } = await api.patch(
-      `/projects/${projectId}/relationships/${relationshipId}`,
+      `/organizations/${organizationId}/projects/${projectId}/relationships/${relationshipId}`,
       null,
       { params: { archive } }
     );
@@ -167,7 +179,7 @@ export const archiveRelationship = async (
 };
 
 /**
- * Create a new relationship at organization level
+ * Create a new relationship at organization level (no project)
  * @param organizationId - The ID of the organization
  * @param dto - The relationship creation request DTO
  * @returns Promise with RelationshipResponseDto

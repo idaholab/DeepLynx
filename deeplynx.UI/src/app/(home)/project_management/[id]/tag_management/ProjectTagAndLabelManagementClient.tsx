@@ -100,10 +100,10 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     () =>
       normalizedLabelSearch
         ? labels.filter(
-            (l) =>
-              l.name.toLowerCase().includes(normalizedLabelSearch) ||
-              l.description?.toLowerCase().includes(normalizedLabelSearch),
-          )
+          (l) =>
+            l.name.toLowerCase().includes(normalizedLabelSearch) ||
+            l.description?.toLowerCase().includes(normalizedLabelSearch),
+        )
         : labels,
     [labels, normalizedLabelSearch],
   );
@@ -211,7 +211,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       setTagsLoading(true);
       setTagsError(null);
 
-      const dtoList: TagResponseDto[] = await getAllTags(projectId);
+      const dtoList: TagResponseDto[] = await getAllTags(organization?.organizationId as number, projectId);
 
       setTags(dtoList.filter((t) => !t.isArchived));
     } catch (error) {
@@ -280,6 +280,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         };
 
         const updated = await updateTag(
+          organization?.organizationId as number,
           projectId,
           editingTag.id,
           updatePayload,
@@ -293,7 +294,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           name: nameInput.trim(),
         };
 
-        const created = await createTag(projectId, createPayload);
+        const created = await createTag(organization?.organizationId as number, projectId, createPayload);
         setTags((prev) => [...prev, created]);
         toast.success(t.translations.PROJECT_TAG_CREATED);
       }
@@ -329,6 +330,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
 
       if (editingLabel) {
         const updated = await updateSensitivityLabelProject(
+          organization?.organizationId as number,
           projectId,
           editingLabel.id,
           {
@@ -343,7 +345,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         await refreshLabels();
         toast.success(t.translations.PROJECT_LABEL_UPDATED);
       } else {
-        const created = await createSensitivityLabelProject(projectId, {
+        const created = await createSensitivityLabelProject(organization?.organizationId as number, projectId, {
           name: labelNameInput.trim(),
           description: labelDescriptionInput.trim() || null,
         });
@@ -376,7 +378,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
 
     try {
       setArchivingTagId(tagToArchive.id);
-      await archiveTag(projectId, tagToArchive.id, true);
+      await archiveTag(organization?.organizationId as number, projectId, tagToArchive.id, true);
 
       setTags((prev) => prev.filter((t) => t.id !== tagToArchive.id));
       toast.success(
@@ -406,7 +408,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
 
     try {
       setArchivingLabelId(labelToArchive.id);
-      await archiveSensitivityLabelProject(projectId, labelToArchive.id, true);
+      await archiveSensitivityLabelProject(organization?.organizationId as number, projectId, labelToArchive.id, true);
 
       setLabels((prev) => prev.filter((l) => l.id !== labelToArchive.id));
       await refreshLabels();

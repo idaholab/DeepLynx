@@ -98,8 +98,8 @@ export function useCollectionsDashboard({
     const loadFacetSources = async () => {
       try {
         const [labels, tags] = await Promise.all([
-          getAllSensitivityLabelsProject(projectId),
-          getAllTags(projectId),
+          getAllSensitivityLabelsProject(organizationId, projectId),
+          getAllTags(organizationId as number, projectId),
         ]);
 
         if (cancelled) return;

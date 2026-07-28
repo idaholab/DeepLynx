@@ -18,12 +18,14 @@ const DetailsEditor = ({
   onSaved,
   onClose,
   setError,
+  organizationId,
 }: {
   projectId: number;
   source: DataSourceResponseDto;
   onSaved: () => Promise<void> | void;
   onClose: () => void;
   setError: (s: string | null) => void;
+  organizationId: number;
 }) => {
   const [form, setForm] = useState<DetailsFormState>({
     name: source.name ?? "",
@@ -76,7 +78,7 @@ const DetailsEditor = ({
     };
 
     try {
-      await updateDataSource(projectId, Number(source.id), payload);
+      await updateDataSource(organizationId, projectId, Number(source.id), payload);
       await onSaved();
       onClose();
     } catch (e) {

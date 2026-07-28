@@ -6,7 +6,8 @@ import { useLanguage } from "@/app/contexts/Language";
 
 export function useFilteredNodes(
     nodes: GraphNodeSummary[],
-    projectId: number | undefined
+    projectId: number | undefined,
+    organizationId: number,
 ) {
 
     const { t } = useLanguage();
@@ -34,7 +35,7 @@ export function useFilteredNodes(
             await Promise.all(
                 uniqueClassIds.map(async (classId) => {
                     try {
-                        await getClass(projectId, classId);
+                        await getClass(organizationId, projectId, classId);
                     } catch {
                         archivedSet.add(classId);
                     }

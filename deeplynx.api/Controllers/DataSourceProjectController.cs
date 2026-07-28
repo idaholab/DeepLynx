@@ -18,7 +18,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [ApiVersion(1)]
 [ApiVersion(2)]
-[Route("projects/{projectId:long}/datasources")]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/datasources")]
 [Authorize]
 [Tags("Project - DataSource")]
 public class DataSourceProjectController : ControllerBase
