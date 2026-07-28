@@ -170,7 +170,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
 
 
         _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(Context,
             _edgeBusiness.Object,
