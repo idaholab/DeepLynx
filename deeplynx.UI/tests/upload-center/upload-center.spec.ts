@@ -1105,6 +1105,11 @@ startxref
       await page.getByRole('link', { name: 'Visit' }).first().click();
 
       for (const name of bulkFileNames) {
+        const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+        if (await clearTermsButton.isVisible()) {
+          await clearTermsButton.click();
+        }
+
         await page.getByRole('textbox', { name: 'Search' }).click();
         await page.getByRole('textbox', { name: 'Search' }).fill(name);
         await page.getByRole('textbox', { name: 'Search' }).press('Enter');
