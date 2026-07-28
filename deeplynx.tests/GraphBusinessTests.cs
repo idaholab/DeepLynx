@@ -76,7 +76,9 @@ public class GraphBusinessTests : IntegrationTestBase
             _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
-            _mockRelationshipBusiness.Object, _eventBusiness);
+            _mockRelationshipBusiness.Object, _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,

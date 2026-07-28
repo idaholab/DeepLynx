@@ -34,9 +34,11 @@ public class ProjectBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
+    private Mock<ILogger<AdminService>> _adminServiceLogger;
     private INotificationBusiness _notificationBusiness = null!;
     private IProjectRolePermissionService _permissionService = null!;
     private Mock<IAdminService> _mockAdminService = null!;
+    private IAdminService _adminService = null!;
     private Mock<ILogger<ProjectRolePermissionService>> _logger = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
@@ -86,6 +88,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _mockAdminService = new Mock<IAdminService>();
+        _adminServiceLogger = new Mock<ILogger<AdminService>>();
+        _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _logger = new Mock<ILogger<ProjectRolePermissionService>>();
         _permissionService = new ProjectRolePermissionService(Context, _logger.Object);
         _mockRecordBusiness = new Mock<IRecordBusiness>();
@@ -101,7 +105,7 @@ public class ProjectBusinessTests : IntegrationTestBase
             _mockRecordBusiness.Object, _eventBusiness, _permissionService, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
-            _mockRelationshipBusiness.Object, _eventBusiness);
+            _mockRelationshipBusiness.Object, _eventBusiness, _permissionService, _adminService);
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
@@ -475,7 +479,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(dto.Name, project.Name);
         var classResult = await _classBusiness.GetAllClasses(
-            oid, [project.Id], true);
+            uid, oid, [project.Id], true);
 
         Assert.Equal(3, classResult.Count);
 
