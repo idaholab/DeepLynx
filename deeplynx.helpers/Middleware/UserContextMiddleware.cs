@@ -64,7 +64,6 @@ public class UserContextMiddleware
                             var adminService = scope.ServiceProvider.GetRequiredService<IAdminService>();
                             UserContextStorage.IsSysAdmin = await adminService.SysAdminCheck(user.Id);
 
-                            // 1. Extract project IDs
                             var projectIds = ExtractProjectIds(context);
 
                             long? organizationId = null;
