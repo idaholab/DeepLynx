@@ -18,7 +18,9 @@ public class DefaultApiVersionConventionTests
             ControllerName = nameof(TestController)
         };
         var builder = new ControllerApiVersionConventionBuilder(typeof(TestController));
-        var convention = new DefaultApiVersionConvention(new ApiVersion(1), new ApiVersion(2));
+        var convention = new DefaultApiVersionConvention(
+            supportedApiVersions: [new ApiVersion(2)],
+            deprecatedApiVersions: [new ApiVersion(1)]);
 
         var applied = convention.Apply(builder, controller);
 
@@ -28,7 +30,7 @@ public class DefaultApiVersionConventionTests
     [Fact]
     public void Constructor_Throws_WhenNoApiVersionsAreConfigured()
     {
-        Assert.Throws<ArgumentException>(() => new DefaultApiVersionConvention());
+        Assert.Throws<ArgumentException>(() => new DefaultApiVersionConvention([], []));
     }
 
     private sealed class TestController

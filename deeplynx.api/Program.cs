@@ -174,7 +174,8 @@ try
         })
         .AddMvc(options =>
         {
-            options.Conventions.Add(new DefaultApiVersionConvention(NexusApiVersions.Supported.ToArray()));
+            options.Conventions.Add(
+                new DefaultApiVersionConvention(NexusApiVersions.Supported, NexusApiVersions.Deprecated));
         })
         .AddApiExplorer(options =>
         {

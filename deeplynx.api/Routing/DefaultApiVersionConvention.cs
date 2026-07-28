@@ -6,16 +6,21 @@ namespace deeplynx.api.Routing;
 
 internal sealed class DefaultApiVersionConvention : IControllerConvention
 {
-    private readonly IReadOnlyCollection<ApiVersion> _apiVersions;
+    private readonly IReadOnlyCollection<ApiVersion> _supportedApiVersions;
+    private readonly IReadOnlyCollection<ApiVersion> _deprecatedApiVersions;
 
-    public DefaultApiVersionConvention(params ApiVersion[] apiVersions)
+    public DefaultApiVersionConvention(
+        IReadOnlyCollection<ApiVersion> supportedApiVersions,
+        IReadOnlyCollection<ApiVersion> deprecatedApiVersions)
     {
-        ArgumentNullException.ThrowIfNull(apiVersions);
+        ArgumentNullException.ThrowIfNull(supportedApiVersions);
+        ArgumentNullException.ThrowIfNull(deprecatedApiVersions);
 
-        if (apiVersions.Length == 0)
-            throw new ArgumentException("At least one API version must be configured.", nameof(apiVersions));
+        if (supportedApiVersions.Count == 0 && deprecatedApiVersions.Count == 0)
+            throw new ArgumentException("At least one API version must be configured.");
 
-        _apiVersions = apiVersions;
+        _supportedApiVersions = supportedApiVersions;
+        _deprecatedApiVersions = deprecatedApiVersions;
     }
 
     public bool Apply(IControllerConventionBuilder builder, ControllerModel controller)
@@ -23,8 +28,11 @@ internal sealed class DefaultApiVersionConvention : IControllerConvention
         if (builder is not ControllerApiVersionConventionBuilder controllerBuilder)
             return false;
 
-        foreach (var apiVersion in _apiVersions)
+        foreach (var apiVersion in _supportedApiVersions)
             controllerBuilder.HasApiVersion(apiVersion);
+
+        foreach (var apiVersion in _deprecatedApiVersions)
+            controllerBuilder.HasDeprecatedApiVersion(apiVersion);
 
         return true;
     }
