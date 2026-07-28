@@ -24,7 +24,6 @@ test.describe("Roles & Permissions", () => {
     if (!projectId) return;
     const BASE_URL = 'http://localhost:5095/api/v1';
     const getAllUrl = `${BASE_URL}/organizations/1/projects/${projectId}/roles?hideArchived=true`;
-    // const createNewUrl = `${BASE_URL}/organizations/1/projects/${projectId}/roles`;
     try {
       let res = await request.fetch(getAllUrl);
       if (!res.ok()) throw new Error(`Failed to fetch roles: ${res.status()}`);
@@ -377,10 +376,9 @@ test.describe("Roles & Permissions", () => {
   /* ------------------------------------------------------------------------ */
 
   test.describe("Role CRUD operations", () => {
-    const testRoleName = `E2E Role ${Date.now()}`;
-    const updatedRoleName = `${testRoleName} Updated`;
-
     test("create a new custom role", async ({ page }) => {
+      const testRoleName = `E2E Role ${crypto.randomUUID()}`;
+      const updatedRoleName = `${testRoleName} Updated`;
       await page.getByRole("button", { name: "Create Role" }).click();
       const modal = page.locator("dialog.modal.modal-open");
       await modal
@@ -396,7 +394,7 @@ test.describe("Roles & Permissions", () => {
 
       // New role should appear in the sidebar
       await expect(
-        page.locator("button", { hasText: testRoleName }),
+        page.getByRole("button", { name: testRoleName }),
       ).toBeVisible({ timeout: 15000 });
 
       // New role should be selected and show PRJ badge
@@ -407,7 +405,7 @@ test.describe("Roles & Permissions", () => {
 
     test("edit a custom role via the edit modal", async ({ page }) => {
       // First create a role to edit
-      const roleName = `Edit Test ${Date.now()}`;
+      const roleName = `Edit Test ${crypto.randomUUID()}`;
       await page.getByRole("button", { name: "Create Role" }).click();
       const createModal = page.locator("dialog.modal.modal-open");
       await createModal
@@ -418,7 +416,7 @@ test.describe("Roles & Permissions", () => {
 
       // Wait for the role to appear and be selected
       await expect(
-        page.locator("button", { hasText: roleName }),
+        page.getByRole("button", { name: roleName }),
       ).toBeVisible({ timeout: 15000 });
 
       // Click the edit (pencil) button in the detail panel header
@@ -443,13 +441,13 @@ test.describe("Roles & Permissions", () => {
 
       // The updated name should appear in the sidebar
       await expect(
-        page.locator("button", { hasText: `${roleName} Edited` }),
+        page.getByRole("button", { name: `${roleName} Edited` }),
       ).toBeVisible({ timeout: 15000 });
     });
 
     test("delete a custom role via the delete modal", async ({ page }) => {
       // First create a role to delete
-      const roleName = `Delete Test ${Date.now()}`;
+      const roleName = `Delete Test ${crypto.randomUUID()}`;
       await page.getByRole("button", { name: "Create Role" }).click();
       const createModal = page.locator("dialog.modal.modal-open");
       await createModal
@@ -460,7 +458,7 @@ test.describe("Roles & Permissions", () => {
 
       // Wait for the role to appear and be selected
       await expect(
-        page.locator("button", { hasText: roleName }),
+        page.getByRole("button", { name: roleName }),
       ).toBeVisible({ timeout: 15000 });
 
       // Click the delete (trash) button in the detail panel
@@ -480,7 +478,7 @@ test.describe("Roles & Permissions", () => {
 
       // The role should no longer appear in the sidebar
       await expect(
-        page.locator("button", { hasText: roleName }),
+        page.getByRole("button", { name: roleName }),
       ).not.toBeVisible({ timeout: 10000 });
     });
   });
