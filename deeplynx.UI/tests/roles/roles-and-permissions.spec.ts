@@ -1,4 +1,4 @@
-import { test, expect, APIRequestContext, APIResponse } from "@playwright/test";
+import { test, expect, APIRequestContext, APIResponse, Page } from "@playwright/test";
 import { seedAndNavigateToProject } from "../helpers/seed";
 import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
 
@@ -19,7 +19,7 @@ test.describe("Roles & Permissions", () => {
   });
 
   async function getNonUserRole(
-    request : APIRequestContext, projectId: string | undefined
+    request : APIRequestContext, projectId: string | undefined, page: Page
   ){
     if (!projectId) return;
     const BASE_URL = 'http://localhost:5095/api/v1';
@@ -36,6 +36,12 @@ test.describe("Roles & Permissions", () => {
         res = await request.get(getAllUrl);
         if (!res.ok()) throw new Error(`Failed to refecth roles: ${res.status()}`);
         roles = await res.json();
+        // reload page so the role shows up, renavigate to the roles and permissions tab
+        await page.reload();
+        await page.locator("a.tab", { hasText: "Roles & Permissions" }).click();
+        await expect(
+          page.locator("a.tab.tab-active", { hasText: "Roles & Permissions" }),
+        ).toBeVisible();
       }
       // return non user
       return (roles.find((role: RoleResponseDto) => role.name !== "User")).name;
@@ -175,7 +181,7 @@ test.describe("Roles & Permissions", () => {
       const url = new URL(page.url());
       const projectId = url.pathname.split('/').pop();
       // Click a different role than "User" in the sidebar (role buttons contain Source: text)
-      const nonUserRole = await getNonUserRole(request, projectId);
+      const nonUserRole = await getNonUserRole(request, projectId, page);
       await page.getByRole('button', { name: nonUserRole }).click();
       // The right panel heading (h2) should not show "User"
       const detailPanel = page.locator(".flex-1.card");
