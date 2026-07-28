@@ -422,7 +422,8 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             Default = objectStorage.Default,
             LastUpdatedAt = objectStorage.LastUpdatedAt,
             LastUpdatedBy = objectStorage.LastUpdatedBy,
-            IsArchived = objectStorage.IsArchived
+            IsArchived = objectStorage.IsArchived,
+            AzureFilePath = project.FilePath
         };
     }
     /// <summary>

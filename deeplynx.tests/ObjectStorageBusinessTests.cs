@@ -456,6 +456,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Assert.Equal("filesystem", objectStorageResponse.Type);
     }
 
+
     [Fact]
     public async Task Create_Success_ReturnsCorrectValues()
     {
@@ -589,6 +590,22 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.Equal(updateDto.Name, updatedObjectStorage.Name);
+    }
+
+    [Fact]
+    public async Task UpdateFilePath_Success_ReturnsUpdatedNameInProject()
+    {
+        // Arrange
+        var updateDto = new UpdateObjectStorageRequestDto
+        {
+            AzureFilePath = "a/b/c"
+        };
+        // Act
+        var updatedObjectStorage = await _objectStorageBusiness.UpdateProjectContainerSettings(
+            uid, organizationId, pid, os1, updateDto);
+
+        // Assert
+        Assert.Equal(updateDto.AzureFilePath, updatedObjectStorage.AzureFilePath);
     }
 
     [Fact]

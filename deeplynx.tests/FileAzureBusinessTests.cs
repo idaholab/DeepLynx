@@ -242,7 +242,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             Name = "Test Project",
             OrganizationId = _oid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = _uid
+            LastUpdatedBy = _uid,
+            FilePath = "a/b/c"
         };
         Context.Projects.Add(project);
         await Context.SaveChangesAsync();
@@ -758,6 +759,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         var fileContent = "Download test content";
         var mockFile = CreateMockFile(fileName, fileContent);
 
+        _objectStorageConfig.AzureObjectConfig?.AzureFilePath = "a/b/c";
+
         var uri = await _fileAzureBusiness.UploadFile(
             _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
 
@@ -783,6 +786,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         Assert.NotNull(result);
         Assert.Equal(fileName, result.FileDownloadName);
         Assert.Equal("text/plain", result.ContentType);
+        Assert.Contains("a/b/c", uri);
 
         // Read stream content
         using var reader = new StreamReader(result.FileStream);
