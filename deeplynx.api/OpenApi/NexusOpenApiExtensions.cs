@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using deeplynx.api;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
@@ -25,6 +26,12 @@ internal static class NexusOpenApiExtensions
 
             options.ShouldInclude = apiDescription =>
                 string.Equals(apiDescription.GroupName, documentName, StringComparison.OrdinalIgnoreCase);
+
+            options.AddOperationTransformer((operation, context, cancellationToken) =>
+            {
+                ApplyDeprecation(operation, context.Description.IsDeprecated());
+                return Task.CompletedTask;
+            });
 
             options.AddDocumentTransformer((document, context, cancellationToken) =>
             {
@@ -252,6 +259,12 @@ internal static class NexusOpenApiExtensions
         });
 
         return services;
+    }
+
+    internal static void ApplyDeprecation(OpenApiOperation operation, bool isDeprecated)
+    {
+        if (isDeprecated)
+            operation.Deprecated = true;
     }
 
     private static HashSet<string> GetUsedTagNames(OpenApiDocument document)
