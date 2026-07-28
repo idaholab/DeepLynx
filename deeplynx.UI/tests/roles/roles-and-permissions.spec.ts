@@ -24,24 +24,18 @@ test.describe("Roles & Permissions", () => {
     if (!projectId) return;
     const BASE_URL = 'http://localhost:5095/api/v1';
     const getAllUrl = `${BASE_URL}/organizations/1/projects/${projectId}/roles?hideArchived=true`;
-    const createNewUrl = `${BASE_URL}/organizations/1/projects/${projectId}/roles`;
+    // const createNewUrl = `${BASE_URL}/organizations/1/projects/${projectId}/roles`;
     try {
       let res = await request.fetch(getAllUrl);
       if (!res.ok()) throw new Error(`Failed to fetch roles: ${res.status()}`);
       let roles = await res.json();
       if (roles.length === 1) {
         // create new role
-        const postRes = await request.post(createNewUrl, { data: { name: "Playwright Role", description: "Role created via playwright testing" }});
-        if (!postRes.ok()) throw new Error(`Failed to create new role: ${postRes.status()}`);
-        res = await request.get(getAllUrl);
-        if (!res.ok()) throw new Error(`Failed to refecth roles: ${res.status()}`);
-        roles = await res.json();
-        // reload page so the role shows up, renavigate to the roles and permissions tab
-        await page.reload();
-        await page.locator("a.tab", { hasText: "Roles & Permissions" }).click();
-        await expect(
-          page.locator("a.tab.tab-active", { hasText: "Roles & Permissions" }),
-        ).toBeVisible();
+        await page.getByRole('button', { name: 'Create Role' }).click();
+        await page.getByRole('textbox', { name: 'Enter role name' }).click();
+        await page.getByRole('textbox', { name: 'Enter role name' }).fill('Playwright test role');
+        await page.getByRole('dialog').getByRole('button', { name: 'Create Role' }).click();
+        return "Playwright test role";
       }
       // return non user
       return (roles.find((role: RoleResponseDto) => role.name !== "User")).name;
