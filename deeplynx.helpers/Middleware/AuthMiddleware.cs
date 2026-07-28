@@ -147,6 +147,7 @@ public class AuthMiddleware
         }
 
         var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
 
         // Handle SysAdmin attribute
         if (sysAdminAttr != null)
@@ -408,7 +409,7 @@ public class AuthMiddleware
             // IsProjectAdmin is pre-populated by UserContextMiddleware
         }
 
-        if (isSysAdmin)
+        if (isSysAdmin || isOrgAdmin)
         {
             await _next(context);
             return;

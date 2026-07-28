@@ -79,12 +79,14 @@ export async function getDefaultOrganizationObjectStorage(
  */
 export async function createOrganizationObjectStorage(
     organizationId: number,
-    dto: CreateObjectStorageRequestDto
+    dto: CreateObjectStorageRequestDto,
+    makeDefault: boolean = false
 ): Promise<ObjectStorageResponseDto> {
     try {
         const res = await api.post<ObjectStorageResponseDto>(
             `/organizations/${organizationId}/storages`,
-            dto
+            dto,
+            { params: { makeDefault } }
         );
         return res.data;
     } catch (error) {

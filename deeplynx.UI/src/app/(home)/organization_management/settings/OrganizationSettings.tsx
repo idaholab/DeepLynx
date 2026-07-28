@@ -1,11 +1,10 @@
 // src/app/(home)/organization_management/settings/OrganizationSettings.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useCallback } from "react";
 import toast from "react-hot-toast";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
-  LockClosedIcon,
   InformationCircleIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
@@ -16,6 +15,27 @@ import {
   fetchOrganizationLogo,
   getOrganization,
 } from "@/app/lib/client_service/organization_services.client";
+import {
+  getAllOrganizationObjectStorages,
+  getDefaultOrganizationObjectStorage,
+  setDefaultOrganizationObjectStorage,
+  createOrganizationObjectStorage,
+  updateOrganizationObjectStorage,
+  deleteOrganizationObjectStorage,
+  archiveOrganizationObjectStorage,
+} from "@/app/lib/client_service/object_storage_services.client";
+import {
+  ObjectStorageResponseDto,
+} from "@/app/(home)/types/responseDTOs";
+import {
+  CreateObjectStorageRequestDto,
+  UpdateObjectStorageRequestDto,
+} from "@/app/(home)/types/requestDTOs";
+import StorageSettingsSection from "@/app/(home)/project_management/[id]/settings/components/StorageSettingsSection";
+import CreateStorageModal from "@/app/(home)/project_management/[id]/settings/components/CreateStorageModal";
+import EditStorageModal from "@/app/(home)/project_management/[id]/settings/components/EditStorageModal";
+import DeleteStorageModal from "@/app/(home)/project_management/[id]/settings/components/DeleteStorageModal";
+import ArchiveStorageModal from "@/app/(home)/project_management/[id]/settings/components/ArchiveStorageModal";
 import { useLanguage } from "@/app/contexts/Language";
 import Image from "next/image";
 import OrganizationInsightModelTemplateSection from "./components/OrganizationInsightModelTemplateSection";
@@ -29,6 +49,8 @@ import { archiveOrganizationObjectStorage, createOrganizationObjectStorage, dele
 import { ObjectStorageResponseDto } from "../../types/responseDTOs";
 import { CreateObjectStorageRequestDto, UpdateObjectStorageRequestDto } from "../../types/requestDTOs";
 
+
+type StorageTab = "default" | "manage";
 
 const OrganizationSettings = () => {
   const { organization, setOrganization } = useOrganizationSession();
@@ -62,11 +84,6 @@ const OrganizationSettings = () => {
   } | null>(null);
 
   // Storage states
-  const [isSavingStorage, setIsSavingStorage] = useState(false);
-  const [defaultStorage, setDefaultStorage] =
-    useState<ObjectStorageResponseDto | null>(null);
-
-
   // Storage config fields based on type
   const [azureConnectionString, setAzureConnectionString] = useState("");
   const [createContainerPerProject, setCreateContainerPerProject] = useState(false);
@@ -82,6 +99,44 @@ const OrganizationSettings = () => {
     setIsTouched(true);
     console.log("isTouched: " + isTouched)
   };
+
+  const [activeStorageTab, setActiveStorageTab] =
+    useState<StorageTab>("default");
+  const [availableStorages, setAvailableStorages] = useState<
+    ObjectStorageResponseDto[]
+  >([]);
+  const [defaultStorage, setDefaultStorage] =
+    useState<ObjectStorageResponseDto | null>(null);
+  const [selectedStorageId, setSelectedStorageId] = useState<number | null>(
+    null,
+  );
+  const [isLoadingStorages, setIsLoadingStorages] = useState(true);
+  const [isSavingStorage, setIsSavingStorage] = useState(false);
+
+  // Create/Edit storage modal states
+  const [isCreateStorageModalOpen, setIsCreateStorageModalOpen] =
+    useState(false);
+  const [isEditStorageModalOpen, setIsEditStorageModalOpen] = useState(false);
+  const [editingStorage, setEditingStorage] =
+    useState<ObjectStorageResponseDto | null>(null);
+  const [storageType, setStorageType] = useState<string>("filesystem");
+  const [storageFormData, setStorageFormData] = useState({
+    name: "",
+    config: {},
+    default: false,
+  });
+
+  // Storage config fields based on type
+  const [filesystemPath, setFilesystemPath] = useState("");
+  const [azureEndpoint, setAzureEndpoint] = useState("");
+  const [azureBucketName, setAzureBucketName] = useState("");
+
+  // Delete/Archive storage modal states
+  const [deleteStorageId, setDeleteStorageId] = useState<number | null>(null);
+  const [archiveStorageId, setArchiveStorageId] = useState<number | null>(
+    null,
+  );
+  const [archiveAction, setArchiveAction] = useState<boolean>(true);
 
   // Load existing logo on mount
   useEffect(() => {
@@ -333,6 +388,308 @@ const OrganizationSettings = () => {
   const handleReset = () => {
     setAzureConnectionString("");
     setCreateContainerPerProject(false);
+  };
+
+  // Load available storages and default storage for the organization
+  const loadStorages = useCallback(async () => {
+    if (!organization?.organizationId) {
+      setIsLoadingStorages(false);
+      return;
+    }
+
+    try {
+      setIsLoadingStorages(true);
+
+      // Fetch all available storages for the organization
+      const storages = await getAllOrganizationObjectStorages(
+        organization.organizationId as number,
+        false, // Don't hide archived storages
+      );
+
+      // Fetch the current default storage
+      try {
+        const defaultStorageData = await getDefaultOrganizationObjectStorage(
+          organization.organizationId as number,
+        );
+        const orgDefaultStorage =
+          storages.find((storage) => storage.default) ?? null;
+        const effectiveDefaultStorage =
+          orgDefaultStorage ?? defaultStorageData;
+
+        setDefaultStorage(effectiveDefaultStorage);
+        setSelectedStorageId(effectiveDefaultStorage.id as number);
+        setAvailableStorages(
+          storages.map((storage) => ({
+            ...storage,
+            default:
+              String(storage.id) === String(effectiveDefaultStorage.id),
+          })),
+        );
+      } catch (error) {
+        setDefaultStorage(null);
+        setSelectedStorageId(null);
+        setAvailableStorages(storages);
+      }
+    } catch (error) {
+      console.error("Error loading organization storages:", error);
+      toast.error(t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS);
+    } finally {
+      setIsLoadingStorages(false);
+    }
+  }, [
+    organization?.organizationId,
+    t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS,
+  ]);
+
+  useEffect(() => {
+    loadStorages();
+  }, [loadStorages]);
+
+  const handleSaveDefaultStorage = async () => {
+    if (!organization?.organizationId || !selectedStorageId) {
+      toast.error(t.translations.PLEASE_SELECT_A_STORAGE_LOCATION);
+      return;
+    }
+
+    if (defaultStorage?.id === selectedStorageId) {
+      toast.error(t.translations.THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT);
+      return;
+    }
+
+    try {
+      setIsSavingStorage(true);
+
+      await setDefaultOrganizationObjectStorage(
+        organization.organizationId as number,
+        selectedStorageId,
+      );
+
+      const updatedDefault = availableStorages.find(
+        (s) => s.id === selectedStorageId,
+      );
+      if (updatedDefault) {
+        setDefaultStorage({ ...updatedDefault, default: true });
+        setAvailableStorages((currentStorages) =>
+          currentStorages.map((storage) => ({
+            ...storage,
+            default: String(storage.id) === String(selectedStorageId),
+          })),
+        );
+      }
+
+      toast.success(
+        t.translations.DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY,
+      );
+    } catch (error) {
+      console.error("Failed to set default organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_DEFAULT_STORAGE,
+      );
+    } finally {
+      setIsSavingStorage(false);
+    }
+  };
+
+  const resetStorageForm = () => {
+    setStorageFormData({ name: "", config: {}, default: false });
+    setStorageType("filesystem");
+    setFilesystemPath("");
+    setAzureEndpoint("");
+    setAzureBucketName("");
+  };
+
+  const handleCreateStorage = async () => {
+    if (!organization?.organizationId) return;
+
+    if (!storageFormData.name.trim()) {
+      toast.error(t.translations.STORAGE_NAME_IS_REQUIRED);
+      return;
+    }
+
+    // Build config based on storage type
+    let config: Record<string, unknown> = {};
+
+    if (storageType === "filesystem") {
+      if (!filesystemPath.trim()) {
+        toast.error(t.translations.FILESYSTEM_PATH_IS_REQUIRED);
+        return;
+      }
+      config = {
+        mountPath: filesystemPath,
+      };
+    } else if (storageType === "azure_blob") {
+      if (!azureEndpoint.trim() || !azureBucketName.trim()) {
+        toast.error(t.translations.ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED);
+        return;
+      }
+      config = {
+        azureObjectConfig: {
+          azureConnectionString: azureEndpoint,
+          azureContainerName: azureBucketName,
+        },
+      };
+    } else if (storageType === "aws_s3") {
+      // TODO: Waiting for backend to finalize AWS S3 config structure
+      toast.error("AWS S3 storage configuration is not yet implemented");
+      return;
+    }
+
+    try {
+      const dto: CreateObjectStorageRequestDto = {
+        name: storageFormData.name,
+        config: config,
+        default: storageFormData.default,
+      };
+
+      const createdStorage = await createOrganizationObjectStorage(
+        organization.organizationId as number,
+        dto,
+        storageFormData.default,
+      );
+      const storageForList = {
+        ...createdStorage,
+        default: storageFormData.default || createdStorage.default,
+      };
+
+      setAvailableStorages((currentStorages) => {
+        const existingStorage = currentStorages.some(
+          (storage) => String(storage.id) === String(storageForList.id),
+        );
+        const nextStorages = existingStorage
+          ? currentStorages.map((storage) =>
+            String(storage.id) === String(storageForList.id)
+              ? storageForList
+              : storage,
+          )
+          : [...currentStorages, storageForList];
+
+        if (!storageForList.default) {
+          return nextStorages;
+        }
+
+        return nextStorages.map((storage) => ({
+          ...storage,
+          default: String(storage.id) === String(storageForList.id),
+        }));
+      });
+
+      if (storageForList.default) {
+        setDefaultStorage(storageForList);
+        setSelectedStorageId(storageForList.id as number);
+      }
+
+      toast.success(t.translations.STORAGE_CREATED_SUCCESSFULLY);
+      setIsCreateStorageModalOpen(false);
+      resetStorageForm();
+    } catch (error) {
+      console.error("Failed to create organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_CREATE_STORAGE,
+      );
+    }
+  };
+
+  const handleEditStorage = async () => {
+    if (!organization?.organizationId || !editingStorage) return;
+    if (editingStorage.isArchived) {
+      toast.error(t.translations.ARCHIVED_STORAGE_CANNOT_BE_EDITED);
+      return;
+    }
+
+    if (!storageFormData.name.trim()) {
+      toast.error(t.translations.STORAGE_NAME_IS_REQUIRED);
+      return;
+    }
+
+    try {
+      const dto: UpdateObjectStorageRequestDto = {
+        name: storageFormData.name,
+        default: storageFormData.default,
+      };
+
+      await updateOrganizationObjectStorage(
+        organization.organizationId as number,
+        editingStorage.id as number,
+        dto,
+      );
+
+      toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
+      setIsEditStorageModalOpen(false);
+      setEditingStorage(null);
+      setStorageFormData({ name: "", config: {}, default: false });
+      loadStorages();
+    } catch (error) {
+      console.error("Failed to update organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_STORAGE,
+      );
+    }
+  };
+
+  const handleDeleteStorage = async () => {
+    if (!organization?.organizationId || !deleteStorageId) return;
+
+    try {
+      await deleteOrganizationObjectStorage(
+        organization.organizationId as number,
+        deleteStorageId,
+      );
+
+      toast.success(t.translations.STORAGE_DELETE_SUCCESSFULLY);
+      setDeleteStorageId(null);
+      loadStorages();
+    } catch (error) {
+      console.error("Failed to delete organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_DELETE_STORAGE,
+      );
+    }
+  };
+
+  const handleArchiveStorage = async () => {
+    if (!organization?.organizationId || !archiveStorageId) return;
+
+    try {
+      await archiveOrganizationObjectStorage(
+        organization.organizationId as number,
+        archiveStorageId,
+        archiveAction,
+      );
+
+      toast.success(
+        `${t.translations.STORAGE} ${archiveAction ? t.translations.ARCHIVE : t.translations.UNARCHIVE} ${t.translations.SUCCESSFULLY}`,
+      );
+      setArchiveStorageId(null);
+      loadStorages();
+    } catch (error) {
+      console.error("Failed to archive/unarchive organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_ARCHIVE_STORAGE,
+      );
+    }
+  };
+
+  const openEditStorageModal = (storage: ObjectStorageResponseDto) => {
+    if (storage.isArchived) {
+      return;
+    }
+    setEditingStorage(storage);
+    setStorageFormData({
+      name: storage.name,
+      config: {},
+      default: storage.default,
+    });
+    setIsEditStorageModalOpen(true);
   };
 
   // Syncs Theme from session
@@ -736,68 +1093,94 @@ const OrganizationSettings = () => {
                     disabled={isSavingStorage}
                   />
                 </div>
-
-                <div className="form-control mb-4">
-                  <span className="text font-semibold mr-2">
-                    {t.translations.CREATE_CONTAINER_PER_PROJECT}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={createContainerPerProject}
-                    onChange={(e) => onCreateContainerToggle(e.target.checked)}
-                    className="toggle toggle-primary"
-                    disabled={isSavingStorage}
-                  />
-                </div>
-
-                <div className="flex justify-end gap-4">
-                  <button
-                    className="btn btn-outline"
-                    onClick={handleReset}
-                    disabled={isSavingStorage}
-                  >
-                    {t.translations.CANCEL}
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleSave}
-                    disabled={isSavingStorage || !isTouched}
-                  >
-                    {isSavingStorage && <span className="loading loading-spinner loading-xs mr-2" />}
-                    {t.translations.SAVE}
-                  </button>
-                </div>
               </div>
-            </div>
-
-            {!isInsightHidden() && (
-              <OrganizationInsightModelTemplateSection
-                organizationId={
-                  organization?.organizationId as number | undefined
-                }
+              ) : (
+              <StorageSettingsSection
+                scope="organization"
+                organizationId={organization?.organizationId ?? undefined}
+                activeTab={activeStorageTab}
+                onChangeTab={setActiveStorageTab}
+                availableStorages={availableStorages}
+                selectedStorageId={selectedStorageId}
+                onSelectStorage={setSelectedStorageId}
+                defaultStorage={defaultStorage}
+                isSavingStorage={isSavingStorage}
+                onSaveDefaultStorage={handleSaveDefaultStorage}
+                onCreateStorage={() => {
+                  resetStorageForm();
+                  setIsCreateStorageModalOpen(true);
+                }}
+                onEditStorage={openEditStorageModal}
+                onToggleArchive={(storage) => {
+                  setArchiveStorageId(storage.id as number);
+                  setArchiveAction(!storage.isArchived);
+                }}
+                onDeleteStorage={(storageId) => setDeleteStorageId(storageId)}
+                t={t}
               />
             )}
-          </div>
-        </div>
 
-        {/* Info Banner at Bottom */}
-        <div className="alert alert-info mt-6">
-          <InformationCircleIcon className="h-6 w-6" />
-          <div>
-            <div className="font-bold">
-              {t.translations.ADDITIONAL_SETTINGS_COMING_SOON}
-            </div>
-            <div className="text-sm">
-              {
-                t.translations
-                  .STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT
-              }
+              <div className="form-control mb-4">
+                <span className="text font-semibold mr-2">
+                  {t.translations.CREATE_CONTAINER_PER_PROJECT}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={createContainerPerProject}
+                  onChange={(e) => onCreateContainerToggle(e.target.checked)}
+                  className="toggle toggle-primary"
+                  disabled={isSavingStorage}
+                />
+              </div>
+
+              <div className="flex justify-end gap-4">
+                <button
+                  className="btn btn-outline"
+                  onClick={handleReset}
+                  disabled={isSavingStorage}
+                >
+                  {t.translations.CANCEL}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSave}
+                  disabled={isSavingStorage || !isTouched}
+                >
+                  {isSavingStorage && <span className="loading loading-spinner loading-xs mr-2" />}
+                  {t.translations.SAVE}
+                </button>
+              </div>
             </div>
           </div>
+
+          {!isInsightHidden() && (
+            <OrganizationInsightModelTemplateSection
+              organizationId={
+                organization?.organizationId as number | undefined
+              }
+            />
+          )}
         </div>
       </div>
 
-      {/* Remove Logo Modal */}
+      {/* Info Banner at Bottom */}
+      <div className="alert alert-info mt-6">
+        <InformationCircleIcon className="h-6 w-6" />
+        <div>
+          <div className="font-bold">
+            {t.translations.ADDITIONAL_SETTINGS_COMING_SOON}
+          </div>
+          <div className="text-sm">
+            {
+              t.translations
+                .STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+
+      {/* Remove Logo Modal */ }
       <input type="checkbox" id="remove_logo" className="modal-toggle" />
       <div className="modal" role="dialog">
         <div className="modal-box">
@@ -819,14 +1202,54 @@ const OrganizationSettings = () => {
           </div>
         </div>
       </div>
-      {themeToast && (
-        <div className="toast toast-bottom toast-end">
-          <div className={`alert alert-${themeToast.type}`}>
-            {themeToast.message}
-          </div>
+  {
+    themeToast && (
+      <div className="toast toast-bottom toast-end">
+        <div className={`alert alert-${themeToast.type}`}>
+          {themeToast.message}
         </div>
-      )}
-    </div>
+      </div>
+    )
+  }
+
+      <CreateStorageModal
+        isOpen={isCreateStorageModalOpen}
+        onToggle={setIsCreateStorageModalOpen}
+        storageType={storageType}
+        setStorageType={setStorageType}
+        storageFormData={storageFormData}
+        setStorageFormData={setStorageFormData}
+        filesystemPath={filesystemPath}
+        setFilesystemPath={setFilesystemPath}
+        azureEndpoint={azureEndpoint}
+        setAzureEndpoint={setAzureEndpoint}
+        azureBucketName={azureBucketName}
+        setAzureBucketName={setAzureBucketName}
+        onCreate={handleCreateStorage}
+        onResetForm={resetStorageForm}
+      />
+      <EditStorageModal
+        isOpen={isEditStorageModalOpen}
+        onToggle={setIsEditStorageModalOpen}
+        storageFormData={storageFormData}
+        setStorageFormData={setStorageFormData}
+        onEdit={handleEditStorage}
+        setEditingStorage={setEditingStorage}
+      />
+      <DeleteStorageModal
+        isOpen={deleteStorageId !== null}
+        onToggle={(value) => setDeleteStorageId(value ? deleteStorageId : null)}
+        onDelete={handleDeleteStorage}
+      />
+      <ArchiveStorageModal
+        isOpen={archiveStorageId !== null}
+        onToggle={(value) =>
+          setArchiveStorageId(value ? archiveStorageId : null)
+        }
+        archiveAction={archiveAction}
+        onArchive={handleArchiveStorage}
+      />
+    </div >
   );
 };
 
