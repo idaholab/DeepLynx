@@ -36,6 +36,13 @@ public interface IFileControllerBusiness
         long? embeddingModelConfigId,
         string? userJwt);
 
+    Task<RecordResponseDto> UpdateFileContentHash(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        UpdateFileContentHashRequestDto dto);
+
     // Download file
     Task<FileStreamResult> DownloadFile(
         long currentUserId,

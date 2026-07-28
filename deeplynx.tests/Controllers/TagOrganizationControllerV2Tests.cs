@@ -1,4 +1,5 @@
 using deeplynx.api.Controllers;
+using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -62,7 +63,7 @@ public class TagOrganizationControllerTestsV2 : IDisposable
         var expected = new List<TagResponseDto>();
 
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(OrgId, null, true))
+            .Setup(b => b.GetAllTags(UserId, OrgId, null, true, false, false))
             .ReturnsAsync(expected);
 
         var result = (await _tagOrganizationController.GetAllTagsV2(OrgId, null, true)).Result as OkObjectResult;
@@ -76,7 +77,7 @@ public class TagOrganizationControllerTestsV2 : IDisposable
     public async Task GetAllTagsV2_Returns200_WithEmptyList()
     {
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>()))
+            .Setup(b => b.GetAllTags(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ReturnsAsync([]);
 
         var result = (await _tagOrganizationController.GetAllTagsV2(OrgId, null, true)).Result as OkObjectResult;
@@ -90,7 +91,7 @@ public class TagOrganizationControllerTestsV2 : IDisposable
     public async Task GetAllTagsV2_ThrowsException_WhenBusinessThrows()
     {
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(OrgId, null, true))
+            .Setup(b => b.GetAllTags(UserId, OrgId, null, true, false, false))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _tagOrganizationController.GetAllTagsV2(OrgId, null, true));
@@ -102,13 +103,13 @@ public class TagOrganizationControllerTestsV2 : IDisposable
         var expected = new List<TagResponseDto>();
 
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(OrgId, null, true))
+            .Setup(b => b.GetAllTags(UserId, OrgId, null, true, false, false))
             .ReturnsAsync(expected);
 
         await _tagOrganizationController.GetAllTagsV2(OrgId, null, true);
 
         _mockTagBusiness.Verify(
-            b => b.GetAllTags(OrgId, null, true),
+            b => b.GetAllTags(UserId, OrgId, null, true, false, false),
             Times.Once);
     }
 

@@ -1,5 +1,6 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -27,6 +28,8 @@ public class InvitationBusinessTests : IntegrationTestBase
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IRecordBusiness> _recordBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
@@ -65,6 +68,8 @@ public class InvitationBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockOrgLogger = new Mock<ILogger<OrganizationBusiness>>();
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _eventBusiness = new EventBusiness(Context, _mockNotificationBusiness.Object, _bulkCopyUpsertExecutor);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _roleBusiness = new Mock<IRoleBusiness>();
@@ -73,7 +78,9 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         _classBusiness = new ClassBusiness(
             Context, _recordBusiness.Object,
-            _relationshipBusiness.Object, _eventBusiness);
+            _relationshipBusiness.Object, _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,

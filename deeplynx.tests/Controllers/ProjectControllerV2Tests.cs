@@ -1,4 +1,5 @@
 using deeplynx.api.Controllers;
+using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -629,11 +630,11 @@ public class ProjectControllerV2Tests : IDisposable
     [Fact]
     public async Task RemoveMemberFromProject_Returns200_OnSuccess()
     {
-        _mockBusiness.Setup(b => b.RemoveMemberFromProject(ProjectId, OtherUserId, null))
+        _mockBusiness.Setup(b => b.RemoveMemberFromProject(ProjectId, OtherUserId, null, UserId))
                      .Returns(Task.FromResult(true));
 
         var result = await _controller.RemoveMemberFromProjectV2(
-            OrgId, ProjectId, OtherUserId, groupId: null) as OkObjectResult;
+            ProjectId, OtherUserId, groupId: null) as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -644,24 +645,24 @@ public class ProjectControllerV2Tests : IDisposable
     public async Task RemoveMemberFromProject_Returns500_OnUnexpectedException()
     {
         _mockBusiness.Setup(b => b.RemoveMemberFromProject(
-                         It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>()))
+                         It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<long?>()))
                      .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _controller.RemoveMemberFromProjectV2(
-            OrgId, ProjectId, OtherUserId, groupId: null));
+            ProjectId, OtherUserId, groupId: null));
     }
 
     [Fact]
     public async Task RemoveMemberFromProject_PassesParametersToBusinessLayer()
     {
-        _mockBusiness.Setup(b => b.RemoveMemberFromProject(ProjectId, null, GroupId))
+        _mockBusiness.Setup(b => b.RemoveMemberFromProject(ProjectId, null, GroupId, UserId))
                      .Returns(Task.FromResult(true));
 
         await _controller.RemoveMemberFromProjectV2(
-            OrgId, ProjectId, userId: null, groupId: GroupId);
+            ProjectId, userId: null, groupId: GroupId);
 
         _mockBusiness.Verify(
-            b => b.RemoveMemberFromProject(ProjectId, null, GroupId),
+            b => b.RemoveMemberFromProject(ProjectId, null, GroupId, UserId),
             Times.Once);
     }
 
@@ -912,7 +913,6 @@ public class ProjectControllerV2Tests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(ProjectController.RemoveMemberFromProjectV2),
-            "organizationId",
             "projectId",
             "userId",
             "groupId");

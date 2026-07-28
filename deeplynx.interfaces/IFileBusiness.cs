@@ -6,6 +6,15 @@ namespace deeplynx.interfaces;
 
 public interface IFileBusiness
 {
+    Task<string?> CalculateFileContentHash(
+        IFormFile file,
+        CancellationToken cancellationToken = default);
+
+    Task<string?> CalculateStoredFileContentHash(
+        string fileUri,
+        ObjectStorageConfigDto objectStorageConfig,
+        CancellationToken cancellationToken = default);
+
     Task<string> UploadFile(long organizationId, long projectId, long datasourceId,
         ObjectStorageConfigDto objectStorageConfig, IFormFile file, Guid guid);
 

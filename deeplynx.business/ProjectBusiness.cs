@@ -901,6 +901,7 @@ public class ProjectBusiness : IProjectBusiness
         if (userId.HasValue && (user == null || user.IsArchived))
             throw new KeyNotFoundException($"User with id {userId} not found");
 
+
         // Service accounts cannot be invited to other projects. Limited to the project where they are created.
         if (userId.HasValue && user.AccountType == AccountType.Service && !allowServiceAccount)
             throw new InvalidOperationException("Service accounts cannot be added to a project directly. Use CreateAndAddServiceAccountToProject.");
@@ -1043,16 +1044,23 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="projectId">ID of the project</param>
     /// <param name="userId">(optional) ID of the user</param>
     /// <param name="groupId">(optional) ID of the group</param>
+    /// <param name="currentUserId">(optional) ID of the current user</param>
     /// <returns>True if member successfully removed</returns>
     /// <exception cref="ArgumentException">Returned if none or both of userID/groupID supplied</exception>
     /// <exception cref="KeyNotFoundException">Returned if member doesn't exist in project</exception>
-    public async Task<bool> RemoveMemberFromProject(long projectId, long? userId, long? groupId)
+    public async Task<bool> RemoveMemberFromProject(long projectId, long? userId, long? groupId, long? currentUserId)
     {
         // ensure one and only one of userID or groupID is supplied
         if (!userId.HasValue && !groupId.HasValue)
             throw new ArgumentException("One of either User ID or Group ID must be provided");
         if (userId.HasValue && groupId.HasValue)
             throw new ArgumentException("Please provide only one of User ID or Group ID, not both");
+
+        // Prevent self-removal
+        if (userId.HasValue && currentUserId != null && userId == currentUserId)
+        {
+            return false;
+        }
 
         // Service Users should not exist without scope. Must Archive or Delete
         if (userId.HasValue)

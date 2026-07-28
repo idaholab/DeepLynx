@@ -665,7 +665,7 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task RemoveMemberFromProject_Returns200_OnSuccess()
     {
-        _mockBusiness.Setup(b => b.RemoveMemberFromProject(ProjectId, OtherUserId, null))
+        _mockBusiness.Setup(b => b.RemoveMemberFromProject(ProjectId, OtherUserId, null, It.IsAny<long?>()))
                      .Returns(Task.FromResult(true));
 
         var result = await _controller.RemoveMemberFromProject(
@@ -680,7 +680,7 @@ public class ProjectControllerTests : IDisposable
     public async Task RemoveMemberFromProject_Returns500_OnUnexpectedException()
     {
         _mockBusiness.Setup(b => b.RemoveMemberFromProject(
-                         It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>()))
+                         It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<long?>()))
                      .ThrowsAsync(new Exception("db error"));
 
         var result = await _controller.RemoveMemberFromProject(
@@ -693,14 +693,14 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task RemoveMemberFromProject_PassesParametersToBusinessLayer()
     {
-        _mockBusiness.Setup(b => b.RemoveMemberFromProject(ProjectId, null, GroupId))
+        _mockBusiness.Setup(b => b.RemoveMemberFromProject(ProjectId, null, GroupId, It.IsAny<long?>()))
                      .Returns(Task.FromResult(true));
 
         await _controller.RemoveMemberFromProject(
             OrgId, ProjectId, userId: null, groupId: GroupId);
 
         _mockBusiness.Verify(
-            b => b.RemoveMemberFromProject(ProjectId, null, GroupId),
+            b => b.RemoveMemberFromProject(ProjectId, null, GroupId, It.IsAny<long?>()),
             Times.Once);
     }
 

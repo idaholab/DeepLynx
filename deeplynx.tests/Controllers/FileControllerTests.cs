@@ -278,6 +278,74 @@ public class FileControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // UpdateFileContentHash Tests
+    // =========================================================================
+
+    #region UpdateFileContentHash Tests
+
+    [Fact]
+    public async Task UpdateFileContentHash_Returns200_WithUpdatedRecord()
+    {
+        var request = new UpdateFileContentHashRequestDto
+        {
+            HashHex = new string('a', 64),
+            ContentLength = 100
+        };
+        var expected = new RecordResponseDto
+        {
+            Id = RecordId,
+            FileContentHash = request.HashHex
+        };
+
+        _mockFileBusiness
+            .Setup(b => b.UpdateFileContentHash(
+                UserId,
+                OrgId,
+                ProjectId,
+                RecordId,
+                request))
+            .ReturnsAsync(expected);
+
+        var actionResult = await _fileController.UpdateFileContentHash(
+            OrgId,
+            ProjectId,
+            RecordId,
+            request);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHash_Returns400_ForInvalidHash()
+    {
+        var request = new UpdateFileContentHashRequestDto
+        {
+            HashHex = "invalid"
+        };
+
+        _mockFileBusiness
+            .Setup(b => b.UpdateFileContentHash(
+                UserId,
+                OrgId,
+                ProjectId,
+                RecordId,
+                request))
+            .ThrowsAsync(new ArgumentException("invalid hash"));
+
+        var actionResult = await _fileController.UpdateFileContentHash(
+            OrgId,
+            ProjectId,
+            RecordId,
+            request);
+
+        var result = Assert.IsType<BadRequestObjectResult>(actionResult.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+    }
+
+    #endregion
+
+    // =========================================================================
     // DownloadAppendedFile Tests
     // =========================================================================
 

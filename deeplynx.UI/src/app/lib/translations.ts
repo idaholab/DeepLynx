@@ -162,6 +162,7 @@ export const translations = {
         "cannot define additional sensitivity labels",
       CANNOT_DEFINE_NEW_LABELS: "cannot define new labels",
       CANNOT_DEFINE_NEW_TAGS: "cannot define new tags",
+      CANNOT_REMOVE_SELF_FROM_PROJECT: "You cannot remove yourself from a project",
       CANT_SWITCH_TO_SINGLE_FILE: "Can't switch to single-file",
       CHANGES_DISCARDED: "Changes discarded",
       CHANGE_LOGO: "Change Logo",
@@ -315,6 +316,8 @@ export const translations = {
       DELETE_SAVED_SEARCH_WARNING: "will be permanently removed. This cannot be undone.",
       DONE: "Done",
       DEFAULT_BADGE: "Default",
+      DEFAULT_PROJECT_BADGE: "Default (Project)",
+      DEFAULT_ORGANIZATION_BADGE: "Default (Organization)",
       DEFAULT_STORAGE: "Delete Storage",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
         "This will be the default storage for data sources in this project",
@@ -2293,6 +2296,7 @@ export const translations = {
         "no pueden definir etiquetas de sensitividad adicionales",
       CANNOT_DEFINE_NEW_LABELS: "no pueden definir nuevas etiquetas",
       CANNOT_DEFINE_NEW_TAGS: "no pueden definir nuevas etiquetas",
+      CANNOT_REMOVE_SELF_FROM_PROJECT: "No puedes eliminarte a ti mismo de un proyecto",
       CANT_SWITCH_TO_SINGLE_FILE: "No se puede cambiar a archivo único",
       CHANGES_DISCARDED: "Cambios descartados",
       CHANGE_LOGO: "Cambiar logotipo",
@@ -2449,6 +2453,8 @@ export const translations = {
       DEFAULT_DATA_SOURCE: "Fuente de datos predeterminada",
       DEEPLYNX_LOGO: "Logotipo de DeepLynx",
       DEFAULT_BADGE: "Predeterminado",
+      DEFAULT_PROJECT_BADGE: "Predeterminado (Proyecto)",
+      DEFAULT_ORGANIZATION_BADGE: "Predeterminado (Organización)",
       DEFAULT_STORAGE: "Eliminar almacenamiento",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
         "Este será el almacenamiento predeterminado para las fuentes de datos en este proyecto",

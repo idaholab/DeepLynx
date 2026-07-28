@@ -1,9 +1,9 @@
-import { test, expect } from "@playwright/test";
-import { seedSession } from "../helpers/seed";
+import { test, expect } from "../fixtures";
+import { sysAdmin } from "../deeplynx-config";
 
 test.describe("Settings Page", () => {
+  test.use({ actingUser: sysAdmin, actingOrg: "PW Org A", actingProject: "PW Project X" });
   test.beforeEach(async ({ page }) => {
-    await seedSession(page);
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     // Wait for the User Settings heading to confirm the page has loaded
     // past the AuthGuard loading spinner. Needs a longer timeout because
