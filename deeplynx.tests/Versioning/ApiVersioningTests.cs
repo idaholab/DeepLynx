@@ -36,7 +36,7 @@ public class ApiVersioningTests : IntegrationTestBase
     private long _organizationId;
     private long _projectId;
 
-    private string OrgAndProjectRoute => $"organizations/{_organizationId}/projects/{_projectId}/permissions";
+    private string ProjectTagsRoute => $"projects/{_projectId}/tags";
 
     public ApiVersioningTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -87,7 +87,7 @@ public class ApiVersioningTests : IntegrationTestBase
     // [Fact]
     // public async Task V1Response_HasDeprecatedVersionsHeader()
     // {
-    //     var response = await _client.GetAsync(ApiPath("v1", OrgAndProjectRoute));
+    //     var response = await _client.GetAsync(ApiPath("v1", ProjectTagsRoute));
     //
     //     Assert.True(response.Headers.Contains("api-deprecated-versions"),
     //         "v1 should be marked deprecated now that v2 exists.");
@@ -96,7 +96,7 @@ public class ApiVersioningTests : IntegrationTestBase
     [Fact]
     public async Task V2Response_DoesNotHaveDeprecatedVersionsHeader()
     {
-        var response = await _client.GetAsync(ApiPath("v2", OrgAndProjectRoute));
+        var response = await _client.GetAsync(ApiPath("v2", ProjectTagsRoute));
 
         Assert.False(response.Headers.Contains("api-deprecated-versions"),
             "v2 is the current version and should not be marked deprecated.");
@@ -105,8 +105,8 @@ public class ApiVersioningTests : IntegrationTestBase
     [Fact]
     public async Task BothVersions_HaveSupportedVersionsHeader()
     {
-        var v1Response = await _client.GetAsync(ApiPath("v1", OrgAndProjectRoute));
-        var v2Response = await _client.GetAsync(ApiPath("v2", OrgAndProjectRoute));
+        var v1Response = await _client.GetAsync(ApiPath("v1", ProjectTagsRoute));
+        var v2Response = await _client.GetAsync(ApiPath("v2", ProjectTagsRoute));
 
         Assert.True(v1Response.Headers.Contains("api-supported-versions"));
         Assert.True(v2Response.Headers.Contains("api-supported-versions"));
@@ -121,15 +121,15 @@ public class ApiVersioningTests : IntegrationTestBase
     [Fact]
     public async Task UnsupportedVersion_Returns404()
     {
-        var response = await _client.GetAsync(ApiPath("v9", OrgAndProjectRoute));
+        var response = await _client.GetAsync(ApiPath("v9", ProjectTagsRoute));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
     // =========================================================================
     // v2 error shapes: RFC 7807 ProblemDetails via the global exception handlers
-    // (DL-1332). IPermissionBusiness is mocked so each test controls exactly which
+    // (DL-1332). ITagBusiness is mocked so each test controls exactly which
     // exception is thrown - the same technique the direct-instantiation controller
     // tests already use, just now exercised through real HTTP instead of a direct
     // method call. This suite proves the HTTP/versioning envelope around an
@@ -142,15 +142,15 @@ public class ApiVersioningTests : IntegrationTestBase
     [Fact]
     public async Task V2_Returns404ProblemDetails_WhenKeyNotFoundExceptionThrown()
     {
-        var mockBusiness = new Mock<IPermissionBusiness>();
+        var mockBusiness = new Mock<ITagBusiness>();
         mockBusiness
-            .Setup(b => b.GetPermission(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
-            .ThrowsAsync(new KeyNotFoundException("Permission not found"));
+            .Setup(b => b.GetTag(It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long>(), It.IsAny<bool>()))
+            .ThrowsAsync(new KeyNotFoundException("Tag not found"));
 
-        using var mockedFactory = WithMockedPermissionBusiness(mockBusiness);
+        using var mockedFactory = WithMockedTagBusiness(mockBusiness);
         using var client = mockedFactory.CreateClient();
 
-        var response = await client.GetAsync(ApiPath("v2", $"{OrgAndProjectRoute}/9"));
+        var response = await client.GetAsync(ApiPath("v2", $"{ProjectTagsRoute}/9"));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -163,15 +163,21 @@ public class ApiVersioningTests : IntegrationTestBase
     [Fact]
     public async Task V2_Returns400ProblemDetails_WhenValidationExceptionThrown()
     {
-        var mockBusiness = new Mock<IPermissionBusiness>();
+        var mockBusiness = new Mock<ITagBusiness>();
         mockBusiness
-            .Setup(b => b.GetAllPermissions(It.IsAny<long?>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
-            .ThrowsAsync(new ValidationException("labelId is invalid"));
+            .Setup(b => b.GetAllTags(
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<long[]?>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>()))
+            .ThrowsAsync(new ValidationException("tag filter is invalid"));
 
-        using var mockedFactory = WithMockedPermissionBusiness(mockBusiness);
+        using var mockedFactory = WithMockedTagBusiness(mockBusiness);
         using var client = mockedFactory.CreateClient();
 
-        var response = await client.GetAsync(ApiPath("v2", OrgAndProjectRoute));
+        var response = await client.GetAsync(ApiPath("v2", ProjectTagsRoute));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -180,21 +186,27 @@ public class ApiVersioningTests : IntegrationTestBase
         Assert.NotNull(problem);
         Assert.Equal(StatusCodes.Status400BadRequest, problem!.Status);
         Assert.Equal("Bad Request", problem.Title);
-        Assert.Equal("labelId is invalid", problem.Detail);
+        Assert.Equal("tag filter is invalid", problem.Detail);
     }
 
     [Fact]
     public async Task V2_Returns500ProblemDetails_AndDoesNotLeakRawExceptionMessage_WhenUnhandledExceptionThrown()
     {
-        var mockBusiness = new Mock<IPermissionBusiness>();
+        var mockBusiness = new Mock<ITagBusiness>();
         mockBusiness
-            .Setup(b => b.GetAllPermissions(It.IsAny<long?>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
+            .Setup(b => b.GetAllTags(
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<long[]?>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>()))
             .ThrowsAsync(new Exception("some internal secret detail"));
 
-        using var mockedFactory = WithMockedPermissionBusiness(mockBusiness);
+        using var mockedFactory = WithMockedTagBusiness(mockBusiness);
         using var client = mockedFactory.CreateClient();
 
-        var response = await client.GetAsync(ApiPath("v2", OrgAndProjectRoute));
+        var response = await client.GetAsync(ApiPath("v2", ProjectTagsRoute));
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -220,21 +232,27 @@ public class ApiVersioningTests : IntegrationTestBase
     [Fact]
     public async Task V1_Returns500AsBareString_NotProblemDetails_WhenUnhandledExceptionThrown()
     {
-        var mockBusiness = new Mock<IPermissionBusiness>();
+        var mockBusiness = new Mock<ITagBusiness>();
         mockBusiness
-            .Setup(b => b.GetAllPermissions(It.IsAny<long?>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
+            .Setup(b => b.GetAllTags(
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<long[]?>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>()))
             .ThrowsAsync(new Exception("db error"));
 
-        using var mockedFactory = WithMockedPermissionBusiness(mockBusiness);
+        using var mockedFactory = WithMockedTagBusiness(mockBusiness);
         using var client = mockedFactory.CreateClient();
 
-        var response = await client.GetAsync(ApiPath("v1", OrgAndProjectRoute));
+        var response = await client.GetAsync(ApiPath("v1", ProjectTagsRoute));
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.NotEqual("application/problem+json", response.Content.Headers.ContentType?.MediaType);
 
         var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("An error occurred while listing permissions", body);
+        Assert.Contains("An error occurred while listing all tags", body);
     }
 
     #endregion
@@ -253,7 +271,7 @@ public class ApiVersioningTests : IntegrationTestBase
     [Fact]
     public async Task V1_ModelValidation400_MatchesFrozenFrameworkDefaultShape()
     {
-        var response = await _client.PostAsync(ApiPath("v1", OrgAndProjectRoute), InvalidCreatePermissionBody());
+        var response = await _client.PostAsync(ApiPath("v1", ProjectTagsRoute), InvalidCreateTagBody());
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -262,14 +280,13 @@ public class ApiVersioningTests : IntegrationTestBase
         Assert.Equal("https://tools.ietf.org/html/rfc9110#section-15.5.1", problem!.Type);
         Assert.Equal("One or more validation errors occurred.", problem.Title);
         Assert.Equal(StatusCodes.Status400BadRequest, problem.Status);
-        Assert.Contains("Name", problem.Errors.Keys);
-        Assert.Contains("Action", problem.Errors.Keys);
+        Assert.Contains("$.name", problem.Errors.Keys);
     }
 
     [Fact]
     public async Task V2_ModelValidation400_UsesUnifiedProblemDetailsEnvelope()
     {
-        var response = await _client.PostAsync(ApiPath("v2", OrgAndProjectRoute), InvalidCreatePermissionBody());
+        var response = await _client.PostAsync(ApiPath("v2", ProjectTagsRoute), InvalidCreateTagBody());
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -280,12 +297,12 @@ public class ApiVersioningTests : IntegrationTestBase
         Assert.Equal(StatusCodes.Status400BadRequest, problem.Status);
     }
 
-    private static StringContent InvalidCreatePermissionBody()
+    private static StringContent InvalidCreateTagBody()
     {
-        // Name and Action are [Required] on CreatePermissionRequestDto - omitting both
-        // triggers [ApiController]'s automatic model-state 400 before the controller
-        // method (and therefore the business layer) ever runs.
-        return new StringContent("{}", Encoding.UTF8, "application/json");
+        // Name is a string on CreateTagRequestDto. Supplying a number triggers
+        // [ApiController]'s automatic model-state 400 before the controller method
+        // (and therefore the business layer) ever runs.
+        return new StringContent("""{"name":123}""", Encoding.UTF8, "application/json");
     }
 
     #endregion
@@ -295,17 +312,17 @@ public class ApiVersioningTests : IntegrationTestBase
     // =========================================================================
 
     /// <summary>
-    ///     Returns a copy of the factory with IPermissionBusiness replaced by the given mock,
+    ///     Returns a copy of the factory with ITagBusiness replaced by the given mock,
     ///     so a test can force a specific exception without needing a real business-layer bug.
     ///     Dispose the returned factory (and any client built from it) when the test is done.
     /// </summary>
-    private WebApplicationFactory<Program> WithMockedPermissionBusiness(Mock<IPermissionBusiness> mockBusiness)
+    private WebApplicationFactory<Program> WithMockedTagBusiness(Mock<ITagBusiness> mockBusiness)
     {
         return _factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<IPermissionBusiness>();
+                services.RemoveAll<ITagBusiness>();
                 services.AddScoped(_ => mockBusiness.Object);
             });
         });
