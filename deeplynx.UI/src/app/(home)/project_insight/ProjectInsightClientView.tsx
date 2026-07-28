@@ -17,7 +17,7 @@ import {
   queueInsightUpload,
   fetchInsightEndpointHealth,
   type InsightEndpointHealthByRole,
-  type InsightModelHealthState,
+  type InsightModelHealthState,  
 } from "@/app/lib/client_service/insight_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
 import {
@@ -85,35 +85,35 @@ export default function ProjectInsightClientView() {
     Record<number, ProjectInsightStatus>
   >({});
   const [endpointHealth, setEndpointHealth] =
-    useState<InsightEndpointHealthByRole>(EMPTY_ENDPOINT_HEALTH);
+      useState<InsightEndpointHealthByRole>(EMPTY_ENDPOINT_HEALTH);
   const isQueryModelUnavailable =
-    endpointHealth.query.response !== null
-      ? !endpointHealth.query.response.reachable ||
-      !endpointHealth.query.response.model_available
-      : Boolean(endpointHealth.query.error);
+      endpointHealth.query.response !== null
+          ? !endpointHealth.query.response.reachable ||
+          !endpointHealth.query.response.model_available
+          : Boolean(endpointHealth.query.error);
   const isUploadModelUnavailable =
-    endpointHealth.upload.response !== null
-      ? !endpointHealth.upload.response.reachable ||
-      !endpointHealth.upload.response.model_available
-      : Boolean(endpointHealth.upload.error);
+      endpointHealth.upload.response !== null
+          ? !endpointHealth.upload.response.reachable ||
+          !endpointHealth.upload.response.model_available
+          : Boolean(endpointHealth.upload.error);
   const isEmbeddingModelUnavailable =
-    endpointHealth.embedding.response !== null
-      ? !endpointHealth.embedding.response.reachable ||
-      !endpointHealth.embedding.response.model_available
-      : Boolean(endpointHealth.embedding.error);
+      endpointHealth.embedding.response !== null
+          ? !endpointHealth.embedding.response.reachable ||
+          !endpointHealth.embedding.response.model_available
+          : Boolean(endpointHealth.embedding.error);
   const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
-  const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;
+  const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;  
   const pollingKey = useMemo(
-    () =>
-      Object.entries(statusMap)
-        .filter(
-          ([, status]) =>
-            status.state === "queued" || status.state === "processing",
-        )
-        .map(([recordId]) => Number(recordId))
-        .sort((a, b) => a - b)
-        .join(","),
-    [statusMap],
+      () =>
+          Object.entries(statusMap)
+              .filter(
+                  ([, status]) =>
+                      status.state === "queued" || status.state === "processing",
+              )
+              .map(([recordId]) => Number(recordId))
+              .sort((a, b) => a - b)
+              .join(","),
+      [statusMap],
   );
   const [isLoadingRecords, setIsLoadingRecords] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
@@ -128,10 +128,10 @@ export default function ProjectInsightClientView() {
 
   useEffect(() => {
     if (
-      !hasProjectLoaded ||
-      !hasOrganizationLoaded ||
-      !organizationId ||
-      !projectId
+        !hasProjectLoaded ||
+        !hasOrganizationLoaded ||
+        !organizationId ||
+        !projectId
     ) {
       setEndpointHealth(EMPTY_ENDPOINT_HEALTH);
       return;
@@ -147,77 +147,77 @@ export default function ProjectInsightClientView() {
       });
 
       const [queryHealth, uploadHealth, embeddingHealth] =
-        await Promise.allSettled([
-          fetchInsightEndpointHealth({
-            organizationId: organizationId!,
-            projectId: projectId!,
-            modelConfigId: selectedInsightModels.queryModelConfigId,
-            modelType: "llm",
-          }),
-          fetchInsightEndpointHealth({
-            organizationId: organizationId!,
-            projectId: projectId!,
-            modelConfigId: selectedInsightModels.uploadModelConfigId,
-            modelType: "vlm",
-          }),
-          fetchInsightEndpointHealth({
-            organizationId: organizationId!,
-            projectId: projectId!,
-            modelConfigId: selectedInsightModels.embeddingModelConfigId,
-            modelType: "embedding",
-          }),
-        ]);
+          await Promise.allSettled([
+            fetchInsightEndpointHealth({
+              organizationId: organizationId!,
+              projectId: projectId!,
+              modelConfigId: selectedInsightModels.queryModelConfigId,
+              modelType: "llm",
+            }),
+            fetchInsightEndpointHealth({
+              organizationId: organizationId!,
+              projectId: projectId!,
+              modelConfigId: selectedInsightModels.uploadModelConfigId,
+              modelType: "vlm",
+            }),
+            fetchInsightEndpointHealth({
+              organizationId: organizationId!,
+              projectId: projectId!,
+              modelConfigId: selectedInsightModels.embeddingModelConfigId,
+              modelType: "embedding",
+            }),
+          ]);
 
       if (cancelled) return;
 
       setEndpointHealth({
         query:
-          queryHealth.status === "fulfilled"
-            ? {
-              isChecking: false,
-              response: queryHealth.value,
-              error: null,
-            }
-            : {
-              isChecking: false,
-              response: null,
-              error:
-                queryHealth.reason instanceof Error
-                  ? queryHealth.reason.message
-                  : "Query model health check failed",
-            },
+            queryHealth.status === "fulfilled"
+                ? {
+                  isChecking: false,
+                  response: queryHealth.value,
+                  error: null,
+                }
+                : {
+                  isChecking: false,
+                  response: null,
+                  error:
+                      queryHealth.reason instanceof Error
+                          ? queryHealth.reason.message
+                          : "Query model health check failed",
+                },
 
         upload:
-          uploadHealth.status === "fulfilled"
-            ? {
-              isChecking: false,
-              response: uploadHealth.value,
-              error: null,
-            }
-            : {
-              isChecking: false,
-              response: null,
-              error:
-                uploadHealth.reason instanceof Error
-                  ? uploadHealth.reason.message
-                  : "Upload/OCR model health check failed",
-            },
+            uploadHealth.status === "fulfilled"
+                ? {
+                  isChecking: false,
+                  response: uploadHealth.value,
+                  error: null,
+                }
+                : {
+                  isChecking: false,
+                  response: null,
+                  error:
+                      uploadHealth.reason instanceof Error
+                          ? uploadHealth.reason.message
+                          : "Upload/OCR model health check failed",
+                },
 
         embedding:
-          embeddingHealth.status === "fulfilled"
-            ? {
-              isChecking: false,
-              response: embeddingHealth.value,
-              error: null,
-            }
-            : {
-              isChecking: false,
-              response: null,
-              error:
-                embeddingHealth.reason instanceof Error
-                  ? embeddingHealth.reason.message
-                  : "Embedding model health check failed",
-            },
+            embeddingHealth.status === "fulfilled"
+                ? {
+                  isChecking: false,
+                  response: embeddingHealth.value,
+                  error: null,
+                }
+                : {
+                  isChecking: false,
+                  response: null,
+                  error:
+                      embeddingHealth.reason instanceof Error
+                          ? embeddingHealth.reason.message
+                          : "Embedding model health check failed",
+                },
       });
     }
 
@@ -235,7 +235,7 @@ export default function ProjectInsightClientView() {
     selectedInsightModels.uploadModelConfigId,
     selectedInsightModels.embeddingModelConfigId,
   ]);
-
+  
   const selectedPendingIdsLength = selectedPendingIds.size;
 
   // Effects
@@ -253,9 +253,9 @@ export default function ProjectInsightClientView() {
 
     const [classDtos, dataSourceDtos, tagDtos] =
       await Promise.all([
-        getAllClasses(organizationId as number, projectId, true),
-        getAllDataSources(organizationId as number, projectId, true),
-        getAllTags(organizationId as number, projectId, true),
+        getAllClasses(projectId, true),
+        getAllDataSources(projectId, true),
+        getAllTags(projectId, true),
       ]);
 
     setClasses(classDtos);
@@ -297,7 +297,7 @@ export default function ProjectInsightClientView() {
   } = useRecordSearchPaginated(pageSize, "pending", classes, sources);
 
   useEffect(() => {
-    setStatusMap({ ...embeddedStatus, ...pendingStatus });
+    setStatusMap({...embeddedStatus, ...pendingStatus});
   }, [embeddedStatus, pendingStatus]);
 
   // Tab state helpers
@@ -314,8 +314,8 @@ export default function ProjectInsightClientView() {
 
   function retryRecordSearch() {
     // Hacky solution that refreshes the search because the filters have "changed"
-    setLibraryState((state) => ({ ...state }));
-    setPendingState((state) => ({ ...state }));
+    setLibraryState((state) => ({...state}));
+    setPendingState((state) => ({...state}));
   }
 
   useEffect(() => {
@@ -338,10 +338,10 @@ export default function ProjectInsightClientView() {
               recordId,
               ingestionStatus.indexed
                 ? {
-                  state: "embedded",
-                  chunkCount: ingestionStatus.chunk_count,
-                  pageCount: ingestionStatus.page_count,
-                }
+                    state: "embedded",
+                    chunkCount: ingestionStatus.chunk_count,
+                    pageCount: ingestionStatus.page_count,
+                  }
                 : { state: "processing" },
             ] as const;
           } catch (error) {
@@ -359,9 +359,9 @@ export default function ProjectInsightClientView() {
           const oldStatus = current[recordId];
 
           const changed =
-            oldStatus?.state !== newStatus.state ||
-            oldStatus?.chunkCount !== newStatus.chunkCount ||
-            oldStatus?.pageCount !== newStatus.pageCount;
+              oldStatus?.state !== newStatus.state ||
+              oldStatus?.chunkCount !== newStatus.chunkCount ||
+              oldStatus?.pageCount !== newStatus.pageCount;
 
           if (!changed) continue;
 
@@ -374,7 +374,7 @@ export default function ProjectInsightClientView() {
 
         return next ?? current;
       });
-
+        
     };
 
     void pollStatuses();
@@ -517,17 +517,17 @@ export default function ProjectInsightClientView() {
       ? t.translations.PROJECT_INSIGHT_SEARCHING
       : embeddedTotal
         ? withTokens(t.translations.PROJECT_INSIGHT_SEARCH_RESULTS, {
-          count: embeddedTotal,
-          query: libraryState.searchQuery.trim(),
-        })
+            count: embeddedTotal,
+            query: libraryState.searchQuery.trim(),
+          })
         : withTokens(t.translations.PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY, {
-          query: libraryState.searchQuery.trim(),
-        })
+            query: libraryState.searchQuery.trim(),
+          })
     : t.translations.PROJECT_INSIGHT_LIBRARY_DESCRIPTION;
   const pendingSearchSummary = normalizedPendingSearchQuery
     ? withTokens(t.translations.PROJECT_INSIGHT_PENDING_SEARCH_RESULTS, {
-      count: pendingTotal,
-    })
+        count: pendingTotal,
+      })
     : t.translations.PROJECT_INSIGHT_PENDING_DESCRIPTION;
   const activeContextTitle =
     activeTabKey === "library"
@@ -670,19 +670,19 @@ export default function ProjectInsightClientView() {
                 </h1>
                 <BetaBadge size="sm" />
                 {isQueryModelUnavailable && (
-                  <span className="badge badge-warning badge-sm">
-                    Query model unavailable
-                  </span>
+                    <span className="badge badge-warning badge-sm">
+                      Query model unavailable
+                    </span>
                 )}
                 {isUploadModelUnavailable && (
-                  <span className="badge badge-warning badge-sm">
-                    Upload/OCR model unavailable
-                  </span>
+                    <span className="badge badge-warning badge-sm">
+                      Upload/OCR model unavailable
+                    </span>
                 )}
                 {isEmbeddingModelUnavailable && (
-                  <span className="badge badge-warning badge-sm">
-                    Embedding model unavailable
-                  </span>
+                    <span className="badge badge-warning badge-sm">
+                      Embedding model unavailable
+                    </span>
                 )}
               </div>
               <p className="mt-3 text-base-content/70">
@@ -735,10 +735,11 @@ export default function ProjectInsightClientView() {
               <div className="inline-flex w-fit rounded-full border border-base-300/60 bg-base-200/60 p-1">
                 <button
                   type="button"
-                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${activeTabKey === "library"
-                    ? "bg-base-100 text-base-content shadow-sm"
-                    : "text-base-content/70 hover:text-base-content"
-                    }`}
+                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                    activeTabKey === "library"
+                      ? "bg-base-100 text-base-content shadow-sm"
+                      : "text-base-content/70 hover:text-base-content"
+                  }`}
                   onClick={() => setActiveTabKey("library")}
                 >
                   {tabLabels.library}
@@ -748,10 +749,11 @@ export default function ProjectInsightClientView() {
                 </button>
                 <button
                   type="button"
-                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${activeTabKey === "pending"
-                    ? "bg-base-100 text-base-content shadow-sm"
-                    : "text-base-content/70 hover:text-base-content"
-                    }`}
+                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                    activeTabKey === "pending"
+                      ? "bg-base-100 text-base-content shadow-sm"
+                      : "text-base-content/70 hover:text-base-content"
+                  }`}
                   onClick={() => setActiveTabKey("pending")}
                 >
                   {tabLabels.pending}
@@ -790,30 +792,30 @@ export default function ProjectInsightClientView() {
                   </div>
 
                   {(activeFilterPills.length !== 0 || activeSearchError) &&
-                    <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-3">
                       {activeFilterPills.length === 0 ?
-                        null : (
-                          <div className="flex flex-wrap items-center gap-2">
-                            {activeFilterPills.map((pill) => (
-                              <button
-                                key={pill.id}
-                                type="button"
-                                className="btn btn-xs btn-outline gap-1"
-                                onClick={() => removeActiveFilterPill(pill)}
-                              >
-                                {pill.label}
-                                <XMarkIcon className="size-3.5" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                      {activeSearchError && (
-                        <span className="text-sm text-warning">
-                          {activeSearchError}
-                        </span>
+                      null : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {activeFilterPills.map((pill) => (
+                            <button
+                              key={pill.id}
+                              type="button"
+                              className="btn btn-xs btn-outline gap-1"
+                              onClick={() => removeActiveFilterPill(pill)}
+                            >
+                              {pill.label}
+                              <XMarkIcon className="size-3.5" />
+                            </button>
+                          ))}
+                        </div>
                       )}
-                    </div>}
+
+                    {activeSearchError && (
+                      <span className="text-sm text-warning">
+                        {activeSearchError}
+                      </span>
+                    )}
+                  </div>}
                 </div>
               </div>
 

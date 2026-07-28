@@ -152,7 +152,7 @@ export default function UploadCenterClient() {
 
     (async () => {
       try {
-        const classes = await getAllClasses(organizationId as number, Number(projectId), true);
+        const classes = await getAllClasses(Number(projectId), true);
         if (cancelled) return;
         setAvailableClasses(classes);
       } catch (error) {
@@ -818,7 +818,6 @@ export default function UploadCenterClient() {
                         onClear={fileUploadState.clearAll}
                         onRemoveAt={fileUploadState.removeAt}
                         projectId={Number(projectId)}
-                        organizationId={organizationId as number}
                       />
                     ) : (
                       <BulkUploadSection

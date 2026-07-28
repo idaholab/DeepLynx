@@ -190,7 +190,7 @@ const DataSources = ({ projectId }: Props) => {
 
     try {
       const [dataSourceList, projectStats, keys] = await Promise.all([
-        getAllDataSources(organization?.organizationId as number, projectId, hideArchived),
+        getAllDataSources(projectId, hideArchived),
         getProjectStats(
           organization?.organizationId as number,
           projectId
@@ -293,7 +293,7 @@ const DataSources = ({ projectId }: Props) => {
   const onArchiveToggle = async (s: DataSourceResponseDto) => {
     setSaving(true);
     try {
-      await archiveDataSource(organization?.organizationId as number, projectId, Number(s.id), !s.isArchived);
+      await archiveDataSource(projectId, Number(s.id), !s.isArchived);
       await fetchAll();
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "Operation failed.";
@@ -306,7 +306,7 @@ const DataSources = ({ projectId }: Props) => {
   const onSetDefault = async (id: number) => {
     setSaving(true);
     try {
-      await setDefaultDataSource(organization?.organizationId as number, projectId, id);
+      await setDefaultDataSource(projectId, id);
       await fetchAll();
     } catch (e) {
       const errorMessage =
@@ -327,7 +327,7 @@ const DataSources = ({ projectId }: Props) => {
     setError(null);
 
     try {
-      await createDataSource(organization?.organizationId as number, projectId, createForm);
+      await createDataSource(projectId, createForm);
 
       setShowCreate(false);
       setCreateForm({
@@ -416,7 +416,6 @@ const DataSources = ({ projectId }: Props) => {
         copiedKey={copiedKey}
         expandedSource={expandedSource}
         projectId={projectId}
-        organizationId={organization?.organizationId as number}
         onArchiveToggle={onArchiveToggle}
         onSetDefault={onSetDefault}
         onToggleExpand={toggleExpand}

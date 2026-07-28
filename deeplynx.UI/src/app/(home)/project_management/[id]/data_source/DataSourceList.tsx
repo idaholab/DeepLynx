@@ -14,7 +14,6 @@ type ListProps = {
   copiedKey: string | null;
   expandedSource: number | null;
   projectId: number;
-  organizationId: number;
   onArchiveToggle: (s: ExtendedDataSource) => Promise<void>;
   onSetDefault: (id: number) => Promise<void>;
   onToggleExpand: (id: number) => void;
@@ -34,7 +33,6 @@ const DataSourceList = ({
   copiedKey,
   expandedSource,
   projectId,
-  organizationId,
   onArchiveToggle,
   onSetDefault,
   onToggleExpand,
@@ -87,7 +85,6 @@ const DataSourceList = ({
             showKey={showKey}
             copiedKey={copiedKey}
             expanded={expandedSource === idNum}
-            organizationId={organizationId}
             onToggleExpand={onToggleExpand}
             onArchiveToggle={onArchiveToggle}
             onSetDefault={onSetDefault}

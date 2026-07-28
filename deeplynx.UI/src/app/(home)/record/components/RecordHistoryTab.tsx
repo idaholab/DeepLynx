@@ -188,7 +188,7 @@ export default function RecordHistoryTab({
 
     const loadClasses = async () => {
       try {
-        const classData = await getAllClasses(organizationId, projectId, false);
+        const classData = await getAllClasses(projectId, false);
         if (cancelled) return;
 
         setClasses(classData);

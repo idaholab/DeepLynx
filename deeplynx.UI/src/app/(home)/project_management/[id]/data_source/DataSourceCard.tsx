@@ -29,7 +29,6 @@ type CardProps = {
   showKey: Record<string, boolean>;
   copiedKey: string | null;
   expanded: boolean;
-  organizationId: number;
   onToggleExpand: (id: number) => void;
   onArchiveToggle: (s: ExtendedDataSource) => Promise<void>;
   onSetDefault: (id: number) => Promise<void>;
@@ -48,7 +47,6 @@ const DataSourceCard = ({
   showKey,
   copiedKey,
   expanded,
-  organizationId,
   onToggleExpand,
   onArchiveToggle,
   onSetDefault,
@@ -176,7 +174,6 @@ const DataSourceCard = ({
             onClose={() => onToggleExpand(idNum)}
             onSaved={onDetailsSaved}
             setError={setError}
-            organizationId={organizationId}
           />
         )}
 

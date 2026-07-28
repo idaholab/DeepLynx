@@ -135,7 +135,6 @@ export default function AddEdgeModal({
   relationship,
   direction,
   projectId,
-  organizationId,
   onSearchRecords,
   onCreateRelationships,
 }: AddEdgeModalProps) {
@@ -195,7 +194,7 @@ export default function AddEdgeModal({
 
       try {
         setIsLoadingRelationships(true);
-        const data = await getAllRelationships(organizationId, projectId, true);
+        const data = await getAllRelationships(projectId, true);
 
         if (cancelled) return;
 
@@ -353,20 +352,22 @@ export default function AddEdgeModal({
                   <div className="flex gap-2">
                     <button
                       onClick={() => setSelectedDirection("outgoing")}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${selectedDirection === "outgoing"
-                        ? "bg-blue-600 text-white"
-                        : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-                        }`}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selectedDirection === "outgoing"
+                          ? "bg-blue-600 text-white"
+                          : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                      }`}
                     >
                       <ArrowRightIcon className="h-4 w-4 inline mr-1" />
                       {t.translations.OUTGOING}
                     </button>
                     <button
                       onClick={() => setSelectedDirection("incoming")}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${selectedDirection === "incoming"
-                        ? "bg-blue-600 text-white"
-                        : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-                        }`}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selectedDirection === "incoming"
+                          ? "bg-blue-600 text-white"
+                          : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                      }`}
                     >
                       <ArrowLeftIcon className="h-4 w-4 inline mr-1" />
                       {t.translations.INCOMING}
@@ -513,8 +514,9 @@ export default function AddEdgeModal({
                           <button
                             key={record.id}
                             onClick={() => handleToggleRecord(record)}
-                            className={`w-full text-left p-3 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-colors ${selected ? "bg-blue-50" : ""
-                              }`}
+                            className={`w-full text-left p-3 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-colors ${
+                              selected ? "bg-blue-50" : ""
+                            }`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">

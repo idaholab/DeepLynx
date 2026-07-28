@@ -50,7 +50,7 @@ export function useNewCollectionWorkflow({
     labelsLoading,
     availableTags,
     tagsLoading,
-  } = useProjectCollectionOptions(projectId, organizationId);
+  } = useProjectCollectionOptions(projectId);
   const [saving, setSaving] = useState(false);
   const [newCollectionStep, setNewCollectionStep] =
     useState<NewCollectionStep>("Records");
@@ -350,7 +350,7 @@ export function useNewCollectionWorkflow({
 
     setNewCollectionLabelCreating(true);
     try {
-      const createdLabel = await createSensitivityLabelProject(organizationId, projectId, {
+      const createdLabel = await createSensitivityLabelProject(projectId, {
         name: trimmed,
         description: "",
       });

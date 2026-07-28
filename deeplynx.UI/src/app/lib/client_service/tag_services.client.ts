@@ -9,20 +9,18 @@ import { CreateTagRequestDto, UpdateTagRequestDto } from '../../(home)/types/req
 // ============================================================================
 
 /**
- * Get all tags for a project within an organization
- * @param organizationId - The ID of the organization
+ * Get all tags for a project
  * @param projectId - The ID of the project
  * @param hideArchived - Flag to hide archived tags (default: true)
  * @returns Promise with array of TagResponseDto
  */
 export const getAllTags = async (
-  organizationId: number,
   projectId: number,
   hideArchived: boolean = true
 ): Promise<TagResponseDto[]> => {
   try {
     const res = await api.get(
-      `/organizations/${organizationId}/projects/${projectId}/tags`,
+      `/projects/${projectId}/tags`,
       { params: { hideArchived } }
     );
     return res.data;
@@ -33,22 +31,20 @@ export const getAllTags = async (
 };
 
 /**
- * Get a specific tag within an organization and project
- * @param organizationId - The ID of the organization
+ * Get a specific tag
  * @param projectId - The ID of the project
  * @param tagId - The ID of the tag
  * @param hideArchived - Flag to hide archived tags (default: true)
  * @returns Promise with TagResponseDto
  */
 export const getTag = async (
-  organizationId: number,
   projectId: number,
   tagId: number,
   hideArchived: boolean = true
 ): Promise<TagResponseDto> => {
   try {
     const res = await api.get(
-      `/organizations/${organizationId}/projects/${projectId}/tags/${tagId}`,
+      `/projects/${projectId}/tags/${tagId}`,
       { params: { hideArchived } }
     );
     return res.data;
@@ -59,20 +55,18 @@ export const getTag = async (
 };
 
 /**
- * Create a new tag within an organization and project
- * @param organizationId - The ID of the organization
+ * Create a new tag
  * @param projectId - The ID of the project
  * @param dto - The tag creation request DTO
  * @returns Promise with TagResponseDto
  */
 export const createTag = async (
-  organizationId: number,
   projectId: number,
   dto: CreateTagRequestDto
 ): Promise<TagResponseDto> => {
   try {
     const res = await api.post(
-      `/organizations/${organizationId}/projects/${projectId}/tags`,
+      `/projects/${projectId}/tags`,
       dto
     );
     return res.data;
@@ -83,20 +77,18 @@ export const createTag = async (
 };
 
 /**
- * Bulk create tags within an organization and project
- * @param organizationId - The ID of the organization
+ * Bulk create tags
  * @param projectId - The ID of the project
  * @param tags - Array of tag creation request DTOs
  * @returns Promise with array of TagResponseDto
  */
 export const bulkCreateTags = async (
-  organizationId: number,
   projectId: number,
   tags: CreateTagRequestDto[]
 ): Promise<TagResponseDto[]> => {
   try {
     const res = await api.post(
-      `/organizations/${organizationId}/projects/${projectId}/tags/bulk`,
+      `/projects/${projectId}/tags/bulk`,
       tags
     );
     return res.data;
@@ -107,22 +99,20 @@ export const bulkCreateTags = async (
 };
 
 /**
- * Update a tag within an organization and project
- * @param organizationId - The ID of the organization
+ * Update a tag
  * @param projectId - The ID of the project
  * @param tagId - The ID of the tag to update
  * @param dto - The tag update request DTO
  * @returns Promise with TagResponseDto
  */
 export const updateTag = async (
-  organizationId: number,
   projectId: number,
   tagId: number,
   dto: UpdateTagRequestDto
 ): Promise<TagResponseDto> => {
   try {
     const res = await api.put(
-      `/organizations/${organizationId}/projects/${projectId}/tags/${tagId}`,
+      `/projects/${projectId}/tags/${tagId}`,
       dto
     );
     return res.data;
@@ -133,20 +123,18 @@ export const updateTag = async (
 };
 
 /**
- * Delete a tag within an organization and project
- * @param organizationId - The ID of the organization
+ * Delete a tag
  * @param projectId - The ID of the project
  * @param tagId - The ID of the tag to delete
  * @returns Promise with success message
  */
 export const deleteTag = async (
-  organizationId: number,
   projectId: number,
   tagId: number
 ): Promise<{ message: string }> => {
   try {
     const res = await api.delete(
-      `/organizations/${organizationId}/projects/${projectId}/tags/${tagId}`
+      `/projects/${projectId}/tags/${tagId}`
     );
     return res.data;
   } catch (error) {
@@ -156,22 +144,20 @@ export const deleteTag = async (
 };
 
 /**
- * Archive or unarchive a tag within an organization and project
- * @param organizationId - The ID of the organization
+ * Archive or unarchive a tag
  * @param projectId - The ID of the project
  * @param tagId - The ID of the tag to archive/unarchive
  * @param archive - True to archive, false to unarchive
  * @returns Promise with success message
  */
 export const archiveTag = async (
-  organizationId: number,
   projectId: number,
   tagId: number,
   archive: boolean
 ): Promise<{ message: string }> => {
   try {
     const res = await api.patch(
-      `/organizations/${organizationId}/projects/${projectId}/tags/${tagId}`,
+      `/projects/${projectId}/tags/${tagId}`,
       null,
       { params: { archive } }
     );

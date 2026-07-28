@@ -18,7 +18,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [ApiVersion(1)]
 [ApiVersion(2)]
-[Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
+[Route("projects/{projectId:long}/classes")]
 [Authorize]
 [Tags("Project - Class")]
 public class ClassProjectController : ControllerBase

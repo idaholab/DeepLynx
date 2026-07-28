@@ -78,7 +78,6 @@ const AddTagModal: React.FC<Props> = ({
 
     try {
       const newTag = await createTag(
-        organization.organizationId as number,
         projectId,
         payload
       );

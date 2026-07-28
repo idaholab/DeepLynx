@@ -52,7 +52,7 @@ const AddLabelModal: React.FC<Props> = ({
     }
 
     try {
-      const newLabel = await createSensitivityLabelProject(organization.organizationId as number, projectId, {
+      const newLabel = await createSensitivityLabelProject(projectId, {
         name,
         description: description.trim() || null,
       });

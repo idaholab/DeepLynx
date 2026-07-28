@@ -268,7 +268,6 @@ const AddRecordModal: React.FC<Props> = ({
         setSelectedDataSourceId(undefined);
 
         const list = await getAllDataSources(
-          organization?.organizationId as number,
           selectedProjectId
         );
 

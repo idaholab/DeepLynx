@@ -9,7 +9,7 @@ using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
-[Route("organizations/{organizationId:long}/projects/{projectId:long}/tags")]
+[Route("projects/{projectId:long}/tags")]
 [ApiController]
 [ApiVersion(1)]
 [ApiVersion(2)]

@@ -43,7 +43,6 @@ interface NewFileUploadCardProps {
   isLoadingClasses: boolean;
   onSearchFiles: (query: string) => Promise<ExistingFile[]>;
   projectId: number;
-  organizationId: number;
   uploadError?: string;
 }
 
@@ -58,7 +57,6 @@ export default function NewFileUploadCard({
   isLoadingClasses,
   onSearchFiles,
   projectId,
-  organizationId,
   uploadError,
 }: NewFileUploadCardProps) {
   const { t } = useLanguage();
@@ -153,7 +151,7 @@ export default function NewFileUploadCard({
 
       if (metadata.ClassId != null) {
         try {
-          await getClass(organizationId, Number(projectId), metadata.ClassId, true);
+          await getClass(Number(projectId), metadata.ClassId, true);
         } catch (error) {
           clearMetadataFile();
           setMetadataPreviewError(

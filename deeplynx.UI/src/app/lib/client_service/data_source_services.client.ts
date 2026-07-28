@@ -12,22 +12,19 @@ import type {
 // ============================================================================
 
 /**
- * Get all data sources for a project within an organization
- * @param organizationId - The ID of the organization
+ * Get all data sources for a project
  * @param projectId - The ID of the project
  * @param hideArchived - Flag to hide archived data sources (default: true)
  * @returns Promise with array of DataSourceResponseDto
  */
 export const getAllDataSources = async (
-  organizationId: number,
   projectId: number,
   hideArchived: boolean = true
 ): Promise<DataSourceResponseDto[]> => {
   try {
-    const res = await api.get(
-      `/organizations/${organizationId}/projects/${projectId}/datasources`,
-      { params: { hideArchived } }
-    );
+    const res = await api.get(`/projects/${projectId}/datasources`, {
+      params: { hideArchived },
+    });
     return res.data;
   } catch (error) {
     console.error("Error getting all data sources:", error);
@@ -36,22 +33,20 @@ export const getAllDataSources = async (
 };
 
 /**
- * Get a specific data source within an organization and project
- * @param organizationId - The ID of the organization
+ * Get a specific data source
  * @param projectId - The ID of the project
  * @param dataSourceId - The ID of the data source
  * @param hideArchived - Flag to hide archived data sources (default: true)
  * @returns Promise with DataSourceResponseDto
  */
 export const getDataSource = async (
-  organizationId: number,
   projectId: number,
   dataSourceId: number,
   hideArchived: boolean = true
 ): Promise<DataSourceResponseDto> => {
   try {
     const res = await api.get(
-      `/organizations/${organizationId}/projects/${projectId}/datasources/${dataSourceId}`,
+      `/projects/${projectId}/datasources/${dataSourceId}`,
       { params: { hideArchived } }
     );
     return res.data;
@@ -62,19 +57,17 @@ export const getDataSource = async (
 };
 
 /**
- * Get default data source for a project within an organization
- * @param organizationId - The ID of the organization
+ * Get default data source for a project
  * @param projectId - The ID of the project
  * @returns Promise with DataSourceResponseDto
+ *
+ * GET /projects/{projectId}/datasources/default
  */
 export const getDefaultDataSource = async (
-  organizationId: number,
   projectId: number
 ): Promise<DataSourceResponseDto> => {
   try {
-    const res = await api.get(
-      `/organizations/${organizationId}/projects/${projectId}/datasources/default`
-    );
+    const res = await api.get(`/projects/${projectId}/datasources/default`);
     return res.data;
   } catch (error) {
     console.error("Error getting default data source:", error);
@@ -83,22 +76,17 @@ export const getDefaultDataSource = async (
 };
 
 /**
- * Create a new data source within an organization and project
- * @param organizationId - The ID of the organization
+ * Create a new data source
  * @param projectId - The ID of the project
  * @param dto - The data source creation request DTO
  * @returns Promise with DataSourceResponseDto
  */
 export const createDataSource = async (
-  organizationId: number,
   projectId: number,
   dto: CreateDataSourceRequestDto
 ): Promise<DataSourceResponseDto> => {
   try {
-    const res = await api.post(
-      `/organizations/${organizationId}/projects/${projectId}/datasources`,
-      dto
-    );
+    const res = await api.post(`/projects/${projectId}/datasources`, dto);
     return res.data;
   } catch (error) {
     console.error("Error creating data source:", error);
@@ -107,22 +95,22 @@ export const createDataSource = async (
 };
 
 /**
- * Update a data source within an organization and project
- * @param organizationId - The ID of the organization
+ * Update a data source
  * @param projectId - The ID of the project
  * @param dataSourceId - The ID of the data source to update
  * @param dto - The data source update request DTO
  * @returns Promise with DataSourceResponseDto
+ *
+ * PUT /projects/{projectId}/datasources/{dataSourceId}
  */
 export const updateDataSource = async (
-  organizationId: number,
   projectId: number,
   dataSourceId: number,
   dto: UpdateDataSourceRequestDto
 ): Promise<DataSourceResponseDto> => {
   try {
     const res = await api.put(
-      `/organizations/${organizationId}/projects/${projectId}/datasources/${dataSourceId}`,
+      `/projects/${projectId}/datasources/${dataSourceId}`,
       dto
     );
     return res.data;
@@ -133,20 +121,18 @@ export const updateDataSource = async (
 };
 
 /**
- * Delete a data source within an organization and project
- * @param organizationId - The ID of the organization
+ * Delete a data source
  * @param projectId - The ID of the project
  * @param dataSourceId - The ID of the data source to delete
  * @returns Promise with success message
  */
 export const deleteDataSource = async (
-  organizationId: number,
   projectId: number,
   dataSourceId: number
 ): Promise<{ message: string }> => {
   try {
     const res = await api.delete(
-      `/organizations/${organizationId}/projects/${projectId}/datasources/${dataSourceId}`
+      `/projects/${projectId}/datasources/${dataSourceId}`
     );
     return res.data;
   } catch (error) {
@@ -156,29 +142,29 @@ export const deleteDataSource = async (
 };
 
 /**
- * Archive or unarchive a data source within an organization and project
- * @param organizationId - The ID of the organization
+ * Archive or unarchive a data source
  * @param projectId - The ID of the project
  * @param dataSourceId - The ID of the data source to archive/unarchive
  * @param archive - True to archive, false to unarchive
  * @returns Promise with success message
  */
 export const archiveDataSource = async (
-  organizationId: number,
   projectId: number,
   dataSourceId: number,
   archive: boolean
 ): Promise<{ message: string }> => {
   try {
     const res = await api.patch(
-      `/organizations/${organizationId}/projects/${projectId}/datasources/${dataSourceId}`,
+      `/projects/${projectId}/datasources/${dataSourceId}`,
       null,
       { params: { archive } }
     );
     return res.data;
   } catch (error) {
     console.error(
-      `Error ${archive ? "archiving" : "unarchiving"} data source ${dataSourceId}:`,
+      `Error ${
+        archive ? "archiving" : "unarchiving"
+      } data source ${dataSourceId}:`,
       error
     );
     throw error;
@@ -186,22 +172,22 @@ export const archiveDataSource = async (
 };
 
 /**
- * Set default data source for a project within an organization
- * @param organizationId - The ID of the organization
+ * Set default data source for a project
  * @param projectId - The ID of the project
  * @param dataSourceId - The ID of the data source to set as default
  * @param isDefault - True to set as default, false to unset (default: true)
  * @returns Promise with DataSourceResponseDto
+ *
+ * PATCH /projects/{projectId}/datasources/{dataSourceId}/default?isDefault=true|false
  */
 export const setDefaultDataSource = async (
-  organizationId: number,
   projectId: number,
   dataSourceId: number,
   isDefault: boolean = true
 ): Promise<DataSourceResponseDto> => {
   try {
     const res = await api.patch(
-      `/organizations/${organizationId}/projects/${projectId}/datasources/${dataSourceId}/default`,
+      `/projects/${projectId}/datasources/${dataSourceId}/default`,
       null,
       { params: { isDefault } }
     );
@@ -238,7 +224,8 @@ export const getRecordCountForDataSource = async (
     return res.data as number | null;
   } catch (error) {
     console.error(
-      `Error getting record count for project ${projectId}${dataSourceId ? ` and data source ${dataSourceId}` : ""
+      `Error getting record count for project ${projectId}${
+        dataSourceId ? ` and data source ${dataSourceId}` : ""
       }:`,
       error
     );
@@ -393,7 +380,8 @@ export const archiveDataSourceOrg = async (
     return res.data;
   } catch (error) {
     console.error(
-      `Error ${archive ? "archiving" : "unarchiving"
+      `Error ${
+        archive ? "archiving" : "unarchiving"
       } data source ${dataSourceId} for organization:`,
       error
     );

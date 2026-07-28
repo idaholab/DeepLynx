@@ -153,7 +153,6 @@ export default function ProjectDetailClient({
               </div>
 
               <RecentRecordsCard
-                organizationId={project.organizationId as number}
                 selectedProjects={[projectId]}
                 border={false}
               />

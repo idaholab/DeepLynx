@@ -18,7 +18,7 @@ namespace deeplynx.api.Controllers;
 [ApiController]
 [ApiVersion(1)]
 [ApiVersion(2)]
-[Route("organizations/{organizationId:long}/projects/{projectId:long}/relationships")]
+[Route("projects/{projectId:long}/relationships")]
 [Authorize]
 [Tags("Project - Relationship")]
 public class RelationshipProjectController : ControllerBase
@@ -80,10 +80,10 @@ public class RelationshipProjectController : ControllerBase
         long projectId,
         [FromQuery] bool hideArchived = true)
     {
-        var organizationId = UserContextStorage.OrganizationId;
-        var relationships =
-            await _relationshipBusiness.GetAllRelationships(organizationId, [projectId], hideArchived);
-        return Ok(relationships);
+            var organizationId = UserContextStorage.OrganizationId;
+            var relationships =
+                await _relationshipBusiness.GetAllRelationships(organizationId, [projectId], hideArchived);
+            return Ok(relationships);
     }
 
     /// <summary>
@@ -136,10 +136,10 @@ public class RelationshipProjectController : ControllerBase
         long relationshipId,
         [FromQuery] bool hideArchived = true)
     {
-        var organizationId = UserContextStorage.OrganizationId;
-        var relationship =
-            await _relationshipBusiness.GetRelationship(organizationId, projectId, relationshipId, hideArchived);
-        return Ok(relationship);
+            var organizationId = UserContextStorage.OrganizationId;
+            var relationship =
+                await _relationshipBusiness.GetRelationship(organizationId, projectId, relationshipId, hideArchived);
+            return Ok(relationship);
     }
 
     /// <summary>
@@ -184,10 +184,10 @@ public class RelationshipProjectController : ControllerBase
         long projectId,
         [FromBody] CreateRelationshipRequestDto dto)
     {
-        var organizationId = UserContextStorage.OrganizationId;
-        var currentUserId = UserContextStorage.UserId;
-        var created = await _relationshipBusiness.CreateRelationship(currentUserId, organizationId, projectId, dto);
-        return Ok(created);
+            var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
+            var created = await _relationshipBusiness.CreateRelationship(currentUserId, organizationId, projectId, dto);
+            return Ok(created);
     }
 
     /// <summary>
@@ -234,12 +234,12 @@ public class RelationshipProjectController : ControllerBase
         long projectId,
         [FromBody] List<CreateRelationshipRequestDto> relationships)
     {
-        var organizationId = UserContextStorage.OrganizationId;
-        var currentUserId = UserContextStorage.UserId;
-        var created =
-            await _relationshipBusiness.BulkCreateRelationships(currentUserId, organizationId, projectId,
-                relationships);
-        return Ok(created);
+            var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
+            var created =
+                await _relationshipBusiness.BulkCreateRelationships(currentUserId, organizationId, projectId,
+                    relationships);
+            return Ok(created);
     }
 
     /// <summary>
@@ -290,12 +290,12 @@ public class RelationshipProjectController : ControllerBase
         long relationshipId,
         [FromBody] UpdateRelationshipRequestDto dto)
     {
-        var organizationId = UserContextStorage.OrganizationId;
-        var currentUserId = UserContextStorage.UserId;
-        var result =
-            await _relationshipBusiness.UpdateRelationship(currentUserId, organizationId, projectId, relationshipId,
-                dto);
-        return Ok(result);
+            var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
+            var result =
+                await _relationshipBusiness.UpdateRelationship(currentUserId, organizationId, projectId, relationshipId,
+                    dto);
+            return Ok(result);
     }
 
     /// <summary>
@@ -340,10 +340,10 @@ public class RelationshipProjectController : ControllerBase
         long projectId,
         long relationshipId)
     {
-        var currentUserId = UserContextStorage.UserId;
-        var organizationId = UserContextStorage.OrganizationId;
-        var response = await _relationshipBusiness.DeleteRelationship(currentUserId, organizationId, projectId, relationshipId);
-        return Ok(response);
+            var currentUserId = UserContextStorage.UserId;
+            var organizationId = UserContextStorage.OrganizationId;
+            var response = await _relationshipBusiness.DeleteRelationship(currentUserId, organizationId, projectId, relationshipId);
+            return Ok(response);
     }
 
     /// <summary>
@@ -400,16 +400,16 @@ public class RelationshipProjectController : ControllerBase
         long relationshipId,
         [FromQuery] bool archive)
     {
-        var organizationId = UserContextStorage.OrganizationId;
-        var currentUserId = UserContextStorage.UserId;
-        if (archive)
-        {
-            var responseA = await _relationshipBusiness.ArchiveRelationship(currentUserId, organizationId, projectId,
-                relationshipId);
-            return Ok(responseA);
-        }
+            var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
+            if (archive)
+            {
+                var responseA = await _relationshipBusiness.ArchiveRelationship(currentUserId, organizationId, projectId,
+                    relationshipId);
+                return Ok(responseA);
+            }
 
-        var responseB = await _relationshipBusiness.UnarchiveRelationship(currentUserId, organizationId, projectId, relationshipId);
-        return Ok(responseB);
+            var responseB = await _relationshipBusiness.UnarchiveRelationship(currentUserId, organizationId, projectId, relationshipId);
+            return Ok(responseB);
     }
 }

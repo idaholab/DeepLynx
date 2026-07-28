@@ -113,7 +113,7 @@ export function useCollectionDetails({
     availableTags,
     setAvailableTags,
     tagsLoading,
-  } = useProjectCollectionOptions(projectId, organizationId);
+  } = useProjectCollectionOptions(projectId);
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [
@@ -158,8 +158,8 @@ export function useCollectionDetails({
     const loadRecordMetadataNames = async () => {
       try {
         const [classes, dataSources] = await Promise.all([
-          getAllClasses(organizationId, projectId, false),
-          getAllDataSources(organizationId, projectId, false),
+          getAllClasses(projectId, false),
+          getAllDataSources(projectId, false),
         ]);
 
         setClassNameById(
@@ -901,7 +901,7 @@ export function useCollectionDetails({
 
     setSelectedCollectionLabelCreating(true);
     try {
-      const createdLabel = await createSensitivityLabelProject(organizationId, projectId, {
+      const createdLabel = await createSensitivityLabelProject(projectId, {
         name: trimmed,
         description: "",
       });
@@ -936,7 +936,7 @@ export function useCollectionDetails({
 
     setSelectedCollectionTagCreating(true);
     try {
-      const createdTag = await createTag(organizationId as number, projectId, { name: trimmed });
+      const createdTag = await createTag(projectId, { name: trimmed });
       setAvailableTags((prev) => [...prev, createdTag]);
       addSelectedCollectionTag({
         id: createdTag.id,

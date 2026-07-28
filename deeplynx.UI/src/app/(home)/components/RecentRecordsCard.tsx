@@ -10,7 +10,6 @@ import { useRecordsPaginated } from "@/app/hooks/useRecordsPaginated";
 import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 
 interface Props {
-    organizationId: number,
     selectedProjects: string[];
     border?: boolean;
 }
@@ -23,7 +22,6 @@ interface RecordViewProps {
 type RecentRecordSortValue = "nameAZ" | "nameZA" | "dateNew" | "dateOld";
 
 const RecentRecordsCard: React.FC<Props> = ({
-    organizationId,
     selectedProjects,
     border = true,
 }) => {
@@ -84,7 +82,7 @@ const RecentRecordsCard: React.FC<Props> = ({
             try {
                 const projectIds = selectedProjects.map((id) => Number(id));
                 const classesArrays = await Promise.all(
-                    projectIds.map((projectId) => getAllClasses(organizationId, projectId, true))
+                    projectIds.map((projectId) => getAllClasses(projectId, true))
                 );
                 if (cancelled) return;
 

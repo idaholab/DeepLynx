@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { SensitivityLabelsDto, TagResponseDto } from "../../types/responseDTOs";
 import { useToast } from "@/app/contexts/ToastProvider";
 
-export function useProjectCollectionOptions(projectId: number, organizationId: number) {
+export function useProjectCollectionOptions(projectId: number) {
   const { t } = useLanguage();
   const [labelsLoading, setLabelsLoading] = useState(false);
   const [availableLabels, setAvailableLabels] = useState<
@@ -24,8 +24,8 @@ export function useProjectCollectionOptions(projectId: number, organizationId: n
       setLabelsLoading(true);
       setTagsLoading(true);
       const [labelsResult, tagsResult] = await Promise.allSettled([
-        getAllSensitivityLabelsProject(organizationId, projectId),
-        getAllTags(organizationId as number, projectId),
+        getAllSensitivityLabelsProject(projectId),
+        getAllTags(projectId),
       ]);
 
       if (cancelled) return;
