@@ -62,35 +62,51 @@ public class UserContextMiddleware
                             UserContextStorage.AccountType = user.AccountType;
 
                             var adminService = scope.ServiceProvider.GetRequiredService<IAdminService>();
+                            var organizationService = scope.ServiceProvider.GetRequiredService<IOrganizationService>();
+
                             UserContextStorage.IsSysAdmin = await adminService.SysAdminCheck(user.Id);
 
                             var projectIds = ExtractProjectIds(context);
 
-                            long? organizationId = null;
+                            long? organizationIdFromRoute = ExtractOrganizationId(context);
 
-                            if (projectIds.Any())
+                            long resolvedOrganizationId;
+
+                            try
                             {
-                                var dbContext2 = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
-                                organizationId = await dbContext2.Projects
-                                    .Where(p => projectIds.Contains(p.Id))
-                                    .Select(p => p.OrganizationId)
-                                    .FirstOrDefaultAsync();
+                                if (projectIds.Any())
+                                {
+                                    resolvedOrganizationId = await organizationService.ResolveOrganizationIdFromProjectsAsync(
+                                        projectIds,
+                                        organizationIdFromRoute
+                                    );
+                                }
+                                else
+                                {
+                                    resolvedOrganizationId = await organizationService.CheckExistence(
+                                        null,
+                                        organizationIdFromRoute
+                                    );
+                                }
                             }
-                            else
+                            catch (Exception ex)
                             {
-                                organizationId = ExtractOrganizationId(context);
+                                var logger = scope.ServiceProvider.GetRequiredService<ILogger<UserContextMiddleware>>();
+                                logger.LogWarning(ex, "Organization resolution failed");
+
+                                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                                await context.Response.WriteAsJsonAsync(new { error = ex.Message });
+                                return;
                             }
 
-                            if (organizationId.HasValue)
-                            {
-                                UserContextStorage.OrganizationId = organizationId.Value;
+                            UserContextStorage.OrganizationId = resolvedOrganizationId;
 
-                                UserContextStorage.IsOrgAdmin = await adminService.OrgAdminCheck(user.Id, organizationId.Value);
-                                UserContextStorage.IsOrgMember = await adminService.OrgMemberCheck(user.Id, organizationId.Value);
-                                UserContextStorage.IsProjectAdmin = projectIds.Any() &&
-                                    await adminService.ProjectAdminCheck(user.Id, organizationId.Value, projectIds);
-                            }
+                            UserContextStorage.IsOrgAdmin = await adminService.OrgAdminCheck(user.Id, resolvedOrganizationId);
+                            UserContextStorage.IsOrgMember = await adminService.OrgMemberCheck(user.Id, resolvedOrganizationId);
+                            UserContextStorage.IsProjectAdmin = projectIds.Any() &&
+                                await adminService.ProjectAdminCheck(user.Id, resolvedOrganizationId, projectIds);
                         }
+
                         else
                         {
                             _logger.LogWarning($"User with email {email} not found in database");
