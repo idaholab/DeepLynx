@@ -1206,31 +1206,35 @@ startxref
   
   test.describe("Data Source and Storage uploads", () => {
     let filePaths: [string, string, string, string, string, string];
+    let tmpDir: string;
 
-    test.beforeAll(async ({}) => {
+    test.beforeAll(async ({}, workerInfo) => {
+      tmpDir = await fs.promises.mkdtemp(
+        path.join(os.tmpdir(), `upload-tests-${workerInfo.workerIndex}-`)
+      );
+      
       // Create the files to use locally
       filePaths = [
-        path.join(os.tmpdir(), 'upload-different-datasource-click'),
-        path.join(os.tmpdir(), 'upload-different-datasource-drag'),
-        path.join(os.tmpdir(), 'upload-different-storage-click'),
-        path.join(os.tmpdir(), 'upload-different-storage-drag'),
-        path.join(os.tmpdir(), 'upload-different-project-click'),
-        path.join(os.tmpdir(), 'upload-different-project-drag')
+        path.join(tmpDir, 'upload-different-datasource-click'),
+        path.join(tmpDir, 'upload-different-datasource-drag'),
+        path.join(tmpDir, 'upload-different-storage-click'),
+        path.join(tmpDir, 'upload-different-storage-drag'),
+        path.join(tmpDir, 'upload-different-project-click'),
+        path.join(tmpDir, 'upload-different-project-drag')
       ];
 
-      for (const filePath of filePaths) {
-        if (!fs.existsSync(filePath)) {
-          await fs.promises.writeFile(filePath, Buffer.alloc(1));
-        }
-      }
+      await Promise.all(
+        filePaths.map(filePath =>
+            fs.promises.writeFile(filePath, Buffer.alloc(1))
+        )
+      );
     });
 
     test.afterAll(async () => {
-      for (const filePath of filePaths) {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      }
+      await fs.promises.rm(tmpDir, {
+        recursive: true,
+        force: true,
+      });
     });
 
     test("default project and storage, nondefault data source, click to browse, successfully uploads file", async ({ page, request }) => {
@@ -1243,7 +1247,7 @@ startxref
 
       // click to browse
       await clickToBrowse({ page }, 'upload-different-datasource-click', filePaths[0]);
-    })
+    });
 
     test("default project and storage, nondefault data source, drag and drop, successfully uploads file", async ({ page, request }) => {
       // set datasource and storage destination
