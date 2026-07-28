@@ -20,7 +20,7 @@ internal static class NexusApiVersions
         V1
     ];
 
-    public static string DefaultOpenApiDocumentName => "v1";
+    public static string DefaultOpenApiDocumentName => "v2";
 
     public static IReadOnlyList<string> OpenApiDocumentNames { get; } =
     [
