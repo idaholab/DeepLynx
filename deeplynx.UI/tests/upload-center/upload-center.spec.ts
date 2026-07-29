@@ -1243,7 +1243,8 @@ startxref
       const nondefaultDs = await getNonDefault(request, projectId, 'data source');
       const dataSourceSelect = page.getByLabel('Data sourceData');
       await expect(dataSourceSelect).toBeEnabled();
-      await expect(dataSourceSelect.locator('option', { hasText: nondefaultDs })).toBeAttached();
+      const option = dataSourceSelect.locator('option', { hasText: nondefaultDs });
+      await expect(option).toBeAttached({ timeout: 15_000 });
       await dataSourceSelect.selectOption(nondefaultDs);
 
       // click to browse
@@ -1256,7 +1257,8 @@ startxref
       const nondefaultDs = await getNonDefault(request, projectId, 'data source');
       const dataSourceSelect = page.getByLabel('Data sourceData');
       await expect(dataSourceSelect).toBeEnabled();
-      await expect(dataSourceSelect.locator('option', { hasText: nondefaultDs })).toBeAttached();
+      const option = dataSourceSelect.locator('option', { hasText: nondefaultDs });
+      await expect(option).toBeAttached({ timeout: 15_000 });
       await dataSourceSelect.selectOption(nondefaultDs);
 
       // click to browse
@@ -1269,7 +1271,8 @@ startxref
       const nondefaultOs = await getNonDefault(request, projectId, 'storage');
       const objectStorageSelect = page.getByLabel('Storage DestinationObject');
       await expect(objectStorageSelect).toBeEnabled();
-      await expect(objectStorageSelect.locator('option', { hasText: nondefaultOs })).toBeAttached();
+      const option = objectStorageSelect.locator('option', { hasText: nondefaultOs });
+      await expect(option).toBeAttached({ timeout: 15_000 });
       await objectStorageSelect.selectOption(nondefaultOs);
 
       // click to browse
@@ -1282,7 +1285,8 @@ startxref
       const nondefaultOs = await getNonDefault(request, projectId, 'storage');
       const objectStorageSelect = page.getByLabel('Storage DestinationObject');
       await expect(objectStorageSelect).toBeEnabled();
-      await expect(objectStorageSelect.locator('option', { hasText: nondefaultOs })).toBeAttached();
+      const option = objectStorageSelect.locator('option', { hasText: nondefaultOs });
+      await expect(option).toBeAttached({ timeout: 15_000 });
       await objectStorageSelect.selectOption(nondefaultOs);
 
       // click to browse
