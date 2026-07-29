@@ -91,7 +91,7 @@ const CreateStorageModal = ({
               <option value="aws_s3">
                 {t.translations.AWS_S3} (Coming Soon)
               </option>
-              <option value="azure_blob">
+              <option value="azure_object">
                 {t.translations.AZURE_BLOB_STORAGE}
               </option>
             </select>
@@ -134,7 +134,7 @@ const CreateStorageModal = ({
             </div>
           )}
 
-          {storageType === "azure_blob" && (
+          {storageType === "azure_object" && (
             <>
               <div className="form-control mb-4 w-full md:w-2/3">
                 <label className="label">
