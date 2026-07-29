@@ -133,7 +133,6 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
       const recordUri = record?.uri || "";
       setIsFolder(recordUri?.endsWith("/"));
 
-      console.log("presignedURL: " + isPresignedUrl)
       await downloadFile(
         organization?.organizationId as number,
         projectId,
@@ -142,7 +141,6 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
         (progressInfo) => {
           // Only process progress for blob downloads (non-presigned URL)
           if (isFolderRef.current) {
-            console.log("folder?")
             const now = Date.now();
             const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
 
@@ -161,7 +159,6 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
             setDownloadProgress(1);
             setBytesDownloaded({ loaded: 1, total: 1 });
           } else if (!usePresignedUrl) {
-            console.log("here")
             const now = Date.now();
             const timeSinceLastDisplay = (now - lastDisplayUpdateTime) / 1000;
 
@@ -199,7 +196,6 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
       // For presigned URL downloads, show toast message
       if (usePresignedUrl) {
-        console.log("over here")
         toast.success(t.translations.DOWNLOAD_STARTED_IN_BROWSER, {
           icon: "📥",
           duration: 3000,

@@ -9,6 +9,7 @@ import {
   archiveProject,
   fetchProjectLogo,
   removeProjectLogo,
+  updateProject,
   uploadProjectLogo,
 } from "@/app/lib/client_service/projects_services.client";
 import {
@@ -27,6 +28,7 @@ import {
 import {
   CreateObjectStorageRequestDto,
   UpdateObjectStorageRequestDto,
+  UpdateProjectRequestDto,
 } from "@/app/(home)/types/requestDTOs";
 import ProjectSettingsLeftColumn from "./components/ProjectSettingsLeftColumn";
 import StorageSettingsSection from "./components/StorageSettingsSection";
@@ -508,7 +510,11 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       const dto: UpdateObjectStorageRequestDto = {
         name: storageFormData.name,
         default: storageFormData.default,
-        azureFilePath: storageFormData.config.AzureObjectConfig?.AzureFilePath
+      };
+
+      const dto2: UpdateProjectRequestDto = {
+        organizationId: organization.organizationId as number,
+        filePath: storageFormData.config.AzureObjectConfig?.AzureFilePath
       };
 
       await updateProjectObjectStorage(
@@ -517,6 +523,12 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         editingStorage.id as number,
         dto,
       );
+
+      await updateProject(
+        organization.organizationId as number,
+        project.id as number,
+        dto2
+      )
 
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditModalOpen(false);

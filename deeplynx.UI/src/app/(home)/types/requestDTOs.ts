@@ -90,7 +90,6 @@ export type CreateObjectStorageRequestDto = {
 export type UpdateObjectStorageRequestDto = {
   name: string;
   default: boolean;
-  azureFilePath?: string;
 };
 
 export type CreateClassRequestDto = {
@@ -206,6 +205,7 @@ export type UpdateProjectRequestDto = {
   description?: string;
   abbreviation?: string;
   banner?: string | null;
+  filePath?: string | null;
 };
 
 export type RecordSearchRequestDto = {
