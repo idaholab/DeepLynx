@@ -128,7 +128,7 @@ public class FileAzureBusiness : IFileBusiness
             throw new FileNotFoundException($"File not found: {record.Uri}");
         }
 
-        var newFileName = $"organization_{record.OrganizationId}/projects_{record.ProjectId}/datasource_{record.DataSourceId}/{guid}_{file.FileName}";
+        var newFileName = $"organization_{record.OrganizationId}/project_{record.ProjectId}/datasource_{record.DataSourceId}/{guid}_{file.FileName}";
         var newBlob = container.GetBlobClient(newFileName);
 
         // try-catch to try and revert to original state on failure
