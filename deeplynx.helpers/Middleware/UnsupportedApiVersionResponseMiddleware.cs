@@ -1,19 +1,24 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace deeplynx.api.Middleware;
+namespace deeplynx.helpers;
 
 /// <summary>
 ///     Converts the empty 404 produced by endpoint routing for a well-formed but
 ///     unsupported URL-segment API version into a 400 Problem Details response.
 /// </summary>
-internal sealed class UnsupportedApiVersionResponseMiddleware
+public sealed class UnsupportedApiVersionResponseMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly IReadOnlyCollection<ApiVersion> _supportedVersions;
 
-    public UnsupportedApiVersionResponseMiddleware(RequestDelegate next)
+    public UnsupportedApiVersionResponseMiddleware(
+        RequestDelegate next,
+        IReadOnlyCollection<ApiVersion> supportedVersions)
     {
         _next = next;
+        _supportedVersions = supportedVersions;
     }
 
     public async Task InvokeAsync(
@@ -44,7 +49,7 @@ internal sealed class UnsupportedApiVersionResponseMiddleware
         });
     }
 
-    private static bool TryGetUnsupportedApiVersion(
+    private bool TryGetUnsupportedApiVersion(
         PathString path,
         out ApiVersion? requestedVersion)
     {
@@ -64,6 +69,6 @@ internal sealed class UnsupportedApiVersionResponseMiddleware
             return false;
 
         requestedVersion = parsedVersion;
-        return !NexusApiVersions.Supported.Contains(parsedVersion);
+        return !_supportedVersions.Contains(parsedVersion);
     }
 }

@@ -13,7 +13,6 @@ using deeplynx.api.Routing;
 using deeplynx.api.Services;
 using deeplynx.api.OpenApi;
 using deeplynx.api.ExceptionHandlers;
-using deeplynx.api.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
@@ -319,7 +318,7 @@ try
     app.UseStaticFiles();
     app.UseRouting();
     app.UseExceptionHandler(); // Runs registered IExceptionHandlers; must precede middleware that may throw
-    app.UseMiddleware<UnsupportedApiVersionResponseMiddleware>();
+    app.UseMiddleware<UnsupportedApiVersionResponseMiddleware>(NexusApiVersions.Supported);
     app.UseCors("AllowAll");
 
     if (isRuntimeStartup)
