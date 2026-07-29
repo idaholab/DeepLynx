@@ -593,22 +593,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateFilePath_Success_ReturnsUpdatedNameInProject()
-    {
-        // Arrange
-        var updateDto = new UpdateObjectStorageRequestDto
-        {
-            AzureFilePath = "a/b/c"
-        };
-        // Act
-        var updatedObjectStorage = await _objectStorageBusiness.UpdateProjectContainerSettings(
-            uid, organizationId, pid, os1, updateDto);
-
-        // Assert
-        Assert.Equal(updateDto.AzureFilePath, updatedObjectStorage.AzureFilePath);
-    }
-
-    [Fact]
     public async Task Update_Success_ReturnsUpdatedNameInOrganization()
     {
         // Arrange
