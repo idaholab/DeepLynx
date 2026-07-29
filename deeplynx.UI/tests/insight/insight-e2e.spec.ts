@@ -6,6 +6,7 @@ const BACKEND_URL = "http://localhost:5000/api/v1";
 const PDF_PATH = path.resolve(__dirname, "genesis-mission.pdf");
 
 test.describe("Insight E2E", () => {
+  test.skip(process.env.RUN_INSIGHT_TESTS !== "true", "Insight tests disabled");
 
   test.beforeEach(async ({ page }) => {
     await seedAndCreateProject(page, "Insight E2E Test");
