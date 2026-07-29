@@ -1243,6 +1243,7 @@ startxref
       const nondefaultDs = await getNonDefault(request, projectId, 'data source');
       const dataSourceSelect = page.getByLabel('Data sourceData');
       await expect(dataSourceSelect).toBeEnabled();
+      await expect(dataSourceSelect.locator('option', { hasText: nondefaultDs })).toBeAttached();
       await dataSourceSelect.selectOption(nondefaultDs);
 
       // click to browse
@@ -1255,6 +1256,7 @@ startxref
       const nondefaultDs = await getNonDefault(request, projectId, 'data source');
       const dataSourceSelect = page.getByLabel('Data sourceData');
       await expect(dataSourceSelect).toBeEnabled();
+      await expect(dataSourceSelect.locator('option', { hasText: nondefaultDs })).toBeAttached();
       await dataSourceSelect.selectOption(nondefaultDs);
 
       // click to browse
@@ -1267,6 +1269,7 @@ startxref
       const nondefaultOs = await getNonDefault(request, projectId, 'storage');
       const objectStorageSelect = page.getByLabel('Storage DestinationObject');
       await expect(objectStorageSelect).toBeEnabled();
+      await expect(objectStorageSelect.locator('option', { hasText: nondefaultOs })).toBeAttached();
       await objectStorageSelect.selectOption(nondefaultOs);
 
       // click to browse
@@ -1279,6 +1282,7 @@ startxref
       const nondefaultOs = await getNonDefault(request, projectId, 'storage');
       const objectStorageSelect = page.getByLabel('Storage DestinationObject');
       await expect(objectStorageSelect).toBeEnabled();
+      await expect(objectStorageSelect.locator('option', { hasText: nondefaultOs })).toBeAttached();
       await objectStorageSelect.selectOption(nondefaultOs);
 
       // click to browse
