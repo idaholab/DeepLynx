@@ -14,7 +14,7 @@ test.describe("Landing Page", () => {
   });
 
   test("renders Your Projects card", async ({ page }) => {
-    await expect(page.getByText("Your Projects")).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your Projects' })).toBeVisible();
   });
 
   test("Your Projects card has a button to create a project", async ({
