@@ -129,29 +129,43 @@ public class MaintenanceController : ControllerBase
     /// </remarks>
     /// <param name="objectStorageId">The ID of the object storage to be scraped.</param>
     /// <param name="dataSourceId">The ID of the data source under which to create the records.</param>
+    /// <param name="afterCursor">Cursor returned from a previous call, or omitted to start from the beginning.</param>
+    /// <param name="batchSize">Number of records per upsert batch.</param>
+    /// <param name="maxBatches">Maximum number of batches to process before returning.</param>
     /// <param name="sensitivityLabelIds">Optional IDs of sensitivity labels to attach to each created record.</param>
-    /// <returns>The number of records created.</returns>
+    /// <returns>Number of records processed this call, plus a cursor for the next call (null if complete).</returns>
     [HttpPost("object-storages/{objectStorageId:long}/scrape", Name = "api_scrape_object_storage_to_catalog")]
     [SysAdmin]
     public async Task<IActionResult> ScrapeObjectStorageToCatalog(
         long objectStorageId,
         [FromQuery] long dataSourceId,
+        [FromQuery] string? afterCursor = null,
+        [FromQuery] int batchSize = 500,
+        [FromQuery] int maxBatches = 5,
         [FromQuery] List<long>? sensitivityLabelIds = null)
     {
         try
         {
             long currentUserId = UserContextStorage.UserId;
 
-            var recordCount = await _maintenanceBusiness.ScrapeObjectStorageToCatalog(
+            var result = await _maintenanceBusiness.ScrapeObjectStorageToCatalog(
                 objectStorageId,
                 currentUserId,
                 dataSourceId,
+                afterCursor,
+                batchSize,
+                maxBatches,
                 sensitivityLabelIds,
                 isSysAdmin: true,
                 isOrgAdmin: false,
-                isProjectAdmin: false);
+                isProjectAdmin: false,
+                HttpContext.RequestAborted);
 
-            return Ok(recordCount);
+            return Ok(result);
+        }
+        catch (OperationCanceledException)
+        {
+            return StatusCode(499);
         }
         catch (Exception exc)
         {

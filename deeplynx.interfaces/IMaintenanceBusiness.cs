@@ -8,14 +8,16 @@ public interface IMaintenanceBusiness
 
     Task<bool> ExportDuckDbTableToFile(long recordId);
 
-    Task<long> ScrapeObjectStorageToCatalog(
+    Task<ScrapeObjectStorageResponseDto> ScrapeObjectStorageToCatalog(
         long objectStorageId,
         long currentUserId,
         long dataSourceId,
+        string? afterCursor = null,
+        int batchSize = 500,
+        int maxBatches = 5,
         List<long>? sensitivityLabelIds = null,
         bool isSysAdmin = false,
         bool isOrgAdmin = false,
         bool isProjectAdmin = false,
-        int batchSize = 500,
         CancellationToken cancellationToken = default);
 }

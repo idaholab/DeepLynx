@@ -173,25 +173,35 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     /// <param name="objectStorageId">The ID of the object storage to be scraped</param>
     /// <param name="currentUserId">ID of the User executing this method.</param>
     /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
+    /// <param name="afterCursor">Cursor returned from a previous call, or null to start from the beginning</param>
+    /// <param name="batchSize">Number of records per upsert batch</param>
+    /// <param name="maxBatches">Maximum number of batches to process before returning</param>
     /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-    /// <param name="batchSize">Number of files to accumulate before upserting a batch of records</param>
-    /// <param name="cancellationToken">Token used to stop the scrape early. For now this is expected to come from the HTTP request</param>
-    /// <returns>The number of files cataloged</returns>
+    /// <param name="cancellationToken">Token checked during the scrape; canceling stops early with whatever was processed so far still committed</param>
+    /// <returns>Number of records processed this call, plus a cursor for the next call (null if complete)</returns>
     /// <exception cref="NotSupportedException"></exception>
-    public async Task<long> ScrapeObjectStorageToCatalog(
+    public async Task<ScrapeObjectStorageResponseDto> ScrapeObjectStorageToCatalog(
         long objectStorageId,
         long currentUserId,
         long dataSourceId,
+        string? afterCursor = null,
+        int batchSize = 500,
+        int maxBatches = 5,
         List<long>? sensitivityLabelIds = null,
         bool isSysAdmin = false,
         bool isOrgAdmin = false,
         bool isProjectAdmin = false,
-        int batchSize = 500,
         CancellationToken cancellationToken = default)
     {
+        if (batchSize <= 0)
+            throw new ArgumentException("batchSize must be greater than zero.");
+
+        if (maxBatches <= 0)
+            throw new ArgumentException("maxBatches must be greater than zero.");
+
         // Retrieve the object storage based on the provided ID
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
 
@@ -199,56 +209,66 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         long organizationId = objectStorage.OrganizationId.GetValueOrDefault();
         long projectId = objectStorage.ProjectId.GetValueOrDefault();
 
-        // Scrape files into DTOs based on storage type
-        IAsyncEnumerable<List<CreateRecordRequestDto>> batches = objectStorage.Type.ToLowerInvariant() switch
+        // TODO: Make sure these type strings are accurate
+        ScrapeResult scrapeResult = objectStorage.Type.ToLowerInvariant() switch
         {
-            "filesystem" => StorageScrapers.ScrapeFileSystem(
+            "filesystem" => await StorageScrapers.ScrapeFileSystem(
                 objectStorage.Config.MountPath
                     ?? throw new InvalidOperationException("File system storage is missing a mount path."),
                 objectStorage.Id,
+                afterCursor,
                 batchSize,
+                maxBatches,
                 cancellationToken),
 
-            "azure_object" => StorageScrapers.ScrapeAzureBlob(
+            "azure_object" => await StorageScrapers.ScrapeAzureBlob(
                 objectStorage.Config.AzureObjectConfig
                     ?? throw new InvalidOperationException("Azure blob storage is missing its config."),
                 objectStorage.Id,
+                afterCursor,
                 batchSize,
+                maxBatches,
                 cancellationToken),
 
-            "aws_s3" => StorageScrapers.ScrapeS3(
+            "aws_s3" => await StorageScrapers.ScrapeS3(
                 objectStorage.Config.AwsConnectionString
                     ?? throw new InvalidOperationException("S3 storage is missing a connection string."),
                 objectStorage.Id,
+                afterCursor,
                 batchSize,
+                maxBatches,
                 cancellationToken),
 
             _ => throw new NotSupportedException($"No scraper registered for storage type '{objectStorage.Type}'.")
         };
 
-        long totalRecordsCataloged = 0;
-
-        // Consume and upsert one batch at a time
-        await foreach (var batch in batches.WithCancellation(cancellationToken))
+        if (scrapeResult.Records.Count == 0)
         {
-            if (batch.Count == 0)
-                continue;
-
-            var recordResponseDtos = await _recordBusiness.BulkCreateRecords(
-                currentUserId,
-                organizationId,
-                projectId,
-                dataSourceId,
-                batch,
-                sensitivityLabelIds,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin);
-
-            totalRecordsCataloged += recordResponseDtos.Count;
+            return new ScrapeObjectStorageResponseDto
+            {
+                Processed = 0,
+                NextCursor = scrapeResult.NextCursor
+            };
         }
 
-        return totalRecordsCataloged;
+        // Upsert everything found this call in one go. BulkCreateRecords already handles
+        // insert-vs-update via its own ON CONFLICT logic, so no separate diffing is needed here.
+        var recordResponseDtos = await _recordBusiness.BulkCreateRecords(
+            currentUserId,
+            organizationId,
+            projectId,
+            dataSourceId,
+            scrapeResult.Records,
+            sensitivityLabelIds,
+            isSysAdmin,
+            isOrgAdmin,
+            isProjectAdmin);
+
+        return new ScrapeObjectStorageResponseDto
+        {
+            Processed = recordResponseDtos.Count,
+            NextCursor = scrapeResult.NextCursor
+        };
     }
 
 }
