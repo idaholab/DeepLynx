@@ -376,18 +376,42 @@ test.describe("Roles & Permissions", () => {
   /* ------------------------------------------------------------------------ */
 
   test.describe("Role CRUD operations", () => {
+    let testRoleName: string;
+    const pendingRoleNames: string[] = [];
+
+    test.beforeEach(async ({}, testInfo) => {
+      testRoleName = `E2E Role w${testInfo.workerIndex}-${testInfo.testId}r${testInfo.retry}-${crypto.randomUUID().slice(0,8)}`;
+    });
+    
+    test.afterEach(async ({ page }) => {
+      // clean up the roles that were created
+      for (const roleName of pendingRoleNames) {
+        const roleButton = page.getByRole("button", { name: roleName });
+        if (await roleButton.isVisible().catch(() => false)) {
+          await roleButton.click();
+          await page.locator(".btn-circle.text-error").click();
+          const deleteModal = page.locator("dialog.modal.modal-open");
+          await deleteModal.getByRole("button", { name: "Delete" }).click();
+          await expect(deleteModal).not.toBeVisible({ timeout: 15000 });
+        }
+      }
+      pendingRoleNames.length = 0;
+    })
+
     test("create a new custom role", async ({ page }) => {
-      const testRoleName = `E2E Role ${crypto.randomUUID()}`;
-      const updatedRoleName = `${testRoleName} Updated`;
+      // const testRoleName = `E2E Role ${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
+      // const updatedRoleName = `${testRoleName} Updated`;
+      const roleName = `${testRoleName} Create`;
       await page.getByRole("button", { name: "Create Role" }).click();
       const modal = page.locator("dialog.modal.modal-open");
       await modal
         .locator('input[placeholder="Enter role name"]')
-        .fill(testRoleName);
+        .fill(roleName);
       await modal
         .locator('textarea[placeholder="Enter role description (optional)"]')
         .fill("Role created by E2E test");
       await modal.getByRole("button", { name: "Create Role" }).click();
+      pendingRoleNames.push(roleName);
 
       // Modal should close after creation
       await expect(modal).not.toBeVisible({ timeout: 15000 });
@@ -405,18 +429,19 @@ test.describe("Roles & Permissions", () => {
 
     test("edit a custom role via the edit modal", async ({ page }) => {
       // First create a role to edit
-      const roleName = `Edit Test ${crypto.randomUUID()}`;
+      const roleName = `${testRoleName} Edit`;
       await page.getByRole("button", { name: "Create Role" }).click();
       const createModal = page.locator("dialog.modal.modal-open");
       await createModal
         .locator('input[placeholder="Enter role name"]')
         .fill(roleName);
       await createModal.getByRole("button", { name: "Create Role" }).click();
+      pendingRoleNames.push(roleName);
       await expect(createModal).not.toBeVisible({ timeout: 15000 });
 
       // Wait for the role to appear and be selected
       await expect(
-        page.getByRole("button", { name: roleName }),
+        page.getByRole("button", { name: roleName }).first(),
       ).toBeVisible({ timeout: 15000 });
 
       // Click the edit (pencil) button in the detail panel header
@@ -443,17 +468,20 @@ test.describe("Roles & Permissions", () => {
       await expect(
         page.getByRole("button", { name: `${roleName} Edited` }),
       ).toBeVisible({ timeout: 15000 });
+
+      pendingRoleNames[0] = `${roleName} Edited`;
     });
 
     test("delete a custom role via the delete modal", async ({ page }) => {
       // First create a role to delete
-      const roleName = `Delete Test ${crypto.randomUUID()}`;
+      const roleName = `${testRoleName} Delete`;
       await page.getByRole("button", { name: "Create Role" }).click();
       const createModal = page.locator("dialog.modal.modal-open");
       await createModal
         .locator('input[placeholder="Enter role name"]')
         .fill(roleName);
       await createModal.getByRole("button", { name: "Create Role" }).click();
+      pendingRoleNames.push(roleName);
       await expect(createModal).not.toBeVisible({ timeout: 15000 });
 
       // Wait for the role to appear and be selected
@@ -480,6 +508,8 @@ test.describe("Roles & Permissions", () => {
       await expect(
         page.getByRole("button", { name: roleName }),
       ).not.toBeVisible({ timeout: 10000 });
+
+      pendingRoleNames.length = 0;
     });
   });
 
