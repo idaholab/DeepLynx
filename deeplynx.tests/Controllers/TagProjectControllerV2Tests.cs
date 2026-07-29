@@ -65,7 +65,7 @@ public class TagProjectControllerTestsV2 : IDisposable
 
         _mockTagBusiness
             .Setup(b => b.GetAllTags(
-                OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true))
+                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true, false, false))
             .ReturnsAsync(expected);
 
         var result = (await _tagProjectController.GetAllTagsV2(ProjectId, true)).Result as OkObjectResult;
@@ -79,7 +79,7 @@ public class TagProjectControllerTestsV2 : IDisposable
     public async Task GetAllTagsV2_Returns200_WithEmptyList()
     {
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>()))
+            .Setup(b => b.GetAllTags(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ReturnsAsync([]);
 
         var result = (await _tagProjectController.GetAllTagsV2(ProjectId, true)).Result as OkObjectResult;
@@ -94,7 +94,7 @@ public class TagProjectControllerTestsV2 : IDisposable
     {
         _mockTagBusiness
             .Setup(b => b.GetAllTags(
-                OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true))
+                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true, false, false))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _tagProjectController.GetAllTagsV2(ProjectId, true));
@@ -107,14 +107,14 @@ public class TagProjectControllerTestsV2 : IDisposable
 
         _mockTagBusiness
             .Setup(b => b.GetAllTags(
-                OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true))
+                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true, false, false))
             .ReturnsAsync(expected);
 
         await _tagProjectController.GetAllTagsV2(ProjectId, true);
 
         _mockTagBusiness.Verify(
             b => b.GetAllTags(
-                OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true),
+                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true, false, false),
             Times.Once);
     }
 

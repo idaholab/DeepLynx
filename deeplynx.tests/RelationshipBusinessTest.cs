@@ -74,7 +74,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
 
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
-            _relationshipBusiness, _eventBusiness);
+            _relationshipBusiness, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,

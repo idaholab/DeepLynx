@@ -52,9 +52,12 @@ public class ClassProjectController : ControllerBase
     {
         try
         {
+            var currentUserId = UserContextStorage.UserId;
             var organizationId = UserContextStorage.OrganizationId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var classes = await _classBusiness.GetAllClasses(
-                organizationId, [projectId], hideArchived);
+                currentUserId, organizationId, [projectId], hideArchived, isSysAdmin, isOrgAdmin);
             return Ok(classes);
         }
         catch (Exception exc)
@@ -79,10 +82,13 @@ public class ClassProjectController : ControllerBase
         long projectId,
         [FromQuery] bool hideArchived = true)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var classes = await _classBusiness.GetAllClasses(
-                organizationId, [projectId], hideArchived);
-            return Ok(classes);
+        var currentUserId = UserContextStorage.UserId;
+        var organizationId = UserContextStorage.OrganizationId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var classes = await _classBusiness.GetAllClasses(
+            currentUserId, organizationId, [projectId], hideArchived, isSysAdmin, isOrgAdmin);
+        return Ok(classes);
     }
 
     /// <summary>
@@ -131,10 +137,10 @@ public class ClassProjectController : ControllerBase
         long classId,
         [FromQuery] bool hideArchived = true)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var classes = await _classBusiness.GetClass(
-                organizationId, projectId, classId, hideArchived);
-            return Ok(classes);
+        var organizationId = UserContextStorage.OrganizationId;
+        var classes = await _classBusiness.GetClass(
+            organizationId, projectId, classId, hideArchived);
+        return Ok(classes);
     }
 
     /// <summary>
@@ -180,11 +186,11 @@ public class ClassProjectController : ControllerBase
         long projectId,
         [FromBody] CreateClassRequestDto dto)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var currentUserId = UserContextStorage.UserId;
-            var newClass = await _classBusiness.CreateClass(
-                currentUserId, organizationId, projectId, dto);
-            return Ok(newClass);
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var newClass = await _classBusiness.CreateClass(
+            currentUserId, organizationId, projectId, dto);
+        return Ok(newClass);
     }
 
     /// <summary>
@@ -230,11 +236,11 @@ public class ClassProjectController : ControllerBase
         long projectId,
         [FromBody] List<CreateClassRequestDto> classes)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var currentUserId = UserContextStorage.UserId;
-            var newClasses = await _classBusiness.BulkCreateClasses(
-                currentUserId, organizationId, projectId, classes);
-            return Ok(newClasses);
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var newClasses = await _classBusiness.BulkCreateClasses(
+            currentUserId, organizationId, projectId, classes);
+        return Ok(newClasses);
     }
 
     /// <summary>
@@ -286,11 +292,11 @@ public class ClassProjectController : ControllerBase
         long classId,
         [FromBody] UpdateClassRequestDto dto)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var currentUserId = UserContextStorage.UserId;
-            var updatedClass = await _classBusiness.UpdateClass(
-                currentUserId, organizationId, projectId, classId, dto);
-            return Ok(updatedClass);
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var updatedClass = await _classBusiness.UpdateClass(
+            currentUserId, organizationId, projectId, classId, dto);
+        return Ok(updatedClass);
     }
 
     /// <summary>
@@ -336,11 +342,11 @@ public class ClassProjectController : ControllerBase
         long projectId,
         long classId)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _classBusiness.DeleteClass(
-                currentUserId, organizationId, projectId, classId);
-            return Ok(response);
+        var organizationId = UserContextStorage.OrganizationId;
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _classBusiness.DeleteClass(
+            currentUserId, organizationId, projectId, classId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -396,15 +402,15 @@ public class ClassProjectController : ControllerBase
         long classId,
         [FromQuery] bool archive)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var userId = UserContextStorage.UserId;
-            if (archive)
-            {
-                var responseA = await _classBusiness.ArchiveClass(userId, organizationId, projectId, classId);
-                return Ok(responseA);
-            }
+        var organizationId = UserContextStorage.OrganizationId;
+        var userId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var responseA = await _classBusiness.ArchiveClass(userId, organizationId, projectId, classId);
+            return Ok(responseA);
+        }
 
-            var responseB = await _classBusiness.UnarchiveClass(userId, organizationId, projectId, classId);
-            return Ok(responseB);
+        var responseB = await _classBusiness.UnarchiveClass(userId, organizationId, projectId, classId);
+        return Ok(responseB);
     }
 }

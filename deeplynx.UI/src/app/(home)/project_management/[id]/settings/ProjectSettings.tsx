@@ -417,7 +417,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       config = {
         mountPath: filesystemPath,
       };
-    } else if (storageType === "azure_blob") {
+    } else if (storageType === "azure_object") {
       if (!azureEndpoint.trim() || !azureBucketName.trim()) {
         toast.error(t.translations.ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED);
         return;

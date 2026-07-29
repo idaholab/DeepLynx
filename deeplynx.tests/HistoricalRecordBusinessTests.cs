@@ -32,8 +32,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private EncryptionHelper _encryptionHelper = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
-
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
 
@@ -66,12 +67,14 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _historicalRecordBusiness = new HistoricalRecordBusiness(Context, _sensitivityLabelService);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockAdminService = new Mock<IAdminService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
