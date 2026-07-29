@@ -14,4 +14,5 @@ public class CreateOrganizationRequestDto
     public string? Description { get; set; }
     public string? Banner { get; set; }
     public bool? RequireSensitivityLabel { get; set; }
+    public bool? CreateContainerPerProject { get; set; } = false;
 }

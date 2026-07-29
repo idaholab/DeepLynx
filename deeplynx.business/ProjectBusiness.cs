@@ -21,6 +21,7 @@ public class ProjectBusiness : IProjectBusiness
     private readonly DeeplynxContext _context;
     private readonly IDataSourceBusiness _dataSourceBusiness;
     private readonly IEventBusiness _eventBusiness;
+    private readonly IFileBusiness _fileAzureBusiness;
 
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -48,11 +49,13 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="eventBusiness">Used for logging events during create and update Operations.</param>
     /// <param name="logger">Used for uniformity in logging</param>
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
+    /// <param name="fileAzureBusiness">Used to manage Azure operations.</param>
     public ProjectBusiness(
         DeeplynxContext context, ILogger<ProjectBusiness> logger,
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
-        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness)
+        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness,
+        IFileBusiness fileAzureBusiness)
     {
         _context = context;
         _logger = logger;
@@ -63,6 +66,7 @@ public class ProjectBusiness : IProjectBusiness
         _objectStorageBusiness = objectStorageBusiness;
         _eventBusiness = eventBusiness;
         _organizationBusiness = organizationBusiness;
+        _fileAzureBusiness = fileAzureBusiness;
     }
 
     /// <summary>
@@ -153,6 +157,36 @@ public class ProjectBusiness : IProjectBusiness
             Banner = project.Banner,
             RequireSensitivityLabel = dto.RequireSensitivityLabel
         };
+
+        var organization = await _context.Organizations
+            .Where(org => org.Id == organizationId)
+            .Select(org => new { org.Id, org.CreateContainerPerProject })
+            .FirstOrDefaultAsync() ?? throw new Exception("Organization not found.");
+
+        if (organization.CreateContainerPerProject)
+        {
+            try
+            {
+                var container = await _fileAzureBusiness.CreateProjectContainer(
+                    userId: userId,
+                    organizationId: organizationId,
+                    projectId: projectId,
+                    projectName: dto.Name);
+
+                projectResponseDto.AssociatedObjectStorage = new ObjectStorageResponseDto
+                {
+                    Id = container.Id,
+                    Name = container.Name,
+                    Type = container.Type,
+                    ProjectId = container.ProjectId,
+                    OrganizationId = container.OrganizationId
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create Azure container for project {ProjectId}", projectId);
+            }
+        }
 
         // Update the Project Cache List
         var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
