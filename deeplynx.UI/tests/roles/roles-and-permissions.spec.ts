@@ -418,7 +418,7 @@ test.describe("Roles & Permissions", () => {
 
       // New role should appear in the sidebar
       await expect(
-        page.getByRole("button", { name: testRoleName }),
+        page.getByRole("button", { name: testRoleName }).first(),
       ).toBeVisible({ timeout: 15000 });
 
       // New role should be selected and show PRJ badge
@@ -466,7 +466,7 @@ test.describe("Roles & Permissions", () => {
 
       // The updated name should appear in the sidebar
       await expect(
-        page.getByRole("button", { name: `${roleName} Edited` }),
+        page.getByRole("button", { name: `${roleName} Edited` }).first(),
       ).toBeVisible({ timeout: 15000 });
 
       pendingRoleNames[0] = `${roleName} Edited`;
@@ -486,7 +486,7 @@ test.describe("Roles & Permissions", () => {
 
       // Wait for the role to appear and be selected
       await expect(
-        page.getByRole("button", { name: roleName }),
+        page.getByRole("button", { name: roleName }).first(),
       ).toBeVisible({ timeout: 15000 });
 
       // Click the delete (trash) button in the detail panel
