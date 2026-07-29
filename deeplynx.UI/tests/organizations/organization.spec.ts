@@ -1,9 +1,11 @@
 import { sysAdmin } from "../deeplynx-config";
 import { test, expect } from "../fixtures";
 
-test.use({ actingUser: sysAdmin, actingOrg: 'PW Org A' })
-
 test.describe("Organizations", () => {
+  test.use({
+    actingUser: sysAdmin,
+    actingOrg: "PW Org A",
+  });
 
   test("user is automatically assigned an organization on startup", async ({
     page,
@@ -44,8 +46,8 @@ test.describe("Organizations", () => {
     await expect(dropdownContent).toBeVisible();
   });
 
-  test('Clicking the View All Organizations button opens Select Org', async ({ 
-    page 
+  test('Clicking the View All Organizations button opens Select Org', async ({
+    page
   }) => {
     const dropdownTrigger = page.getByRole('button', { name: 'Organization' });
     await dropdownTrigger.click();
@@ -53,7 +55,7 @@ test.describe("Organizations", () => {
     const dropdownContent = page.getByRole('link', { name: 'View All Organizations' });
     await expect(dropdownContent).toBeVisible();
     await dropdownContent.click();
-    
-    await expect(page).toHaveURL('/select-org'); 
+
+    await expect(page).toHaveURL('/select-org');
   });
 });
