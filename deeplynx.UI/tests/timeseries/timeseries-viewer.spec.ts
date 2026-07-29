@@ -37,7 +37,8 @@ test.describe("Timeseries Viewer", () => {
   });
 
   test("Data Schema tab is visible", async ({ page }) => {
-    await expect(page.getByText("Data Schema")).toBeVisible();
+    const bottomSection = page.locator('section').filter({ hasText: 'Set UpData CheckData' });
+    await expect(bottomSection.getByText("Data Schema")).toBeVisible();
   });
 
   test("Plot Options section is visible in sidebar", async ({ page }) => {

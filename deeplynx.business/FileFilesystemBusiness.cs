@@ -843,4 +843,8 @@ public class FileFilesystemBusiness : IFileBusiness
         return (string)meta.FileName;
     }
 
+    public Task<ObjectStorageResponseDto> CreateProjectContainer(long userId, long organizationId, long projectId, string projectName)
+    {
+        throw new NotImplementedException();
+    }
 }

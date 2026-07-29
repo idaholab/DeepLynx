@@ -17,6 +17,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 {
     private BulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ClassBusiness _classBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IDataSourceBusiness> _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private InvitationBusiness _invitationBusiness = null!;
@@ -82,10 +83,12 @@ public class InvitationBusinessTests : IntegrationTestBase
             _mockPermissionService.Object,
             _mockAdminService.Object);
 
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness, _mockFileAzureBusiness.Object);
 
         _invitationBusiness = new InvitationBusiness(
             Context,

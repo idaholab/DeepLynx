@@ -33,6 +33,6 @@ test.describe("Settings Page", () => {
   });
 
   test("API Keypairs section is visible", async ({ page }) => {
-    await expect(page.getByText("API Keypairs")).toBeVisible();
+    await expect(page.getByText("API Keys")).toBeVisible();
   });
 });
