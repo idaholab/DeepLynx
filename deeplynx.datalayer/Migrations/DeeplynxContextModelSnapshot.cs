@@ -1410,10 +1410,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("banner");
 
-                    b.Property<bool>("CreateContainerPerProject")
-                        .HasColumnType("boolean")
-                        .HasColumnName("create_container_per_project");
-
                     b.Property<bool>("DefaultOrg")
                         .HasColumnType("boolean")
                         .HasColumnName("default_org");

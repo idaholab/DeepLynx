@@ -12,5 +12,4 @@ public class OrganizationResponseDto
     public string? Banner { get; set; }
     public bool? RequireSensitivityLabel { get; set; }
     public string Theme { get; set; } = "default";
-    public bool? CreateContainerPerProject { get; set; } = false;
 }
