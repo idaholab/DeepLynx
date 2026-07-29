@@ -256,62 +256,6 @@ public class ObjectStorageProjectController : ControllerBase
     }
 
     /// <summary>
-    ///     Update a Project Container
-    /// </summary>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId">The ID of the project to which the object storage belongs</param>
-    /// <param name="objectStorageId">The ID of the object storage to update</param>
-    /// <param name="dto">The data transfer object containing updated object storage details</param>
-    /// <returns>The updated object storage</returns>
-    [HttpPut("{objectStorageId:long}/project", Name = "api_update_project_container")]
-    [MapToApiVersion(1)]
-    [Auth("update", "object_storage")]
-    public async Task<ActionResult<ObjectStorageResponseDto>> UpdateProjectContainer(
-        long organizationId,
-        long projectId,
-        long objectStorageId,
-        [FromBody] UpdateObjectStorageRequestDto dto)
-    {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var objectStorage = await _objectStorageBusiness.UpdateProjectContainerSettings(
-                currentUserId, organizationId, projectId, objectStorageId, dto);
-            return Ok(objectStorage);
-        }
-        catch (Exception ex)
-        {
-            var message = $"An error occurred while updating object storage {objectStorageId}: {ex}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-    /// <summary>
-    ///     Update a Project Container
-    /// </summary>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId">The ID of the project to which the object storage belongs</param>
-    /// <param name="objectStorageId">The ID of the object storage to update</param>
-    /// <param name="dto">The data transfer object containing updated object storage details</param>
-    /// <returns>The updated object storage</returns>
-    [HttpPut("{objectStorageId:long}/project", Name = "api_update_project_container")]
-    [MapToApiVersion(2)]
-    [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    [Auth("update", "object_storage")]
-    public async Task<ActionResult<ObjectStorageResponseDto>> UpdateProjectContainerV2(
-        long organizationId,
-        long projectId,
-        long objectStorageId,
-        [FromBody] UpdateObjectStorageRequestDto dto)
-    {
-        var currentUserId = UserContextStorage.UserId;
-        var objectStorage = await _objectStorageBusiness.UpdateProjectContainerSettings(
-            currentUserId, organizationId, projectId, objectStorageId, dto);
-        return Ok(objectStorage);
-    }
-
-    /// <summary>
     ///     Delete an Object Storage 
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
