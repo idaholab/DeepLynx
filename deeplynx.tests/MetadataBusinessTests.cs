@@ -30,6 +30,8 @@ public class MetadataBusinessTests : IntegrationTestBase
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private RecordBusiness _recordBusiness = null!;
     private RelationshipBusiness _relationshipBusiness = null!;
     private TagBusiness _tagBusiness = null!;
@@ -57,14 +59,18 @@ public class MetadataBusinessTests : IntegrationTestBase
         await base.InitializeAsync();
 
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockAdminService = new Mock<IAdminService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
 
         // Build leaf dependencies first
         _userBusiness = new UserBusiness(Context);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
         _sensitivityLabelService = new SensitivityLabelService(Context);
@@ -86,7 +92,12 @@ public class MetadataBusinessTests : IntegrationTestBase
         _relationshipBusiness = new RelationshipBusiness(Context, _edgeBusiness, _eventBusiness);
 
         // Now classBusiness gets valid dependencies
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness, _eventBusiness);
+        _classBusiness = new ClassBusiness(Context,
+            _recordBusiness,
+            _relationshipBusiness,
+            _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
 
         _metadataBusiness = new MetadataBusiness(
             Context, _classBusiness, _relationshipBusiness, _tagBusiness, _recordBusiness, _edgeBusiness);
