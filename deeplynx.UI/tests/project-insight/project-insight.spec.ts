@@ -29,8 +29,18 @@ test.describe("Project Insight", () => {
     ).toBeVisible();
   });
 
+  test("Embedded Library tab is visible", async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Embedded' })).toBeVisible();
+  });
+
   test("Need Embedding tab is visible", async ({ page }) => {
     await expect(page.getByText("Need Embedding")).toBeVisible();
+  });
+
+  test("Filters button is visible", async ({ page }) => {
+    await expect(
+      page.getByRole('button', { name: 'Filters' }),
+    ).toBeVisible();
   });
 
   test("search input is visible", async ({ page }) => {

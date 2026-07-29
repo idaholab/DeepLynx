@@ -36,8 +36,18 @@ test.describe("Upload Center", () => {
     }
   }
   async function checkDataSourcesAndStorageDestinations(page: Page) {
-    await checkDataSources(page);
-    await checkStorageDestinations(page);
+    const dataSourceBox = page.locator('span').filter({ hasText: 'Data source' }).first();
+    const storageDestinationBox = page.locator('span').filter({ hasText: 'Storage Destination' }).first();
+    try {
+      await expect(dataSourceBox.locator('.size-6.text-success')).toBeVisible({ timeout: 3000 });
+    } catch {
+      await checkDataSources(page);
+    }
+    try {
+      await expect(storageDestinationBox.locator('.size-6.text-success')).toBeVisible({ timeout: 3000 });
+    } catch {
+      await checkStorageDestinations(page);
+    }
   }
 
   async function getNonDefault(
@@ -45,34 +55,33 @@ test.describe("Upload Center", () => {
   ){
     if (!projectId) return;
     const BASE_URL = 'http://localhost:5095/api/v1';
-    let getAllUrl: string;
-    let createNewUrl: string;
-    if (type === 'data source') {
-      getAllUrl = `${BASE_URL}/projects/${projectId}/datasources?hideArchived=true`;
-      createNewUrl = `${BASE_URL}/projects/${projectId}/datasources`;
-    } else {
-      getAllUrl = `${BASE_URL}/organizations/1/projects/${projectId}/storages?hideArchived=true`;
-      createNewUrl = `${BASE_URL}/organizations/1/projects/${projectId}/storages?makeDefault=false`;
-    }
+    const isDataSource = type === 'data source';
+    const getAllUrl = isDataSource
+      ? `${BASE_URL}/projects/${projectId}/datasources?hideArchived=true`
+      : `${BASE_URL}/organizations/1/projects/${projectId}/storages?hideArchived=true`;
+    const createUrl = isDataSource
+      ? `${BASE_URL}/projects/${projectId}/datasources`
+      :`${BASE_URL}/organizations/1/projects/${projectId}/storages?makeDefault=false`
+    const FIXED_NAME = isDataSource
+      ? "Second data source for playwright tests"
+      : "Second storage for playwright tests";
     try {
-      let res = await request.fetch(getAllUrl);
-      if (!res.ok()) throw new Error(`Failed to fetch ${type}s: ${res.status()}`);
-      let allOfType = await res.json();
-      if (allOfType.length === 1) {
-        // create new of type
-        let postRes: APIResponse;
-        if (type === 'data source') {
-          postRes = await request.post(createNewUrl, { data: { name: "Second data source for playwright tests" }});
-        } else {
-          postRes = await request.post(createNewUrl, { data: { name: `Second storage for playwright tests`, config: {mountPath: `../data/duckdb/org_1/project_${projectId}`} }});
+      for (let attempt = 0; attempt < 5; attempt ++) {
+        let res = await request.fetch(getAllUrl);
+        if (!res.ok()) throw new Error(`Failed to fetch ${type}s: ${res.status()}`);
+        const allOfType = await res.json();
+        const nonDefault = allOfType.find((singleType: DataSourceOrStorage) => singleType.default !== true);
+        if (nonDefault) return nonDefault.name;
+
+        const postRes = isDataSource
+          ? await request.post(createUrl, { data: { name: FIXED_NAME }})
+          : await request.post(createUrl, { data: { name: FIXED_NAME, config: { mountPath: `../data/duckdb/org_1/project_${projectId}` }}});
+
+        if (!postRes.ok() && postRes.status() !== 409) {
+          throw new Error(`Failed to create new ${type}: ${postRes.status()}`);
         }
-        if (!postRes.ok()) throw new Error(`Failed to create new ${type}: ${postRes.status()}`);
-        res = await request.get(getAllUrl);
-        if (!res.ok()) throw new Error(`Failed to refecth ${type}: ${res.status()}`);
-        allOfType = await res.json();
       }
-      // return non default
-      return (allOfType.find((singleType: DataSourceOrStorage) => singleType.default !== true)).name;
+      throw new Error(`Could not establish a non-default ${type} after retries`);
     } catch(err) {
       console.warn(`Error getting different ${type}.`, err);
       return undefined;
@@ -171,7 +180,7 @@ test.describe("Upload Center", () => {
 
     if (projectNav) {
       await page.getByRole('complementary').filter({ hasText: 'Projects' }).getByRole('button').click();
-      await page.getByRole('button', { name: projectNav }).click();
+      await page.getByRole('button', { name: projectNav }).first().click();
     }
 
     await page.getByRole('link', { name: 'Project Dashboard' }).click();
@@ -228,7 +237,7 @@ test.describe("Upload Center", () => {
 
     if (projectNav) {
       await page.getByRole('complementary').filter({ hasText: 'Projects' }).getByRole('button').click();
-      await page.getByRole('button', { name: projectNav }).click();
+      await page.getByRole('button', { name: projectNav }).first().click();
     }
 
     await page.getByRole('link', { name: 'Project Dashboard' }).click();
@@ -935,7 +944,7 @@ startxref
       // Navigate to Project Page
       await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
-      await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
 
       for (const baseName of fileBaseNames) {
         await expect(page.getByText(baseName)).toBeVisible();
@@ -949,6 +958,11 @@ startxref
       await page.getByRole('link', { name: 'Visit' }).first().click();
 
       for (const baseName of fileBaseNames) {
+        const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+        if (await clearTermsButton.isVisible()) {
+          await clearTermsButton.click();
+        }
+        
         await page.getByRole('textbox', { name: 'Search' }).click();
         await page.getByRole('textbox', { name: 'Search' }).fill(baseName);
         await page.getByRole('textbox', { name: 'Search' }).press('Enter');
@@ -1082,7 +1096,7 @@ startxref
       // Verify the new files appear
       await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
-      await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
       for (const name of bulkFileNames) {
         await expect(page.getByText(name)).toBeVisible();
       }
@@ -1095,6 +1109,11 @@ startxref
       await page.getByRole('link', { name: 'Visit' }).first().click();
 
       for (const name of bulkFileNames) {
+        const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+        if (await clearTermsButton.isVisible()) {
+          await clearTermsButton.click();
+        }
+
         await page.getByRole('textbox', { name: 'Search' }).click();
         await page.getByRole('textbox', { name: 'Search' }).fill(name);
         await page.getByRole('textbox', { name: 'Search' }).press('Enter');
@@ -1160,7 +1179,7 @@ startxref
       // Navigate to Project Page
       await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
-      await expect(page.getByRole("heading", { name: "PROJECT" })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
       await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
       await page.getByRole('link', { name: 'timeseries-test-file.csv' }).first().click();
       await page.waitForURL(/\/record/);
@@ -1186,50 +1205,60 @@ startxref
   
   test.describe("Data Source and Storage uploads", () => {
     let filePaths: [string, string, string, string, string, string];
+    let tmpDir: string;
 
-    test.beforeAll(async ({}) => {
+    test.beforeAll(async ({}, workerInfo) => {
+      tmpDir = await fs.promises.mkdtemp(
+        path.join(os.tmpdir(), `upload-tests-${workerInfo.workerIndex}-`)
+      );
+      
       // Create the files to use locally
       filePaths = [
-        path.join(os.tmpdir(), 'upload-different-datasource-click'),
-        path.join(os.tmpdir(), 'upload-different-datasource-drag'),
-        path.join(os.tmpdir(), 'upload-different-storage-click'),
-        path.join(os.tmpdir(), 'upload-different-storage-drag'),
-        path.join(os.tmpdir(), 'upload-different-project-click'),
-        path.join(os.tmpdir(), 'upload-different-project-drag')
+        path.join(tmpDir, 'upload-different-datasource-click'),
+        path.join(tmpDir, 'upload-different-datasource-drag'),
+        path.join(tmpDir, 'upload-different-storage-click'),
+        path.join(tmpDir, 'upload-different-storage-drag'),
+        path.join(tmpDir, 'upload-different-project-click'),
+        path.join(tmpDir, 'upload-different-project-drag')
       ];
 
-      for (const filePath of filePaths) {
-        if (!fs.existsSync(filePath)) {
-          await fs.promises.writeFile(filePath, Buffer.alloc(1));
-        }
-      }
+      await Promise.all(
+        filePaths.map(filePath =>
+            fs.promises.writeFile(filePath, Buffer.alloc(1))
+        )
+      );
     });
 
     test.afterAll(async () => {
-      for (const filePath of filePaths) {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      }
+      await fs.promises.rm(tmpDir, {
+        recursive: true,
+        force: true,
+      });
     });
 
     test("default project and storage, nondefault data source, click to browse, successfully uploads file", async ({ page, request }) => {
       // set datasource and storage destination
       await checkStorageDestinations(page);
       const nondefaultDs = await getNonDefault(request, projectId, 'data source');
-      await page.getByLabel('Data sourceData').click();
-      await page.getByText(nondefaultDs).click();
+      const dataSourceSelect = page.getByLabel('Data sourceData');
+      await expect(dataSourceSelect).toBeEnabled();
+      const option = dataSourceSelect.locator('option', { hasText: nondefaultDs });
+      await expect(option).toBeAttached({ timeout: 15_000 });
+      await dataSourceSelect.selectOption(nondefaultDs);
 
       // click to browse
       await clickToBrowse({ page }, 'upload-different-datasource-click', filePaths[0]);
-    })
+    });
 
     test("default project and storage, nondefault data source, drag and drop, successfully uploads file", async ({ page, request }) => {
       // set datasource and storage destination
       await checkStorageDestinations(page);
       const nondefaultDs = await getNonDefault(request, projectId, 'data source');
-      await page.getByLabel('Data sourceData').click();
-      await page.getByText(nondefaultDs).click();
+      const dataSourceSelect = page.getByLabel('Data sourceData');
+      await expect(dataSourceSelect).toBeEnabled();
+      const option = dataSourceSelect.locator('option', { hasText: nondefaultDs });
+      await expect(option).toBeAttached({ timeout: 15_000 });
+      await dataSourceSelect.selectOption(nondefaultDs);
 
       // click to browse
       await dragAndDrop({ page }, 'upload-different-datasource-drag', filePaths[1], 'txt');
@@ -1239,8 +1268,11 @@ startxref
       // set datasource and storage destination
       await checkDataSources(page);
       const nondefaultOs = await getNonDefault(request, projectId, 'storage');
-      await page.getByLabel('Storage DestinationObject').click();
-      await page.getByText(nondefaultOs).click();
+      const objectStorageSelect = page.getByLabel('Storage DestinationObject');
+      await expect(objectStorageSelect).toBeEnabled();
+      const option = objectStorageSelect.locator('option', { hasText: nondefaultOs });
+      await expect(option).toBeAttached({ timeout: 15_000 });
+      await objectStorageSelect.selectOption(nondefaultOs);
 
       // click to browse
       await clickToBrowse({ page }, 'upload-different-storage-click', filePaths[2]);
@@ -1250,8 +1282,11 @@ startxref
       // set datasource and storage destination
       await checkDataSources(page);
       const nondefaultOs = await getNonDefault(request, projectId, 'storage');
-      await page.getByLabel('Storage DestinationObject').click();
-      await page.getByText(nondefaultOs).click();
+      const objectStorageSelect = page.getByLabel('Storage DestinationObject');
+      await expect(objectStorageSelect).toBeEnabled();
+      const option = objectStorageSelect.locator('option', { hasText: nondefaultOs });
+      await expect(option).toBeAttached({ timeout: 15_000 });
+      await objectStorageSelect.selectOption(nondefaultOs);
 
       // click to browse
       await dragAndDrop({ page }, 'upload-different-storage-drag', filePaths[3], 'txt');
