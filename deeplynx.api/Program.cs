@@ -13,6 +13,7 @@ using deeplynx.api.Routing;
 using deeplynx.api.Services;
 using deeplynx.api.OpenApi;
 using deeplynx.api.ExceptionHandlers;
+using deeplynx.api.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
@@ -171,6 +172,7 @@ try
             options.ReportApiVersions = true;
             options.AssumeDefaultVersionWhenUnspecified = true;
             options.ApiVersionReader = new UrlSegmentApiVersionReader();
+            options.UnsupportedApiVersionStatusCode = StatusCodes.Status400BadRequest;
         })
         .AddMvc(options =>
         {
@@ -317,6 +319,7 @@ try
     app.UseStaticFiles();
     app.UseRouting();
     app.UseExceptionHandler(); // Runs registered IExceptionHandlers; must precede middleware that may throw
+    app.UseMiddleware<UnsupportedApiVersionResponseMiddleware>();
     app.UseCors("AllowAll");
 
     if (isRuntimeStartup)
