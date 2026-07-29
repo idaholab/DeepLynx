@@ -507,12 +507,12 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     }
 
     try {
-      const dto: UpdateObjectStorageRequestDto = {
+      const objectStorageDto: UpdateObjectStorageRequestDto = {
         name: storageFormData.name,
         default: storageFormData.default,
       };
 
-      const dto2: UpdateProjectRequestDto = {
+      const projectRequestDto: UpdateProjectRequestDto = {
         organizationId: organization.organizationId as number,
         filePath: storageFormData.config.AzureObjectConfig?.AzureFilePath
       };
@@ -521,13 +521,13 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         organization.organizationId as number,
         project.id as number,
         editingStorage.id as number,
-        dto,
+        objectStorageDto,
       );
 
       await updateProject(
         organization.organizationId as number,
         project.id as number,
-        dto2
+        projectRequestDto
       )
 
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
