@@ -22,6 +22,8 @@ public class ProjectBusiness : IProjectBusiness
     private readonly IDataSourceBusiness _dataSourceBusiness;
     private readonly IEventBusiness _eventBusiness;
 
+    private readonly IFileBusiness _fileAzureBusiness;
+
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -48,11 +50,13 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="eventBusiness">Used for logging events during create and update Operations.</param>
     /// <param name="logger">Used for uniformity in logging</param>
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
+    /// <param name="fileAzureBusiness">Used to manage Azure operations.</param>
     public ProjectBusiness(
         DeeplynxContext context, ILogger<ProjectBusiness> logger,
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
-        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness)
+        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness,
+        IFileBusiness fileAzureBusiness)
     {
         _context = context;
         _logger = logger;
@@ -63,6 +67,7 @@ public class ProjectBusiness : IProjectBusiness
         _objectStorageBusiness = objectStorageBusiness;
         _eventBusiness = eventBusiness;
         _organizationBusiness = organizationBusiness;
+        _fileAzureBusiness = fileAzureBusiness;
     }
 
     /// <summary>
@@ -163,7 +168,7 @@ public class ProjectBusiness : IProjectBusiness
         {
             try
             {
-                var container = await _objectStorageBusiness.CreateProjectContainer(
+                var container = await _fileAzureBusiness.CreateProjectContainer(
                     userId: userId,
                     organizationId: organizationId,
                     projectId: projectId,

@@ -216,75 +216,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
 
     /// <summary>
-    ///     Creates an object storage
-    /// </summary>
-    /// <param name="userId">ID of the User executing this method.</param>
-    /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
-    /// <param name="projectId">The ID of the project to which the object storage belongs</param>
-    /// <param name="projectName">The name of the project</param>
-    public async Task<ObjectStorageResponseDto> CreateProjectContainer(
-        long userId,
-        long organizationId,
-        long projectId,
-        string projectName)
-    {
-        const int maxContainerNameLength = 63;
-        const int guidLength = 36;
-        const int separatorLength = 1;
-        int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
-
-        string truncatedProjectName = projectName.Length > maxProjectNameLength
-            ? projectName[..maxProjectNameLength]
-            : projectName;
-
-        truncatedProjectName = new string([.. truncatedProjectName
-            .ToLower()
-            .Where(c => char.IsLetterOrDigit(c) || c == '-')]);
-
-        string guid = Guid.NewGuid().ToString();
-
-        string containerName = $"{truncatedProjectName}-{guid}".ToLower();
-
-        if (containerName.Length > maxContainerNameLength || containerName.Length < 3)
-            throw new Exception("Generated container name does not comply with Azure Blob storage naming rules.");
-
-        var defaultObjectStorage = await _context.ObjectStorages
-            .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Default && os.Type == "azure_object")
-            .FirstOrDefaultAsync() ?? throw new Exception("No default Azure object storage found for the organization.");
-        var azureConfig = DeserializeAndDecryptConfig(defaultObjectStorage.ConfigEncrypted);
-
-        if (azureConfig == null || string.IsNullOrWhiteSpace(azureConfig.AzureObjectConfig.AzureConnectionString))
-            throw new Exception("Invalid or missing Azure configuration in the default object storage.");
-
-        var blobServiceClient = new BlobServiceClient(azureConfig.AzureObjectConfig.AzureConnectionString);
-        var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-
-        await containerClient.CreateIfNotExistsAsync();
-
-        var newObjectStorageDto = new CreateObjectStorageRequestDto
-        {
-            Name = containerName,
-            Config = new ObjectStorageConfigDto
-            {
-                AzureObjectConfig = new AzureObjectConfigDto
-                {
-                    AzureConnectionString = azureConfig.AzureObjectConfig.AzureConnectionString,
-                    AzureContainerName = containerName
-                }
-            },
-            Default = true
-        };
-
-        var createdContainer = await CreateObjectStorage(
-            currentUserId: userId,
-            organizationId: organizationId,
-            projectId: projectId,
-            dto: newObjectStorageDto);
-
-        return createdContainer;
-    }
-
-    /// <summary>
     ///     Updates an object storage
     /// </summary>
     /// <param name="currentUserId">ID of the User executing this method.</param>
@@ -361,69 +292,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         }
     }
 
-    /// <summary>
-    ///     Updates an object storage
-    /// </summary>
-    /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
-    /// <param name="projectId">The ID of the project to which the object storage belongs</param>
-    /// <param name="objectStorageId">ID of object storage</param>
-    /// <param name="dto">A data transfer object with details on object storage fields to be updated</param>
-    /// <exception cref="KeyNotFoundException"></exception>
-    public async Task<ObjectStorageResponseDto> UpdateProjectContainerSettings(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long objectStorageId,
-        UpdateObjectStorageRequestDto dto)
-    {
-        ValidationHelper.ValidateModel(dto);
 
-        var objectStorage = await _context.ObjectStorages
-            .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId && os.ProjectId == projectId)
-            .FirstOrDefaultAsync();
-
-        if (objectStorage == null || objectStorage.IsArchived)
-        {
-            objectStorage = await _context.ObjectStorages
-                .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId && os.ProjectId == null)
-                .FirstOrDefaultAsync();
-
-            if (objectStorage == null || objectStorage.IsArchived)
-                throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found for the specified project or organization default.");
-        }
-
-        var project = await _context.Projects
-            .Where(p => p.Id == projectId && p.OrganizationId == organizationId)
-            .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Project with id {projectId} not found.");
-        project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        project.LastUpdatedBy = currentUserId;
-
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
-        {
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw new Exception("Unable to update project container settings.");
-        }
-
-        return new ObjectStorageResponseDto
-        {
-            Id = objectStorage.Id,
-            Name = objectStorage.Name,
-            Type = objectStorage.Type,
-            ProjectId = objectStorage.ProjectId,
-            OrganizationId = objectStorage.OrganizationId,
-            Default = objectStorage.Default,
-            LastUpdatedAt = objectStorage.LastUpdatedAt,
-            LastUpdatedBy = objectStorage.LastUpdatedBy,
-            IsArchived = objectStorage.IsArchived,
-        };
-    }
     /// <summary>
     ///     Delete an object storage by ID
     /// </summary>
