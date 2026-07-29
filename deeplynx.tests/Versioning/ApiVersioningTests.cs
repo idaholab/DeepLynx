@@ -86,15 +86,6 @@ public class ApiVersioningTests : IntegrationTestBase
 
     //Todo: add this back when v1 is deprecated
 
-    // [Fact]
-    // public async Task V1Response_HasDeprecatedVersionsHeader()
-    // {
-    //     var response = await _client.GetAsync(ApiPath("v1", ProjectTagsRoute));
-    //
-    //     Assert.True(response.Headers.Contains("api-deprecated-versions"),
-    //         "v1 should be marked deprecated now that v2 exists.");
-    // }
-
     [Fact]
     public async Task V2Response_DoesNotHaveDeprecatedVersionsHeader()
     {
@@ -121,11 +112,11 @@ public class ApiVersioningTests : IntegrationTestBase
     // =========================================================================
 
     [Fact]
-    public async Task UnsupportedVersion_Returns404()
+    public async Task UnsupportedVersion_Returns400()
     {
         var response = await _client.GetAsync(ApiPath("v9", ProjectTagsRoute));
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
