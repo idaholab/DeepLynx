@@ -2,6 +2,8 @@
 import "server-only";
 import { cache } from "react";
 import { auth } from "../../../../auth";
+import { apiErrorFromResponse } from "../api-error";
+import { backendApiUrl } from "./backend-api-url.server";
 
 /**
  * Request-scoped memoized session getter.
@@ -19,21 +21,6 @@ import { auth } from "../../../../auth";
  * another. cache() is request-scoped, so it isolates users correctly.
  */
 export const getServerSession = cache(() => auth());
-
-/** ----- Strict env handling (lazy) ----- */
-let _BASE: string | null = null;
-
-function getBase(): string {
-  if (_BASE) return _BASE;
-
-  const v = process.env.BACKEND_BASE_URL;
-  if (!v) throw new Error("[ENV] BACKEND_BASE_URL is not set");
-  if (!/^https?:\/\//.test(v)) {
-    throw new Error(`[ENV] BACKEND_BASE_URL must start with http(s):// (got "${v}")`);
-  }
-  _BASE = v.replace(/\/+$/, ""); // strip trailing slash
-  return _BASE;
-}
 
 const SERVICE_TOKEN = process.env.BACKEND_SERVICE_TOKEN ?? process.env.SERVICE_TOKEN ?? "";
 
@@ -74,7 +61,7 @@ async function authHeaders(): Promise<HeadersInit> {
 
 /** Small fetch wrapper with detailed error logging */
 export async function apiFetch(path: string, init: RequestInit = {}) {
-  const url = `${getBase()}${path.startsWith("/") ? "" : "/"}${path}`;
+  const url = backendApiUrl(path);
   const headers = {
     ...(await authHeaders()),
     ...(init.headers || {}),
@@ -87,16 +74,16 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => "<no response body>");
+    const error = await apiErrorFromResponse(res);
     console.error("[API ERROR]", {
       method: init.method || "GET",
       url,
       status: res.status,
       statusText: res.statusText,
       respHeaders: Object.fromEntries(res.headers.entries()),
-      body: body.slice(0, 2000),
+      body: error.body,
     });
-    throw new Error(`API ${init.method || "GET"} ${path} -> ${res.status}`);
+    throw error;
   }
   return res;
 }

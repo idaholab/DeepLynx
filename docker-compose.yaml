@@ -8,11 +8,11 @@ services:
         NEXTAUTH_URL: "http://localhost:3000"
         REDIRECT_LINK: "http://localhost:3000/api/auth/callback/okta"
         NEXT_PUBLIC_DOCS_PATH: "http://localhost:3001/docs"
-        NEXT_PUBLIC_API_URL: "http://localhost:5000/api/v1"
+        NEXT_PUBLIC_API_URL: "http://localhost:5000"
         OKTA_CLIENT_ID: ""
         OKTA_CLIENT_SECRET: ""
         NEXTAUTH_SECRET: "changeMe"
-        BACKEND_BASE_URL: "http://server:5000/api/v1"
+        BACKEND_BASE_URL: "http://server:5000"
         AUTH_TRUST_HOST: true
         NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
     environment:
@@ -21,11 +21,11 @@ services:
       NEXTAUTH_URL: "http://localhost:3000"
       REDIRECT_LINK: "http://localhost:3000/api/auth/callback/okta"
       NEXT_PUBLIC_DOCS_PATH: "http://localhost:3001/docs"
-      NEXT_PUBLIC_API_URL: "http://localhost:5000/api/v1"
+      NEXT_PUBLIC_API_URL: "http://localhost:5000"
       OKTA_CLIENT_ID: ""
       OKTA_CLIENT_SECRET: ""
       NEXTAUTH_SECRET: "changeMe"
-      BACKEND_BASE_URL: "http://server:5000/api/v1"
+      BACKEND_BASE_URL: "http://server:5000"
       INSIGHT_API_URL: "http://insight-fastapi:5009"
       AUTH_TRUST_HOST: true
       NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
@@ -124,7 +124,7 @@ services:
       context: ./
       dockerfile: Dockerfiles/mcp/Dockerfile.local
     environment:
-      NEXUS_API_URL: "http://server:5000/api/v1"
+      NEXUS_API_URL: "http://server:5000"
       MCP_SERVER_URL: "http://0.0.0.0:43656"
     ports:
       - "43656:43656"
