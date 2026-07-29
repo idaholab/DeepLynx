@@ -11,8 +11,8 @@
 
     <ItemGroup>
         <PackageReference Include="coverlet.collector" Version="6.0.4">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-            <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+          <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="DotNetEnv" Version="3.1.1" />
         <PackageReference Include="FluentAssertions" Version="8.8.0" />
@@ -34,8 +34,8 @@
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
         <PackageReference Include="xunit" Version="2.9.3" />
         <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-            <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+          <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="Serilog" Version="4.3.1-dev-02406" />
         <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
@@ -48,16 +48,16 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\deeplynx.api\deeplynx.api.csproj" />
-        <ProjectReference Include="..\deeplynx.business\deeplynx.business.csproj" />
-        <ProjectReference Include="..\deeplynx.datalayer\deeplynx.datalayer.csproj" />
-        <ProjectReference Include="..\deeplynx.helpers\deeplynx.helpers.csproj" />
-        <ProjectReference Include="..\deeplynx.interfaces\deeplynx.interfaces.csproj" />
-        <ProjectReference Include="..\deeplynx.models\deeplynx.models.csproj" />
+      <ProjectReference Include="..\deeplynx.api\deeplynx.api.csproj" />
+      <ProjectReference Include="..\deeplynx.business\deeplynx.business.csproj" />
+      <ProjectReference Include="..\deeplynx.datalayer\deeplynx.datalayer.csproj" />
+      <ProjectReference Include="..\deeplynx.helpers\deeplynx.helpers.csproj" />
+      <ProjectReference Include="..\deeplynx.interfaces\deeplynx.interfaces.csproj" />
+      <ProjectReference Include="..\deeplynx.models\deeplynx.models.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <None Update="ExceptionHandlers\Snapshots\*.json" CopyToOutputDirectory="PreserveNewest" />
+      <None Update="ExceptionHandlers\Snapshots\*.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
 </Project>
