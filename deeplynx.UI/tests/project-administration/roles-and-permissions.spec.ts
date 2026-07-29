@@ -1,5 +1,6 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, APIRequestContext, APIResponse, Page } from "@playwright/test";
 import { seedAndNavigateToProject } from "../helpers/seed";
+import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
 
 test.describe("Roles & Permissions", () => {
   test.beforeEach(async ({ page }) => {
@@ -17,6 +18,32 @@ test.describe("Roles & Permissions", () => {
     ).toBeVisible();
   });
 
+  async function getNonUserRole(
+    request : APIRequestContext, projectId: string | undefined, page: Page
+  ){
+    if (!projectId) return;
+    const BASE_URL = 'http://localhost:5095/api/v1';
+    const getAllUrl = `${BASE_URL}/organizations/1/projects/${projectId}/roles?hideArchived=true`;
+    try {
+      let res = await request.fetch(getAllUrl);
+      if (!res.ok()) throw new Error(`Failed to fetch roles: ${res.status()}`);
+      let roles = await res.json();
+      if (roles.length === 1) {
+        // create new role
+        await page.getByRole('button', { name: 'Create Role' }).click();
+        await page.getByRole('textbox', { name: 'Enter role name' }).click();
+        await page.getByRole('textbox', { name: 'Enter role name' }).fill('Playwright test role');
+        await page.getByRole('dialog').getByRole('button', { name: 'Create Role' }).click();
+        return "Playwright test role";
+      }
+      // return non user
+      return (roles.find((role: RoleResponseDto) => role.name !== "User")).name;
+    } catch(err) {
+      console.warn(`Error getting different role.`, err);
+      return undefined;
+    }
+  }
+
   /* ------------------------------------------------------------------------ */
   /*                         Page Rendering                                   */
   /* ------------------------------------------------------------------------ */
@@ -31,7 +58,7 @@ test.describe("Roles & Permissions", () => {
     test("displays the page description", async ({ page }) => {
       await expect(
         page.getByText(
-          /View project-level roles and their permissions/i,
+          /View project roles and/i,
         ),
       ).toBeVisible();
     });
@@ -76,11 +103,8 @@ test.describe("Roles & Permissions", () => {
       ).toBeVisible();
     });
 
-    test("displays standard roles (Admin, User)", async ({ page }) => {
-      // Standard roles should be listed in the sidebar
-      await expect(
-        page.locator("button", { hasText: "Admin" }).first(),
-      ).toBeVisible();
+    test("displays standard role (User)", async ({ page }) => {
+      // Standard role of User should be listed in the sidebar
       await expect(
         page.locator("button", { hasText: "User" }).first(),
       ).toBeVisible();
@@ -145,18 +169,19 @@ test.describe("Roles & Permissions", () => {
       ).toBeDisabled({ timeout: 15000 });
     });
 
-    test("clicking a different role selects it", async ({ page }) => {
-      // Click the "User" role in the sidebar (role buttons contain Source: text)
-      await page
-        .locator("button", { hasText: /Source:/ })
-        .filter({ hasText: "User" })
-        .first()
-        .click();
-      // The right panel heading (h2) should now show "User"
+    test("clicking a different role selects it", async ({ page, request }) => {
+      // make sure a second role is set up
+      const url = new URL(page.url());
+      const projectId = url.pathname.split('/').pop();
+      // Click a different role than "User" in the sidebar (role buttons contain Source: text)
+      const nonUserRole = await getNonUserRole(request, projectId, page);
+      await page.getByRole('button', { name: nonUserRole }).click();
+      // The right panel heading (h2) should not show "User"
       const detailPanel = page.locator(".flex-1.card");
       await expect(
         detailPanel.locator("h2.card-title", { hasText: "User" }),
-      ).toBeVisible();
+      ).not.toBeVisible();
+      await expect(detailPanel.locator("h2.card-title")).toBeVisible();
     });
 
     test("switching between Sensitivity Labels and Resource Permissions tabs works", async ({
@@ -223,10 +248,7 @@ test.describe("Roles & Permissions", () => {
 
     test("displays role names as column headers", async ({ page }) => {
       await expect(page.locator("table")).toBeVisible({ timeout: 15000 });
-      // Standard roles should appear in the table header
-      await expect(
-        page.locator("thead span", { hasText: "Admin" }).first(),
-      ).toBeVisible();
+      // Standard role should appear in the table header
       await expect(
         page.locator("thead span", { hasText: "User" }).first(),
       ).toBeVisible();
@@ -354,26 +376,49 @@ test.describe("Roles & Permissions", () => {
   /* ------------------------------------------------------------------------ */
 
   test.describe("Role CRUD operations", () => {
-    const testRoleName = `E2E Role ${Date.now()}`;
-    const updatedRoleName = `${testRoleName} Updated`;
+    let testRoleName: string;
+    const pendingRoleNames: string[] = [];
+
+    test.beforeEach(async ({}, testInfo) => {
+      testRoleName = `E2E Role w${testInfo.workerIndex}-${testInfo.testId}r${testInfo.retry}-${crypto.randomUUID().slice(0,8)}`;
+    });
+    
+    test.afterEach(async ({ page }) => {
+      // clean up the roles that were created
+      for (const roleName of pendingRoleNames) {
+        const roleButton = page.getByRole("button", { name: roleName });
+        if (await roleButton.isVisible().catch(() => false)) {
+          await roleButton.click();
+          await page.locator(".btn-circle.text-error").click();
+          const deleteModal = page.locator("dialog.modal.modal-open");
+          await deleteModal.getByRole("button", { name: "Delete" }).click();
+          await expect(deleteModal).not.toBeVisible({ timeout: 15000 });
+        }
+      }
+      pendingRoleNames.length = 0;
+    })
 
     test("create a new custom role", async ({ page }) => {
+      // const testRoleName = `E2E Role ${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
+      // const updatedRoleName = `${testRoleName} Updated`;
+      const roleName = `${testRoleName} Create`;
       await page.getByRole("button", { name: "Create Role" }).click();
       const modal = page.locator("dialog.modal.modal-open");
       await modal
         .locator('input[placeholder="Enter role name"]')
-        .fill(testRoleName);
+        .fill(roleName);
       await modal
         .locator('textarea[placeholder="Enter role description (optional)"]')
         .fill("Role created by E2E test");
       await modal.getByRole("button", { name: "Create Role" }).click();
+      pendingRoleNames.push(roleName);
 
       // Modal should close after creation
       await expect(modal).not.toBeVisible({ timeout: 15000 });
 
       // New role should appear in the sidebar
       await expect(
-        page.locator("button", { hasText: testRoleName }),
+        page.getByRole("button", { name: testRoleName }).first(),
       ).toBeVisible({ timeout: 15000 });
 
       // New role should be selected and show PRJ badge
@@ -384,18 +429,19 @@ test.describe("Roles & Permissions", () => {
 
     test("edit a custom role via the edit modal", async ({ page }) => {
       // First create a role to edit
-      const roleName = `Edit Test ${Date.now()}`;
+      const roleName = `${testRoleName} Edit`;
       await page.getByRole("button", { name: "Create Role" }).click();
       const createModal = page.locator("dialog.modal.modal-open");
       await createModal
         .locator('input[placeholder="Enter role name"]')
         .fill(roleName);
       await createModal.getByRole("button", { name: "Create Role" }).click();
+      pendingRoleNames.push(roleName);
       await expect(createModal).not.toBeVisible({ timeout: 15000 });
 
       // Wait for the role to appear and be selected
       await expect(
-        page.locator("button", { hasText: roleName }),
+        page.getByRole("button", { name: roleName }).first(),
       ).toBeVisible({ timeout: 15000 });
 
       // Click the edit (pencil) button in the detail panel header
@@ -420,24 +466,27 @@ test.describe("Roles & Permissions", () => {
 
       // The updated name should appear in the sidebar
       await expect(
-        page.locator("button", { hasText: `${roleName} Edited` }),
+        page.getByRole("button", { name: `${roleName} Edited` }).first(),
       ).toBeVisible({ timeout: 15000 });
+
+      pendingRoleNames[0] = `${roleName} Edited`;
     });
 
     test("delete a custom role via the delete modal", async ({ page }) => {
       // First create a role to delete
-      const roleName = `Delete Test ${Date.now()}`;
+      const roleName = `${testRoleName} Delete`;
       await page.getByRole("button", { name: "Create Role" }).click();
       const createModal = page.locator("dialog.modal.modal-open");
       await createModal
         .locator('input[placeholder="Enter role name"]')
         .fill(roleName);
       await createModal.getByRole("button", { name: "Create Role" }).click();
+      pendingRoleNames.push(roleName);
       await expect(createModal).not.toBeVisible({ timeout: 15000 });
 
       // Wait for the role to appear and be selected
       await expect(
-        page.locator("button", { hasText: roleName }),
+        page.getByRole("button", { name: roleName }).first(),
       ).toBeVisible({ timeout: 15000 });
 
       // Click the delete (trash) button in the detail panel
@@ -457,8 +506,10 @@ test.describe("Roles & Permissions", () => {
 
       // The role should no longer appear in the sidebar
       await expect(
-        page.locator("button", { hasText: roleName }),
+        page.getByRole("button", { name: roleName }),
       ).not.toBeVisible({ timeout: 10000 });
+
+      pendingRoleNames.length = 0;
     });
   });
 
@@ -470,9 +521,9 @@ test.describe("Roles & Permissions", () => {
     test("Edit Permissions button is disabled for standard roles", async ({
       page,
     }) => {
-      // Admin is a standard role - Edit Permissions should be disabled
+      // User is a standard role - Edit Permissions should be disabled
       await expect(
-        page.locator("button", { hasText: "Admin" }).first(),
+        page.locator("button", { hasText: "User" }).first(),
       ).toBeVisible();
 
       await expect(

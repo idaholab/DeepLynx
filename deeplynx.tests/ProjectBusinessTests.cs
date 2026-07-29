@@ -24,6 +24,7 @@ namespace deeplynx.tests;
 public class ProjectBusinessTests : IntegrationTestBase
 {
     private ClassBusiness _classBusiness = null!;
+    private FileAzureBusiness _fileAzureBusiness;
     private UserBusiness _userBusiness = null!;
     private DataSourceBusiness _dataSourceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
@@ -106,10 +107,11 @@ public class ProjectBusinessTests : IntegrationTestBase
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness, _permissionService, _adminService);
+        _fileAzureBusiness = new FileAzureBusiness(Context, _objectStorageBusiness, _encryptionHelper);
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
-            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
+            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _fileAzureBusiness);
     }
 
     #region GetProjectStats Tests
