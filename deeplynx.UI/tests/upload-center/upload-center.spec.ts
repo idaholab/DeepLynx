@@ -55,34 +55,33 @@ test.describe("Upload Center", () => {
   ){
     if (!projectId) return;
     const BASE_URL = 'http://localhost:5095/api/v1';
-    let getAllUrl: string;
-    let createNewUrl: string;
-    if (type === 'data source') {
-      getAllUrl = `${BASE_URL}/projects/${projectId}/datasources?hideArchived=true`;
-      createNewUrl = `${BASE_URL}/projects/${projectId}/datasources`;
-    } else {
-      getAllUrl = `${BASE_URL}/organizations/1/projects/${projectId}/storages?hideArchived=true`;
-      createNewUrl = `${BASE_URL}/organizations/1/projects/${projectId}/storages?makeDefault=false`;
-    }
+    const isDataSource = type === 'data source';
+    const getAllUrl = isDataSource
+      ? `${BASE_URL}/projects/${projectId}/datasources?hideArchived=true`
+      : `${BASE_URL}/organizations/1/projects/${projectId}/storages?hideArchived=true`;
+    const createUrl = isDataSource
+      ? `${BASE_URL}/projects/${projectId}/datasources`
+      :`${BASE_URL}/organizations/1/projects/${projectId}/storages?makeDefault=false`
+    const FIXED_NAME = isDataSource
+      ? "Second data source for playwright tests"
+      : "Second storage for playwright tests";
     try {
-      let res = await request.fetch(getAllUrl);
-      if (!res.ok()) throw new Error(`Failed to fetch ${type}s: ${res.status()}`);
-      let allOfType = await res.json();
-      if (allOfType.length === 1) {
-        // create new of type
-        let postRes: APIResponse;
-        if (type === 'data source') {
-          postRes = await request.post(createNewUrl, { data: { name: "Second data source for playwright tests" }});
-        } else {
-          postRes = await request.post(createNewUrl, { data: { name: `Second storage for playwright tests`, config: {mountPath: `../data/duckdb/org_1/project_${projectId}`} }});
+      for (let attempt = 0; attempt < 5; attempt ++) {
+        let res = await request.fetch(getAllUrl);
+        if (!res.ok()) throw new Error(`Failed to fetch ${type}s: ${res.status()}`);
+        const allOfType = await res.json();
+        const nonDefault = allOfType.find((singleType: DataSourceOrStorage) => singleType.default !== true);
+        if (nonDefault) return nonDefault.name;
+
+        const postRes = isDataSource
+          ? await request.post(createUrl, { data: { name: FIXED_NAME }})
+          : await request.post(createUrl, { data: { name: FIXED_NAME, config: { mountPath: `../data/duckdb/org_1/project_${projectId}` }}});
+
+        if (!postRes.ok() && postRes.status() !== 409) {
+          throw new Error(`Failed to create new ${type}: ${postRes.status()}`);
         }
-        if (!postRes.ok()) throw new Error(`Failed to create new ${type}: ${postRes.status()}`);
-        res = await request.get(getAllUrl);
-        if (!res.ok()) throw new Error(`Failed to refecth ${type}: ${res.status()}`);
-        allOfType = await res.json();
       }
-      // return non default
-      return (allOfType.find((singleType: DataSourceOrStorage) => singleType.default !== true)).name;
+      throw new Error(`Could not establish a non-default ${type} after retries`);
     } catch(err) {
       console.warn(`Error getting different ${type}.`, err);
       return undefined;
