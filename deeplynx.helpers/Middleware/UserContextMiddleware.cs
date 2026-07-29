@@ -59,28 +59,54 @@ public class UserContextMiddleware
                         if (user != null)
                         {
                             UserContextStorage.UserId = user.Id;
-                            _logger.LogInformation($"User found: {user.Email} (ID: {user.Id})");
-
                             UserContextStorage.AccountType = user.AccountType;
 
                             var adminService = scope.ServiceProvider.GetRequiredService<IAdminService>();
+                            var organizationService = scope.ServiceProvider.GetRequiredService<IOrganizationService>();
+
                             UserContextStorage.IsSysAdmin = await adminService.SysAdminCheck(user.Id);
 
-                            var organizationId = ExtractOrganizationId(context);
-                            if (organizationId.HasValue)
+                            var projectIds = ExtractProjectIds(context);
+
+                            long? organizationIdFromRoute = ExtractOrganizationId(context);
+
+                            long resolvedOrganizationId;
+
+                            try
                             {
-                                UserContextStorage.IsOrgAdmin =
-                                    await adminService.OrgAdminCheck(user.Id, organizationId.Value);
-
-                                UserContextStorage.IsOrgMember =
-                                    await adminService.OrgMemberCheck(user.Id, organizationId.Value);
-
-                                var projectIds = ExtractProjectIds(context);
                                 if (projectIds.Any())
-                                    UserContextStorage.IsProjectAdmin = await adminService.ProjectAdminCheck(
-                                        user.Id, organizationId.Value, projectIds);
+                                {
+                                    resolvedOrganizationId = await organizationService.ResolveOrganizationIdFromProjectsAsync(
+                                        projectIds,
+                                        organizationIdFromRoute
+                                    );
+                                }
+                                else
+                                {
+                                    resolvedOrganizationId = await organizationService.CheckExistence(
+                                        null,
+                                        organizationIdFromRoute
+                                    );
+                                }
                             }
+                            catch (Exception ex)
+                            {
+                                var logger = scope.ServiceProvider.GetRequiredService<ILogger<UserContextMiddleware>>();
+                                logger.LogWarning(ex, "Organization resolution failed");
+
+                                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                                await context.Response.WriteAsJsonAsync(new { error = ex.Message });
+                                return;
+                            }
+
+                            UserContextStorage.OrganizationId = resolvedOrganizationId;
+
+                            UserContextStorage.IsOrgAdmin = await adminService.OrgAdminCheck(user.Id, resolvedOrganizationId);
+                            UserContextStorage.IsOrgMember = await adminService.OrgMemberCheck(user.Id, resolvedOrganizationId);
+                            UserContextStorage.IsProjectAdmin = projectIds.Any() &&
+                                await adminService.ProjectAdminCheck(user.Id, resolvedOrganizationId, projectIds);
                         }
+
                         else
                         {
                             _logger.LogWarning($"User with email {email} not found in database");
