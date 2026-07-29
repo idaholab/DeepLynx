@@ -168,7 +168,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             .Returns(realFileFilesystemBusiness);
 
         // Wire up the real filesystem implementation via the factory mock
-        var realFileAzureBusiness = new FileAzureBusiness();
+        var realFileAzureBusiness = new FileAzureBusiness(Context, _objectStorageBusiness, _encryptionHelper);
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("azure_object"))
             .Returns(realFileAzureBusiness);

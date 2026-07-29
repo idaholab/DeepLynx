@@ -149,4 +149,9 @@ public class FileS3Business : IFileBusiness
     {
         return "";
     }
+
+    public Task<ObjectStorageResponseDto> CreateProjectContainer(long userId, long organizationId, long projectId, string projectName)
+    {
+        throw new NotImplementedException();
+    }
 }

@@ -27,7 +27,13 @@ public interface IFileBusiness
         RecordResponseDto record,
         ObjectStorageConfigDto objectStorageConfig,
         CancellationToken cancellationToken = default);
-    
+
+    Task<ObjectStorageResponseDto> CreateProjectContainer(
+        long userId,
+        long organizationId,
+        long projectId,
+        string projectName);
+
     Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig);
 
     Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,
