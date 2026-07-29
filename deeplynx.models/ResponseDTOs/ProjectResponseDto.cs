@@ -12,4 +12,7 @@ public class ProjectResponseDto
     public long? OrganizationId { get; set; }
     public string? Banner { get; set; }
     public bool? RequireSensitivityLabel { get; set; }
+    public ObjectStorageResponseDto? AssociatedObjectStorage { get; set; }
+    public string? FilePath { get; set; }
+
 }

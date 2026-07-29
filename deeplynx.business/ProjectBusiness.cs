@@ -489,6 +489,7 @@ public class ProjectBusiness : IProjectBusiness
         project.LastUpdatedBy = currentUserId;
         project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         project.Banner = dto.Banner;
+        project.FilePath = dto.FilePath;
 
         _context.Projects.Update(project);
         await _context.SaveChangesAsync();
@@ -515,7 +516,8 @@ public class ProjectBusiness : IProjectBusiness
             LastUpdatedBy = project.LastUpdatedBy,
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
-            RequireSensitivityLabel = project.RequireSensitivityLabel
+            RequireSensitivityLabel = project.RequireSensitivityLabel,
+            FilePath = project.FilePath
         };
 
         // Update the Project Cache List
