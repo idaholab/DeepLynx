@@ -122,7 +122,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             IsArchived = organization.IsArchived,
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
-            Theme = organization.Theme,
+            Theme = organization.Theme
         };
     }
 
@@ -146,7 +146,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             LastUpdatedBy = currentUserId,
             Banner = dto.Banner,
             RequireSensitivityLabel = dto.RequireSensitivityLabel ?? false,
-            Theme = "default",
+            Theme = "default"
         };
 
         _context.Organizations.Add(organization);
@@ -190,7 +190,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
             RequireSensitivityLabel = organization.RequireSensitivityLabel,
-            Theme = organization.Theme,
+            Theme = organization.Theme
         };
     }
 
@@ -272,7 +272,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
             RequireSensitivityLabel = organization.RequireSensitivityLabel,
-            Theme = organization.Theme,
+            Theme = organization.Theme
         };
     }
 

@@ -456,7 +456,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Assert.Equal("filesystem", objectStorageResponse.Type);
     }
 
-
     [Fact]
     public async Task Create_Success_ReturnsCorrectValues()
     {

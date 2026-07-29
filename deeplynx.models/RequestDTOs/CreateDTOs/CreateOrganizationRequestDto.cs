@@ -12,8 +12,6 @@ public class CreateOrganizationRequestDto
 
     [MaxLength(250)]
     public string? Description { get; set; }
-
     public string? Banner { get; set; }
-
     public bool? RequireSensitivityLabel { get; set; }
 }

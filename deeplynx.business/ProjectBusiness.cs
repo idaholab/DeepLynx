@@ -517,7 +517,6 @@ public class ProjectBusiness : IProjectBusiness
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
             RequireSensitivityLabel = project.RequireSensitivityLabel,
-            FilePath = project.FilePath
         };
 
         // Update the Project Cache List
