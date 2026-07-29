@@ -84,6 +84,8 @@ public class ApiVersioningTests : IntegrationTestBase
 
     #region Versioning Headers
 
+    //Todo: add this back when v1 is deprecated
+
     // [Fact]
     // public async Task V1Response_HasDeprecatedVersionsHeader()
     // {
