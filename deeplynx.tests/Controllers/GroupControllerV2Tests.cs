@@ -126,7 +126,7 @@ public class GroupControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteGroupV2_ReturnsEmptyOkAndUsesCurrentUser()
+    public async Task DeleteGroupV2_ReturnsBooleanAndUsesCurrentUser()
     {
         _mockGroupBusiness
             .Setup(business => business.DeleteGroup(CurrentUserId, OrganizationId, GroupId))
@@ -134,14 +134,15 @@ public class GroupControllerV2Tests : IDisposable
 
         var result = await _controller.DeleteGroupV2(OrganizationId, GroupId);
 
-        Assert.IsType<OkResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.True(Assert.IsType<bool>(ok.Value));
         _mockGroupBusiness.Verify(
             business => business.DeleteGroup(CurrentUserId, OrganizationId, GroupId),
             Times.Once);
     }
 
     [Fact]
-    public async Task ArchiveGroupV2_WhenArchiveIsTrue_ReturnsEmptyOkAndArchivesGroup()
+    public async Task ArchiveGroupV2_WhenArchiveIsTrue_ReturnsBooleanAndArchivesGroup()
     {
         _mockGroupBusiness
             .Setup(business => business.ArchiveGroup(CurrentUserId, OrganizationId, GroupId))
@@ -149,7 +150,8 @@ public class GroupControllerV2Tests : IDisposable
 
         var result = await _controller.ArchiveGroupV2(OrganizationId, GroupId, archive: true);
 
-        Assert.IsType<OkResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.True(Assert.IsType<bool>(ok.Value));
         _mockGroupBusiness.Verify(
             business => business.ArchiveGroup(CurrentUserId, OrganizationId, GroupId),
             Times.Once);
@@ -159,7 +161,7 @@ public class GroupControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task ArchiveGroupV2_WhenArchiveIsFalse_ReturnsEmptyOkAndUnarchivesGroup()
+    public async Task ArchiveGroupV2_WhenArchiveIsFalse_ReturnsBooleanAndUnarchivesGroup()
     {
         _mockGroupBusiness
             .Setup(business => business.UnarchiveGroup(CurrentUserId, OrganizationId, GroupId))
@@ -167,7 +169,8 @@ public class GroupControllerV2Tests : IDisposable
 
         var result = await _controller.ArchiveGroupV2(OrganizationId, GroupId, archive: false);
 
-        Assert.IsType<OkResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.True(Assert.IsType<bool>(ok.Value));
         _mockGroupBusiness.Verify(
             business => business.UnarchiveGroup(CurrentUserId, OrganizationId, GroupId),
             Times.Once);
@@ -177,7 +180,7 @@ public class GroupControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task AddUserToGroupV2_ReturnsEmptyOkAndForwardsArguments()
+    public async Task AddUserToGroupV2_ReturnsBooleanAndForwardsArguments()
     {
         _mockGroupBusiness
             .Setup(business => business.AddUserToGroup(MemberId, OrganizationId, GroupId))
@@ -185,14 +188,15 @@ public class GroupControllerV2Tests : IDisposable
 
         var result = await _controller.AddUserToGroupV2(OrganizationId, GroupId, MemberId);
 
-        Assert.IsType<OkResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.True(Assert.IsType<bool>(ok.Value));
         _mockGroupBusiness.Verify(
             business => business.AddUserToGroup(MemberId, OrganizationId, GroupId),
             Times.Once);
     }
 
     [Fact]
-    public async Task RemoveUserFromGroupV2_ReturnsEmptyOkAndForwardsArguments()
+    public async Task RemoveUserFromGroupV2_ReturnsBooleanAndForwardsArguments()
     {
         _mockGroupBusiness
             .Setup(business => business.RemoveUserFromGroup(MemberId, OrganizationId, GroupId))
@@ -200,7 +204,8 @@ public class GroupControllerV2Tests : IDisposable
 
         var result = await _controller.RemoveUserFromGroupV2(OrganizationId, GroupId, MemberId);
 
-        Assert.IsType<OkResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.True(Assert.IsType<bool>(ok.Value));
         _mockGroupBusiness.Verify(
             business => business.RemoveUserFromGroup(MemberId, OrganizationId, GroupId),
             Times.Once);
@@ -257,8 +262,9 @@ public class GroupControllerV2Tests : IDisposable
 
         Assert.Equal("organizations/{organizationId:long}/groups", route.Template);
         Assert.Equal(2, versions.Count);
-        Assert.Contains(versions, version => version.Deprecated);
-        Assert.Contains(versions, version => !version.Deprecated);
+        Assert.All(versions, version => Assert.False(version.Deprecated));
+        Assert.Contains(versions, version => version.Versions.Any(apiVersion => apiVersion.MajorVersion == 1));
+        Assert.Contains(versions, version => version.Versions.Any(apiVersion => apiVersion.MajorVersion == 2));
         Assert.NotNull(controller.GetCustomAttribute<AuthorizeAttribute>());
         Assert.NotNull(controller.GetCustomAttribute<ForbidServiceAccountsAttribute>());
     }

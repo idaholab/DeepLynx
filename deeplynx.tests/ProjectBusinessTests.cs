@@ -7,6 +7,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
+using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.Configuration;
@@ -23,7 +24,8 @@ namespace deeplynx.tests;
 public class ProjectBusinessTests : IntegrationTestBase
 {
     private ClassBusiness _classBusiness = null!;
-    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "ProjectBusinessLogoTests");
+    private FileAzureBusiness _fileAzureBusiness;
+    private UserBusiness _userBusiness = null!;
     private DataSourceBusiness _dataSourceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
     private EventBusiness _eventBusiness = null!;
@@ -33,9 +35,11 @@ public class ProjectBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
+    private Mock<ILogger<AdminService>> _adminServiceLogger;
     private INotificationBusiness _notificationBusiness = null!;
     private IProjectRolePermissionService _permissionService = null!;
     private Mock<IAdminService> _mockAdminService = null!;
+    private IAdminService _adminService = null!;
     private Mock<ILogger<ProjectRolePermissionService>> _logger = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
@@ -85,6 +89,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _mockAdminService = new Mock<IAdminService>();
+        _adminServiceLogger = new Mock<ILogger<AdminService>>();
+        _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _logger = new Mock<ILogger<ProjectRolePermissionService>>();
         _permissionService = new ProjectRolePermissionService(Context, _logger.Object);
         _mockRecordBusiness = new Mock<IRecordBusiness>();
@@ -94,16 +100,18 @@ public class ProjectBusinessTests : IntegrationTestBase
         _organizationBusiness = new Mock<IOrganizationBusiness>();
 
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(
             Context, _mockEdgeBusiness.Object,
             _mockRecordBusiness.Object, _eventBusiness, _permissionService, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
-            _mockRelationshipBusiness.Object, _eventBusiness);
+            _mockRelationshipBusiness.Object, _eventBusiness, _permissionService, _adminService);
+        _fileAzureBusiness = new FileAzureBusiness(Context, _objectStorageBusiness, _encryptionHelper);
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
-            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
+            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _fileAzureBusiness);
     }
 
     #region GetProjectStats Tests
@@ -473,7 +481,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(dto.Name, project.Name);
         var classResult = await _classBusiness.GetAllClasses(
-            oid, [project.Id], true);
+            uid, oid, [project.Id], true);
 
         Assert.Equal(3, classResult.Count);
 
@@ -1373,7 +1381,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     public async Task RemoveMemberFromProject_CanRemoveUser()
     {
         // Act
-        var result = await _projectBusiness.RemoveMemberFromProject(pid, uid, null);
+        var result = await _projectBusiness.RemoveMemberFromProject(pid, uid, null, null);
 
         // Assert
         Assert.True(result);
@@ -1383,13 +1391,31 @@ public class ProjectBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task RemoveSelfFromProject_CannotRemoveUser()
+    {
+        //Arrange
+        var currentUserId = uid;
+
+        // Act
+        var result = await _projectBusiness.RemoveMemberFromProject(pid, uid, null, currentUserId);
+
+        // Assert
+        Assert.False(result);
+
+        // Verify the user is still a member of the project
+        var projectMember = await Context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.ProjectId == pid && pm.UserId == uid);
+        Assert.NotNull(projectMember);
+    }
+
+    [Fact]
     public async Task RemoveMemberFromProject_CanRemoveGroup()
     {
         // Add group to project first - we don't seed this data as of now for groups
         await _projectBusiness.AddMemberToProject(pid3, null, null, gid);
 
         // Act
-        var result = await _projectBusiness.RemoveMemberFromProject(pid3, null, gid);
+        var result = await _projectBusiness.RemoveMemberFromProject(pid3, null, gid, null);
 
         // Assert
         Assert.True(result);
@@ -1403,7 +1429,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<ArgumentException>(() => _projectBusiness.RemoveMemberFromProject(pid, 1, 1)
+            await Assert.ThrowsAsync<ArgumentException>(() => _projectBusiness.RemoveMemberFromProject(pid, 1, 1, null)
             );
         Assert.Equal("Please provide only one of User ID or Group ID, not both", exception.Message);
     }
@@ -1413,7 +1439,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<ArgumentException>(() => _projectBusiness.RemoveMemberFromProject(pid, null, null)
+            await Assert.ThrowsAsync<ArgumentException>(() => _projectBusiness.RemoveMemberFromProject(pid, null, null, null)
             );
         Assert.Equal("One of either User ID or Group ID must be provided", exception.Message);
     }
@@ -1424,7 +1450,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _projectBusiness.RemoveMemberFromProject(pid, uid2, null)
+                _projectBusiness.RemoveMemberFromProject(pid, uid2, null, null)
             );
         Assert.Equal($"User with id {uid2} is not a member of project {pid}", exception.Message);
     }
@@ -1435,7 +1461,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _projectBusiness.RemoveMemberFromProject(pid, null, gid2)
+                _projectBusiness.RemoveMemberFromProject(pid, null, gid2, null)
             );
         Assert.Equal($"Group with id {gid2} is not a member of project {pid}", exception.Message);
     }
@@ -1446,7 +1472,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Act & Assert
         const long nonExistentProjectId = 999999;
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _projectBusiness.RemoveMemberFromProject(nonExistentProjectId, uid, null)
+            _projectBusiness.RemoveMemberFromProject(nonExistentProjectId, uid, null, null)
         );
         Assert.Equal($"User with id {uid} is not a member of project {nonExistentProjectId}", exception.Message);
     }
@@ -1457,7 +1483,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Act & Assert (user exists but is not a member of the project)
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _projectBusiness.RemoveMemberFromProject(pid3, uid, null)
+                _projectBusiness.RemoveMemberFromProject(pid3, uid, null, null)
             );
         Assert.Equal($"User with id {uid} is not a member of project {pid3}", exception.Message);
     }

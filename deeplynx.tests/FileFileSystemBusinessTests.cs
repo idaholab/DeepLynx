@@ -140,8 +140,16 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             _objectStorageBusiness,
             _fileBusinessFactory.Object);
 
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+
+        _classBusiness = new ClassBusiness(Context,
+          _recordBusiness,
+          _mockRelationshipBusiness.Object,
+          _eventBusiness,
+          _mockPermissionService.Object,
+          _mockAdminService.Object);
+
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+
         _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object,
             _recordBusiness, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
@@ -273,6 +281,21 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _recordId = record.Id;
     }
 
+
+    [Fact]
+    public async Task CalculateFileContentHash_ReturnsNullPlaceholder()
+    {
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("filesystem placeholder"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "hash.txt");
+
+        var result = await _fileBusiness.CalculateFileContentHash(file);
+        var storedResult = await _fileBusiness.CalculateStoredFileContentHash(
+            "placeholder",
+            new ObjectStorageConfigDto());
+
+        Assert.Null(result);
+        Assert.Null(storedResult);
+    }
 
     [Fact]
     public async Task UploadFile_ShouldSaveFileAndReturnPath()

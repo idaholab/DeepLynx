@@ -21,6 +21,7 @@ public class ProjectBusiness : IProjectBusiness
     private readonly DeeplynxContext _context;
     private readonly IDataSourceBusiness _dataSourceBusiness;
     private readonly IEventBusiness _eventBusiness;
+    private readonly IFileBusiness _fileAzureBusiness;
 
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -48,11 +49,13 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="eventBusiness">Used for logging events during create and update Operations.</param>
     /// <param name="logger">Used for uniformity in logging</param>
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
+    /// <param name="fileAzureBusiness">Used to manage Azure operations.</param>
     public ProjectBusiness(
         DeeplynxContext context, ILogger<ProjectBusiness> logger,
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
-        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness)
+        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness,
+        IFileBusiness fileAzureBusiness)
     {
         _context = context;
         _logger = logger;
@@ -63,6 +66,7 @@ public class ProjectBusiness : IProjectBusiness
         _objectStorageBusiness = objectStorageBusiness;
         _eventBusiness = eventBusiness;
         _organizationBusiness = organizationBusiness;
+        _fileAzureBusiness = fileAzureBusiness;
     }
 
     /// <summary>
@@ -153,6 +157,36 @@ public class ProjectBusiness : IProjectBusiness
             Banner = project.Banner,
             RequireSensitivityLabel = dto.RequireSensitivityLabel
         };
+
+        var organization = await _context.Organizations
+            .Where(org => org.Id == organizationId)
+            .Select(org => new { org.Id, org.CreateContainerPerProject })
+            .FirstOrDefaultAsync() ?? throw new Exception("Organization not found.");
+
+        if (organization.CreateContainerPerProject)
+        {
+            try
+            {
+                var container = await _fileAzureBusiness.CreateProjectContainer(
+                    userId: userId,
+                    organizationId: organizationId,
+                    projectId: projectId,
+                    projectName: dto.Name);
+
+                projectResponseDto.AssociatedObjectStorage = new ObjectStorageResponseDto
+                {
+                    Id = container.Id,
+                    Name = container.Name,
+                    Type = container.Type,
+                    ProjectId = container.ProjectId,
+                    OrganizationId = container.OrganizationId
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create Azure container for project {ProjectId}", projectId);
+            }
+        }
 
         // Update the Project Cache List
         var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
@@ -489,6 +523,7 @@ public class ProjectBusiness : IProjectBusiness
         project.LastUpdatedBy = currentUserId;
         project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         project.Banner = dto.Banner;
+        project.FilePath = dto.FilePath;
 
         _context.Projects.Update(project);
         await _context.SaveChangesAsync();
@@ -515,7 +550,7 @@ public class ProjectBusiness : IProjectBusiness
             LastUpdatedBy = project.LastUpdatedBy,
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
-            RequireSensitivityLabel = project.RequireSensitivityLabel
+            RequireSensitivityLabel = project.RequireSensitivityLabel,
         };
 
         // Update the Project Cache List
@@ -871,6 +906,7 @@ public class ProjectBusiness : IProjectBusiness
         if (userId.HasValue && (user == null || user.IsArchived))
             throw new KeyNotFoundException($"User with id {userId} not found");
 
+
         // Service accounts cannot be invited to other projects. Limited to the project where they are created.
         if (userId.HasValue && user.AccountType == AccountType.Service && !allowServiceAccount)
             throw new InvalidOperationException("Service accounts cannot be added to a project directly. Use CreateAndAddServiceAccountToProject.");
@@ -1013,16 +1049,23 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="projectId">ID of the project</param>
     /// <param name="userId">(optional) ID of the user</param>
     /// <param name="groupId">(optional) ID of the group</param>
+    /// <param name="currentUserId">(optional) ID of the current user</param>
     /// <returns>True if member successfully removed</returns>
     /// <exception cref="ArgumentException">Returned if none or both of userID/groupID supplied</exception>
     /// <exception cref="KeyNotFoundException">Returned if member doesn't exist in project</exception>
-    public async Task<bool> RemoveMemberFromProject(long projectId, long? userId, long? groupId)
+    public async Task<bool> RemoveMemberFromProject(long projectId, long? userId, long? groupId, long? currentUserId)
     {
         // ensure one and only one of userID or groupID is supplied
         if (!userId.HasValue && !groupId.HasValue)
             throw new ArgumentException("One of either User ID or Group ID must be provided");
         if (userId.HasValue && groupId.HasValue)
             throw new ArgumentException("Please provide only one of User ID or Group ID, not both");
+
+        // Prevent self-removal
+        if (userId.HasValue && currentUserId != null && userId == currentUserId)
+        {
+            return false;
+        }
 
         // Service Users should not exist without scope. Must Archive or Delete
         if (userId.HasValue)

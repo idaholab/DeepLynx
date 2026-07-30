@@ -125,7 +125,7 @@ public class OauthApplicationControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteOauthApplicationV2_ReturnsEmptyOkAndUsesCurrentUser()
+    public async Task DeleteOauthApplicationV2_ReturnsBooleanAndUsesCurrentUser()
     {
         _mockBusiness
             .Setup(business => business.DeleteOauthApplication(ApplicationId, CurrentUserId))
@@ -133,14 +133,15 @@ public class OauthApplicationControllerV2Tests : IDisposable
 
         var result = await _controller.DeleteOauthApplicationV2(ApplicationId);
 
-        Assert.IsType<OkResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.True(Assert.IsType<bool>(ok.Value));
         _mockBusiness.Verify(
             business => business.DeleteOauthApplication(ApplicationId, CurrentUserId),
             Times.Once);
     }
 
     [Fact]
-    public async Task ArchiveOauthApplicationV2_WhenArchiveIsTrue_ReturnsEmptyOkAndArchives()
+    public async Task ArchiveOauthApplicationV2_WhenArchiveIsTrue_ReturnsBooleanAndArchives()
     {
         _mockBusiness
             .Setup(business => business.ArchiveOauthApplication(ApplicationId, CurrentUserId))
@@ -148,7 +149,8 @@ public class OauthApplicationControllerV2Tests : IDisposable
 
         var result = await _controller.ArchiveOauthApplicationV2(ApplicationId, archive: true);
 
-        Assert.IsType<OkResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.True(Assert.IsType<bool>(ok.Value));
         _mockBusiness.Verify(
             business => business.ArchiveOauthApplication(ApplicationId, CurrentUserId),
             Times.Once);
@@ -158,7 +160,7 @@ public class OauthApplicationControllerV2Tests : IDisposable
     }
 
     [Fact]
-    public async Task ArchiveOauthApplicationV2_WhenArchiveIsFalse_ReturnsEmptyOkAndUnarchives()
+    public async Task ArchiveOauthApplicationV2_WhenArchiveIsFalse_ReturnsBooleanAndUnarchives()
     {
         _mockBusiness
             .Setup(business => business.UnarchiveOauthApplication(ApplicationId, CurrentUserId))
@@ -166,7 +168,8 @@ public class OauthApplicationControllerV2Tests : IDisposable
 
         var result = await _controller.ArchiveOauthApplicationV2(ApplicationId, archive: false);
 
-        Assert.IsType<OkResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.True(Assert.IsType<bool>(ok.Value));
         _mockBusiness.Verify(
             business => business.UnarchiveOauthApplication(ApplicationId, CurrentUserId),
             Times.Once);
@@ -231,8 +234,9 @@ public class OauthApplicationControllerV2Tests : IDisposable
 
         Assert.Equal("oauth/applications", route.Template);
         Assert.Equal(2, versions.Count);
-        Assert.Contains(versions, version => version.Deprecated);
-        Assert.Contains(versions, version => !version.Deprecated);
+        Assert.All(versions, version => Assert.False(version.Deprecated));
+        Assert.Contains(versions, version => version.Versions.Any(apiVersion => apiVersion.MajorVersion == 1));
+        Assert.Contains(versions, version => version.Versions.Any(apiVersion => apiVersion.MajorVersion == 2));
         Assert.NotNull(controller.GetCustomAttribute<AuthorizeAttribute>());
         Assert.NotNull(controller.GetCustomAttribute<SysAdminAttribute>());
     }

@@ -33,6 +33,9 @@ public class GraphBusinessTests : IntegrationTestBase
     private ProjectBusiness _projectBusiness = null!;
     private IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
+    private EncryptionHelper _encryptionHelper = null!;
+    private ObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness = null!;
 
     public long classId;
     public long dsid;
@@ -76,12 +79,16 @@ public class GraphBusinessTests : IntegrationTestBase
             _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
-            _mockRelationshipBusiness.Object, _eventBusiness);
+            _mockRelationshipBusiness.Object, _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
+
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
     }
 
     protected override async Task SeedTestDataAsync()

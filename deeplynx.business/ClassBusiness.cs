@@ -14,57 +14,119 @@ public class ClassBusiness : IClassBusiness
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
     private readonly IRecordBusiness _recordBusiness;
+    private readonly IProjectRolePermissionService _projectRolePermissionService;
+    private readonly IAdminService _adminService;
+
     private readonly IRelationshipBusiness _relationshipBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ClassBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for class operations</param>
-    /// <param name="edgeMappingBusiness">Passed in context of edge mapping objects</param>
     /// <param name="recordBusiness">Passed in context of record objects</param>
     /// <param name="relationshipBusiness">Passed in context of relationship objects</param>
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
+    /// <param name="projectRolePermissionService">Used to get permissions allowed for a user</param>
+    /// <param name="adminService">Used to check level the user is</param>
+
     public ClassBusiness(
         DeeplynxContext context,
         IRecordBusiness recordBusiness,
         IRelationshipBusiness relationshipBusiness,
-        IEventBusiness eventBusiness
+        IEventBusiness eventBusiness,
+        IProjectRolePermissionService projectRolePermissionService,
+        IAdminService adminService
     )
     {
         _context = context;
         _recordBusiness = recordBusiness;
         _relationshipBusiness = relationshipBusiness;
         _eventBusiness = eventBusiness;
+        _projectRolePermissionService = projectRolePermissionService;
+        _adminService = adminService;
     }
 
     /// <summary>
     ///     Retrieves all classes
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the classes belong</param>
+    /// <param name="currentUserId">The ID of the user</param>
     /// <param name="projectIds">(optional) The ID(s) of the project(s) to filter classes by</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived classes from the result</param>
+    /// <param name="isSysAdmin">Flag indicating whether you are a system admin</param>
+    /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin</param>
     /// <returns>A list of classes</returns>
     public async Task<List<ClassResponseDto>> GetAllClasses(
+        long currentUserId,
         long organizationId,
         long[]? projectIds,
-        bool hideArchived)
+        bool hideArchived = true,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false)
     {
-        // Start with base query
+        var userProjectAdminStatus = new Dictionary<long, bool>();
+
+        if (projectIds?.Length > 0)
+        {
+            var adminProjectIds = await _context.ProjectMembers
+                .Where(pm =>
+                    pm.IsProjectAdmin &&
+                    projectIds.Contains(pm.ProjectId) &&
+                    (
+                    (
+                        (pm.UserId != null && pm.UserId == currentUserId) ||
+                        pm.Group!.Users.Any(u => u.Id == currentUserId)
+                    )
+                    ))
+                    .Select(pm => pm.ProjectId)
+                    .Distinct()
+                    .ToHashSetAsync();
+
+            foreach (var projectId in projectIds)
+            {
+                userProjectAdminStatus[projectId] = adminProjectIds.Contains(projectId);
+            }
+        }
+
+        var authorizedProjectIds = new List<long>();
+        foreach (var projectId in projectIds ?? [])
+        {
+            if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId, false))
+            {
+                authorizedProjectIds.Add(projectId);
+                continue;
+            }
+
+            var hasPermission = await _projectRolePermissionService.PermissionInProject(
+                currentUserId, projectId, "read", "class");
+
+            if (hasPermission)
+                authorizedProjectIds.Add(projectId);
+        }
+
+        if (projectIds != null && authorizedProjectIds.Count == 0)
+        {
+            return [];
+        }
+
         var query = _context.Classes
             .Where(c => c.OrganizationId == organizationId)
             .AsQueryable();
 
-        // Filter by projectIds if provided and not empty
-        if (projectIds is { Length: > 0 })
+        if (projectIds != null && projectIds.Length > 0)
+        {
             query = query.Where(c =>
-            (c.ProjectId.HasValue && projectIds.Contains(c.ProjectId.Value)) ||
-            !c.ProjectId.HasValue);
+                (c.ProjectId.HasValue && authorizedProjectIds.Contains(c.ProjectId.Value)) ||
+                !c.ProjectId.HasValue);
+        }
+        else
+        {
+            query = query.Where(c => c.ProjectId == null);
+        }
 
-        // Optionally hide archived classes
         if (hideArchived)
             query = query.Where(c => !c.IsArchived);
 
-        // Execute the query and project to DTO
         return await query
             .Select(c => new ClassResponseDto
             {
@@ -150,7 +212,9 @@ public class ClassBusiness : IClassBusiness
             Name = dto.Name,
             Description = dto.Description,
             Properties = dto.Properties?.ToString(),
-            Uuid = dto.Uuid,
+            Uuid = string.IsNullOrWhiteSpace(dto.Uuid)
+                ? Guid.NewGuid().ToString()
+                : dto.Uuid.Trim(),
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = currentUserId,
             IsArchived = false

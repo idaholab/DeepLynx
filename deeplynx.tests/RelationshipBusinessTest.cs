@@ -16,6 +16,7 @@ namespace deeplynx.tests;
 public class RelationshipBusinessTests : IntegrationTestBase
 {
     private ClassBusiness _classBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private DataSourceBusiness _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private Mock<IEdgeBusiness> _mockEdgeBusiness = null!;
@@ -65,6 +66,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _mockObjectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
         _relationshipBusiness = new RelationshipBusiness(
             Context, _mockEdgeBusiness.Object, _eventBusiness);
@@ -74,12 +76,12 @@ public class RelationshipBusinessTests : IntegrationTestBase
 
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
-            _relationshipBusiness, _eventBusiness);
+            _relationshipBusiness, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -246,6 +248,32 @@ public class RelationshipBusinessTests : IntegrationTestBase
         Assert.Equal("relationship", actualEvent.EntityType);
         Assert.Equal(result.Id, actualEvent.EntityId);
         Assert.Equal(result.ProjectId, actualEvent.ProjectId);
+    }
+
+    [Fact]
+    public async Task CreateRelationship_Success_GeneratesUuid_WhenUuidNotProvided()
+    {
+        // Arrange
+        var dto = new CreateRelationshipRequestDto
+        {
+            Name = $"Test Relationship {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Test Description",
+            OriginId = cid,
+            DestinationId = cid2
+            // Leave Uuid null
+        };
+
+        // Act
+        var result = await _relationshipBusiness.CreateRelationship(uid, oid, pid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.False(string.IsNullOrWhiteSpace(result.Uuid));
+        Assert.True(Guid.TryParse(result.Uuid, out _));
+        Assert.Equal(dto.Name, result.Name);
+        Assert.Equal(dto.Description, result.Description);
+        Assert.Equal(cid, result.OriginId);
+        Assert.Equal(cid2, result.DestinationId);
     }
 
     [Fact]

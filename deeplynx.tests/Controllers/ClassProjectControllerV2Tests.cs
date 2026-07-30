@@ -64,7 +64,7 @@ public class ClassProjectControllerTestsV2 : IDisposable
         var expected = new List<ClassResponseDto> { new(), new() };
 
         _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })), true))
+                         UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })), true))
                      .ReturnsAsync(expected);
 
         var result = (await _classProjectController.GetAllClassesV2(ProjectId, true)).Result as OkObjectResult;
@@ -78,7 +78,7 @@ public class ClassProjectControllerTestsV2 : IDisposable
     public async Task GetAllClassesV2_Returns200_WithEmptyList()
     {
         _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
                      .ReturnsAsync([]);
 
         var result = (await _classProjectController.GetAllClassesV2(ProjectId, true)).Result as OkObjectResult;
@@ -92,7 +92,7 @@ public class ClassProjectControllerTestsV2 : IDisposable
     public async Task GetAllClassesV2_ThrowsException_WhenBusinessThrows()
     {
         _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _classProjectController.GetAllClassesV2(ProjectId, true));
@@ -102,13 +102,13 @@ public class ClassProjectControllerTestsV2 : IDisposable
     public async Task GetAllClassesV2_PassesProjectIdAndHideArchivedToBusinessLayer()
     {
         _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })), false))
+                         UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })), false))
                      .ReturnsAsync([]);
 
         await _classProjectController.GetAllClassesV2(ProjectId, hideArchived: false);
 
         _mockClassBusiness.Verify(b => b.GetAllClasses(
-            OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })), false), Times.Once);
+            UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })), false), Times.Once);
     }
 
     #endregion
