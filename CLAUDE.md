@@ -1,9 +1,11 @@
 # CLAUDE.md
 
 This file provides repository-specific guidance for Claude Code and other automated
-development agents working on DeepLynx Nexus. See
-`documentation/development-code-style-guide.md` for the detailed development
-conventions.
+development agents working on DeepLynx Nexus. See the
+[development code style guide](documentation/development-code-style-guide.md) for
+detailed conventions, including the canonical
+[How to Add a New API Version](documentation/development-code-style-guide.md#how-to-add-a-new-api-version)
+procedure.
 
 ## Architecture
 
