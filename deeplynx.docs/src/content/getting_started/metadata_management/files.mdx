@@ -30,12 +30,14 @@ DeepLynx supports two methods for uploading files via API:
 - **Regular Upload**: For files under 500MB
 - **Chunked Upload**: For files 500MB or larger (recommended for large files)
 
+The examples use the v2 base path, `/api/v2`, for forward development. The frozen and deprecated v1 contract remains accessible at `/api/v1`, with no announced removal date.
+
 #### Regular File Upload (< 500MB)
 
 To upload files using the API:
 
 1. First [obtain an API Key](../../developing_deeplynx_nexus/creating_api_keys.mdx)
-2. Set up a POST request to `/organizations/{organizationId}/projects/{projectId}/files`
+2. Set up a POST request to `/api/v2/organizations/{organizationId}/projects/{projectId}/files`
 3. Add the `Authorization` header with the value `Bearer [YOUR_API_KEY]`
 4. Include the file in the request body as form data with the key `file`
 5. Optionally add query parameters:
@@ -49,7 +51,7 @@ To upload files using the API:
 
 ```bash copy
 curl -X POST \
-  "https://your-deeplynx-instance.com/organizations/123/projects/456/files?dataSourceId=789&objectStorageId=1" \
+  "https://your-deeplynx-instance.com/api/v2/organizations/123/projects/456/files?dataSourceId=789&objectStorageId=1" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -F "file=@/path/to/your/file.pdf"
 ```
@@ -60,7 +62,7 @@ This example explicitly specifies both the data source (789) and object storage 
 
 ```bash copy
 curl -X POST \
-  "https://your-deeplynx-instance.com/organizations/123/projects/456/files" \
+  "https://your-deeplynx-instance.com/api/v2/organizations/123/projects/456/files" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -F "file=@/path/to/your/file.pdf"
 ```
@@ -119,7 +121,7 @@ The chunked upload process follows three phases:
 All chunked upload endpoints follow the base pattern:
 
 ```
-/organizations/{organizationId}/projects/{projectId}/files/upload/...
+/api/v2/organizations/{organizationId}/projects/{projectId}/files/upload/...
 ```
 
 #### 1. Start Chunked Upload
@@ -297,7 +299,7 @@ class ChunkedFileUploader:
         Initialize the chunked file uploader.
 
         Args:
-            base_url: Base URL of your DeepLynx instance (e.g., 'https://your-instance.com')
+            base_url: Versioned API base URL (e.g., 'https://your-instance.com/api/v2')
             auth_token: Your DeepLynx API key
         """
         self.base_url = base_url.rstrip('/')
@@ -573,7 +575,7 @@ class ChunkedFileUploader:
 # Usage Example
 if __name__ == "__main__":
     uploader = ChunkedFileUploader(
-        base_url="https://your-deeplynx-instance.com",
+        base_url="https://your-deeplynx-instance.com/api/v2",
         auth_token="your-api-key"
     )
 
