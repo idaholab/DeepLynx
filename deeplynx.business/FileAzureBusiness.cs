@@ -168,7 +168,7 @@ public class FileAzureBusiness : IFileBusiness
     }
 
     /// <summary>
-    ///     Creates an Azure Blobl Container
+    ///     Creates an Azure Blob Container
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="containerName">The name of the container</param>
