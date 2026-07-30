@@ -146,7 +146,7 @@ v1 controllers and actions are legacy code whose routes, status codes, response 
 
 #### V2 and Later Controller Shape
 
-v2 and later controllers contain the success path only. They do not use controller-level `try`/`catch` for logging or HTTP error translation; domain exceptions flow to the global RFC 7807 Problem Details handlers. See [V2 and Later Controller Pattern](#v2-and-later-controller-pattern) for the error-handling rules.
+v2 and later controllers contain the success path only. They do not use controller-level `try`/`catch` for logging or HTTP error translation; domain exceptions flow to the global RFC 7807 `ProblemDetails` handlers. See [V2 and Later Controller Pattern](#v2-and-later-controller-pattern) for the error-handling rules.
 
 Preferred v2 template:
 
@@ -384,7 +384,7 @@ public class ClassProjectController : ControllerBase
 }
 ```
 
-Existing unannotated controllers are registered for the currently supported default versions. Do not add `[ApiVersion(1)]` or `[ApiVersion(2)]` to every controller or action just for consistency. That creates churn without changing behavior.
+Existing unannotated controllers are registered for the currently supported versions. Do not add `[ApiVersion(1)]` or `[ApiVersion(2)]` to every controller or action just for consistency. That creates churn without changing behavior.
 
 When a controller starts supporting a new API version, make that controller's supported versions explicit:
 
@@ -415,7 +415,7 @@ public class ClassProjectController : ControllerBase
 
 Versioning rules:
 
-- Leave untouched controllers unannotated; they are treated as unchanged APIs and are available in the configured default versions.
+- Leave untouched controllers unannotated; they are treated as unchanged APIs and are available in the configured supported versions.
 - Once a controller gets version-specific behavior, add explicit `[ApiVersion(1)]` and `[ApiVersion(2)]` at the controller level.
 - If a controller declares only `[ApiVersion(1)]`, its actions are v1 by default; do not add `[MapToApiVersion(1)]` to every action.
 - Use `[MapToApiVersion(...)]` when two actions share the same HTTP verb and route but have version-specific behavior.
@@ -587,6 +587,7 @@ Scalar uses document-name URLs for API docs:
 
 ```text
 /api/scalar/v1
+/api/scalar/v2
 ```
 
 The Scalar document version controls which OpenAPI document is displayed. OpenAPI operation paths include the URL-segment version, such as `/api/v1/...` or `/api/v2/...`; OpenAPI server URLs should be host-only so generated examples do not duplicate the API prefix.
