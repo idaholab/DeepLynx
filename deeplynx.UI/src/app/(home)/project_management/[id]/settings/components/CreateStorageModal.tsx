@@ -206,6 +206,7 @@ const CreateStorageModal = ({
                   placeholder="e.g., path/to/container/folder"
                   className="input input-bordered"
                   value={getAzureFilePath()}
+                  disabled={isFilePathDisabled}
                   onChange={(e) => setAzureFilePath(e.target.value)}
                 />
               </div>
