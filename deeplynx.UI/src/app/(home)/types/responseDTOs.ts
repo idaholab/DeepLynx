@@ -187,6 +187,7 @@ export type OrganizationResponseDto = {
   defaultOrg?: boolean;
   banner?: string;
   theme?: string;
+  createContainerPerProject: boolean;
 };
 
 export type PermissionResponseDto = {

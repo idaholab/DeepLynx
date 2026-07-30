@@ -144,7 +144,7 @@ const StorageSettingsSection = ({
         ) : (
           <>
             <select
-              className="select select-bordered"
+              className="select select-bordered w-full"
               value={selectedStorageId || ""}
               onChange={(e) => onSelectStorage(Number(e.target.value))}
             >

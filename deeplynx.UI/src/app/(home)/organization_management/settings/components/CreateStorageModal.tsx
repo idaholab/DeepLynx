@@ -1,15 +1,21 @@
-// src/app/(home)/project_management/[id]/settings/components/CreateStorageModal.tsx
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
-import { useState } from "react";
-import toast from "react-hot-toast";
+
+interface AzureObjectConfig {
+  AzureFilePath?: string;
+}
+
+interface StorageConfig {
+  AzureObjectConfig?: AzureObjectConfig;
+}
 
 interface StorageFormData {
   name: string;
-  config: Record<string, any>;
+  config: StorageConfig;
   default: boolean;
+  createContainerPerProject: boolean;
 }
 
 interface CreateStorageModalProps {
@@ -47,33 +53,6 @@ const CreateStorageModal = ({
 }: CreateStorageModalProps) => {
   const { t } = useLanguage();
 
-  const [isFilePathDisabled, setIsFilePathDisabled] = useState(false);
-
-  const getAzureFilePath = () =>
-    storageFormData.config.AzureObjectConfig?.AzureFilePath ?? "";
-
-  const validateAzureFilePath = (filePath: string): boolean => {
-    const filePathRegex = /^[a-zA-Z0-9/]*$/;
-    return filePathRegex.test(filePath);
-  };
-
-  const setAzureFilePath = (value: string) => {
-    if (!validateAzureFilePath(value)) {
-      toast.error(t.translations.INVALID_FILE_PATH);
-      return;
-    }
-    setStorageFormData({
-      ...storageFormData,
-      config: {
-        ...storageFormData.config,
-        AzureObjectConfig: {
-          ...(storageFormData.config.AzureObjectConfig ?? {}),
-          AzureFilePath: value,
-        },
-      },
-    });
-  };
-
   return (
     <>
       <input
@@ -85,15 +64,11 @@ const CreateStorageModal = ({
       />
       <div className="modal" role="dialog">
         <div className="modal-box max-w-2xl">
-          <h3 className="text-lg font-bold mb-4">
-            {t.translations.CREATE_STORAGE}
-          </h3>
+          <h3 className="text-lg font-bold mb-4">{t.translations.CREATE_STORAGE}</h3>
 
           <div className="form-control mb-4 w-full md:w-2/3">
             <label className="label">
-              <span className="label-text required">
-                {t.translations.STORAGE_NAME}
-              </span>
+              <span className="label-text required">{t.translations.STORAGE_NAME}</span>
             </label>
             <input
               type="text"
@@ -108,9 +83,7 @@ const CreateStorageModal = ({
 
           <div className="form-control mb-4 w-full md:w-2/3">
             <label className="label">
-              <span className="label-text">
-                {t.translations.STORAGE_TYPE} *
-              </span>
+              <span className="label-text">{t.translations.STORAGE_TYPE} *</span>
             </label>
             <select
               className="select select-bordered w-full"
@@ -118,21 +91,15 @@ const CreateStorageModal = ({
               onChange={(e) => setStorageType(e.target.value)}
             >
               <option value="filesystem">{t.translations.FILESYSTEM}</option>
-              <option value="aws_s3">
-                {t.translations.AWS_S3} (Coming Soon)
-              </option>
-              <option value="azure_object">
-                {t.translations.AZURE_BLOB_STORAGE}
-              </option>
+              <option value="aws_s3">{t.translations.AWS_S3} (Coming Soon)</option>
+              <option value="azure_blob">{t.translations.AZURE_BLOB_STORAGE}</option>
             </select>
           </div>
 
           {storageType === "filesystem" && (
             <div className="form-control mb-4 w-full md:w-2/3">
               <label className="label">
-                <span className="label-text">
-                  {t.translations.FILESYSTEM_PATH} *
-                </span>
+                <span className="label-text">{t.translations.FILESYSTEM_PATH} *</span>
               </label>
               <input
                 type="text"
@@ -153,24 +120,19 @@ const CreateStorageModal = ({
             <div className="alert alert-warning">
               <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
               <div>
-                <p className="font-semibold">
-                  AWS S3 Configuration Coming Soon
-                </p>
+                <p className="font-semibold">AWS S3 Configuration Coming Soon</p>
                 <p className="text-sm">
-                  The backend configuration for AWS S3 storage is currently
-                  being finalized.
+                  The backend configuration for AWS S3 storage is currently being finalized.
                 </p>
               </div>
             </div>
           )}
 
-          {storageType === "azure_object" && (
+          {storageType === "azure_blob" && (
             <>
               <div className="form-control mb-4 w-full md:w-2/3">
                 <label className="label">
-                  <span className="label-text">
-                    {t.translations.CONNECTION_STRING} *
-                  </span>
+                  <span className="label-text">{t.translations.CONNECTION_STRING} *</span>
                 </label>
                 <input
                   type="text"
@@ -183,9 +145,7 @@ const CreateStorageModal = ({
 
               <div className="form-control mb-4 w-full md:w-2/3">
                 <label className="label">
-                  <span className="label-text">
-                    {t.translations.CONTAINER_NAME} *
-                  </span>
+                  <span className="label-text">{t.translations.CONTAINER_NAME} *</span>
                 </label>
                 <input
                   type="text"
@@ -196,49 +156,28 @@ const CreateStorageModal = ({
                 />
               </div>
 
-              {/* New File Path Input */}
-              <div className="form-control mb-4">
-                <label className="label">
-                  <span className="label-text">{t.translations.FILE_PATH}</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g., path/to/container/folder"
-                  className="input input-bordered"
-                  value={getAzureFilePath()}
-                  disabled={isFilePathDisabled}
-                  onChange={(e) => setAzureFilePath(e.target.value)}
-                />
-              </div>
-
-              {/* No File Pathing Checkbox */}
-              <div className="form-control mb-4">
-                <label className="cursor-pointer label flex items-center space-x-2">
-                  <span>{t.translations.NO_FILE_PATHING}</span>
+              {/* Create Container Per Project Checkbox */}
+              <div className="form-control mb-4 w-full md:w-2/3">
+                <label className="cursor-pointer label flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={isFilePathDisabled}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setIsFilePathDisabled(checked);
-                      if (checked) {
-                        setAzureFilePath("/");
-                      } else {
-                        setAzureFilePath("");
-                      }
-                    }}
                     className="checkbox checkbox-primary"
+                    checked={storageFormData.createContainerPerProject || false}
+                    onChange={(e) =>
+                      setStorageFormData({
+                        ...storageFormData,
+                        createContainerPerProject: e.target.checked,
+                      })
+                    }
                   />
+                  <span className="label-text">{t.translations.CREATE_CONTAINER_PER_PROJECT}</span>
                 </label>
               </div>
             </>
           )}
 
           <div className="form-control mb-4">
-            <label className="cursor-pointer label">
-              <span className="label-text">
-                {t.translations.SET_AS_DEFAULT_STORAGE}
-              </span>
+            <label className="cursor-pointer label flex items-center gap-2">
               <input
                 type="checkbox"
                 className="checkbox checkbox-primary"
@@ -250,6 +189,7 @@ const CreateStorageModal = ({
                   })
                 }
               />
+              <span className="label-text">{t.translations.SET_AS_DEFAULT_STORAGE}</span>
             </label>
           </div>
 

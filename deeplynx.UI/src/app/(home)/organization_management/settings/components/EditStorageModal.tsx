@@ -2,8 +2,6 @@
 
 import { ObjectStorageResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
-import { useState } from "react";
-import toast from "react-hot-toast";
 
 interface AzureObjectConfig {
   AzureFilePath?: string;
@@ -12,10 +10,12 @@ interface AzureObjectConfig {
 interface StorageConfig {
   AzureObjectConfig?: AzureObjectConfig;
 }
+
 interface StorageFormData {
   name: string;
   config: StorageConfig;
   default: boolean;
+  createContainerPerProject: boolean;
 }
 
 interface EditStorageModalProps {
@@ -37,34 +37,6 @@ const EditStorageModal = ({
 }: EditStorageModalProps) => {
   const { t } = useLanguage();
 
-  const [isFilePathDisabled, setIsFilePathDisabled] = useState(false);
-
-  // Helper to safely get or set nested AzureFilePath
-  const getAzureFilePath = () =>
-    storageFormData.config.AzureObjectConfig?.AzureFilePath ?? "";
-
-  const validateAzureFilePath = (filePath: string): boolean => {
-    const filePathRegex = /^[a-zA-Z0-9/]*$/;
-    return filePathRegex.test(filePath);
-  };
-
-  const setAzureFilePath = (value: string) => {
-    if (!validateAzureFilePath(value)) {
-      toast.error(t.translations.INVALID_FILE_PATH);
-      return;
-    }
-    setStorageFormData({
-      ...storageFormData,
-      config: {
-        ...storageFormData.config,
-        AzureObjectConfig: {
-          ...(storageFormData.config.AzureObjectConfig ?? {}),
-          AzureFilePath: value,
-        },
-      },
-    });
-  };
-
   return (
     <>
       <input
@@ -76,9 +48,7 @@ const EditStorageModal = ({
       />
       <div className="modal" role="dialog">
         <div className="modal-box">
-          <h3 className="text-lg font-bold mb-4">
-            {t.translations.EDIT_STORAGE}
-          </h3>
+          <h3 className="text-lg font-bold mb-4">{t.translations.EDIT_STORAGE}</h3>
 
           {/* Storage Name */}
           <div className="form-control mb-4">
@@ -96,47 +66,9 @@ const EditStorageModal = ({
             />
           </div>
 
-          {/* Azure File Path */}
-          <div className="form-control mb-4">
-            <label className="label">
-              <span className="label-text mr-2">{t.translations.FILE_PATH}</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., path/to/container/folder"
-              className="input input-bordered"
-              value={getAzureFilePath()}
-              disabled={isFilePathDisabled}
-              onChange={(e) => setAzureFilePath(e.target.value)}
-            />
-          </div>
-
-          {/* No File Pathing Checkbox */}
-          <div className="form-control mb-4">
-            <label className="cursor-pointer label flex items-center space-x-2">
-              <span>{t.translations.NO_FILE_PATHING}</span>
-              <input
-                type="checkbox"
-                checked={isFilePathDisabled}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setIsFilePathDisabled(checked);
-                  if (checked) {
-                    setAzureFilePath("/");
-                  } else {
-                    setAzureFilePath("");
-                  }
-                }}
-                className="checkbox checkbox-primary"
-              />
-
-            </label>
-          </div>
-
           {/* Set as Default Storage */}
           <div className="form-control mb-4">
-            <label className="cursor-pointer label">
-              <span className="label-text">{t.translations.SET_AS_DEFAULT_STORAGE}</span>
+            <label className="cursor-pointer label flex items-center gap-2">
               <input
                 type="checkbox"
                 className="checkbox checkbox-primary"
@@ -148,6 +80,25 @@ const EditStorageModal = ({
                   })
                 }
               />
+              <span className="label-text">{t.translations.SET_AS_DEFAULT_STORAGE}</span>
+            </label>
+          </div>
+
+          {/* Create Container Per Project */}
+          <div className="form-control mb-4">
+            <label className="cursor-pointer label flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-primary"
+                checked={storageFormData.createContainerPerProject || false}
+                onChange={(e) =>
+                  setStorageFormData({
+                    ...storageFormData,
+                    createContainerPerProject: e.target.checked,
+                  })
+                }
+              />
+              <span className="label-text">{t.translations.CREATE_CONTAINER_PER_PROJECT}</span>
             </label>
           </div>
 
@@ -158,8 +109,7 @@ const EditStorageModal = ({
               onClick={() => {
                 onToggle(false);
                 setEditingStorage(null);
-                setStorageFormData({ name: "", config: {}, default: false });
-                setIsFilePathDisabled(false);
+                setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false });
               }}
             >
               {t.translations.CANCEL}
