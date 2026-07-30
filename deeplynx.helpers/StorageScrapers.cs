@@ -208,8 +208,7 @@ public static class StorageScrapers
 
             var properties = new JsonObject
             {
-                ["lastModified"] = fileInfo.LastWriteTimeUtc.ToString("o"),
-                ["fullPath"] = fullPath
+                ["lastModified"] = fileInfo.LastWriteTimeUtc.ToString("o")
             };
 
             result.Records.Add(new CreateRecordRequestDto
@@ -261,7 +260,6 @@ public static class StorageScrapers
         var currentBatch = new List<CreateRecordRequestDto>(batchSize);
         var batchesCompleted = 0;
         string? continuationToken = cursor;
-        var shouldStop = false;
 
         // AsPages() (unlike the simpler GetBlobsAsync() enumeration) exposes the actual
         // continuation token per page, which we need to make this resumable across calls.
@@ -309,7 +307,6 @@ public static class StorageScrapers
 
             if (batchesCompleted >= maxBatches && !string.IsNullOrEmpty(continuationToken))
             {
-                shouldStop = true;
                 break;
             }
 
