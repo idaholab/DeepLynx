@@ -196,12 +196,7 @@ public class AuthMiddleware
         {
             organizationId = await organizationService.CheckExistence(null, organizationId);
         }
-        else
-        {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsJsonAsync(new { error = "Organization or project ID required" });
-            return;
-        }
+
 
         // Handle OrgAdmin attribute
         if (orgAdminAttr != null)
