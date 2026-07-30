@@ -3,6 +3,7 @@
 
 import { useLanguage } from "@/app/contexts/Language";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { useState } from "react";
 import toast from "react-hot-toast";
 
 interface StorageFormData {
@@ -45,6 +46,8 @@ const CreateStorageModal = ({
   onResetForm,
 }: CreateStorageModalProps) => {
   const { t } = useLanguage();
+
+  const [isFilePathDisabled, setIsFilePathDisabled] = useState(false);
 
   const getAzureFilePath = () =>
     storageFormData.config.AzureObjectConfig?.AzureFilePath ?? "";
@@ -205,6 +208,27 @@ const CreateStorageModal = ({
                   value={getAzureFilePath()}
                   onChange={(e) => setAzureFilePath(e.target.value)}
                 />
+              </div>
+
+              {/* No File Pathing Checkbox */}
+              <div className="form-control mb-4">
+                <label className="cursor-pointer label flex items-center space-x-2">
+                  <span>{t.translations.NO_FILE_PATHING}</span>
+                  <input
+                    type="checkbox"
+                    checked={isFilePathDisabled}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsFilePathDisabled(checked);
+                      if (checked) {
+                        setAzureFilePath("/");
+                      } else {
+                        setAzureFilePath("");
+                      }
+                    }}
+                    className="checkbox checkbox-primary"
+                  />
+                </label>
               </div>
             </>
           )}
