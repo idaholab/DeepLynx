@@ -212,13 +212,9 @@ test.describe("Upload Center", () => {
       }
     }
 
-    await page.getByRole('link', { name: 'Project Dashboard' }).click();
-
-    await expect(
-      page.getByText(baseFileName).first()
-    ).toBeVisible();
-
-    await page.getByRole('link', { name: 'Visit' }).first().click();
+    const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+    const dataCatalogButton = sideBar.getByRole('link').nth(1);
+    await dataCatalogButton.click();
 
     const recordLink = page.getByRole('link', { name: baseFileName, exact: true }).first();
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -273,13 +269,9 @@ test.describe("Upload Center", () => {
       }
     }
 
-    await page.getByRole('link', { name: 'Project Dashboard' }).click();
-
-    await expect(
-      page.getByText(baseFileName).first()
-    ).toBeVisible();
-
-    await page.getByRole('link', { name: 'Visit' }).first().click();
+    const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+    const dataCatalogButton = sideBar.getByRole('link').nth(1);
+    await dataCatalogButton.click();
 
     const recordLink = page.getByRole('link', { name: baseFileName, exact: true }).first();
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -991,17 +983,14 @@ startxref
         timeout: 120_000,
       });
 
-      // Navigate to Project Page
-      await page.getByRole("link", { name: "Project Dashboard" }).click();
-      await page.waitForURL(/\/project/);
-      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
-
       const elapsedMs = Date.now() - start;
       expect(elapsedMs).toBeLessThan(60_000);
 
       // Visit the data catalog and resolve each uploaded file to its
       // recordId/projectId so we can clean them up afterward.
-      await page.getByRole('link', { name: 'Visit' }).first().click();
+      const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+      const dataCatalogButton = sideBar.getByRole('link').nth(1);
+      await dataCatalogButton.click();
 
       for (const baseName of fileBaseNames) {
         const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
@@ -1151,16 +1140,14 @@ startxref
         timeout: 60_000,
       });
 
-      // Verify the new files appear
-      await page.getByRole("link", { name: "Project Dashboard" }).click();
-      await page.waitForURL(/\/project/);
-
       const elapsedMs = Date.now() - start;
       expect(elapsedMs).toBeLessThan(120_000);
 
       // Visit the data catalog and resolve each created record's
       // recordId/projectId so we can clean them up afterward.
-      await page.getByRole('link', { name: 'Visit' }).first().click();
+      const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+      const dataCatalogButton = sideBar.getByRole('link').nth(1);
+      await dataCatalogButton.click();
 
       for (const name of bulkFileNames) {
         const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
