@@ -167,19 +167,42 @@ public class ProjectBusiness : IProjectBusiness
         {
             try
             {
-                var container = await _fileAzureBusiness.CreateProjectContainer(
-                    userId: userId,
+
+                const int maxContainerNameLength = 63;
+                const int guidLength = 36;
+                const int separatorLength = 1;
+                int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
+
+                string truncatedProjectName = dto.Name.Length > maxProjectNameLength
+                    ? dto.Name[..maxProjectNameLength]
+                    : dto.Name;
+
+                truncatedProjectName = new string(truncatedProjectName
+                    .ToLower()
+                    .Where(c => char.IsLetterOrDigit(c) || c == '-')
+                    .ToArray());
+
+                string guid = Guid.NewGuid().ToString();
+
+                var containerName = $"{truncatedProjectName}-{guid}".ToLower();
+
+                var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
+                    organizationId: organizationId,
+                    containerName: containerName);
+
+                var objectStorageResponse = await _objectStorageBusiness.CreateObjectStorage(
+                    currentUserId: userId,
                     organizationId: organizationId,
                     projectId: projectId,
-                    projectName: dto.Name);
+                    dto: newObjectStorageDto);
 
                 projectResponseDto.AssociatedObjectStorage = new ObjectStorageResponseDto
                 {
-                    Id = container.Id,
-                    Name = container.Name,
-                    Type = container.Type,
-                    ProjectId = container.ProjectId,
-                    OrganizationId = container.OrganizationId
+                    Id = objectStorageResponse.Id,
+                    Name = objectStorageResponse.Name,
+                    Type = objectStorageResponse.Type,
+                    ProjectId = objectStorageResponse.ProjectId,
+                    OrganizationId = objectStorageResponse.OrganizationId
                 };
             }
             catch (Exception ex)

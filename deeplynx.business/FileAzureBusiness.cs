@@ -14,22 +14,20 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using System.ComponentModel;
 
 namespace deeplynx.business;
 
 public class FileAzureBusiness : IFileBusiness
 {
-    private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly DeeplynxContext _context;
     private readonly EncryptionHelper _encryptionHelper;
 
     public FileAzureBusiness(
         DeeplynxContext context,
-        IObjectStorageBusiness objectStorageBusiness,
         EncryptionHelper encryptionHelper)
     {
         _context = context;
-        _objectStorageBusiness = objectStorageBusiness;
         _encryptionHelper = encryptionHelper;
     }
 
@@ -172,32 +170,13 @@ public class FileAzureBusiness : IFileBusiness
     /// <summary>
     ///     Creates a project container
     /// </summary>
-    /// <param name="userId">ID of the User executing this method.</param>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
-    /// <param name="projectId">The ID of the project to which the object storage belongs</param>
-    /// <param name="projectName">The name of the project</param>
-    public async Task<ObjectStorageResponseDto> CreateProjectContainer(
-        long userId,
+    /// <param name="containerName">The name of the container</param>
+    public async Task<CreateObjectStorageRequestDto> CreateContainer(
         long organizationId,
-        long projectId,
-        string projectName)
+        string containerName)
     {
         const int maxContainerNameLength = 63;
-        const int guidLength = 36;
-        const int separatorLength = 1;
-        int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
-
-        string truncatedProjectName = projectName.Length > maxProjectNameLength
-            ? projectName[..maxProjectNameLength]
-            : projectName;
-
-        truncatedProjectName = new string([.. truncatedProjectName
-            .ToLower()
-            .Where(c => char.IsLetterOrDigit(c) || c == '-')]);
-
-        string guid = Guid.NewGuid().ToString();
-
-        string containerName = $"{truncatedProjectName}-{guid}".ToLower();
 
         if (containerName.Length > maxContainerNameLength || containerName.Length < 3)
             throw new Exception("Generated container name does not comply with Azure Blob storage naming rules.");
@@ -207,7 +186,7 @@ public class FileAzureBusiness : IFileBusiness
             .FirstOrDefaultAsync() ?? throw new Exception("No default Azure object storage found for the organization.");
         var azureConfig = DeserializeAndDecryptConfig(defaultObjectStorage.ConfigEncrypted);
 
-        if (azureConfig == null || string.IsNullOrWhiteSpace(azureConfig.AzureObjectConfig.AzureConnectionString))
+        if (azureConfig == null || string.IsNullOrWhiteSpace(azureConfig.AzureObjectConfig?.AzureConnectionString))
             throw new Exception("Invalid or missing Azure configuration in the default object storage.");
 
         var blobServiceClient = new BlobServiceClient(azureConfig.AzureObjectConfig.AzureConnectionString);
@@ -229,13 +208,7 @@ public class FileAzureBusiness : IFileBusiness
             Default = true
         };
 
-        var createdContainer = await _objectStorageBusiness.CreateObjectStorage(
-            currentUserId: userId,
-            organizationId: organizationId,
-            projectId: projectId,
-            dto: newObjectStorageDto);
-
-        return createdContainer;
+        return newObjectStorageDto;
     }
 
     /// <summary>
