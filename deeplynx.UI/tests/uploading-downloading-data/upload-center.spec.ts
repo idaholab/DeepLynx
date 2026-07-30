@@ -996,10 +996,6 @@ startxref
       await page.waitForURL(/\/project/);
       await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
 
-      // for (const baseName of fileBaseNames) {
-      //   await expect(page.getByText(baseName)).toBeVisible();
-      // }
-
       const elapsedMs = Date.now() - start;
       expect(elapsedMs).toBeLessThan(60_000);
 
@@ -1009,12 +1005,12 @@ startxref
 
       for (const baseName of fileBaseNames) {
         const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
-        if (await clearTermsButton.isVisible()) {
-          await clearTermsButton.click();
-        }
         
         const recordLink = page.getByRole('link', { name: baseName, exact: true }).first();
         await expect(async () => {
+          if (await clearTermsButton.isVisible()) {
+            await clearTermsButton.click();
+          }
           await page.getByRole('textbox', { name: 'Search' }).click();
           await page.getByRole('textbox', { name: 'Search' }).fill(baseName);
           await page.getByRole('textbox', { name: 'Search' }).press('Enter');
@@ -1088,10 +1084,15 @@ startxref
     let filePath: string;
     let createdRecords: ({ recordId: string; projectId: string } | null)[] = [];
     const file1 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-1`;
+    const id1 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-1-id`;
     const file2 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-2`;
+    const id2 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-2-id`;
     const file3 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-3`;
+    const id3 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-3-id`;
     const file4 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-4`;
+    const id4 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-4-id`;
     const file5 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-5`;
+    const id5 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-5-id`;
     const bulkFileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-upload.csv`;
 
     test.beforeEach(async ({ }) => {
@@ -1100,11 +1101,11 @@ startxref
 
       const fileContent = [
         'name (required),description (required),original_id (required),properties (required - JSON format),uri (optional),object_storage_id (optional),class_id (optional),class_name (optional),file_type (optional),tags (optional - comma-separated),sensitivity_labels (optional - comma-separated)',
-        `${file1},A test file for bulk upload testing,bt1,"{""created"":""June 2026"",""candy"":""smarties"",""color"":""red""}",,,,,txt,,`,
-        `${file2},A test file for bulk upload testing,bt2,"{""created"":""July 2026"",""candy"":""M&Ms"",""color"":""yellow""}",,,,,pdf,,`,
-        `${file3},A test file for bulk upload testing,bt3,"{""created"":""July 2026"",""candy"":""skittles"",""color"":""purple""}",,,,,docx,,`,
-        `${file4},A test file for bulk upload testing,bt4,"{""created"":""July 2026"",""chips"":""takis"",""spice"":""extreme""}",,,,,txt,,`,
-        `${file5},A test file for bulk upload testing,btS,"{""created"":""July 2026"",""cookies"":""oreos"",""type"":""birthday cake""}",,,,,json,,`
+        `${file1},A test file for bulk upload testing,${id1},"{""created"":""June 2026"",""candy"":""smarties"",""color"":""red""}",,,,,txt,,`,
+        `${file2},A test file for bulk upload testing,${id2},"{""created"":""July 2026"",""candy"":""M&Ms"",""color"":""yellow""}",,,,,pdf,,`,
+        `${file3},A test file for bulk upload testing,${id3},"{""created"":""July 2026"",""candy"":""skittles"",""color"":""purple""}",,,,,docx,,`,
+        `${file4},A test file for bulk upload testing,${id4},"{""created"":""July 2026"",""chips"":""takis"",""spice"":""extreme""}",,,,,txt,,`,
+        `${file5},A test file for bulk upload testing,${id5},"{""created"":""July 2026"",""cookies"":""oreos"",""type"":""birthday cake""}",,,,,json,,`
       ].join('\n');
 
       await fs.promises.writeFile(filePath, fileContent, 'utf8');
@@ -1153,10 +1154,6 @@ startxref
       // Verify the new files appear
       await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
-      // await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
-      // for (const name of bulkFileNames) {
-      //   await expect(page.getByText(name)).toBeVisible();
-      // }
 
       const elapsedMs = Date.now() - start;
       expect(elapsedMs).toBeLessThan(120_000);
@@ -1167,24 +1164,17 @@ startxref
 
       for (const name of bulkFileNames) {
         const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
-        if (await clearTermsButton.isVisible()) {
-          await clearTermsButton.click();
-        }
-
-        // await page.getByRole('textbox', { name: 'Search' }).click();
-        // await page.getByRole('textbox', { name: 'Search' }).fill(name);
-        // await page.getByRole('textbox', { name: 'Search' }).press('Enter');
 
         const recordLink = page.getByRole('link', { name, exact: true }).first();
         await expect(async () => {
+          if (await clearTermsButton.isVisible()) {
+            await clearTermsButton.click();
+          }
           await page.getByRole('textbox', { name: 'Search' }).click();
           await page.getByRole('textbox', { name: 'Search' }).fill(name);
           await page.getByRole('textbox', { name: 'Search' }).press('Enter');
           await expect(recordLink).toBeVisible({ timeout: 3_000 });
         }).toPass({ timeout: 30_000 });
-
-        // const recordLink = page.getByRole('link', { name, exact: true }).first();
-        // await expect(recordLink).toBeVisible();
 
         await recordLink.click();
         await page.waitForURL(/\/record\?/);
