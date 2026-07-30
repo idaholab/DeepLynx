@@ -457,11 +457,22 @@ const OrganizationSettings = () => {
         default: storageFormData.default,
       };
 
+      const updateOrganizationDto: UpdateOrganizationRequestDto = {
+        createContainerPerProject: storageFormData.createContainerPerProject,
+      };
+
       const createdStorage = await createOrganizationObjectStorage(
         organization.organizationId as number,
         dto,
         storageFormData.default,
       );
+
+      await updateOrganization(
+        organization.organizationId as number,
+        updateOrganizationDto
+      );
+
+      setCreateContainerPerProject(storageFormData.createContainerPerProject);
       const storageForList = {
         ...createdStorage,
         default: storageFormData.default || createdStorage.default,
@@ -520,24 +531,24 @@ const OrganizationSettings = () => {
     }
 
     try {
-      const dto: UpdateObjectStorageRequestDto = {
+      const updateObjectStorageDto: UpdateObjectStorageRequestDto = {
         name: storageFormData.name,
         default: storageFormData.default,
       };
 
-      const dto2: UpdateOrganizationRequestDto = {
+      const updateOrganizationDto: UpdateOrganizationRequestDto = {
         createContainerPerProject: storageFormData.createContainerPerProject,
       };
 
       await updateOrganizationObjectStorage(
         organization.organizationId as number,
         editingStorage.id as number,
-        dto,
+        updateObjectStorageDto,
       );
 
       await updateOrganization(
         organization.organizationId as number,
-        dto2
+        updateOrganizationDto
       );
       setCreateContainerPerProject(storageFormData.createContainerPerProject);
 

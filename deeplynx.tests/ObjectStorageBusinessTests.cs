@@ -27,6 +27,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private ObjectStorageBusiness _objectStorageBusiness;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
+    private FileAzureBusiness _fileAzureBusiness;
     private ProjectBusiness _projectBusiness;
     private EncryptionHelper _encryptionHelper = null!;
 
@@ -63,7 +64,8 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         await base.InitializeAsync();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _fileAzureBusiness);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =

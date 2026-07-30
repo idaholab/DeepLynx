@@ -28,11 +28,10 @@ public interface IFileBusiness
         ObjectStorageConfigDto objectStorageConfig,
         CancellationToken cancellationToken = default);
 
-    Task<ObjectStorageResponseDto> CreateProjectContainer(
-        long userId,
+    Task<CreateObjectStorageRequestDto> CreateContainer(
         long organizationId,
-        long projectId,
-        string projectName);
+        string containerName,
+        string? connectionString);
 
     Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig);
 
