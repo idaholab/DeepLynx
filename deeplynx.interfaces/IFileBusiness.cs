@@ -30,7 +30,8 @@ public interface IFileBusiness
 
     Task<CreateObjectStorageRequestDto> CreateContainer(
         long organizationId,
-        string? containerName);
+        string containerName,
+        string? connectionString);
 
     Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig);
 

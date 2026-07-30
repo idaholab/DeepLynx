@@ -188,7 +188,8 @@ public class ProjectBusiness : IProjectBusiness
 
                 var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
                     organizationId: organizationId,
-                    containerName: containerName);
+                    containerName: containerName,
+                    connectionString: null);
 
                 var objectStorageResponse = await _objectStorageBusiness.CreateObjectStorage(
                     currentUserId: userId,

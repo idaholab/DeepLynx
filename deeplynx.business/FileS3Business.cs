@@ -150,7 +150,7 @@ public class FileS3Business : IFileBusiness
         return "";
     }
 
-    public Task<CreateObjectStorageRequestDto> CreateContainer(long organizationId, string? containerName)
+    public Task<CreateObjectStorageRequestDto> CreateContainer(long organizationId, string? containerName, string? connectionString)
     {
         throw new NotImplementedException();
     }

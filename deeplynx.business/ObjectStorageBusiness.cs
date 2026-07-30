@@ -206,7 +206,8 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
                 var container = await _fileAzureBusiness.CreateContainer(
                     organizationId: organizationId,
-                    containerName: containerName);
+                    containerName: containerName,
+                    connectionString: dto.Config.AzureObjectConfig?.AzureConnectionString);
             }
 
 
