@@ -214,11 +214,11 @@ public static class StorageScrapers
             result.Records.Add(new CreateRecordRequestDto
             {
                 Name = fileInfo.Name,
-                Description = relativePath,
+                Description = "File scraped from filesystem",
                 ObjectStorageId = objectStorageId,
-                Uri = relativePath,
+                Uri = fullPath,
                 Properties = properties,
-                OriginalId = relativePath,
+                OriginalId = Guid.NewGuid().ToString(),
                 FileType = string.IsNullOrEmpty(fileInfo.Extension) ? null : fileInfo.Extension.TrimStart('.'),
                 FileSize = fileInfo.Length
             });
