@@ -1217,32 +1217,7 @@ startxref
       test.setTimeout(120_000); // two minutes buffer time
       const start = Date.now();
 
-      // Upload the files
-      await page.getByRole("link", { name: "Upload Center" }).click();
-      await page.waitForURL(/\/upload_center/);
-      await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
-
-      await checkDataSourcesAndStorageDestinations(page);
-
-      await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
-      const fileInput = page.locator('input[type="file"]');
-      await fileInput.setInputFiles(filePath);
-      await page.getByRole('button', { name: 'Upload', exact: true }).click();
-      await expect(page.getByText('File uploaded successfully!')).toBeVisible({
-        timeout: 120_000,
-      });
-
-      // Navigate to Project Page
-      await page.getByRole("link", { name: "Project Dashboard" }).click();
-      await page.waitForURL(/\/project/);
-      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
-      await expect(page.getByText(fileName).first()).toBeVisible();
-      await page.getByRole('link', { name: fileName }).first().click();
-      await page.waitForURL(/\/record/);
-      await expect(page.getByText('Timeseries', { exact: true }).first()).toBeVisible();
-
-      // Capture recordId/projectId from the current record page URL for cleanup
-      createdRecord = parseRecordFromUrl(page.url());
+      createdRecord = await clickToBrowse({ page }, fileName, filePath);
 
       // Check that it shows up on the timeseries page
       await page.getByRole("link", { name: "Timeseries Viewer" }).click();
