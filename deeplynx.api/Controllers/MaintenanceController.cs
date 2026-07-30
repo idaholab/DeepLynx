@@ -148,30 +148,67 @@ public class MaintenanceController : ControllerBase
         {
             long currentUserId = UserContextStorage.UserId;
 
-            var result = await _maintenanceBusiness.ScrapeObjectStorageToCatalog(
-                objectStorageId,
-                currentUserId,
-                dataSourceId,
-                afterCursor,
-                batchSize,
-                maxBatches,
-                sensitivityLabelIds,
-                isSysAdmin: true,
-                isOrgAdmin: false,
-                isProjectAdmin: false,
-                HttpContext.RequestAborted);
+            var result =
+                await _maintenanceBusiness.ScrapeObjectStorageToCatalog(
+                    objectStorageId,
+                    currentUserId,
+                    dataSourceId,
+                    afterCursor,
+                    batchSize,
+                    maxBatches,
+                    sensitivityLabelIds,
+                    isSysAdmin: true,
+                    isOrgAdmin: false,
+                    isProjectAdmin: false,
+                    HttpContext.RequestAborted);
 
             return Ok(result);
         }
+        catch (ArgumentOutOfRangeException exc)
+        {
+            _logger.LogWarning(
+                exc,
+                "Invalid scrape request for object storage {ObjectStorageId}",
+                objectStorageId);
+
+            return BadRequest(exc.Message);
+        }
+        catch (ArgumentException exc)
+        {
+            _logger.LogWarning(
+                exc,
+                "Invalid scrape request for object storage {ObjectStorageId}",
+                objectStorageId);
+
+            return BadRequest(exc.Message);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            _logger.LogWarning(
+                exc,
+                "Referenced resource was not found while scraping object storage {ObjectStorageId}",
+                objectStorageId);
+
+            return NotFound(exc.Message);
+        }
         catch (OperationCanceledException)
         {
+            _logger.LogWarning(
+                "Scrape request was cancelled for object storage {ObjectStorageId}",
+                objectStorageId);
+
             return StatusCode(499);
         }
         catch (Exception exc)
         {
-            var message = $"An error occurred while scraping object storage to catalog: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
+            _logger.LogError(
+                exc,
+                "Unexpected error while scraping object storage {ObjectStorageId}",
+                objectStorageId);
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                "An unexpected error occurred while scraping object storage.");
         }
     }
 }

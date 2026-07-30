@@ -196,51 +196,171 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         bool isProjectAdmin = false,
         CancellationToken cancellationToken = default)
     {
+        if (objectStorageId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(objectStorageId),
+                objectStorageId,
+                "Object storage ID must be greater than zero.");
+        }
+
+        if (dataSourceId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(dataSourceId),
+                dataSourceId,
+                "Data source ID must be greater than zero.");
+        }
+
         if (batchSize <= 0)
-            throw new ArgumentException("batchSize must be greater than zero.");
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(batchSize),
+                batchSize,
+                "Batch size must be greater than zero.");
+        }
 
         if (maxBatches <= 0)
-            throw new ArgumentException("maxBatches must be greater than zero.");
-
-        // Retrieve the object storage based on the provided ID
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
-
-        // Retrieve non-nullable organization and project IDs from the object storage
-        long organizationId = objectStorage.OrganizationId.GetValueOrDefault();
-        long projectId = objectStorage.ProjectId.GetValueOrDefault();
-
-        // TODO: Make sure these type strings are accurate
-        ScrapeResult scrapeResult = objectStorage.Type.ToLowerInvariant() switch
         {
-            "filesystem" => await StorageScrapers.ScrapeFileSystem(
-                objectStorage.Config.MountPath
-                    ?? throw new InvalidOperationException("File system storage is missing a mount path."),
-                objectStorage.Id,
-                afterCursor,
-                batchSize,
+            throw new ArgumentOutOfRangeException(
+                nameof(maxBatches),
                 maxBatches,
-                cancellationToken),
+                "Maximum batches must be greater than zero.");
+        }
 
-            "azure_object" => await StorageScrapers.ScrapeAzureBlob(
-                objectStorage.Config.AzureObjectConfig
-                    ?? throw new InvalidOperationException("Azure blob storage is missing its config."),
-                objectStorage.Id,
-                afterCursor,
-                batchSize,
-                maxBatches,
-                cancellationToken),
+        sensitivityLabelIds = sensitivityLabelIds?
+            .Distinct()
+            .ToList();
 
-            "aws_s3" => await StorageScrapers.ScrapeS3(
-                objectStorage.Config.AwsConnectionString
-                    ?? throw new InvalidOperationException("S3 storage is missing a connection string."),
-                objectStorage.Id,
-                afterCursor,
-                batchSize,
-                maxBatches,
-                cancellationToken),
+        if (sensitivityLabelIds?.Any(id => id <= 0) == true)
+        {
+            var invalidIds = sensitivityLabelIds
+                .Where(id => id <= 0);
 
-            _ => throw new NotSupportedException($"No scraper registered for storage type '{objectStorage.Type}'.")
-        };
+            throw new ArgumentException(
+                $"Sensitivity label IDs must be greater than zero. " +
+                $"Invalid IDs: {string.Join(", ", invalidIds)}",
+                nameof(sensitivityLabelIds));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Retrieve the storage and translate a missing result into an expected 404.
+        var objectStorage =
+            await _objectStorageBusiness.GetDecryptedObjectStorage(
+                objectStorageId);
+
+        if (objectStorage == null)
+        {
+            throw new KeyNotFoundException(
+                $"Object storage {objectStorageId} was not found.");
+        }
+
+        if (!objectStorage.OrganizationId.HasValue)
+        {
+            throw new InvalidOperationException(
+                $"Object storage {objectStorageId} does not have an organization.");
+        }
+
+        if (!objectStorage.ProjectId.HasValue)
+        {
+            throw new InvalidOperationException(
+                $"Object storage {objectStorageId} is not assigned to a project.");
+        }
+
+        long organizationId = objectStorage.OrganizationId.Value;
+        long projectId = objectStorage.ProjectId.Value;
+
+        // Validate the data source before listing objects.
+        bool dataSourceExists =
+            await _context.DataSources.AnyAsync(
+                dataSource =>
+                    dataSource.Id == dataSourceId &&
+                    !dataSource.IsArchived &&
+                    dataSource.OrganizationId == organizationId &&
+                    (
+                        dataSource.ProjectId == projectId ||
+                        dataSource.ProjectId == null
+                    ),
+                cancellationToken);
+
+        if (!dataSourceExists)
+        {
+            throw new KeyNotFoundException(
+                $"Data source {dataSourceId} was not found for project {projectId}.");
+        }
+
+        // Validate every requested label before BulkCreateRecords reaches the FK.
+        if (sensitivityLabelIds is { Count: > 0 })
+        {
+            var existingLabelIds =
+                await _context.SensitivityLabels
+                    .Where(label =>
+                        sensitivityLabelIds.Contains(label.Id) &&
+                        !label.IsArchived &&
+                        label.OrganizationId == organizationId &&
+                        (
+                            label.ProjectId == projectId ||
+                            label.ProjectId == null
+                        ))
+                    .Select(label => label.Id)
+                    .ToListAsync(cancellationToken);
+
+            var missingLabelIds = sensitivityLabelIds
+                .Except(existingLabelIds)
+                .OrderBy(id => id)
+                .ToList();
+
+            if (missingLabelIds.Count > 0)
+            {
+                throw new KeyNotFoundException(
+                    $"Sensitivity label IDs were not found for project " +
+                    $"{projectId}: {string.Join(", ", missingLabelIds)}");
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        ScrapeResult scrapeResult =
+            objectStorage.Type.ToLowerInvariant() switch
+            {
+                "filesystem" =>
+                    await StorageScrapers.ScrapeFileSystem(
+                        objectStorage.Config.MountPath
+                            ?? throw new InvalidOperationException(
+                                "Filesystem storage is missing a mount path."),
+                        objectStorage.Id,
+                        afterCursor,
+                        batchSize,
+                        maxBatches,
+                        cancellationToken),
+
+                "azure_object" =>
+                    await StorageScrapers.ScrapeAzureBlob(
+                        objectStorage.Config.AzureObjectConfig
+                            ?? throw new InvalidOperationException(
+                                "Azure Blob storage is missing its configuration."),
+                        objectStorage.Id,
+                        afterCursor,
+                        batchSize,
+                        maxBatches,
+                        cancellationToken),
+
+                "aws_s3" =>
+                    await StorageScrapers.ScrapeS3(
+                        objectStorage.Config.AwsConnectionString
+                            ?? throw new InvalidOperationException(
+                                "S3 storage is missing its connection string."),
+                        objectStorage.Id,
+                        afterCursor,
+                        batchSize,
+                        maxBatches,
+                        cancellationToken),
+
+                _ => throw new NotSupportedException(
+                    $"No scraper is registered for storage type " +
+                    $"'{objectStorage.Type}'.")
+            };
 
         if (scrapeResult.Records.Count == 0)
         {
@@ -251,18 +371,19 @@ public class MaintenanceBusiness : IMaintenanceBusiness
             };
         }
 
-        // Upsert everything found this call in one go. BulkCreateRecords already handles
-        // insert-vs-update via its own ON CONFLICT logic, so no separate diffing is needed here.
-        var recordResponseDtos = await _recordBusiness.BulkCreateRecords(
-            currentUserId,
-            organizationId,
-            projectId,
-            dataSourceId,
-            scrapeResult.Records,
-            sensitivityLabelIds,
-            isSysAdmin,
-            isOrgAdmin,
-            isProjectAdmin);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var recordResponseDtos =
+            await _recordBusiness.BulkCreateRecords(
+                currentUserId,
+                organizationId,
+                projectId,
+                dataSourceId,
+                scrapeResult.Records,
+                sensitivityLabelIds,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
 
         return new ScrapeObjectStorageResponseDto
         {
