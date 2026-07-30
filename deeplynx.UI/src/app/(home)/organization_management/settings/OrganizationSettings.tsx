@@ -13,26 +13,11 @@ import {
   removeOrganizationLogo,
   updateOrganization,
   fetchOrganizationLogo,
+  getOrganization,
 } from "@/app/lib/client_service/organization_services.client";
-import {
-  getAllOrganizationObjectStorages,
-  getDefaultOrganizationObjectStorage,
-  setDefaultOrganizationObjectStorage,
-  createOrganizationObjectStorage,
-  updateOrganizationObjectStorage,
-  deleteOrganizationObjectStorage,
-  archiveOrganizationObjectStorage,
-} from "@/app/lib/client_service/object_storage_services.client";
-import {
-  ObjectStorageResponseDto,
-} from "@/app/(home)/types/responseDTOs";
-import {
-  CreateObjectStorageRequestDto,
-  UpdateObjectStorageRequestDto,
-} from "@/app/(home)/types/requestDTOs";
 import StorageSettingsSection from "@/app/(home)/project_management/[id]/settings/components/StorageSettingsSection";
-import CreateStorageModal from "@/app/(home)/project_management/[id]/settings/components/CreateStorageModal";
-import EditStorageModal from "@/app/(home)/project_management/[id]/settings/components/EditStorageModal";
+import CreateStorageModal from "@/app/(home)/organization_management/settings/components/CreateStorageModal";
+import EditStorageModal from "@/app/(home)/organization_management/settings/components/EditStorageModal";
 import DeleteStorageModal from "@/app/(home)/project_management/[id]/settings/components/DeleteStorageModal";
 import ArchiveStorageModal from "@/app/(home)/project_management/[id]/settings/components/ArchiveStorageModal";
 import { useLanguage } from "@/app/contexts/Language";
@@ -44,6 +29,10 @@ import {
 } from "@/app/lib/themes/organizationTheme";
 import { applyOrganizationTheme } from "@/app/lib/themes/themeMode";
 import { isInsightHidden } from "@/app/lib/feature_flags";
+import { archiveOrganizationObjectStorage, createOrganizationObjectStorage, deleteOrganizationObjectStorage, getAllOrganizationObjectStorages, getDefaultOrganizationObjectStorage, setDefaultOrganizationObjectStorage, updateOrganizationObjectStorage } from "@/app/lib/client_service/object_storage_services.client";
+import { ObjectStorageResponseDto } from "../../types/responseDTOs";
+import { CreateObjectStorageRequestDto, UpdateObjectStorageRequestDto, UpdateOrganizationRequestDto } from "../../types/requestDTOs";
+
 
 type StorageTab = "default" | "manage";
 
@@ -79,6 +68,10 @@ const OrganizationSettings = () => {
   } | null>(null);
 
   // Storage states
+  // Storage config fields based on type
+  const [azureConnectionString, setAzureConnectionString] = useState("");
+  const [createContainerPerProject, setCreateContainerPerProject] = useState(false);
+
   const [activeStorageTab, setActiveStorageTab] =
     useState<StorageTab>("default");
   const [availableStorages, setAvailableStorages] = useState<
@@ -103,6 +96,7 @@ const OrganizationSettings = () => {
     name: "",
     config: {},
     default: false,
+    createContainerPerProject: false
   });
 
   // Storage config fields based on type
@@ -293,6 +287,23 @@ const OrganizationSettings = () => {
     }
   };
 
+  useEffect(() => {
+    async function loadOrgSettings() {
+      if (!organization?.organizationId) return;
+
+      try {
+        const orgData = await getOrganization(organization.organizationId as number);
+        const objectStorage = await getDefaultOrganizationObjectStorage(organization.organizationId as number);
+        setDefaultStorage(objectStorage);
+        setCreateContainerPerProject(orgData.createContainerPerProject ?? false);
+      } catch (error) {
+        console.error("Failed to load organization settings", error);
+      }
+    }
+
+    loadOrgSettings();
+  }, [organization?.organizationId]);
+
   // Load available storages and default storage for the organization
   const loadStorages = useCallback(async () => {
     if (!organization?.organizationId) {
@@ -396,7 +407,7 @@ const OrganizationSettings = () => {
   };
 
   const resetStorageForm = () => {
-    setStorageFormData({ name: "", config: {}, default: false });
+    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false });
     setStorageType("filesystem");
     setFilesystemPath("");
     setAzureEndpoint("");
@@ -462,10 +473,10 @@ const OrganizationSettings = () => {
         );
         const nextStorages = existingStorage
           ? currentStorages.map((storage) =>
-              String(storage.id) === String(storageForList.id)
-                ? storageForList
-                : storage,
-            )
+            String(storage.id) === String(storageForList.id)
+              ? storageForList
+              : storage,
+          )
           : [...currentStorages, storageForList];
 
         if (!storageForList.default) {
@@ -514,16 +525,26 @@ const OrganizationSettings = () => {
         default: storageFormData.default,
       };
 
+      const dto2: UpdateOrganizationRequestDto = {
+        createContainerPerProject: storageFormData.createContainerPerProject,
+      };
+
       await updateOrganizationObjectStorage(
         organization.organizationId as number,
         editingStorage.id as number,
         dto,
       );
 
+      await updateOrganization(
+        organization.organizationId as number,
+        dto2
+      );
+      setCreateContainerPerProject(storageFormData.createContainerPerProject);
+
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditStorageModalOpen(false);
       setEditingStorage(null);
-      setStorageFormData({ name: "", config: {}, default: false });
+      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false });
       loadStorages();
     } catch (error) {
       console.error("Failed to update organization storage:", error);
@@ -591,6 +612,7 @@ const OrganizationSettings = () => {
       name: storage.name,
       config: {},
       default: storage.default,
+      createContainerPerProject: createContainerPerProject
     });
     setIsEditStorageModalOpen(true);
   };
@@ -1021,21 +1043,29 @@ const OrganizationSettings = () => {
               />
             )}
           </div>
-        </div>
 
-        {/* Info Banner at Bottom */}
-        <div className="alert alert-info mt-6">
-          <InformationCircleIcon className="h-6 w-6" />
-          <div>
-            <div className="font-bold">
-              {t.translations.ADDITIONAL_SETTINGS_COMING_SOON}
-            </div>
-            <div className="text-sm">
-              {
-                t.translations
-                  .STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT
+          {!isInsightHidden() && (
+            <OrganizationInsightModelTemplateSection
+              organizationId={
+                organization?.organizationId as number | undefined
               }
-            </div>
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Info Banner at Bottom */}
+      <div className="alert alert-info mt-6">
+        <InformationCircleIcon className="h-6 w-6" />
+        <div>
+          <div className="font-bold">
+            {t.translations.ADDITIONAL_SETTINGS_COMING_SOON}
+          </div>
+          <div className="text-sm">
+            {
+              t.translations
+                .STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT
+            }
           </div>
         </div>
       </div>
@@ -1062,13 +1092,15 @@ const OrganizationSettings = () => {
           </div>
         </div>
       </div>
-      {themeToast && (
-        <div className="toast toast-bottom toast-end">
-          <div className={`alert alert-${themeToast.type}`}>
-            {themeToast.message}
+      {
+        themeToast && (
+          <div className="toast toast-bottom toast-end">
+            <div className={`alert alert-${themeToast.type}`}>
+              {themeToast.message}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       <CreateStorageModal
         isOpen={isCreateStorageModalOpen}
@@ -1107,7 +1139,7 @@ const OrganizationSettings = () => {
         archiveAction={archiveAction}
         onArchive={handleArchiveStorage}
       />
-    </div>
+    </div >
   );
 };
 

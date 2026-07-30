@@ -14,13 +14,9 @@ public interface IObjectStorageBusiness
         long currentUserId, long organizationId, long? projectId,
         CreateObjectStorageRequestDto dto);
 
-
-
     Task<ObjectStorageResponseDto> UpdateObjectStorage(
         long currentUserId, long organizationId, long? projectId,
         long objectStorageId, UpdateObjectStorageRequestDto dto);
-
-
 
     Task<bool> DeleteObjectStorage(
         long currentUserId, long organizationId, long? projectId, long objectStorageId);

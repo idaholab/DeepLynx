@@ -124,6 +124,7 @@ export const translations = {
       AWS_S3: "AWS S3",
       AXIS_SELECTION: "Axis Selection",
       AZURE_BLOB_STORAGE: "Azure Blob Storage",
+      AZURE_DEFAULT_CONNECTION_STRING: "Azure Default Connection String",
       BACK: "Back",
       BACK_TO_CLASS_SELECTION: "← Back to class selection",
       BANNER_EXAMPLE_CUI:
@@ -238,6 +239,7 @@ export const translations = {
       COPY_VALUE: "Copy value",
       CREATE: "Create",
       CREATE_AND_APPLY: "Create & Apply",
+      CREATE_CONTAINER_PER_PROJECT: "Create Container Per Project",
       CREATE_EDIT_MANAGE_STORAGE_LOCATIONS:
         "Create, edit, and manage your storage locations",
       CREATE_GROUP: "Create Group",
@@ -371,6 +373,7 @@ export const translations = {
       EDIT_MATRIX: "Edit Matrix",
       EDIT_OAUTH_APP: "Edit OAuth Application",
       ENTER: "Enter",
+      ENTER_AZURE_CONNECTION_STRING: "Enter Azure Connection String",
       EDIT_ORGANIZATION: "Edit Organization",
       EDIT_PERMISSIONS: "Edit Permissions",
       EDIT_PERMISSIONS_ACROSS_ROLES_MATRIX_VIEW:
@@ -481,6 +484,7 @@ export const translations = {
       FAILED_TO_UPLOAD_LOGO: "Failed to upload logo",
       FILE: "File",
       FILE_A_BUG: "File A Bug",
+      FILE_PATH: "File Path",
       FILTER_BY_DATA_SOURCE: "Filter by data source...",
       FILTER_BY_ENTITY_NAME: "Filter by entity name...",
       FILTER_BY_ENTITY_TYPE: "Filter by entity type...",
@@ -731,6 +735,7 @@ export const translations = {
       INSIGHT_TEMPLATE_MANAGE_TAB: "Manage Templates",
       INTERACTIVE_ZOOM_SLIDER: "Interactive zoom slider",
       INVALID_EMAIL_ERROR: "That doesn’t look like a valid email address",
+      INVALID_FILE_PATH: "Invalid File Path",
       INVALID_JASON: "Invalid JSON.",
       INVALID_JSON_ARRAY_SYNTAX:
         "Invalid JSON format - must be valid array syntax",
@@ -1042,6 +1047,7 @@ export const translations = {
       NO_FILES_AVAILABLE: "No files available.",
       NO_FILES_FOUND: "No files found.",
       NO_FILE_CHOSEN: "No file chosen",
+      NO_FILE_PATHING: "No file pathing",
       NO_FILES_SELECTED_YET: "No files selected yet.",
       NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD:
         "No historical versions were found for this record.",
@@ -2258,6 +2264,7 @@ export const translations = {
       AWS_S3: "AWS S3",
       AXIS_SELECTION: "Selección de Ejes",
       AZURE_BLOB_STORAGE: "Azure Blob Storage",
+      AZURE_DEFAULT_CONNECTION_STRING: "Cadena de conexión predeterminada de Azure",
       BACK: "Atrás",
       BACK_TO_CLASS_SELECTION: "← Volver a la seleccion de clase",
       BANNER_EXAMPLE_CUI:
@@ -2365,6 +2372,7 @@ export const translations = {
       COPY_VALUE: "Copiar valor",
       CREATE: "Crear",
       CREATE_AND_APPLY: "Crear y aplicar",
+      CREATE_CONTAINER_PER_PROJECT: "Crear contenedor por proyecto",
       CREATE_EDIT_MANAGE_STORAGE_LOCATIONS:
         "Crear, editar y administrar tus ubicaciones de almacenamiento",
       CREATE_GROUP: "Crear grupo",
@@ -2524,6 +2532,7 @@ export const translations = {
       EMAIL_ADDRESS: "Correo electrónico",
       EMAIL_ADDRESSES: "Correos electrónicos",
       ENTER: "Ingresar",
+      ENTER_AZURE_CONNECTION_STRING: "Ingrese la cadena de conexión de Azure",
       EMAIL_INVITATION_DESCRIPTION:
         "Se enviará un correo de invitación con instrucciones para unirse a la organización. El usuario podrá acceder a todos los recursos de la organización una vez que acepte la invitación.",
       EMAIL_INVITATIONS: "Invitaciones por correo electrónico",
@@ -2656,6 +2665,7 @@ export const translations = {
       FILTER_BY: "Filtrar por",
       FILTERED_BY: "Filtrado por: ",
       FILE: "Archivo",
+      FILE_PATH: "Ruta del archivo",
       FOUND: "Encontrados",
       FOR_CURRENT_USER: "Para el usuario actual",
       FROM: "de",
@@ -2896,6 +2906,7 @@ export const translations = {
       INTERACTIVE_ZOOM_SLIDER: "Control deslizante de zoom interactivo",
       INVALID_EMAIL_ERROR:
         "Eso no parece una dirección de correo electrónico válida",
+      INVALID_FILE_PATH: "Ruta de archivo inválida",
       INVALID_JASON: "JSON inválido.",
       INVALID_JSON_ARRAY_SYNTAX:
         "Formato JSON invalido - debe ser una sintaxis valida de arreglo",
@@ -3230,6 +3241,7 @@ export const translations = {
       NO_FILES_AVAILABLE: "No hay archivos disponibles.",
       NO_FILES_FOUND: "No se encontraron archivos.",
       NO_FILE_CHOSEN: "Ningún archivo seleccionado",
+      NO_FILE_PATHING: "Sin ruta de archivo",
       NO_FILES_SELECTED_YET: "Aún no se han seleccionado archivos.",
       NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD:
         "No se encontraron versiones históricas para este registro.",

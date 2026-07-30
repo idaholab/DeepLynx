@@ -115,7 +115,15 @@ public class FileBusiness : IFileControllerBusiness
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
         var guid = Guid.NewGuid();
 
+        var project = await _context.Projects.FindAsync(projectId) ?? throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+        if (objectStorage.Config.AzureObjectConfig == null)
+            objectStorage.Config.AzureObjectConfig = new AzureObjectConfigDto();
+
+        objectStorage.Config.AzureObjectConfig.AzureFilePath = project.FilePath ?? string.Empty;
+
         var fileContentHash = await fileBusiness.CalculateFileContentHash(file);
+
         var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, objectStorage.Config, file, guid);
 
         var recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");

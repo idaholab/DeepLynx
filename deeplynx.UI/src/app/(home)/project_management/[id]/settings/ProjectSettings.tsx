@@ -9,6 +9,7 @@ import {
   archiveProject,
   fetchProjectLogo,
   removeProjectLogo,
+  updateProject,
   uploadProjectLogo,
 } from "@/app/lib/client_service/projects_services.client";
 import {
@@ -27,6 +28,7 @@ import {
 import {
   CreateObjectStorageRequestDto,
   UpdateObjectStorageRequestDto,
+  UpdateProjectRequestDto,
 } from "@/app/(home)/types/requestDTOs";
 import ProjectSettingsLeftColumn from "./components/ProjectSettingsLeftColumn";
 import StorageSettingsSection from "./components/StorageSettingsSection";
@@ -43,6 +45,20 @@ import { isInsightHidden } from "@/app/lib/feature_flags";
 interface ProjectSettingsProps {
   project: ProjectResponseDto | null;
   setProject: React.Dispatch<React.SetStateAction<ProjectResponseDto | null>>;
+}
+
+interface AzureObjectConfig {
+  AzureFilePath?: string;
+}
+
+interface StorageConfig {
+  AzureObjectConfig?: AzureObjectConfig;
+}
+
+interface StorageFormData {
+  name: string;
+  config: StorageConfig;
+  default: boolean;
 }
 
 type StorageTab = "default" | "manage";
@@ -75,7 +91,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   const [editingStorage, setEditingStorage] =
     useState<ObjectStorageResponseDto | null>(null);
   const [storageType, setStorageType] = useState<string>("filesystem");
-  const [storageFormData, setStorageFormData] = useState({
+  const [storageFormData, setStorageFormData] = useState<StorageFormData>({
     name: "",
     config: {},
     default: false,
@@ -491,17 +507,28 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     }
 
     try {
-      const dto: UpdateObjectStorageRequestDto = {
+      const objectStorageDto: UpdateObjectStorageRequestDto = {
         name: storageFormData.name,
         default: storageFormData.default,
+      };
+
+      const projectRequestDto: UpdateProjectRequestDto = {
+        organizationId: organization.organizationId as number,
+        filePath: storageFormData.config.AzureObjectConfig?.AzureFilePath
       };
 
       await updateProjectObjectStorage(
         organization.organizationId as number,
         project.id as number,
         editingStorage.id as number,
-        dto,
+        objectStorageDto,
       );
+
+      await updateProject(
+        organization.organizationId as number,
+        project.id as number,
+        projectRequestDto
+      )
 
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditModalOpen(false);

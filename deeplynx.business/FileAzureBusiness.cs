@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.IO.Pipelines;
+using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -68,29 +69,46 @@ public class FileAzureBusiness : IFileBusiness
     /// <param name="file"></param>
     /// <param name="guid"></param>
     /// <returns></returns>
-    public async Task<string> UploadFile(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig,
-        IFormFile file, Guid guid)
+    public async Task<string> UploadFile(
+    long organizationId,
+    long projectId,
+    long datasourceId,
+    ObjectStorageConfigDto objectStorageConfig,
+    IFormFile file,
+    Guid guid)
     {
         if (objectStorageConfig.AzureObjectConfig == null)
-        {
-            throw new ArgumentException("Azure connection string is null");
-        }
+            throw new ArgumentException("AzureObjectConfig is null");
 
-        var fileName = $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/{guid}_{file.FileName}";
+        var azureConfig = objectStorageConfig.AzureObjectConfig;
 
-        // Get a reference to the container
-        var container = new BlobContainerClient(objectStorageConfig.AzureObjectConfig.AzureConnectionString, objectStorageConfig.AzureObjectConfig.AzureContainerName);
-        await container.CreateIfNotExistsAsync();
+        if (string.IsNullOrWhiteSpace(azureConfig.AzureConnectionString))
+            throw new ArgumentException("Azure connection string is null or empty");
 
-        // Get a reference to a blob (using the original filename from the uploaded file)
-        var blob = container.GetBlobClient(fileName);
+        if (string.IsNullOrWhiteSpace(azureConfig.AzureContainerName))
+            throw new ArgumentException("Azure container name is null or empty");
 
-        // Upload the IFormFile
+        var baseFilePath = azureConfig.AzureFilePath ?? string.Empty;
+
+        if (!IsValidFilePath(baseFilePath))
+            throw new ArgumentException("Invalid Azure file path. Allowed characters are letters (a-z, A-Z), numbers (0-9), and '/'.");
+
+        var filePath = string.IsNullOrEmpty(baseFilePath)
+            ? $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/{guid}_{file.FileName}"
+            : $"{baseFilePath.TrimEnd('/')}/{guid}_{file.FileName}";
+
+        var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+        await containerClient.CreateIfNotExistsAsync();
+
+        var blobClient = containerClient.GetBlobClient(filePath);
+
         await using var stream = file.OpenReadStream();
-        await blob.UploadAsync(stream, overwrite: true);
+        await blobClient.UploadAsync(stream, overwrite: true);
 
-        return fileName;
+        return filePath;
     }
+
+
 
     /// <summary>
     /// Replaces old file with a new one in Azure Object Storage
@@ -564,8 +582,9 @@ public class FileAzureBusiness : IFileBusiness
             throw new InvalidOperationException("Azure Object Storage container does not exist");
         }
 
-        // Get blob client reference
-        var blobClient = containerClient.GetBlobClient(record.Uri);
+        var blobName = record.Uri.TrimStart('/');
+
+        var blobClient = containerClient.GetBlobClient(blobName);
 
         // Verify blob exists
         if (!await blobClient.ExistsAsync())
@@ -574,16 +593,17 @@ public class FileAzureBusiness : IFileBusiness
         }
 
         // Check if the blob client can generate SAS URI
-        // if (!blobClient.CanGenerateSasUri)
-        // {
-        //     throw new InvalidOperationException("BlobClient must be authorized with Shared Key credentials to generate SAS tokens");
-        // }
+        if (!blobClient.CanGenerateSasUri)
+        {
+            await DownloadFile(record, objectStorageConfig);
+            return "Cannot Create SAS URI";
+        }
 
         // Create SAS builder with read permissions
         var sasBuilder = new BlobSasBuilder
         {
             BlobContainerName = objectStorageConfig.AzureObjectConfig.AzureContainerName,
-            BlobName = record.Uri,
+            BlobName = blobName,
             Resource = "b", // "b" for blob
             StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5), // Account for clock skew
             ExpiresOn = DateTimeOffset.UtcNow.AddHours(expirationHours)
@@ -1168,6 +1188,12 @@ public class FileAzureBusiness : IFileBusiness
     {
         return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
     }
+
+    private static bool IsValidFilePath(string filePath)
+    {
+        var filePathRegex = new Regex(@"^[a-zA-Z0-9/]*$");
+        return filePathRegex.IsMatch(filePath);
+    }
 }
 
 /// <summary>
@@ -1244,6 +1270,4 @@ internal sealed class WeightedSemaphore
             }
         }
     }
-
-
 }

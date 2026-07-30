@@ -188,29 +188,15 @@ public class AuthMiddleware
             }
         }
 
-        try
+        if (projectIds.Any())
         {
-            if (projectIds.Any())
-            {
-                organizationId = await organizationService.ResolveOrganizationIdFromProjectsAsync(projectIds, organizationId);
-            }
-            else if (organizationId.HasValue)
-            {
-                organizationId = await organizationService.CheckExistence(null, organizationId);
-            }
-            else
-            {
-                context.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await context.Response.WriteAsJsonAsync(new { error = "Organization or project ID required" });
-                return;
-            }
+            organizationId = await organizationService.ResolveOrganizationIdFromProjectsAsync(projectIds, organizationId);
         }
-        catch (Exception ex)
+        else if (organizationId.HasValue)
         {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsJsonAsync(new { error = ex.Message });
-            return;
+            organizationId = await organizationService.CheckExistence(null, organizationId);
         }
+
 
         // Handle OrgAdmin attribute
         if (orgAdminAttr != null)

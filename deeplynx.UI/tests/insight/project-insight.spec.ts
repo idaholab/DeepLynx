@@ -1,10 +1,18 @@
-import { test, expect } from "@playwright/test";
-import { seedAndNavigateToProject } from "../helpers/seed";
+import { test, expect } from "../fixtures";
+import { sysAdmin } from "../deeplynx-config";
 
 test.describe("Project Insight", () => {
+  test.use({
+    actingUser: sysAdmin,
+    actingOrg: "PW Org A",
+    actingProject: "PW Project X",
+  });
   test.beforeEach(async ({ page }) => {
-    await seedAndNavigateToProject(page);
     // Navigate to Project Insight via sidebar
+    await page.getByTestId("project-select").click();
+    await page
+      .getByRole("button", { name: "PW Project X", exact: true })
+      .click();
     await page.locator("aside a", { hasText: "Insight" }).click();
     await page.waitForURL(/\/project_insight/);
     // Wait for the heading to confirm client-side render is done.
@@ -22,16 +30,16 @@ test.describe("Project Insight", () => {
   });
 
   test("Embedded Library tab is visible", async ({ page }) => {
-    await expect(page.getByText("Embedded Library")).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Embedded' })).toBeVisible();
   });
 
   test("Need Embedding tab is visible", async ({ page }) => {
     await expect(page.getByText("Need Embedding")).toBeVisible();
   });
 
-  test("Select Filters button is visible", async ({ page }) => {
+  test("Filters button is visible", async ({ page }) => {
     await expect(
-      page.getByRole("button", { name: /Select Filters/ }),
+      page.getByRole('button', { name: 'Filters' }),
     ).toBeVisible();
   });
 

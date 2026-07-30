@@ -11,4 +11,5 @@ public class ObjectStorageResponseDto
     public DateTime LastUpdatedAt { get; set; }
     public long? LastUpdatedBy { get; set; }
     public bool IsArchived { get; set; } = false;
+    public string? AzureFilePath { get; set; } = null;
 }

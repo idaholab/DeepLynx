@@ -213,7 +213,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         }
     }
 
-
     /// <summary>
     ///     Updates an object storage
     /// </summary>
@@ -290,7 +289,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             throw new Exception("Unable to update object storage");
         }
     }
-
 
     /// <summary>
     ///     Delete an object storage by ID
