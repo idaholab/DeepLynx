@@ -165,51 +165,43 @@ public class ProjectBusiness : IProjectBusiness
 
         if (organization.CreateContainerPerProject)
         {
-            try
+            const int maxContainerNameLength = 63;
+            const int guidLength = 36;
+            const int separatorLength = 1;
+            int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
+
+            string truncatedProjectName = dto.Name.Length > maxProjectNameLength
+                ? dto.Name[..maxProjectNameLength]
+                : dto.Name;
+
+            truncatedProjectName = new string(truncatedProjectName
+                .ToLower()
+                .Where(c => char.IsLetterOrDigit(c) || c == '-')
+                .ToArray());
+
+            string guid = Guid.NewGuid().ToString();
+
+            var containerName = $"{truncatedProjectName}-{guid}".ToLower();
+
+            var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
+                organizationId: organizationId,
+                containerName: containerName,
+                connectionString: null);
+
+            var objectStorageResponse = await _objectStorageBusiness.CreateObjectStorage(
+                currentUserId: userId,
+                organizationId: organizationId,
+                projectId: projectId,
+                dto: newObjectStorageDto);
+
+            projectResponseDto.AssociatedObjectStorage = new ObjectStorageResponseDto
             {
-
-                const int maxContainerNameLength = 63;
-                const int guidLength = 36;
-                const int separatorLength = 1;
-                int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
-
-                string truncatedProjectName = dto.Name.Length > maxProjectNameLength
-                    ? dto.Name[..maxProjectNameLength]
-                    : dto.Name;
-
-                truncatedProjectName = new string(truncatedProjectName
-                    .ToLower()
-                    .Where(c => char.IsLetterOrDigit(c) || c == '-')
-                    .ToArray());
-
-                string guid = Guid.NewGuid().ToString();
-
-                var containerName = $"{truncatedProjectName}-{guid}".ToLower();
-
-                var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
-                    organizationId: organizationId,
-                    containerName: containerName,
-                    connectionString: null);
-
-                var objectStorageResponse = await _objectStorageBusiness.CreateObjectStorage(
-                    currentUserId: userId,
-                    organizationId: organizationId,
-                    projectId: projectId,
-                    dto: newObjectStorageDto);
-
-                projectResponseDto.AssociatedObjectStorage = new ObjectStorageResponseDto
-                {
-                    Id = objectStorageResponse.Id,
-                    Name = objectStorageResponse.Name,
-                    Type = objectStorageResponse.Type,
-                    ProjectId = objectStorageResponse.ProjectId,
-                    OrganizationId = objectStorageResponse.OrganizationId
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to create Azure container for project {ProjectId}", projectId);
-            }
+                Id = objectStorageResponse.Id,
+                Name = objectStorageResponse.Name,
+                Type = objectStorageResponse.Type,
+                ProjectId = objectStorageResponse.ProjectId,
+                OrganizationId = objectStorageResponse.OrganizationId
+            };
         }
 
         // Update the Project Cache List
