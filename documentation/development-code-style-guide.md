@@ -436,6 +436,44 @@ public static IReadOnlyList<string> OpenApiDocumentNames { get; } =
 
 Scalar loads versioned docs by document name, so a new API version is not visible in the Scalar dropdown until the matching document name is added to `OpenApiDocumentNames`.
 
+#### API Version Catalogs in Standalone Consumers
+
+Standalone .NET consumers, such as `deeplynx.mcp`, must select an API version
+explicitly. Do not make a standalone consumer reference the `deeplynx.api` web
+project solely to reuse `deeplynx.api/NexusApiVersions.cs`, and do not derive
+the consumer's target from the server's default version.
+
+Follow the same discoverable catalog pattern within the consumer project:
+
+```csharp
+namespace deeplynx.mcp;
+
+internal static class NexusApiVersions
+{
+    public const string V1 = "v1";
+
+    public const string V2 = "v2";
+
+    public const string Target = V1;
+}
+```
+
+Consumer-versioning rules:
+
+- Keep the catalog in a clearly named, top-level `NexusApiVersions.cs` file.
+- List known version route segments as named constants; do not scatter string
+  literals such as `"v1"` through factories or tools.
+- Use a named `Target` constant for the version selected by that consumer. A
+  consumer target is not the API server's default.
+- Compose the target into every outbound API URL. Base-URL environment
+  variables should identify the server origin and optional deployment base
+  path, not control the consumer's API contract.
+- Treat a `Target` change as a reviewed API-contract cutover. Update error
+  parsing and response handling for the target contract in the same change.
+- Test both the constructed HTTP client base address and at least one resolved
+  tool or service request URL. Also test that a conflicting version embedded in
+  configuration is rejected rather than silently overriding `Target`.
+
 #### Scalar Version Badges
 
 Nexus enables Scalar's OpenAPI transformers for every versioned document. Import `Scalar.AspNetCore` in a controller before using the `Badge` annotation:
