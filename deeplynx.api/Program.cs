@@ -171,6 +171,7 @@ try
             options.ReportApiVersions = true;
             options.AssumeDefaultVersionWhenUnspecified = true;
             options.ApiVersionReader = new UrlSegmentApiVersionReader();
+            options.UnsupportedApiVersionStatusCode = StatusCodes.Status400BadRequest;
         })
         .AddMvc(options =>
         {
@@ -318,6 +319,7 @@ try
     app.UseStaticFiles();
     app.UseRouting();
     app.UseExceptionHandler(); // Runs registered IExceptionHandlers; must precede middleware that may throw
+    app.UseMiddleware<UnsupportedApiVersionResponseMiddleware>(NexusApiVersions.Supported);
     app.UseCors("AllowAll");
 
     if (isRuntimeStartup)
