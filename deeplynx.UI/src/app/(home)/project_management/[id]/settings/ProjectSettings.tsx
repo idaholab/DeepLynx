@@ -517,12 +517,14 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         filePath: storageFormData.config.AzureObjectConfig?.AzureFilePath
       };
 
-      await updateProjectObjectStorage(
-        organization.organizationId as number,
-        project.id as number,
-        editingStorage.id as number,
-        objectStorageDto,
-      );
+      if (editingStorage.projectId != null) {
+        await updateProjectObjectStorage(
+          organization.organizationId as number,
+          project.id as number,
+          editingStorage.id as number,
+          objectStorageDto,
+        );
+      }
 
       await updateProject(
         organization.organizationId as number,
@@ -727,6 +729,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         storageFormData={storageFormData}
         setStorageFormData={setStorageFormData}
         onEdit={handleEditStorage}
+        editingStorage={editingStorage}
         setEditingStorage={setEditingStorage}
       />
       <DeleteStorageModal

@@ -165,27 +165,43 @@ public class ProjectBusiness : IProjectBusiness
 
         if (organization.CreateContainerPerProject)
         {
-            try
-            {
-                var container = await _fileAzureBusiness.CreateProjectContainer(
-                    userId: userId,
-                    organizationId: organizationId,
-                    projectId: projectId,
-                    projectName: dto.Name);
+            const int maxContainerNameLength = 63;
+            const int guidLength = 36;
+            const int separatorLength = 1;
+            int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
 
-                projectResponseDto.AssociatedObjectStorage = new ObjectStorageResponseDto
-                {
-                    Id = container.Id,
-                    Name = container.Name,
-                    Type = container.Type,
-                    ProjectId = container.ProjectId,
-                    OrganizationId = container.OrganizationId
-                };
-            }
-            catch (Exception ex)
+            string truncatedProjectName = dto.Name.Length > maxProjectNameLength
+                ? dto.Name[..maxProjectNameLength]
+                : dto.Name;
+
+            truncatedProjectName = new string(truncatedProjectName
+                .ToLower()
+                .Where(c => char.IsLetterOrDigit(c) || c == '-')
+                .ToArray());
+
+            string guid = Guid.NewGuid().ToString();
+
+            var containerName = $"{truncatedProjectName}-{guid}".ToLower();
+
+            var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
+                organizationId: organizationId,
+                containerName: containerName,
+                connectionString: null);
+
+            var objectStorageResponse = await _objectStorageBusiness.CreateObjectStorage(
+                currentUserId: userId,
+                organizationId: organizationId,
+                projectId: projectId,
+                dto: newObjectStorageDto);
+
+            projectResponseDto.AssociatedObjectStorage = new ObjectStorageResponseDto
             {
-                _logger.LogError(ex, "Failed to create Azure container for project {ProjectId}", projectId);
-            }
+                Id = objectStorageResponse.Id,
+                Name = objectStorageResponse.Name,
+                Type = objectStorageResponse.Type,
+                ProjectId = objectStorageResponse.ProjectId,
+                OrganizationId = objectStorageResponse.OrganizationId
+            };
         }
 
         // Update the Project Cache List
