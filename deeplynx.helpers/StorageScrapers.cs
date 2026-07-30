@@ -218,7 +218,7 @@ public static class StorageScrapers
                 ObjectStorageId = objectStorageId,
                 Uri = fullPath,
                 Properties = properties,
-                OriginalId = Guid.NewGuid().ToString(),
+                OriginalId = fullPath,
                 FileType = string.IsNullOrEmpty(fileInfo.Extension) ? null : fileInfo.Extension.TrimStart('.'),
                 FileSize = fileInfo.Length
             });
