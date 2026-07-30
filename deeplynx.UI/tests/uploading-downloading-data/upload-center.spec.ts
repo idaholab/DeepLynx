@@ -117,7 +117,6 @@ test.describe("Upload Center", () => {
     request: APIRequestContext, orgId: string, projectId: string
   ) {
     if (!projectId) return;
-    console.log("inside function", projectId);
     const BASE_URL = 'http://localhost:5095/api/v1';
     const getAllUrl = `${BASE_URL}/organizations/${orgId}/projects`;
     const createNewUrl = `${BASE_URL}/organizations/${orgId}/projects`;
@@ -126,7 +125,6 @@ test.describe("Upload Center", () => {
       let res = await request.fetch(getAllUrl);
       if (!res.ok()) throw new Error(`Failed to fetch projects: ${res.status()}`);
       let projects = await res.json();
-      console.log("projects", projects);
       if (projects.length === 1) {
         // create new of type
         const postRes = await request.post(createNewUrl, { data: { name: "New Project for playwright testing" } });
@@ -136,7 +134,6 @@ test.describe("Upload Center", () => {
         projects = await res.json();
       }
       // return non default
-      console.log(typeof projects[1].id);
       return (projects.find((project: Project) => project.id != projectId)).name;
     } catch (err) {
       console.warn(`Error getting different project.`, err);
@@ -1345,9 +1342,7 @@ startxref
 
     test("default data source and storage, nondefault project, click to browse, successfully uploads file", async ({ page, request }) => {
       // project setup
-      console.log(projectId);
       const nondefaultProj = await getNonDefaultProject(request, orgId, projectId);
-      console.log(nondefaultProj);
       const projectSelect = page.getByRole('combobox', { name: /project/i }).first();
       await expect(projectSelect).toBeEnabled();
       await projectSelect.selectOption(nondefaultProj);
