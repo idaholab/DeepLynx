@@ -1,5 +1,6 @@
 import logging
 import requests
+import time
 import urllib3
 import warnings
 
@@ -17,17 +18,19 @@ BASE_URL = "http://localhost:5000/api/v1/maintenance/object-storages"
 TOKEN = "MY.NEXUS.TOKEN"  # ignored by local dev auth bypass; required for real environments
 BATCH_SIZE = 500
 MAX_BATCHES = 5
+MAX_RETRIES = 30
+RETRY_DELAY_SECONDS = 5
 
 # Each entry is one object storage to scrape, and the data source under
 # which its records should be created.
 # TODO: fill in with the real object storage / data source IDs you want to run.
 SCRAPE_TARGETS = [
-    {"object_storage_id": 20, "data_source_id": 14},
+    {"object_storage_id": 22, "data_source_id": 16},
 ]
 
 # Optional sensitivity labels applied to every created record.
 # Leave empty to apply no labels.
-SENSITIVITY_LABEL_IDS = []
+SENSITIVITY_LABEL_IDS = [4]
 
 LOG_EVERY = 1000  # log a running-total checkpoint every N records processed
 
@@ -62,28 +65,69 @@ def run_scrape_for_storage(object_storage_id: int, data_source_id: int) -> None:
         for label_id in SENSITIVITY_LABEL_IDS:
             params.setdefault("sensitivityLabelIds", []).append(str(label_id))
 
+        cursor_display = (
+            after_cursor
+            if after_cursor is not None
+            else "start"
+        )
+
         log.info(
             "Sending scrape request: cursor=%s",
             after_cursor if after_cursor is not None else "start",
         )
 
-        response = requests.post(
-            f"{BASE_URL}/{object_storage_id}/scrape",
-            headers={
-                "Authorization": f"Bearer {TOKEN}"
-            } if TOKEN != "MY.NEXUS.TOKEN" else {},
-            params=params,
-            verify=False,
-            timeout=(10, 300),
-        )
+        attempt = 0
 
-        if not response.ok:
-            log.error(
-                "Scrape failed with status %s: %s",
-                response.status_code,
-                response.text,
-            )
-            response.raise_for_status()
+        while True:
+            try:
+                response = requests.post(
+                    f"{BASE_URL}/{object_storage_id}/scrape",
+                    headers={
+                        "Authorization": f"Bearer {TOKEN}"
+                    } if TOKEN != "MY.NEXUS.TOKEN" else {},
+                    params=params,
+                    verify=False,
+                    timeout=(10, 300),
+                )
+
+                if not response.ok:
+                    log.error(
+                        "Scrape failed with status %s: %s",
+                        response.status_code,
+                        response.text,
+                    )
+
+                    # HTTP errors such as 400 or 500 are not retried here.
+                    response.raise_for_status()
+
+                break
+
+            except (
+                requests.ConnectionError,
+                requests.Timeout,
+            ) as exc:
+                attempt += 1
+
+                if attempt >= MAX_RETRIES:
+                    log.error(
+                        "Request failed after %s attempts at cursor=%s: %s",
+                        attempt,
+                        cursor_display,
+                        exc,
+                    )
+                    raise
+
+                log.warning(
+                    "Connection interrupted at cursor=%s: %s. "
+                    "Retrying in %s seconds (%s/%s).",
+                    cursor_display,
+                    exc,
+                    RETRY_DELAY_SECONDS,
+                    attempt,
+                    MAX_RETRIES,
+                )
+
+                time.sleep(RETRY_DELAY_SECONDS)
 
         data = response.json()
 
