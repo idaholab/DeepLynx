@@ -29,6 +29,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     private DataSourceBusiness _dataSourceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
     private EventBusiness _eventBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IEdgeBusiness> _mockEdgeBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
@@ -87,7 +88,8 @@ public class ProjectBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _mockAdminService = new Mock<IAdminService>();
         _adminServiceLogger = new Mock<ILogger<AdminService>>();
         _adminService = new AdminService(Context, _adminServiceLogger.Object);
@@ -107,7 +109,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness, _permissionService, _adminService);
-        _fileAzureBusiness = new FileAzureBusiness(Context, _objectStorageBusiness, _encryptionHelper);
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,

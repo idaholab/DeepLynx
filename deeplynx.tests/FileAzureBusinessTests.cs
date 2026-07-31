@@ -144,13 +144,13 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         _notificationBusiness = null!;
 
         // Initialize dependent services in order:
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _fileAzureBusiness);
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
 
         // Initialize FileBusinessFactory mocks
         var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
-        var realFileAzureBusiness = new FileAzureBusiness(Context, _objectStorageBusiness, _encryptionHelper);
+        var realFileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(realFileAzureBusiness);
@@ -186,7 +186,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             _mockAdminService.Object);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
-        _fileAzureBusiness = new FileAzureBusiness(Context, _objectStorageBusiness, _encryptionHelper);
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
 
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
 
