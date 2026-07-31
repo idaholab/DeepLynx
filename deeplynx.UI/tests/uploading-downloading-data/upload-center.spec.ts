@@ -171,6 +171,27 @@ test.describe("Upload Center", () => {
     }
   }
 
+  async function verifyInProject(page: Page, fileName: string) {
+    const nextPage = page.getByRole('button', { name: 'Next page' }).first();
+    const pageNumber = page.getByRole('spinbutton', { name: 'Go to page' }).first();
+    const file = page.getByText(fileName).first();
+    
+    while (true) {
+      try {
+        await expect(file).toBeVisible();
+        return;
+      } catch {
+        if (!(await nextPage.isVisible())) {
+          break;
+        }
+        const currentPage = Number(await pageNumber.inputValue());
+        await nextPage.click();
+        await expect(pageNumber).toHaveValue(String(currentPage + 1));
+      };
+    };
+    throw new Error(`Could not find "${fileName}" in the project overview.`);
+  };
+
   async function dragAndDrop({ page }: { page: Page }, baseFileName: string, filePath: string, type: string, projectNav?: string): Promise<{ recordId: string; projectId: string } | null> {
     await checkDataSourcesAndStorageDestinations(page);
 
@@ -211,6 +232,12 @@ test.describe("Upload Center", () => {
         await page.getByRole('button', { name: projectNav }).first().click();
       }
     }
+
+    // Verify in Project Dashboard
+    await page.getByRole("link", { name: "Project Dashboard" }).click();
+    await page.waitForURL(/\/project/);
+    await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+    await verifyInProject(page, fileName);
 
     const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
     const dataCatalogButton = sideBar.getByRole('link').nth(1);
@@ -268,6 +295,12 @@ test.describe("Upload Center", () => {
         await page.getByRole('button', { name: projectNav }).first().click();
       }
     }
+
+    // Verify in Project Dashboard
+    await page.getByRole("link", { name: "Project Dashboard" }).click();
+    await page.waitForURL(/\/project/);
+    await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+    await verifyInProject(page, baseFileName);
 
     const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
     const dataCatalogButton = sideBar.getByRole('link').nth(1);
@@ -983,6 +1016,14 @@ startxref
         timeout: 120_000,
       });
 
+      // Verify in Project Dashboard
+      await page.getByRole("link", { name: "Project Dashboard" }).click();
+      await page.waitForURL(/\/project/);
+      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+      for (const fileName of fileBaseNames) {
+        await verifyInProject(page, fileName);
+      }
+
       const elapsedMs = Date.now() - start;
       expect(elapsedMs).toBeLessThan(60_000);
 
@@ -1139,6 +1180,14 @@ startxref
       await expect(page.getByText('Successfully uploaded 5 Records!')).toBeVisible({
         timeout: 60_000,
       });
+
+      // Verify in Project Dashboard
+      await page.getByRole("link", { name: "Project Dashboard" }).click();
+      await page.waitForURL(/\/project/);
+      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+      for (const fileName of bulkFileNames) {
+        await verifyInProject(page, fileName);
+      }
 
       const elapsedMs = Date.now() - start;
       expect(elapsedMs).toBeLessThan(120_000);
