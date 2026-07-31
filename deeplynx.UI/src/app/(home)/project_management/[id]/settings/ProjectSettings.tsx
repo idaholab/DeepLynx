@@ -17,6 +17,7 @@ import {
   getDefaultProjectObjectStorage,
   setDefaultProjectObjectStorage,
   createProjectObjectStorage,
+  createProjectAzureContainer,
   updateProjectObjectStorage,
   deleteProjectObjectStorage,
   archiveProjectObjectStorage,
@@ -84,6 +85,8 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   );
   const [isLoadingStorages, setIsLoadingStorages] = useState(true);
   const [isSavingStorage, setIsSavingStorage] = useState(false);
+  const [isCreatingAzureContainer, setIsCreatingAzureContainer] =
+    useState(false);
 
   // Create/Edit modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -493,6 +496,71 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     }
   };
 
+  const handleCreateAzureContainer = async () => {
+    if (!organization?.organizationId || !project?.id) return;
+
+    try {
+      setIsCreatingAzureContainer(true);
+
+      const createdStorage = await createProjectAzureContainer(
+        organization.organizationId as number,
+        project.id as number,
+      );
+
+      const shouldSetAsDefault = storageFormData.default;
+      let storageForList = createdStorage;
+
+      if (shouldSetAsDefault) {
+        await setDefaultProjectObjectStorage(
+          organization.organizationId as number,
+          project.id as number,
+          createdStorage.id as number,
+        );
+        storageForList = { ...createdStorage, default: true };
+      }
+
+      setAvailableStorages((currentStorages) => {
+        const existingStorage = currentStorages.some(
+          (storage) => String(storage.id) === String(storageForList.id),
+        );
+        const nextStorages = existingStorage
+          ? currentStorages.map((storage) =>
+              String(storage.id) === String(storageForList.id)
+                ? storageForList
+                : storage,
+            )
+          : [...currentStorages, storageForList];
+
+        if (!storageForList.default) {
+          return nextStorages;
+        }
+
+        return nextStorages.map((storage) => ({
+          ...storage,
+          default: String(storage.id) === String(storageForList.id),
+        }));
+      });
+
+      if (storageForList.default) {
+        setDefaultStorage(storageForList);
+        setSelectedStorageId(storageForList.id as number);
+      }
+
+      toast.success(t.translations.STORAGE_CREATED_SUCCESSFULLY);
+      setIsCreateModalOpen(false);
+      resetStorageForm();
+    } catch (error) {
+      console.error("Failed to create Azure container from project name:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_CREATE_STORAGE,
+      );
+    } finally {
+      setIsCreatingAzureContainer(false);
+    }
+  };
+
   const handleEditStorage = async () => {
     if (!organization?.organizationId || !project?.id || !editingStorage)
       return;
@@ -721,6 +789,8 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         azureBucketName={azureBucketName}
         setAzureBucketName={setAzureBucketName}
         onCreate={handleCreateStorage}
+        onCreateFromProjectName={handleCreateAzureContainer}
+        isCreatingFromProjectName={isCreatingAzureContainer}
         onResetForm={resetStorageForm}
       />
       <EditStorageModal
