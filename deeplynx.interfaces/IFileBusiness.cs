@@ -32,7 +32,8 @@ public interface IFileBusiness
         long organizationId,
         string containerName,
         string? connectionString,
-        bool isDefault = false);
+        bool isDefault = false,
+        bool existingContainer = false);
 
     Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig);
 

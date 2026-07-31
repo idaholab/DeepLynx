@@ -174,11 +174,13 @@ public class FileAzureBusiness : IFileBusiness
     /// <param name="containerName">The name of the container</param>
     /// <param name="connectionString">The connection string to connect to Azure</param>
     /// <param name="isDefault">Specifies whether the resulting obj storage DTO should be default</param>
+    /// <param name="existingContainer">Specifies whether the container exists already</param>
     public async Task<CreateObjectStorageRequestDto> CreateContainer(
-     long organizationId,
-     string containerName,
-     string? connectionString,
-     bool isDefault = false)
+        long organizationId,
+        string containerName,
+        string? connectionString,
+        bool isDefault = false,
+        bool existingContainer = false)
     {
         const int maxContainerNameLength = 63;
 
@@ -186,7 +188,6 @@ public class FileAzureBusiness : IFileBusiness
             throw new Exception("Generated container name does not comply with Azure Blob storage naming rules.");
 
         BlobServiceClient blobServiceClient;
-        BlobContainerClient containerClient;
         string effectiveConnectionString;
 
         if (!string.IsNullOrWhiteSpace(connectionString))
@@ -207,10 +208,13 @@ public class FileAzureBusiness : IFileBusiness
             effectiveConnectionString = azureConfig.AzureObjectConfig.AzureConnectionString;
         }
 
-        blobServiceClient = new BlobServiceClient(effectiveConnectionString);
-        containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+        if (!existingContainer)
+        {
+            blobServiceClient = new BlobServiceClient(effectiveConnectionString);
+            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
 
-        await containerClient.CreateIfNotExistsAsync();
+            await containerClient.CreateIfNotExistsAsync();
+        }
 
         var newObjectStorageDto = new CreateObjectStorageRequestDto
         {

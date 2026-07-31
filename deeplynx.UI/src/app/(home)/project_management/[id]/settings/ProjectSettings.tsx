@@ -60,6 +60,7 @@ interface StorageFormData {
   name: string;
   config: StorageConfig;
   default: boolean;
+  existingContainer?: boolean;
 }
 
 type StorageTab = "default" | "manage";
@@ -89,6 +90,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     useState(false);
 
   // Create/Edit modal states
+  const [existingContainer, setExistingContainer] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStorage, setEditingStorage] =
@@ -98,6 +100,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     name: "",
     config: {},
     default: false,
+    existingContainer: false
   });
 
   // Storage config fields based on type
@@ -394,7 +397,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   };
 
   const resetStorageForm = () => {
-    setStorageFormData({ name: "", config: {}, default: false });
+    setStorageFormData({ name: "", config: {}, default: false, existingContainer: false });
     setStorageType("filesystem");
     setFilesystemPath("");
     setAzureEndpoint("");
@@ -429,6 +432,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         azureObjectConfig: {
           azureConnectionString: azureEndpoint,
           azureContainerName: azureBucketName,
+          existingContainer: storageFormData.existingContainer || false
         },
       };
     } else if (storageType === "aws_s3") {
@@ -450,6 +454,9 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         dto,
         storageFormData.default,
       );
+
+      setExistingContainer(storageFormData.existingContainer as boolean)
+
       const storageForList = {
         ...createdStorage,
         default: storageFormData.default || createdStorage.default,
@@ -525,10 +532,10 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         );
         const nextStorages = existingStorage
           ? currentStorages.map((storage) =>
-              String(storage.id) === String(storageForList.id)
-                ? storageForList
-                : storage,
-            )
+            String(storage.id) === String(storageForList.id)
+              ? storageForList
+              : storage,
+          )
           : [...currentStorages, storageForList];
 
         if (!storageForList.default) {
@@ -578,6 +585,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       const objectStorageDto: UpdateObjectStorageRequestDto = {
         name: storageFormData.name,
         default: storageFormData.default,
+        existingContainer: storageFormData.existingContainer
       };
 
       const projectRequestDto: UpdateProjectRequestDto = {
@@ -600,10 +608,12 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         projectRequestDto
       )
 
+      setExistingContainer(storageFormData.existingContainer as boolean)
+
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditModalOpen(false);
       setEditingStorage(null);
-      setStorageFormData({ name: "", config: {}, default: false });
+      setStorageFormData({ name: "", config: {}, default: false, existingContainer: false });
       loadStorages();
     } catch (error) {
       console.error("Failed to update storage:", error);
@@ -675,6 +685,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       name: storage.name,
       config: {},
       default: storage.default,
+      existingContainer: existingContainer
     });
     setIsEditModalOpen(true);
   };

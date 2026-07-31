@@ -36,6 +36,22 @@ import { CreateObjectStorageRequestDto, UpdateObjectStorageRequestDto, UpdateOrg
 
 type StorageTab = "default" | "manage";
 
+interface AzureObjectConfig {
+  AzureFilePath?: string;
+}
+
+interface StorageConfig {
+  AzureObjectConfig?: AzureObjectConfig;
+}
+
+interface StorageFormData {
+  name: string;
+  config: StorageConfig;
+  default: boolean;
+  createContainerPerProject: boolean;
+  existingContainer?: boolean;
+}
+
 const OrganizationSettings = () => {
   const { organization, setOrganization } = useOrganizationSession();
   const { t } = useLanguage();
@@ -69,8 +85,8 @@ const OrganizationSettings = () => {
 
   // Storage states
   // Storage config fields based on type
-  const [azureConnectionString, setAzureConnectionString] = useState("");
   const [createContainerPerProject, setCreateContainerPerProject] = useState(false);
+  const [existingContainer, setExistingContainer] = useState(false);
 
   const [activeStorageTab, setActiveStorageTab] =
     useState<StorageTab>("default");
@@ -92,11 +108,12 @@ const OrganizationSettings = () => {
   const [editingStorage, setEditingStorage] =
     useState<ObjectStorageResponseDto | null>(null);
   const [storageType, setStorageType] = useState<string>("filesystem");
-  const [storageFormData, setStorageFormData] = useState({
+  const [storageFormData, setStorageFormData] = useState<StorageFormData>({
     name: "",
     config: {},
     default: false,
-    createContainerPerProject: false
+    createContainerPerProject: false,
+    existingContainer: false
   });
 
   // Storage config fields based on type
@@ -407,7 +424,7 @@ const OrganizationSettings = () => {
   };
 
   const resetStorageForm = () => {
-    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false });
+    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
     setStorageType("filesystem");
     setFilesystemPath("");
     setAzureEndpoint("");
@@ -442,6 +459,7 @@ const OrganizationSettings = () => {
         azureObjectConfig: {
           azureConnectionString: azureEndpoint,
           azureContainerName: azureBucketName,
+          existingContainer: storageFormData.existingContainer || false
         },
       };
     } else if (storageType === "aws_s3") {
@@ -473,6 +491,8 @@ const OrganizationSettings = () => {
       );
 
       setCreateContainerPerProject(storageFormData.createContainerPerProject);
+      setExistingContainer(storageFormData.existingContainer as boolean);
+
       const storageForList = {
         ...createdStorage,
         default: storageFormData.default || createdStorage.default,
@@ -534,6 +554,7 @@ const OrganizationSettings = () => {
       const updateObjectStorageDto: UpdateObjectStorageRequestDto = {
         name: storageFormData.name,
         default: storageFormData.default,
+        existingContainer: storageFormData.existingContainer,
       };
 
       const updateOrganizationDto: UpdateOrganizationRequestDto = {
@@ -551,11 +572,12 @@ const OrganizationSettings = () => {
         updateOrganizationDto
       );
       setCreateContainerPerProject(storageFormData.createContainerPerProject);
+      setExistingContainer(storageFormData.existingContainer as boolean);
 
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditStorageModalOpen(false);
       setEditingStorage(null);
-      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false });
+      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
       loadStorages();
     } catch (error) {
       console.error("Failed to update organization storage:", error);
@@ -623,7 +645,8 @@ const OrganizationSettings = () => {
       name: storage.name,
       config: {},
       default: storage.default,
-      createContainerPerProject: createContainerPerProject
+      createContainerPerProject: createContainerPerProject,
+      existingContainer: existingContainer,
     });
     setIsEditStorageModalOpen(true);
   };
