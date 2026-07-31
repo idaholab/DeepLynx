@@ -2,6 +2,7 @@ using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.exceptions;
+using static deeplynx.helpers.StorageScraperHelpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using DotNetEnv;
@@ -182,6 +183,10 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <param name="cancellationToken">Token checked during the scrape; canceling stops early with whatever was processed so far still committed</param>
     /// <returns>Number of records processed this call, plus a cursor for the next call (null if complete)</returns>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="KeyNotFoundException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
     /// <exception cref="NotSupportedException"></exception>
     public async Task<ScrapeObjectStorageResponseDto> ScrapeObjectStorageToCatalog(
         long objectStorageId,
@@ -196,52 +201,8 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         bool isProjectAdmin = false,
         CancellationToken cancellationToken = default)
     {
-        if (objectStorageId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(objectStorageId),
-                objectStorageId,
-                "Object storage ID must be greater than zero.");
-        }
-
-        if (dataSourceId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(dataSourceId),
-                dataSourceId,
-                "Data source ID must be greater than zero.");
-        }
-
-        if (batchSize <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(batchSize),
-                batchSize,
-                "Batch size must be greater than zero.");
-        }
-
-        if (maxBatches <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(maxBatches),
-                maxBatches,
-                "Maximum batches must be greater than zero.");
-        }
-
-        sensitivityLabelIds = sensitivityLabelIds?
-            .Distinct()
-            .ToList();
-
-        if (sensitivityLabelIds?.Any(id => id <= 0) == true)
-        {
-            var invalidIds = sensitivityLabelIds
-                .Where(id => id <= 0);
-
-            throw new ArgumentException(
-                $"Sensitivity label IDs must be greater than zero. " +
-                $"Invalid IDs: {string.Join(", ", invalidIds)}",
-                nameof(sensitivityLabelIds));
-        }
+        ValidateScraperParameters(objectStorageId, dataSourceId, batchSize, maxBatches);
+        sensitivityLabelIds = NormalizeAndValidateSensitivityLabelIds(sensitivityLabelIds);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -327,8 +288,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
                 "filesystem" =>
                     await StorageScrapers.ScrapeFileSystem(
                         objectStorage.Config.MountPath
-                            ?? throw new InvalidOperationException(
-                                "Filesystem storage is missing a mount path."),
+                            ?? throw new InvalidOperationException("Filesystem storage is missing a mount path."),
                         objectStorage.Id,
                         afterCursor,
                         batchSize,
@@ -338,8 +298,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
                 "azure_object" =>
                     await StorageScrapers.ScrapeAzureBlob(
                         objectStorage.Config.AzureObjectConfig
-                            ?? throw new InvalidOperationException(
-                                "Azure Blob storage is missing its configuration."),
+                            ?? throw new InvalidOperationException("Azure Blob storage is missing its configuration."),
                         objectStorage.Id,
                         afterCursor,
                         batchSize,
@@ -349,8 +308,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
                 "aws_s3" =>
                     await StorageScrapers.ScrapeS3(
                         objectStorage.Config.AwsConnectionString
-                            ?? throw new InvalidOperationException(
-                                "S3 storage is missing its connection string."),
+                            ?? throw new InvalidOperationException("S3 storage is missing its connection string."),
                         objectStorage.Id,
                         afterCursor,
                         batchSize,

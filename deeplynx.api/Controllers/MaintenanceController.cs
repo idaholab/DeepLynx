@@ -167,14 +167,14 @@ public class MaintenanceController : ControllerBase
 
             return Ok(result);
         }
-        catch (ArgumentOutOfRangeException exc)
+        catch (NotSupportedException exc)
         {
             _logger.LogWarning(
                 exc,
-                "Invalid scrape request for object storage {ObjectStorageId}",
+                "Unsupported storage type for object storage {ObjectStorageId}",
                 objectStorageId);
 
-            return BadRequest(exc.Message);
+            return UnprocessableEntity(exc.Message);
         }
         catch (ArgumentException exc)
         {

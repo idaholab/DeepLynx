@@ -3,162 +3,15 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using deeplynx.models;
 using System.Text.Json.Nodes;
-using System.Runtime.CompilerServices;
 
 namespace deeplynx.helpers;
 
-// =====================================================================
-// Result of one bounded scrape call: at most (batchSize * maxBatches) records,
-// plus a cursor to resume from and a flag indicating whether the whole
-// storage has been fully scraped.
-// =====================================================================
-public class ScrapeResult
-{
-    public List<CreateRecordRequestDto> Records { get; set; } = new();
-
-    /// <summary>
-    /// Opaque cursor to pass back in on the next call to resume where this one left off.
-    /// Null when the entire storage has been fully scraped — matches the BackfillFileSizes
-    /// convention where a null lastRecordId signals the client to stop looping.
-    /// </summary>
-    public string? NextCursor { get; set; }
-}
-
-// =====================================================================
-// Parsed shape of an "s3://bucket/prefix?region=...&accessKey=...&secretKey=..." string
-// =====================================================================
-public class S3ConnectionInfo
-{
-    public string BucketName { get; set; } = null!;
-    public string? Prefix { get; set; }
-    public string Region { get; set; } = "us-east-1";
-    public string AccessKey { get; set; } = null!;
-    public string SecretKey { get; set; } = null!;
-    public string? ServiceUrl { get; set; }
-
-    /// <summary>
-    /// Parses a string like: s3://test-bucket/path?region=us-west-2&accessKey=xxx&secretKey=xxx&serviceUrl=http%3A%2F%2Fhost.docker.internal%3A9100
-    /// </summary>
-    public static S3ConnectionInfo Parse(string awsConnectionString)
-    {
-        Uri uri;
-
-        try
-        {
-            uri = new Uri(awsConnectionString);
-        }
-        catch (UriFormatException ex)
-        {
-            // Avoid logging the entire connection string because it contains credentials.
-            throw new InvalidOperationException(
-                "AwsConnectionString is not a valid URI.",
-                ex);
-        }
-
-        if (!string.Equals(
-                uri.Scheme,
-                "s3",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                $"Expected an 's3://' URI but got scheme '{uri.Scheme}'.");
-        }
-
-        var bucketName = uri.Host;
-
-        if (string.IsNullOrWhiteSpace(bucketName))
-        {
-            throw new InvalidOperationException(
-                "AwsConnectionString is missing a bucket name.");
-        }
-
-        var prefix = uri.AbsolutePath.Trim('/');
-
-        var queryParams = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
-
-        var query = uri.Query.TrimStart('?');
-
-        if (!string.IsNullOrEmpty(query))
-        {
-            foreach (var pair in query.Split(
-                         '&',
-                         StringSplitOptions.RemoveEmptyEntries))
-            {
-                var parts = pair.Split('=', 2);
-
-                var key = Uri.UnescapeDataString(parts[0]);
-
-                var value = parts.Length > 1
-                    ? Uri.UnescapeDataString(parts[1])
-                    : string.Empty;
-
-                queryParams[key] = value;
-            }
-        }
-
-        if (!queryParams.TryGetValue(
-                "accessKey",
-                out var accessKey) ||
-            string.IsNullOrWhiteSpace(accessKey))
-        {
-            throw new InvalidOperationException(
-                "AwsConnectionString is missing 'accessKey'.");
-        }
-
-        if (!queryParams.TryGetValue(
-                "secretKey",
-                out var secretKey) ||
-            string.IsNullOrWhiteSpace(secretKey))
-        {
-            throw new InvalidOperationException(
-                "AwsConnectionString is missing 'secretKey'.");
-        }
-
-        queryParams.TryGetValue("region", out var region);
-        queryParams.TryGetValue("serviceUrl", out var serviceUrl);
-
-        if (!string.IsNullOrWhiteSpace(serviceUrl) &&
-            !Uri.TryCreate(
-                serviceUrl,
-                UriKind.Absolute,
-                out var parsedServiceUrl))
-        {
-            throw new InvalidOperationException(
-                "AwsConnectionString contains an invalid 'serviceUrl'.");
-        }
-
-        return new S3ConnectionInfo
-        {
-            BucketName = bucketName,
-            Prefix = string.IsNullOrWhiteSpace(prefix)
-                ? null
-                : prefix,
-            Region = string.IsNullOrWhiteSpace(region)
-                ? "us-east-1"
-                : region,
-            AccessKey = accessKey,
-            SecretKey = secretKey,
-            ServiceUrl = string.IsNullOrWhiteSpace(serviceUrl)
-                ? null
-                : serviceUrl.TrimEnd('/')
-        };
-    }
-}
-
-// =====================================================================
-// Scrapers — each takes its relevant slice of ObjectStorageConfigDto,
-// plus the objectStorageId now that CreateRecordRequestDto needs it directly.
-// =====================================================================
 public static class StorageScrapers
 {
     /// <summary>
-    /// Scrapes at most (batchSize * maxBatches) files from a file system storage, starting
-    /// after the given cursor (a relative path from a previous call, or null to start from
-    /// the beginning). Files are processed in a deterministic sort order (ordinal string sort
-    /// on relative path) so that resuming from a cursor is reliable across calls.
+    /// Scrapes at most (batchSize * maxBatches) files from a file system storage, startingafter the given cursor.
     /// </summary>
-    /// <param name="mountPath">Root path to scan (Config.MountPath)</param>
+    /// <param name="mountPath">Root path to scan</param>
     /// <param name="objectStorageId">The ID of the object storage being scraped</param>
     /// <param name="cursor">Relative path to resume after, from a previous call, or null to start from the beginning</param>
     /// <param name="batchSize">Number of records per batch</param>
@@ -179,11 +32,6 @@ public static class StorageScrapers
         var result = new ScrapeResult();
         var recordsWanted = (long)batchSize * maxBatches;
 
-        // NOTE: Directory.EnumerateFiles does not guarantee any particular order across
-        // platforms/filesystems, so we materialize and sort explicitly. For very large trees
-        // this means a full directory walk happens on every call even though only a slice is
-        // returned — there's no way around this without maintaining our own index/cache of
-        // the tree, since the filesystem itself offers no continuation token like S3/Azure do.
         var allRelativePaths = Directory.EnumerateFiles(mountPath, "*", SearchOption.AllDirectories)
             .Select(p => Path.GetRelativePath(mountPath, p))
             .OrderBy(p => p, StringComparer.Ordinal)
@@ -231,9 +79,7 @@ public static class StorageScrapers
     }
 
     /// <summary>
-    /// Scrapes at most (batchSize * maxBatches) blobs from an Azure Blob storage, starting
-    /// from the given cursor (an Azure continuation token from a previous call, or null to
-    /// start from the beginning).
+    /// Scrapes at most (batchSize * maxBatches) blobs from an Azure Blob storage, starting from the given cursor.
     /// </summary>
     /// <param name="config">Config.AzureObjectConfig</param>
     /// <param name="objectStorageId">The ID of the object storage being scraped</param>
@@ -241,6 +87,7 @@ public static class StorageScrapers
     /// <param name="batchSize">Number of records per batch</param>
     /// <param name="maxBatches">Maximum number of batches to process before returning</param>
     /// <param name="cancellationToken">Token checked between pages</param>
+    /// <exception cref="InvalidOperationException"></exception>
     public static async Task<ScrapeResult> ScrapeAzureBlob(
         AzureObjectConfigDto config,
         long objectStorageId,
@@ -261,8 +108,6 @@ public static class StorageScrapers
         var batchesCompleted = 0;
         string? continuationToken = cursor;
 
-        // AsPages() (unlike the simpler GetBlobsAsync() enumeration) exposes the actual
-        // continuation token per page, which we need to make this resumable across calls.
         var pageable = containerClient.GetBlobsAsync(cancellationToken: cancellationToken)
             .AsPages(continuationToken);
 
@@ -270,8 +115,6 @@ public static class StorageScrapers
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Always finish the current page in full, same reasoning as the S3 scraper:
-            // Azure continuation tokens only resume at page boundaries.
             foreach (var blobItem in page.Values)
             {
                 var properties = new JsonObject
@@ -327,9 +170,7 @@ public static class StorageScrapers
     }
 
     /// <summary>
-    /// Scrapes at most (batchSize * maxBatches) objects from an S3 storage, starting
-    /// from the given cursor (an S3 ContinuationToken from a previous call, or null to start
-    /// from the beginning).
+    /// Scrapes at most (batchSize * maxBatches) objects from an S3 storage, starting from the given cursor.
     /// </summary>
     /// <param name="awsConnectionString">Config.AwsConnectionString, e.g. s3://bucket/prefix?region=...&accessKey=...&secretKey=...</param>
     /// <param name="objectStorageId">The ID of the object storage being scraped</param>
