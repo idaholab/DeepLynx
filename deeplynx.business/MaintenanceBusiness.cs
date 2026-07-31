@@ -202,7 +202,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         bool isProjectAdmin = false,
         CancellationToken cancellationToken = default)
     {
-        ValidateScraperParameters(objectStorageId, batchSize, maxBatches);
+        ValidateScraperParameters(batchSize, maxBatches);
         sensitivityLabelIds = NormalizeAndValidateSensitivityLabelIds(sensitivityLabelIds);
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -271,7 +271,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
             objectStorage.Type.ToLowerInvariant() switch
             {
                 "filesystem" =>
-                    await StorageScrapers.ScrapeFileSystem(
+                    await FileFilesystemBusiness.ScrapeFileSystem(
                         objectStorage.Config.MountPath
                             ?? throw new InvalidOperationException("Filesystem storage is missing a mount path."),
                         objectStorage.Id,
@@ -281,7 +281,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
                         cancellationToken),
 
                 "azure_object" =>
-                    await StorageScrapers.ScrapeAzureBlob(
+                    await FileAzureBusiness.ScrapeAzureBlob(
                         objectStorage.Config.AzureObjectConfig
                             ?? throw new InvalidOperationException("Azure Blob storage is missing its configuration."),
                         objectStorage.Id,
@@ -291,7 +291,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
                         cancellationToken),
 
                 "aws_s3" =>
-                    await StorageScrapers.ScrapeS3(
+                    await FileS3Business.ScrapeS3(
                         objectStorage.Config.AwsConnectionString
                             ?? throw new InvalidOperationException("S3 storage is missing its connection string."),
                         objectStorage.Id,
@@ -336,17 +336,9 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     }
 
     private static void ValidateScraperParameters(
-        long objectStorageId,
         int batchSize,
         int maxBatches)
     {
-        if (objectStorageId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(objectStorageId),
-                objectStorageId,
-                "Object storage ID must be greater than zero.");
-        }
 
         if (batchSize <= 0)
         {
