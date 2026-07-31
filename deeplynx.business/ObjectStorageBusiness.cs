@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
@@ -110,11 +111,13 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="projectId">The ID of the project to which the object storage belongs</param>
     /// <param name="dto">A data transfer object with details on the new object storage to be created.</param>
+    /// <param name="createContainer">A bool to create a container</param>
     public async Task<ObjectStorageResponseDto> CreateObjectStorage(
         long currentUserId,
         long organizationId,
         long? projectId,
-        CreateObjectStorageRequestDto dto)
+        CreateObjectStorageRequestDto dto,
+        bool createContainer = true)
     {
         ValidationHelper.ValidateModel(dto);
 
@@ -184,25 +187,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             _context.ObjectStorages.Add(newObjectStorage);
             await _context.SaveChangesAsync();
 
-            if (hasAzure && projectId == null)
+            if (hasAzure && createContainer)
             {
-                const int maxContainerNameLength = 63;
-                const int guidLength = 36;
-                const int separatorLength = 1;
-                int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
-
-                string? truncatedProjectName = dto.Config.AzureObjectConfig?.AzureContainerName?.Length > maxProjectNameLength
-                    ? dto.Config.AzureObjectConfig?.AzureContainerName[..maxProjectNameLength]
-                    : dto.Config.AzureObjectConfig?.AzureContainerName ?? "container";
-
-                truncatedProjectName = new string(truncatedProjectName!
-                    .ToLower()
-                    .Where(c => char.IsLetterOrDigit(c) || c == '-')
-                    .ToArray()) ?? "container";
-
-                string guid = Guid.NewGuid().ToString();
-
-                var containerName = $"{truncatedProjectName}-{guid}".ToLower();
+                var containerName = UniqueContainerNameFromString(dto.Config.AzureObjectConfig?.AzureContainerName ?? "container");
 
                 var container = await _fileAzureBusiness.CreateContainer(
                     organizationId: organizationId,
@@ -652,5 +639,33 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         await _context.ObjectStorages
             .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
+    }
+
+    /// <summary>
+    ///     Create an azure-acceptable container name based on an input string
+    /// </summary>
+    /// <param name="inputString">The input string on which the unique name will be based</param>
+    /// <returns></returns>
+    private string UniqueContainerNameFromString(string inputString)
+    {
+        // max length based on the azure container name constraints found at the link below
+        // https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names
+        const int maxContainerNameLength = 63;
+        const int guidLength = 36;
+        const int separatorLength = 1;
+        int maxInputStringLength = maxContainerNameLength - guidLength - separatorLength;
+
+        string truncatedInputString = inputString.Length > maxInputStringLength
+            ? inputString[..maxInputStringLength]
+            : inputString;
+
+        truncatedInputString = new string(truncatedInputString
+            .ToLower()
+            .Where(c => char.IsLetterOrDigit(c) || c == '-')
+            .ToArray());
+
+        string guid = Guid.NewGuid().ToString();
+
+        return $"{truncatedInputString}-{guid}".ToLower();
     }
 }
