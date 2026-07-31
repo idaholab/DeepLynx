@@ -2,7 +2,6 @@ using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.exceptions;
-using static deeplynx.helpers.StorageScraperHelpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using DotNetEnv;
@@ -237,25 +236,6 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         DataSourceResponseDto dataSourceResponse = await _dataSourceBusiness.GetDefaultDataSource(organizationId, projectId);
         long dataSourceId = dataSourceResponse.Id;
 
-        // Validate the data source before listing objects.
-        bool dataSourceExists =
-            await _context.DataSources.AnyAsync(
-                dataSource =>
-                    dataSource.Id == dataSourceId &&
-                    !dataSource.IsArchived &&
-                    dataSource.OrganizationId == organizationId &&
-                    (
-                        dataSource.ProjectId == projectId ||
-                        dataSource.ProjectId == null
-                    ),
-                cancellationToken);
-
-        if (!dataSourceExists)
-        {
-            throw new KeyNotFoundException(
-                $"Data source {dataSourceId} was not found for project {projectId}.");
-        }
-
         // Validate every requested label before BulkCreateRecords reaches the FK.
         if (sensitivityLabelIds is { Count: > 0 })
         {
@@ -353,6 +333,56 @@ public class MaintenanceBusiness : IMaintenanceBusiness
             Processed = recordResponseDtos.Count,
             NextCursor = scrapeResult.NextCursor
         };
+    }
+
+    private static void ValidateScraperParameters(
+        long objectStorageId,
+        int batchSize,
+        int maxBatches)
+    {
+        if (objectStorageId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(objectStorageId),
+                objectStorageId,
+                "Object storage ID must be greater than zero.");
+        }
+
+        if (batchSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(batchSize),
+                batchSize,
+                "Batch size must be greater than zero.");
+        }
+
+        if (maxBatches <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxBatches),
+                maxBatches,
+                "Maximum batches must be greater than zero.");
+        }
+    }
+
+    private static List<long>? NormalizeAndValidateSensitivityLabelIds(
+        List<long>? sensitivityLabelIds)
+    {
+        sensitivityLabelIds = sensitivityLabelIds?
+            .Distinct()
+            .ToList();
+
+        if (sensitivityLabelIds?.Any(id => id <= 0) == true)
+        {
+            var invalidIds = sensitivityLabelIds.Where(id => id <= 0);
+
+            throw new ArgumentException(
+                $"Sensitivity label IDs must be greater than zero. " +
+                $"Invalid IDs: {string.Join(", ", invalidIds)}",
+                nameof(sensitivityLabelIds));
+        }
+
+        return sensitivityLabelIds;
     }
 
 }
