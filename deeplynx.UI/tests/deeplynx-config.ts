@@ -1,19 +1,16 @@
 // tests/deeplynx-config.ts
 import type { Page } from '@playwright/test';
-import fs from 'fs';
-import { loadEnvConfig } from '@next/env';
+import { createHash } from 'crypto';
 
-loadEnvConfig(process.cwd());
-
-const FRONTEND_URL = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
-
-// Orgs & Projects- configure any additional orgs and projects that are needed for testing here
+// ----------------------------------------
+// Configure Global Orgs & Projects
+// ----------------------------------------
 export interface TestOrg {
-  name: string;
+  readonly name: string;
 }
 export interface TestProject {
-  name: string;
-  org: string; // references TestOrg.name
+  readonly name: string;
+  readonly org: TestOrg;
 }
 
 export const ORGS = {
@@ -22,108 +19,177 @@ export const ORGS = {
 } as const satisfies Record<string, TestOrg>;
 
 export const PROJECTS = {
-  projectX: { name: 'PW Project X', org: ORGS.orgA.name },
+  projectX: { name: 'PW Project X', org: ORGS.orgA },
 } as const satisfies Record<string, TestProject>;
 
-// Accounts and Roles- configure any additional test accounts with their roles here
-
+// ---------------------------------------------------------------------------
+// Configure Global Roles
+// ---------------------------------------------------------------------------
 export const DEFAULT_ROLE_NAME = 'User';
 
-export type TestAccountTitle =
-  | 'sysAdmin'
-  | 'orgAdminA'
-  | 'orgAdminB'
-  | 'projectAdminX'
-  | 'standardUserX';
+export const PermissionResource = {
+  Project: 'Project',
+  ObjectStorage: 'Object Storage',
+  DataSource: 'Data Source',
+  Record: 'Record',
+  Edge: 'Edge',
+  File: 'File',
+  Tag: 'Tag',
+  Class: 'Class',
+  Relationship: 'Relationship',
+  User: 'User',
+  Group: 'Group',
+  Organization: 'Organization',
+  Role: 'Role',
+  Permission: 'Permission',
+  SensitivityLabel: 'Sensitivity Label',
+  RecordCollection: 'Record Collection',
+  Insight: 'Insight',
+} as const;
+export type PermissionResource = typeof PermissionResource[keyof typeof PermissionResource];
+
+// `All` is an authoring-time shorthand, not a real permission. Keeps provisioning more succinct
+export const PermissionAction = {
+  Read: 'Read',
+  Write: 'Write',
+  Update: 'Update',
+  All: 'All',
+} as const;
+
+export type PermissionAction =
+  Exclude<typeof PermissionAction[keyof typeof PermissionAction], typeof PermissionAction['All']>;
+
+// 'Insight' only has Read/Write on the actual permission matrix so it's typed separately
+type NonUpdateAction = Exclude<PermissionAction, typeof PermissionAction['Update']>;
+
+// Hash the full shape. If 'all' is provided for the permission action, 
+// the hash the full list of permission actions instead of 'all'
+export type RolePermissions =
+  Partial<Record<Exclude<PermissionResource, typeof PermissionResource['Insight']>, PermissionAction[]>> & {
+    [PermissionResource.Insight]?: NonUpdateAction[];
+  };
+
+type ActionsAllowedFor<R extends PermissionResource> =
+  R extends typeof PermissionResource['Insight']
+    ? (NonUpdateAction | typeof PermissionAction['All'])[]
+    : (PermissionAction | typeof PermissionAction['All'])[];
+
+export type RolePermissionsInput = Partial<{ [R in PermissionResource]: ActionsAllowedFor<R> }>;
+
+export interface CustomRole {
+  readonly kind: 'custom';
+  readonly name: string;
+  readonly permissions: RolePermissions;
+}
+
+function stableStringify(perms: RolePermissions): string {
+  const sorted = Object.keys(perms).sort().reduce((acc, key) => {
+    acc[key] = [...(perms as Record<string, string[]>)[key]].sort();
+    return acc;
+  }, {} as Record<string, string[]>);
+  return JSON.stringify(sorted);
+}
+
+const ALL_ACTIONS: PermissionAction[] = [PermissionAction.Read, PermissionAction.Write, PermissionAction.Update];
+const INSIGHT_ACTIONS: PermissionAction[] = [PermissionAction.Read, PermissionAction.Write];
+
+// Hash the full list of resource permission actions. 
+// If all is provided Hash the full action list for that resource
+function expandActions(
+  resource: PermissionResource,
+  spec: (PermissionAction | typeof PermissionAction['All'])[],
+): PermissionAction[] {
+  const fullSet = resource === PermissionResource.Insight ? INSIGHT_ACTIONS : ALL_ACTIONS;
+
+  if (spec.includes(PermissionAction.All)) return fullSet;
+
+  const explicit = spec as PermissionAction[];
+  const invalid = explicit.filter((a) => !fullSet.includes(a));
+  if (invalid.length) throw new Error(`${resource} does not support: ${invalid.join(', ')}`);
+
+  return [...new Set(explicit)];
+}
+
+// List specific resource permission actions or 'all' for faster provisioning.
+export function defineRole(input: RolePermissionsInput | 'all'): CustomRole {
+  const resolvedInput: RolePermissionsInput = input === 'all'
+    ? Object.fromEntries(Object.values(PermissionResource).map((r) => [r, [PermissionAction.All]]))
+    : input;
+
+  const expanded = Object.fromEntries(
+    Object.entries(resolvedInput).map(([resource, spec]) => [
+      resource,
+      expandActions(resource as PermissionResource, spec!),
+    ]),
+  ) as RolePermissions;
+
+  const hash = createHash('sha1').update(stableStringify(expanded)).digest('hex').slice(0, 10);
+  return { kind: 'custom', name: `PW Custom Role ${hash}`, permissions: expanded };
+}
+
+export const ROLES = {
+  allPermissions: defineRole('all'),
+  // Add more shared custom roles here, e.g.:
+  //   dataEditor: defineRole({
+  //     [PermissionResource.Record]: [PermissionAction.All],
+  //     [PermissionResource.Edge]: [PermissionAction.All],
+  //   }),
+} as const satisfies Record<string, CustomRole>;
+
+export type RoleSpec = 'org_admin' | 'project_admin' | 'user' | CustomRole;
+
+// ---------------------------------------------------------------------------
+// Configure Global Accounts
+// Named accounts (sysAdmin, orgAdminA, ...) are available in any test to import and use. 
+// One-off accounts can be created and provisioned per test with "defineTestAccount"
+// ---------------------------------------------------------------------------
+export interface Provision {
+  role: RoleSpec;
+  org?: TestOrg;
+  project?: TestProject;
+}
 
 export interface TestAccount {
-  name: TestAccountTitle;
-  provision?: {
-    role: 'org_admin' | 'project_admin' | 'user'; // currently setup for only assigning the available default roles
-    org?: string;     // an ORGS[...].name
-    project?: string; // a PROJECTS[...].name
-  };
+  readonly name: string; // stable across runs — the cache key & authFile name
+  readonly provision?: Provision;
+}
+
+function roleKey(role: RoleSpec): string {
+  return typeof role === 'string' ? role : role.name;
+}
+
+function provisionFingerprint(p: Provision): string {
+  return [roleKey(p.role), p.org?.name ?? 'no-org', p.project?.name ?? 'no-project']
+    .join('__')
+    .replace(/\s+/g, '-');
+}
+
+export function defineTestAccount(provision: Provision, name?: string): TestAccount {
+  return { name: name ?? `auto-${provisionFingerprint(provision)}`, provision };
 }
 
 export const sysAdmin: TestAccount = { name: 'sysAdmin' };
-export const orgAdminA: TestAccount = { name: 'orgAdminA', provision: { role: 'org_admin', org: ORGS.orgA.name } };
-export const orgAdminB: TestAccount = { name: 'orgAdminB', provision: { role: 'org_admin', org: ORGS.orgB.name } };
+export const orgAdminA: TestAccount = { name: 'orgAdminA', provision: { role: 'org_admin', org: ORGS.orgA } };
+export const orgAdminB: TestAccount = { name: 'orgAdminB', provision: { role: 'org_admin', org: ORGS.orgB } };
 export const projectAdminX: TestAccount = {
   name: 'projectAdminX',
-  provision: { role: 'project_admin', org: ORGS.orgA.name, project: PROJECTS.projectX.name },
+  provision: { role: 'project_admin', org: ORGS.orgA, project: PROJECTS.projectX },
 };
 export const standardUserX: TestAccount = {
   name: 'standardUserX',
-  provision: { role: 'user', org: ORGS.orgA.name, project: PROJECTS.projectX.name },
+  provision: { role: 'user', org: ORGS.orgA, project: PROJECTS.projectX },
 };
 
-export const ACTINGUSERS: TestAccount[] = [
-  sysAdmin, orgAdminA, orgAdminB, projectAdminX, standardUserX,
-];
+export const authFile = (name: string) => `playwright/.auth/${name}.json`;
 
-export const authFile = (name: TestAccountTitle) => `playwright/.auth/${name}.json`;
-export const testUserCacheFile = 'playwright/.auth/testUserCache.json';
 
-// TestUserCache — resolved IDs written by auth.setup.ts, read by tests
-export interface TestUserCacheEntry {
-  email: string;
-  organizationId?: string;
-  projectId?: string;
-  userId?: string;
-  apiKey?: string;
-  apiSecret?: string;
-}
+// ---------------------------------------------------------------------------
+// UI selection helpers. To write the localStorage/cookie state the frontend reads.
+// ---------------------------------------------------------------------------
 
-type TestUserCache = Record<TestAccountTitle, TestUserCacheEntry>;
+const FRONTEND_URL = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
 
-let cachedTestUsers: TestUserCache;
-function readTestUserCache(): TestUserCache {
-  if (!cachedTestUsers) cachedTestUsers = JSON.parse(fs.readFileSync(testUserCacheFile, 'utf8'));
-  return cachedTestUsers;
-}
-
-export function accountMeta(name: TestAccountTitle) {
-  return readTestUserCache()[name];
-}
-
-// UI selection helpers.
-// Auth comes from storageState (see fixtures.ts). These only control UI state:
-// Determines which org/project is active in the browser
-
-export function orgIdByName(orgName: string): number {
-  const owner = ACTINGUSERS.find((a) => a.provision?.org === orgName);
-  if (!owner) {
-    throw new Error(`No account is provisioned into org "${orgName}" — can't resolve its organizationId.`);
-  }
-  const meta = accountMeta(owner.name);
-  if (!meta?.organizationId) {
-    throw new Error(`No organizationId cached for "${owner.name}" (org "${orgName}") — did auth.setup.ts run?`);
-  }
-  return Number(meta.organizationId);
-}
-
-export function projectIdByName(projectName: string): number {
-  const owner = ACTINGUSERS.find((a) => a.provision?.project === projectName);
-  if (!owner) {
-    throw new Error(`No account is provisioned into project "${projectName}" — can't resolve its projectId.`);
-  }
-  const meta = accountMeta(owner.name);
-  if (!meta?.projectId) {
-    throw new Error(`No projectId cached for "${owner.name}" (project "${projectName}") — did auth.setup.ts run?`);
-  }
-  return Number(meta.projectId);
-}
-
-export async function selectOrganization(page: Page, account: TestAccount, orgNameOverride?: string) {
-  const orgName = orgNameOverride ?? account.provision?.org;
-  if (!orgName) {
-    throw new Error(
-      `No org to select for "${account.name}" — either provision it with an org, ` +
-      `or pass an explicit org name (e.g. via test.use({ actingOrg: ... })).`,
-    );
-  }
-  const orgId = orgIdByName(orgName);
-
+export async function selectOrganization(page: Page, orgId: string, orgName: string) {
   await page.addInitScript(([id, name]) => {
     localStorage.setItem('organizationSession', JSON.stringify({ organizationId: id, organizationName: name }));
     localStorage.setItem('dashboard-tour-completed', 'true');
@@ -139,27 +205,9 @@ export async function selectOrganization(page: Page, account: TestAccount, orgNa
   ]);
 }
 
-export async function selectProject(page: Page, account: TestAccount, projectNameOverride?: string) {
-  const projectName = projectNameOverride ?? account.provision?.project;
-  if (!projectName) {
-    throw new Error(
-      `No project to select for "${account.name}" — either provision it with a ` +
-      `project, or pass an explicit project name (e.g. via test.use({ actingProject: ... })).`,
-    );
-  }
-
-  // When overriding, resolve the projectId from whichever account actually owns that project
-  const projectId = projectNameOverride
-    ? projectIdByName(projectNameOverride)
-    : Number(accountMeta(account.name)?.projectId);
-
-  if (!projectId) {
-    throw new Error(`No projectId resolved for "${account.name}" / project "${projectName}".`);
-  }
-
+export async function selectProject(page: Page, projectId: string, projectName: string) {
   const serialized = JSON.stringify({ projectId, projectName });
 
-  // ProjectSessionProvider.setProject writes to both localStorage AND a cookie
   await page.addInitScript((serialized) => {
     localStorage.setItem('projectSession', serialized);
   }, serialized);

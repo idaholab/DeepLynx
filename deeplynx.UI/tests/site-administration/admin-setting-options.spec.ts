@@ -1,5 +1,5 @@
-import { test, expect } from "../fixtures";
-import { sysAdmin, orgAdminA, projectAdminX, standardUserX } from "../deeplynx-config";
+import { test, expect, Page} from "../fixtures";
+import { sysAdmin, orgAdminA, projectAdminX, standardUserX, ORGS, PROJECTS } from "../deeplynx-config";
 
 // Each describe block below acts as a different account to verify that
 // settings visibility scales down correctly with role: sysAdmin sees
@@ -14,10 +14,11 @@ import { sysAdmin, orgAdminA, projectAdminX, standardUserX } from "../deeplynx-c
 
 // SysAdmin Acting
 test.describe("SysAdmin settings visibility", () => {
-  test.use({ actingUser: sysAdmin, actingOrg: "PW Org A", actingProject: "PW Project X" });
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX });
 
   test("sees the sysAdmin settings link", async ({ page }) => {
     await expect(page.getByRole("link", { name: "Admin Settings" })).toBeVisible();
+    await page.pause();
   });
 
   test("sees the organization settings link", async ({ page }) => {
@@ -31,7 +32,7 @@ test.describe("SysAdmin settings visibility", () => {
 
 // OrgAdmin Acting
 test.describe("Org admin settings visibility", () => {
-  test.use({ actingUser: orgAdminA, actingProject: "PW Project X" });
+  test.use({ actingUser: orgAdminA, actingProject: PROJECTS.projectX });
 
   test("does not see the sysAdmin settings link", async ({ page }) => {
     await expect(page.getByRole("link", { name: "Admin Settings" })).not.toBeVisible();
