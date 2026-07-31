@@ -1,15 +1,59 @@
-import { test, expect } from "@playwright/test";
-import { seedAndCreateProject } from "../helpers/seed";
+import { test, expect, Page } from "../fixtures";
+import { sysAdmin } from "../deeplynx-config";
 import path from "path";
 
 const BACKEND_URL = "http://localhost:5000/api/v1";
 const PDF_PATH = path.resolve(__dirname, "genesis-mission.pdf");
 
+async function checkDataSources(page: Page) {
+  const dataSourceSelect = page.getByLabel('Data sourceData Sources');
+  const selectedText = await dataSourceSelect.locator('option:checked').textContent();
+
+  if (selectedText === 'Data Sources') {
+    await dataSourceSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
+  }
+}
+
+async function checkStorageDestinations(page: Page) {
+  const storageSelect = page.getByLabel('Storage DestinationObject');
+  const selectedText = await storageSelect.locator('option:checked').textContent();
+
+  if (selectedText === 'Object storages') {
+    await storageSelect.selectOption({ index: 1 }); // first real option, skipping the placeholder
+  }
+}
+async function checkDataSourcesAndStorageDestinations(page: Page) {
+  const dataSourceBox = page.locator('span').filter({ hasText: 'Data source' }).first();
+  const storageDestinationBox = page.locator('span').filter({ hasText: 'Storage Destination' }).first();
+  try {
+    await expect(dataSourceBox.locator('.size-6.text-success')).toBeVisible({ timeout: 3000 });
+  } catch {
+    await checkDataSources(page);
+  }
+  try {
+    await expect(storageDestinationBox.locator('.size-6.text-success')).toBeVisible({ timeout: 3000 });
+  } catch {
+    await checkStorageDestinations(page);
+  }
+}
+
 test.describe("Insight E2E", () => {
   test.skip(process.env.RUN_INSIGHT_TESTS !== "true", "Insight tests disabled");
 
+  test.use({
+    actingUser: sysAdmin,
+    actingOrg: "PW Org A",
+    actingProject: "PW Project X",
+  });
+
   test.beforeEach(async ({ page }) => {
-    await seedAndCreateProject(page, "Insight E2E Test");
+    await page.getByTestId("project-select").click();
+
+    await page
+      .getByRole("button", { name: "PW Project X", exact: true })
+      .click();
+
+    await expect(page).toHaveURL(/\/project\/\d+/);
   });
 
   test("upload file, embed, and query chatbot", async ({ page }) => {
@@ -34,6 +78,7 @@ test.describe("Insight E2E", () => {
     await expect(page.getByText("genesis-mission.pdf")).toBeVisible({
       timeout: 10000,
     });
+    await checkDataSourcesAndStorageDestinations(page);
 
     // Click the Upload button
     await page.locator("button.btn-secondary", { hasText: "Upload" }).click();
@@ -63,12 +108,12 @@ test.describe("Insight E2E", () => {
 
     // Wait for the uploaded record to appear in the pending list
     await expect(
-      page.getByText("genesis-mission.pdf"),
+      page.getByRole('article').filter({ hasText: 'Ready to embed' }).locator('h3').first()
     ).toBeVisible({ timeout: 15000 });
 
     // Select all visible pending records (our file)
     await page
-      .locator("button", { hasText: "Select Visible" })
+      .getByRole("checkbox").first()
       .click();
 
     // Click "Embed Selected" to queue for embedding
