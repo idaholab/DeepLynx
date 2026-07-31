@@ -722,10 +722,11 @@ test.describe("Upload Center", () => {
 
   test.describe('Large file upload', () => {
     let filePath: string;
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-ten-gb-test-file.bin`;
     let createdRecord: { recordId: string; projectId: string } | null = null;
 
     test.beforeAll(async () => {
-      filePath = path.join(os.tmpdir(), 'ten-gb-test-file.bin');
+      filePath = path.join(os.tmpdir(), fileName);
 
       // Reuse the file across runs if it already exists and is the right size
       if (fs.existsSync(filePath) && fs.statSync(filePath).size === TEN_GB) {
@@ -781,7 +782,7 @@ test.describe("Upload Center", () => {
 
       const start = Date.now();
 
-      createdRecord = await clickToBrowse({ page }, 'ten-gb-test-file.bin', filePath, TWENTY_MIN_MS);
+      createdRecord = await clickToBrowse({ page }, fileName, filePath, TWENTY_MIN_MS);
 
       const elapsedMs = Date.now() - start;
       console.log(`Upload completed in ${(elapsedMs / 1000 / 60).toFixed(2)} minutes`);
