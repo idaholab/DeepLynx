@@ -15,6 +15,7 @@ interface StorageFormData {
   name: string;
   config: Record<string, any>;
   default: boolean;
+  existingContainer?: boolean;
 }
 
 interface CreateStorageModalProps {
@@ -252,10 +253,28 @@ const CreateStorageModal = ({
                 />
               </div>
 
+              {/* Existing Container Checkbox */}
+              <div className="form-control mb-4 w-full md:w-2/3">
+                <label className="cursor-pointer label flex items-center gap-2">
+                  <span className="label-text">Use Existing Container</span>
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-primary"
+                    checked={storageFormData.existingContainer || false}
+                    onChange={(e) =>
+                      setStorageFormData({
+                        ...storageFormData,
+                        existingContainer: e.target.checked,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
               {/* New File Path Input */}
               <div className="form-control mb-4">
                 <label className="label">
-                  <span className="label-text">{t.translations.FILE_PATH}</span>
+                  <span className="label-text mr-2">{t.translations.FILE_PATH}</span>
                 </label>
                 <input
                   type="text"

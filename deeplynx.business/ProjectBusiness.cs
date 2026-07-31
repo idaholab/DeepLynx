@@ -172,7 +172,8 @@ public class ProjectBusiness : IProjectBusiness
                 organizationId: organizationId,
                 containerName: containerName,
                 connectionString: null,
-                isDefault: true);
+                isDefault: true,
+                existingContainer: true);
 
             var objectStorageResponse = await _objectStorageBusiness.CreateObjectStorage(
                 currentUserId: userId,
