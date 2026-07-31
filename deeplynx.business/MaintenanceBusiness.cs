@@ -16,7 +16,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     private readonly DeeplynxContext _context;
     private readonly FileAzureBusiness _fileAzureBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
-    private readonly RecordBusiness _recordBusiness;
+    private readonly IRecordBusiness _recordBusiness;
     private readonly IDataSourceBusiness _dataSourceBusiness;
 
     /// <summary>
@@ -31,7 +31,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         DeeplynxContext context,
         FileAzureBusiness fileAzureBusiness,
         IObjectStorageBusiness objectStorageBusiness,
-        RecordBusiness recordBusiness,
+        IRecordBusiness recordBusiness,
         IDataSourceBusiness dataSourceBusiness)
     {
         _context = context;
@@ -173,7 +173,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
 
 
     /// <summary>
-    /// Scrapes files from a given object storage and creates records for them. 
+    ///     Scrapes files from a given object storage and creates records for them. 
     /// </summary>
     /// <param name="objectStorageId">The ID of the object storage to be scraped</param>
     /// <param name="currentUserId">ID of the User executing this method.</param>
