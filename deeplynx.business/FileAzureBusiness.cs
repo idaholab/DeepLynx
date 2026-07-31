@@ -173,10 +173,12 @@ public class FileAzureBusiness : IFileBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="containerName">The name of the container</param>
     /// <param name="connectionString">The connection string to connect to Azure</param>
+    /// <param name="isDefault">Specifies whether the resulting obj storage DTO should be default</param>
     public async Task<CreateObjectStorageRequestDto> CreateContainer(
      long organizationId,
      string containerName,
-     string? connectionString)
+     string? connectionString,
+     bool isDefault = false)
     {
         const int maxContainerNameLength = 63;
 
@@ -195,7 +197,7 @@ public class FileAzureBusiness : IFileBusiness
         {
             var defaultObjectStorage = await _context.ObjectStorages
                 .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Default && os.Type == "azure_object")
-                .FirstOrDefaultAsync() ?? throw new Exception("No default Azure object storage found for the organization.");
+                .FirstOrDefaultAsync() ?? throw new KeyNotFoundException("No default Azure object storage found for the organization.");
 
             var azureConfig = DeserializeAndDecryptConfig(defaultObjectStorage.ConfigEncrypted);
 
@@ -221,7 +223,7 @@ public class FileAzureBusiness : IFileBusiness
                     AzureContainerName = containerName
                 }
             },
-            Default = true
+            Default = isDefault
         };
 
         return newObjectStorageDto;
