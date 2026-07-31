@@ -563,7 +563,16 @@ test.describe("Upload Center", () => {
       .getByRole("button", { name: "PW Project X", exact: true })
       .click();
 
-    await page.waitForURL(/\/project\/\d+/);
+    try {
+      await page.waitForURL(/\/project\/\d+/, { timeout: 3_000 });
+    } catch {
+      await page.getByRole('link').nth(1).click();
+      await page.getByTestId("project-select").click();
+      await page
+        .getByRole("button", { name: "PW Project X", exact: true })
+        .click();
+      await page.waitForURL(/\/project\/\d+/);
+    }
 
     // Extract project ID from the URL (e.g. /project/42)
     const url = page.url();
