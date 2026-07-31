@@ -39,6 +39,7 @@ interface SplitViewLayoutProps {
   roleHasPermission: (roleId: number, permissionId: number) => boolean;
   isOrganizationRole: (role: RoleResponseDto) => boolean;
   isProjectRole: (role: RoleResponseDto) => boolean;
+  isAdmin: boolean;
 }
 
 const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
@@ -61,6 +62,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   onCancelEditingPermissions,
   onSavePermissions,
   onTogglePermission,
+  isAdmin,
 }) => {
   // Determine if current role can be edited
   const canEditRole =
@@ -143,11 +145,11 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
               className="btn btn-primary btn-sm gap-2"
               title={
                 isOrganizationRole(currentRole)
-                    ? t.translations
-                        .ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL
-                    : rolesLocked
-                      ? "Roles are locked"
-                      : "Edit Permissions"
+                  ? t.translations
+                    .ORGANIZATION_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED_AT_PROJECT_LEVEL
+                  : rolesLocked
+                    ? "Roles are locked"
+                    : "Edit Permissions"
               }
             >
               <PencilIcon className="w-4 h-4" />
@@ -204,14 +206,20 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                         ? tempPermissions.has(Number(perm.id))
                         : roleHasPermission(currentRole.id, Number(perm.id));
 
+
+                      const disableCheckbox =
+                        !isEditingPermissions ||
+                        (category.id.includes("label-") &&
+                          perm.projectId == null &&
+                          !isAdmin);
+
                       return (
                         <label
                           key={perm.id}
-                          className={`label justify-start gap-2 ${
-                            isEditingPermissions
-                              ? "cursor-pointer"
-                              : "cursor-default"
-                          }`}
+                          className={`label justify-start gap-2 ${isEditingPermissions
+                            ? "cursor-pointer"
+                            : "cursor-default"
+                            }`}
                           title={
                             displayMode === "permission-action"
                               ? perm.description || perm.action || perm.name
@@ -222,7 +230,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                             type="checkbox"
                             checked={hasPermission}
                             onChange={() => onTogglePermission(Number(perm.id))}
-                            disabled={!isEditingPermissions}
+                            disabled={disableCheckbox}
                             className="checkbox checkbox-primary checkbox-sm"
                           />
                           <span className="label-text">
@@ -305,24 +313,21 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                   key={role.id}
                   onClick={() => onRoleSelection(role.id)}
                   disabled={isEditingPermissions}
-                  className={`w-full px-4 py-3 text-left border-b border-base-300/50 transition-colors ${
-                    selectedRoleId === role.id
-                      ? "bg-primary/10 border-l-4 border-l-primary"
-                      : ""
-                  } ${
-                    isEditingPermissions
+                  className={`w-full px-4 py-3 text-left border-b border-base-300/50 transition-colors ${selectedRoleId === role.id
+                    ? "bg-primary/10 border-l-4 border-l-primary"
+                    : ""
+                    } ${isEditingPermissions
                       ? "opacity-50 cursor-not-allowed"
                       : "hover:bg-base-200 cursor-pointer"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <ShieldCheckIcon
-                        className={`w-4 h-4 ${
-                          selectedRoleId === role.id
-                            ? "text-primary"
-                            : "text-base-content/40"
-                        }`}
+                        className={`w-4 h-4 ${selectedRoleId === role.id
+                          ? "text-primary"
+                          : "text-base-content/40"
+                          }`}
                       />
                       <span className="font-medium text-sm">{role.name}</span>
                     </div>
@@ -389,8 +394,8 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                     className="btn btn-ghost btn-sm btn-circle"
                     title={
                       isOrganizationRole(currentRole)
-                          ? "Organization roles cannot be edited at project level"
-                          : "Edit Role"
+                        ? "Organization roles cannot be edited at project level"
+                        : "Edit Role"
                     }
                   >
                     <PencilIcon className="size-6" />

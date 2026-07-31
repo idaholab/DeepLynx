@@ -2,7 +2,12 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ExclamationTriangleIcon,
+  StarIcon,
+} from "@heroicons/react/24/outline";
 import { useState } from "react";
 import toast from "react-hot-toast";
 
@@ -10,6 +15,7 @@ interface StorageFormData {
   name: string;
   config: Record<string, any>;
   default: boolean;
+  existingContainer?: boolean;
 }
 
 interface CreateStorageModalProps {
@@ -26,6 +32,8 @@ interface CreateStorageModalProps {
   azureBucketName: string;
   setAzureBucketName: (value: string) => void;
   onCreate: () => void;
+  onCreateFromProjectName: () => void;
+  isCreatingFromProjectName?: boolean;
   onResetForm: () => void;
 }
 
@@ -43,11 +51,14 @@ const CreateStorageModal = ({
   azureBucketName,
   setAzureBucketName,
   onCreate,
+  onCreateFromProjectName,
+  isCreatingFromProjectName = false,
   onResetForm,
 }: CreateStorageModalProps) => {
   const { t } = useLanguage();
 
   const [isFilePathDisabled, setIsFilePathDisabled] = useState(false);
+  const [isManualSectionOpen, setIsManualSectionOpen] = useState(false);
 
   const getAzureFilePath = () =>
     storageFormData.config.AzureObjectConfig?.AzureFilePath ?? "";
@@ -89,22 +100,24 @@ const CreateStorageModal = ({
             {t.translations.CREATE_STORAGE}
           </h3>
 
-          <div className="form-control mb-4 w-full md:w-2/3">
-            <label className="label">
-              <span className="label-text required">
-                {t.translations.STORAGE_NAME}
-              </span>
-            </label>
-            <input
-              type="text"
-              placeholder={t.translations.PRIMARY_STORAGE_PLACEHOLDER}
-              className="input input-bordered w-full"
-              value={storageFormData.name}
-              onChange={(e) =>
-                setStorageFormData({ ...storageFormData, name: e.target.value })
-              }
-            />
-          </div>
+          {storageType !== "azure_object" && (
+            <div className="form-control mb-4 w-full md:w-2/3">
+              <label className="label">
+                <span className="label-text required">
+                  {t.translations.STORAGE_NAME}
+                </span>
+              </label>
+              <input
+                type="text"
+                placeholder={t.translations.PRIMARY_STORAGE_PLACEHOLDER}
+                className="input input-bordered w-full"
+                value={storageFormData.name}
+                onChange={(e) =>
+                  setStorageFormData({ ...storageFormData, name: e.target.value })
+                }
+              />
+            </div>
+          )}
 
           <div className="form-control mb-4 w-full md:w-2/3">
             <label className="label">
@@ -166,6 +179,50 @@ const CreateStorageModal = ({
 
           {storageType === "azure_object" && (
             <>
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 mb-4 flex items-center gap-4">
+                <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
+                  <StarIcon className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+                    {t.translations.RECOMMENDED}
+                  </p>
+                  <p className="font-semibold">
+                    {t.translations.USE_ORGANIZATION_STORAGE}
+                  </p>
+                  <p className="text-sm text-base-content/70">
+                    {t.translations.CREATE_PROJECT_CONTAINER_HELPER}
+                  </p>
+                </div>
+                <button
+                  className="btn btn-primary btn-sm shrink-0"
+                  onClick={onCreateFromProjectName}
+                  disabled={isCreatingFromProjectName}
+                >
+                  {isCreatingFromProjectName && (
+                    <span className="loading loading-spinner loading-xs" />
+                  )}
+                  {t.translations.CREATE_PROJECT_CONTAINER}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm w-full text-primary mb-4"
+                onClick={() => setIsManualSectionOpen(!isManualSectionOpen)}
+              >
+                {t.translations.CONNECT_STORAGE_MANUALLY_INSTEAD}
+                {isManualSectionOpen ? (
+                  <ChevronUpIcon className="w-4 h-4" />
+                ) : (
+                  <ChevronDownIcon className="w-4 h-4" />
+                )}
+              </button>
+            </>
+          )}
+
+          {storageType === "azure_object" && isManualSectionOpen && (
+            <>
               <div className="form-control mb-4 w-full md:w-2/3">
                 <label className="label">
                   <span className="label-text">
@@ -196,10 +253,28 @@ const CreateStorageModal = ({
                 />
               </div>
 
+              {/* Existing Container Checkbox */}
+              <div className="form-control mb-4 w-full md:w-2/3">
+                <label className="cursor-pointer label flex items-center gap-2">
+                  <span className="label-text">Use Existing Container</span>
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-primary"
+                    checked={storageFormData.existingContainer || false}
+                    onChange={(e) =>
+                      setStorageFormData({
+                        ...storageFormData,
+                        existingContainer: e.target.checked,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
               {/* New File Path Input */}
               <div className="form-control mb-4">
                 <label className="label">
-                  <span className="label-text">{t.translations.FILE_PATH}</span>
+                  <span className="label-text mr-2">{t.translations.FILE_PATH}</span>
                 </label>
                 <input
                   type="text"
@@ -263,7 +338,11 @@ const CreateStorageModal = ({
             >
               {t.translations.CANCEL}
             </button>
-            <button className="btn btn-primary" onClick={onCreate}>
+            <button
+              className="btn btn-primary"
+              onClick={onCreate}
+              disabled={isCreatingFromProjectName}
+            >
               {t.translations.CREATE}
             </button>
           </div>

@@ -21,6 +21,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 {
     private EventBusiness _eventBusiness;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private HistoricalRecordBusiness _historicalRecordBusiness = null!;
     private UserBusiness _userBusiness;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -77,7 +78,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();

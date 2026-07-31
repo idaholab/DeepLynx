@@ -31,6 +31,7 @@ public class OrganizationBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
     private RoleBusiness _roleBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private EncryptionHelper _encryptionHelper = null!;
 
     public long oid; // organization ID
@@ -61,7 +62,8 @@ public class OrganizationBusinessTests : IntegrationTestBase
         _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
 
         // org business and dependencies
         _mockLoggerOrg = new Mock<ILogger<OrganizationBusiness>>();

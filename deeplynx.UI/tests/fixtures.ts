@@ -62,4 +62,4 @@ export const test = base.extend<Fixtures>({
   },
 });
 
-export { expect, type Page } from '@playwright/test';
+export { expect, type Page, type APIRequestContext } from '@playwright/test';

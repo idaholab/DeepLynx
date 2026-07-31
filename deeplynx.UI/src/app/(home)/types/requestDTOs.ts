@@ -90,6 +90,7 @@ export type CreateObjectStorageRequestDto = {
 export type UpdateObjectStorageRequestDto = {
   name: string;
   default: boolean;
+  existingContainer?: boolean;
 };
 
 export type CreateClassRequestDto = {

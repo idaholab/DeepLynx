@@ -16,6 +16,7 @@ interface StorageFormData {
   config: StorageConfig;
   default: boolean;
   createContainerPerProject: boolean;
+  existingContainer?: boolean;
 }
 
 interface CreateStorageModalProps {
@@ -154,6 +155,24 @@ const CreateStorageModal = ({
                   value={azureBucketName}
                   onChange={(e) => setAzureBucketName(e.target.value)}
                 />
+              </div>
+
+              {/* Existing Container Checkbox */}
+              <div className="form-control mb-4 w-full md:w-2/3">
+                <label className="cursor-pointer label flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-primary"
+                    checked={storageFormData.existingContainer || false}
+                    onChange={(e) =>
+                      setStorageFormData({
+                        ...storageFormData,
+                        existingContainer: e.target.checked,
+                      })
+                    }
+                  />
+                  <span className="label-text">Use Existing Container</span>
+                </label>
               </div>
 
               {/* Create Container Per Project Checkbox */}

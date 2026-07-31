@@ -224,6 +224,7 @@ export const translations = {
         "Configure branding and manage your project",
       CONFIRM_BULK_UPLOAD: "Confirm Bulk Upload",
       CONFIRM_UPLOAD: "Confirm Upload",
+      CONNECT_STORAGE_MANUALLY_INSTEAD: "Connect storage manually instead",
       CONNECTION_STRING: "Connection String",
       CONNECTIONS: "Connections",
       CONNECTOR: "Connector",
@@ -258,6 +259,8 @@ export const translations = {
       CREATE_OAUTH_APPLICATION: "Create OAuth Application",
       CREATE_OBJECT_STORAGE: "Create Object Storage",
       CREATE_ORGANIZATION: "Create Organization",
+      CREATE_PROJECT_CONTAINER_HELPER: "Create an organization-managed container in Azure Blob Storage. This is the fastest and easiest way to get started.",
+      CREATE_PROJECT_CONTAINER: "Create Project Container",
       CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
         "Create your first organization to get started.",
       CREATE_PROJECT: "Create New Project",
@@ -1444,6 +1447,7 @@ export const translations = {
       RUNNING: "Running",
       RECENT_ACTIVITY: "Recent Activity",
       RECENTLY_ADDED_RECORDS: "Recently Added Records",
+      RECOMMENDED: "Recommended",
       RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND:
         "Recommended: PNG with transparent background",
       RECORD: "Record",
@@ -2012,6 +2016,7 @@ export const translations = {
       URI_PLACEHOLDER: "uri",
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Used as the default when creating new data sources for projects.",
+      USE_ORGANIZATION_STORAGE: "Use Organization Storage",
       USE_SELECTOR_TO_ADD_LABELS: "Use the selector above to add labels.",
       USE_SELECTOR_TO_ADD_TAGS: "Use the selector above to add tags.",
       USER: "User",
@@ -2357,6 +2362,7 @@ export const translations = {
         "Configura la identidad visual y administra tu proyecto",
       CONFIRM_BULK_UPLOAD: "Confirmar carga masiva",
       CONFIRM_UPLOAD: "Confirmar carga",
+      CONNECT_STORAGE_MANUALLY_INSTEAD: "Conectar el almacenamiento manualmente en su lugar",
       CONNECTION_STRING: "Cadena de conexión",
       CONNECTIONS: "Conexiones",
       CONNECTOR: "Conector",
@@ -2402,6 +2408,8 @@ export const translations = {
       CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
         "Crea tu primera organización para comenzar.",
       CREATE_PROJECT: "Crear nuevo proyecto",
+      CREATE_PROJECT_CONTAINER_HELPER: "Cree un contenedor administrado por la organización en Azure Blob Storage. Esta es la forma más rápida y sencilla de empezar.",
+      CREATE_PROJECT_CONTAINER: "Crear contenedor de proyecto",
       CREATE_CLASS: "Crear clase",
       CREATE_RELATIONSHIP: "Crear relacion",
       CREATE_ROLE: "Crear un rol",
@@ -3646,6 +3654,7 @@ export const translations = {
       READ: "leer",
       RECENT_ACTIVITY: "Actividad reciente",
       RECENTLY_ADDED_RECORDS: "Registros añadidos recientemente",
+      RECOMMENDED: "Recomendado",
       RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND:
         "Recomendado: PNG con fondo transparente",
       RECORD: "Registro",
@@ -4245,6 +4254,8 @@ export const translations = {
       UPDATED: "actualizado",
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Se usa como valor predeterminado al crear nuevas fuentes de datos para los proyectos.",
+      USE_ORGANIZATION_STORAGE:
+        "Utilizar el almacenamiento de la organización",
       USE_SELECTOR_TO_ADD_LABELS:
         "Usa el selector de arriba para agregar etiquetas de sensibilidad.",
       USE_SELECTOR_TO_ADD_TAGS:

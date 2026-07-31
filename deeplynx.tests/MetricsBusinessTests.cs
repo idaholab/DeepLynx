@@ -43,6 +43,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
     private MetricsBusiness _metricsBusiness = null!;
     private IFileBusinessFactory _fileBusinessFactory = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
 
@@ -95,11 +96,12 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         await Context.SaveChangesAsync();
 
         // Initialize business layer
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
 
         var fileBusinessFactory = new Mock<IFileBusinessFactory>();
         var filesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, null!, null!);
-        var azureBusiness = new FileAzureBusiness(Context, _objectStorageBusiness, _encryptionHelper);
+        var azureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
 
         fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(filesystemBusiness);
         fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(azureBusiness);

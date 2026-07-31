@@ -76,6 +76,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
     private ObjectStorageConfigDto _objectStorageConfig = null!;
     private OlapBusiness _olapBusiness = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private EncryptionHelper _encryptionHelper = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
     private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
@@ -137,7 +138,8 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
         _insightBusiness = new Mock<IInsightBusiness>();
 
         // Set up business layer dependencies
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness,
@@ -168,7 +170,7 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             .Returns(realFileFilesystemBusiness);
 
         // Wire up the real filesystem implementation via the factory mock
-        var realFileAzureBusiness = new FileAzureBusiness(Context, _objectStorageBusiness, _encryptionHelper);
+        var realFileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("azure_object"))
             .Returns(realFileAzureBusiness);

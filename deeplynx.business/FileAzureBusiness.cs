@@ -14,22 +14,20 @@ using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using System.ComponentModel;
 
 namespace deeplynx.business;
 
 public class FileAzureBusiness : IFileBusiness
 {
-    private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly DeeplynxContext _context;
     private readonly EncryptionHelper _encryptionHelper;
 
     public FileAzureBusiness(
         DeeplynxContext context,
-        IObjectStorageBusiness objectStorageBusiness,
         EncryptionHelper encryptionHelper)
     {
         _context = context;
-        _objectStorageBusiness = objectStorageBusiness;
         _encryptionHelper = encryptionHelper;
     }
 
@@ -170,50 +168,53 @@ public class FileAzureBusiness : IFileBusiness
     }
 
     /// <summary>
-    ///     Creates a project container
+    ///     Creates an Azure Blob Container
     /// </summary>
-    /// <param name="userId">ID of the User executing this method.</param>
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
-    /// <param name="projectId">The ID of the project to which the object storage belongs</param>
-    /// <param name="projectName">The name of the project</param>
-    public async Task<ObjectStorageResponseDto> CreateProjectContainer(
-        long userId,
+    /// <param name="containerName">The name of the container</param>
+    /// <param name="connectionString">The connection string to connect to Azure</param>
+    /// <param name="isDefault">Specifies whether the resulting obj storage DTO should be default</param>
+    /// <param name="existingContainer">Specifies whether the container exists already</param>
+    public async Task<CreateObjectStorageRequestDto> CreateContainer(
         long organizationId,
-        long projectId,
-        string projectName)
+        string containerName,
+        string? connectionString,
+        bool isDefault = false,
+        bool existingContainer = false)
     {
         const int maxContainerNameLength = 63;
-        const int guidLength = 36;
-        const int separatorLength = 1;
-        int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
-
-        string truncatedProjectName = projectName.Length > maxProjectNameLength
-            ? projectName[..maxProjectNameLength]
-            : projectName;
-
-        truncatedProjectName = new string([.. truncatedProjectName
-            .ToLower()
-            .Where(c => char.IsLetterOrDigit(c) || c == '-')]);
-
-        string guid = Guid.NewGuid().ToString();
-
-        string containerName = $"{truncatedProjectName}-{guid}".ToLower();
 
         if (containerName.Length > maxContainerNameLength || containerName.Length < 3)
             throw new Exception("Generated container name does not comply with Azure Blob storage naming rules.");
 
-        var defaultObjectStorage = await _context.ObjectStorages
-            .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Default && os.Type == "azure_object")
-            .FirstOrDefaultAsync() ?? throw new Exception("No default Azure object storage found for the organization.");
-        var azureConfig = DeserializeAndDecryptConfig(defaultObjectStorage.ConfigEncrypted);
+        BlobServiceClient blobServiceClient;
+        string effectiveConnectionString;
 
-        if (azureConfig == null || string.IsNullOrWhiteSpace(azureConfig.AzureObjectConfig.AzureConnectionString))
-            throw new Exception("Invalid or missing Azure configuration in the default object storage.");
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            effectiveConnectionString = connectionString;
+        }
+        else
+        {
+            var defaultObjectStorage = await _context.ObjectStorages
+                .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Default && os.Type == "azure_object")
+                .FirstOrDefaultAsync() ?? throw new KeyNotFoundException("No default Azure object storage found for the organization.");
 
-        var blobServiceClient = new BlobServiceClient(azureConfig.AzureObjectConfig.AzureConnectionString);
-        var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+            var azureConfig = DeserializeAndDecryptConfig(defaultObjectStorage.ConfigEncrypted);
 
-        await containerClient.CreateIfNotExistsAsync();
+            if (azureConfig == null || string.IsNullOrWhiteSpace(azureConfig.AzureObjectConfig?.AzureConnectionString))
+                throw new Exception("Invalid or missing Azure configuration in the default object storage.");
+
+            effectiveConnectionString = azureConfig.AzureObjectConfig.AzureConnectionString;
+        }
+
+        if (!existingContainer)
+        {
+            blobServiceClient = new BlobServiceClient(effectiveConnectionString);
+            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+
+            await containerClient.CreateIfNotExistsAsync();
+        }
 
         var newObjectStorageDto = new CreateObjectStorageRequestDto
         {
@@ -222,20 +223,14 @@ public class FileAzureBusiness : IFileBusiness
             {
                 AzureObjectConfig = new AzureObjectConfigDto
                 {
-                    AzureConnectionString = azureConfig.AzureObjectConfig.AzureConnectionString,
+                    AzureConnectionString = effectiveConnectionString,
                     AzureContainerName = containerName
                 }
             },
-            Default = true
+            Default = isDefault
         };
 
-        var createdContainer = await _objectStorageBusiness.CreateObjectStorage(
-            currentUserId: userId,
-            organizationId: organizationId,
-            projectId: projectId,
-            dto: newObjectStorageDto);
-
-        return createdContainer;
+        return newObjectStorageDto;
     }
 
     /// <summary>
