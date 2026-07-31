@@ -147,6 +147,9 @@ public class MaintenanceController : ControllerBase
         try
         {
             long currentUserId = UserContextStorage.UserId;
+            bool isSysAdmin = UserContextStorage.IsSysAdmin;
+            bool isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            bool isProjectAdmin = UserContextStorage.IsProjectAdmin;
 
             var result =
                 await _maintenanceBusiness.ScrapeObjectStorageToCatalog(
@@ -157,9 +160,9 @@ public class MaintenanceController : ControllerBase
                     batchSize,
                     maxBatches,
                     sensitivityLabelIds,
-                    isSysAdmin: true,
-                    isOrgAdmin: false,
-                    isProjectAdmin: false,
+                    isSysAdmin,
+                    isOrgAdmin,
+                    isProjectAdmin,
                     HttpContext.RequestAborted);
 
             return Ok(result);
