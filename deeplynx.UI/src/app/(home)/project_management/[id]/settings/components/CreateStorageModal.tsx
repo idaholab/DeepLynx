@@ -184,13 +184,13 @@ const CreateStorageModal = ({
                 </div>
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-primary uppercase tracking-wide">
-                    {/* {t.translations.RECOMMENDED} */} Recommended
+                    {t.translations.RECOMMENDED}
                   </p>
                   <p className="font-semibold">
-                    {/* {t.translations.USE_ORGANIZATION_STORAGE} */} Use Organization Storage
+                    {t.translations.USE_ORGANIZATION_STORAGE}
                   </p>
                   <p className="text-sm text-base-content/70">
-                    {/* {t.translations.CREATE_AZURE_CONTAINER_FROM_PROJECT_NAME_HELPER} */} Create an organization-managed container in Azure Blob Storage. This is the fastest and easiest way to get started.
+                    {t.translations.CREATE_PROJECT_CONTAINER_HELPER}
                   </p>
                 </div>
                 <button
@@ -201,7 +201,7 @@ const CreateStorageModal = ({
                   {isCreatingFromProjectName && (
                     <span className="loading loading-spinner loading-xs" />
                   )}
-                  {/* {t.translations.CREATE_PROJECT_CONTAINER} */} Create Project Container
+                  {t.translations.CREATE_PROJECT_CONTAINER}
                 </button>
               </div>
 
@@ -210,7 +210,7 @@ const CreateStorageModal = ({
                 className="btn btn-ghost btn-sm w-full text-primary mb-4"
                 onClick={() => setIsManualSectionOpen(!isManualSectionOpen)}
               >
-                {/* {t.translations.CONNECT_STORAGE_MANUALLY_INSTEAD} */} Connect storage manually instead
+                {t.translations.CONNECT_STORAGE_MANUALLY_INSTEAD}
                 {isManualSectionOpen ? (
                   <ChevronUpIcon className="w-4 h-4" />
                 ) : (

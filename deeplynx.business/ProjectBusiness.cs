@@ -1246,6 +1246,8 @@ public class ProjectBusiness : IProjectBusiness
     /// <returns></returns>
     private string UniqueContainerNameFromString(string inputString)
     {
+        // max length based on the azure container name constraints found at the link below
+        // https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names
         const int maxContainerNameLength = 63;
         const int guidLength = 36;
         const int separatorLength = 1;
