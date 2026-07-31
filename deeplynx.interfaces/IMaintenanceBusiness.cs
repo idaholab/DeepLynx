@@ -11,7 +11,6 @@ public interface IMaintenanceBusiness
     Task<ScrapeObjectStorageResponseDto> ScrapeObjectStorageToCatalog(
         long objectStorageId,
         long currentUserId,
-        long dataSourceId,
         string? afterCursor = null,
         int batchSize = 500,
         int maxBatches = 5,

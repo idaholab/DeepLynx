@@ -4,7 +4,6 @@ public static class StorageScraperHelpers
 {
     public static void ValidateScraperParameters(
         long objectStorageId,
-        long dataSourceId,
         int batchSize,
         int maxBatches)
     {
@@ -14,14 +13,6 @@ public static class StorageScraperHelpers
                 nameof(objectStorageId),
                 objectStorageId,
                 "Object storage ID must be greater than zero.");
-        }
-
-        if (dataSourceId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(dataSourceId),
-                dataSourceId,
-                "Data source ID must be greater than zero.");
         }
 
         if (batchSize <= 0)

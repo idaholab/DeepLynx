@@ -17,6 +17,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     private readonly FileAzureBusiness _fileAzureBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly RecordBusiness _recordBusiness;
+    private readonly IDataSourceBusiness _dataSourceBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsBusiness" /> class.
@@ -25,16 +26,19 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     /// <param name="fileBusinessFactory">Factory to create storage-specific file business instances</param>
     /// <param name="objectStorageBusiness">Business layer service used to retrieve and decrypt object storage configuration</param>
     /// <param name="recordBusiness">Business layer service used to bulk create records from scraped files</param>
+    /// <param name="dataSourceBusiness">Business layer service used to retrieve the default data source of a project</param>
     public MaintenanceBusiness(
         DeeplynxContext context,
         FileAzureBusiness fileAzureBusiness,
         IObjectStorageBusiness objectStorageBusiness,
-        RecordBusiness recordBusiness)
+        RecordBusiness recordBusiness,
+        IDataSourceBusiness dataSourceBusiness)
     {
         _context = context;
         _fileAzureBusiness = fileAzureBusiness;
         _objectStorageBusiness = objectStorageBusiness;
         _recordBusiness = recordBusiness;
+        _dataSourceBusiness = dataSourceBusiness;
     }
     /// <summary>
     /// Gets the records that have been uploaded using our old timeseries methods,
@@ -173,7 +177,6 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     /// </summary>
     /// <param name="objectStorageId">The ID of the object storage to be scraped</param>
     /// <param name="currentUserId">ID of the User executing this method.</param>
-    /// <param name="dataSourceId">The ID of the data source under which to create the record</param>
     /// <param name="afterCursor">Cursor returned from a previous call, or null to start from the beginning</param>
     /// <param name="batchSize">Number of records per upsert batch</param>
     /// <param name="maxBatches">Maximum number of batches to process before returning</param>
@@ -191,7 +194,6 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     public async Task<ScrapeObjectStorageResponseDto> ScrapeObjectStorageToCatalog(
         long objectStorageId,
         long currentUserId,
-        long dataSourceId,
         string? afterCursor = null,
         int batchSize = 500,
         int maxBatches = 5,
@@ -201,7 +203,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         bool isProjectAdmin = false,
         CancellationToken cancellationToken = default)
     {
-        ValidateScraperParameters(objectStorageId, dataSourceId, batchSize, maxBatches);
+        ValidateScraperParameters(objectStorageId, batchSize, maxBatches);
         sensitivityLabelIds = NormalizeAndValidateSensitivityLabelIds(sensitivityLabelIds);
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -231,6 +233,9 @@ public class MaintenanceBusiness : IMaintenanceBusiness
 
         long organizationId = objectStorage.OrganizationId.Value;
         long projectId = objectStorage.ProjectId.Value;
+
+        DataSourceResponseDto dataSourceResponse = await _dataSourceBusiness.GetDefaultDataSource(organizationId, projectId);
+        long dataSourceId = dataSourceResponse.Id;
 
         // Validate the data source before listing objects.
         bool dataSourceExists =

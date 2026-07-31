@@ -128,7 +128,6 @@ public class MaintenanceController : ControllerBase
     ///     Scrapes every file in the given object storage and creates a catalog record for each one.
     /// </remarks>
     /// <param name="objectStorageId">The ID of the object storage to be scraped.</param>
-    /// <param name="dataSourceId">The ID of the data source under which to create the records.</param>
     /// <param name="afterCursor">Cursor returned from a previous call, or omitted to start from the beginning.</param>
     /// <param name="batchSize">Number of records per upsert batch.</param>
     /// <param name="maxBatches">Maximum number of batches to process before returning.</param>
@@ -138,7 +137,6 @@ public class MaintenanceController : ControllerBase
     [SysAdmin]
     public async Task<IActionResult> ScrapeObjectStorageToCatalog(
         long objectStorageId,
-        [FromQuery] long dataSourceId,
         [FromQuery] string? afterCursor = null,
         [FromQuery] int batchSize = 500,
         [FromQuery] int maxBatches = 5,
@@ -155,7 +153,6 @@ public class MaintenanceController : ControllerBase
                 await _maintenanceBusiness.ScrapeObjectStorageToCatalog(
                     objectStorageId,
                     currentUserId,
-                    dataSourceId,
                     afterCursor,
                     batchSize,
                     maxBatches,
