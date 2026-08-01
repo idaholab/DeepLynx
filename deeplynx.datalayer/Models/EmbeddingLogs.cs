@@ -8,13 +8,6 @@ namespace deeplynx.datalayer.Models;
 [Table("embeddings_logs", Schema = "dl_vector")]
 public class EmbeddingLogs
 {
-    public enum QueueStatus {
-        Pending,
-        InProgress,
-        Failed,
-        Retrying,
-        Error
-    }
 
     [Key]
     [Column("id")]
@@ -30,7 +23,7 @@ public class EmbeddingLogs
     public required string Stage { get; set; }
 
     [Column("status")]
-    public required QueueStatus Status { get; set; }
+    public required string Status { get; set; }
 
     [Column("worker")]
     public required string Worker { get; set; }
@@ -39,8 +32,11 @@ public class EmbeddingLogs
     public float Progress { get; set; }
 
     [Column("error")]
-    public required string Error { get; set; }
+    public string? Error { get; set; }
 
     [Column("timestamp")]
     public required DateTime Timestamp { get; set; }
+
+    [Column("metadata", TypeName = "jsonb")]
+    public string? Metadata { get; set; }
 }
