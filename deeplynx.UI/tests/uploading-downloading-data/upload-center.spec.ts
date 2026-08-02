@@ -1,3 +1,4 @@
+import { orgAdminA } from './../deeplynx-config';
 import { test, expect, Page, APIRequestContext } from "../fixtures";
 import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 import * as fs from 'fs';
@@ -22,6 +23,7 @@ type Organization = {
 
 let projectId: string;
 let orgId: string;
+const ORG_NAME = "PW Org A";
 
 test.describe("Upload Center", () => {
   async function checkDataSources(page: Page) {
@@ -443,19 +445,19 @@ test.describe("Upload Center", () => {
 
   function createMinimalXlsx(): Buffer {
     const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`;
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`;
 
     const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
 
     const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>`;
 
     const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`;
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`;
 
     const sheet1 = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="str"><v>id</v></c><c r="B1" t="str"><v>name</v></c></row><row r="2"><c r="A2"><v>1</v></c><c r="B2" t="str"><v>Test Row</v></c></row></sheetData></worksheet>`;
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="str"><v>id</v></c><c r="B1" t="str"><v>name</v></c></row><row r="2"><c r="A2"><v>1</v></c><c r="B2" t="str"><v>Test Row</v></c></row></sheetData></worksheet>`;
 
     return createMultiEntryZip([
       { name: '[Content_Types].xml', content: contentTypes },
@@ -468,13 +470,13 @@ test.describe("Upload Center", () => {
 
   function createMinimalDocx(): Buffer {
     const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
 
     const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
 
     const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Test Row content for upload test</w:t></w:r></w:p></w:body></w:document>`;
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Test Row content for upload test</w:t></w:r></w:p></w:body></w:document>`;
 
     return createMultiEntryZip([
       { name: '[Content_Types].xml', content: contentTypes },
@@ -529,7 +531,7 @@ test.describe("Upload Center", () => {
   });
 
   test.beforeEach(async ({ page, request }) => {
-    orgId = await getOrgIdByName(request, ORGS.orgA.name);
+    orgId = await getOrgIdByName(request, ORG_NAME);
 
     await page.getByTestId("project-select").click();
 
@@ -788,13 +790,13 @@ test.describe("Upload Center", () => {
       fileName: 'test-file.sql',
       mimeType: 'application/sql',
       content: `-- Minimal test SQL file
-  CREATE TABLE test_table (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  );
-  INSERT INTO test_table (id, name) VALUES (1, 'Test Row');
-  `,
+CREATE TABLE test_table (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO test_table (id, name) VALUES (1, 'Test Row');
+`,
     },
     {
       label: 'DOCX',
@@ -835,50 +837,50 @@ test.describe("Upload Center", () => {
       fileName: 'test-file.xml',
       mimeType: 'text/xml',
       content: `<?xml version="1.0" encoding="UTF-8"?>
-  <testData>
-    <record id="1">
-      <name>Test Row</name>
-      <createdAt>2024-01-01T00:00:00Z</createdAt>
-    </record>
-  </testData>
-  `,
+<testData>
+  <record id="1">
+    <name>Test Row</name>
+    <createdAt>2024-01-01T00:00:00Z</createdAt>
+  </record>
+</testData>
+`,
     },
     {
       label: 'PDF',
       fileName: 'test-file.pdf',
       mimeType: 'application/pdf',
       content: `%PDF-1.4
-  1 0 obj
-  << /Type /Catalog /Pages 2 0 R >>
-  endobj
-  2 0 obj
-  << /Type /Pages /Kids [3 0 R] /Count 1 >>
-  endobj
-  3 0 obj
-  << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
-  endobj
-  4 0 obj
-  << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
-  endobj
-  5 0 obj
-  << /Length 44 >>
-  stream
-  BT /F1 24 Tf 100 700 Td (Test PDF file) Tj ET
-  endstream
-  endobj
-  xref
-  0 6
-  0000000000 65535 f 
-  0000000009 00000 n 
-  0000000058 00000 n 
-  0000000115 00000 n
-  0000000241 00000 n
-  0000000312 00000 n
-  trailer
-  << /Size 6 /Root 1 0 R >>
-  startxref
-  407
-  %%EOF`,
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 44 >>
+stream
+BT /F1 24 Tf 100 700 Td (Test PDF file) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n
+0000000241 00000 n
+0000000312 00000 n
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+407
+%%EOF`,
     },
     {
       label: 'CSV',
