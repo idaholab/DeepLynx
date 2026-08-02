@@ -1,10 +1,11 @@
-import { test, expect, APIRequestContext, APIResponse, Page } from "@playwright/test";
-import { seedAndNavigateToProject } from "../helpers/seed";
+import { test, expect, APIRequestContext, Page } from "../fixtures";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
+
+test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX})
 
 test.describe("Roles & Permissions", () => {
   test.beforeEach(async ({ page }) => {
-    await seedAndNavigateToProject(page);
     // Navigate to Project Settings via sidebar
     await page.locator("aside a", { hasText: "Project Settings" }).click();
     await page.waitForURL(/\/project_management\/\d+/);

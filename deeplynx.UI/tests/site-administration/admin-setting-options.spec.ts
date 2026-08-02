@@ -1,4 +1,4 @@
-import { test, expect, Page} from "../fixtures";
+import { test, expect } from "../fixtures";
 import { sysAdmin, orgAdminA, projectAdminX, standardUserX, ORGS, PROJECTS } from "../deeplynx-config";
 
 // Each describe block below acts as a different account to verify that

@@ -1,4 +1,4 @@
-// tests/deeplynx-config.ts
+
 import type { Page } from '@playwright/test';
 import { createHash } from 'crypto';
 
@@ -48,7 +48,6 @@ export const PermissionResource = {
 } as const;
 export type PermissionResource = typeof PermissionResource[keyof typeof PermissionResource];
 
-// `All` is an authoring-time shorthand, not a real permission. Keeps provisioning more succinct
 export const PermissionAction = {
   Read: 'Read',
   Write: 'Write',
@@ -59,11 +58,8 @@ export const PermissionAction = {
 export type PermissionAction =
   Exclude<typeof PermissionAction[keyof typeof PermissionAction], typeof PermissionAction['All']>;
 
-// 'Insight' only has Read/Write on the actual permission matrix so it's typed separately
 type NonUpdateAction = Exclude<PermissionAction, typeof PermissionAction['Update']>;
 
-// Hash the full shape. If 'all' is provided for the permission action, 
-// the hash the full list of permission actions instead of 'all'
 export type RolePermissions =
   Partial<Record<Exclude<PermissionResource, typeof PermissionResource['Insight']>, PermissionAction[]>> & {
     [PermissionResource.Insight]?: NonUpdateAction[];
@@ -93,24 +89,18 @@ function stableStringify(perms: RolePermissions): string {
 const ALL_ACTIONS: PermissionAction[] = [PermissionAction.Read, PermissionAction.Write, PermissionAction.Update];
 const INSIGHT_ACTIONS: PermissionAction[] = [PermissionAction.Read, PermissionAction.Write];
 
-// Hash the full list of resource permission actions. 
-// If all is provided Hash the full action list for that resource
 function expandActions(
   resource: PermissionResource,
   spec: (PermissionAction | typeof PermissionAction['All'])[],
 ): PermissionAction[] {
   const fullSet = resource === PermissionResource.Insight ? INSIGHT_ACTIONS : ALL_ACTIONS;
-
   if (spec.includes(PermissionAction.All)) return fullSet;
-
   const explicit = spec as PermissionAction[];
   const invalid = explicit.filter((a) => !fullSet.includes(a));
   if (invalid.length) throw new Error(`${resource} does not support: ${invalid.join(', ')}`);
-
   return [...new Set(explicit)];
 }
 
-// List specific resource permission actions or 'all' for faster provisioning.
 export function defineRole(input: RolePermissionsInput | 'all'): CustomRole {
   const resolvedInput: RolePermissionsInput = input === 'all'
     ? Object.fromEntries(Object.values(PermissionResource).map((r) => [r, [PermissionAction.All]]))
@@ -129,64 +119,155 @@ export function defineRole(input: RolePermissionsInput | 'all'): CustomRole {
 
 export const ROLES = {
   allPermissions: defineRole('all'),
-  // Add more shared custom roles here, e.g.:
-  //   dataEditor: defineRole({
-  //     [PermissionResource.Record]: [PermissionAction.All],
-  //     [PermissionResource.Edge]: [PermissionAction.All],
-  //   }),
 } as const satisfies Record<string, CustomRole>;
 
-export type RoleSpec = 'org_admin' | 'project_admin' | 'user' | CustomRole;
+// ---------------------------------------------------------------------
+// Roles — permission-bearing roles ONLY. sysAdmin/orgAdmin/projectAdmin
+// are NOT roles — they're booleans (users.IsSysAdmin, the org-admin
+// endpoint, the project-member isProjectAdmin flag).
+// ---------------------------------------------------------------------
+export const Roles = {
+  user: 'user',
+} as const;
+export type BuiltInRoleName = typeof Roles[keyof typeof Roles];
+export type RoleSpec = BuiltInRoleName | CustomRole;
+
+export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
+  [PermissionResource.Project]: [PermissionAction.Read],
+  [PermissionResource.Organization]: [PermissionAction.Read], // ceiling — see SPECIAL CASE below
+  [PermissionResource.Record]: [PermissionAction.Read, PermissionAction.Write],
+  [PermissionResource.File]: [PermissionAction.Read, PermissionAction.Write],
+  [PermissionResource.Edge]: [PermissionAction.Read, PermissionAction.Write],
+  [PermissionResource.Tag]: [PermissionAction.Read],
+};
 
 // ---------------------------------------------------------------------------
 // Configure Global Accounts
-// Named accounts (sysAdmin, orgAdminA, ...) are available in any test to import and use. 
-// One-off accounts can be created and provisioned per test with "defineTestAccount"
 // ---------------------------------------------------------------------------
+// SPECIAL CASE: Organization Write/Update can never be granted through a
+// project-scoped role assignment. The backend's default project "User"
+// role only ever grants Organization:Read. 
+// Write/Update Org should not be given on the project level.
+function assertRoleValidForProjectScope(role: RoleSpec, project?: TestProject): void {
+  if (!project || role === Roles.user) return; // DEFAULT_ROLE_PERMISSIONS is already capped to Read
+  const orgPerms = role.permissions[PermissionResource.Organization];
+  const violation = orgPerms?.find((a) => a === PermissionAction.Write || a === PermissionAction.Update);
+  if (violation) {
+    throw new Error(
+      `Role "${role.name}" grants "${violation}" on Organization but is being assigned within project ` +
+      `scope ("${project.name}"). Organization Write/Update is only reachable via isOrgAdmin — never ` +
+      `through a project-level role. Remove it from the role, or provision this account without a project.`,
+    );
+  }
+}
+
 export interface Provision {
-  role: RoleSpec;
+  org?: TestOrg;
+  project?: TestProject;
+  isOrgAdmin?: boolean;     // grants org-admin via PUT /organizations/{orgId}/admin
+  isProjectAdmin?: boolean; // grants project-admin via PUT .../projects/{id}/members
+  role?: RoleSpec;          // baseline role — still assigned even if isProjectAdmin is true (see provisioning.ts)
+}
+
+export interface TestAccount {
+  readonly name: string;
+  readonly isSysAdmin?: boolean; // grants sysAdmin via PATCH /users/{userId}/admin — global, not org/project-scoped
+  readonly provision?: Provision;
+}
+
+function provisionFingerprint(p: Provision): string {
+  const identity = p.isProjectAdmin ? 'project_admin'
+    : p.isOrgAdmin ? 'org_admin'
+    : p.role ? (typeof p.role === 'string' ? p.role : p.role.name)
+    : 'no-role';
+  return [identity, p.org?.name ?? 'no-org', p.project?.name ?? 'no-project'].join('__').replace(/\s+/g, '-');
+}
+
+export function defineTestAccount(provision: Provision, name?: string): TestAccount {
+  if (provision.role) assertRoleValidForProjectScope(provision.role, provision.project);
+  return { name: name ?? `auto-${provisionFingerprint(provision)}`, provision };
+}
+
+export function defineSysAdmin(name: string): TestAccount {
+  return { name, isSysAdmin: true };
+}
+
+export function defineOrgAdmin(org: TestOrg, name?: string): TestAccount {
+  return { name: name ?? `auto-orgAdmin-${org.name}`.replace(/\s+/g, '-'), provision: { org, isOrgAdmin: true } };
+}
+
+export function defineProjectAdmin(project: TestProject, name?: string): TestAccount {
+  return {
+    name: name ?? `auto-projectAdmin-${project.name}`.replace(/\s+/g, '-'),
+    provision: { org: project.org, project, isProjectAdmin: true },
+  };
+}
+
+// ---------------------------------------------------------------------
+// Built-in accounts
+// ---------------------------------------------------------------------
+export const sysAdmin: TestAccount = { name: 'sysAdmin', isSysAdmin: true }; // env-var creds — see provisioning.ts special case
+export const orgAdminA: TestAccount = defineOrgAdmin(ORGS.orgA, 'orgAdminA');
+export const orgAdminB: TestAccount = defineOrgAdmin(ORGS.orgB, 'orgAdminB');
+export const projectAdminX: TestAccount = defineProjectAdmin(PROJECTS.projectX, 'projectAdminX');
+export const standardUserX: TestAccount = defineTestAccount({ role: Roles.user, org: ORGS.orgA, project: PROJECTS.projectX }, 'standardUserX');
+export const fullPermissionUserX: TestAccount = defineTestAccount({ role: ROLES.allPermissions, org: ORGS.orgA }, 'fullPermissionUserX');
+
+export const authFile = (name: string) => `playwright/.auth/${name}.json`;
+export interface ActionScope {
   org?: TestOrg;
   project?: TestProject;
 }
 
-export interface TestAccount {
-  readonly name: string; // stable across runs — the cache key & authFile name
-  readonly provision?: Provision;
+function sameOrg(a?: TestOrg, b?: TestOrg): boolean {
+  return !!a && !!b && a.name === b.name;
+}
+function sameProject(a?: TestProject, b?: TestProject): boolean {
+  return !!a && !!b && a.name === b.name;
 }
 
-function roleKey(role: RoleSpec): string {
-  return typeof role === 'string' ? role : role.name;
+export function can(
+  account: TestAccount,
+  resource: PermissionResource,
+  action: PermissionAction,
+  scope: ActionScope = {},
+): boolean {
+  if (account.isSysAdmin) return true;
+
+  const provision = account.provision;
+  if (!provision) {
+    throw new Error(`can(): account "${account.name}" is not sysAdmin and has no provision — nothing to evaluate.`);
+  }
+
+  const targetOrg = scope.org ?? provision.org;
+  const targetProject = scope.project ?? provision.project;
+
+  if (provision.isOrgAdmin && sameOrg(provision.org, targetOrg)) {
+    return true;
+  }
+
+  if (provision.isProjectAdmin && sameProject(provision.project, targetProject)) {
+    if (resource === PermissionResource.Organization) {
+      return action === PermissionAction.Read; // same ceiling, enforced at runtime too
+    }
+    return true;
+  }
+
+  function hasPermission(perms: RolePermissions, resource: PermissionResource, action: PermissionAction): boolean {
+    const grantedActions = perms[resource] as PermissionAction[] | undefined;
+    return grantedActions?.includes(action) ?? false;
+  }
+
+  if (!provision.role) return false;
+  if (provision.role === Roles.user) {
+    return hasPermission(DEFAULT_ROLE_PERMISSIONS, resource, action);
+  }
+  return hasPermission(provision.role.permissions, resource, action);
 }
-
-function provisionFingerprint(p: Provision): string {
-  return [roleKey(p.role), p.org?.name ?? 'no-org', p.project?.name ?? 'no-project']
-    .join('__')
-    .replace(/\s+/g, '-');
-}
-
-export function defineTestAccount(provision: Provision, name?: string): TestAccount {
-  return { name: name ?? `auto-${provisionFingerprint(provision)}`, provision };
-}
-
-export const sysAdmin: TestAccount = { name: 'sysAdmin' };
-export const orgAdminA: TestAccount = { name: 'orgAdminA', provision: { role: 'org_admin', org: ORGS.orgA } };
-export const orgAdminB: TestAccount = { name: 'orgAdminB', provision: { role: 'org_admin', org: ORGS.orgB } };
-export const projectAdminX: TestAccount = {
-  name: 'projectAdminX',
-  provision: { role: 'project_admin', org: ORGS.orgA, project: PROJECTS.projectX },
-};
-export const standardUserX: TestAccount = {
-  name: 'standardUserX',
-  provision: { role: 'user', org: ORGS.orgA, project: PROJECTS.projectX },
-};
-
-export const authFile = (name: string) => `playwright/.auth/${name}.json`;
-
 
 // ---------------------------------------------------------------------------
-// UI selection helpers. To write the localStorage/cookie state the frontend reads.
+// UI selection helpers
 // ---------------------------------------------------------------------------
-
 const FRONTEND_URL = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
 
 export async function selectOrganization(page: Page, orgId: string, orgName: string) {
@@ -207,16 +288,10 @@ export async function selectOrganization(page: Page, orgId: string, orgName: str
 
 export async function selectProject(page: Page, projectId: string, projectName: string) {
   const serialized = JSON.stringify({ projectId, projectName });
-
   await page.addInitScript((serialized) => {
     localStorage.setItem('projectSession', serialized);
   }, serialized);
-
   await page.context().addCookies([
-    {
-      name: 'projectSession',
-      value: encodeURIComponent(serialized),
-      url: FRONTEND_URL,
-    },
+    { name: 'projectSession', value: encodeURIComponent(serialized), url: FRONTEND_URL },
   ]);
 }

@@ -1,12 +1,9 @@
-import { test, expect } from "@playwright/test";
-import { seedSession } from "../helpers/seed";
+import { test, expect } from "../fixtures";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Landing Page", () => {
-  test.beforeEach(async ({ page }) => {
-    await seedSession(page);
-    await page.goto("/", { waitUntil: "domcontentloaded" });
-  });
-
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX})
+  
   test("displays welcome message for local developer", async ({ page }) => {
     await expect(
       page.getByRole("heading", { name: /Welcome Back/ }),

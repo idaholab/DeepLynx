@@ -1,11 +1,11 @@
 import { test, expect } from "../fixtures";
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Timeseries Viewer", () => {
   test.use({
     actingUser: sysAdmin,
-    actingOrg: "PW Org A",
-    actingProject: "PW Project X",
+    actingOrg: ORGS.orgA,
+    actingProject: PROJECTS.projectX,
   });
 
   test.beforeEach(async ({ page }) => {

@@ -1,10 +1,10 @@
 import { test, expect } from "../fixtures";
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Select Organization", () => {
   test.use({
     actingUser: sysAdmin,
-    actingOrg: "PW Org A",
+    actingOrg: ORGS.orgA,
   });
 
   test("banner has an Organization dropdown label", async ({ page }) => {

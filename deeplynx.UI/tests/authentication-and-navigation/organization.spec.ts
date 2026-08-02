@@ -1,10 +1,10 @@
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 import { test, expect } from "../fixtures";
 
 test.describe("Organizations", () => {
   test.use({
     actingUser: sysAdmin,
-    actingOrg: "PW Org A",
+    actingOrg: ORGS.orgA,
   });
 
   test("user is automatically assigned an organization on startup", async ({

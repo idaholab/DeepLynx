@@ -1,9 +1,15 @@
-import { test, expect } from "@playwright/test";
-import { seedAndCreateProject } from "../helpers/seed";
+import { test, expect } from "../fixtures";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Project Dashboard", () => {
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX})
+
   test.beforeEach(async ({ page }) => {
-    await seedAndCreateProject(page, "Dashboard Test Project");
+    await page.getByTestId("project-select").click();
+
+    await page
+      .getByRole("button", { name: "PW Project X", exact: true })
+      .click();
   });
 
   test("dashboard URL matches /project/{id} pattern", async ({ page }) => {
