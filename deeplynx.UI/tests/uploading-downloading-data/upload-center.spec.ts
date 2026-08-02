@@ -1,4 +1,3 @@
-import { orgAdminA } from './../deeplynx-config';
 import { test, expect, Page, APIRequestContext } from "../fixtures";
 import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 import * as fs from 'fs';
@@ -533,12 +532,6 @@ test.describe("Upload Center", () => {
   test.beforeEach(async ({ page, request }) => {
     orgId = await getOrgIdByName(request, ORG_NAME);
 
-    await page.getByTestId("project-select").click();
-
-    await page
-      .getByRole("button", { name: "PW Project X", exact: true })
-      .click();
-
     await page.waitForURL(/\/project\/\d+/);
 
     // Extract project ID from the URL (e.g. /project/42)
@@ -688,6 +681,7 @@ test.describe("Upload Center", () => {
   });
 
   test.describe('Large file upload', () => {
+    test.use({actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX});
     let filePath: string;
     let createdRecord: { recordId: string; projectId: string } | null = null;
 
@@ -903,6 +897,7 @@ startxref
   ];
 
   test.describe('Upload a file', () => {
+    test.use({actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX});
     for (const fileType of fileTypes) {
       test.describe(`${fileType.label} upload`, () => {
         let filePath: string;
@@ -932,6 +927,7 @@ startxref
   });
 
   test.describe("Upload multiple files", () => {
+    test.use({actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX});
     let filePaths: [string, string, string, string, string];
     const fileBaseNames = [
       'upload-test-file-one.bin',
@@ -1030,6 +1026,7 @@ startxref
   });
 
   test.describe('Empty file upload', () => {
+    test.use({actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX});
     const emptyFileName = 'empty-test-file.txt';
     let filePath: string;
 
@@ -1083,6 +1080,7 @@ startxref
   });
 
   test.describe("Upload bulk records", () => {
+    test.use({actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX});
     let filePath: string;
     let createdRecords: ({ recordId: string; projectId: string } | null)[] = [];
 
@@ -1181,6 +1179,7 @@ startxref
   });
 
   test.describe("Upload timeseries file", () => {
+    test.use({actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX});
     let filePath: string;
     let createdRecord: { recordId: string; projectId: string } | null = null;
 
@@ -1253,6 +1252,7 @@ startxref
   });
 
   test.describe("Data Source and Storage uploads", () => {
+    test.use({actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX});
     let filePaths: [string, string, string, string, string, string];
     let tmpDir: string;
 

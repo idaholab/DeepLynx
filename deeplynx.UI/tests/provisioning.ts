@@ -103,6 +103,26 @@ function getSysApi(): Promise<APIRequestContext> {
   return sysApiPromise;
 }
 
+export async function getApiContext(
+  account: TestAccount,
+): Promise<{ context: APIRequestContext; shouldDispose: boolean }> {
+  if (account.name === 'sysAdmin') {
+    return { context: await getSysApi(), shouldDispose: false };
+  }
+
+  const entry = await ensureAccount(account);
+  if (!entry.apiKey || !entry.apiSecret) {
+    throw new Error(`getApiContext: no API credentials cached for account "${account.name}"`);
+  }
+
+  const anonApi = await request.newContext();
+  const jwt = await generateJwt(anonApi, entry.apiKey, entry.apiSecret);
+  await anonApi.dispose();
+
+  const context = await request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${jwt}` } });
+  return { context, shouldDispose: true };
+}
+
 // --------------------------------
 // Org & project helpers — unchanged
 // --------------------------------
