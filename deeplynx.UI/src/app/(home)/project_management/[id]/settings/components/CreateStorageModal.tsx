@@ -236,8 +236,6 @@ const CreateStorageModal = ({
                         {t.translations.CREATE_PROJECT_CONTAINER_HELPER}
                       </p>
                     </div>
-
-
                   </div>
 
                   <div className="form-control mb-2 w-full md:w-2/3">
