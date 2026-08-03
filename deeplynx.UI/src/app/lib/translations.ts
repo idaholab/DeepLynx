@@ -127,6 +127,7 @@ export const translations = {
       AZURE_DEFAULT_CONNECTION_STRING: "Azure Default Connection String",
       BACK: "Back",
       BACK_TO_CLASS_SELECTION: "← Back to class selection",
+      BACKEND_CONFIG_AWS: "The backend configuration for AWS S3 storage is currently being finalized.",
       BANNER_EXAMPLE_CUI:
         'e.g. "This organization space contains CUI/ECI data that must be protected accordingly."',
       BANNER_TEXT: "Banner Text",
@@ -2016,6 +2017,7 @@ export const translations = {
       URI_PLACEHOLDER: "uri",
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Used as the default when creating new data sources for projects.",
+      USE_EXISTING_CONTAINER: "Use Existing Container",
       USE_ORGANIZATION_STORAGE: "Use Organization Storage",
       USE_SELECTOR_TO_ADD_LABELS: "Use the selector above to add labels.",
       USE_SELECTOR_TO_ADD_TAGS: "Use the selector above to add tags.",
@@ -2272,6 +2274,7 @@ export const translations = {
       AZURE_DEFAULT_CONNECTION_STRING: "Cadena de conexión predeterminada de Azure",
       BACK: "Atrás",
       BACK_TO_CLASS_SELECTION: "← Volver a la seleccion de clase",
+      BACKEND_CONFIG_AWS: "La configuración del backend para el almacenamiento AWS S3 está actualmente en proceso de finalización.",
       BANNER_EXAMPLE_CUI:
         'Ej. "Este espacio de la organización contiene datos CUI/ECI que deben protegerse adecuadamente."',
       BANNER_TEXT: "Texto del banner",
@@ -4254,6 +4257,7 @@ export const translations = {
       UPDATED: "actualizado",
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Se usa como valor predeterminado al crear nuevas fuentes de datos para los proyectos.",
+      USE_EXISTING_CONTAINER: "Usar contenedor existente",
       USE_ORGANIZATION_STORAGE:
         "Utilizar el almacenamiento de la organización",
       USE_SELECTOR_TO_ADD_LABELS:
