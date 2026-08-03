@@ -48,17 +48,10 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0.9 AS final
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Install tools needed for entrypoint.sh operations
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    && apt-get clean
-
 # Copy the published backend code from the build stage
 COPY --from=build /app/publish .
 COPY deeplynx.api/moon.css .
 
-# Copy the entrypoint script
-COPY ./Dockerfiles/server/entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+# Run the application directly. Database readiness and requirements are handled
+# by Compose health checks and application startup checks, respectively.
+CMD ["dotnet", "deeplynx.api.dll", "--urls", "http://*:5000;http://*:50051"]

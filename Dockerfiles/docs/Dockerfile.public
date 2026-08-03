@@ -4,6 +4,9 @@ FROM node:22-alpine AS frontend-build
 # Set working directory
 WORKDIR /usr/src/app
 
+# Build args for static generated next SSG w/ generateStaticParams
+ARG HOSTED_LINK
+
 # Copy dependency metadata first
 COPY deeplynx.docs/package.json deeplynx.docs/package-lock.json ./
 
@@ -23,6 +26,9 @@ RUN set -eux; \
     tar -xzf picomatch-4.0.4.tgz --strip-components=1 -C "$target"; \
     test -f "$target/package.json" && grep -q '"version": "4.0.4"' "$target/package.json"; \
     cd / && rm -rf "$tmp"
+
+# Set build vars
+ENV HOSTED_LINK=$HOSTED_LINK
 
 # Build the frontend
 RUN npm run build

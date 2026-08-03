@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using Asp.Versioning;
+using deeplynx.api;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
@@ -7,8 +9,10 @@ using deeplynx.helpers.ExceptionHandlers;
 using deeplynx.helpers.Hubs;
 using deeplynx.helpers.Json;
 using deeplynx.interfaces;
+using deeplynx.api.Routing;
 using deeplynx.api.Services;
 using deeplynx.api.OpenApi;
+using deeplynx.api.ExceptionHandlers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +27,10 @@ using Log = Serilog.Log;
 var builder = WebApplication.CreateBuilder(args);
 var isOpenApiDocumentGeneration = OpenApiGenerationMode.IsActive();
 var isRuntimeStartup = !isOpenApiDocumentGeneration;
+const string ApiV1BasePath = "/api/v1";
+const string ApiDocsBasePath = "/api";
+const string OpenApiRoutePattern = $"{ApiDocsBasePath}/openapi/{{documentName}}.json";
+const string ScalarRoutePrefix = $"{ApiDocsBasePath}/scalar";
 
 builder.WebHost.ConfigureKestrel(options => { options.Limits.MaxRequestBodySize = 2L * 1024 * 1024 * 1024; });
 
@@ -135,7 +143,10 @@ try
 
     builder.Services.AddAuthorization();
 
-    builder.Services.AddControllers()
+    builder.Services.AddControllers(options =>
+        {
+            options.Conventions.Add(new ApiVersionRoutePrefixConvention("api/v{version:apiVersion}"));
+        })
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
@@ -144,22 +155,33 @@ try
         })
         .ConfigureApiBehaviorOptions(options =>
         {
-            options.InvalidModelStateResponseFactory = context =>
-            {
-                return new BadRequestObjectResult(
-                    BadRequestProblemDetailsFactory.CreateForModelState(
-                        context.ModelState,
-                        context.ActionDescriptor.Parameters))
-                {
-                    ContentTypes = { "application/problem+json" }
-                };
-            };
+            options.InvalidModelStateResponseFactory =
+                VersionedInvalidModelStateResponseFactory.Create;
         });
 
     builder.Services.ConfigureHttpJsonOptions(options =>
     {
         options.SerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
     });
+
+    builder.Services
+        .AddApiVersioning(options =>
+        {
+            options.DefaultApiVersion = NexusApiVersions.Default;
+            options.ReportApiVersions = true;
+            options.AssumeDefaultVersionWhenUnspecified = true;
+            options.ApiVersionReader = new UrlSegmentApiVersionReader();
+            options.UnsupportedApiVersionStatusCode = StatusCodes.Status400BadRequest;
+        })
+        .AddMvc(options =>
+        {
+            options.Conventions.Add(new DefaultApiVersionConvention(NexusApiVersions.Supported.ToArray()));
+        })
+        .AddApiExplorer(options =>
+        {
+            options.GroupNameFormat = "'v'V";
+            options.SubstituteApiVersionInUrl = true;
+        });
 
     /*
     ╔════════════════════════════╗
@@ -188,17 +210,14 @@ try
     builder.Services.AddTransient<IRecordCollectionBusiness, RecordCollectionBusiness>();
     builder.Services.AddTransient<IObjectStorageBusiness, ObjectStorageBusiness>();
     builder.Services.AddTransient<IClassBusiness, ClassBusiness>();
-    builder.Services.AddTransient<IProjectBusiness, ProjectBusiness>();
     builder.Services.AddTransient<IEdgeBusiness, EdgeBusiness>();
     builder.Services.AddTransient<IDataSourceBusiness, DataSourceBusiness>();
     builder.Services.AddTransient<IRelationshipBusiness, RelationshipBusiness>();
     builder.Services.AddTransient<ITagBusiness, TagBusiness>();
     builder.Services.AddTransient<IOlapBusiness, OlapBusiness>();
     builder.Services.AddTransient<IMetricsBusiness, MetricsBusiness>();
-    builder.Services.AddTransient<IMaintenanceBusiness, MaintenanceBusiness>();
     builder.Services.AddTransient<IUserBusiness, UserBusiness>();
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
-    builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
     builder.Services.AddTransient<ITokenBusiness, TokenBusiness>();
     builder.Services.AddTransient<IOauthApplicationBusiness, OauthApplicationBusiness>();
     builder.Services.AddTransient<IProvenanceBusiness, ProvenanceBusiness>();
@@ -210,13 +229,17 @@ try
     // builder.Services.AddTransient<ISubscriptionBusiness, SubscriptionBusiness>();
     builder.Services.AddTransient<FileBusiness>();
     builder.Services.AddTransient<FileFilesystemBusiness>();
+    builder.Services.AddTransient<IFileBusiness, FileAzureBusiness>();
     builder.Services.AddTransient<FileAzureBusiness>();
     builder.Services.AddTransient<FileS3Business>();
     builder.Services.AddTransient<IFileBusinessFactory, FileBusinessFactory>();
     builder.Services.AddTransient<IOrganizationBusiness, OrganizationBusiness>();
+    builder.Services.AddTransient<IProjectBusiness, ProjectBusiness>();
+    builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
     builder.Services.AddTransient<IGroupBusiness, GroupBusiness>();
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
+    builder.Services.AddTransient<IMaintenanceBusiness, MaintenanceBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
@@ -259,7 +282,7 @@ try
        ╚════════════════════════════╝ */
     if (isRuntimeStartup)
     {
-        await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
+        await PgvectorExtensionValidator.EnsureExtensionAsync(connectionString);
         EncryptionHelper.CheckEncryptionConfig();
     }
 
@@ -293,15 +316,10 @@ try
         Log.Information("Migrations applied successfully.");
     }
 
-    /* ╔════════════════════════════╗
-       ║      App Base Path         ║
-       ╚════════════════════════════╝ */
-    PathString basePath = "/api/v1";
-    app.UsePathBase(basePath);
-
     app.UseStaticFiles();
     app.UseRouting();
     app.UseExceptionHandler(); // Runs registered IExceptionHandlers; must precede middleware that may throw
+    app.UseMiddleware<UnsupportedApiVersionResponseMiddleware>(NexusApiVersions.Supported);
     app.UseCors("AllowAll");
 
     if (isRuntimeStartup)
@@ -317,12 +335,12 @@ try
     app.MapControllers(); // Last
 
     //Health check endpoint
-    app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
+    app.MapGet($"{ApiV1BasePath}/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
         .ExcludeFromDescription(); // hide from docs
 
     // Check if the notification service is enabled (defaults to false if not set)
     if (Environment.GetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE") == "true")
-        app.MapHub<EventNotificationHub>("/eventNotificationHub"); // endpoint for real-time notifications with SignalR
+        app.MapHub<EventNotificationHub>($"{ApiV1BasePath}/eventNotificationHub"); // endpoint for real-time notifications with SignalR
 
     /* ╔════════════════════════════╗
        ║   Scalar Configuration     ║
@@ -330,7 +348,8 @@ try
     // Always using scalar:
     //if (app.Environment.IsDevelopment()) { ...
     // app.UseOpenApi();
-    app.MapOpenApi();
+    app.MapOpenApi(OpenApiRoutePattern);
+    app.MapOpenApi($"{ApiV1BasePath}/openapi/{{documentName}}.json");
 
     if (isRuntimeStartup)
     {
@@ -358,23 +377,41 @@ try
       </header>
     </div>";
 
-        app.MapScalarApiReference(options =>
+        void ConfigureScalar(ScalarOptions options, HttpContext context)
         {
+            var defaultDocumentName = context.Request.Query["defaultDocument"].FirstOrDefault()
+                ?? NexusApiVersions.DefaultOpenApiDocumentName;
+
             options
                 .WithDarkMode()
-                .WithBaseServerUrl(basePath.ToString())
+                .WithOpenApiRoutePattern(OpenApiRoutePattern)
                 .WithTheme(ScalarTheme.Kepler)
                 .WithTitle("DeepLynx Nexus API")
                 .WithCustomCss(customcss)
                 .AddHeaderContent(scalarHeaderContent);
 
+            foreach (var documentName in NexusApiVersions.OpenApiDocumentNames)
+            {
+                options.AddDocument(
+                    documentName,
+                    documentName,
+                    isDefault: documentName == defaultDocumentName);
+            }
+
 
             if (!string.IsNullOrEmpty(hostedLink))
             {
-                var hostedLinkWithApi = string.Concat(hostedLink + "/api/v1");
-                options.Servers = new List<ScalarServer> { new(hostedLinkWithApi) };
+                options.Servers = new List<ScalarServer> { new(hostedLink) };
             }
-        });
+        }
+
+        app.MapGet($"{ScalarRoutePrefix}/{{documentName:regex(^v[0-9]+$)}}",
+            (string documentName) => Results.Redirect($"{ScalarRoutePrefix}/?defaultDocument={documentName}"));
+        app.MapGet($"{ApiV1BasePath}/scalar/{{documentName:regex(^v[0-9]+$)}}",
+            (string documentName) => Results.Redirect($"{ScalarRoutePrefix}/?defaultDocument={documentName}"));
+
+        app.MapScalarApiReference(ScalarRoutePrefix, ConfigureScalar);
+        app.MapScalarApiReference($"{ApiV1BasePath}/scalar", ConfigureScalar);
     }
 
     app.Run();

@@ -1,5 +1,6 @@
 import "server-only";
 import { auth } from "../../../../auth";
+import { backendApiUrl } from "./backend-api-url.server";
 
 type SessionWithNestedAccessToken = {
   tokens?: { access_token?: unknown };
@@ -18,8 +19,6 @@ type InsightModelConfigQuery = {
   embeddingModelConfigId?: number;
   vlmModelConfigId?: number;
 };
-
-const BASE = (process.env.BACKEND_BASE_URL ?? "").replace(/\/+$/, "");
 
 function extractAccessToken(session: unknown): string | null {
   if (typeof session !== "object" || session === null) return null;
@@ -65,7 +64,9 @@ function buildInsightUrl(
   });
 
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return `${BASE}/organizations/${organizationId}/projects/${projectId}/insight${path}${suffix}`;
+  return backendApiUrl(
+    `organizations/${organizationId}/projects/${projectId}/insight${path}${suffix}`,
+  );
 }
 
 async function parseJsonOrTextResponseBody(response: Response) {

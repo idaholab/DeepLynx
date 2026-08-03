@@ -398,6 +398,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         SetAuthenticatedUser(context, userId3);
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
 
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
         // User has org permission as an org admin 
         _orgRolePermissionServiceMock
             .Setup(x => x.PermissionInOrg(userId3, organizationId1, "delete", "data"))
@@ -431,6 +435,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         var context = CreateHttpContextWithAuth("read", "organization");
         SetAuthenticatedUser(context, userId1);
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
 
         _orgRolePermissionServiceMock
             .Setup(x => x.PermissionInOrg(userId1, organizationId1, "read", "organization"))
@@ -818,6 +826,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         context.SetEndpoint(endpoint);
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
 
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
         _orgRolePermissionServiceMock
             .Setup(x => x.PermissionInOrg(userId1, organizationId1, "read", "organization"))
             .ReturnsAsync(true);
@@ -930,6 +942,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
         context.Request.QueryString = new QueryString($"?organizationId={organizationId2}");
 
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
         _orgRolePermissionServiceMock
             .Setup(x => x.PermissionInOrg(userId1, organizationId1, "read", "organization"))
             .ReturnsAsync(true);
@@ -1040,6 +1056,13 @@ public class AuthMiddlewareTests : IntegrationTestBase
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
         context.Request.RouteValues["projectId"] = projectId1.ToString();
 
+        _organizationServiceMock
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(),
+                false))
+            .ReturnsAsync(organizationId1);
+
         _orgRolePermissionServiceMock
             .Setup(x => x.PermissionInOrg(userId1, organizationId1, "read", "organization"))
             .ReturnsAsync(true);
@@ -1075,6 +1098,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         SetAuthenticatedUser(context, userId1);
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
 
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
         _orgRolePermissionServiceMock
             .Setup(x => x.PermissionInOrg(userId1, organizationId1, "read", "organization"))
             .ReturnsAsync(true);
@@ -1096,7 +1123,7 @@ public class AuthMiddlewareTests : IntegrationTestBase
         Assert.True(nextCalled);
         _organizationServiceMock.Verify(
             x => x.CheckExistence(null, organizationId1, false),
-            Times.Once);
+            Times.Exactly(2));
     }
 
     [Fact]
@@ -1106,6 +1133,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         var context = CreateHttpContextWithAuth("read", "project");
         SetAuthenticatedUser(context, userId1);
         context.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(projectId1, null, false))
+            .ReturnsAsync(organizationId1);
 
         _projectRolePermissionServiceMock
             .Setup(x => x.PermissionInProject(userId1, projectId1, "read", "project"))
@@ -1127,7 +1158,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         // Assert
         Assert.True(nextCalled);
         _organizationServiceMock.Verify(
-            x => x.CheckExistence(projectId1, null, false),
+            x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(),
+                false),
             Times.Once);
     }
 
@@ -1160,7 +1194,7 @@ public class AuthMiddlewareTests : IntegrationTestBase
         Assert.True(nextCalled);
         _organizationServiceMock.Verify(
             x => x.CheckExistence(null, organizationId1, false),
-            Times.Once);
+            Times.Exactly(2));
     }
 
     #endregion
@@ -1176,6 +1210,13 @@ public class AuthMiddlewareTests : IntegrationTestBase
         // Project1 belongs to Organization1, but we're checking with Organization2
         context.Request.RouteValues["organizationId"] = organizationId2.ToString();
         context.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(),
+                false))
+            .ReturnsAsync(organizationId2);
 
         // CheckExistence should throw when project doesn't belong to org
         _organizationServiceMock
@@ -1222,6 +1263,13 @@ public class AuthMiddlewareTests : IntegrationTestBase
             .Callback(() => callOrder.Add("CheckExistence"))
             .ReturnsAsync(organizationId1);
 
+        _organizationServiceMock
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(),
+                false))
+            .ReturnsAsync(organizationId1);
+
         _orgRolePermissionServiceMock
             .Setup(x => x.PermissionInOrg(userId1, organizationId1, "read", "data"))
             .Callback(() => callOrder.Add("OrgPermission"))
@@ -1263,6 +1311,13 @@ public class AuthMiddlewareTests : IntegrationTestBase
         context.Request.RouteValues["projectId"] = projectId2.ToString();
 
         _organizationServiceMock
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId2 })),
+                It.IsAny<long?>(),
+                false))
+            .ReturnsAsync(organizationId2);
+
+        _organizationServiceMock
             .Setup(x => x.CheckExistence(projectId2, organizationId2, false))
             .ThrowsAsync(new KeyNotFoundException("Project not found"));
 
@@ -1296,6 +1351,13 @@ public class AuthMiddlewareTests : IntegrationTestBase
         // Setup successful existence check
         _organizationServiceMock
             .Setup(x => x.CheckExistence(projectId1, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
+        _organizationServiceMock
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(),
+                false))
             .ReturnsAsync(organizationId1);
 
         _orgRolePermissionServiceMock
@@ -1334,10 +1396,14 @@ public class AuthMiddlewareTests : IntegrationTestBase
         var context = CreateHttpContextWithAuth("read", "project");
         SetAuthenticatedUser(context, userId1);
         context.Request.RouteValues["projectId"] = "99999"; // Non-existent project
+        long testProjectId = 99999;
 
         _organizationServiceMock
-            .Setup(x => x.CheckExistence(99999, null, false))
-            .ThrowsAsync(new KeyNotFoundException("Project with ID 99999 not found"));
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { testProjectId })),
+                It.IsAny<long?>(),
+                false))
+            .ThrowsAsync(new KeyNotFoundException("No projects found for the provided project IDs."));
 
         RequestDelegate next = ctx => Task.CompletedTask;
         var middleware = new AuthMiddleware(next);
@@ -1347,7 +1413,7 @@ public class AuthMiddlewareTests : IntegrationTestBase
             await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
                 _projectRolePermissionServiceMock.Object, _adminServiceMock.Object, _organizationServiceMock.Object));
 
-        Assert.Contains("99999", exception.Message);
+        Assert.Contains("No projects found for the provided project IDs.", exception.Message);
     }
 
     [Fact]
@@ -1383,6 +1449,13 @@ public class AuthMiddlewareTests : IntegrationTestBase
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
         context.Request.RouteValues["projectId"] = projectId1.ToString();
 
+        _organizationServiceMock
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(),
+                false))
+            .ReturnsAsync(organizationId1);
+
         // CheckExistence succeeds (no exception thrown)
         _organizationServiceMock
             .Setup(x => x.CheckExistence(projectId1, organizationId1, false))
@@ -1417,7 +1490,7 @@ public class AuthMiddlewareTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task InvokeAsync_SysAdminFailsCheckExistence_ForMismatchedProjectOrg()
+    public async Task InvokeAsync_SysAdminFailsResolveOrganizationIdFromProjectsAsync_ForMismatchedProjectOrg()
     {
         // Arrange
         var context = CreateHttpContextWithAuth("delete", "data");
@@ -1426,10 +1499,12 @@ public class AuthMiddlewareTests : IntegrationTestBase
         context.Request.RouteValues["organizationId"] = organizationId2.ToString();
         context.Request.RouteValues["projectId"] = projectId1.ToString();
 
-        // CheckExistence should throw when project doesn't belong to org, even for sysadmin
         _organizationServiceMock
-            .Setup(x => x.CheckExistence(projectId1, organizationId2, false))
-            .ThrowsAsync(new InvalidOperationException($"Project {projectId1} does not belong to organization {organizationId2}"));
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(),
+                false))
+            .ThrowsAsync(new InvalidOperationException($"Organization ID {organizationId2} does not match the organization of the projects."));
 
         var nextCalled = false;
         RequestDelegate next = ctx =>
@@ -1445,12 +1520,15 @@ public class AuthMiddlewareTests : IntegrationTestBase
             await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object,
                 _projectRolePermissionServiceMock.Object, _adminServiceMock.Object, _organizationServiceMock.Object));
 
-        Assert.Contains($"Project {projectId1} does not belong to organization {organizationId2}", exception.Message);
+        Assert.Contains($"Organization ID {organizationId2} does not match the organization of the projects.", exception.Message);
         Assert.False(nextCalled);
 
         // Verify CheckExistence was called even for sysadmin
         _organizationServiceMock.Verify(
-            x => x.CheckExistence(projectId1, organizationId2, false),
+            x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(),
+                false),
             Times.Once);
     }
 
@@ -1498,6 +1576,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         SetAuthenticatedUser(context, userId1);
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
 
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
         _orgRolePermissionServiceMock
             .Setup(x => x.PermissionInOrg(userId1, organizationId1, "read", "organization"))
             .ReturnsAsync(true);
@@ -1535,6 +1617,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
 
         _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
+        _organizationServiceMock
             .Setup(x => x.CheckExistence(It.IsAny<long?>(), It.IsAny<long?>(), false))
             .ThrowsAsync(new Exception("Organization not found"));
 
@@ -1554,6 +1640,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         var context = CreateHttpContextWithAuth("read", "organization");
         SetAuthenticatedUser(context, userId1);
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
 
         _orgRolePermissionServiceMock
             .Setup(x => x.PermissionInOrg(userId1, organizationId1, "read", "organization"))
@@ -2075,6 +2165,13 @@ public class AuthMiddlewareTests : IntegrationTestBase
             });
 
         _organizationServiceMock
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1, projectId2 })),
+                It.IsAny<long?>(),
+                false))
+            .ReturnsAsync(organizationId1);
+
+        _organizationServiceMock
             .Setup(x => x.CheckExistence(It.IsAny<long?>(), It.IsAny<long?>(), false))
             .ReturnsAsync(organizationId1);
 
@@ -2175,6 +2272,13 @@ public class AuthMiddlewareTests : IntegrationTestBase
             {
                 { "projectIds", projectId1.ToString() }
             });
+
+        _organizationServiceMock
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(),
+                false))
+            .ReturnsAsync(organizationId2);
 
         // CheckExistence should throw when project doesn't belong to org
         _organizationServiceMock
@@ -2350,6 +2454,10 @@ public class AuthMiddlewareTests : IntegrationTestBase
         var context = CreateHttpContextWithAuth("update", "organization");
         SetAuthenticatedUser(context, userId1);
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
+            .ReturnsAsync(organizationId1);
 
         _orgRolePermissionServiceMock
             .Setup(x => x.PermissionInOrg(userId1, organizationId1, "update", "organization"))
@@ -2799,10 +2907,6 @@ public class AuthMiddlewareTests : IntegrationTestBase
         SetAuthenticatedUser(context, userId3, isOrgAdmin: true);
         context.Request.RouteValues["organizationId"] = organizationId1.ToString();
 
-        _organizationServiceMock
-            .Setup(x => x.CheckExistence(null, organizationId1, false))
-            .ReturnsAsync(organizationId1);
-
         var nextCalled = false;
         RequestDelegate next = ctx =>
         {
@@ -2831,6 +2935,14 @@ public class AuthMiddlewareTests : IntegrationTestBase
 
         _organizationServiceMock
             .Setup(x => x.CheckExistence(null, organizationId1, true))
+            .ReturnsAsync(organizationId1);
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, 0, true))
+            .ReturnsAsync(0);
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1, false))
             .ReturnsAsync(organizationId1);
 
         var nextCalled = false;

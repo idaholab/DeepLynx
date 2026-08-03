@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLanguage } from "@/app/contexts/Language";
 
 interface CreateRoleModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ const CreateRoleModal = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { t } = useLanguage();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -36,7 +39,7 @@ const CreateRoleModal = ({
       setDescription("");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create role");
+      setError(err instanceof Error ? err.message : t.translations.FAILED_TO_CREATE_ROLE);
     } finally {
       setIsSubmitting(false);
     }
@@ -47,20 +50,20 @@ const CreateRoleModal = ({
   return (
     <dialog className="modal modal-open">
       <div className="modal-box">
-        <h3 className="font-bold text-lg mb-4">Create New Role</h3>
+        <h3 className="font-bold text-lg mb-4">{t.translations.CREATE_NEW_ROLE}</h3>
 
         <form onSubmit={handleSubmit}>
           <div className="form-control mb-4">
             <label className="label">
               <span className="label-text">
-                Role Name <span className="text-error">*</span>
+                {t.translations.ROLE_NAME} <span className="text-error">*</span>
               </span>
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter role name"
+              placeholder={t.translations.ENTER_ROLE_NAME}
               className="input input-bordered w-full"
               required
               disabled={isSubmitting}
@@ -69,12 +72,12 @@ const CreateRoleModal = ({
 
           <div className="form-control mb-4">
             <label className="label">
-              <span className="label-text">Description</span>
+              <span className="label-text">{t.translations.DESCRIPTION}</span>
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter role description (optional)"
+              placeholder={t.translations.ENTER_ROLE_DESCRIPTION_OPTIONAL}
               className="textarea textarea-bordered w-full"
               rows={3}
               disabled={isSubmitting}
@@ -94,7 +97,7 @@ const CreateRoleModal = ({
               className="btn btn-ghost"
               disabled={isSubmitting}
             >
-              Cancel
+              {t.translations.CANCEL}
             </button>
             <button
               type="submit"
@@ -104,17 +107,17 @@ const CreateRoleModal = ({
               {isSubmitting ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>
-                  Creating...
+                  {t.translations.CREATING}
                 </>
               ) : (
-                "Create Role"
+                t.translations.CREATE_ROLE
               )}
             </button>
           </div>
         </form>
       </div>
       <form method="dialog" className="modal-backdrop" onClick={onClose}>
-        <button>close</button>
+        <button>{t.translations.CLOSE}</button>
       </form>
     </dialog>
   );

@@ -46,7 +46,7 @@ public class PermissionBusiness : IPermissionBusiness
         // This allows the user to see all permissions available for use in the given context (defaults being global)
         var permissionQuery = _context.Permissions.Where(p =>
             p.IsDefault || (!p.IsDefault &&
-            (!projectId.HasValue || p.ProjectId == projectId) && 
+            (!projectId.HasValue || p.ProjectId == projectId || p.ProjectId == null) &&
             p.OrganizationId == organizationId &&
             (!labelId.HasValue || p.LabelId == labelId)));
 
@@ -54,20 +54,20 @@ public class PermissionBusiness : IPermissionBusiness
             permissionQuery = permissionQuery.Where(p => !p.IsArchived);
 
         return await permissionQuery.Select(p => new PermissionResponseDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                Action = p.Action,
-                Resource = p.Resource,
-                LastUpdatedAt = p.LastUpdatedAt,
-                LastUpdatedBy = p.LastUpdatedBy,
-                IsArchived = p.IsArchived,
-                LabelId = p.LabelId,
-                ProjectId = p.ProjectId,
-                OrganizationId = p.OrganizationId,
-                IsDefault = p.IsDefault
-            })
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Description = p.Description,
+            Action = p.Action,
+            Resource = p.Resource,
+            LastUpdatedAt = p.LastUpdatedAt,
+            LastUpdatedBy = p.LastUpdatedBy,
+            IsArchived = p.IsArchived,
+            LabelId = p.LabelId,
+            ProjectId = p.ProjectId,
+            OrganizationId = p.OrganizationId,
+            IsDefault = p.IsDefault
+        })
             .ToListAsync();
     }
 
@@ -81,13 +81,13 @@ public class PermissionBusiness : IPermissionBusiness
     public async Task<PermissionResponseDto> GetPermission(long? organizationId, long? projectId, long permissionId, bool hideArchived = true)
     {
         var permission = await _context.Permissions
-            .Where(p => p.Id == permissionId && 
-                        (p.IsDefault || 
+            .Where(p => p.Id == permissionId &&
+                        (p.IsDefault ||
                          (!p.IsDefault && // For non-default permissions, check scope matches
-                          (!projectId.HasValue || p.ProjectId == projectId) && 
+                          (!projectId.HasValue || p.ProjectId == projectId) &&
                           (!organizationId.HasValue || p.OrganizationId == organizationId))))
             .FirstOrDefaultAsync();
-    
+
         if (permission == null)
             throw new KeyNotFoundException($"Permission with id {permissionId} not found");
 
@@ -126,7 +126,7 @@ public class PermissionBusiness : IPermissionBusiness
         long? projectId, long organizationId)
     {
         ValidationHelper.ValidateModel(dto);
-        
+
         // Note that the CreatePermission dto only allows for the creation of permissions
         // using labelId. Any Default permissions such as "write projects" should not
         // be manipulated by users.
@@ -148,9 +148,9 @@ public class PermissionBusiness : IPermissionBusiness
 
         // Log create Permission event
         await _eventBusiness.CreateEvent(
-            currentUserId, 
-            organizationId, 
-            projectId, 
+            currentUserId,
+            organizationId,
+            projectId,
             new CreateEventRequestDto
             {
                 Operation = "create",
@@ -192,12 +192,12 @@ public class PermissionBusiness : IPermissionBusiness
         UpdatePermissionRequestDto dto)
     {
         var permission = await _context.Permissions
-            .Where(p => 
-                p.Id == permissionId && 
-                (!projectId.HasValue || p.ProjectId == projectId) && 
+            .Where(p =>
+                p.Id == permissionId &&
+                (!projectId.HasValue || p.ProjectId == projectId) &&
                 p.OrganizationId == organizationId)
             .FirstOrDefaultAsync();
-        
+
         // ensure that default permissions cannot be edited
         if (permission == null || permission.IsArchived)
             throw new KeyNotFoundException($"Permission with id {permissionId} not found");
@@ -257,12 +257,12 @@ public class PermissionBusiness : IPermissionBusiness
     public async Task<bool> ArchivePermission(long organizationId, long? projectId, long currentUserId, long permissionId)
     {
         var permission = await _context.Permissions
-            .Where(p => 
-                p.Id == permissionId && 
-                (!projectId.HasValue || p.ProjectId == projectId) && 
+            .Where(p =>
+                p.Id == permissionId &&
+                (!projectId.HasValue || p.ProjectId == projectId) &&
                 p.OrganizationId == organizationId)
             .FirstOrDefaultAsync();
-      
+
         if (permission == null || permission.IsArchived)
             throw new KeyNotFoundException($"Permission with id {permissionId} not found or is already archived");
         if (permission.IsDefault)
@@ -299,12 +299,12 @@ public class PermissionBusiness : IPermissionBusiness
     public async Task<bool> UnarchivePermission(long organizationId, long? projectId, long currentUserId, long permissionId)
     {
         var permission = await _context.Permissions
-            .Where(p => 
-                p.Id == permissionId && 
-                (!projectId.HasValue || p.ProjectId == projectId) && 
+            .Where(p =>
+                p.Id == permissionId &&
+                (!projectId.HasValue || p.ProjectId == projectId) &&
                 p.OrganizationId == organizationId)
             .FirstOrDefaultAsync();
-        
+
         if (permission != null && permission.IsDefault)
             throw new KeyNotFoundException($"Permission with id {permissionId} cannot be updated");
         if (permission == null || !permission.IsArchived)
@@ -341,12 +341,12 @@ public class PermissionBusiness : IPermissionBusiness
     public async Task<bool> DeletePermission(long organizationId, long? projectId, long currentUserId, long permissionId)
     {
         var permission = await _context.Permissions
-            .Where(p => 
-                p.Id == permissionId && 
-                (!projectId.HasValue || p.ProjectId == projectId) && 
+            .Where(p =>
+                p.Id == permissionId &&
+                (!projectId.HasValue || p.ProjectId == projectId) &&
                 p.OrganizationId == organizationId)
             .FirstOrDefaultAsync();
-        
+
         if (permission == null || permission.IsArchived)
             throw new KeyNotFoundException($"Permission with id {permissionId} not found");
         if (permission.IsDefault)

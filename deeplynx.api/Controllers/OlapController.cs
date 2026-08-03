@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.helpers.exceptions;
@@ -5,10 +6,13 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.Controllers;
 
 [ApiController]
+[ApiVersion(1)]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/olap")]
 [Authorize]
 [Tags("Olap")]
@@ -36,8 +40,9 @@ public class OlapController : ControllerBase
     /// <param name="request"> The request containing an sql query string</param>
     /// <param name="viewName"> The request containing an sql query string</param>
     /// <param name="recordId"> ID of the record to query from</param>
-    /// <returns></returns>
+    /// <returns>Query respoonse</returns>
     [HttpPost("query", Name = "api_execute_olap_query")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Auth("read", "file")]
     [Sensitivity("download file")]
@@ -73,6 +78,31 @@ public class OlapController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
+    /// <summary>
+    ///     Execute OLAP Query
+    /// </summary>
+    /// <param name="organizationId">ID of organization that tabular data is associated with</param>
+    /// <param name="projectId">ID of project the tabular data is associated with</param>
+    /// <param name="request"> The request containing an sql query string</param>
+    /// <param name="viewName"> The request containing an sql query string</param>
+    /// <param name="recordId"> ID of the record to query from</param>
+    /// <returns>Query response</returns>
+    [HttpPost("query", Name = "api_execute_olap_query")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    [Auth("read", "file")]
+    [Sensitivity("download file")]
+    public async Task<ActionResult<PlotDataDto>> ExecuteOlapQueryV2(long organizationId, long projectId, long recordId,
+        [FromQuery] string viewName, [FromBody] OlapQueryRequestDto request)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var reportRecordResponse =
+            await _olapBusiness.QueryTabularFile(currentUserId, organizationId, projectId, recordId, request,
+                viewName);
+        return Ok(reportRecordResponse);
+    }
 
     /// <summary>
     ///     Append Tabular File
@@ -82,8 +112,9 @@ public class OlapController : ControllerBase
     /// <param name="recordId"> ID of the record being appended to</param>
     /// <param name="partNumber"> Part number of the file being appended</param>
     /// <param name="file"> Tabular file to append</param>
-    /// <returns></returns>
+    /// <returns>String "Data Appended"</returns>
     [HttpPatch("append", Name = "api_append_tabular_file")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Auth("update", "file")]
     [Sensitivity("update file")]
@@ -104,39 +135,30 @@ public class OlapController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
     /// <summary>
-    ///     Exports Table to File
+    ///     Append Tabular File
     /// </summary>
     /// <param name="organizationId">ID of organization the tabular data is associated with</param>
-    /// <param name="projectId">ID of project that timeseries data is associated with</param>
-    /// <param name="dataSourceId">ID of data source that timeseries data is associated with</param>
-    /// <param name="tableName">Name of the duckDB table on which the timeseries data is encoded</param>
-    /// <param name="fileType">The type of file to convert query to</param>
+    /// <param name="projectId">ID of project the tabular data is associated with</param>
+    /// <param name="recordId"> ID of the record being appended to</param>
+    /// <param name="partNumber"> Part number of the file being appended</param>
+    /// <param name="file"> Tabular file to append</param>
     /// <returns></returns>
-    // [HttpGet("export", Name = "api_export_timeseries_table")]
-    // [Auth("read", "record")]
-    // [Auth("read", "file")]
-    // public async Task<IActionResult> ExportTimeseriesTable(
-    //     long organizationId, long projectId, long dataSourceId, [FromQuery] string tableName, string fileType)
-    // {
-    //     try
-    //     {
-    //         var currentUserId = UserContextStorage.UserId;
-    //         var timeseriesUploadRecord =
-    //             await _timeseriesBusiness.ExportTimeseriesTable(currentUserId, organizationId, projectId, dataSourceId,
-    //                 tableName,
-    //                 fileType);
-    //         return Ok(new { TimeseriesUploadRecord = timeseriesUploadRecord });
-    //     }
-    //     catch (Exception e)
-    //     {
-    //         var message = $"An error occurred while querying a timeseries table {tableName}: {e}";
-    //         _logger.LogError(message);
-    //         return StatusCode(StatusCodes.Status500InternalServerError, message);
-    //     }
-    // }
-
+    [HttpPatch("append", Name = "api_append_tabular_file")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    [Auth("update", "file")]
+    [Sensitivity("update file")]
+    public async Task<ActionResult<string>> AppendTabularFileV2(
+        long organizationId, long projectId, long recordId, [FromQuery] long partNumber, IFormFile file)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        await _olapBusiness.AppendTabularBlob(currentUserId, organizationId, projectId, recordId, partNumber, file);
+        return Ok();
+     
+    }
 
     /// <summary>
     ///     Get a View of Data Points
@@ -147,6 +169,7 @@ public class OlapController : ControllerBase
     /// <param name="request">Windowing, column selection, and downsampling options</param>
     /// <returns>JSON: { PlotData: { columns: [], data: [][] } }</returns>
     [HttpGet("plot", Name = "api_plot_data")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Auth("read", "file")]
     [Sensitivity("download file")]
@@ -171,6 +194,29 @@ public class OlapController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, e.Message);
         }
     }
+    
+    /// <summary>
+    ///     Get a View of Data Points
+    /// </summary>
+    /// <param name="organizationId">ID of organization the tabular data is associated with</param>
+    /// <param name="projectId">ID of project the tabular data is associated with</param>
+    /// <param name="recordId">ID of the record pointing to the file or folder to plot</param>
+    /// <param name="request">Windowing, column selection, and downsampling options</param>
+    /// <returns>PlotDataDto</returns>
+    [HttpGet("plot", Name = "api_plot_data")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    [Auth("read", "file")]
+    [Sensitivity("download file")]
+    public async Task<ActionResult<PlotDataDto>> GetPlotDataV2(long organizationId, long projectId, long recordId,
+        [FromQuery] OlapQueryRequestDto request)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var plotData =
+            await _olapBusiness.GetPlotData(currentUserId, organizationId, projectId, recordId, request);
+        return Ok(plotData);
+    }
 
     /// <summary>
     ///     Get Highest Part Number (For Appending)
@@ -178,7 +224,9 @@ public class OlapController : ControllerBase
     /// <param name="organizationId">ID of organization the tabular data is associated with</param>
     /// <param name="projectId">ID of project the tabular data is associated with</param>
     /// <param name="recordId">ID of the record pointing to the file or folder to data</param>
+    /// <returns>Part number</returns>
     [HttpGet("part", Name = "api_highest_part_number")]
+    [MapToApiVersion(1)]
     [Auth("read", "record")]
     [Auth("read", "file")]
     [Sensitivity("download file")]
@@ -199,5 +247,24 @@ public class OlapController : ControllerBase
             _logger.LogError(e, "Error retrieving highest part number for record {RecordId}", recordId);
             return StatusCode(StatusCodes.Status500InternalServerError, e.Message);
         }
+    }
+    
+    /// <summary>
+    ///     Get Highest Part Number (For Appending)
+    /// </summary>
+    /// <param name="organizationId">ID of organization the tabular data is associated with</param>
+    /// <param name="projectId">ID of project the tabular data is associated with</param>
+    /// <param name="recordId">ID of the record pointing to the file or folder to data</param>
+    /// <returns>Part Number</returns>
+    [HttpGet("part", Name = "api_highest_part_number")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    [Auth("read", "file")]
+    [Sensitivity("download file")]
+    public async Task<ActionResult<long>> GetHighestPartNumberV2(long organizationId, long projectId, long recordId)
+    {
+       var partNumber = await _olapBusiness.GetHighestPartNumber(organizationId, projectId, recordId);
+            return Ok(partNumber);
     }
 }

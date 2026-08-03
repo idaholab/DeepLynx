@@ -319,7 +319,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
                 )}
               </div>
               {!isCollapsed && (
-                <button className="btn btn-ghost btn-xs btn-circle flex-shrink-0">
+                <button data-testid="project-select" className="btn btn-ghost btn-xs btn-circle flex-shrink-0">
                   {isProjectsExpanded ? (
                     <ChevronUpIcon className="size-4" />
                   ) : (
@@ -433,7 +433,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
           {/* Project Settings (Admin only) */}
           <ProjectAdminRoute>
             <li className="mt-2">
-              <Link
+              <Link aria-label="Project Settings"
                 href={`/project_management/${project?.projectId || ""}`}
                 onClick={(e) =>
                   handleItemClick(

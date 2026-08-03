@@ -25,6 +25,8 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private RecordCollectionBusiness _recordCollectionBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private SensitivityLabelService _sensitivityLabelService = null!;
     private TagBusiness _tagBusiness = null!;
     private BulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
@@ -53,11 +55,13 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
 
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockAdminService = new Mock<IAdminService>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
@@ -294,7 +298,7 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         return collection;
     }
-    
+
     #region Get all Tests
     [Theory]
     [InlineData(0)]
@@ -352,7 +356,7 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Assert.Single(collection.Labels);
         Assert.Equal(_labelId, collection.Labels.First().Id);
     }
-    
+
     [Fact]
     public async Task GetAllRecordCollections_NonAdmin_FiltersOutUnauthorizedLabeledCollections()
     {
@@ -503,9 +507,9 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Assert.Equal(charlieCollection.Id, collection.Id);
         Assert.Equal("charlie-page", collection.Name);
     }
-    
+
     #endregion
-    
+
     #region Get Records In Collections Tests
     [Fact]
     public async Task GetRecordsInRecordCollection_HideArchived_ExcludesArchivedRecords()
@@ -525,7 +529,7 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
             _recordCollectionBusiness.GetRecordsInRecordCollection(
                 _userId, _organizationId, _projectId, _archivedCollectionId, true, isSysAdmin: true));
     }
-    
+
     #endregion
 
     #region Get Collection By Tags
@@ -540,9 +544,9 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         var collection = Assert.Single(result);
         Assert.Equal(_collectionId, collection.Id);
     }
-    
+
     #endregion
-    
+
     #region Add Records to Collections
 
     [Fact]
@@ -689,9 +693,9 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
 
         Assert.Contains(collection.Records, r => r.Id == _recordId2);
     }
-    
+
     #endregion
-    
+
     #region Remove Record
     [Fact]
     public async Task RemoveRecordsFromRecordCollection_RemovesRequestedRecords()
@@ -787,9 +791,9 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
 
         Assert.DoesNotContain(collection.Records, r => r.Id == _recordId1);
     }
-    
+
     #endregion
-    
+
     #region Create Collection
     [Fact]
     public async Task CreateRecordCollection_CreatesCollection_AndDeduplicatesTags()
@@ -913,7 +917,7 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Assert.Empty(result.Labels);
     }
     #endregion
-    
+
     #region Update Collection
     [Fact]
     public async Task UpdateRecordCollection_UpdatesMutableFields()
@@ -934,9 +938,9 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Assert.Equal("updated", JsonNode.Parse(result.Properties)?["status"]?.GetValue<string>());
         Assert.Equal(_userId, result.LastUpdatedBy);
     }
-    
+
     #endregion
-    
+
     #region Attach/Unattach Tags
     [Fact]
     public async Task AttachTag_ValidTag_AttachesSuccessfully()
@@ -1038,9 +1042,9 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
             _recordCollectionBusiness.UnattachTag(
                 _organizationId, _projectId, _collectionId, long.MaxValue));
     }
-    
+
     #endregion
-    
+
     #region Attach/Unattach Labels
 
     [Fact]
@@ -1132,9 +1136,9 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _recordCollectionBusiness.UnattachLabel(_organizationId, _projectId, _collectionId, _labelId));
     }
-    
+
     #endregion
-    
+
     #region Archive/Unarchive/Delete Collections
     [Fact]
     public async Task ArchiveRecordCollection_ActiveCollection_ArchivesSuccessfully()
@@ -1195,7 +1199,7 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
             _recordCollectionBusiness.UnarchiveRecordCollection(
                 _userId, _organizationId, _projectId, long.MaxValue));
     }
-    
+
     [Fact]
     public async Task DeleteRecordCollection_NotFound_ThrowsKeyNotFound()
     {
@@ -1232,9 +1236,9 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
 
         Assert.False(exists);
     }
-    
+
     #endregion
-    
+
     #region GetSensitivityLabelsForRecordCollection Tests
 
     [Fact]

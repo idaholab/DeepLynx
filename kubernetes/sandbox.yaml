@@ -426,14 +426,6 @@ spec:
         - name: deeplynx-test
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynx-docs-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          env:
-            - name: NODE_ENV
-              value: "production"
-            - name: HOSTED_LINK
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: hosted-link
           resources:
             requests:
               cpu: "100m"
@@ -920,7 +912,7 @@ spec:
                 name: deeplynx-service
                 port:
                   number: 80
-          - path: /api/v1
+          - path: /api
             pathType: Prefix
             backend:
               service:
@@ -946,6 +938,13 @@ spec:
             backend:
               service:
                 name: deeplynx-mcp-service
+                port:
+                  number: 80
+          - path: /api/oauth
+            pathType: Prefix
+            backend:
+              service:
+                name: deeplynx-service
                 port:
                   number: 80
 

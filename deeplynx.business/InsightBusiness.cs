@@ -225,6 +225,48 @@ public class InsightBusiness : IInsightBusiness
     }
 
     /// <summary>
+    ///     Fetches the persistent upload pipeline status for a record from Insight
+    ///     after validating that the record belongs to the requested organization/project
+    ///     and that the current user is authorized to read it.
+    ///     Maps to GET /pipeline_status/{recordId}.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user making the request.</param>
+    /// <param name="organizationId">The ID of the organization to which the record belongs.</param>
+    /// <param name="projectId">The ID of the project to which the record belongs.</param>
+    /// <param name="recordId">The Insight file ID to check.</param>
+    /// <returns>The parsed pipeline status from Insight.</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when the record is not found in the requested organization/project or is archived.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when the current user is not authorized to read the record.</exception>
+    /// <exception cref="InsightServiceException">Thrown when Insight returns a non-success status.</exception>
+    public async Task<InsightPipelineStatusResponseDto> FetchInsightPipelineStatus(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+        var recordExists = await _context.Records.AnyAsync(r =>
+            r.Id == recordId &&
+            r.OrganizationId == organizationId &&
+            r.ProjectId == projectId &&
+            !r.IsArchived);
+
+        if (!recordExists)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        var authorizedIds = await _sensitivityLabelService.FilterAuthorizedRecordIds(
+            currentUserId,
+            organizationId,
+            projectId,
+            [recordId],
+            _context);
+
+        if (!authorizedIds.Contains(recordId))
+            throw new UnauthorizedAccessException($"User is not authorized to access record {recordId}");
+
+        return await _insightServiceClient.GetPipelineStatus(recordId);
+    }
+
+    /// <summary>
     ///     Checks the health of the requested model endpoint using the resolved model configuration.
     /// </summary>
     /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
