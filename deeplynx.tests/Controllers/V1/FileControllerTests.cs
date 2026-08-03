@@ -278,7 +278,98 @@ public class FileControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // CompleteUpdateUpload Tests
+    // =========================================================================
+
+    #region CompleteUpdateUpload Tests
+
+    [Fact]
+    public async Task CompleteUpdateUpload_Returns200_WithRecord()
+    {
+        // Arrange
+        var request = new FileUploadCompleteRequestDto { UploadId = UploadId, FileName = "updated.zip" };
+        var expected = new RecordResponseDto();
+
+        _mockFileBusiness
+            .Setup(b => b.CompleteUpdateUpload(
+                UserId, OrgId, ProjectId, RecordId, request, null, null, UserJwt))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _fileController.CompleteUpdateUpload(OrgId, ProjectId, RecordId, request);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task CompleteUpdateUpload_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        var request = new FileUploadCompleteRequestDto { UploadId = UploadId, FileName = "updated.zip" };
+
+        _mockFileBusiness
+            .Setup(b => b.CompleteUpdateUpload(
+                It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                It.IsAny<FileUploadCompleteRequestDto>(), It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<string?>()))
+            .ThrowsAsync(new Exception("complete update error"));
+
+        // Act
+        var actionResult = await _fileController.CompleteUpdateUpload(OrgId, ProjectId, RecordId, request);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while completing file update upload {request.UploadId}", message);
+        Assert.Contains("complete update error", message);
+    }
+
+    [Fact]
+    public async Task CompleteUpdateUpload_PassesArgumentsToBusinessLayer()
+    {
+        // Arrange
+        var request = new FileUploadCompleteRequestDto { UploadId = UploadId, FileName = "updated.zip" };
+        const long vlmConfigId = 100L;
+        const long embeddingModelConfigId = 200L;
+
+        var expected = new RecordResponseDto();
+
+        _mockFileBusiness
+            .Setup(b => b.CompleteUpdateUpload(
+                UserId, OrgId, ProjectId, RecordId, request, vlmConfigId, embeddingModelConfigId, UserJwt))
+            .ReturnsAsync(expected);
+
+        // Act
+        await _fileController.CompleteUpdateUpload(
+            OrgId, ProjectId, RecordId, request, vlmConfigId, embeddingModelConfigId);
+
+        // Assert
+        _mockFileBusiness.Verify(
+            b => b.CompleteUpdateUpload(
+                UserId, OrgId, ProjectId, RecordId, request, vlmConfigId, embeddingModelConfigId, UserJwt),
+            Times.Once);
+    }
+
+    [Fact]
+    public void CompleteUpdateUpload_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(FileController.CompleteUpdateUpload),
+            "organizationId", "projectId", "recordId", "request");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+    // =========================================================================
     // UpdateFileContentHash Tests
+
     // =========================================================================
 
     #region UpdateFileContentHash Tests

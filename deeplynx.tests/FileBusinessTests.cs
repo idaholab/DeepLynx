@@ -2405,7 +2405,50 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CompleteUpdateUpload_ReplacesExistingFileContent()
+    {
+        var initialContent = "original content";
+        var initialStream = new MemoryStream(Encoding.UTF8.GetBytes(initialContent));
+        var initialFile = new FormFile(initialStream, 0, initialStream.Length, "file", "original.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var initialRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, initialFile);
+        var originalUri = initialRecord.Uri;
+
+        var updatedContent = "updated content";
+        var session = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = Encoding.UTF8.GetByteCount(updatedContent) });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("updated "), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "updated.txt",
+            TotalChunks = 2
+        };
+
+        var updatedRecord = await _fileBusiness.CompleteUpdateUpload(uid, oid, pid, initialRecord.Id, completeRequest);
+
+        Assert.Equal(initialRecord.Id, updatedRecord.Id);
+        Assert.Equal("updated.txt", updatedRecord.Name);
+        Assert.Equal(osid, updatedRecord.ObjectStorageId);
+        Assert.Equal(did, updatedRecord.DataSourceId);
+        Assert.Equal(Encoding.UTF8.GetByteCount(updatedContent), updatedRecord.FileSize);
+        Assert.True(File.Exists(updatedRecord.Uri));
+        Assert.Equal(updatedContent, await File.ReadAllTextAsync(updatedRecord.Uri));
+        Assert.False(File.Exists(originalUri));
+    }
+    [Fact]
     public async Task CompleteUpload_CsvFile_AssignsTimeseriesClassAndExtractsColumns()
+
     {
         // Arrange
         var csvContent = "timestamp,temperature,humidity\n2024-01-01,22.5,60.1\n2024-01-02,23.0,58.3";

@@ -111,6 +111,16 @@ public interface IFileControllerBusiness
         long? vlmConfigId,
         long? embeddingModelConfigId);
 
+    Task<RecordResponseDto> CompleteUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadCompleteRequestDto request,
+        long? vlmConfigId,
+        long? embeddingModelConfigId,
+        string? userJwt);
+
     // Cancel upload
     Task CancelUpload(
         long currentUserId,

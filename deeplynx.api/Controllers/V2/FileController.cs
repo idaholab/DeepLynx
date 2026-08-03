@@ -112,6 +112,40 @@ public class FileController : ControllerBase
         return Ok(updatedFileInfo);
     }
 
+
+
+    /// <summary>
+    ///     Complete Chunked File Update
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="request">File upload completion request DTO</param>
+    /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if the record is embedded</param>
+    /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if the record is embedded</param>
+    /// <returns>Record response DTO containing updated file information</returns>
+    [HttpPost("{recordId:long}/upload/complete", Name = "api_complete_file_update_upload")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "file")]
+    [Auth("update", "record")]
+    [Sensitivity("update file")]
+    public async Task<ActionResult<RecordResponseDto>> CompleteUpdateUpload(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromBody] FileUploadCompleteRequestDto request,
+        [FromQuery] long? vlmConfigId = null,
+        [FromQuery] long? embeddingModelConfigId = null)
+    {
+        var currentUserId = UserContextStorage.UserId;
+        var userJwt = UserContextStorage.Token;
+        var updatedFileInfo = await _fileBusiness.CompleteUpdateUpload(
+            currentUserId, organizationId, projectId, recordId, request, vlmConfigId, embeddingModelConfigId,
+            userJwt);
+        return Ok(updatedFileInfo);
+    }
+
+
     /// <summary>
     ///     Updates the SHA-256 content hash stored for a file record.
     /// </summary>
