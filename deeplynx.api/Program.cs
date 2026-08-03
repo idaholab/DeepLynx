@@ -146,6 +146,7 @@ try
     builder.Services.AddControllers(options =>
         {
             options.Conventions.Add(new ApiVersionRoutePrefixConvention("api/v{version:apiVersion}"));
+            options.Filters.Add(new ApiVersionLifecycleHeadersFilter());
         })
         .AddJsonOptions(options =>
         {

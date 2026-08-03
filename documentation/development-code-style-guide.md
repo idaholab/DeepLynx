@@ -487,6 +487,21 @@ public class ClassProjectController : ControllerBase
 }
 ```
 
+Deprecated v1 controller responses also report lifecycle dates:
+
+```text
+Deprecation: @1785196800
+Sunset: Wed, 30 Sep 2026 23:59:59 GMT
+```
+
+`Deprecation` uses the RFC 9745 Structured Field Date syntax and represents
+2026-07-28 00:00:00 UTC. `Sunset` uses the RFC 8594 HTTP-date syntax and
+represents the planned v1 removal at 2026-09-30 23:59:59 UTC.
+
+The policy-document `Link` header is intentionally deferred because no
+published policy URL exists yet. When that document is available, v1 responses
+must link to it with both `rel="deprecation"` and `rel="sunset"`.
+
 If the controller is configured through API versioning conventions instead of attributes, use `HasDeprecatedApiVersion`:
 
 ```csharp
