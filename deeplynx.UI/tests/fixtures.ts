@@ -1,6 +1,7 @@
-// tests/fixtures.ts
 import { test as base, BrowserContext, Page, APIRequestContext } from '@playwright/test';
-import { authFile, TestAccount, TestOrg, TestProject, selectOrganization, selectProject } from './deeplynx-config';
+import {
+  authFile, TestAccount, TestOrg, TestProject, selectOrganization, selectProject,
+} from './deeplynx-config';
 import { ensureAccount, ensureOrg, ensureProject, getApiContext } from './provisioning';
 
 type Fixtures = {
@@ -11,6 +12,31 @@ type Fixtures = {
   page: Page;
   request: APIRequestContext;
 };
+
+// Selects org (and project, if given) via cookie, then navigates. A separate
+// step from actAs on purpose: actAs's only job is "give me an authenticated
+// page for this account" — logging in and navigating to a scope are two
+// different things, and keeping them separate means a test can call actAs
+// without immediately committing to a scope, or navigate a page to a
+// different scope later. Exported so both the `page` fixture and tests that
+// call `actAs` directly (e.g. multi-actor workflow tests looping over
+// several accounts) can use it.
+export async function gotoScope(page: Page, org: TestOrg, project?: TestProject): Promise<void> {
+  const orgId = await ensureOrg(org);
+  await selectOrganization(page, orgId, org.name);
+
+  if (project) {
+    const projectId = await ensureProject(project);
+    await selectProject(page, projectId, project.name);
+    // Org/project are already selected via cookie above, so land directly
+    // on the project page rather than '/'.
+    await page.goto(`/project/${projectId}`, { waitUntil: 'domcontentloaded' });
+  } else {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+  }
+
+  await page.locator('header .dropdown').waitFor();
+}
 
 export const test = base.extend<Fixtures>({
   actAs: async ({ browser }, use) => {
@@ -28,17 +54,6 @@ export const test = base.extend<Fixtures>({
   actingOrg: [undefined as unknown as TestOrg, { option: true }],
   actingProject: [undefined as unknown as TestProject, { option: true }],
 
-  // Overrides Playwright's built-in `request` fixture. The stock fixture is an
-  // anonymous, unauthenticated APIRequestContext — any direct backend calls
-  // made with it (as several helpers in upload_center.spec.ts do) go out
-  // without an Authorization header. This override makes `request` resolve
-  // to an APIRequestContext authenticated as whichever `actingUser` the test
-  // declared, so existing call sites don't need to change.
-  //
-  // sysAdmin's context is a shared, module-level singleton (see getSysApi()
-  // in provisioning.ts) reused across every test in the worker — it must
-  // NOT be disposed here, or the next test to run gets a dead context.
-  // Only dispose contexts this fixture created itself.
   request: async ({ actingUser }, use) => {
     if (!actingUser) {
       throw new Error(
@@ -46,12 +61,9 @@ export const test = base.extend<Fixtures>({
         'to this file/describe block before using `request`.',
       );
     }
-
     const { context, shouldDispose } = await getApiContext(actingUser);
     await use(context);
-    if (shouldDispose) {
-      await context.dispose();
-    }
+    if (shouldDispose) await context.dispose();
   },
 
   page: async ({ actAs, actingUser, actingOrg, actingProject }, use) => {
@@ -62,10 +74,6 @@ export const test = base.extend<Fixtures>({
       );
     }
 
-    const page = await actAs(actingUser);
-
-    // An explicit override always wins; otherwise fall back to whatever the
-    // account itself is provisioned into.
     const org = actingOrg ?? actingUser.provision?.org;
     if (!org) {
       throw new Error(
@@ -73,27 +81,9 @@ export const test = base.extend<Fixtures>({
         `\`test.use({ actingOrg: ORGS.someOrg })\` alongside actingUser.`,
       );
     }
-    const orgId = await ensureOrg(org);
-    await selectOrganization(page, orgId, org.name);
 
-    const project = actingProject ?? actingUser.provision?.project;
-    if (project) {
-      const projectId = await ensureProject(project);
-      await selectProject(page, projectId, project.name);
-
-      // Org/project are already selected via cookie above, so land directly
-      // on the project page rather than '/'. Tests used to have to click
-      // through the project-select dropdown themselves to get here; now
-      // that this fixture pre-selects the project, that manual UI step is
-      // redundant and can hang (the already-active project may not appear
-      // as a clickable option in the dropdown).
-      await page.goto(`/project/${projectId}`, { waitUntil: 'domcontentloaded' });
-    } else {
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
-    }
-
-    await page.locator('header .dropdown').waitFor();
-
+    const page = await actAs(actingUser);
+    await gotoScope(page, org, actingProject ?? actingUser.provision?.project);
     await use(page);
   },
 });

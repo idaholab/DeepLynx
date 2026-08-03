@@ -174,56 +174,6 @@ export const standardUserX: TestAccount = defineTestAccount({ role: Roles.user, 
 export const fullPermissionUserX: TestAccount = defineTestAccount({ role: ROLES.allPermissions, org: ORGS.orgA, project: PROJECTS.projectX }, 'fullPermissionUserX');
 
 export const authFile = (name: string) => `playwright/.auth/${name}.json`;
-export interface ActionScope {
-  org?: TestOrg;
-  project?: TestProject;
-}
-
-function sameOrg(a?: TestOrg, b?: TestOrg): boolean {
-  return !!a && !!b && a.name === b.name;
-}
-function sameProject(a?: TestProject, b?: TestProject): boolean {
-  return !!a && !!b && a.name === b.name;
-}
-
-export function can(
-  account: TestAccount,
-  resource: PermissionResource,
-  action: PermissionAction,
-  scope: ActionScope = {},
-): boolean {
-  if (account.isSysAdmin) return true;
-
-  const provision = account.provision;
-  if (!provision) {
-    throw new Error(`can(): account "${account.name}" is not sysAdmin and has no provision — nothing to evaluate.`);
-  }
-
-  const targetOrg = scope.org ?? provision.org;
-  const targetProject = scope.project ?? provision.project;
-
-  if (provision.isOrgAdmin && sameOrg(provision.org, targetOrg)) {
-    return true;
-  }
-
-  if (provision.isProjectAdmin && sameProject(provision.project, targetProject)) {
-    if (resource === PermissionResource.Organization) {
-      return action === PermissionAction.Read; // same ceiling, enforced at runtime too
-    }
-    return true;
-  }
-
-  function hasPermission(perms: RolePermissions, resource: PermissionResource, action: PermissionAction): boolean {
-    const grantedActions = perms[resource] as PermissionAction[] | undefined;
-    return grantedActions?.includes(action) ?? false;
-  }
-
-  if (!provision.role) return false;
-  if (provision.role === Roles.user) {
-    return hasPermission(DEFAULT_ROLE_PERMISSIONS, resource, action);
-  }
-  return hasPermission(provision.role.permissions, resource, action);
-}
 
 // ---------------------------------------------------------------------------
 // UI selection helpers
