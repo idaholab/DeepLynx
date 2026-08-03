@@ -1224,7 +1224,7 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateFile_WithFilesystemPlaceholder_ClearsPreviousContentHash()
+    public async Task UpdateFile_WithFilesystemHashing_ReplacesPreviousContentHash()
     {
         await using var originalStream = new MemoryStream(Encoding.UTF8.GetBytes("original"));
         var originalFile = new FormFile(
@@ -1260,8 +1260,9 @@ public class FileBusinessTests : IntegrationTestBase
             originalRecord.Id,
             updatedFile);
 
-        Assert.Null(updatedRecord.FileContentHash);
-        Assert.Null((await Context.Records.FindAsync(originalRecord.Id))!.FileContentHash);
+        const string expectedHash = "27eb5e51506c911f6fc4bb345c0d9db6f60415fceab7c18e1e9b862637415777";
+        Assert.Equal(expectedHash, updatedRecord.FileContentHash);
+        Assert.Equal(expectedHash, (await Context.Records.FindAsync(originalRecord.Id))!.FileContentHash);
     }
 
     [Fact]
