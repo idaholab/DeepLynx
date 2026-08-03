@@ -121,9 +121,9 @@ const CreateStorageModal = ({
             <div className="alert alert-warning">
               <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
               <div>
-                <p className="font-semibold">AWS S3 Configuration Coming Soon</p>
+                <p className="font-semibold">{t.translations.AWS_S3} (t.translations.COMING_SOON)</p>
                 <p className="text-sm">
-                  The backend configuration for AWS S3 storage is currently being finalized.
+                  {t.translations.BACKEND_CONFIG_AWS}
                 </p>
               </div>
             </div>
@@ -171,7 +171,7 @@ const CreateStorageModal = ({
                       })
                     }
                   />
-                  <span className="label-text">Use Existing Container</span>
+                  <span className="label-text">{t.translations.USE_EXISTING_CONTAINER}</span>
                 </label>
               </div>
 

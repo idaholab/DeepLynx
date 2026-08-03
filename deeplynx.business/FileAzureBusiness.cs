@@ -218,13 +218,13 @@ public class FileAzureBusiness : IFileBusiness
 
         var newObjectStorageDto = new CreateObjectStorageRequestDto
         {
-            Name = containerName,
+            Name = ContainerName.UniqueContainerNameFromString(containerName),
             Config = new ObjectStorageConfigDto
             {
                 AzureObjectConfig = new AzureObjectConfigDto
                 {
                     AzureConnectionString = effectiveConnectionString,
-                    AzureContainerName = containerName
+                    AzureContainerName = containerName,
                 }
             },
             Default = isDefault
