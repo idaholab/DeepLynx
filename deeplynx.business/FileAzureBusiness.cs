@@ -1271,6 +1271,23 @@ public class FileAzureBusiness : IFileBusiness
         return result;
     }
 
+    public async Task<ScrapeResult> ScrapeAsync(
+        ObjectStorageDecryptedDto objectStorage,
+        string? afterCursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        return await ScrapeAzureBlob(
+            objectStorage.Config.AzureObjectConfig
+                ?? throw new InvalidOperationException("Azure Blob storage is missing its configuration."),
+            objectStorage.Id,
+            afterCursor,
+            batchSize,
+            maxBatches,
+            cancellationToken);
+    }
+
     private ObjectStorageConfigDto DeserializeAndDecryptConfig(string encryptedConfig)
     {
         return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);

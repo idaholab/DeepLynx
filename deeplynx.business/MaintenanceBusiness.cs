@@ -14,6 +14,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly FileAzureBusiness _fileAzureBusiness;
+    private readonly IFileBusinessFactory _fileBusinessFactory;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly IRecordBusiness _recordBusiness;
     private readonly IDataSourceBusiness _dataSourceBusiness;
@@ -29,12 +30,14 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     public MaintenanceBusiness(
         DeeplynxContext context,
         FileAzureBusiness fileAzureBusiness,
+        IFileBusinessFactory fileBusinessFactory,
         IObjectStorageBusiness objectStorageBusiness,
         IRecordBusiness recordBusiness,
         IDataSourceBusiness dataSourceBusiness)
     {
         _context = context;
         _fileAzureBusiness = fileAzureBusiness;
+        _fileBusinessFactory = fileBusinessFactory;
         _objectStorageBusiness = objectStorageBusiness;
         _recordBusiness = recordBusiness;
         _dataSourceBusiness = dataSourceBusiness;
@@ -267,43 +270,14 @@ public class MaintenanceBusiness : IMaintenanceBusiness
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        ScrapeResult scrapeResult =
-            objectStorage.Type.ToLowerInvariant() switch
-            {
-                "filesystem" =>
-                    await FileFilesystemBusiness.ScrapeFileSystem(
-                        objectStorage.Config.MountPath
-                            ?? throw new InvalidOperationException("Filesystem storage is missing a mount path."),
-                        objectStorage.Id,
-                        afterCursor,
-                        batchSize,
-                        maxBatches,
-                        cancellationToken),
+        var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
 
-                "azure_object" =>
-                    await FileAzureBusiness.ScrapeAzureBlob(
-                        objectStorage.Config.AzureObjectConfig
-                            ?? throw new InvalidOperationException("Azure Blob storage is missing its configuration."),
-                        objectStorage.Id,
-                        afterCursor,
-                        batchSize,
-                        maxBatches,
-                        cancellationToken),
-
-                "aws_s3" =>
-                    await FileS3Business.ScrapeS3(
-                        objectStorage.Config.AwsConnectionString
-                            ?? throw new InvalidOperationException("S3 storage is missing its connection string."),
-                        objectStorage.Id,
-                        afterCursor,
-                        batchSize,
-                        maxBatches,
-                        cancellationToken),
-
-                _ => throw new NotSupportedException(
-                    $"No scraper is registered for storage type " +
-                    $"'{objectStorage.Type}'.")
-            };
+        ScrapeResult scrapeResult = await fileBusiness.ScrapeAsync(
+            objectStorage,
+            afterCursor,
+            batchSize,
+            maxBatches,
+            cancellationToken);
 
         if (scrapeResult.Records.Count == 0)
         {

@@ -914,6 +914,23 @@ public class FileFilesystemBusiness : IFileBusiness
         return Task.FromResult(result);
     }
 
+    public async Task<ScrapeResult> ScrapeAsync(
+        ObjectStorageDecryptedDto objectStorage,
+        string? afterCursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        return await ScrapeFileSystem(
+            objectStorage.Config.MountPath
+                ?? throw new InvalidOperationException("Filesystem storage is missing a mount path."),
+            objectStorage.Id,
+            afterCursor,
+            batchSize,
+            maxBatches,
+            cancellationToken);
+    }
+
     public Task<CreateObjectStorageRequestDto> CreateContainer(long organizationId, string? containerName, string? connectionString, bool isDefault = false, bool existingContainer = false)
     {
         throw new NotImplementedException();

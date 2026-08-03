@@ -171,6 +171,23 @@ public class FileS3Business : IFileBusiness
         return new ScrapeResult();
     }
 
+    public async Task<ScrapeResult> ScrapeAsync(
+        ObjectStorageDecryptedDto objectStorage,
+        string? afterCursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        return await ScrapeS3(
+            objectStorage.Config.AwsConnectionString
+                ?? throw new InvalidOperationException("S3 storage is missing its connection string."),
+            objectStorage.Id,
+            afterCursor,
+            batchSize,
+            maxBatches,
+            cancellationToken);
+    }
+
     public Task<CreateObjectStorageRequestDto> CreateContainer(long organizationId, string? containerName, string? connectionString, bool isDefault = false, bool existingContainer = false)
     {
         throw new NotImplementedException();
