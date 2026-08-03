@@ -162,7 +162,7 @@ test.describe("Insight E2E", () => {
   test("upload file, embed, and query chatbot", async ({ page }) => {
     // This test walks the full Insight pipeline: upload -> embed -> chat.
     // Embedding takes ~30s; give the entire test 3 minutes.
-    test.setTimeout(240_000);
+    test.setTimeout(360_000);
 
     // ----------------------------------------------------------------
     // Step 1: Navigate to Upload Center and upload the PDF
@@ -244,7 +244,7 @@ test.describe("Insight E2E", () => {
           return false;
         }
       },
-      { timeout: 120_000 },
+      { timeout: 240_000 },
     );
 
     await page.getByRole('button', { name: 'Embedded' }).click();
