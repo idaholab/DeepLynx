@@ -610,6 +610,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     if (!record) return [];
 
     const isDownloadable =
+      !organization?.disableFileTransfer &&
       !!record.uri &&
       record.uri.trim().length > 0 &&
       record.uri.toLowerCase() !== "null";
@@ -644,6 +645,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         copyAriaLabel: t.translations.COPY_RECORD_URI,
         idleIconClassName: "size-6 text-base-content/70",
         copiedIconClassName: "size-6 text-success",
+        isLink: organization?.disableFileTransfer,
       },
       {
         label: t.translations.ORIGINAL_ID,
@@ -695,7 +697,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         value: record.objectStorageId,
       },
     ];
-  }, [record, recordFileType, handleUpdateRecord, t.translations]);
+  }, [
+    record, 
+    recordFileType,
+    handleUpdateRecord,
+    t.translations,
+    organization?.disableFileTransfer,
+  ]);
 
   const additionalPropertiesRows = useMemo(() => {
     if (!record?.properties) return [];
@@ -1110,6 +1118,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   }
 
   const isDownloadable =
+    !organization?.disableFileTransfer &&
     !!record.uri &&
     record.uri.trim().length > 0 &&
     record.uri.toLowerCase() !== "null";

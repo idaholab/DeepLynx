@@ -32,4 +32,5 @@ public class AzureObjectConfigDto
     public string AzureConnectionString { get; set; } = null!;
     public string? AzureContainerName { get; set; }
     public string? AzureFilePath { get; set; }
+    public bool ExistingContainer { get; set; }
 }

@@ -535,6 +535,26 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
+    ///     Invite/Add User to Organization
+    /// </summary>
+    /// <param name="organizationId"></param>
+    /// <param name="userEmail"></param>
+    /// <param name="userId"></param>
+    /// <returns>A 200 OK response with an empty body.</returns>
+    [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [ProjectAdmin(unscoped: true)]
+    public async Task<ActionResult> InviteUserToOrganizationV2(
+        long organizationId,
+        [FromQuery] string? userEmail,
+        [FromQuery] long? userId)
+    {
+        var response = await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, userId, userEmail);
+        return Ok(response);
+    }
+
+    /// <summary>
     ///     Upload a Organization Logo
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -542,8 +562,9 @@ public class OrganizationController : ControllerBase
     /// <returns>File path for the logo</returns>
     [HttpPost("{organizationId}/logo", Name = "api_upload_organization_logo")]
     [OrgAdmin]
+    [MapToApiVersion(1)]
     [Sensitivity("upload file")]
-    public async Task<IActionResult> UploadProjectLogo(
+    public async Task<IActionResult> UploadOrganizationLogoV1(
         long organizationId,
         IFormFile file)
     {
@@ -555,7 +576,34 @@ public class OrganizationController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Failed to upload project logo for organization {organizationId}: {ex.Message}");
+            _logger.LogError($"Failed to upload Organization logo for organization {organizationId}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
+    }
+
+    /// <summary>
+    ///     Upload a Organization Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="file">The file to upload</param>
+    /// <returns>File path for the logo</returns>
+    [HttpPost("{organizationId}/logo", Name = "api_upload_organization_logo")]
+    [OrgAdmin]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Sensitivity("upload file")]
+    public async Task<IActionResult> UploadOrganizationLogoV2(
+        long organizationId,
+        IFormFile file)
+    {
+        try
+        {
+            var logoUri = await _organizationBusiness.UploadOrganizationLogo(organizationId, file);
+            return Ok(logoUri);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to upload Organization logo for organization {organizationId}: {ex.Message}");
             return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
         }
     }
@@ -566,7 +614,8 @@ public class OrganizationController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <returns>File stream of the logo bytes</returns>
     [HttpGet("{organizationId}/logo/image", Name = "api_get_organization_image")]
-    public async Task<IActionResult> GetProjectLogoImage(
+    [MapToApiVersion(1)]
+    public async Task<IActionResult> GetOrganizationLogoImageV1(
         long organizationId)
     {
         try
@@ -594,14 +643,50 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Organization Logo
+    ///     Get an Organization Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <returns>File stream of the logo bytes</returns>
+    [HttpGet("{organizationId}/logo/image", Name = "api_get_organization_image")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    public async Task<IActionResult> GetOrganizationLogoImageV2(
+        long organizationId)
+    {
+        try
+        {
+            var result = await _organizationBusiness.GetOrganizationLogoStreamAsync(organizationId);
+            if (result == null)
+                return NotFound();
+
+            var (logoStream, fullPath) = result.Value;
+
+
+            var provider = new FileExtensionContentTypeProvider();
+            if (!provider.TryGetContentType(fullPath, out var contentType))
+            {
+                contentType = "application/octet-stream";
+            }
+
+            return File(logoStream, contentType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error retrieving logo image for organization {organizationId}");
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    /// <summary>
+    ///     Remove a Organization Logo
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <returns>True if file was sucessfully deleted</returns>
     [HttpDelete("{organizationId}/logo/delete", Name = "api_delete_organization_logo")]
     [OrgAdmin]
+    [MapToApiVersion(1)]
     [Sensitivity("delete file")]
-    public async Task<IActionResult> RemoveProjectLogo(
+    public async Task<IActionResult> RemoveOrganizationLogoV1(
         long organizationId)
     {
         try
@@ -623,22 +708,27 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Invite/Add User to Organization
+    ///     Remove a Organization Logo
     /// </summary>
-    /// <param name="organizationId"></param>
-    /// <param name="userEmail"></param>
-    /// <param name="userId"></param>
-    /// <returns>A 200 OK response with an empty body.</returns>
-    [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <returns>True if file was successfully deleted</returns>
+    [HttpDelete("{organizationId}/logo/delete", Name = "api_delete_organization_logo")]
+    [OrgAdmin]
     [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    [ProjectAdmin(unscoped: true)]
-    public async Task<ActionResult> InviteUserToOrganizationV2(
-        long organizationId,
-        [FromQuery] string? userEmail,
-        [FromQuery] long? userId)
+    [Sensitivity("delete file")]
+    public async Task<IActionResult> RemoveOrganizationLogoV2(
+        long organizationId)
     {
-        var response = await _invitationBusiness.InviteAndAddUserToHierarchy(organizationId, null, null, null, userId, userEmail);
-        return Ok(response);
+        try
+        {
+            var success = await _organizationBusiness.RemoveLogoFileAsync(organizationId);
+            return Ok(success);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to remove active logo file for organization {organizationId}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
     }
 }

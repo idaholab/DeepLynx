@@ -88,7 +88,7 @@ public class FileAzureBusiness : IFileBusiness
 
         var baseFilePath = azureConfig.AzureFilePath ?? string.Empty;
 
-        if (!IsValidFilePath(baseFilePath))
+        if (!SanitizeFilePath.IsValidFilePath(baseFilePath))
             throw new ArgumentException("Invalid Azure file path. Allowed characters are letters (a-z, A-Z), numbers (0-9), and '/'.");
 
         var filePath = string.IsNullOrEmpty(baseFilePath)
@@ -173,10 +173,14 @@ public class FileAzureBusiness : IFileBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="containerName">The name of the container</param>
     /// <param name="connectionString">The connection string to connect to Azure</param>
+    /// <param name="isDefault">Specifies whether the resulting obj storage DTO should be default</param>
+    /// <param name="existingContainer">Specifies whether the container exists already</param>
     public async Task<CreateObjectStorageRequestDto> CreateContainer(
-     long organizationId,
-     string containerName,
-     string? connectionString)
+        long organizationId,
+        string containerName,
+        string? connectionString,
+        bool isDefault = false,
+        bool existingContainer = false)
     {
         const int maxContainerNameLength = 63;
 
@@ -184,7 +188,6 @@ public class FileAzureBusiness : IFileBusiness
             throw new Exception("Generated container name does not comply with Azure Blob storage naming rules.");
 
         BlobServiceClient blobServiceClient;
-        BlobContainerClient containerClient;
         string effectiveConnectionString;
 
         if (!string.IsNullOrWhiteSpace(connectionString))
@@ -195,7 +198,7 @@ public class FileAzureBusiness : IFileBusiness
         {
             var defaultObjectStorage = await _context.ObjectStorages
                 .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Default && os.Type == "azure_object")
-                .FirstOrDefaultAsync() ?? throw new Exception("No default Azure object storage found for the organization.");
+                .FirstOrDefaultAsync() ?? throw new KeyNotFoundException("No default Azure object storage found for the organization.");
 
             var azureConfig = DeserializeAndDecryptConfig(defaultObjectStorage.ConfigEncrypted);
 
@@ -205,23 +208,26 @@ public class FileAzureBusiness : IFileBusiness
             effectiveConnectionString = azureConfig.AzureObjectConfig.AzureConnectionString;
         }
 
-        blobServiceClient = new BlobServiceClient(effectiveConnectionString);
-        containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+        if (!existingContainer)
+        {
+            blobServiceClient = new BlobServiceClient(effectiveConnectionString);
+            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
 
-        await containerClient.CreateIfNotExistsAsync();
+            await containerClient.CreateIfNotExistsAsync();
+        }
 
         var newObjectStorageDto = new CreateObjectStorageRequestDto
         {
-            Name = containerName,
+            Name = ContainerName.UniqueContainerNameFromString(containerName),
             Config = new ObjectStorageConfigDto
             {
                 AzureObjectConfig = new AzureObjectConfigDto
                 {
                     AzureConnectionString = effectiveConnectionString,
-                    AzureContainerName = containerName
+                    AzureContainerName = containerName,
                 }
             },
-            Default = true
+            Default = isDefault
         };
 
         return newObjectStorageDto;
@@ -1176,12 +1182,6 @@ public class FileAzureBusiness : IFileBusiness
     private ObjectStorageConfigDto DeserializeAndDecryptConfig(string encryptedConfig)
     {
         return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
-    }
-
-    private static bool IsValidFilePath(string filePath)
-    {
-        var filePathRegex = new Regex(@"^[a-zA-Z0-9/]*$");
-        return filePathRegex.IsMatch(filePath);
     }
 }
 

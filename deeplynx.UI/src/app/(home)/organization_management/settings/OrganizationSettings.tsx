@@ -36,6 +36,22 @@ import { CreateObjectStorageRequestDto, UpdateObjectStorageRequestDto, UpdateOrg
 
 type StorageTab = "default" | "manage";
 
+interface AzureObjectConfig {
+  AzureFilePath?: string;
+}
+
+interface StorageConfig {
+  AzureObjectConfig?: AzureObjectConfig;
+}
+
+interface StorageFormData {
+  name: string;
+  config: StorageConfig;
+  default: boolean;
+  createContainerPerProject: boolean;
+  existingContainer?: boolean;
+}
+
 const OrganizationSettings = () => {
   const { organization, setOrganization } = useOrganizationSession();
   const { t } = useLanguage();
@@ -69,8 +85,8 @@ const OrganizationSettings = () => {
 
   // Storage states
   // Storage config fields based on type
-  const [azureConnectionString, setAzureConnectionString] = useState("");
   const [createContainerPerProject, setCreateContainerPerProject] = useState(false);
+  const [existingContainer, setExistingContainer] = useState(false);
 
   const [activeStorageTab, setActiveStorageTab] =
     useState<StorageTab>("default");
@@ -92,11 +108,12 @@ const OrganizationSettings = () => {
   const [editingStorage, setEditingStorage] =
     useState<ObjectStorageResponseDto | null>(null);
   const [storageType, setStorageType] = useState<string>("filesystem");
-  const [storageFormData, setStorageFormData] = useState({
+  const [storageFormData, setStorageFormData] = useState<StorageFormData>({
     name: "",
     config: {},
     default: false,
-    createContainerPerProject: false
+    createContainerPerProject: false,
+    existingContainer: false
   });
 
   // Storage config fields based on type
@@ -110,6 +127,12 @@ const OrganizationSettings = () => {
     null,
   );
   const [archiveAction, setArchiveAction] = useState<boolean>(true);
+
+  // File Transfer states
+  const [disableFileTransfer, setDisableFileTransfer] = useState(false);
+  const [originalDisableFileTransfer, setOriginalDisableFileTransfer] =
+    useState(false);
+  const [isSavingFileTransfer, setIsSavingFileTransfer] = useState(false);
 
   // Load existing logo on mount
   useEffect(() => {
@@ -407,7 +430,7 @@ const OrganizationSettings = () => {
   };
 
   const resetStorageForm = () => {
-    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false });
+    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
     setStorageType("filesystem");
     setFilesystemPath("");
     setAzureEndpoint("");
@@ -442,6 +465,7 @@ const OrganizationSettings = () => {
         azureObjectConfig: {
           azureConnectionString: azureEndpoint,
           azureContainerName: azureBucketName,
+          existingContainer: storageFormData.existingContainer || false
         },
       };
     } else if (storageType === "aws_s3") {
@@ -473,6 +497,8 @@ const OrganizationSettings = () => {
       );
 
       setCreateContainerPerProject(storageFormData.createContainerPerProject);
+      setExistingContainer(storageFormData.existingContainer as boolean);
+
       const storageForList = {
         ...createdStorage,
         default: storageFormData.default || createdStorage.default,
@@ -534,6 +560,7 @@ const OrganizationSettings = () => {
       const updateObjectStorageDto: UpdateObjectStorageRequestDto = {
         name: storageFormData.name,
         default: storageFormData.default,
+        existingContainer: storageFormData.existingContainer,
       };
 
       const updateOrganizationDto: UpdateOrganizationRequestDto = {
@@ -551,11 +578,12 @@ const OrganizationSettings = () => {
         updateOrganizationDto
       );
       setCreateContainerPerProject(storageFormData.createContainerPerProject);
+      setExistingContainer(storageFormData.existingContainer as boolean);
 
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditStorageModalOpen(false);
       setEditingStorage(null);
-      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false });
+      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
       loadStorages();
     } catch (error) {
       console.error("Failed to update organization storage:", error);
@@ -623,7 +651,8 @@ const OrganizationSettings = () => {
       name: storage.name,
       config: {},
       default: storage.default,
-      createContainerPerProject: createContainerPerProject
+      createContainerPerProject: createContainerPerProject,
+      existingContainer: existingContainer,
     });
     setIsEditStorageModalOpen(true);
   };
@@ -699,6 +728,60 @@ const OrganizationSettings = () => {
       setOriginalBannerText(banner);
     }
   }, [organization?.banner]);
+
+  useEffect(() => {
+    const disabled = !!organization?.disableFileTransfer;
+    setDisableFileTransfer(disabled);
+    setOriginalDisableFileTransfer(disabled);
+  }, [organization?.disableFileTransfer]);
+
+  const handleSaveFileTransfer = async () => {
+    if (!organization?.organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
+
+    try {
+      setIsSavingFileTransfer(true);
+
+      await updateOrganization(organization.organizationId as number, {
+        disableFileTransfer,
+      });
+
+      setOriginalDisableFileTransfer(disableFileTransfer);
+      setOrganization({
+        ...organization,
+        disableFileTransfer,
+      });
+
+      toast.success(
+        disableFileTransfer
+          ? t.translations.FILE_TRANSFER_DISABLED_SUCCESSFULLY ||
+              "File transfer disabled for this organization"
+          : t.translations.FILE_TRANSFER_ENABLED_SUCCESSFULLY ||
+              "File transfer enabled for this organization",
+      );
+    } catch (error) {
+      console.error("Failed to update file transfer setting: ", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_FILE_TRANSFER_SETTING,
+      );
+    } finally {
+      setIsSavingFileTransfer(false);
+    }
+  };
+
+  const handleCancelFileTransfer = () => {
+    setDisableFileTransfer(originalDisableFileTransfer);
+    toast.custom(
+      <div className="text-info">
+        <ExclamationTriangleIcon className="size-4" />
+        {t.translations.CHANGES_DISCARDED}
+      </div>,
+    );
+  };
 
   const handleSaveBanner = async () => {
     if (!organization?.organizationId) {
@@ -999,6 +1082,67 @@ const OrganizationSettings = () => {
                         type="button"
                         onClick={() => setSelectedThemeName(originalThemeName)}
                         disabled={isSavingTheme}
+                      >
+                        {t.translations.CANCEL}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="divider" />
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="card-title text-lg mb-2">
+                      {t.translations.FILE_TRANSFER}
+                    </h3>
+                    <p className="text-sm text-base-content/60 mt-1">
+                      {t.translations.FILE_TRANSFER_DESCRIPTION}
+                    </p>
+                  </div>
+
+                  <div className="form-control">
+                    <label className="cursor-pointer label flex items-center justify-start w-fit gap-3">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary"
+                        checked={disableFileTransfer}
+                        disabled={isSavingFileTransfer}
+                        onChange={(e) =>
+                          setDisableFileTransfer(e.target.checked)
+                        }
+                      />
+                      <span className="label-text font-semibold">
+                        {t.translations.DISABLE_FILE_TRANSFER}
+                      </span>
+                    </label>
+                    <span className="text-xs text-base-content/60 mt-1">
+                      {t.translations.DISABLE_FILE_TRANSFER_HELPER}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSaveFileTransfer}
+                      disabled={
+                        isSavingFileTransfer ||
+                        disableFileTransfer === originalDisableFileTransfer
+                      }
+                    >
+                      {isSavingFileTransfer && (
+                        <span className="loading loading-spinner loading-xs" />
+                      )}
+                      {t.translations.SAVE}
+                    </button>
+
+                    {disableFileTransfer !== originalDisableFileTransfer && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={handleCancelFileTransfer}
+                        disabled={isSavingFileTransfer}
                       >
                         {t.translations.CANCEL}
                       </button>

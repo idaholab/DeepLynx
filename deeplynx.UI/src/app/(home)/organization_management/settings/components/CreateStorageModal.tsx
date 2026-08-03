@@ -16,6 +16,7 @@ interface StorageFormData {
   config: StorageConfig;
   default: boolean;
   createContainerPerProject: boolean;
+  existingContainer?: boolean;
 }
 
 interface CreateStorageModalProps {
@@ -120,9 +121,9 @@ const CreateStorageModal = ({
             <div className="alert alert-warning">
               <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
               <div>
-                <p className="font-semibold">AWS S3 Configuration Coming Soon</p>
+                <p className="font-semibold">{t.translations.AWS_S3} (t.translations.COMING_SOON)</p>
                 <p className="text-sm">
-                  The backend configuration for AWS S3 storage is currently being finalized.
+                  {t.translations.BACKEND_CONFIG_AWS}
                 </p>
               </div>
             </div>
@@ -154,6 +155,24 @@ const CreateStorageModal = ({
                   value={azureBucketName}
                   onChange={(e) => setAzureBucketName(e.target.value)}
                 />
+              </div>
+
+              {/* Existing Container Checkbox */}
+              <div className="form-control mb-4 w-full md:w-2/3">
+                <label className="cursor-pointer label flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-primary"
+                    checked={storageFormData.existingContainer || false}
+                    onChange={(e) =>
+                      setStorageFormData({
+                        ...storageFormData,
+                        existingContainer: e.target.checked,
+                      })
+                    }
+                  />
+                  <span className="label-text">{t.translations.USE_EXISTING_CONTAINER}</span>
+                </label>
               </div>
 
               {/* Create Container Per Project Checkbox */}
