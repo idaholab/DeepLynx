@@ -15,11 +15,22 @@ import { ObjectStorageResponseDto } from "@/app/(home)/types/responseDTOs";
 import Tabs from "@/app/(home)/components/Tabs";
 
 type StorageTab = "default" | "manage";
+type StorageScope = "project" | "organization";
 
 interface StorageSettingsSectionProps {
   activeTab: StorageTab;
   onChangeTab: (tab: StorageTab) => void;
-  projectId: number | string;
+  /**
+   * "project" (default) — storages are scoped to a project, and the
+   * "current default" badge logic falls checks at the project level.
+   * "organization" — storages are scoped to the org only; the
+   * "current default" badge logic falls checks at the org level.
+   */
+  scope?: StorageScope;
+  // Only required/used when scope === "project".
+  projectId?: number | string;
+  // Only required/used when scope === "organization".
+  organizationId?: number | string;
   availableStorages: ObjectStorageResponseDto[];
   selectedStorageId: number | null;
   onSelectStorage: (storageId: number) => void;
@@ -36,7 +47,9 @@ interface StorageSettingsSectionProps {
 const StorageSettingsSection = ({
   activeTab,
   onChangeTab,
+  scope = "project",
   projectId,
+  organizationId,
   availableStorages,
   selectedStorageId,
   onSelectStorage,
@@ -50,14 +63,49 @@ const StorageSettingsSection = ({
   t,
 }: StorageSettingsSectionProps) => {
   const currentProjectId = Number(projectId);
-  const hasProjectDefaultStorage = availableStorages.some(
-    (storage) =>
-      storage.default && Number(storage.projectId) === currentProjectId,
-  );
+  const hasProjectDefaultStorage =
+    scope === "project" &&
+    availableStorages.some(
+      (storage) =>
+        storage.default && Number(storage.projectId) === currentProjectId,
+    );
   const defaultStorageProjectId = Number(defaultStorage?.projectId);
   const hasDefaultStorageWithProject =
-    defaultStorage !== null && defaultStorageProjectId === currentProjectId;
+    scope === "project" &&
+    defaultStorage !== null &&
+    defaultStorageProjectId === currentProjectId;
+
+  const currentOrgId = Number(organizationId);
+  const hasOrgDefaultStorage =
+    scope === "organization" &&
+    availableStorages.some(
+      (storage) =>
+        storage.default && Number(storage.organizationId) === currentOrgId,
+    );
+  const defaultStorageOrgId = Number(defaultStorage?.organizationId);
+  const hasDefaultStorageWithOrg =
+    scope === "organization" &&
+    defaultStorage !== null &&
+    defaultStorageOrgId === currentOrgId;
+
   const isCurrentDefaultStorage = (storage: ObjectStorageResponseDto) => {
+    if (scope === "organization") {
+      if (defaultStorage) {
+        return (
+          String(storage.id) === String(defaultStorage.id) &&
+          (!hasDefaultStorageWithOrg ||
+            Number(storage.organizationId) === currentOrgId)
+        );
+      }
+
+      // return in both cases so logic doesn't fall through to the project level
+      return (
+        storage.default &&
+        (!hasOrgDefaultStorage ||
+          Number(storage.organizationId) === currentOrgId)
+      );
+    }
+
     if (defaultStorage) {
       return (
         String(storage.id) === String(defaultStorage.id) &&
@@ -96,7 +144,7 @@ const StorageSettingsSection = ({
         ) : (
           <>
             <select
-              className="select select-bordered"
+              className="select select-bordered w-full"
               value={selectedStorageId || ""}
               onChange={(e) => onSelectStorage(Number(e.target.value))}
             >

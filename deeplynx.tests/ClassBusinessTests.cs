@@ -18,12 +18,17 @@ namespace deeplynx.tests;
 public class ClassBusinessTests : IntegrationTestBase
 {
     private ClassBusiness _classBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IDataSourceBusiness> _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
+    private Mock<ILogger<ProjectRolePermissionService>> _projectServiceLogger;
+    private Mock<ILogger<AdminService>> _adminServiceLogger;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
+    private IAdminService _adminService = null!;
+    private IProjectRolePermissionService _permissionService = null!;
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
@@ -67,19 +72,25 @@ public class ClassBusinessTests : IntegrationTestBase
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
+        _projectServiceLogger = new Mock<ILogger<ProjectRolePermissionService>>();
+        _adminServiceLogger = new Mock<ILogger<AdminService>>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
+        _permissionService = new ProjectRolePermissionService(Context, _projectServiceLogger.Object);
+        _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _roleBusiness = new Mock<IRoleBusiness>();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
 
         _classBusiness = new ClassBusiness(
             Context, _recordBusiness.Object,
-            _relationshipBusiness.Object, _eventBusiness);
+            _relationshipBusiness.Object, _eventBusiness, _permissionService, _adminService);
+
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -92,6 +103,7 @@ public class ClassBusinessTests : IntegrationTestBase
             Name = "Test User",
             Email = "test.user@test.com",
             Password = "test_password",
+            IsSysAdmin = true,
             IsArchived = false
         };
         Context.Users.Add(user);
@@ -498,7 +510,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ReturnsOnlyForProjects()
     {
         // Act - Get classes for pid only
-        var list = await _classBusiness.GetAllClasses(oid, new[] { pid }, true);
+        var list = await _classBusiness.GetAllClasses(uid, oid, [pid], true, true);
 
         // Assert - Should get class1 and class5 (not class2 which is archived, not class4 which is in pid2)
         Assert.Equal(3, list.Count);
@@ -512,7 +524,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ExcludesSoftDeleted()
     {
         // Act
-        var list = await _classBusiness.GetAllClasses(oid, new[] { pid }, true);
+        var list = await _classBusiness.GetAllClasses(uid, oid, [pid], true, true);
 
         // Assert - class2 is archived, should not be returned
         Assert.DoesNotContain(list, c => c.Id == cid2);
@@ -523,7 +535,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ValidProjectIds_ReturnsClassesFromAllProjects()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(oid, new[] { pid, pid2 }, true);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid, pid2], true, true);
 
         // Assert - Should get class1, class4, class5 (not class2 which is archived)
         Assert.Equal(4, result.Count);
@@ -536,7 +548,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_NonExistentProjectIds_ReturnsEmptyList()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(oid, new long[] { 999, 998 }, true);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [999, 998], true, true);
 
         // Assert
         Assert.Single(result);
@@ -546,7 +558,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_HideArchivedFalse_ReturnsArchivedClasses()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(oid, new[] { pid }, false);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], false, true);
 
         // Assert - Should include archived class2
         Assert.Contains(result, c => c.Id == cid2 && c.IsArchived);
@@ -556,7 +568,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_HideArchivedTrue_ExcludesArchivedClasses()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(oid, new[] { pid }, true);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], true, true);
 
         // Assert
         Assert.DoesNotContain(result, c => c.Id == cid2);
@@ -567,7 +579,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ReturnsAllProperties_Correctly()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(oid, new[] { pid }, false);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], false, true);
         var class1Dto = result.First(c => c.Id == cid1);
 
         // Assert

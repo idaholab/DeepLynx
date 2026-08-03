@@ -124,6 +124,7 @@ export const translations = {
       AWS_S3: "AWS S3",
       AXIS_SELECTION: "Axis Selection",
       AZURE_BLOB_STORAGE: "Azure Blob Storage",
+      AZURE_DEFAULT_CONNECTION_STRING: "Azure Default Connection String",
       BACK: "Back",
       BACK_TO_CLASS_SELECTION: "← Back to class selection",
       BANNER_EXAMPLE_CUI:
@@ -223,6 +224,7 @@ export const translations = {
         "Configure branding and manage your project",
       CONFIRM_BULK_UPLOAD: "Confirm Bulk Upload",
       CONFIRM_UPLOAD: "Confirm Upload",
+      CONNECT_STORAGE_MANUALLY_INSTEAD: "Connect storage manually instead",
       CONNECTION_STRING: "Connection String",
       CONNECTIONS: "Connections",
       CONNECTOR: "Connector",
@@ -238,6 +240,7 @@ export const translations = {
       COPY_VALUE: "Copy value",
       CREATE: "Create",
       CREATE_AND_APPLY: "Create & Apply",
+      CREATE_CONTAINER_PER_PROJECT: "Create Container Per Project",
       CREATE_EDIT_MANAGE_STORAGE_LOCATIONS:
         "Create, edit, and manage your storage locations",
       CREATE_GROUP: "Create Group",
@@ -256,6 +259,8 @@ export const translations = {
       CREATE_OAUTH_APPLICATION: "Create OAuth Application",
       CREATE_OBJECT_STORAGE: "Create Object Storage",
       CREATE_ORGANIZATION: "Create Organization",
+      CREATE_PROJECT_CONTAINER_HELPER: "Create an organization-managed container in Azure Blob Storage. This is the fastest and easiest way to get started.",
+      CREATE_PROJECT_CONTAINER: "Create Project Container",
       CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
         "Create your first organization to get started.",
       CREATE_PROJECT: "Create New Project",
@@ -371,6 +376,7 @@ export const translations = {
       EDIT_MATRIX: "Edit Matrix",
       EDIT_OAUTH_APP: "Edit OAuth Application",
       ENTER: "Enter",
+      ENTER_AZURE_CONNECTION_STRING: "Enter Azure Connection String",
       EDIT_ORGANIZATION: "Edit Organization",
       EDIT_PERMISSIONS: "Edit Permissions",
       EDIT_PERMISSIONS_ACROSS_ROLES_MATRIX_VIEW:
@@ -481,6 +487,7 @@ export const translations = {
       FAILED_TO_UPLOAD_LOGO: "Failed to upload logo",
       FILE: "File",
       FILE_A_BUG: "File A Bug",
+      FILE_PATH: "File Path",
       FILTER_BY_DATA_SOURCE: "Filter by data source...",
       FILTER_BY_ENTITY_NAME: "Filter by entity name...",
       FILTER_BY_ENTITY_TYPE: "Filter by entity type...",
@@ -731,6 +738,7 @@ export const translations = {
       INSIGHT_TEMPLATE_MANAGE_TAB: "Manage Templates",
       INTERACTIVE_ZOOM_SLIDER: "Interactive zoom slider",
       INVALID_EMAIL_ERROR: "That doesn’t look like a valid email address",
+      INVALID_FILE_PATH: "Invalid File Path",
       INVALID_JASON: "Invalid JSON.",
       INVALID_JSON_ARRAY_SYNTAX:
         "Invalid JSON format - must be valid array syntax",
@@ -1042,6 +1050,7 @@ export const translations = {
       NO_FILES_AVAILABLE: "No files available.",
       NO_FILES_FOUND: "No files found.",
       NO_FILE_CHOSEN: "No file chosen",
+      NO_FILE_PATHING: "No file pathing",
       NO_FILES_SELECTED_YET: "No files selected yet.",
       NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD:
         "No historical versions were found for this record.",
@@ -1438,6 +1447,7 @@ export const translations = {
       RUNNING: "Running",
       RECENT_ACTIVITY: "Recent Activity",
       RECENTLY_ADDED_RECORDS: "Recently Added Records",
+      RECOMMENDED: "Recommended",
       RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND:
         "Recommended: PNG with transparent background",
       RECORD: "Record",
@@ -2006,6 +2016,7 @@ export const translations = {
       URI_PLACEHOLDER: "uri",
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Used as the default when creating new data sources for projects.",
+      USE_ORGANIZATION_STORAGE: "Use Organization Storage",
       USE_SELECTOR_TO_ADD_LABELS: "Use the selector above to add labels.",
       USE_SELECTOR_TO_ADD_TAGS: "Use the selector above to add tags.",
       USER: "User",
@@ -2258,6 +2269,7 @@ export const translations = {
       AWS_S3: "AWS S3",
       AXIS_SELECTION: "Selección de Ejes",
       AZURE_BLOB_STORAGE: "Azure Blob Storage",
+      AZURE_DEFAULT_CONNECTION_STRING: "Cadena de conexión predeterminada de Azure",
       BACK: "Atrás",
       BACK_TO_CLASS_SELECTION: "← Volver a la seleccion de clase",
       BANNER_EXAMPLE_CUI:
@@ -2350,6 +2362,7 @@ export const translations = {
         "Configura la identidad visual y administra tu proyecto",
       CONFIRM_BULK_UPLOAD: "Confirmar carga masiva",
       CONFIRM_UPLOAD: "Confirmar carga",
+      CONNECT_STORAGE_MANUALLY_INSTEAD: "Conectar el almacenamiento manualmente en su lugar",
       CONNECTION_STRING: "Cadena de conexión",
       CONNECTIONS: "Conexiones",
       CONNECTOR: "Conector",
@@ -2365,6 +2378,7 @@ export const translations = {
       COPY_VALUE: "Copiar valor",
       CREATE: "Crear",
       CREATE_AND_APPLY: "Crear y aplicar",
+      CREATE_CONTAINER_PER_PROJECT: "Crear contenedor por proyecto",
       CREATE_EDIT_MANAGE_STORAGE_LOCATIONS:
         "Crear, editar y administrar tus ubicaciones de almacenamiento",
       CREATE_GROUP: "Crear grupo",
@@ -2394,6 +2408,8 @@ export const translations = {
       CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
         "Crea tu primera organización para comenzar.",
       CREATE_PROJECT: "Crear nuevo proyecto",
+      CREATE_PROJECT_CONTAINER_HELPER: "Cree un contenedor administrado por la organización en Azure Blob Storage. Esta es la forma más rápida y sencilla de empezar.",
+      CREATE_PROJECT_CONTAINER: "Crear contenedor de proyecto",
       CREATE_CLASS: "Crear clase",
       CREATE_RELATIONSHIP: "Crear relacion",
       CREATE_ROLE: "Crear un rol",
@@ -2524,6 +2540,7 @@ export const translations = {
       EMAIL_ADDRESS: "Correo electrónico",
       EMAIL_ADDRESSES: "Correos electrónicos",
       ENTER: "Ingresar",
+      ENTER_AZURE_CONNECTION_STRING: "Ingrese la cadena de conexión de Azure",
       EMAIL_INVITATION_DESCRIPTION:
         "Se enviará un correo de invitación con instrucciones para unirse a la organización. El usuario podrá acceder a todos los recursos de la organización una vez que acepte la invitación.",
       EMAIL_INVITATIONS: "Invitaciones por correo electrónico",
@@ -2656,6 +2673,7 @@ export const translations = {
       FILTER_BY: "Filtrar por",
       FILTERED_BY: "Filtrado por: ",
       FILE: "Archivo",
+      FILE_PATH: "Ruta del archivo",
       FOUND: "Encontrados",
       FOR_CURRENT_USER: "Para el usuario actual",
       FROM: "de",
@@ -2896,6 +2914,7 @@ export const translations = {
       INTERACTIVE_ZOOM_SLIDER: "Control deslizante de zoom interactivo",
       INVALID_EMAIL_ERROR:
         "Eso no parece una dirección de correo electrónico válida",
+      INVALID_FILE_PATH: "Ruta de archivo inválida",
       INVALID_JASON: "JSON inválido.",
       INVALID_JSON_ARRAY_SYNTAX:
         "Formato JSON invalido - debe ser una sintaxis valida de arreglo",
@@ -3230,6 +3249,7 @@ export const translations = {
       NO_FILES_AVAILABLE: "No hay archivos disponibles.",
       NO_FILES_FOUND: "No se encontraron archivos.",
       NO_FILE_CHOSEN: "Ningún archivo seleccionado",
+      NO_FILE_PATHING: "Sin ruta de archivo",
       NO_FILES_SELECTED_YET: "Aún no se han seleccionado archivos.",
       NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD:
         "No se encontraron versiones históricas para este registro.",
@@ -3634,6 +3654,7 @@ export const translations = {
       READ: "leer",
       RECENT_ACTIVITY: "Actividad reciente",
       RECENTLY_ADDED_RECORDS: "Registros añadidos recientemente",
+      RECOMMENDED: "Recomendado",
       RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND:
         "Recomendado: PNG con fondo transparente",
       RECORD: "Registro",
@@ -4233,6 +4254,8 @@ export const translations = {
       UPDATED: "actualizado",
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Se usa como valor predeterminado al crear nuevas fuentes de datos para los proyectos.",
+      USE_ORGANIZATION_STORAGE:
+        "Utilizar el almacenamiento de la organización",
       USE_SELECTOR_TO_ADD_LABELS:
         "Usa el selector de arriba para agregar etiquetas de sensibilidad.",
       USE_SELECTOR_TO_ADD_TAGS:

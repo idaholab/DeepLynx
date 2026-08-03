@@ -1,9 +1,13 @@
-import { test, expect } from "@playwright/test";
-import { seedSession } from "../helpers/seed";
+import { test, expect } from "../fixtures";
+import { sysAdmin } from "../deeplynx-config";
 
 test.describe("Landing Page", () => {
+  test.use({
+    actingUser: sysAdmin,
+    actingOrg: "PW Org A",
+  });
+
   test.beforeEach(async ({ page }) => {
-    await seedSession(page);
     await page.goto("/", { waitUntil: "domcontentloaded" });
   });
 
@@ -14,7 +18,7 @@ test.describe("Landing Page", () => {
   });
 
   test("renders Your Projects card", async ({ page }) => {
-    await expect(page.getByText("Your Projects")).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your Projects' })).toBeVisible();
   });
 
   test("Your Projects card has a button to create a project", async ({

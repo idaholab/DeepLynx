@@ -25,18 +25,22 @@ public class ObjectStorageProjectController : ControllerBase
 {
     private readonly ILogger<ObjectStorageProjectController> _logger;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly IProjectBusiness _projectBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ObjectStorageProjectController" /> class
     /// </summary>
     /// <param name="objectStorageBusiness">The business logic interface for handling object storage operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
+    /// <param name="projectBusiness">The business logic interface for handling project operations.</param>
     public ObjectStorageProjectController(
         IObjectStorageBusiness objectStorageBusiness,
-        ILogger<ObjectStorageProjectController> logger)
+        ILogger<ObjectStorageProjectController> logger,
+        IProjectBusiness projectBusiness)
     {
         _objectStorageBusiness = objectStorageBusiness;
         _logger = logger;
+        _projectBusiness = projectBusiness;
     }
 
     /// <summary>
@@ -85,10 +89,10 @@ public class ObjectStorageProjectController : ControllerBase
         long projectId,
         [FromQuery] bool hideArchived = true)
     {
-            var objectStorages = await _objectStorageBusiness.GetAllObjectStorages(
-                organizationId, projectId, hideArchived);
+        var objectStorages = await _objectStorageBusiness.GetAllObjectStorages(
+            organizationId, projectId, hideArchived);
 
-            return Ok(objectStorages);
+        return Ok(objectStorages);
     }
 
     /// <summary>
@@ -141,10 +145,10 @@ public class ObjectStorageProjectController : ControllerBase
         long objectStorageId,
         [FromQuery] bool hideArchived = true)
     {
-            var objectStorage =
-                await _objectStorageBusiness.GetObjectStorage(
-                    organizationId, projectId, objectStorageId, hideArchived);
-            return Ok(objectStorage);
+        var objectStorage =
+            await _objectStorageBusiness.GetObjectStorage(
+                organizationId, projectId, objectStorageId, hideArchived);
+        return Ok(objectStorage);
     }
 
     /// <summary>
@@ -193,10 +197,10 @@ public class ObjectStorageProjectController : ControllerBase
         long projectId,
         [FromBody] CreateObjectStorageRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var objectStorage = await _objectStorageBusiness.CreateObjectStorage(
-                currentUserId, organizationId, projectId, dto);
-            return Ok(objectStorage);
+        var currentUserId = UserContextStorage.UserId;
+        var objectStorage = await _objectStorageBusiness.CreateObjectStorage(
+            currentUserId, organizationId, projectId, dto);
+        return Ok(objectStorage);
     }
 
     /// <summary>
@@ -249,10 +253,10 @@ public class ObjectStorageProjectController : ControllerBase
         long objectStorageId,
         [FromBody] UpdateObjectStorageRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var objectStorage = await _objectStorageBusiness.UpdateObjectStorage(
-                currentUserId, organizationId, projectId, objectStorageId, dto);
-            return Ok(objectStorage);
+        var currentUserId = UserContextStorage.UserId;
+        var objectStorage = await _objectStorageBusiness.UpdateObjectStorage(
+            currentUserId, organizationId, projectId, objectStorageId, dto);
+        return Ok(objectStorage);
     }
 
     /// <summary>
@@ -301,10 +305,10 @@ public class ObjectStorageProjectController : ControllerBase
         long projectId,
         long objectStorageId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _objectStorageBusiness.DeleteObjectStorage(
-                currentUserId, organizationId, projectId, objectStorageId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _objectStorageBusiness.DeleteObjectStorage(
+            currentUserId, organizationId, projectId, objectStorageId);
+        return Ok(response);
     }
 
     /// <summary>
@@ -365,17 +369,17 @@ public class ObjectStorageProjectController : ControllerBase
         long objectStorageId,
         [FromQuery] bool archive)
     {
-            var currentUserId = UserContextStorage.UserId;
-            if (archive)
-            {
-                var responseA = await _objectStorageBusiness.ArchiveObjectStorage(
-                    currentUserId, organizationId, projectId, objectStorageId);
-                return Ok(responseA);
-            }
-
-            var responseB = await _objectStorageBusiness.UnarchiveObjectStorage(
+        var currentUserId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var responseA = await _objectStorageBusiness.ArchiveObjectStorage(
                 currentUserId, organizationId, projectId, objectStorageId);
-            return Ok(responseB);
+            return Ok(responseA);
+        }
+
+        var responseB = await _objectStorageBusiness.UnarchiveObjectStorage(
+            currentUserId, organizationId, projectId, objectStorageId);
+        return Ok(responseB);
     }
 
     /// <summary>
@@ -420,9 +424,9 @@ public class ObjectStorageProjectController : ControllerBase
         long organizationId,
         long projectId)
     {
-            var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
-                organizationId, projectId);
-            return Ok(defaultObjectStorage);
+        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
+            organizationId, projectId);
+        return Ok(defaultObjectStorage);
     }
 
     /// <summary>
@@ -471,9 +475,75 @@ public class ObjectStorageProjectController : ControllerBase
         long projectId,
         long objectStorageId)
     {
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _objectStorageBusiness.SetDefaultObjectStorage(
+            currentUserId, organizationId, projectId, objectStorageId);
+        return Ok(response);
+    }
+
+    /// <summary>
+    ///     Create a cloud object storage container for a Project
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the object storage will belong</param>
+    /// <param name="storageType">
+    ///     The type of container to create. Currently only "azure_object" is supported;
+    ///     additional providers (e.g. "aws") may be added in the future without a new endpoint.
+    /// </param>
+    /// <returns>The newly created object storage.</returns>
+    [HttpPost("container", Name = "api_create_project_azure_container")]
+    [MapToApiVersion(1)]
+    [Auth("write", "object_storage")]
+    public async Task<ActionResult<ObjectStorageResponseDto>> CreateProjectContainerV1(
+        long organizationId,
+        long projectId,
+        [FromQuery] string storageType = "azure_object")
+    {
+        if (string.Equals(storageType, "azure_object", StringComparison.OrdinalIgnoreCase))
+        {
             var currentUserId = UserContextStorage.UserId;
-            var response = await _objectStorageBusiness.SetDefaultObjectStorage(
-                currentUserId, organizationId, projectId, objectStorageId);
-            return Ok(response);
+            var objectStorage = await _projectBusiness.CreateProjectAzureContainer(
+                currentUserId, organizationId, projectId);
+            return Ok(objectStorage);
+        }
+        else
+        {
+            throw new ArgumentException(
+                $"Unsupported storage type '{storageType}'. Only 'azure_object' is currently supported.");
+        }
+    }
+
+    /// <summary>
+    ///     Create a cloud object storage container for a Project
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the object storage will belong</param>
+    /// <param name="storageType">
+    ///     The type of container to create. Currently only "azure_object" is supported;
+    ///     additional providers (e.g. "aws") may be added in the future without a new endpoint.
+    /// </param>
+    /// <returns>The newly created object storage.</returns>
+    [HttpPost("container", Name = "api_create_project_azure_container")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "object_storage")]
+    public async Task<ActionResult<ObjectStorageResponseDto>> CreateProjectContainerV2(
+        long organizationId,
+        long projectId,
+        [FromQuery] string storageType = "azure_object")
+    {
+        if (string.Equals(storageType, "azure_object", StringComparison.OrdinalIgnoreCase))
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var objectStorage = await _projectBusiness.CreateProjectAzureContainer(
+                currentUserId, organizationId, projectId);
+            return Ok(objectStorage);
+        }
+        else
+        {
+            // TODO: eventually support 'aws' as an option. https://nstinl.atlassian-us-gov-mod.net/browse/DL-2732
+            throw new ArgumentException(
+                $"Unsupported storage type '{storageType}'. Only 'azure_object' is currently supported.");
+        }
     }
 }

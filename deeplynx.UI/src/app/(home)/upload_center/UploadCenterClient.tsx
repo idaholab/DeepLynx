@@ -375,7 +375,6 @@ export default function UploadCenterClient() {
             const file = selectedFiles[currentIndex];
             const metadata = fileUploadState.filesMetadata[currentIndex] ?? {};
             fileUploadState.cleanUploadError(currentIndex);
-
             try {
               if ((metadata.recordMode ?? "new") === "update") {
                 if (!metadata.targetRecordId) {

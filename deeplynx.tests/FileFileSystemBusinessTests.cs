@@ -59,6 +59,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     private UserBusiness _userBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private NotificationBusiness _notificationBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IAdminService> _mockAdminService = null!;
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
@@ -118,8 +119,9 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _sensitivityLabelBusiness = null!;
         _objectStorageBusiness = null!;
         _notificationBusiness = null!;
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
 
         var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
@@ -140,8 +142,16 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             _objectStorageBusiness,
             _fileBusinessFactory.Object);
 
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+
+        _classBusiness = new ClassBusiness(Context,
+          _recordBusiness,
+          _mockRelationshipBusiness.Object,
+          _eventBusiness,
+          _mockPermissionService.Object,
+          _mockAdminService.Object);
+
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+
         _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object,
             _recordBusiness, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);

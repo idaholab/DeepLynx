@@ -11,12 +11,14 @@ namespace deeplynx.business;
 public class ObjectStorageBusiness : IObjectStorageBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly IFileBusiness _fileAzureBusiness;
     private readonly EncryptionHelper _encryptionHelper;
 
-    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper)
+    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper, IFileBusiness fileAzureBusiness)
     {
         _encryptionHelper = encryptionHelper;
         _context = context;
+        _fileAzureBusiness = fileAzureBusiness;
     }
 
     /// <summary>
@@ -181,6 +183,34 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
             _context.ObjectStorages.Add(newObjectStorage);
             await _context.SaveChangesAsync();
+
+            if (hasAzure && projectId == null)
+            {
+                const int maxContainerNameLength = 63;
+                const int guidLength = 36;
+                const int separatorLength = 1;
+                int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
+
+                string? truncatedProjectName = dto.Config.AzureObjectConfig?.AzureContainerName?.Length > maxProjectNameLength
+                    ? dto.Config.AzureObjectConfig?.AzureContainerName[..maxProjectNameLength]
+                    : dto.Config.AzureObjectConfig?.AzureContainerName ?? "container";
+
+                truncatedProjectName = new string(truncatedProjectName!
+                    .ToLower()
+                    .Where(c => char.IsLetterOrDigit(c) || c == '-')
+                    .ToArray()) ?? "container";
+
+                string guid = Guid.NewGuid().ToString();
+
+                var containerName = $"{truncatedProjectName}-{guid}".ToLower();
+
+                var container = await _fileAzureBusiness.CreateContainer(
+                    organizationId: organizationId,
+                    containerName: containerName,
+                    connectionString: dto.Config.AzureObjectConfig?.AzureConnectionString,
+                    existingContainer: dto.Config.AzureObjectConfig.ExistingContainer);
+            }
+
 
             // reset the defaults at the project or org level
             if (dto.Default)

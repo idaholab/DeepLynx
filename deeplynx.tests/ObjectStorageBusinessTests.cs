@@ -23,9 +23,11 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private INotificationBusiness _notificationBusiness = null!;
     private ObjectStorageBusiness _objectStorageBusiness;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
+    private FileAzureBusiness _fileAzureBusiness;
     private ProjectBusiness _projectBusiness;
     private EncryptionHelper _encryptionHelper = null!;
 
@@ -62,7 +64,8 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         await base.InitializeAsync();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _fileAzureBusiness);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
@@ -73,6 +76,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         _mockClassBusiness = new Mock<IClassBusiness>();
         _mockDataSourceBusiness = new Mock<IDataSourceBusiness>();
         _mockRoleBusiness = new Mock<IRoleBusiness>();
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _projectBusiness = new ProjectBusiness(
             Context,
             _mockLogger.Object,
@@ -80,7 +84,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             _mockRoleBusiness.Object,
             _mockDataSourceBusiness.Object,
             _objectStorageBusiness,
-            _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
+            _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
     }
 
     #region ObjectStorageResponseDto Tests

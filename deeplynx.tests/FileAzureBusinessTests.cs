@@ -144,13 +144,13 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         _notificationBusiness = null!;
 
         // Initialize dependent services in order:
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _fileAzureBusiness);
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
 
         // Initialize FileBusinessFactory mocks
         var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
-        var realFileAzureBusiness = new FileAzureBusiness();
+        var realFileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(realFileAzureBusiness);
@@ -169,8 +169,14 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             _fileBusinessFactory.Object);
 
 
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _classBusiness = new ClassBusiness(Context, _recordBusiness,
+            _mockRelationshipBusiness.Object,
+            _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
+
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+
         _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(Context,
             _edgeBusiness.Object,
@@ -180,7 +186,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             _mockAdminService.Object);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
-        _fileAzureBusiness = new FileAzureBusiness();
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
 
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
 
@@ -242,7 +248,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             Name = "Test Project",
             OrganizationId = _oid,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = _uid
+            LastUpdatedBy = _uid,
+            FilePath = "a/b/c"
         };
         Context.Projects.Add(project);
         await Context.SaveChangesAsync();
@@ -859,6 +866,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         var fileContent = "Download test content";
         var mockFile = CreateMockFile(fileName, fileContent);
 
+        _objectStorageConfig.AzureObjectConfig?.AzureFilePath = "a/b/c";
+
         var uri = await _fileAzureBusiness.UploadFile(
             _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
 
@@ -884,6 +893,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         Assert.NotNull(result);
         Assert.Equal(fileName, result.FileDownloadName);
         Assert.Equal("text/plain", result.ContentType);
+        Assert.Contains("a/b/c", uri);
 
         // Read stream content
         using var reader = new StreamReader(result.FileStream);

@@ -28,6 +28,7 @@ public class FileBusinessTests : IntegrationTestBase
     private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "FileBusinessChunkedTests");
     private ClassBusiness _classBusiness = null!;
     private DataSourceBusiness _dataSourceBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IEdgeBusiness> _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private UserBusiness _userBusiness = null!;
@@ -96,9 +97,10 @@ public class FileBusinessTests : IntegrationTestBase
 
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness,
             _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
 
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
@@ -112,9 +114,13 @@ public class FileBusinessTests : IntegrationTestBase
             _provenanceBusiness.Object,
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
 
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
+        _classBusiness = new ClassBusiness(Context,
+        _recordBusiness,
+        _relationshipBusiness.Object,
+        _eventBusiness,
+        _mockPermissionService.Object,
+        _mockAdminService.Object);
 
         var realFileFilesystemBusiness =
             new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
@@ -2675,7 +2681,7 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert: Upload directory should be deleted
         Assert.False(Directory.Exists(uploadPath));
     }
-    
+
     [Fact]
     public async Task CompleteUpload_WithAzureBlobObjectStorage_GetsFileSizeFromStorageBusiness()
     {
@@ -2773,7 +2779,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         _fileBusinessFactory.Verify(x => x.CreateFileBusiness("azure_object"), Times.Once);
     }
-    
+
     [Fact]
     public async Task CompleteUpload_MetadataNoClassInformation_ReturnsDefault()
     {

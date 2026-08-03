@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Context;
 using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -21,6 +22,7 @@ public class ProjectBusiness : IProjectBusiness
     private readonly DeeplynxContext _context;
     private readonly IDataSourceBusiness _dataSourceBusiness;
     private readonly IEventBusiness _eventBusiness;
+    private readonly IFileBusiness _fileAzureBusiness;
 
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -48,11 +50,13 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="eventBusiness">Used for logging events during create and update Operations.</param>
     /// <param name="logger">Used for uniformity in logging</param>
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
+    /// <param name="fileAzureBusiness">Used to manage Azure operations.</param>
     public ProjectBusiness(
         DeeplynxContext context, ILogger<ProjectBusiness> logger,
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
-        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness)
+        IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness,
+        IFileBusiness fileAzureBusiness)
     {
         _context = context;
         _logger = logger;
@@ -63,6 +67,7 @@ public class ProjectBusiness : IProjectBusiness
         _objectStorageBusiness = objectStorageBusiness;
         _eventBusiness = eventBusiness;
         _organizationBusiness = organizationBusiness;
+        _fileAzureBusiness = fileAzureBusiness;
     }
 
     /// <summary>
@@ -153,6 +158,38 @@ public class ProjectBusiness : IProjectBusiness
             Banner = project.Banner,
             RequireSensitivityLabel = dto.RequireSensitivityLabel
         };
+
+        var organization = await _context.Organizations
+            .Where(org => org.Id == organizationId)
+            .Select(org => new { org.Id, org.CreateContainerPerProject })
+            .FirstOrDefaultAsync() ?? throw new Exception("Organization not found.");
+
+        if (organization.CreateContainerPerProject)
+        {
+            string containerName = UniqueContainerNameFromString(dto.Name);
+
+            var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
+                organizationId: organizationId,
+                containerName: containerName,
+                connectionString: null,
+                isDefault: true,
+                existingContainer: true);
+
+            var objectStorageResponse = await _objectStorageBusiness.CreateObjectStorage(
+                currentUserId: userId,
+                organizationId: organizationId,
+                projectId: projectId,
+                dto: newObjectStorageDto);
+
+            projectResponseDto.AssociatedObjectStorage = new ObjectStorageResponseDto
+            {
+                Id = objectStorageResponse.Id,
+                Name = objectStorageResponse.Name,
+                Type = objectStorageResponse.Type,
+                ProjectId = objectStorageResponse.ProjectId,
+                OrganizationId = objectStorageResponse.OrganizationId
+            };
+        }
 
         // Update the Project Cache List
         var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
@@ -489,6 +526,7 @@ public class ProjectBusiness : IProjectBusiness
         project.LastUpdatedBy = currentUserId;
         project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         project.Banner = dto.Banner;
+        project.FilePath = dto.FilePath;
 
         _context.Projects.Update(project);
         await _context.SaveChangesAsync();
@@ -515,7 +553,7 @@ public class ProjectBusiness : IProjectBusiness
             LastUpdatedBy = project.LastUpdatedBy,
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
-            RequireSensitivityLabel = project.RequireSensitivityLabel
+            RequireSensitivityLabel = project.RequireSensitivityLabel,
         };
 
         // Update the Project Cache List
@@ -901,7 +939,7 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Add(projMember);
         await _context.SaveChangesAsync();
 
-        if (userId.HasValue)
+        if (userId.HasValue && userId != UserContextStorage.UserId)
         {
             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user != null)
@@ -1099,6 +1137,43 @@ public class ProjectBusiness : IProjectBusiness
             });
     }
 
+    /// <summary>
+    ///     Create an Azure Container for a Project
+    /// </summary>
+    /// <param name="userId">ID of the user performing the operation.</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs.</param>
+    /// <param name="projectId">The ID of the project to create the container for.</param>
+    /// <returns>The newly created object storage</returns>
+    public async Task<ObjectStorageResponseDto?> CreateProjectAzureContainer(
+        long userId, long organizationId, long projectId)
+    {
+        var project = await _context.Projects
+            .Where(p => p.Id == projectId
+                        && p.OrganizationId == organizationId)
+            .FirstOrDefaultAsync();
+
+        if (project == null || project.IsArchived)
+            throw new KeyNotFoundException($"Project with id {projectId} not found or is archived");
+
+        // TODO: pass in a custom name as an option instead of using project name
+        // https://nstinl.atlassian-us-gov-mod.net/browse/DL-2739
+        string containerName = UniqueContainerNameFromString(project.Name);
+
+        // CreateContainer will throw if there is no org-level azure storage
+        var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
+                organizationId: organizationId,
+                containerName: containerName,
+                connectionString: null,
+                isDefault: false);
+
+        return await _objectStorageBusiness.CreateObjectStorage(
+            currentUserId: userId,
+            organizationId: organizationId,
+            projectId: projectId,
+            dto: newObjectStorageDto);
+    }
+
+    // PRIVATE HELPER FUNCTIONS //
     private async Task<bool> RefreshProjectsCache()
     {
         var dbProjects = await _context.Projects.ToListAsync();
@@ -1164,5 +1239,33 @@ public class ProjectBusiness : IProjectBusiness
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
             ?? throw new KeyNotFoundException("Default object storage not found");
         return defaultObjectStorage.Id;
+    }
+
+    /// <summary>
+    ///     Create an azure-acceptable container name based on an input string
+    /// </summary>
+    /// <param name="inputString">The input string on which the unique name will be based</param>
+    /// <returns></returns>
+    private string UniqueContainerNameFromString(string inputString)
+    {
+        // max length based on the azure container name constraints found at the link below
+        // https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names
+        const int maxContainerNameLength = 63;
+        const int guidLength = 36;
+        const int separatorLength = 1;
+        int maxInputStringLength = maxContainerNameLength - guidLength - separatorLength;
+
+        string truncatedInputString = inputString.Length > maxInputStringLength
+            ? inputString[..maxInputStringLength]
+            : inputString;
+
+        truncatedInputString = new string(truncatedInputString
+            .ToLower()
+            .Where(c => char.IsLetterOrDigit(c) || c == '-')
+            .ToArray());
+
+        string guid = Guid.NewGuid().ToString();
+
+        return $"{truncatedInputString}-{guid}".ToLower();
     }
 }

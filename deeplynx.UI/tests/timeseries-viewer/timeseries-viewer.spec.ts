@@ -1,9 +1,21 @@
-import { test, expect } from "@playwright/test";
-import { seedAndNavigateToProject } from "../helpers/seed";
+import { test, expect } from "../fixtures";
+import { sysAdmin } from "../deeplynx-config";
 
 test.describe("Timeseries Viewer", () => {
+  test.use({
+    actingUser: sysAdmin,
+    actingOrg: "PW Org A",
+    actingProject: "PW Project X",
+  });
+
   test.beforeEach(async ({ page }) => {
-    await seedAndNavigateToProject(page);
+    await page.getByTestId("project-select").click();
+
+    await page
+      .getByRole("button", { name: "PW Project X", exact: true })
+      .click();
+
+    await expect(page).toHaveURL(/\/project\/\d+/);
     // Navigate to Timeseries Viewer via sidebar
     await page.locator("aside a", { hasText: "Timeseries Viewer" }).click();
     await page.waitForURL(/\/timeseries_viewer/);
@@ -37,7 +49,8 @@ test.describe("Timeseries Viewer", () => {
   });
 
   test("Data Schema tab is visible", async ({ page }) => {
-    await expect(page.getByText("Data Schema")).toBeVisible();
+    const bottomSection = page.locator('section').filter({ hasText: 'Set UpData CheckData' });
+    await expect(bottomSection.getByText("Data Schema")).toBeVisible();
   });
 
   test("Plot Options section is visible in sidebar", async ({ page }) => {
