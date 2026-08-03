@@ -543,7 +543,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         var objectStorageResponse2 = await _objectStorageBusiness.CreateObjectStorage(
             uid, organizationId, pid, dto2);
         var objectStorageResponse3 = await _objectStorageBusiness.CreateObjectStorage(
-            uid, organizationId, pid, dto3);
+            uid, organizationId, pid, dto3, false);
 
 
         // Assert

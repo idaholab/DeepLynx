@@ -1,9 +1,13 @@
-import { test, expect } from "@playwright/test";
-import { seedSession } from "../helpers/seed";
+import { test, expect } from "../fixtures";
+import { sysAdmin } from "../deeplynx-config";
 
 test.describe("Landing Page", () => {
+  test.use({
+    actingUser: sysAdmin,
+    actingOrg: "PW Org A",
+  });
+
   test.beforeEach(async ({ page }) => {
-    await seedSession(page);
     await page.goto("/", { waitUntil: "domcontentloaded" });
   });
 
