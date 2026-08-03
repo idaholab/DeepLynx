@@ -199,6 +199,12 @@ test.describe("Upload Center", () => {
     const pageNumber = page.getByRole('spinbutton', { name: 'Go to page' }).first();
     const file = page.getByText(fileName).first();
     
+    if (await pageNumber.isVisible()) {
+      await pageNumber.fill('1');
+      await pageNumber.press('Enter');
+      await expect(pageNumber).toHaveValue('1');
+    }
+
     while (true) {
       try {
         await expect(file).toBeVisible({ timeout: 1000 });
