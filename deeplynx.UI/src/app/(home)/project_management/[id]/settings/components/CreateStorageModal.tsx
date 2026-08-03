@@ -96,7 +96,7 @@ const CreateStorageModal = ({
       />
       <div className="modal" role="dialog">
         <div className="modal-box max-w-2xl">
-          <h3 className="text-lg font-bold mb-4">
+          <h3 className="text-lg font-bold mb-2">
             {t.translations.CREATE_STORAGE}
           </h3>
 
@@ -342,7 +342,7 @@ const CreateStorageModal = ({
 
               <button
                 type="button"
-                className="btn btn-ghost btn-sm w-full text-primary mb-4"
+                className="btn btn-ghost btn-sm w-full text-primary"
                 onClick={() => setIsManualSectionOpen(!isManualSectionOpen)}
               >
                 {t.translations.CONNECT_STORAGE_MANUALLY_INSTEAD}
