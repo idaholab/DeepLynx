@@ -13,20 +13,20 @@ public class SanitizedFormFile : IFormFile
 
     public string FileName { get; }
 
-    public string ContentType        => _inner.ContentType;
+    public string ContentType => _inner.ContentType;
     public string ContentDisposition => _inner.ContentDisposition;
     public IHeaderDictionary Headers => _inner.Headers;
-    public long Length               => _inner.Length;
-    public string Name               => _inner.Name;
+    public long Length => _inner.Length;
+    public string Name => _inner.Name;
 
-    public Stream OpenReadStream()                                           => _inner.OpenReadStream();
-    public void CopyTo(Stream target)                                        => _inner.CopyTo(target);
-    public Task CopyToAsync(Stream target, CancellationToken c = default)    => _inner.CopyToAsync(target, c);
+    public Stream OpenReadStream() => _inner.OpenReadStream();
+    public void CopyTo(Stream target) => _inner.CopyTo(target);
+    public Task CopyToAsync(Stream target, CancellationToken c = default) => _inner.CopyToAsync(target, c);
 
     public static string SanitizeFileName(string fileName)
     {
         var name = Path.GetFileNameWithoutExtension(fileName);
-        var ext  = Path.GetExtension(fileName);
+        var ext = Path.GetExtension(fileName);
 
         name = Regex.Replace(name, @"[^\w\-]", "_");
         name = Regex.Replace(name, @"_+", "_").Trim('_');

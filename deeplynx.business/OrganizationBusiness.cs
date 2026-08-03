@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 using DotNetEnv;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 using Microsoft.AspNetCore.Http;
+using Azure.Storage.Blobs;
+using System.Text.RegularExpressions;
 
 
 namespace deeplynx.business;
@@ -429,66 +431,125 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs.</param>
     /// <returns>True if the file is successfully removed, false otherwise.</returns>
-    public async Task<bool> RemoveLogoFileAsync(
-        long organizationId)
+    public async Task<bool> RemoveLogoFileAsync(long organizationId)
     {
         var realObjectStorageId = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId.Id);
-        if (objectStorage.Config.MountPath == null)
+
+        if (objectStorage.Config.MountPath != null)
         {
-            throw new Exception("File system mount path not set in object storage");
-        }
+            var logosFolderPath = Path.Combine(
+                objectStorage.Config.MountPath,
+                $"org_{organizationId}",
+                "logos");
 
-        var logosFolderPath = Path.Combine(
-            objectStorage.Config.MountPath,
-            $"org_{organizationId}",
-            "logos");
+            if (!Directory.Exists(logosFolderPath))
+            {
+                throw new DirectoryNotFoundException($"Logos folder not found for organization {organizationId}");
+            }
 
-        if (!Directory.Exists(logosFolderPath))
-        {
-            throw new DirectoryNotFoundException($"Logos folder not found for organization {organizationId}");
-        }
+            var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+            if (!File.Exists(metadataFilePath))
+            {
+                return false;
+            }
 
-        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
-        if (!File.Exists(metadataFilePath))
-        {
-            return false;
-        }
+            var activeLogoFileName = await File.ReadAllTextAsync(metadataFilePath);
+            activeLogoFileName = activeLogoFileName?.Trim();
 
-        var activeLogoFileName = await File.ReadAllTextAsync(metadataFilePath);
-        activeLogoFileName = activeLogoFileName?.Trim();
+            if (string.IsNullOrEmpty(activeLogoFileName))
+            {
+                return false;
+            }
 
-        if (string.IsNullOrEmpty(activeLogoFileName))
-        {
-            return false;
-        }
+            var activeLogoFilePath = Path.Combine(logosFolderPath, activeLogoFileName);
 
-        var activeLogoFilePath = Path.Combine(logosFolderPath, activeLogoFileName);
+            if (!File.Exists(activeLogoFilePath))
+            {
+                return false;
+            }
 
-        if (!File.Exists(activeLogoFilePath))
-        {
-            return false;
-        }
+            File.Delete(activeLogoFilePath);
 
-        File.Delete(activeLogoFilePath);
+            var remainingFiles = Directory.GetFiles(logosFolderPath).OrderByDescending(File.GetLastWriteTime).ToList();
 
-        var remainingFiles = Directory.GetFiles(logosFolderPath).OrderByDescending(File.GetLastWriteTime).ToList();
+            if (remainingFiles.Count != 0)
+            {
+                var newActiveLogoFile = Path.GetFileName(remainingFiles.First());
+                File.WriteAllText(metadataFilePath, newActiveLogoFile);
+            }
+            else
+            {
+                if (File.Exists(metadataFilePath))
+                {
+                    File.Delete(metadataFilePath);
+                }
+            }
 
-        if (remainingFiles.Count != 0)
-        {
-            var newActiveLogoFile = Path.GetFileName(remainingFiles.First());
-            File.WriteAllText(metadataFilePath, newActiveLogoFile);
+            return true;
         }
         else
         {
-            if (File.Exists(metadataFilePath))
+            var azureConfig = objectStorage.Config.AzureObjectConfig;
+
+            if (azureConfig == null)
+                throw new ArgumentException("Azure Object Storage configuration is missing.");
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureConnectionString))
+                throw new ArgumentException("Azure connection string is null or empty.");
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureContainerName))
+                throw new ArgumentException("Azure container name is null or empty.");
+
+            var baseFilePath = azureConfig.AzureFilePath ?? string.Empty;
+
+            var filePath = string.IsNullOrEmpty(baseFilePath)
+                ? $"organization_{organizationId}/logos"
+                : $"{baseFilePath.TrimEnd('/')}/logos";
+
+            var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+
+            var blobs = containerClient.GetBlobsAsync(prefix: filePath);
+            string? activeLogoBlobName = null;
+
+            await foreach (var blob in blobs)
             {
-                File.Delete(metadataFilePath);
+                if (activeLogoBlobName == null || blob.Properties.LastModified > containerClient.GetBlobClient(activeLogoBlobName).GetProperties().Value.LastModified)
+                {
+                    activeLogoBlobName = blob.Name;
+                }
             }
+
+            if (string.IsNullOrEmpty(activeLogoBlobName))
+            {
+                return false;
+            }
+
+            var activeBlobClient = containerClient.GetBlobClient(activeLogoBlobName);
+            await activeBlobClient.DeleteAsync();
+
+            string? newActiveLogoBlobName = null;
+            await foreach (var blob in containerClient.GetBlobsAsync(prefix: filePath))
+            {
+                if (newActiveLogoBlobName == null || blob.Properties.LastModified > containerClient.GetBlobClient(newActiveLogoBlobName).GetProperties().Value.LastModified)
+                {
+                    newActiveLogoBlobName = blob.Name;
+                }
+            }
+
+            if (newActiveLogoBlobName != null)
+            {
+                var metadataBlobClient = containerClient.GetBlobClient($"{filePath}/active_logo.txt");
+                await metadataBlobClient.UploadAsync(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(newActiveLogoBlobName)), overwrite: true);
+            }
+            else
+            {
+                var metadataBlobClient = containerClient.GetBlobClient($"{filePath}/active_logo.txt");
+                await metadataBlobClient.DeleteIfExistsAsync();
+            }
+
+            return true;
         }
-
-        return true;
-
     }
 
 
@@ -498,10 +559,9 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="logoFile">The file to upload</param>
     /// <returns>The full path of the uploaded logo file</returns>
-    public async Task<string> UploadOrganizationLogo(
-        long organizationId,
-        IFormFile logoFile)
+    public async Task<string> UploadOrganizationLogo(long organizationId, IFormFile logoFile)
     {
+        // Validate the provided file
         if (logoFile == null || logoFile.Length == 0)
             throw new ArgumentException("Logo file is required and cannot be empty.");
 
@@ -520,8 +580,44 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         var realObjectStorageId = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId.Id);
+
+        if (objectStorage.Config.AzureObjectConfig != null)
+        {
+            var azureConfig = objectStorage.Config.AzureObjectConfig;
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureConnectionString))
+                throw new ArgumentException("Azure connection string is null or empty.");
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureContainerName))
+                throw new ArgumentException("Azure container name is null or empty.");
+
+            var baseFilePath = azureConfig.AzureFilePath ?? string.Empty;
+
+            if (!IsValidFilePath(baseFilePath))
+                throw new ArgumentException("Invalid Azure file path. Allowed characters are letters (a-z, A-Z), numbers (0-9), and '/'.");
+
+            var newLogoFileId2 = $"logo_{Guid.NewGuid()}";
+            var fileName2 = $"{newLogoFileId2}.{fileExtension}";
+
+            var filePath = string.IsNullOrEmpty(baseFilePath)
+                ? $"organization_{organizationId}/logos/{fileName2}"
+                : $"{baseFilePath.TrimEnd('/')}/logos/{fileName2}";
+
+            Console.WriteLine("filepath: " + filePath);
+
+            var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+            await containerClient.CreateIfNotExistsAsync();
+
+            var blobClient = containerClient.GetBlobClient(filePath);
+
+            await using var stream = logoFile.OpenReadStream();
+            await blobClient.UploadAsync(stream, overwrite: true);
+
+            return blobClient.Uri.ToString();
+        }
+
         if (objectStorage.Config.MountPath == null)
-            throw new Exception("File system mount path not set in object storage");
+            throw new Exception("File system mount path not set in object storage.");
 
         var logosFolderPath = Path.Combine(
             objectStorage.Config.MountPath,
@@ -578,53 +674,84 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <returns>Record Id of Logo</returns>
-    public async Task<(Stream Stream, string FullPath)?> GetOrganizationLogoStreamAsync(
-        long organizationId)
+    public async Task<(Stream Stream, string FullPath)?> GetOrganizationLogoStreamAsync(long organizationId)
     {
         var realObjectStorageId = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId.Id);
-        if (objectStorage.Config.MountPath == null)
+
+        if (objectStorage.Config.MountPath != null)
         {
-            throw new Exception("File system mount path not set in object storage");
-        }
+            var logosFolderPath = Path.Combine(
+                objectStorage.Config.MountPath,
+                $"org_{organizationId}",
+                "logos");
 
-        var logosFolderPath = Path.Combine(
-            objectStorage.Config.MountPath,
-            $"org_{organizationId}",
-            "logos");
-
-        if (!Directory.Exists(logosFolderPath))
-        {
-            return null;
-        }
-
-        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
-        if (File.Exists(metadataFilePath))
-        {
-            var activeLogoFileName = await File.ReadAllTextAsync(metadataFilePath);
-            activeLogoFileName = activeLogoFileName?.Trim();
-
-            if (!string.IsNullOrEmpty(activeLogoFileName))
+            if (!Directory.Exists(logosFolderPath))
             {
-                var activeLogoFilePath = Path.Combine(logosFolderPath, activeLogoFileName);
-                if (File.Exists(activeLogoFilePath))
+                return null;
+            }
+
+            var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+            if (File.Exists(metadataFilePath))
+            {
+                var activeLogoFileName = await File.ReadAllTextAsync(metadataFilePath);
+                activeLogoFileName = activeLogoFileName?.Trim();
+
+                if (!string.IsNullOrEmpty(activeLogoFileName))
                 {
-                    var activeFileStream = new FileStream(activeLogoFilePath, FileMode.Open, FileAccess.Read);
-                    return (activeFileStream, activeLogoFilePath);
+                    var activeLogoFilePath = Path.Combine(logosFolderPath, activeLogoFileName);
+                    if (File.Exists(activeLogoFilePath))
+                    {
+                        var activeFileStream = new FileStream(activeLogoFilePath, FileMode.Open, FileAccess.Read);
+                        return (activeFileStream, activeLogoFilePath);
+                    }
                 }
             }
-        }
 
-        var files = Directory.GetFiles(logosFolderPath).OrderByDescending(File.GetLastWriteTime).ToList();
-        if (files.Count == 0)
+            var files = Directory.GetFiles(logosFolderPath).OrderByDescending(File.GetLastWriteTime).ToList();
+            if (files.Count == 0)
+            {
+                return null;
+            }
+
+            var mostRecentFile = files.First();
+            var fileStream = new FileStream(mostRecentFile, FileMode.Open, FileAccess.Read);
+
+            return (fileStream, mostRecentFile);
+        }
+        else
         {
+            var azureConfig = objectStorage.Config.AzureObjectConfig;
+
+            if (azureConfig == null)
+                throw new Exception("Azure Object Storage configuration is missing.");
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureConnectionString))
+                throw new ArgumentException("Azure connection string is null or empty.");
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureContainerName))
+                throw new ArgumentException("Azure container name is null or empty.");
+
+            var baseFilePath = azureConfig.AzureFilePath ?? string.Empty;
+
+            var filePath = string.IsNullOrEmpty(baseFilePath)
+                ? $"organization_{organizationId}/logos"
+                : $"{baseFilePath.TrimEnd('/')}/logos";
+
+            var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+            var blobClient = containerClient.GetBlobClient(filePath);
+
+            var blobs = containerClient.GetBlobsAsync(prefix: filePath);
+            await foreach (var blob in blobs)
+            {
+                var currentBlobClient = containerClient.GetBlobClient(blob.Name);
+
+                var stream = await currentBlobClient.OpenReadAsync();
+                return (stream, currentBlobClient.Uri.ToString());
+            }
+
             return null;
         }
-
-        var mostRecentFile = files.First();
-        var fileStream = new FileStream(mostRecentFile, FileMode.Open, FileAccess.Read);
-
-        return (fileStream, mostRecentFile);
     }
 
     /// <summary>
@@ -779,5 +906,11 @@ public class OrganizationBusiness : IOrganizationBusiness
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
             ?? throw new KeyNotFoundException("Default object storage not found");
         return defaultObjectStorage.Id;
+    }
+
+    private static bool IsValidFilePath(string filePath)
+    {
+        var filePathRegex = new Regex(@"^[a-zA-Z0-9/]*$");
+        return filePathRegex.IsMatch(filePath);
     }
 }
