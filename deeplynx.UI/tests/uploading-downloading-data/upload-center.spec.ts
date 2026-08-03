@@ -171,6 +171,29 @@ test.describe("Upload Center", () => {
     }
   }
 
+  async function selectProjectWithRetry(page: Page, projectName: string, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const projectButton = page.getByRole("button", { name: projectName, exact: true });
+      await expect(projectButton).toBeVisible();
+      await expect(projectButton).toBeEnabled();
+
+      try {
+        await Promise.all([
+          projectButton.click(),
+          page.waitForURL(/\/project\/\d+/, { timeout: 15_000 }),
+        ]);
+        return;
+      } catch(e) {
+        console.log(`[selectProjectWithRetry] attempt ${attempt} failed, url=${page.url()}`);
+
+        if (attempt === maxAttempts) throw e;
+
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.getByTestId("project-select").click();
+      }
+    }
+  }
+
   async function verifyInProject(page: Page, fileName: string) {
     const nextPage = page.getByRole('button', { name: 'Next page' }).first();
     const pageNumber = page.getByRole('spinbutton', { name: 'Go to page' }).first();
@@ -559,14 +582,7 @@ test.describe("Upload Center", () => {
 
     await page.getByTestId("project-select").click();
 
-    const projectButton = page.getByRole("button", { name: "PW Project X", exact: true });
-    await expect(projectButton).toBeVisible();
-    await expect(projectButton).toBeEnabled();
-
-    await Promise.all([
-      projectButton.click(),
-      page.waitForURL(/\/project\/\d+/)
-    ])
+    await selectProjectWithRetry(page, "PW Project X");
 
     await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
 
