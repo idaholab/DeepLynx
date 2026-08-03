@@ -202,6 +202,8 @@ public class MaintenanceController : ControllerBase
     /// <param name="sensitivityLabelIds">Optional IDs of sensitivity labels to attach to each created record.</param>
     /// <returns>Number of records processed this call, plus a cursor for the next call (null if complete).</returns>
     [HttpPost("object-storages/{objectStorageId:long}/scrape", Name = "api_scrape_object_storage_to_catalog")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [SysAdmin]
     public async Task<IActionResult> ScrapeObjectStorageToCatalog(
         long objectStorageId,
@@ -210,73 +212,23 @@ public class MaintenanceController : ControllerBase
         [FromQuery] int maxBatches = 5,
         [FromQuery] List<long>? sensitivityLabelIds = null)
     {
-        try
-        {
-            long currentUserId = UserContextStorage.UserId;
-            bool isSysAdmin = UserContextStorage.IsSysAdmin;
-            bool isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            bool isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        long currentUserId = UserContextStorage.UserId;
+        bool isSysAdmin = UserContextStorage.IsSysAdmin;
+        bool isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        bool isProjectAdmin = UserContextStorage.IsProjectAdmin;
 
-            var result =
-                await _maintenanceBusiness.ScrapeObjectStorageToCatalog(
-                    objectStorageId,
-                    currentUserId,
-                    afterCursor,
-                    batchSize,
-                    maxBatches,
-                    sensitivityLabelIds,
-                    isSysAdmin,
-                    isOrgAdmin,
-                    isProjectAdmin,
-                    HttpContext.RequestAborted);
+        var result = await _maintenanceBusiness.ScrapeObjectStorageToCatalog(
+                objectStorageId,
+                currentUserId,
+                afterCursor,
+                batchSize,
+                maxBatches,
+                sensitivityLabelIds,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin,
+                HttpContext.RequestAborted);
 
-            return Ok(result);
-        }
-        catch (NotSupportedException exc)
-        {
-            _logger.LogWarning(
-                exc,
-                "Unsupported storage type for object storage {ObjectStorageId}",
-                objectStorageId);
-
-            return UnprocessableEntity(exc.Message);
-        }
-        catch (ArgumentException exc)
-        {
-            _logger.LogWarning(
-                exc,
-                "Invalid scrape request for object storage {ObjectStorageId}",
-                objectStorageId);
-
-            return BadRequest(exc.Message);
-        }
-        catch (KeyNotFoundException exc)
-        {
-            _logger.LogWarning(
-                exc,
-                "Referenced resource was not found while scraping object storage {ObjectStorageId}",
-                objectStorageId);
-
-            return NotFound(exc.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogWarning(
-                "Scrape request was cancelled for object storage {ObjectStorageId}",
-                objectStorageId);
-
-            return StatusCode(499);
-        }
-        catch (Exception exc)
-        {
-            _logger.LogError(
-                exc,
-                "Unexpected error while scraping object storage {ObjectStorageId}",
-                objectStorageId);
-
-            return StatusCode(
-                StatusCodes.Status500InternalServerError,
-                "An unexpected error occurred while scraping object storage.");
-        }
+        return Ok(result);
     }
 }
