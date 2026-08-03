@@ -20,13 +20,13 @@ The existing file workflow asks the selected storage provider to calculate a con
 4. `FileBusiness` includes the hash when it creates or updates the associated record.
 5. Nexus returns the hash as `fileContentHash` in `RecordResponseDto`.
 
-Azure hashing is implemented in `FileAzureBusiness`. It streams the upload through the shared `Sha256HashHelper`, so the entire file does not need to be held in memory. Hash calculation is synchronous and adds one read of the incoming upload stream before the Azure upload begins. It does not reread the completed blob from Azure.
+Azure and filesystem hashing are implemented in their respective storage providers. Both stream the upload through the shared `Sha256HashHelper`, so the entire file does not need to be held in memory. Hash calculation is synchronous and adds one read of the incoming upload stream before storage begins. It does not reread the completed stored file for standard uploads or updates.
 
-For completed chunked Azure uploads, where the original `IFormFile` is no longer available, `FileAzureBusiness` streams the finalized blob once to calculate its digest before the record is created.
+For completed chunked uploads, where the original `IFormFile` is no longer available, the Azure and filesystem providers stream the finalized stored file once to calculate its digest before the record is created.
 
-`FileFilesystemBusiness` and `FileS3Business` currently return a null hash from the same provider hook. These placeholders keep the provider contract stable without changing existing filesystem or S3 upload behavior. Their hashing implementations are deferred to provider-specific follow-up tickets.
+`FileS3Business` currently returns a null hash from the same provider hook. This placeholder keeps the provider contract stable without changing existing S3 upload behavior. Its hashing implementation is deferred to a provider-specific follow-up ticket.
 
-When a file is replaced through a provider that does not yet calculate hashes, Nexus clears the previous hash rather than retaining a digest for bytes that no longer exist.
+When a file is replaced through S3, which does not yet calculate hashes, Nexus clears the previous hash rather than retaining a digest for bytes that no longer exist.
 
 ## Updating or backfilling a hash
 
@@ -60,7 +60,7 @@ The endpoint supports future provider integrations and controlled backfill tools
 | Provider | Automatic upload hash | Automatic update hash |
 | --- | --- | --- |
 | Azure Blob Storage | SHA-256 | SHA-256 |
-| Filesystem | Deferred; returns null | Deferred; clears a previous hash |
+| Filesystem | SHA-256 | SHA-256 |
 | Amazon S3 | Deferred; returns null | Deferred; clears a previous hash |
 
 No database migration is required for this change because `records.file_content_hash` already exists in the current schema.
