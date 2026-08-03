@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Context;
 using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -165,28 +166,14 @@ public class ProjectBusiness : IProjectBusiness
 
         if (organization.CreateContainerPerProject)
         {
-            const int maxContainerNameLength = 63;
-            const int guidLength = 36;
-            const int separatorLength = 1;
-            int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
-
-            string truncatedProjectName = dto.Name.Length > maxProjectNameLength
-                ? dto.Name[..maxProjectNameLength]
-                : dto.Name;
-
-            truncatedProjectName = new string(truncatedProjectName
-                .ToLower()
-                .Where(c => char.IsLetterOrDigit(c) || c == '-')
-                .ToArray());
-
-            string guid = Guid.NewGuid().ToString();
-
-            var containerName = $"{truncatedProjectName}-{guid}".ToLower();
+            string containerName = UniqueContainerNameFromString(dto.Name);
 
             var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
                 organizationId: organizationId,
                 containerName: containerName,
-                connectionString: null);
+                connectionString: null,
+                isDefault: true,
+                existingContainer: true);
 
             var objectStorageResponse = await _objectStorageBusiness.CreateObjectStorage(
                 currentUserId: userId,
@@ -952,7 +939,7 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Add(projMember);
         await _context.SaveChangesAsync();
 
-        if (userId.HasValue)
+        if (userId.HasValue && userId != UserContextStorage.UserId)
         {
             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user != null)
@@ -1150,6 +1137,43 @@ public class ProjectBusiness : IProjectBusiness
             });
     }
 
+    /// <summary>
+    ///     Create an Azure Container for a Project
+    /// </summary>
+    /// <param name="userId">ID of the user performing the operation.</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs.</param>
+    /// <param name="projectId">The ID of the project to create the container for.</param>
+    /// <returns>The newly created object storage</returns>
+    public async Task<ObjectStorageResponseDto?> CreateProjectAzureContainer(
+        long userId, long organizationId, long projectId)
+    {
+        var project = await _context.Projects
+            .Where(p => p.Id == projectId
+                        && p.OrganizationId == organizationId)
+            .FirstOrDefaultAsync();
+
+        if (project == null || project.IsArchived)
+            throw new KeyNotFoundException($"Project with id {projectId} not found or is archived");
+
+        // TODO: pass in a custom name as an option instead of using project name
+        // https://nstinl.atlassian-us-gov-mod.net/browse/DL-2739
+        string containerName = UniqueContainerNameFromString(project.Name);
+
+        // CreateContainer will throw if there is no org-level azure storage
+        var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
+                organizationId: organizationId,
+                containerName: containerName,
+                connectionString: null,
+                isDefault: false);
+
+        return await _objectStorageBusiness.CreateObjectStorage(
+            currentUserId: userId,
+            organizationId: organizationId,
+            projectId: projectId,
+            dto: newObjectStorageDto);
+    }
+
+    // PRIVATE HELPER FUNCTIONS //
     private async Task<bool> RefreshProjectsCache()
     {
         var dbProjects = await _context.Projects.ToListAsync();
@@ -1215,5 +1239,33 @@ public class ProjectBusiness : IProjectBusiness
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
             ?? throw new KeyNotFoundException("Default object storage not found");
         return defaultObjectStorage.Id;
+    }
+
+    /// <summary>
+    ///     Create an azure-acceptable container name based on an input string
+    /// </summary>
+    /// <param name="inputString">The input string on which the unique name will be based</param>
+    /// <returns></returns>
+    private string UniqueContainerNameFromString(string inputString)
+    {
+        // max length based on the azure container name constraints found at the link below
+        // https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names
+        const int maxContainerNameLength = 63;
+        const int guidLength = 36;
+        const int separatorLength = 1;
+        int maxInputStringLength = maxContainerNameLength - guidLength - separatorLength;
+
+        string truncatedInputString = inputString.Length > maxInputStringLength
+            ? inputString[..maxInputStringLength]
+            : inputString;
+
+        truncatedInputString = new string(truncatedInputString
+            .ToLower()
+            .Where(c => char.IsLetterOrDigit(c) || c == '-')
+            .ToArray());
+
+        string guid = Guid.NewGuid().ToString();
+
+        return $"{truncatedInputString}-{guid}".ToLower();
     }
 }
