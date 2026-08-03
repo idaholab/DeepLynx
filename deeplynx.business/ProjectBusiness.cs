@@ -1147,30 +1147,34 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="existingContainer">A bool for an existing container</param>
     /// <returns>The newly created object storage</returns>
     public async Task<ObjectStorageResponseDto?> CreateProjectAzureContainer(
-        long userId, long organizationId, long projectId, string containerName, bool existingContainer = false)
+    long userId, long organizationId, long projectId, string? containerName, bool existingContainer = false)
     {
         var project = await _context.Projects
-            .Where(p => p.Id == projectId
-                        && p.OrganizationId == organizationId)
+            .Where(p => p.Id == projectId && p.OrganizationId == organizationId)
             .FirstOrDefaultAsync();
 
         if (project == null || project.IsArchived)
             throw new KeyNotFoundException($"Project with id {projectId} not found or is archived");
 
-        string? truncatedContainerName = null;
+        string containerNameToUse;
 
-        if (!existingContainer)
+        if (!string.IsNullOrWhiteSpace(containerName))
         {
-            truncatedContainerName = ContainerName.UniqueContainerNameFromString(containerName);
+            containerNameToUse = !existingContainer
+                ? ContainerName.UniqueContainerNameFromString(containerName)
+                : containerName;
+        }
+        else
+        {
+            containerNameToUse = ContainerName.UniqueContainerNameFromString(project.Name);
         }
 
-        // CreateContainer will throw if there is no org-level azure storage
         var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
-                organizationId: organizationId,
-                containerName: truncatedContainerName ?? containerName,
-                connectionString: null,
-                isDefault: false,
-                existingContainer: existingContainer);
+            organizationId: organizationId,
+            containerName: containerNameToUse,
+            connectionString: null,
+            isDefault: false,
+            existingContainer: existingContainer);
 
         return await _objectStorageBusiness.CreateObjectStorage(
             currentUserId: userId,

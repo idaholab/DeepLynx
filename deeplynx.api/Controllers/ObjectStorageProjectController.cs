@@ -499,7 +499,7 @@ public class ObjectStorageProjectController : ControllerBase
     public async Task<ActionResult<ObjectStorageResponseDto>> CreateProjectContainerV1(
         long organizationId,
         long projectId,
-        string containerName,
+        string? containerName,
         bool existingContainer,
         [FromQuery] string storageType = "azure_object")
     {
@@ -536,7 +536,7 @@ public class ObjectStorageProjectController : ControllerBase
     public async Task<ActionResult<ObjectStorageResponseDto>> CreateProjectContainerV2(
         long organizationId,
         long projectId,
-        string containerName,
+        string? containerName,
         bool existingContainer = false,
         [FromQuery] string storageType = "azure_object")
     {

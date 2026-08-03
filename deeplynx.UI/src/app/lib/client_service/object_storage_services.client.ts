@@ -390,9 +390,9 @@ export async function setDefaultProjectObjectStorage(
 export async function createProjectAzureContainer(
     organizationId: number,
     projectId: number,
-    containerName: string,
     existingContainer: boolean,
     storageType: string = "azure_object",
+    containerName?: string | null,
 ): Promise<ObjectStorageResponseDto> {
     try {
         const res = await api.post<ObjectStorageResponseDto>(
@@ -401,8 +401,8 @@ export async function createProjectAzureContainer(
             {
                 params: {
                     storageType,
+                    existingContainer,
                     containerName,
-                    existingContainer
                 },
             },
         );

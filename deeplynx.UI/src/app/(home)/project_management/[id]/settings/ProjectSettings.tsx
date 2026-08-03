@@ -509,11 +509,14 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     try {
       setIsCreatingAzureContainer(true);
 
+      var containerName = azureBucketName ?? null
+
       const createdStorage = await createProjectAzureContainer(
         organization.organizationId as number,
         project.id as number,
-        azureBucketName,
-        storageFormData.existingContainer as boolean
+        storageFormData.existingContainer as boolean,
+        "azure_object",
+        containerName,
       );
 
       setExistingContainer(storageFormData.existingContainer as boolean)

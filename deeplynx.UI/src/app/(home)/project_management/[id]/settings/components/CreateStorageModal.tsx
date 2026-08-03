@@ -243,7 +243,7 @@ const CreateStorageModal = ({
                   <div className="form-control mb-2 w-full md:w-2/3">
                     <label className="label">
                       <span className="label-text">
-                        {t.translations.CONTAINER_NAME} *
+                        {t.translations.CONTAINER_NAME}
                       </span>
                     </label>
                     <input
