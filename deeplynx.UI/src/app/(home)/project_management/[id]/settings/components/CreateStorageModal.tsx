@@ -96,7 +96,7 @@ const CreateStorageModal = ({
       />
       <div className="modal" role="dialog">
         <div className="modal-box max-w-2xl">
-          <h3 className="text-lg font-bold mb-2">
+          <h3 className="text-lg font-bold mb-4">
             {t.translations.CREATE_STORAGE}
           </h3>
 
@@ -132,7 +132,7 @@ const CreateStorageModal = ({
             >
               <option value="filesystem">{t.translations.FILESYSTEM}</option>
               <option value="aws_s3">
-                {t.translations.AWS_S3} (Coming Soon)
+                {t.translations.AWS_S3} (t.translations.COMING_SOON)
               </option>
               <option value="azure_object">
                 {t.translations.AZURE_BLOB_STORAGE}
@@ -188,11 +188,10 @@ const CreateStorageModal = ({
                 <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
                 <div>
                   <p className="font-semibold">
-                    AWS S3 Configuration Coming Soon
+                    {t.translations.AWS_S3} (t.translations.COMING_SOON)
                   </p>
                   <p className="text-sm">
-                    The backend configuration for AWS S3 storage is currently
-                    being finalized.
+                    {t.translations.BACKEND_CONFIG_AWS}
                   </p>
                 </div>
               </div>
@@ -238,22 +237,13 @@ const CreateStorageModal = ({
                       </p>
                     </div>
 
-                    <button
-                      className="btn btn-primary btn-sm shrink-0"
-                      onClick={onCreateFromProjectName}
-                      disabled={isCreatingFromProjectName}
-                    >
-                      {isCreatingFromProjectName && (
-                        <span className="loading loading-spinner loading-xs" />
-                      )}
-                      {t.translations.CREATE_PROJECT_CONTAINER}
-                    </button>
+
                   </div>
 
                   <div className="form-control mb-2 w-full md:w-2/3">
                     <label className="label">
                       <span className="label-text">
-                        {t.translations.CONTAINER_NAME}
+                        {t.translations.CONTAINER_NAME} *
                       </span>
                     </label>
                     <input
@@ -268,7 +258,7 @@ const CreateStorageModal = ({
                   {/* Existing Container Checkbox */}
                   <div className="form-control mb-2 w-full md:w-2/3">
                     <label className="cursor-pointer label flex items-center gap-2">
-                      <span className="label-text">Use Existing Container</span>
+                      <span className="label-text">{t.translations.USE_EXISTING_CONTAINER}</span>
                       <input
                         type="checkbox"
                         className="checkbox checkbox-primary"
@@ -337,13 +327,24 @@ const CreateStorageModal = ({
                       />
                     </label>
                   </div>
+
+                  <button
+                    className="btn btn-primary btn-sm shrink-0"
+                    onClick={onCreateFromProjectName}
+                    disabled={isCreatingFromProjectName}
+                  >
+                    {isCreatingFromProjectName && (
+                      <span className="loading loading-spinner loading-xs" />
+                    )}
+                    {t.translations.CREATE_PROJECT_CONTAINER}
+                  </button>
                 </div>
               )}
 
 
               <button
                 type="button"
-                className="btn btn-ghost btn-sm w-full text-primary"
+                className="btn btn-ghost btn-sm w-full text-primary mb-4"
                 onClick={() => setIsManualSectionOpen(!isManualSectionOpen)}
               >
                 {t.translations.CONNECT_STORAGE_MANUALLY_INSTEAD}
@@ -391,7 +392,7 @@ const CreateStorageModal = ({
               {/* Existing Container Checkbox */}
               <div className="form-control mb-4 w-full md:w-2/3">
                 <label className="cursor-pointer label flex items-center gap-2">
-                  <span className="label-text">Use Existing Container</span>
+                  <span className="label-text">{t.translations.USE_EXISTING_CONTAINER}</span>
                   <input
                     type="checkbox"
                     className="checkbox checkbox-primary"

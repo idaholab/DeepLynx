@@ -218,7 +218,7 @@ public class FileAzureBusiness : IFileBusiness
 
         var newObjectStorageDto = new CreateObjectStorageRequestDto
         {
-            Name = containerName + "-" + Guid.NewGuid(),
+            Name = ContainerName.UniqueContainerNameFromString(containerName),
             Config = new ObjectStorageConfigDto
             {
                 AzureObjectConfig = new AzureObjectConfigDto
