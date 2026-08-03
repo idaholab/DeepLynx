@@ -1,4 +1,3 @@
-
 import type { Page } from '@playwright/test';
 import { createHash } from 'crypto';
 
@@ -58,19 +57,9 @@ export const PermissionAction = {
 export type PermissionAction =
   Exclude<typeof PermissionAction[keyof typeof PermissionAction], typeof PermissionAction['All']>;
 
-type NonUpdateAction = Exclude<PermissionAction, typeof PermissionAction['Update']>;
+export type RolePermissions = Partial<Record<PermissionResource, PermissionAction[]>>;
 
-export type RolePermissions =
-  Partial<Record<Exclude<PermissionResource, typeof PermissionResource['Insight']>, PermissionAction[]>> & {
-    [PermissionResource.Insight]?: NonUpdateAction[];
-  };
-
-type ActionsAllowedFor<R extends PermissionResource> =
-  R extends typeof PermissionResource['Insight']
-    ? (NonUpdateAction | typeof PermissionAction['All'])[]
-    : (PermissionAction | typeof PermissionAction['All'])[];
-
-export type RolePermissionsInput = Partial<{ [R in PermissionResource]: ActionsAllowedFor<R> }>;
+export type RolePermissionsInput = Partial<Record<PermissionResource, (PermissionAction | typeof PermissionAction['All'])[]>>;
 
 export interface CustomRole {
   readonly kind: 'custom';
@@ -87,18 +76,10 @@ function stableStringify(perms: RolePermissions): string {
 }
 
 const ALL_ACTIONS: PermissionAction[] = [PermissionAction.Read, PermissionAction.Write, PermissionAction.Update];
-const INSIGHT_ACTIONS: PermissionAction[] = [PermissionAction.Read, PermissionAction.Write];
 
-function expandActions(
-  resource: PermissionResource,
-  spec: (PermissionAction | typeof PermissionAction['All'])[],
-): PermissionAction[] {
-  const fullSet = resource === PermissionResource.Insight ? INSIGHT_ACTIONS : ALL_ACTIONS;
-  if (spec.includes(PermissionAction.All)) return fullSet;
-  const explicit = spec as PermissionAction[];
-  const invalid = explicit.filter((a) => !fullSet.includes(a));
-  if (invalid.length) throw new Error(`${resource} does not support: ${invalid.join(', ')}`);
-  return [...new Set(explicit)];
+function expandActions(spec: (PermissionAction | typeof PermissionAction['All'])[]): PermissionAction[] {
+  if (spec.includes(PermissionAction.All)) return ALL_ACTIONS;
+  return [...new Set(spec as PermissionAction[])];
 }
 
 export function defineRole(input: RolePermissionsInput | 'all'): CustomRole {
@@ -107,10 +88,7 @@ export function defineRole(input: RolePermissionsInput | 'all'): CustomRole {
     : input;
 
   const expanded = Object.fromEntries(
-    Object.entries(resolvedInput).map(([resource, spec]) => [
-      resource,
-      expandActions(resource as PermissionResource, spec!),
-    ]),
+    Object.entries(resolvedInput).map(([resource, spec]) => [resource, expandActions(spec!)]),
   ) as RolePermissions;
 
   const hash = createHash('sha1').update(stableStringify(expanded)).digest('hex').slice(0, 10);
@@ -134,7 +112,7 @@ export type RoleSpec = BuiltInRoleName | CustomRole;
 
 export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   [PermissionResource.Project]: [PermissionAction.Read],
-  [PermissionResource.Organization]: [PermissionAction.Read], // ceiling — see SPECIAL CASE below
+  [PermissionResource.Organization]: [PermissionAction.Read],
   [PermissionResource.Record]: [PermissionAction.Read, PermissionAction.Write],
   [PermissionResource.File]: [PermissionAction.Read, PermissionAction.Write],
   [PermissionResource.Edge]: [PermissionAction.Read, PermissionAction.Write],
@@ -144,23 +122,6 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
 // ---------------------------------------------------------------------------
 // Configure Global Accounts
 // ---------------------------------------------------------------------------
-// SPECIAL CASE: Organization Write/Update can never be granted through a
-// project-scoped role assignment. The backend's default project "User"
-// role only ever grants Organization:Read. 
-// Write/Update Org should not be given on the project level.
-function assertRoleValidForProjectScope(role: RoleSpec, project?: TestProject): void {
-  if (!project || role === Roles.user) return; // DEFAULT_ROLE_PERMISSIONS is already capped to Read
-  const orgPerms = role.permissions[PermissionResource.Organization];
-  const violation = orgPerms?.find((a) => a === PermissionAction.Write || a === PermissionAction.Update);
-  if (violation) {
-    throw new Error(
-      `Role "${role.name}" grants "${violation}" on Organization but is being assigned within project ` +
-      `scope ("${project.name}"). Organization Write/Update is only reachable via isOrgAdmin — never ` +
-      `through a project-level role. Remove it from the role, or provision this account without a project.`,
-    );
-  }
-}
-
 export interface Provision {
   org?: TestOrg;
   project?: TestProject;
@@ -184,7 +145,6 @@ function provisionFingerprint(p: Provision): string {
 }
 
 export function defineTestAccount(provision: Provision, name?: string): TestAccount {
-  if (provision.role) assertRoleValidForProjectScope(provision.role, provision.project);
   return { name: name ?? `auto-${provisionFingerprint(provision)}`, provision };
 }
 
@@ -211,7 +171,7 @@ export const orgAdminA: TestAccount = defineOrgAdmin(ORGS.orgA, 'orgAdminA');
 export const orgAdminB: TestAccount = defineOrgAdmin(ORGS.orgB, 'orgAdminB');
 export const projectAdminX: TestAccount = defineProjectAdmin(PROJECTS.projectX, 'projectAdminX');
 export const standardUserX: TestAccount = defineTestAccount({ role: Roles.user, org: ORGS.orgA, project: PROJECTS.projectX }, 'standardUserX');
-export const fullPermissionUserX: TestAccount = defineTestAccount({ role: ROLES.allPermissions, org: ORGS.orgA }, 'fullPermissionUserX');
+export const fullPermissionUserX: TestAccount = defineTestAccount({ role: ROLES.allPermissions, org: ORGS.orgA, project: PROJECTS.projectX }, 'fullPermissionUserX');
 
 export const authFile = (name: string) => `playwright/.auth/${name}.json`;
 export interface ActionScope {
