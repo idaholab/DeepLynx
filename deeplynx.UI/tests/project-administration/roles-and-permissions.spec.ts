@@ -1,10 +1,47 @@
-import { test, expect, APIRequestContext, APIResponse, Page } from "@playwright/test";
-import { seedAndNavigateToProject } from "../helpers/seed";
+import { test, expect, APIRequestContext, Page } from "../fixtures";
+import { sysAdmin } from "../deeplynx-config";
 import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
 
+type Organization = {
+  id: number;
+  name: string;
+};
+
+let orgId: string;
+
+// Resolves an org name (e.g. "PW Org A") to its numeric ID (as a string,
+// to match how projectId/URLs are handled throughout this file). We can
+// no longer assume orgId === "1" now that fixtures let tests run as
+// accounts scoped to arbitrary orgs.
+async function getOrgIdByName(
+  request: APIRequestContext, orgName: string
+): Promise<string> {
+  const BASE_URL = 'http://localhost:5095/api/v1';
+  const res = await request.fetch(`${BASE_URL}/organizations`);
+  if (!res.ok()) throw new Error(`Failed to fetch organizations: ${res.status()}`);
+  const orgs: Organization[] = await res.json();
+  const match = orgs.find((org) => org.name === orgName);
+  if (!match) {
+    throw new Error(`Could not find organization named "${orgName}" in ${JSON.stringify(orgs)}`);
+  }
+  return String(match.id);
+}
+
 test.describe("Roles & Permissions", () => {
-  test.beforeEach(async ({ page }) => {
-    await seedAndNavigateToProject(page);
+  test.use({
+    actingUser: sysAdmin,
+    actingOrg: "PW Org A",
+    actingProject: "PW Project X",
+  });
+
+  test.beforeEach(async ({ page, request }) => {
+    await page.getByTestId("project-select").click();
+
+    await page
+      .getByRole("button", { name: "PW Project X", exact: true })
+      .click();
+
+    await expect(page).toHaveURL(/\/project\/\d+/);
     // Navigate to Project Settings via sidebar
     await page.locator("aside a", { hasText: "Project Settings" }).click();
     await page.waitForURL(/\/project_management\/\d+/);
@@ -19,11 +56,11 @@ test.describe("Roles & Permissions", () => {
   });
 
   async function getNonUserRole(
-    request : APIRequestContext, projectId: string | undefined, page: Page
-  ){
+    request: APIRequestContext, projectId: string | undefined, page: Page, orgId: string,
+  ) {
     if (!projectId) return;
     const BASE_URL = 'http://localhost:5095/api/v1';
-    const getAllUrl = `${BASE_URL}/organizations/1/projects/${projectId}/roles?hideArchived=true`;
+    const getAllUrl = `${BASE_URL}/organizations/${orgId}/projects/${projectId}/roles?hideArchived=true`;
     try {
       let res = await request.fetch(getAllUrl);
       if (!res.ok()) throw new Error(`Failed to fetch roles: ${res.status()}`);
@@ -38,7 +75,7 @@ test.describe("Roles & Permissions", () => {
       }
       // return non user
       return (roles.find((role: RoleResponseDto) => role.name !== "User")).name;
-    } catch(err) {
+    } catch (err) {
       console.warn(`Error getting different role.`, err);
       return undefined;
     }
@@ -173,8 +210,10 @@ test.describe("Roles & Permissions", () => {
       // make sure a second role is set up
       const url = new URL(page.url());
       const projectId = url.pathname.split('/').pop();
+      orgId = await getOrgIdByName(request, "PW Org A");
+
       // Click a different role than "User" in the sidebar (role buttons contain Source: text)
-      const nonUserRole = await getNonUserRole(request, projectId, page);
+      const nonUserRole = await getNonUserRole(request, projectId, page, orgId);
       await page.getByRole('button', { name: nonUserRole }).click();
       // The right panel heading (h2) should not show "User"
       const detailPanel = page.locator(".flex-1.card");
@@ -379,10 +418,10 @@ test.describe("Roles & Permissions", () => {
     let testRoleName: string;
     const pendingRoleNames: string[] = [];
 
-    test.beforeEach(async ({}, testInfo) => {
-      testRoleName = `E2E Role w${testInfo.workerIndex}-${testInfo.testId}r${testInfo.retry}-${crypto.randomUUID().slice(0,8)}`;
+    test.beforeEach(async ({ }, testInfo) => {
+      testRoleName = `E2E Role w${testInfo.workerIndex}-${testInfo.testId}r${testInfo.retry}-${crypto.randomUUID().slice(0, 8)}`;
     });
-    
+
     test.afterEach(async ({ page }) => {
       // clean up the roles that were created
       for (const roleName of pendingRoleNames) {
