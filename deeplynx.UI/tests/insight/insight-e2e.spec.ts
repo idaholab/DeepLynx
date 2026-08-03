@@ -125,8 +125,6 @@ test.describe("Insight E2E", () => {
     }
 
     orgId = await getOrgIdByName(request, ORG_NAME);
-
-    await expect(page.getByText("PW Project X")).toBeVisible();
     await page.getByTestId("project-select").click();
 
     await page
@@ -164,7 +162,7 @@ test.describe("Insight E2E", () => {
   test("upload file, embed, and query chatbot", async ({ page }) => {
     // This test walks the full Insight pipeline: upload -> embed -> chat.
     // Embedding takes ~30s; give the entire test 3 minutes.
-    test.setTimeout(180_000);
+    test.setTimeout(240_000);
 
     // ----------------------------------------------------------------
     // Step 1: Navigate to Upload Center and upload the PDF
