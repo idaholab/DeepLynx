@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.Context;
@@ -166,7 +167,7 @@ public class ProjectBusiness : IProjectBusiness
 
         if (organization.CreateContainerPerProject)
         {
-            string containerName = UniqueContainerNameFromString(dto.Name);
+            string containerName = ContainerName.UniqueContainerNameFromString(dto.Name);
 
             var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
                 organizationId: organizationId,
@@ -223,7 +224,7 @@ public class ProjectBusiness : IProjectBusiness
 
 
     /// <summary>
-    ///     Uploads a Project Logo to the logos folder without creating a record
+    ///     Uploads a Project Logo
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
@@ -253,25 +254,67 @@ public class ProjectBusiness : IProjectBusiness
             throw new ArgumentException("File size exceeds the 5MB limit.");
 
         var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
-        if (objectStorage == null)
-            throw new Exception("Object storage not found or failed to decrypt.");
-
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId) ?? throw new Exception("Object storage not found or failed to decrypt.");
         if (objectStorage.Config == null)
             throw new Exception("Object storage config is null.");
+
+        if (objectStorage.Config.AzureObjectConfig != null)
+        {
+            var azureConfig = objectStorage.Config.AzureObjectConfig;
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureConnectionString))
+                throw new ArgumentException("Azure connection string is null or empty.");
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureContainerName))
+                throw new ArgumentException("Azure container name is null or empty.");
+
+            var baseFilePath = azureConfig.AzureFilePath ?? string.Empty;
+
+            if (!SanitizeFilePath.IsValidFilePath(baseFilePath))
+                throw new ArgumentException("Invalid Azure file path. Allowed characters are letters (a-z, A-Z), numbers (0-9), and '/'.");
+
+            var newLogoFileId = $"logo_{Guid.NewGuid()}";
+            var fileName = $"{newLogoFileId}.{fileExtension}";
+
+            var logosFolderPath = string.IsNullOrEmpty(baseFilePath)
+                ? $"organization_{organizationId}/project_{projectId}/logos"
+                : $"{baseFilePath.TrimEnd('/')}/project_{projectId}/logos";
+
+            var filePath = $"{logosFolderPath}/{fileName}";
+
+            var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+            await containerClient.CreateIfNotExistsAsync();
+
+            var blobClient = containerClient.GetBlobClient(filePath);
+
+            await using (var stream = logoFile.OpenReadStream())
+            {
+                await blobClient.UploadAsync(stream, overwrite: true);
+            }
+
+            var metadataBlobClient = containerClient.GetBlobClient($"{logosFolderPath}/active_logo.txt");
+            var activeLogoBytes = System.Text.Encoding.UTF8.GetBytes(fileName);
+
+            using (var ms = new MemoryStream(activeLogoBytes))
+            {
+                await metadataBlobClient.UploadAsync(ms, overwrite: true);
+            }
+
+            return blobClient.Uri.ToString();
+        }
 
         if (string.IsNullOrEmpty(objectStorage.Config.MountPath))
             throw new Exception("File system mount path not set in object storage.");
 
-        var logosFolderPath = Path.Combine(
+        var logosFolderPathFs = Path.Combine(
             objectStorage.Config.MountPath,
             $"org_{organizationId}",
             $"project_{projectId}",
             "logos");
 
-        Directory.CreateDirectory(logosFolderPath);
+        Directory.CreateDirectory(logosFolderPathFs);
 
-        var existingFiles = Directory.GetFiles(logosFolderPath)
+        var existingFiles = Directory.GetFiles(logosFolderPathFs)
             .OrderByDescending(File.GetLastWriteTime)
             .ToList();
 
@@ -299,17 +342,17 @@ public class ProjectBusiness : IProjectBusiness
             baseNumber = parsedNumber;
         }
 
-        var newLogoFileId = $"logo_{baseNumber + 1}";
-        var fileName = $"{newLogoFileId}.{fileExtension}";
-        var logoFilePath = Path.Combine(logosFolderPath, fileName);
+        var newLogoFileIdFs = $"logo_{baseNumber + 1}";
+        var fileNameFs = $"{newLogoFileIdFs}.{fileExtension}";
+        var logoFilePath = Path.Combine(logosFolderPathFs, fileNameFs);
 
         await using (var stream = new FileStream(logoFilePath, FileMode.Create))
         {
             await logoFile.CopyToAsync(stream);
         }
 
-        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
-        File.WriteAllText(metadataFilePath, fileName);
+        var metadataFilePath = Path.Combine(logosFolderPathFs, "active_logo.txt");
+        File.WriteAllText(metadataFilePath, fileNameFs);
 
         return logoFilePath;
     }
@@ -328,46 +371,90 @@ public class ProjectBusiness : IProjectBusiness
     {
         var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
-        if (objectStorage.Config.MountPath == null)
+
+        if (objectStorage.Config == null)
+            throw new Exception("Object storage config is null.");
+
+        if (objectStorage.Config.AzureObjectConfig != null)
         {
-            throw new Exception("File system mount path not set in object storage");
+            var azureConfig = objectStorage.Config.AzureObjectConfig;
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureConnectionString))
+                throw new ArgumentException("Azure connection string is null or empty.");
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureContainerName))
+                throw new ArgumentException("Azure container name is null or empty.");
+
+            var baseFilePath = azureConfig.AzureFilePath ?? string.Empty;
+
+            var logosFolderPath = string.IsNullOrEmpty(baseFilePath)
+                ? $"organization_{organizationId}/project_{projectId}/logos"
+                : $"{baseFilePath.TrimEnd('/')}/project_{projectId}/logos";
+
+            var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+
+            var metadataBlobClient = containerClient.GetBlobClient($"{logosFolderPath}/active_logo.txt");
+
+            if (!await metadataBlobClient.ExistsAsync())
+            {
+                return false;
+            }
+
+            var downloadResponse = await metadataBlobClient.DownloadContentAsync();
+            var activeLogoFileName = downloadResponse.Value.Content.ToString().Trim();
+
+            if (string.IsNullOrEmpty(activeLogoFileName))
+            {
+                return false;
+            }
+
+            var activeLogoBlobClient = containerClient.GetBlobClient($"{logosFolderPath}/{activeLogoFileName}");
+
+            if (!await activeLogoBlobClient.ExistsAsync())
+            {
+                return false;
+            }
+
+            await activeLogoBlobClient.DeleteAsync();
+
+            await metadataBlobClient.UploadAsync(
+                new MemoryStream([]),
+                overwrite: true);
+
+            return true;
         }
 
-        var logosFolderPath = Path.Combine(
+        if (string.IsNullOrEmpty(objectStorage.Config.MountPath))
+            throw new Exception("File system mount path not set in object storage.");
+
+        var logosFolderPathFs = Path.Combine(
             objectStorage.Config.MountPath,
             $"org_{organizationId}",
             $"project_{projectId}",
             "logos");
 
-        if (!Directory.Exists(logosFolderPath))
-        {
+        if (!Directory.Exists(logosFolderPathFs))
             throw new DirectoryNotFoundException($"Logos folder not found for project {projectId}");
-        }
 
-        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+        var metadataFilePath = Path.Combine(logosFolderPathFs, "active_logo.txt");
+
         if (!File.Exists(metadataFilePath))
-        {
             return false;
-        }
 
-        var activeLogoFileName = await File.ReadAllTextAsync(metadataFilePath);
-        activeLogoFileName = activeLogoFileName?.Trim();
+        var activeLogoFileNameFs = await File.ReadAllTextAsync(metadataFilePath);
+        activeLogoFileNameFs = activeLogoFileNameFs?.Trim();
 
-        if (string.IsNullOrEmpty(activeLogoFileName))
-        {
+        if (string.IsNullOrEmpty(activeLogoFileNameFs))
             return false;
-        }
 
-        var activeLogoFilePath = Path.Combine(logosFolderPath, activeLogoFileName);
+        var activeLogoFilePath = Path.Combine(logosFolderPathFs, activeLogoFileNameFs);
 
         if (!File.Exists(activeLogoFilePath))
-        {
             return false;
-        }
 
         File.Delete(activeLogoFilePath);
 
-        var remainingFiles = Directory.GetFiles(logosFolderPath).OrderByDescending(File.GetLastWriteTime).ToList();
+        var remainingFiles = Directory.GetFiles(logosFolderPathFs).OrderByDescending(File.GetLastWriteTime).ToList();
 
         if (remainingFiles.Count != 0)
         {
@@ -376,10 +463,7 @@ public class ProjectBusiness : IProjectBusiness
         }
         else
         {
-            if (File.Exists(metadataFilePath))
-            {
-                File.Delete(metadataFilePath);
-            }
+            File.WriteAllText(metadataFilePath, string.Empty);
         }
 
         return true;
@@ -400,23 +484,73 @@ public class ProjectBusiness : IProjectBusiness
     {
         var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
-        if (objectStorage.Config.MountPath == null)
+
+        if (objectStorage.Config == null)
+            throw new Exception("Object storage config is null.");
+
+        if (objectStorage.Config.AzureObjectConfig != null)
         {
-            throw new Exception("File system mount path not set in object storage");
+            var azureConfig = objectStorage.Config.AzureObjectConfig;
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureConnectionString))
+                throw new ArgumentException("Azure connection string is null or empty.");
+
+            if (string.IsNullOrWhiteSpace(azureConfig.AzureContainerName))
+                throw new ArgumentException("Azure container name is null or empty.");
+
+            var baseFilePath = azureConfig.AzureFilePath ?? string.Empty;
+
+            var logosFolderPath = string.IsNullOrEmpty(baseFilePath)
+                ? $"organization_{organizationId}/project_{projectId}/logos"
+                : $"{baseFilePath.TrimEnd('/')}/project_{projectId}/logos";
+
+            var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+
+            var metadataBlobClient = containerClient.GetBlobClient($"{logosFolderPath}/active_logo.txt");
+
+            if (await metadataBlobClient.ExistsAsync())
+            {
+                var downloadResponse = await metadataBlobClient.DownloadContentAsync();
+                var activeLogoFileName = downloadResponse.Value.Content.ToString().Trim();
+
+                if (!string.IsNullOrEmpty(activeLogoFileName))
+                {
+                    var activeLogoBlobClient = containerClient.GetBlobClient($"{logosFolderPath}/{activeLogoFileName}");
+
+                    if (await activeLogoBlobClient.ExistsAsync())
+                    {
+                        var stream = await activeLogoBlobClient.OpenReadAsync();
+                        return (stream, activeLogoBlobClient.Uri.ToString());
+                    }
+                }
+            }
+
+            await foreach (var blobItem in containerClient.GetBlobsAsync(prefix: logosFolderPath))
+            {
+                if (blobItem.Name.EndsWith("active_logo.txt"))
+                    continue;
+
+                var blobClient = containerClient.GetBlobClient(blobItem.Name);
+                var stream = await blobClient.OpenReadAsync();
+                return (stream, blobClient.Uri.ToString());
+            }
+
+            return null;
         }
 
-        var logosFolderPath = Path.Combine(
+        if (string.IsNullOrEmpty(objectStorage.Config.MountPath))
+            throw new Exception("File system mount path not set in object storage.");
+
+        var logosFolderPathFs = Path.Combine(
             objectStorage.Config.MountPath,
             $"org_{organizationId}",
             $"project_{projectId}",
             "logos");
 
-        if (!Directory.Exists(logosFolderPath))
-        {
+        if (!Directory.Exists(logosFolderPathFs))
             return null;
-        }
 
-        var metadataFilePath = Path.Combine(logosFolderPath, "active_logo.txt");
+        var metadataFilePath = Path.Combine(logosFolderPathFs, "active_logo.txt");
         if (File.Exists(metadataFilePath))
         {
             var activeLogoFileName = await File.ReadAllTextAsync(metadataFilePath);
@@ -424,7 +558,7 @@ public class ProjectBusiness : IProjectBusiness
 
             if (!string.IsNullOrEmpty(activeLogoFileName))
             {
-                var activeLogoFilePath = Path.Combine(logosFolderPath, activeLogoFileName);
+                var activeLogoFilePath = Path.Combine(logosFolderPathFs, activeLogoFileName);
                 if (File.Exists(activeLogoFilePath))
                 {
                     var activeFileStream = new FileStream(activeLogoFilePath, FileMode.Open, FileAccess.Read);
@@ -433,11 +567,9 @@ public class ProjectBusiness : IProjectBusiness
             }
         }
 
-        var files = Directory.GetFiles(logosFolderPath).OrderByDescending(File.GetLastWriteTime).ToList();
+        var files = Directory.GetFiles(logosFolderPathFs).OrderByDescending(File.GetLastWriteTime).ToList();
         if (files.Count == 0)
-        {
             return null;
-        }
 
         var mostRecentFile = files.First();
         var fileStream = new FileStream(mostRecentFile, FileMode.Open, FileAccess.Read);
@@ -1143,34 +1275,45 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="userId">ID of the user performing the operation.</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs.</param>
     /// <param name="projectId">The ID of the project to create the container for.</param>
+    /// <param name="containerName">The name of the container</param>
+    /// <param name="existingContainer">A bool for an existing container</param>
     /// <returns>The newly created object storage</returns>
     public async Task<ObjectStorageResponseDto?> CreateProjectAzureContainer(
-        long userId, long organizationId, long projectId)
+    long userId, long organizationId, long projectId, string? containerName, bool existingContainer = false)
     {
         var project = await _context.Projects
-            .Where(p => p.Id == projectId
-                        && p.OrganizationId == organizationId)
+            .Where(p => p.Id == projectId && p.OrganizationId == organizationId)
             .FirstOrDefaultAsync();
 
         if (project == null || project.IsArchived)
             throw new KeyNotFoundException($"Project with id {projectId} not found or is archived");
 
-        // TODO: pass in a custom name as an option instead of using project name
-        // https://nstinl.atlassian-us-gov-mod.net/browse/DL-2739
-        string containerName = UniqueContainerNameFromString(project.Name);
+        string containerNameToUse;
 
-        // CreateContainer will throw if there is no org-level azure storage
+        if (!string.IsNullOrWhiteSpace(containerName))
+        {
+            containerNameToUse = !existingContainer
+                ? ContainerName.UniqueContainerNameFromString(containerName)
+                : containerName;
+        }
+        else
+        {
+            containerNameToUse = ContainerName.UniqueContainerNameFromString(project.Name);
+        }
+
         var newObjectStorageDto = await _fileAzureBusiness.CreateContainer(
-                organizationId: organizationId,
-                containerName: containerName,
-                connectionString: null,
-                isDefault: false);
+            organizationId: organizationId,
+            containerName: containerNameToUse,
+            connectionString: null,
+            isDefault: false,
+            existingContainer: existingContainer);
 
         return await _objectStorageBusiness.CreateObjectStorage(
             currentUserId: userId,
             organizationId: organizationId,
             projectId: projectId,
-            dto: newObjectStorageDto);
+            dto: newObjectStorageDto,
+            createContainer: false);
     }
 
     // PRIVATE HELPER FUNCTIONS //
@@ -1239,33 +1382,5 @@ public class ProjectBusiness : IProjectBusiness
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
             ?? throw new KeyNotFoundException("Default object storage not found");
         return defaultObjectStorage.Id;
-    }
-
-    /// <summary>
-    ///     Create an azure-acceptable container name based on an input string
-    /// </summary>
-    /// <param name="inputString">The input string on which the unique name will be based</param>
-    /// <returns></returns>
-    private string UniqueContainerNameFromString(string inputString)
-    {
-        // max length based on the azure container name constraints found at the link below
-        // https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names
-        const int maxContainerNameLength = 63;
-        const int guidLength = 36;
-        const int separatorLength = 1;
-        int maxInputStringLength = maxContainerNameLength - guidLength - separatorLength;
-
-        string truncatedInputString = inputString.Length > maxInputStringLength
-            ? inputString[..maxInputStringLength]
-            : inputString;
-
-        truncatedInputString = new string(truncatedInputString
-            .ToLower()
-            .Where(c => char.IsLetterOrDigit(c) || c == '-')
-            .ToArray());
-
-        string guid = Guid.NewGuid().ToString();
-
-        return $"{truncatedInputString}-{guid}".ToLower();
     }
 }

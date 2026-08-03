@@ -88,7 +88,7 @@ public class FileAzureBusiness : IFileBusiness
 
         var baseFilePath = azureConfig.AzureFilePath ?? string.Empty;
 
-        if (!IsValidFilePath(baseFilePath))
+        if (!SanitizeFilePath.IsValidFilePath(baseFilePath))
             throw new ArgumentException("Invalid Azure file path. Allowed characters are letters (a-z, A-Z), numbers (0-9), and '/'.");
 
         var filePath = string.IsNullOrEmpty(baseFilePath)
@@ -218,13 +218,13 @@ public class FileAzureBusiness : IFileBusiness
 
         var newObjectStorageDto = new CreateObjectStorageRequestDto
         {
-            Name = containerName,
+            Name = ContainerName.UniqueContainerNameFromString(containerName),
             Config = new ObjectStorageConfigDto
             {
                 AzureObjectConfig = new AzureObjectConfigDto
                 {
                     AzureConnectionString = effectiveConnectionString,
-                    AzureContainerName = containerName
+                    AzureContainerName = containerName,
                 }
             },
             Default = isDefault
@@ -1182,12 +1182,6 @@ public class FileAzureBusiness : IFileBusiness
     private ObjectStorageConfigDto DeserializeAndDecryptConfig(string encryptedConfig)
     {
         return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
-    }
-
-    private static bool IsValidFilePath(string filePath)
-    {
-        var filePathRegex = new Regex(@"^[a-zA-Z0-9/]*$");
-        return filePathRegex.IsMatch(filePath);
     }
 }
 
