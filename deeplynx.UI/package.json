@@ -30,7 +30,7 @@
     "graphology-types": "^0.24.8",
     "jsonwebtoken": "9.0.2",
     "motion": "^12.18.1",
-    "next": "16.2.10",
+    "next": "^16.2.11",
     "next-auth": "5.0.0-beta.30",
     "papaparse": "^5.5.3",
     "react": "19.2.7",
