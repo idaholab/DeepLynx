@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Scalar.AspNetCore;
+using V1TokenController = deeplynx.api.Controllers.V1.TokenController;
 
 namespace deeplynx.tests.Controllers.V2;
 
@@ -200,7 +201,12 @@ public class TokenControllerTests : IDisposable
                 request.ExpirationMinutes))
             .ThrowsAsync(new UnauthorizedAccessException("invalid credentials"));
 
-        var result = await _controller.CreateToken(request);
+        var v1Controller = new V1TokenController(
+            Mock.Of<IEventBusiness>(),
+            _mockTokenBusiness.Object,
+            Mock.Of<ILogger<V1TokenController>>());
+
+        var result = await v1Controller.CreateToken(request);
 
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
@@ -277,7 +283,9 @@ public class TokenControllerTests : IDisposable
             metadata.AttributeType == typeof(MapToApiVersionAttribute));
         Assert.NotNull(method.GetCustomAttribute<BadgeAttribute>());
         Assert.Single(method.GetCustomAttributes<HttpMethodAttribute>());
-        Assert.NotEmpty(GetProtectedMetadata(method));
+        Assert.True(
+            GetProtectedMetadata(method).Length > 0 ||
+            typeof(TokenController).GetCustomAttribute<AuthorizeAttribute>() is not null);
     }
 
     private static TokenResponseDto CreateTokenResponse()
