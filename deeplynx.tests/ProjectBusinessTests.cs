@@ -17,12 +17,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
+using deeplynx.helpers.BigData;
 
 namespace deeplynx.tests;
 
 [Collection("Test Suite Collection")]
 public class ProjectBusinessTests : IntegrationTestBase
 {
+    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "ProjectBusinessTests");
     private ClassBusiness _classBusiness = null!;
     private FileAzureBusiness _fileAzureBusiness;
     private UserBusiness _userBusiness = null!;
@@ -34,7 +38,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
-    private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<ILogger<AdminService>> _adminServiceLogger;
     private INotificationBusiness _notificationBusiness = null!;
@@ -47,9 +50,25 @@ public class ProjectBusinessTests : IntegrationTestBase
     private ProjectBusiness _projectBusiness = null!;
     private RoleBusiness _roleBusiness = null!;
     private Mock<IBulkCopyUpsertExecutor> _bulkCopyUpsertExecutor = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness;
+    private RecordBusiness _recordBusiness;
+    private TagBusiness _tagBusiness = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private SensitivityLabelService _sensitivityLabelService = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private FileBusiness _fileBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private OlapBusiness _olapBusiness = null!;
+    private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private long cid; // class ID
     private long did; // datasource ID
     private long os1;
+    private long osid;
     private long gid; // group ID
     private long gid2;
     private long oid; // org IDs
@@ -95,7 +114,6 @@ public class ProjectBusinessTests : IntegrationTestBase
         _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _logger = new Mock<ILogger<ProjectRolePermissionService>>();
         _permissionService = new ProjectRolePermissionService(Context, _logger.Object);
-        _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockEdgeBusiness = new Mock<IEdgeBusiness>();
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
@@ -105,15 +123,60 @@ public class ProjectBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(
             Context, _mockEdgeBusiness.Object,
-            _mockRecordBusiness.Object, _eventBusiness, _permissionService, _mockAdminService.Object);
+            _recordBusiness, _eventBusiness, _permissionService, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
-            Context, _mockRecordBusiness.Object,
+            Context, _recordBusiness,
             _mockRelationshipBusiness.Object, _eventBusiness, _permissionService, _adminService);
         _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(realFileFilesystemBusiness);
+
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
-            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _fileAzureBusiness);
+            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _fileAzureBusiness, _fileBusinessFactory.Object);
+
+        _relationshipBusiness = new Mock<IRelationshipBusiness>();
+
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
+
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _insightBusiness = new Mock<IInsightBusiness>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
+        );
     }
 
     #region GetProjectStats Tests
