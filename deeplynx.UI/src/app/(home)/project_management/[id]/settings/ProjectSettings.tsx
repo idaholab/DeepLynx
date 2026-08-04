@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { v4 as uuidv4 } from 'uuid';
 import toast from "react-hot-toast";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
@@ -428,10 +429,13 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         toast.error(t.translations.ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED);
         return;
       }
+      const containerName = storageFormData.existingContainer
+        ? azureBucketName
+        : uniqueContainerNameFromString(azureBucketName);
       config = {
         azureObjectConfig: {
           azureConnectionString: azureEndpoint,
-          azureContainerName: azureBucketName,
+          azureContainerName: containerName,
           existingContainer: storageFormData.existingContainer || false
         },
       };
@@ -454,6 +458,17 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         dto,
         storageFormData.default,
       );
+
+      const projectRequestDto: UpdateProjectRequestDto = {
+        organizationId: organization.organizationId as number,
+        filePath: storageFormData.config.AzureObjectConfig?.AzureFilePath
+      };
+
+      await updateProject(
+        organization.organizationId as number,
+        project.id as number,
+        projectRequestDto
+      )
 
       setExistingContainer(storageFormData.existingContainer as boolean)
 
@@ -509,7 +524,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     try {
       setIsCreatingAzureContainer(true);
 
-      var containerName = azureBucketName ?? null
+      var containerName = uniqueContainerNameFromString(azureBucketName) ?? null
 
       const createdStorage = await createProjectAzureContainer(
         organization.organizationId as number,
@@ -518,6 +533,17 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         "azure_object",
         containerName,
       );
+
+      const projectRequestDto: UpdateProjectRequestDto = {
+        organizationId: organization.organizationId as number,
+        filePath: storageFormData.config.AzureObjectConfig?.AzureFilePath
+      };
+
+      await updateProject(
+        organization.organizationId as number,
+        project.id as number,
+        projectRequestDto
+      )
 
       setExistingContainer(storageFormData.existingContainer as boolean)
 
@@ -714,6 +740,28 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         </div>
       </div>
     );
+  }
+
+
+  function uniqueContainerNameFromString(inputString: string): string {
+    const maxContainerNameLength = 63;
+    const guidLength = 36;
+    const separatorLength = 1;
+    const maxInputStringLength = maxContainerNameLength - guidLength - separatorLength;
+
+    let truncatedInputString = inputString.length > maxInputStringLength
+      ? inputString.substring(0, maxInputStringLength)
+      : inputString;
+
+    truncatedInputString = truncatedInputString
+      .toLowerCase()
+      .split('')
+      .filter(c => /[a-z0-9-]/.test(c))
+      .join('');
+
+    const guid = uuidv4();
+
+    return `${truncatedInputString}-${guid}`.toLowerCase();
   }
 
   return (

@@ -169,71 +169,65 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         using var transaction = await _context.Database.BeginTransactionAsync();
 
-        try
+        if (hasAzure && createContainer && !dto.Config.AzureObjectConfig.ExistingContainer)
         {
-            var newObjectStorage = new ObjectStorage
+            string containerName;
+            if (projectId == null)
             {
-                Name = dto.Name,
-                Type = type,
-                Default = dto.Default,
-                ProjectId = projectId,
-                OrganizationId = organizationId,
-                ConfigEncrypted = SerializeAndEncryptConfig(dto.Config),
-                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-                LastUpdatedBy = currentUserId
-            };
-
-            _context.ObjectStorages.Add(newObjectStorage);
-            await _context.SaveChangesAsync();
-
-            if (hasAzure && createContainer)
+                containerName = ContainerName.UniqueContainerNameFromString(dto.Config.AzureObjectConfig?.AzureContainerName ?? "container");
+            }
+            else
             {
-                string containerName;
-                if (projectId == null)
-                {
-                    containerName = ContainerName.UniqueContainerNameFromString(dto.Config.AzureObjectConfig?.AzureContainerName ?? "container");
-                }
-                else
-                {
-                    containerName = dto.Config.AzureObjectConfig?.AzureContainerName ?? ContainerName.UniqueContainerNameFromString("container");
-                }
-
-                var container = await _fileAzureBusiness.CreateContainer(
-                    organizationId: organizationId,
-                    containerName: containerName,
-                    connectionString: dto.Config.AzureObjectConfig?.AzureConnectionString,
-                    existingContainer: dto.Config.AzureObjectConfig.ExistingContainer);
+                containerName = dto.Config.AzureObjectConfig?.AzureContainerName ?? ContainerName.UniqueContainerNameFromString("container");
             }
 
-            // reset the defaults at the project or org level
-            if (dto.Default)
-            {
-                if (projectId.HasValue)
-                    await ResetProjectDefaults(projectId.Value, newObjectStorage.Id);
-                else
-                    await ResetOrganizationDefaults(organizationId, newObjectStorage.Id);
-            }
+            dto.Config.AzureObjectConfig?.AzureContainerName = containerName;
 
-            await transaction.CommitAsync();
-
-            return new ObjectStorageResponseDto
-            {
-                Id = newObjectStorage.Id,
-                Name = newObjectStorage.Name,
-                Type = newObjectStorage.Type,
-                ProjectId = newObjectStorage.ProjectId,
-                OrganizationId = newObjectStorage.OrganizationId,
-                Default = newObjectStorage.Default,
-                LastUpdatedAt = newObjectStorage.LastUpdatedAt,
-                LastUpdatedBy = newObjectStorage.LastUpdatedBy,
-                IsArchived = newObjectStorage.IsArchived
-            };
+            await _fileAzureBusiness.CreateContainer(
+                organizationId: organizationId,
+                containerName: containerName,
+                connectionString: dto.Config.AzureObjectConfig?.AzureConnectionString,
+                existingContainer: dto.Config.AzureObjectConfig.ExistingContainer);
         }
-        catch
+        var newObjectStorage = new ObjectStorage
         {
-            await transaction.RollbackAsync();
-            throw new Exception("Unable to create object storage");
+            Name = dto.Name,
+            Type = type,
+            Default = dto.Default,
+            ProjectId = projectId,
+            OrganizationId = organizationId,
+            ConfigEncrypted = SerializeAndEncryptConfig(dto.Config),
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = currentUserId
+        };
+
+        _context.ObjectStorages.Add(newObjectStorage);
+        await _context.SaveChangesAsync();
+
+        // reset the defaults at the project or org level
+        if (dto.Default)
+        {
+            if (projectId.HasValue)
+                await ResetProjectDefaults(projectId.Value, newObjectStorage.Id);
+            else
+                await ResetOrganizationDefaults(organizationId, newObjectStorage.Id);
         }
+
+
+        await transaction.CommitAsync();
+
+        return new ObjectStorageResponseDto
+        {
+            Id = newObjectStorage.Id,
+            Name = newObjectStorage.Name,
+            Type = newObjectStorage.Type,
+            ProjectId = newObjectStorage.ProjectId,
+            OrganizationId = newObjectStorage.OrganizationId,
+            Default = newObjectStorage.Default,
+            LastUpdatedAt = newObjectStorage.LastUpdatedAt,
+            LastUpdatedBy = newObjectStorage.LastUpdatedBy,
+            IsArchived = newObjectStorage.IsArchived
+        };
     }
 
     /// <summary>
