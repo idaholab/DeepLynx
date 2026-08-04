@@ -9,9 +9,9 @@ URLs:
 - `NEXUS_API_URL` for `deeplynx.mcp`
 
 The UI also accepts host-only and legacy versioned base URLs during migration.
-An individual UI service can explicitly override the configured default when
-its response contract has moved to another version. The MCP consumer remains
-pinned to v1.
+All UI services use the same configured version. The backend is responsible for
+exposing a complete API surface at that version, including unchanged behavior.
+The MCP consumer remains pinned to v1.
 
 ## UI configuration
 
@@ -36,16 +36,22 @@ image. `BACKEND_BASE_URL` remains server-only and may use an internal hostname.
 
 | Consumer | Current target | Decision and rationale |
 | --- | --- | --- |
-| Next.js UI proxy and client services | Configurable; v1 fallback | `NEXT_PUBLIC_API_VERSION` selects the default. Services may explicitly select another validated version when adopting its response contract. The shared fetch and Axios paths can read legacy error packets and RFC 7807 `detail`, `title`, and validation `errors`. |
+| Next.js UI proxy and client services | Configurable; v1 fallback | `NEXT_PUBLIC_API_VERSION` selects one version for the entire UI deployment. The backend exposes changed and unchanged endpoints beneath that version. The shared fetch and Axios paths can read legacy error packets and RFC 7807 `detail`, `title`, and validation `errors`. |
 | `deeplynx.mcp` tools | v1 | Pinned in `AuthenticatedHttpClientFactory`. MCP tools keep their current v1 response/error behavior. Moving to v2 requires separately adopting and testing RFC 7807 ProblemDetails handling. |
 
 The API server's configured default version is irrelevant to these consumers:
 the UI always composes an explicit `/api/{version}` segment, and every relative
 MCP tool path resolves beneath an `HttpClient.BaseAddress` ending in `/api/v1/`.
 
+Browser services share one Axios client in
+`deeplynx.UI/src/app/lib/client_service/api.ts`. It follows the deployment-wide
+configured version and owns the authentication, single-flight session lookup,
+and error interceptors.
+
 ## Cutover rule
 
-Moving a UI service to v2 requires an explicit service override or a reviewed
-default-version change, plus tests for its response contract and all non-2xx
+Moving the UI to another API version is a deployment-wide contract cutover. The
+backend must make all required endpoints available at that version, and the UI
+must test affected response contracts and all non-2xx
 `application/problem+json` responses. Moving the MCP consumer still requires a
 code change and its own contract review.

@@ -26,23 +26,19 @@ export function getDefaultNexusApiVersion(): string {
 /**
  * Compose an API version with an environment-provided origin or /api base path.
  * Host-only and legacy versioned base URLs remain supported during migration.
- * Passing version lets an individual service explicitly target another API
- * contract without changing the configured default.
+ * The entire UI targets the single version selected by the environment.
  */
-export function withNexusApiVersion(
-  baseUrl: string,
-  version: string = getDefaultNexusApiVersion(),
-): string {
+export function withNexusApiVersion(baseUrl: string): string {
   const base = baseUrl.trim().replace(/\/+$/, "");
-  const normalizedVersion = normalizeNexusApiVersion(version);
+  const version = getDefaultNexusApiVersion();
 
   if (VERSIONED_API_SUFFIX.test(base)) {
-    return base.replace(VERSIONED_API_SUFFIX, `/api/${normalizedVersion}`);
+    return base.replace(VERSIONED_API_SUFFIX, `/api/${version}`);
   }
 
   if (/\/api$/i.test(base)) {
-    return `${base}/${normalizedVersion}`;
+    return `${base}/${version}`;
   }
 
-  return `${base}/api/${normalizedVersion}`;
+  return `${base}/api/${version}`;
 }

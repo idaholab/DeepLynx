@@ -111,14 +111,24 @@ versioned API base URLs. Do not concatenate `/api/v1`, `/v2`, or another version
 segment in components, services, routes, or tests.
 
 ```ts
-withNexusApiVersion(baseUrl);       // configured default, with v1 fallback
-withNexusApiVersion(baseUrl, "v2"); // explicit service-level override
+withNexusApiVersion(baseUrl); // configured version, with v1 fallback
 ```
 
-Keep endpoints that have not migrated on v1. When a backend response contract
-changes, explicitly select the corresponding API version in the service layer
-and update its DTOs, error handling, and tests together. Do not change the
-shared default merely to migrate one service.
+Service modules use the single shared client from
+`src/app/lib/client_service/api.ts`:
+
+```ts
+import api from "./api";
+
+api.get("/projects"); // deployment-wide configured API version
+```
+
+Do not create per-service version clients or select versions inside service
+modules. The UI targets one API version per deployment. The backend must expose
+a complete surface for that version, including unchanged functionality, while
+preserving older versions for older consumers. When changing the configured UI
+version, update affected DTOs, error handling, and tests as one reviewed
+contract cutover.
 
 Routes whose layout differs from `/api/{version}`, such as Scalar's
 `/api/scalar/{version}` route, require a dedicated shared URL helper. Do not use
