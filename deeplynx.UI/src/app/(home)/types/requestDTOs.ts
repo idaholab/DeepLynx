@@ -87,12 +87,14 @@ export type CreateObjectStorageRequestDto = {
   name: string;
   config: Record<string, unknown>;
   default?: boolean;
+  filesDeletable?: boolean;
 };
 
 export type UpdateObjectStorageRequestDto = {
   name: string;
   default: boolean;
   existingContainer?: boolean;
+  filesDeletable?: boolean;
 };
 
 export type CreateClassRequestDto = {
