@@ -23,22 +23,31 @@ export function getDefaultNexusApiVersion(): string {
   );
 }
 
+/** Normalize an environment-provided origin or API URL to its /api base path. */
+export function getNexusApiBaseUrl(baseUrl: string): string {
+  const base = baseUrl.trim().replace(/\/+$/, "");
+
+  if (VERSIONED_API_SUFFIX.test(base)) {
+    return base.replace(VERSIONED_API_SUFFIX, "/api");
+  }
+
+  if (/\/api$/i.test(base)) {
+    return base;
+  }
+
+  return `${base}/api`;
+}
+
 /**
  * Compose an API version with an environment-provided origin or /api base path.
  * Host-only and legacy versioned base URLs remain supported during migration.
  * The entire UI targets the single version selected by the environment.
  */
 export function withNexusApiVersion(baseUrl: string): string {
-  const base = baseUrl.trim().replace(/\/+$/, "");
-  const version = getDefaultNexusApiVersion();
+  return `${getNexusApiBaseUrl(baseUrl)}/${getDefaultNexusApiVersion()}`;
+}
 
-  if (VERSIONED_API_SUFFIX.test(base)) {
-    return base.replace(VERSIONED_API_SUFFIX, `/api/${version}`);
-  }
-
-  if (/\/api$/i.test(base)) {
-    return `${base}/${version}`;
-  }
-
-  return `${base}/api/${version}`;
+/** Build the Scalar documentation URL, whose version follows /api/scalar. */
+export function getNexusScalarUrl(baseUrl: string): string {
+  return `${getNexusApiBaseUrl(baseUrl)}/scalar/${getDefaultNexusApiVersion()}`;
 }

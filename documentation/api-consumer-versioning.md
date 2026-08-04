@@ -48,6 +48,10 @@ Browser services share one Axios client in
 configured version and owns the authentication, single-flight session lookup,
 and error interceptors.
 
+Non-Axios routes use the same configuration through shared helpers. The OAuth
+proxy appends `/oauth/authorize` with `backendApiUrl`, while the UI builds the
+distinct `/api/scalar/{version}` documentation route with `getNexusScalarUrl`.
+
 ## Cutover rule
 
 Moving the UI to another API version is a deployment-wide contract cutover. The

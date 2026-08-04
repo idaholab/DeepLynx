@@ -131,9 +131,11 @@ version, update affected DTOs, error handling, and tests as one reviewed
 contract cutover.
 
 Routes whose layout differs from `/api/{version}`, such as Scalar's
-`/api/scalar/{version}` route, require a dedicated shared URL helper. Do not use
-`withNexusApiVersion` and then append `/scalar`, because that produces the wrong
-route order.
+`/api/scalar/{version}` route, use their dedicated shared URL helper. Use
+`getNexusScalarUrl` for Scalar rather than appending `/scalar` to
+`withNexusApiVersion`, which produces the wrong route order. Server routes use
+`backendApiUrl` to append endpoint paths to the configured versioned backend
+base URL.
 
 ## State and Context
 
