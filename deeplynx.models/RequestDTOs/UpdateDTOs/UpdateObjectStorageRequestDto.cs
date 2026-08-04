@@ -13,5 +13,5 @@ public class UpdateObjectStorageRequestDto
     public string? AzureFilePath { get; set; } = null!;
 
     [DefaultValue(true)]
-    [JsonPropertyName("files_deletable")] public bool FilesDeletable { get; set; } = true;
+    [JsonPropertyName("filesDeletable")] public bool FilesDeletable { get; set; } = true;
 }
