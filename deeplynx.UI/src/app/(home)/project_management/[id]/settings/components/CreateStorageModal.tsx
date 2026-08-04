@@ -16,6 +16,7 @@ interface StorageFormData {
   config: Record<string, any>;
   default: boolean;
   existingContainer?: boolean;
+  filesDeletable: boolean;
 }
 
 interface CreateStorageModalProps {
@@ -84,6 +85,27 @@ const CreateStorageModal = ({
       },
     });
   };
+
+  const filesDeletableToggle = (
+    <div className="form-control mt-4">
+      <label className="cursor-pointer label">
+        <span className="label-text">
+          {t.translations.STORAGE_FILES_DELETABLE}
+        </span>
+        <input
+          type="checkbox"
+          className="checkbox checkbox-primary"
+          checked={storageFormData.filesDeletable}
+          onChange={(e) =>
+            setStorageFormData({
+              ...storageFormData,
+              filesDeletable: e.target.checked,
+            })
+          }
+        />
+      </label>
+    </div>
+  );
 
   return (
     <>
@@ -179,6 +201,7 @@ const CreateStorageModal = ({
                 </label>
               </div>
 
+              {filesDeletableToggle}
             </div>
           )}
 
@@ -214,6 +237,8 @@ const CreateStorageModal = ({
                   />
                 </label>
               </div>
+
+              {filesDeletableToggle}
             </div>
           )}
 
@@ -327,6 +352,8 @@ const CreateStorageModal = ({
                       />
                     </label>
                   </div>
+
+                  {filesDeletableToggle}
 
                   <button
                     className="btn btn-primary btn-sm shrink-0"
@@ -461,6 +488,8 @@ const CreateStorageModal = ({
                   />
                 </label>
               </div>
+
+              {filesDeletableToggle}
             </>
           )}
 
