@@ -4,13 +4,15 @@
 import AvatarCell from "@/app/(home)/components/Avatar";
 import { RoleGate } from "@/app/(home)/rbac/RBACComponents";
 import { CreateOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
-import { OrganizationResponseDto, UserResponseDto } from "@/app/(home)/types/responseDTOs";
+import { OrganizationResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
   createOrganization,
+  getAllOrganizationsForUser,
 } from "@/app/lib/client_service/organization_services.client";
 import { getAllProjects } from "@/app/lib/client_service/projects_services.client";
+import { getAllUsers } from "@/app/lib/client_service/user_services.client";
 import {
   ArrowRightIcon,
   Cog6ToothIcon,
@@ -29,58 +31,18 @@ interface OrgWithCounts extends OrganizationResponseDto {
 
 interface Props {
   session: Session;
-  organizations: OrganizationResponseDto[];
-  initialUsersByOrg: Record<number, UserResponseDto[]>;
 }
 
-const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) => {
-
+const SelectOrgClient = ({ session }: Props) => {
   const router = useRouter();
   const { t } = useLanguage();
   const { setOrganization } = useOrganizationSession();
+  const [organizations, setOrganizations] = useState<OrgWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [orgsWithCounts, setOrgsWithCounts] = useState<OrgWithCounts[]>([]);
-
-  useEffect(() => {
-    async function fetchProjectCounts() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const orgsWithProjectCounts = await Promise.all(
-          organizations.map(async (org) => {
-            try {
-              const projects = await getAllProjects(org.id as number, true);
-              return {
-                ...org,
-                projectCount: projects.length,
-                userCount: initialUsersByOrg[Number(org.id)]?.length || 0,
-              };
-            } catch (innerError) {
-              console.error(`Error fetching projects for org ${org.id}`, innerError);
-              return {
-                ...org,
-                projectCount: 0,
-                userCount: initialUsersByOrg[Number(org.id)]?.length || 0,
-              };
-            }
-          })
-        );
-
-        setOrgsWithCounts(orgsWithProjectCounts);
-      } catch (error) {
-        console.error("Failed to fetch project counts:", error);
-        setError(t.translations.FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchProjectCounts();
-  }, [organizations, initialUsersByOrg, t]);
 
   // Form state
   const [formData, setFormData] = useState<CreateOrganizationRequestDto>({
@@ -88,6 +50,51 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
     description: "",
     disableFileTransfer: false,
   });
+
+  useEffect(() => {
+    fetchOrganizationsWithCounts();
+  }, []);
+
+  const fetchOrganizationsWithCounts = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch all organizations
+      const orgs = await getAllOrganizationsForUser(true);
+
+      // Fetch project and user counts for each organization
+      const orgsWithCounts = await Promise.all(
+        orgs.map(async (org) => {
+          try {
+            const [projects, users] = await Promise.all([
+              getAllProjects(org.id as number, true),
+              getAllUsers(org.id),
+            ]);
+
+            return {
+              ...org,
+              projectCount: projects.length,
+              userCount: users.length,
+            };
+          } catch (err) {
+            console.error(`Failed to fetch data for org ${org.id}:`, err);
+            return {
+              ...org,
+              projectCount: 0,
+              userCount: 0,
+            };
+          }
+        }),
+      );
+
+      setOrganizations(orgsWithCounts);
+    } catch (err) {
+      console.error("Failed to fetch organizations:", err);
+      setError(t.translations.FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,10 +104,12 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
     try {
       await createOrganization(formData);
 
+      // Reset form and close modal
       setFormData({ name: "", description: "", disableFileTransfer: false });
       setIsModalOpen(false);
 
-      router.refresh();
+      // Refresh the organizations list
+      await fetchOrganizationsWithCounts();
     } catch (err) {
       console.error("Failed to create organization:", err);
       setCreateError(t.translations.FAILED_TO_CREATE_ORGANIZATION_TRY_AGAIN);
@@ -193,7 +202,7 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
                     </p>
                   </div>
                 ) : (
-                  orgsWithCounts.map((org) => (
+                  organizations.map((org) => (
                     <div
                       key={org.id}
                       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 hover:bg-base-200 rounded-lg transition-colors"
