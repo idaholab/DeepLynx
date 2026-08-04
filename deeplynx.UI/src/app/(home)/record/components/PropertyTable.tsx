@@ -37,7 +37,18 @@ interface PropertyRow {
   copyAriaLabel?: string;
   idleIconClassName?: string;
   copiedIconClassName?: string;
+  isLink?: boolean;
 }
+
+// Returns true if `value` parses as an absolute URL (http/https/etc.)
+const isValidUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return !!url.protocol;
+  } catch {
+    return false;
+  }
+};
 
 interface PropertyTableProps {
   title?: string;
@@ -386,6 +397,18 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                         String(row.nestedRows?.length ?? 0),
                       )}
                   </span>
+                ) : row.isLink &&
+                  organization?.disableFileTransfer &&
+                  typeof row.value === "string" &&
+                  isValidUrl(row.value) ? (
+                  <a
+                    href={row.value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="link link-primary break-all"
+                  >
+                    {row.value}
+                  </a>
                 ) : (
                   row.value
                 )}
@@ -469,7 +492,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                 </button>
               )}
 
-              {download && (
+              {download && !organization?.disableFileTransfer && (
                 <div className="flex items-center gap-3">
                   {/* Status indicator - show during preparation or for presigned URL downloads */}
                   {downloading && (preparingDownload || isPresignedUrl) && !showProgressBar && !isFolder && (

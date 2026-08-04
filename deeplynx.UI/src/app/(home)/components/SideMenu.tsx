@@ -228,6 +228,10 @@ const SideMenu: React.FC<SideMenuProps> = ({
     // On org portal, disable anything not explicitly allowed
     if (isOrgPortalRoute && !orgAllowedPaths.includes(targetPath)) return true;
 
+    // Upload Center is disabled when the organization has file transfer disabled
+    if (targetPath === "/upload_center" && organization?.disableFileTransfer)
+      return true;
+
     return false;
   };
 
@@ -319,7 +323,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
                 )}
               </div>
               {!isCollapsed && (
-                <button className="btn btn-ghost btn-xs btn-circle flex-shrink-0">
+                <button data-testid="project-select" className="btn btn-ghost btn-xs btn-circle flex-shrink-0">
                   {isProjectsExpanded ? (
                     <ChevronUpIcon className="size-4" />
                   ) : (
@@ -433,7 +437,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
           {/* Project Settings (Admin only) */}
           <ProjectAdminRoute>
             <li className="mt-2">
-              <Link
+              <Link aria-label="Project Settings"
                 href={`/project_management/${project?.projectId || ""}`}
                 onClick={(e) =>
                   handleItemClick(

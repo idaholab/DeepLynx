@@ -128,6 +128,12 @@ const OrganizationSettings = () => {
   );
   const [archiveAction, setArchiveAction] = useState<boolean>(true);
 
+  // File Transfer states
+  const [disableFileTransfer, setDisableFileTransfer] = useState(false);
+  const [originalDisableFileTransfer, setOriginalDisableFileTransfer] =
+    useState(false);
+  const [isSavingFileTransfer, setIsSavingFileTransfer] = useState(false);
+
   // Load existing logo on mount
   useEffect(() => {
     const loadExistingLogo = async () => {
@@ -723,6 +729,61 @@ const OrganizationSettings = () => {
     }
   }, [organization?.banner]);
 
+  useEffect(() => {
+    const disabled = !!organization?.disableFileTransfer;
+    setDisableFileTransfer(disabled);
+    setOriginalDisableFileTransfer(disabled);
+  }, [organization?.disableFileTransfer]);
+
+  const handleSaveFileTransfer = async () => {
+    if (!organization?.organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
+
+    try {
+      setIsSavingFileTransfer(true);
+
+      await updateOrganization(organization.organizationId as number, {
+        disableFileTransfer,
+      });
+
+      setOriginalDisableFileTransfer(disableFileTransfer);
+      setOrganization({
+        ...organization,
+        disableFileTransfer,
+      });
+
+      toast.success(
+        disableFileTransfer
+          ? t.translations.FILE_TRANSFER_DISABLED_SUCCESSFULLY ||
+          "File transfer disabled for this organization"
+          : t.translations.FILE_TRANSFER_ENABLED_SUCCESSFULLY ||
+          "File transfer enabled for this organization",
+      );
+    } catch (error) {
+      console.error("Failed to update file transfer setting: ", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_FILE_TRANSFER_SETTING,
+      );
+    } finally {
+      setIsSavingFileTransfer(false);
+    }
+  };
+
+  const handleCancelFileTransfer = () => {
+    setDisableFileTransfer(originalDisableFileTransfer);
+    toast.custom(
+      <div className="text-info">
+        <ExclamationTriangleIcon className="size-4" />
+        {t.translations.CHANGES_DISCARDED}
+      </div>,
+    );
+  };
+
+
   const handleSaveBanner = async () => {
     if (!organization?.organizationId) {
       toast.error(t.translations.NO_ORG_SELECTED);
@@ -1022,6 +1083,67 @@ const OrganizationSettings = () => {
                         type="button"
                         onClick={() => setSelectedThemeName(originalThemeName)}
                         disabled={isSavingTheme}
+                      >
+                        {t.translations.CANCEL}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="divider" />
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="card-title text-lg mb-2">
+                      {t.translations.FILE_TRANSFER}
+                    </h3>
+                    <p className="text-sm text-base-content/60 mt-1">
+                      {t.translations.FILE_TRANSFER_DESCRIPTION}
+                    </p>
+                  </div>
+
+                  <div className="form-control">
+                    <label className="cursor-pointer label flex items-center justify-start w-fit gap-3">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary"
+                        checked={disableFileTransfer}
+                        disabled={isSavingFileTransfer}
+                        onChange={(e) =>
+                          setDisableFileTransfer(e.target.checked)
+                        }
+                      />
+                      <span className="label-text font-semibold">
+                        {t.translations.DISABLE_FILE_TRANSFER}
+                      </span>
+                    </label>
+                    <span className="text-xs text-base-content/60 mt-1">
+                      {t.translations.DISABLE_FILE_TRANSFER_HELPER}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSaveFileTransfer}
+                      disabled={
+                        isSavingFileTransfer ||
+                        disableFileTransfer === originalDisableFileTransfer
+                      }
+                    >
+                      {isSavingFileTransfer && (
+                        <span className="loading loading-spinner loading-xs" />
+                      )}
+                      {t.translations.SAVE}
+                    </button>
+
+                    {disableFileTransfer !== originalDisableFileTransfer && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={handleCancelFileTransfer}
+                        disabled={isSavingFileTransfer}
                       >
                         {t.translations.CANCEL}
                       </button>

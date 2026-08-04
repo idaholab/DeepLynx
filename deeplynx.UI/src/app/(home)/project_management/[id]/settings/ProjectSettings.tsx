@@ -429,9 +429,13 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         toast.error(t.translations.ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED);
         return;
       }
-      const containerName = storageFormData.existingContainer
+      let containerName = storageFormData.existingContainer
         ? azureBucketName
         : uniqueContainerNameFromString(azureBucketName);
+
+      if (azureBucketName == null || azureBucketName == "") {
+        containerName = uniqueContainerNameFromString(project.name)
+      }
       config = {
         azureObjectConfig: {
           azureConnectionString: azureEndpoint,
@@ -524,9 +528,13 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     try {
       setIsCreatingAzureContainer(true);
 
-      const containerName = storageFormData.existingContainer
+      let containerName = storageFormData.existingContainer
         ? azureBucketName
         : uniqueContainerNameFromString(azureBucketName);
+
+      if (azureBucketName == null || azureBucketName == "") {
+        containerName = uniqueContainerNameFromString(project.name)
+      }
 
       const createdStorage = await createProjectAzureContainer(
         organization.organizationId as number,
