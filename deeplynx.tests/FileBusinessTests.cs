@@ -28,6 +28,7 @@ public class FileBusinessTests : IntegrationTestBase
     private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "FileBusinessChunkedTests");
     private ClassBusiness _classBusiness = null!;
     private DataSourceBusiness _dataSourceBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IEdgeBusiness> _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private UserBusiness _userBusiness = null!;
@@ -96,7 +97,8 @@ public class FileBusinessTests : IntegrationTestBase
 
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness,
             _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
 
         _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _userBusiness = new UserBusiness(Context);
@@ -112,7 +114,6 @@ public class FileBusinessTests : IntegrationTestBase
             _provenanceBusiness.Object,
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
 
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
         _classBusiness = new ClassBusiness(Context,
         _recordBusiness,
@@ -1223,7 +1224,7 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateFile_WithFilesystemPlaceholder_ClearsPreviousContentHash()
+    public async Task UpdateFile_WithFilesystemHashing_ReplacesPreviousContentHash()
     {
         await using var originalStream = new MemoryStream(Encoding.UTF8.GetBytes("original"));
         var originalFile = new FormFile(
@@ -1259,8 +1260,9 @@ public class FileBusinessTests : IntegrationTestBase
             originalRecord.Id,
             updatedFile);
 
-        Assert.Null(updatedRecord.FileContentHash);
-        Assert.Null((await Context.Records.FindAsync(originalRecord.Id))!.FileContentHash);
+        const string expectedHash = "27eb5e51506c911f6fc4bb345c0d9db6f60415fceab7c18e1e9b862637415777";
+        Assert.Equal(expectedHash, updatedRecord.FileContentHash);
+        Assert.Equal(expectedHash, (await Context.Records.FindAsync(originalRecord.Id))!.FileContentHash);
     }
 
     [Fact]

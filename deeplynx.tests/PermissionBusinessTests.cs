@@ -21,7 +21,7 @@ public class PermissionBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private PermissionBusiness _permissionBusiness;
     private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
-    
+
     public long lid; // label IDs
     public long lid2;
 
@@ -132,7 +132,8 @@ public class PermissionBusinessTests : IntegrationTestBase
             Action = "manage",
             LabelId = lid,
             OrganizationId = oid,
-            IsDefault = false, ProjectId = pid
+            IsDefault = false,
+            ProjectId = pid
         };
         var permission6 = new Permission
         {
@@ -204,15 +205,15 @@ public class PermissionBusinessTests : IntegrationTestBase
 
         // Assert - should return only permissions with lid and organizationId = oid
         Assert.Equal(4, permissions.Count);
-        Assert.All(permissions, p => 
+        Assert.All(permissions, p =>
             Assert.True(p.LabelId == lid || p.IsDefault));
-        Assert.All(permissions, p => 
+        Assert.All(permissions, p =>
             Assert.True(p.OrganizationId == oid || p.IsDefault));
         Assert.Contains(permissions, p => p.Id == permid1);
         Assert.Contains(permissions, p => p.Id == permid3);
         Assert.Contains(permissions, p => p.Id == permid5);
     }
-    
+
 
     [Fact]
     public async Task GetAllPermissions_FiltersOnOrganizationId()
@@ -223,7 +224,7 @@ public class PermissionBusinessTests : IntegrationTestBase
 
         // Assert - should return all non-archived permissions for this organization
         Assert.Equal(6, permissions.Count);
-        Assert.All(permissions, p => 
+        Assert.All(permissions, p =>
             Assert.True(p.OrganizationId == oid || p.IsDefault));
         Assert.Contains(permissions, p => p.Id == permid1);
         Assert.Contains(permissions, p => p.Id == permid3);
@@ -241,11 +242,11 @@ public class PermissionBusinessTests : IntegrationTestBase
 
         // Assert - should return permissions matching all criteria
         Assert.Equal(4, permissions.Count);
-        Assert.All(permissions, p => 
+        Assert.All(permissions, p =>
             Assert.True(p.ProjectId == pid || p.IsDefault));
-        Assert.All(permissions, p => 
+        Assert.All(permissions, p =>
             Assert.True(p.LabelId == lid || p.IsDefault));
-        Assert.All(permissions, p => 
+        Assert.All(permissions, p =>
             Assert.True(p.OrganizationId == oid || p.IsDefault));
         Assert.Contains(permissions, p => p.Id == permid1);
         Assert.Contains(permissions, p => p.Id == permid3);
@@ -679,7 +680,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         var savedPermission = await Context.Permissions.FindAsync(permid5);
         Assert.NotNull(savedPermission);
         Assert.True(savedPermission.IsArchived);
-        
+
     }
 
     [Fact]
@@ -846,7 +847,7 @@ public class PermissionBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region UniqueConstraintTests
 
     [Fact]
@@ -943,7 +944,7 @@ public class PermissionBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region Scope Level Tests (Default, Organization, Project)
 
     [Fact]
@@ -992,49 +993,57 @@ public class PermissionBusinessTests : IntegrationTestBase
 
         // Assert - should return only org-level permissions (has org, no project)
         Assert.True(permissions.Count >= 1); // At least permid7 is org-level only
-        Assert.All(permissions, p => 
+        Assert.All(permissions, p =>
             Assert.True(p.OrganizationId == oid || p.IsDefault));
-        
+
         // Check that org-level permissions are included
         Assert.Contains(permissions, p => p.Id == permid7); // "Second Permission Same Organization" - org only, no project
     }
 
     [Fact]
-    public async Task GetAllPermissions_ReturnsOnlyProjectLevel_WhenBothOrgAndProjectSupplied()
+    public async Task GetAllPermissions_ReturnsProjectLevelAndOrgLevel_WhenBothOrgAndProjectSupplied()
     {
-        // Act - Get project-level permissions
+        // Act - Get project-level and org-level permissions
         var result = await _permissionBusiness.GetAllPermissions(null, pid, oid);
         var permissions = result.ToList();
 
-        // Assert - should return only project-level permissions
-        Assert.True(permissions.Count >= 4); // Several project-level permissions exist
-        Assert.All(permissions, p => 
-            Assert.True(p.ProjectId == pid || p.IsDefault));
-        Assert.All(permissions, p => 
+        // Assert - should return at least project-level and org-level permissions
+        Assert.True(permissions.Count >= 4); // Several permissions exist
+
+        // All permissions must belong either to the requested project or have ProjectId == null (org-level) or be default
+        Assert.All(permissions, p =>
+            Assert.True(p.ProjectId == pid || p.ProjectId == null || p.IsDefault));
+
+        // All permissions must belong to the organization or be default
+        Assert.All(permissions, p =>
             Assert.True(p.OrganizationId == oid || p.IsDefault));
-        
-        // Check that project-level permissions are included
+
+        // Check specific permissions exist
         Assert.Contains(permissions, p => p.Id == permid1); // "Basic Permission"
         Assert.Contains(permissions, p => p.Id == permid3); // "Permission with Project"
         Assert.Contains(permissions, p => p.Id == permid5); // "Permission with Organization"
         Assert.Contains(permissions, p => p.Id == permid6); // "Second Permission Same Project"
-        
-        // Should NOT include org-level only permissions
-        Assert.DoesNotContain(permissions, p => p.Id == permid7); // org-level only (no project)
+
+        // Now explicitly check org-level only permission is included
+        Assert.Contains(permissions, p => p.Id == permid7); // org-level only (no project)
     }
 
+
+
     [Fact]
-    public async Task GetAllPermissions_ScopeIsolation_OrgDoNotMixWithProject()
+    public async Task GetAllPermissions_ScopeIsolation_IncludesOrgLevelWithProject()
     {
         // Arrange - permid7 is org-level only (no project)
-        
-        // Act - Get project permissions
+
+        // Act - Get permissions for given project and org
         var permissions = await _permissionBusiness.GetAllPermissions(null, pid, oid);
-        
-        // Assert - org-level permission should NOT appear in project results
-        Assert.DoesNotContain(permissions, p => p.Id == permid7);
-        Assert.All(permissions, p => 
-            Assert.True(p.ProjectId == pid || p.IsDefault));
+
+        // Assert - org-level permission SHOULD appear in project results now
+        Assert.Contains(permissions, p => p.Id == permid7);
+
+        // All permissions must have ProjectId == pid OR ProjectId == null OR be default
+        Assert.All(permissions, p =>
+            Assert.True(p.ProjectId == pid || p.ProjectId == null || p.IsDefault));
     }
 
     [Fact]
@@ -1105,10 +1114,10 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.NotNull(resultWithProject);
         Assert.NotNull(resultWithOrg);
         Assert.NotNull(resultWithNeither);
-        Assert.All(new[] { resultWithProject, resultWithOrg, resultWithNeither }, 
+        Assert.All(new[] { resultWithProject, resultWithOrg, resultWithNeither },
             r => Assert.True(r.IsDefault));
     }
-    
+
 
     [Fact]
     public async Task UpdatePermission_CannotUpdateDefaultPermission()
@@ -1131,7 +1140,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.NotNull(unchangedPermission);
         Assert.Equal("Default Permission with Project", unchangedPermission.Name); // Original name
     }
-    
+
 
     [Fact]
     public async Task DeletePermission_CannotDeleteDefaultPermission()
@@ -1146,7 +1155,7 @@ public class PermissionBusinessTests : IntegrationTestBase
         var unchangedPermission = await Context.Permissions.FindAsync(permid8);
         Assert.NotNull(unchangedPermission);
     }
-    
+
 
     [Fact]
     public async Task ArchivePermission_CannotArchiveDefaultPermission()

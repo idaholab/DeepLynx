@@ -24,18 +24,22 @@ public class ObjectStorageProjectController : ControllerBase
 {
     private readonly ILogger<ObjectStorageProjectController> _logger;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly IProjectBusiness _projectBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ObjectStorageProjectController" /> class
     /// </summary>
     /// <param name="objectStorageBusiness">The business logic interface for handling object storage operations.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
+    /// <param name="projectBusiness">The business logic interface for handling project operations.</param>
     public ObjectStorageProjectController(
         IObjectStorageBusiness objectStorageBusiness,
-        ILogger<ObjectStorageProjectController> logger)
+        ILogger<ObjectStorageProjectController> logger,
+        IProjectBusiness projectBusiness)
     {
         _objectStorageBusiness = objectStorageBusiness;
         _logger = logger;
+        _projectBusiness = projectBusiness;
     }
 
 
@@ -230,5 +234,37 @@ public class ObjectStorageProjectController : ControllerBase
         var response = await _objectStorageBusiness.SetDefaultObjectStorage(
             currentUserId, organizationId, projectId, objectStorageId);
         return Ok(response);
+    }
+
+    /// <summary>
+    ///     Create a cloud object storage container for a Project
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the object storage will belong</param>
+    /// <param name="containerName">The name of the container</param>
+    /// <param name="existingContainer">A bool indicating whether the container already exists</param>
+    /// <param name="storageType">The storage provider type. Currently only "azure_object" is supported.</param>
+    /// <returns>The newly created object storage.</returns>
+    [HttpPost("container", Name = "api_create_project_azure_container")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("write", "object_storage")]
+    public async Task<ActionResult<ObjectStorageResponseDto>> CreateProjectContainer(
+        long organizationId,
+        long projectId,
+        string? containerName,
+        bool existingContainer = false,
+        [FromQuery] string storageType = "azure_object")
+    {
+        if (!string.Equals(storageType, "azure_object", StringComparison.OrdinalIgnoreCase))
+        {
+            // TODO: eventually support 'aws' as an option. https://nstinl.atlassian-us-gov-mod.net/browse/DL-2732
+            throw new ArgumentException(
+                $"Unsupported storage type '{storageType}'. Only 'azure_object' is currently supported.");
+        }
+
+        var currentUserId = UserContextStorage.UserId;
+        var objectStorage = await _projectBusiness.CreateProjectAzureContainer(
+            currentUserId, organizationId, projectId, containerName, existingContainer);
+        return Ok(objectStorage);
     }
 }

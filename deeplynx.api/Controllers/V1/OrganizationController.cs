@@ -361,7 +361,7 @@ public class OrganizationController : ControllerBase
     [HttpPost("{organizationId}/logo", Name = "api_upload_organization_logo")]
     [OrgAdmin]
     [Sensitivity("upload file")]
-    public async Task<IActionResult> UploadProjectLogo(
+    public async Task<IActionResult> UploadOrganizationLogo(
         long organizationId,
         IFormFile file)
     {
@@ -373,7 +373,7 @@ public class OrganizationController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Failed to upload project logo for organization {organizationId}: {ex.Message}");
+            _logger.LogError($"Failed to upload organization logo for organization {organizationId}: {ex.Message}");
             return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
         }
     }
@@ -384,7 +384,7 @@ public class OrganizationController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <returns>File stream of the logo bytes</returns>
     [HttpGet("{organizationId}/logo/image", Name = "api_get_organization_image")]
-    public async Task<IActionResult> GetProjectLogoImage(
+    public async Task<IActionResult> GetOrganizationLogoImage(
         long organizationId)
     {
         try
@@ -419,7 +419,7 @@ public class OrganizationController : ControllerBase
     [HttpDelete("{organizationId}/logo/delete", Name = "api_delete_organization_logo")]
     [OrgAdmin]
     [Sensitivity("delete file")]
-    public async Task<IActionResult> RemoveProjectLogo(
+    public async Task<IActionResult> RemoveOrganizationLogo(
         long organizationId)
     {
         try

@@ -22,6 +22,7 @@ public class ObjectStorageProjectControllerTests : IDisposable
 {
     private readonly Mock<IObjectStorageBusiness> _mockBusiness;
     private readonly Mock<ILogger<ObjectStorageProjectController>> _mockLogger;
+    private readonly Mock<IProjectBusiness> _mockProjectBusiness;
     private readonly ObjectStorageProjectController _controller;
 
     private const long OrgId = 1L;
@@ -33,10 +34,12 @@ public class ObjectStorageProjectControllerTests : IDisposable
     {
         _mockBusiness = new Mock<IObjectStorageBusiness>();
         _mockLogger = new Mock<ILogger<ObjectStorageProjectController>>();
+        _mockProjectBusiness = new Mock<IProjectBusiness>();
 
         _controller = new ObjectStorageProjectController(
             _mockBusiness.Object,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _mockProjectBusiness.Object);
 
         UserContextStorage.UserId = UserId;
     }
@@ -522,6 +525,62 @@ public class ObjectStorageProjectControllerTests : IDisposable
 
         AssertHasHttpAttribute(method, "HttpPatchAttribute");
         AssertHasAuthAttribute(method, "update", "object_storage");
+    }
+
+    #endregion
+
+    // =========================================================================
+    // CreateProjectContainer Tests
+    // =========================================================================
+
+    #region CreateProjectContainer Tests
+
+    [Fact]
+    public async Task CreateProjectContainer_Returns200_WithObjectStorage()
+    {
+        var expected = new ObjectStorageResponseDto();
+
+        _mockProjectBusiness.Setup(b => b.CreateProjectAzureContainer(UserId, OrgId, ProjectId, "test"))
+                            .ReturnsAsync(expected);
+
+        var result = (await _controller.CreateProjectContainer(OrgId, ProjectId, "test", false)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task CreateProjectContainer_ThrowsException_WhenBusinessThrows()
+    {
+        _mockProjectBusiness.Setup(b => b.CreateProjectAzureContainer(
+                                It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<string>()))
+                            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() => _controller.CreateProjectContainer(OrgId, ProjectId, "test", false));
+    }
+
+    [Fact]
+    public async Task CreateProjectContainer_PassesCurrentUserIdAndOrganizationIdAndProjectIdFromRouteToBusinessLayer()
+    {
+        var expected = new ObjectStorageResponseDto();
+        _mockProjectBusiness.Setup(b => b.CreateProjectAzureContainer(UserId, OrgId, ProjectId, "test"))
+                            .ReturnsAsync(expected);
+
+        await _controller.CreateProjectContainer(OrgId, ProjectId, "test");
+
+        _mockProjectBusiness.Verify(b => b.CreateProjectAzureContainer(UserId, OrgId, ProjectId, "test"), Times.Once);
+    }
+
+    [Fact]
+    public void CreateProjectContainer_HasHttpPostAndWriteObjectStorageAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(ObjectStorageProjectController.CreateProjectContainer),
+            "organizationId", "projectId");
+
+        AssertHasHttpAttribute(method, "HttpPostAttribute");
+        AssertHasAuthAttribute(method, "write", "object_storage");
     }
 
     #endregion

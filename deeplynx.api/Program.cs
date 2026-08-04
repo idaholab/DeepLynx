@@ -422,3 +422,8 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+// Expose the generated top-level Program class so integration tests can host this application.
+public partial class Program
+{
+}
