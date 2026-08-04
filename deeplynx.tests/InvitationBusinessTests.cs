@@ -16,6 +16,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 {
     private BulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ClassBusiness _classBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IDataSourceBusiness> _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private InvitationBusiness _invitationBusiness = null!;
@@ -50,7 +51,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        
+
         _mockInvitationLogger = new Mock<ILogger<InvitationBusiness>>();
         _recordBusiness = new Mock<IRecordBusiness>();
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
@@ -72,10 +73,11 @@ public class InvitationBusinessTests : IntegrationTestBase
             Context, _recordBusiness.Object,
             _relationshipBusiness.Object, _eventBusiness);
 
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness.Object, _mockFileAzureBusiness.Object);
 
         _invitationBusiness = new InvitationBusiness(
             Context,
@@ -485,7 +487,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region New User by Email - Transaction with Rollback
 
     [Fact]
@@ -617,7 +619,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region CreateAndAddServiceAccountToProject Tests
 
     [Fact]
@@ -670,7 +672,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Assert
         var accounts = await Context.Users
-            .Where(u => u.AccountType == AccountType.Service && 
+            .Where(u => u.AccountType == AccountType.Service &&
                         (u.Name == "Service Account A" || u.Name == "Service Account B"))
             .ToListAsync();
 
@@ -902,7 +904,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         Assert.Contains("Roles do not exist for organization users", exception.Message);
     }
-    
+
     [Fact]
     public async Task Invite_Fails_WhenGroupIdProvidedForOrgInvitation()
     {

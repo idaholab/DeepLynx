@@ -32,6 +32,23 @@ public class FileFilesystemBusiness : IFileBusiness
         _recordBusiness = recordBusiness;
     }
 
+    public Task<string?> CalculateFileContentHash(
+        IFormFile file,
+        CancellationToken cancellationToken = default)
+    {
+        // TODO: Implement filesystem file hashing in its dedicated follow-up ticket.
+        return Task.FromResult<string?>(null);
+    }
+
+    public Task<string?> CalculateStoredFileContentHash(
+        string fileUri,
+        ObjectStorageConfigDto objectStorageConfig,
+        CancellationToken cancellationToken = default)
+    {
+        // TODO: Implement filesystem file hashing in its dedicated follow-up ticket.
+        return Task.FromResult<string?>(null);
+    }
+
     /// <summary>
     ///     Uploads a file to the local file system
     /// </summary>
@@ -826,4 +843,8 @@ public class FileFilesystemBusiness : IFileBusiness
         return (string)meta.FileName;
     }
 
+    public Task<CreateObjectStorageRequestDto> CreateContainer(long organizationId, string? containerName, string? connectionString, bool isDefault = false, bool existingContainer = false)
+    {
+        throw new NotImplementedException();
+    }
 }

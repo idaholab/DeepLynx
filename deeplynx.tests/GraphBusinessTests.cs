@@ -28,6 +28,7 @@ public class GraphBusinessTests : IntegrationTestBase
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private ProjectBusiness _projectBusiness = null!;
     private IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
@@ -73,11 +74,13 @@ public class GraphBusinessTests : IntegrationTestBase
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness);
-
+        _notificationBusiness =
+            new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -802,7 +805,7 @@ public class GraphBusinessTests : IntegrationTestBase
         Assert.Equal(record1Id, result.Nodes[0].Id);
         Assert.Empty(result.Links);
     }
-    
+
     [Fact]
     public async Task GetGraphData_RootNode_IncludesClassData()
     {
@@ -1027,6 +1030,6 @@ public class GraphBusinessTests : IntegrationTestBase
                 regularUser.Id,
                 depth: 1));
     }
-    
+
     #endregion
 }

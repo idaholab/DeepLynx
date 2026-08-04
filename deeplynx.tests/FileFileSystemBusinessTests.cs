@@ -59,9 +59,12 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     private UserBusiness _userBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private NotificationBusiness _notificationBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private FileBusiness _realFileBusiness = null!;
@@ -87,6 +90,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _insightBusiness = new Mock<IInsightBusiness>();
 
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
@@ -97,6 +101,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockObjectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _mockClassBusiness = new Mock<IClassBusiness>();
+        _mockAdminService = new Mock<IAdminService>();
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _insightBusiness = new Mock<IInsightBusiness>();
@@ -114,8 +119,9 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _sensitivityLabelBusiness = null!;
         _objectStorageBusiness = null!;
         _notificationBusiness = null!;
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
 
         var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
@@ -268,6 +274,21 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _recordId = record.Id;
     }
 
+
+    [Fact]
+    public async Task CalculateFileContentHash_ReturnsNullPlaceholder()
+    {
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("filesystem placeholder"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "hash.txt");
+
+        var result = await _fileBusiness.CalculateFileContentHash(file);
+        var storedResult = await _fileBusiness.CalculateStoredFileContentHash(
+            "placeholder",
+            new ObjectStorageConfigDto());
+
+        Assert.Null(result);
+        Assert.Null(storedResult);
+    }
 
     [Fact]
     public async Task UploadFile_ShouldSaveFileAndReturnPath()

@@ -30,13 +30,17 @@ public partial class Project
 
     [Column("organization_id")]
     public long OrganizationId { get; set; }
-    
+
     [Column("banner")]
     [MaxLength(50)]
     public string? Banner { get; set; }
-    
+
     [Column("require_sensitivity_label")]
     public bool RequireSensitivityLabel { get; set; } = false;
+
+    [Column("file_path")]
+    [MaxLength(255)]
+    public string? FilePath { get; set; }
 
     [InverseProperty("Project")]
     public virtual ICollection<Action> Actions { get; set; } = new List<Action>();
@@ -62,7 +66,7 @@ public partial class Project
 
     [InverseProperty("Project")]
     public virtual ICollection<Record> Records { get; set; } = new List<Record>();
-    
+
     [InverseProperty("Project")]
     public virtual ICollection<RecordCollection> RecordCollections { get; set; } = new List<RecordCollection>();
 
@@ -86,16 +90,16 @@ public partial class Project
 
     [InverseProperty("LastUpdatedProjects")]
     public virtual User? LastUpdatedByUser { get; set; }
-    
+
     [InverseProperty("Project")]
     public virtual ICollection<Event> Events { get; set; } = new List<Event>();
-    
+
     [InverseProperty("Project")]
     public virtual ICollection<HistoricalEdge> HistoricalEdges { get; set; } = new List<HistoricalEdge>();
-    
+
     [InverseProperty("Project")]
     public virtual ICollection<HistoricalRecord> HistoricalRecords { get; set; } = new List<HistoricalRecord>();
-    
+
     [InverseProperty("Project")]
     public virtual ICollection<AiModelConfig> AiModelConfigs { get; set; } = new List<AiModelConfig>();
 
