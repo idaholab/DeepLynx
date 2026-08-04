@@ -173,10 +173,7 @@ try
             options.ApiVersionReader = new UrlSegmentApiVersionReader();
             options.UnsupportedApiVersionStatusCode = StatusCodes.Status400BadRequest;
         })
-        .AddMvc(options =>
-        {
-            options.Conventions.Add(new DefaultApiVersionConvention(NexusApiVersions.Supported.ToArray()));
-        })
+        .AddMvc()
         .AddApiExplorer(options =>
         {
             options.GroupNameFormat = "'v'V";
