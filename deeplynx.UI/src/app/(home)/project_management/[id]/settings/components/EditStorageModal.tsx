@@ -167,6 +167,7 @@ const EditStorageModal = ({
                 type="checkbox"
                 className="checkbox checkbox-primary"
                 checked={storageFormData.filesDeletable}
+                disabled={editingStorage?.projectId == null}
                 onChange={(e) =>
                   setStorageFormData({
                     ...storageFormData,
