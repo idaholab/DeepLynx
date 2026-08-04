@@ -472,7 +472,8 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         var dto = new CreateObjectStorageRequestDto
         {
             Name = "Test",
-            Config = config
+            Config = config,
+            FilesDeletable = false,
         };
 
         var now = DateTime.UtcNow;
@@ -484,6 +485,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(objectStorageResponse);
         Assert.Equal(dto.Name, objectStorageResponse.Name);
+        Assert.Equal(dto.FilesDeletable, objectStorageResponse.FilesDeletable);
         Assert.Equal("filesystem", objectStorageResponse.Type);
         Assert.Null(objectStorageResponse.ProjectId);
         Assert.Equal(organizationId, objectStorageResponse.OrganizationId);
@@ -617,6 +619,18 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Assert.False(updatedObjectStorage.IsArchived);
         Assert.True(updatedObjectStorage.LastUpdatedAt >= now);
         Assert.Equal(uid, updatedObjectStorage.LastUpdatedBy);
+    }
+
+    [Fact]
+    public async Task Update_Success_ReturnsUpdatedFilesDeletable()
+    {
+        var dto = new UpdateObjectStorageRequestDto{ Name = "Updated Name", FilesDeletable = true };
+        var os = await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, null, os7, dto);
+        Assert.True(os.FilesDeletable);
+
+        dto = new UpdateObjectStorageRequestDto{ Name = "Updated Name", FilesDeletable = false };
+        os = await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, null, os7, dto);
+        Assert.False(os.FilesDeletable);
     }
 
     [Fact]
