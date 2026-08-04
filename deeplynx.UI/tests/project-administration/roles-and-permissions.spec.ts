@@ -1,14 +1,5 @@
 import { test, expect, APIRequestContext, Page } from "../fixtures";
-<<<<<<< HEAD
-import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
-import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
-
-test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX})
-
-test.describe("Roles & Permissions", () => {
-  test.beforeEach(async ({ page }) => {
-=======
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS} from "../deeplynx-config";
 import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
 
 type Organization = {
@@ -39,8 +30,8 @@ async function getOrgIdByName(
 test.describe("Roles & Permissions", () => {
   test.use({
     actingUser: sysAdmin,
-    actingOrg: "PW Org A",
-    actingProject: "PW Project X",
+    actingOrg: ORGS.orgA,
+    actingProject: PROJECTS.projectX,
   });
 
   test.beforeEach(async ({ page, request }) => {
@@ -51,7 +42,6 @@ test.describe("Roles & Permissions", () => {
       .click();
 
     await expect(page).toHaveURL(/\/project\/\d+/);
->>>>>>> 180bdcf27aafc532fd9df766cc5165e528c20bb4
     // Navigate to Project Settings via sidebar
     await page.locator("aside a", { hasText: "Project Settings" }).click();
     await page.waitForURL(/\/project_management\/\d+/);

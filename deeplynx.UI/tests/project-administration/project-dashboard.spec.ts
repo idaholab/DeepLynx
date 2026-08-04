@@ -1,19 +1,12 @@
 import { test, expect } from "../fixtures";
-<<<<<<< HEAD
-import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
-
-test.describe("Project Dashboard", () => {
-  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX})
-=======
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS} from "../deeplynx-config";
 
 test.describe("Project Dashboard", () => {
   test.use({
     actingUser: sysAdmin,
-    actingOrg: "PW Org A",
-    actingProject: "PW Project X",
+    actingOrg: ORGS.orgA,
+    actingProject: PROJECTS.projectX,
   });
->>>>>>> 180bdcf27aafc532fd9df766cc5165e528c20bb4
 
   test.beforeEach(async ({ page }) => {
     await page.getByTestId("project-select").click();
@@ -21,11 +14,8 @@ test.describe("Project Dashboard", () => {
     await page
       .getByRole("button", { name: "PW Project X", exact: true })
       .click();
-<<<<<<< HEAD
-=======
 
     await expect(page).toHaveURL(/\/project\/\d+/);
->>>>>>> 180bdcf27aafc532fd9df766cc5165e528c20bb4
   });
 
   test("dashboard URL matches /project/{id} pattern", async ({ page }) => {
