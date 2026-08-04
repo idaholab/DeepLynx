@@ -524,7 +524,9 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     try {
       setIsCreatingAzureContainer(true);
 
-      var containerName = uniqueContainerNameFromString(azureBucketName) ?? null
+      const containerName = storageFormData.existingContainer
+        ? azureBucketName
+        : uniqueContainerNameFromString(azureBucketName);
 
       const createdStorage = await createProjectAzureContainer(
         organization.organizationId as number,
