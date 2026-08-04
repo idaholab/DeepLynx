@@ -86,6 +86,45 @@ Keep API access behind service modules:
 
 Pages and components should not hand-roll `fetch` or `axios` calls when a service module exists for the domain.
 
+### API Version Configuration
+
+Keep the Nexus API base path separate from its URL-segment version. Local UI
+configuration should use:
+
+```dotenv
+NEXT_PUBLIC_API_URL=http://localhost:5095/api
+NEXT_PUBLIC_API_VERSION=v1
+BACKEND_BASE_URL=http://localhost:5095/api
+```
+
+- `NEXT_PUBLIC_API_URL` is the browser-visible API base path.
+- `NEXT_PUBLIC_API_VERSION` selects the default API version and falls back to
+  `v1` when it is missing or empty.
+- `BACKEND_BASE_URL` is the server-only API base path and may use an internal
+  hostname in deployed environments.
+- API versions must be `v` followed by a positive integer, such as `v1`, `v2`,
+  or `v12`.
+- `NEXT_PUBLIC_*` settings must be supplied when building the Next.js UI image.
+
+Use `withNexusApiVersion` from `src/app/lib/api-version.ts` to construct regular
+versioned API base URLs. Do not concatenate `/api/v1`, `/v2`, or another version
+segment in components, services, routes, or tests.
+
+```ts
+withNexusApiVersion(baseUrl);       // configured default, with v1 fallback
+withNexusApiVersion(baseUrl, "v2"); // explicit service-level override
+```
+
+Keep endpoints that have not migrated on v1. When a backend response contract
+changes, explicitly select the corresponding API version in the service layer
+and update its DTOs, error handling, and tests together. Do not change the
+shared default merely to migrate one service.
+
+Routes whose layout differs from `/api/{version}`, such as Scalar's
+`/api/scalar/{version}` route, require a dedicated shared URL helper. Do not use
+`withNexusApiVersion` and then append `/scalar`, because that produces the wrong
+route order.
+
 ## State and Context
 
 Use the existing providers in `src/app/contexts` for app-wide state:

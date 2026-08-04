@@ -1,32 +1,48 @@
-/**
- * The Nexus API version used by the UI.
- *
- * Changing this constant is an API-contract cutover. In particular, moving to
- * v2 requires the UI's non-2xx handling to support RFC 7807 ProblemDetails.
- */
-export const NEXUS_API_VERSION = "v1" as const;
-export const NEXUS_API_PATH = `/api/${NEXUS_API_VERSION}`;
+export const DEFAULT_NEXUS_API_VERSION = "v1" as const;
 
-const VERSIONED_API_SUFFIX = /\/api\/(v[^/]+)$/i;
+const API_VERSION_PATTERN = /^v[1-9]\d*$/i;
+const VERSIONED_API_SUFFIX = /\/api\/(v[1-9]\d*)$/i;
 
-/**
- * Compose the reviewed API version with an environment-provided origin/base
- * path. A trailing /api/v1 is accepted for backwards-compatible deployments,
- * but a different embedded version is rejected instead of silently overriding
- * the code-level pin.
- */
-export function withNexusApiVersion(baseUrl: string): string {
-  const base = baseUrl.trim().replace(/\/+$/, "");
-  const embeddedVersion = base.match(VERSIONED_API_SUFFIX)?.[1];
+/** Return a normalized API version, rejecting malformed URL segments. */
+export function normalizeNexusApiVersion(version: string): string {
+  const normalizedVersion = version.trim().toLowerCase();
 
-  if (embeddedVersion) {
-    if (embeddedVersion.toLowerCase() !== NEXUS_API_VERSION) {
-      throw new Error(
-        `Nexus API URL embeds ${embeddedVersion}; this consumer is pinned to ${NEXUS_API_VERSION}`,
-      );
-    }
-    return base;
+  if (!API_VERSION_PATTERN.test(normalizedVersion)) {
+    throw new Error(
+      `Invalid Nexus API version "${version}"; expected "v" followed by a positive integer`,
+    );
   }
 
-  return `${base}${NEXUS_API_PATH}`;
+  return normalizedVersion;
+}
+
+/** Return the environment-selected API version, with v1 as a safe fallback. */
+export function getDefaultNexusApiVersion(): string {
+  return normalizeNexusApiVersion(
+    process.env.NEXT_PUBLIC_API_VERSION || DEFAULT_NEXUS_API_VERSION,
+  );
+}
+
+/**
+ * Compose an API version with an environment-provided origin or /api base path.
+ * Host-only and legacy versioned base URLs remain supported during migration.
+ * Passing version lets an individual service explicitly target another API
+ * contract without changing the configured default.
+ */
+export function withNexusApiVersion(
+  baseUrl: string,
+  version: string = getDefaultNexusApiVersion(),
+): string {
+  const base = baseUrl.trim().replace(/\/+$/, "");
+  const normalizedVersion = normalizeNexusApiVersion(version);
+
+  if (VERSIONED_API_SUFFIX.test(base)) {
+    return base.replace(VERSIONED_API_SUFFIX, `/api/${normalizedVersion}`);
+  }
+
+  if (/\/api$/i.test(base)) {
+    return `${base}/${normalizedVersion}`;
+  }
+
+  return `${base}/api/${normalizedVersion}`;
 }
