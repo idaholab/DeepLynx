@@ -108,7 +108,7 @@ public class ApiVersioningTests : IntegrationTestBase
         var response = await _client.GetAsync(ApiPath("v1", ProjectTagsRoute));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("@1785196800", Assert.Single(response.Headers.GetValues("Deprecation")));
+        Assert.Equal("@1785888000", Assert.Single(response.Headers.GetValues("Deprecation")));
         Assert.Equal(
             "Wed, 30 Sep 2026 23:59:59 GMT",
             Assert.Single(response.Headers.GetValues("Sunset")));

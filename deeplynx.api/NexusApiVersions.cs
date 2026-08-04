@@ -21,7 +21,7 @@ internal static class NexusApiVersions
     ];
 
     public static DateTimeOffset V1DeprecatedOn { get; } =
-        new(2026, 7, 28, 0, 0, 0, TimeSpan.Zero);
+        new(2026, 8, 5, 0, 0, 0, TimeSpan.Zero);
 
     public static DateTimeOffset V1SunsetOn { get; } =
         new(2026, 9, 30, 23, 59, 59, TimeSpan.Zero);
