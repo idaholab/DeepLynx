@@ -228,6 +228,10 @@ const SideMenu: React.FC<SideMenuProps> = ({
     // On org portal, disable anything not explicitly allowed
     if (isOrgPortalRoute && !orgAllowedPaths.includes(targetPath)) return true;
 
+    // Upload Center is disabled when the organization has file transfer disabled
+    if (targetPath === "/upload_center" && organization?.disableFileTransfer)
+      return true;
+
     return false;
   };
 

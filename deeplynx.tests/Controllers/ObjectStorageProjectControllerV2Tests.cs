@@ -540,10 +540,10 @@ public class ObjectStorageProjectControllerTestsV2 : IDisposable
     {
         var expected = new ObjectStorageResponseDto();
 
-        _mockProjectBusiness.Setup(b => b.CreateProjectAzureContainer(UserId, OrgId, ProjectId))
+        _mockProjectBusiness.Setup(b => b.CreateProjectAzureContainer(UserId, OrgId, ProjectId, "test"))
                             .ReturnsAsync(expected);
 
-        var result = (await _controller.CreateProjectContainerV2(OrgId, ProjectId)).Result as OkObjectResult;
+        var result = (await _controller.CreateProjectContainerV2(OrgId, ProjectId, "test", false)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -554,22 +554,22 @@ public class ObjectStorageProjectControllerTestsV2 : IDisposable
     public async Task CreateProjectContainerV2_ThrowsException_WhenBusinessThrows()
     {
         _mockProjectBusiness.Setup(b => b.CreateProjectAzureContainer(
-                                It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>()))
+                                It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<string>()))
                             .ThrowsAsync(new Exception("db error"));
 
-        await Assert.ThrowsAsync<Exception>(() => _controller.CreateProjectContainerV2(OrgId, ProjectId));
+        await Assert.ThrowsAsync<Exception>(() => _controller.CreateProjectContainerV2(OrgId, ProjectId, "test", false));
     }
 
     [Fact]
     public async Task CreateProjectContainerV2_PassesCurrentUserIdAndOrganizationIdAndProjectIdFromRouteToBusinessLayer()
     {
         var expected = new ObjectStorageResponseDto();
-        _mockProjectBusiness.Setup(b => b.CreateProjectAzureContainer(UserId, OrgId, ProjectId))
+        _mockProjectBusiness.Setup(b => b.CreateProjectAzureContainer(UserId, OrgId, ProjectId, "test"))
                             .ReturnsAsync(expected);
 
-        await _controller.CreateProjectContainerV2(OrgId, ProjectId);
+        await _controller.CreateProjectContainerV2(OrgId, ProjectId, "test");
 
-        _mockProjectBusiness.Verify(b => b.CreateProjectAzureContainer(UserId, OrgId, ProjectId), Times.Once);
+        _mockProjectBusiness.Verify(b => b.CreateProjectAzureContainer(UserId, OrgId, ProjectId, "test"), Times.Once);
     }
 
     [Fact]

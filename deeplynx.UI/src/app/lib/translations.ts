@@ -127,6 +127,7 @@ export const translations = {
       AZURE_DEFAULT_CONNECTION_STRING: "Azure Default Connection String",
       BACK: "Back",
       BACK_TO_CLASS_SELECTION: "← Back to class selection",
+      BACKEND_CONFIG_AWS: "The backend configuration for AWS S3 storage is currently being finalized.",
       BANNER_EXAMPLE_CUI:
         'e.g. "This organization space contains CUI/ECI data that must be protected accordingly."',
       BANNER_TEXT: "Banner Text",
@@ -319,6 +320,8 @@ export const translations = {
       DESTINATION: "Destination",
       DESTINATION_CLASS: "Destination Class",
       DELETE_SAVED_SEARCH_WARNING: "will be permanently removed. This cannot be undone.",
+      DISABLE_FILE_TRANSFER: "Disable File Transfers",
+      DISABLE_FILE_TRANSFER_HELPER: "Members won't be able to upload or download files through this organization.",
       DONE: "Done",
       DEFAULT_BADGE: "Default",
       DEFAULT_PROJECT_BADGE: "Default (Project)",
@@ -485,6 +488,7 @@ export const translations = {
       FAILED_TO_UPDATE_STORAGE: "Failed to update storage",
       FAILED_TO_UPDATE_TAGS: "Failed to update tags",
       FAILED_TO_UPLOAD_LOGO: "Failed to upload logo",
+      FAILED_TO_UPDATE_FILE_TRANSFER_SETTING: "Failed to update file transfer setting",
       FILE: "File",
       FILE_A_BUG: "File A Bug",
       FILE_PATH: "File Path",
@@ -502,6 +506,10 @@ export const translations = {
       FILE_NAME: "File name:",
       FILE_SIZE: "File Size",
       FILE_SIZE_MUST_BE_5MB: "File size must be less than 5MB",
+      FILE_TRANSFER: "File Transfer",
+      FILE_TRANSFER_DESCRIPTION: "Control whether members of this organization can upload or download files.",
+      FILE_TRANSFER_DISABLED_SUCCESSFULLY: "File transfer disabled for this organization",
+      FILE_TRANSFER_ENABLED_SUCCESSFULLY: "File transfer enabled for this organization",
       FILE_TYPE: "File Type",
       FILE_UPLOAD: "File Upload",
       FILE_UPLOADED_SUCCESSFULLY: "File uploaded successfully!",
@@ -1995,6 +2003,8 @@ export const translations = {
       UPLOAD_CENTER: "Upload Center",
       UPLOAD_CENTER_DESCRIPTION:
         "Choose an upload mode, configure destination resources, then upload.",
+      UPLOAD_CENTER_DISABLED: "File transfer is disabled for this organization",
+      UPLOAD_CENTER_DISABLED_DETAIL: "An administrator has disabled file uploads and downloads for this organization.",
       UPLOAD_FAILED_CHECK_FILE_CARD: "Upload failed. Check the file card.",
       UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW:
         "Upload failed. Please check the error details below.",
@@ -2016,6 +2026,7 @@ export const translations = {
       URI_PLACEHOLDER: "uri",
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Used as the default when creating new data sources for projects.",
+      USE_EXISTING_CONTAINER: "Use Existing Container",
       USE_ORGANIZATION_STORAGE: "Use Organization Storage",
       USE_SELECTOR_TO_ADD_LABELS: "Use the selector above to add labels.",
       USE_SELECTOR_TO_ADD_TAGS: "Use the selector above to add tags.",
@@ -2272,6 +2283,7 @@ export const translations = {
       AZURE_DEFAULT_CONNECTION_STRING: "Cadena de conexión predeterminada de Azure",
       BACK: "Atrás",
       BACK_TO_CLASS_SELECTION: "← Volver a la seleccion de clase",
+      BACKEND_CONFIG_AWS: "La configuración del backend para el almacenamiento AWS S3 está actualmente en proceso de finalización.",
       BANNER_EXAMPLE_CUI:
         'Ej. "Este espacio de la organización contiene datos CUI/ECI que deben protegerse adecuadamente."',
       BANNER_TEXT: "Texto del banner",
@@ -2444,6 +2456,8 @@ export const translations = {
       DATA_TYPE: "Tipo de dato",
       DELETE_SAVED_SEARCH: "¿Eliminar búsqueda guardada?",
       DELETE_SAVED_SEARCH_WARNING: "se eliminará permanentemente. Esta acción no se puede deshacer.",
+      DISABLE_FILE_TRANSFER: "Desactivar la transferencia de archivos",
+      DISABLE_FILE_TRANSFER_HELPER: "Los miembros no podrán cargar ni descargar archivos a través de esta organización.",
       DONE: "Hecho",
       DATA_SCHEMA_DESCRIPTION: "Creación y administración de clases y relaciones para asignarlas a registros y aristas.",
       DEFINE_WHICH_CLASSES_CAN_CONNECT_AND_HOW_EDGE_SHOULD_READ: "Define qué clases pueden conectarse y cómo debe interpretarse esa relación.",
@@ -2652,6 +2666,7 @@ export const translations = {
       FAILED_TO_UPDATE_STORAGE: "No se pudo actualizar el almacenamiento",
       FAILED_TO_UPDATE_TAGS: "Error al actualizar las etiquetas",
       FAILED_TO_UPLOAD_LOGO: "No se pudo subir el logotipo",
+      FAILED_TO_UPDATE_FILE_TRANSFER_SETTING: "No se pudo actualizar la configuración de transferencia de archivos.",
       FILE_A_BUG: "Reportar un error",
       FILE_CARD_TITLE: "Archivo {index}: {name}",
       FILE_COUNT: "Conteo de archivos",
@@ -2661,6 +2676,10 @@ export const translations = {
       FILTER_ALL_RESULTS: "Filtrar todos los resultados",
       FILTER_OPTIONS: "Opciones de filtro",
       FILE_SIZE_MUST_BE_5MB: "El tamaño del archivo debe ser menor a 5 MB",
+      FILE_TRANSFER: "Transferencia de archivos",
+      FILE_TRANSFER_DESCRIPTION: "Controla si los miembros de esta organización pueden subir o descargar archivos.",
+      FILE_TRANSFER_DISABLED_SUCCESSFULLY: "Transferencia de archivos deshabilitada para esta organización.",
+      FILE_TRANSFER_ENABLED_SUCCESSFULLY: "Transferencia de archivos habilitada para esta organización.",
       FILE_TYPE: "Tipo de archivo",
       FILE_UPLOAD: "Carga de archivos",
       FILE_UPLOADED_SUCCESSFULLY: "¡Archivo cargado correctamente!",
@@ -4229,6 +4248,8 @@ export const translations = {
       UPLOAD_CENTER: "Centro de carga",
       UPLOAD_CENTER_DESCRIPTION:
         "Elige un modo de carga, configura los recursos de destino y luego carga.",
+      UPLOAD_CENTER_DISABLED: "La transferencia de archivos está deshabilitada para esta organización.",
+      UPLOAD_CENTER_DISABLED_DETAIL: "Un administrador ha deshabilitado la carga y descarga de archivos para esta organización.",
       UPLOAD_FAILED_CHECK_FILE_CARD:
         "La carga falló. Revise la tarjeta del archivo.",
       UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW:
@@ -4254,6 +4275,7 @@ export const translations = {
       UPDATED: "actualizado",
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Se usa como valor predeterminado al crear nuevas fuentes de datos para los proyectos.",
+      USE_EXISTING_CONTAINER: "Usar contenedor existente",
       USE_ORGANIZATION_STORAGE:
         "Utilizar el almacenamiento de la organización",
       USE_SELECTOR_TO_ADD_LABELS:
