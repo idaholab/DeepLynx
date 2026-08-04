@@ -16,6 +16,7 @@ interface StorageFormData {
   name: string;
   config: StorageConfig;
   default: boolean;
+  existingContainer?: boolean;
 }
 
 interface EditStorageModalProps {
@@ -24,6 +25,7 @@ interface EditStorageModalProps {
   storageFormData: StorageFormData;
   setStorageFormData: (value: StorageFormData) => void;
   onEdit: () => void;
+  editingStorage: ObjectStorageResponseDto | null;
   setEditingStorage: (value: ObjectStorageResponseDto | null) => void;
 }
 
@@ -33,6 +35,7 @@ const EditStorageModal = ({
   storageFormData,
   setStorageFormData,
   onEdit,
+  editingStorage,
   setEditingStorage,
 }: EditStorageModalProps) => {
   const { t } = useLanguage();
@@ -90,6 +93,7 @@ const EditStorageModal = ({
               placeholder="e.g., Primary Storage"
               className="input input-bordered"
               value={storageFormData.name}
+              disabled={editingStorage?.projectId == null}
               onChange={(e) =>
                 setStorageFormData({ ...storageFormData, name: e.target.value })
               }
@@ -141,6 +145,7 @@ const EditStorageModal = ({
                 type="checkbox"
                 className="checkbox checkbox-primary"
                 checked={storageFormData.default}
+                disabled={editingStorage?.projectId == null}
                 onChange={(e) =>
                   setStorageFormData({
                     ...storageFormData,

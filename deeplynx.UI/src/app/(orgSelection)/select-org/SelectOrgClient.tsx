@@ -86,6 +86,7 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
   const [formData, setFormData] = useState<CreateOrganizationRequestDto>({
     name: "",
     description: "",
+    disableFileTransfer: false,
   });
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
@@ -96,7 +97,7 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
     try {
       await createOrganization(formData);
 
-      setFormData({ name: "", description: "" });
+      setFormData({ name: "", description: "", disableFileTransfer: false });
       setIsModalOpen(false);
 
       router.refresh();
@@ -281,7 +282,7 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
                 onClick={() => {
                   setIsModalOpen(false);
                   setCreateError(null);
-                  setFormData({ name: "", description: "" });
+                  setFormData({ name: "", description: "", disableFileTransfer: false });
                 }}
               >
                 <XMarkIcon className="size-5" />
@@ -319,6 +320,30 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
                 disabled={isCreating}
               />
 
+              {/* Disable File Transfer Checkbox */}
+              <div className="form-control">
+                <label className="cursor-pointer label flex items-center justify-start w-fit gap-3">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-primary"
+                    checked={formData.disableFileTransfer || false}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        disableFileTransfer: e.target.checked,
+                      })
+                    }
+                    disabled={isCreating}
+                  />
+                  <span className="font-bold text-lg text-base-content/60">
+                    {t.translations.DISABLE_FILE_TRANSFER}
+                  </span>
+                </label>
+                <span className="text-xs text-base-content/60 mt-1">
+                  {t.translations.DISABLE_FILE_TRANSFER_HELPER}
+                </span>
+              </div>
+
               <div className="modal-action mt-6">
                 <button
                   type="button"
@@ -326,7 +351,7 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
                   onClick={() => {
                     setIsModalOpen(false);
                     setCreateError(null);
-                    setFormData({ name: "", description: "" });
+                    setFormData({ name: "", description: "", disableFileTransfer: false });
                   }}
                   disabled={isCreating}
                 >

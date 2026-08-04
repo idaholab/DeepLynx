@@ -16,6 +16,7 @@ interface StorageFormData {
   config: StorageConfig;
   default: boolean;
   createContainerPerProject: boolean;
+  existingStorage?: boolean;
 }
 
 interface EditStorageModalProps {
