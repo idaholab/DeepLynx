@@ -47,6 +47,12 @@ export function withNexusApiVersion(baseUrl: string): string {
   return `${getNexusApiBaseUrl(baseUrl)}/${getDefaultNexusApiVersion()}`;
 }
 
+/** Append an endpoint path to an already-versioned Nexus API base URL. */
+export function appendNexusApiPath(apiBaseUrl: string, path: string): string {
+  const base = apiBaseUrl.trim().replace(/\/+$/, "");
+  return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
+}
+
 /** Build the Scalar documentation URL, whose version follows /api/scalar. */
 export function getNexusScalarUrl(baseUrl: string): string {
   return `${getNexusApiBaseUrl(baseUrl)}/scalar/${getDefaultNexusApiVersion()}`;

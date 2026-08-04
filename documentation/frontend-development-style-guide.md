@@ -340,8 +340,15 @@ Run targeted tests during development and the broader suite before submitting si
 
 ```bash
 cd deeplynx.UI
+npm run test:unit
+npm run test:e2e
 npm run test
 ```
+
+`npm run test` runs the focused unit suite before the Playwright end-to-end
+suite. Keep API URL, authentication interceptor, session deduplication, and API
+error behavior covered in `tests/unit`; these tests do not start a browser or
+development server.
 
 ## Local Development Commands
 

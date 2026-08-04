@@ -10,7 +10,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npx playwright test"
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "playwright test --config=playwright.unit.config.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
