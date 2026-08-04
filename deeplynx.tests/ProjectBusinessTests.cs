@@ -442,6 +442,25 @@ public class ProjectBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Add object storage
+        var config = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+        var objectStorageFs = new ObjectStorage
+        {
+            Name = "Object Storage 1",
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.ObjectStorages.Add(objectStorageFs);
+        await Context.SaveChangesAsync();
+        osid = objectStorageFs.Id;
+
+        // Add object storage
         var os1Config = new JsonObject
         {
             ["MountPath"] = "../data/duckdb"
@@ -914,6 +933,63 @@ public class ProjectBusinessTests : IntegrationTestBase
                 _projectBusiness.DeleteProject(uid, oid, nonExistentId));
 
         Assert.Contains($"Project with id {nonExistentId} not found.", exception.Message);
+    }
+
+    #endregion
+
+    #region Integration DeleteProject Tests
+
+    [Fact]
+    public async Task DeleteProject_FileDeleted_DeletesProjectFile()
+    {
+        // Create record file
+        var file = CreateMockFile("file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Delete project and files
+        var result = await _projectBusiness.DeleteProject(uid, oid, pid);
+        Assert.True(result);
+
+        // Check file
+        Assert.False(File.Exists(record.Uri));
+    }
+
+    [Fact]
+    public async Task DeleteProject_FileSaved_DeletesProjectNotFile()
+    {
+        // Disable file deletion
+        var os = await Context.ObjectStorages.FindAsync(osid);
+        os!.FilesDeletable = false;
+        await Context.SaveChangesAsync();
+
+        // Create record file
+        var file = CreateMockFile("not_file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Delete project but not files
+        var result = await _projectBusiness.DeleteProject(uid, oid, pid);
+        Assert.True(result);
+
+        // Check file
+        Assert.True(File.Exists(record.Uri));
+    }
+
+    private static FormFile CreateMockFile(string fileName, string content = "Mock File")
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
+
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
     }
 
     #endregion
