@@ -33,21 +33,21 @@ public class FileFilesystemBusiness : IFileBusiness
         _recordBusiness = recordBusiness;
     }
 
-    public Task<string?> CalculateFileContentHash(
+    public async Task<string?> CalculateFileContentHash(
         IFormFile file,
         CancellationToken cancellationToken = default)
     {
-        // TODO: Implement filesystem file hashing in its dedicated follow-up ticket.
-        return Task.FromResult<string?>(null);
+        await using var stream = file.OpenReadStream();
+        return await Sha256HashHelper.ComputeHexAsync(stream, cancellationToken);
     }
 
-    public Task<string?> CalculateStoredFileContentHash(
+    public async Task<string?> CalculateStoredFileContentHash(
         string fileUri,
         ObjectStorageConfigDto objectStorageConfig,
         CancellationToken cancellationToken = default)
     {
-        // TODO: Implement filesystem file hashing in its dedicated follow-up ticket.
-        return Task.FromResult<string?>(null);
+        await using var stream = File.OpenRead(fileUri);
+        return await Sha256HashHelper.ComputeHexAsync(stream, cancellationToken);
     }
 
     /// <summary>
