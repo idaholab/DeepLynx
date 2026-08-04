@@ -771,7 +771,9 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
 
     const guid = uuidv4();
 
-    return `${truncatedInputString}-${guid}`.toLowerCase();
+    let finalString = `${truncatedInputString}-${guid}`.toLowerCase().replace("--", "-")
+
+    return finalString;
   }
 
   return (
