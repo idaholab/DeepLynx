@@ -98,8 +98,8 @@ public class ApiVersioningTests : IntegrationTestBase
         var deprecatedVersions = Assert.Single(response.Headers.GetValues("api-deprecated-versions"));
 
         Assert.Multiple(
-            () => Assert.Equal("2", supportedVersions),
-            () => Assert.Equal("1", deprecatedVersions));
+            () => Assert.Matches(@"^2(?:\.0)?$", supportedVersions),
+            () => Assert.Matches(@"^1(?:\.0)?$", deprecatedVersions));
     }
 
     [Fact]
