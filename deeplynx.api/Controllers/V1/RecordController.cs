@@ -81,10 +81,10 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
 
-
-
-
+    
+    
     /// <summary>
     ///     Get All Records Paginated
     /// </summary>
@@ -139,7 +139,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -179,7 +179,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -252,7 +252,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -299,7 +299,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -345,7 +345,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -379,7 +379,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -427,7 +427,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -475,7 +475,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -513,7 +513,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -544,7 +544,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -584,7 +584,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -618,7 +618,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -652,7 +652,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -693,7 +693,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -734,7 +734,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -768,7 +768,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -807,7 +807,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -841,7 +841,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -879,7 +879,7 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -911,6 +911,6 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 }

@@ -49,7 +49,7 @@ public class AirflowController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -75,7 +75,7 @@ public class AirflowController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -102,7 +102,7 @@ public class AirflowController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -132,7 +132,7 @@ public class AirflowController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-
+    
 
 
     /// <summary>
@@ -162,10 +162,10 @@ public class AirflowController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+    
 
 
-
-
+    
     //TODO: Remove when V1 api is deprecated https://nstinl.atlassian-us-gov-mod.net/browse/DL-2642
     private ObjectResult HandleAirflowError(HttpRequestException exc, string context)
     {
