@@ -353,7 +353,7 @@ try
 
     if (isRuntimeStartup)
     {
-        var customcss = File.ReadAllText("moon.css");
+        var customcss = File.ReadAllText(Path.Combine(app.Environment.ContentRootPath, "moon.css"));
         var hostedLink = Environment.GetEnvironmentVariable("HOSTED_LINK");
 
         // Conditional image hosting
@@ -424,4 +424,11 @@ catch (Exception ex) when (ex is not HostAbortedException && ex.Source != "Micro
 finally
 {
     Log.CloseAndFlush();
+}
+
+// Top-level statements generate an internal "Program" class by default.
+// Making it public here lets deeplynx.tests host this exact app with
+// WebApplicationFactory<Program> for integration tests - nothing else changes.
+public partial class Program
+{
 }
