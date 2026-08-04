@@ -68,4 +68,8 @@ public interface IFileBusiness
         ObjectStorageConfigDto objectStorageConfig, string uploadId, Guid guid, string fileName);
     Task<string> GetFileNameTus(long organizationId, long projectId, long realDataSourceId,
         string uploadId, ObjectStorageConfigDto objectStorageConfig);
+
+    Task<ScrapeResult> ScrapeAsync(
+        ObjectStorageDecryptedDto objectStorage, string? afterCursor, int batchSize,
+        int maxBatches, CancellationToken cancellationToken = default);
 }

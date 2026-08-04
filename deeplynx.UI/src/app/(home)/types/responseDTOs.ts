@@ -188,6 +188,7 @@ export type OrganizationResponseDto = {
   banner?: string;
   theme?: string;
   createContainerPerProject: boolean;
+  disableFileTransfer?: boolean;
 };
 
 export type PermissionResponseDto = {

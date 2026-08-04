@@ -33,10 +33,7 @@ interface TestUserCacheEntry {
 }
 
 // ---------------------------------------------------------------------
-// JSON cache files — single-worker only. There's exactly one process
-// touching these files, so plain read/modify/write is sufficient; no
-// cross-process file locking is needed. (Will need revisiting if/when
-// multiple workers are reintroduced.)
+// JSON cache files
 // ---------------------------------------------------------------------
 function readJsonCache<T>(file: string): Record<string, T> {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; }
@@ -162,9 +159,6 @@ async function createOrg(sysApi: APIRequestContext, orgName: string): Promise<st
   return String((await res.json() as Scope).id);
 }
 
-// Single-worker: the orgIdMemo map above already serializes concurrent
-// callers for the same TestOrg within this process, so there's no need to
-// guard against a second process racing us to create the same org.
 export function ensureOrg(org: TestOrg): Promise<string> {
   if (!orgIdMemo.has(org)) {
     orgIdMemo.set(org, (async () => {
@@ -195,8 +189,6 @@ async function createProject(sysApi: APIRequestContext, projectName: string, org
   return String((await res.json() as Scope).id);
 }
 
-// Single-worker: same reasoning as ensureOrg — projectIdMemo already
-// serializes concurrent callers within this process.
 export function ensureProject(project: TestProject): Promise<string> {
   if (!projectIdMemo.has(project)) {
     projectIdMemo.set(project, (async () => {
@@ -237,9 +229,6 @@ async function getAllPermissions(sysApi: APIRequestContext, orgId: string): Prom
   return (await res.json()) as Permission[];
 }
 
-// PermissionResource/PermissionAction values are already the exact display
-// strings the backend's permission catalog uses (e.g. "Object Storage",
-// "Write") — no case/format conversion needed, just concatenate.
 function flattenRolePermissions(perms: RolePermissions): string[] {
   return Object.entries(perms).flatMap(([resource, actions]) => ((actions ?? []) as string[]).map((action) => `${action} ${resource}`));
 }
@@ -266,12 +255,6 @@ async function createCustomRole(sysApi: APIRequestContext, orgId: string, role: 
   return roleId;
 }
 
-// Resolves a project role assignment to a backend role id.
-// - Built-in "user" role: just looked up by name (DEFAULT_ROLE_NAME), no
-//   disk persistence needed since it always exists on the backend already.
-// - Custom role: looked up by name, created if missing, and persisted to
-//   roleCacheFile so re-running tests doesn't recreate it every time.
-// roleIdMemo memoizes both cases in-memory for the life of this run.
 const roleIdMemo = new Map<string, Promise<string>>();
 
 async function resolveProjectUserRoleId(sysApi: APIRequestContext, orgId: string, role: RoleSpec): Promise<string> {

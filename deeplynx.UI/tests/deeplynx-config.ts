@@ -100,9 +100,7 @@ export const ROLES = {
 } as const satisfies Record<string, CustomRole>;
 
 // ---------------------------------------------------------------------
-// Roles — permission-bearing roles ONLY. sysAdmin/orgAdmin/projectAdmin
-// are NOT roles — they're booleans (users.IsSysAdmin, the org-admin
-// endpoint, the project-member isProjectAdmin flag).
+// Roles — permission-bearing roles ONLY.
 // ---------------------------------------------------------------------
 export const Roles = {
   user: 'user',

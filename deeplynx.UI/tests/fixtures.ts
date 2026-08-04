@@ -13,14 +13,6 @@ type Fixtures = {
   request: APIRequestContext;
 };
 
-// Selects org (and project, if given) via cookie, then navigates. A separate
-// step from actAs on purpose: actAs's only job is "give me an authenticated
-// page for this account" — logging in and navigating to a scope are two
-// different things, and keeping them separate means a test can call actAs
-// without immediately committing to a scope, or navigate a page to a
-// different scope later. Exported so both the `page` fixture and tests that
-// call `actAs` directly (e.g. multi-actor workflow tests looping over
-// several accounts) can use it.
 export async function gotoScope(page: Page, org: TestOrg, project?: TestProject): Promise<void> {
   const orgId = await ensureOrg(org);
   await selectOrganization(page, orgId, org.name);
@@ -28,8 +20,6 @@ export async function gotoScope(page: Page, org: TestOrg, project?: TestProject)
   if (project) {
     const projectId = await ensureProject(project);
     await selectProject(page, projectId, project.name);
-    // Org/project are already selected via cookie above, so land directly
-    // on the project page rather than '/'.
     await page.goto(`/project/${projectId}`, { waitUntil: 'domcontentloaded' });
   } else {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
