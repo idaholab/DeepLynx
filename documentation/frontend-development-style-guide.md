@@ -130,6 +130,11 @@ preserving older versions for older consumers. When changing the configured UI
 version, update affected DTOs, error handling, and tests as one reviewed
 contract cutover.
 
+Playwright tests that call the backend directly must use `testApiUrl` from
+`tests/api-url.ts`. This keeps setup, RBAC, Insight, upload, and future tests on
+the same deployment-wide API version as the UI. Do not declare test-local
+backend base URLs or embed a version in test request strings.
+
 Routes whose layout differs from `/api/{version}`, such as Scalar's
 `/api/scalar/{version}` route, use their dedicated shared URL helper. Use
 `getNexusScalarUrl` for Scalar rather than appending `/scalar` to

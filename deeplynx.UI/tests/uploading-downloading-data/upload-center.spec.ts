@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as zlib from 'zlib';
 import { Project } from "@/app/(home)/types/types";
+import { testApiUrl } from "../api-url";
 
 const TEN_GB = 10 * 1024 * 1024 * 1024;
 const TWENTY_MIN_MS = 20 * 60 * 1000;
@@ -64,8 +65,7 @@ test.describe("Upload Center", () => {
   async function getOrgIdByName(
     request: APIRequestContext, orgName: string
   ): Promise<string> {
-    const BASE_URL = 'http://localhost:5095/api/v1';
-    const res = await request.fetch(`${BASE_URL}/organizations`);
+    const res = await request.fetch(testApiUrl("/organizations"));
     if (!res.ok()) throw new Error(`Failed to fetch organizations: ${res.status()}`);
     const orgs: Organization[] = await res.json();
     const match = orgs.find((org) => org.name === orgName);
@@ -79,14 +79,13 @@ test.describe("Upload Center", () => {
     request: APIRequestContext, orgId: string, projectId: string, type: string
   ) {
     if (!projectId) return;
-    const BASE_URL = 'http://localhost:5095/api/v1';
     const isDataSource = type === 'data source';
     const getAllUrl = isDataSource
-      ? `${BASE_URL}/projects/${projectId}/datasources?hideArchived=true`
-      : `${BASE_URL}/organizations/${orgId}/projects/${projectId}/storages?hideArchived=true`;
+      ? testApiUrl(`/projects/${projectId}/datasources?hideArchived=true`)
+      : testApiUrl(`/organizations/${orgId}/projects/${projectId}/storages?hideArchived=true`);
     const createUrl = isDataSource
-      ? `${BASE_URL}/projects/${projectId}/datasources`
-      : `${BASE_URL}/organizations/${orgId}/projects/${projectId}/storages?makeDefault=false`
+      ? testApiUrl(`/projects/${projectId}/datasources`)
+      : testApiUrl(`/organizations/${orgId}/projects/${projectId}/storages?makeDefault=false`)
     const FIXED_NAME = isDataSource
       ? "Second data source for playwright tests"
       : "Second storage for playwright tests";
@@ -117,9 +116,8 @@ test.describe("Upload Center", () => {
     request: APIRequestContext, orgId: string, projectId: string
   ) {
     if (!projectId) return;
-    const BASE_URL = 'http://localhost:5095/api/v1';
-    const getAllUrl = `${BASE_URL}/organizations/${orgId}/projects`;
-    const createNewUrl = `${BASE_URL}/organizations/${orgId}/projects`;
+    const getAllUrl = testApiUrl(`/organizations/${orgId}/projects`);
+    const createNewUrl = testApiUrl(`/organizations/${orgId}/projects`);
 
     try {
       let res = await request.fetch(getAllUrl);
@@ -160,7 +158,9 @@ test.describe("Upload Center", () => {
     orgId: string,
   ) {
     if (!record) return;
-    const url = `http://localhost:5095/api/v1/organizations/${orgId}/projects/${record.projectId}/records/${record.recordId}`;
+    const url = testApiUrl(
+      `/organizations/${orgId}/projects/${record.projectId}/records/${record.recordId}`,
+    );
     try {
       const response = await request.delete(url);
       if (!response.ok()) {

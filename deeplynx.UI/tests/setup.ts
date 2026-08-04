@@ -7,6 +7,7 @@ import {
   ACTINGUSERS, ORGS, PROJECTS, DEFAULT_ROLE_NAME, TestAccount,
   authFile, testUserCacheFile, TestUserCacheEntry,
 } from './deeplynx-config';
+import { TEST_API_BASE_URL } from './api-url';
 
 loadEnvConfig(process.cwd());
 
@@ -16,7 +17,7 @@ function requireEnv(name: string): string {
   return value;
 }
 
-const API_URL = requireEnv('BACKEND_BASE_URL');
+const API_URL = TEST_API_BASE_URL;
 const FRONTEND_URL = requireEnv('NEXTAUTH_URL');
 
 // ---- Token + session helpers ------------------------------------------------
