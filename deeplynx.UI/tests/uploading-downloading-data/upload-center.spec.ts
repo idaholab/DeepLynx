@@ -183,7 +183,7 @@ test.describe("Upload Center", () => {
           page.waitForURL(/\/project\/\d+/, { timeout: 15_000 }),
         ]);
         return;
-      } catch(e) {
+      } catch (e) {
         console.log(`[selectProjectWithRetry] attempt ${attempt} failed, url=${page.url()}`);
 
         if (attempt === maxAttempts) throw e;
@@ -198,7 +198,7 @@ test.describe("Upload Center", () => {
     const nextPage = page.getByRole('button', { name: 'Next page' }).first();
     const pageNumber = page.getByRole('spinbutton', { name: 'Go to page' }).first();
     const file = page.getByText(fileName).first();
-    
+
     if (await pageNumber.isVisible()) {
       await pageNumber.fill('1');
       await pageNumber.press('Enter');
@@ -1065,7 +1065,7 @@ startxref
 
       for (const baseName of fileBaseNames) {
         const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
-        
+
         const recordLink = page.getByRole('link', { name: baseName, exact: true }).first();
         await expect(async () => {
           if (await clearTermsButton.isVisible()) {
@@ -1417,6 +1417,115 @@ startxref
 
       // drag and drop
       await dragAndDrop({ page }, differentProjectDragName, filePaths[5], 'txt', nondefaultProj);
+    });
+  });
+  test.describe("Bulk Metadata -> Default Settings -> Upload csv file with unexpected info", () => {
+    let filePath: string;
+    let row: string;
+    let name: string;
+    let description: string;
+    let original_id: string;
+    let properties: string;
+    let uri: string;
+    let object_storage_id: string;
+    let class_id: string;
+    let class_name: string;
+    let file_type: string;
+    let tags: string;
+    let sensitivity_labels: string;
+
+    const header = [
+      'name (required)',
+      'description (required)',
+      'original_id (required)',
+      'properties (required - JSON format)',
+      'uri (optional)',
+      'object_storage_id (optional)',
+      'class_id (optional)',
+      'class_name (optional)',
+      'file_type (optional)',
+      'tags (optional - comma-separated)',
+      'sensitivity_labels (optional - comma-separated)',
+    ].join('\t');
+
+    test.beforeEach(async ({ }, testInfo) => {
+      name = `Assembly 33-${testInfo.testId}`;
+      description = `Assembly 33 Description`;
+      original_id = `assy-033-${testInfo.testId}`;
+      properties = `{"description":"Assembly 33 Description","diversion flag":false,"height":160,"number of fuel pins":72,"number of heat pipes":19,"temperature":1000}`;
+      uri = `https://example.com/assembly/33`;
+      object_storage_id = `1`;
+      class_id = `5`;
+      class_name = `FuelAssembly`;
+      file_type = `csv`;
+      tags = `monitoring,critical,assembly`;
+    });
+    test.describe("Upload csv file with missing name", () => {
+      const file1 = `${Date.now()}-${Math.random().toString(36).slice(2)}-Assembly-33`;
+      const id1 = `${Date.now()}-${Math.random().toString(36).slice(2)}-assy-033`;
+      const id2 = `${Date.now()}-${Math.random().toString(36).slice(2)}-sensor-alpha-001`;
+      const bulkFileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-upload-missing-name.csv`;
+
+      test.beforeEach(async ({ }) => {
+        // Tab-separated, matching the real template. Row 2 has an empty
+        // name field (required) to trigger a validation failure.
+        filePath = path.join(os.tmpdir(), bulkFileName);
+
+
+
+        const row1 = [
+          file1,
+          'A test file for bulk upload testing',
+          id1,
+          '{"created":"July 2026","candy":"smarties","color":"red"}',
+          '', '', '', '', 'txt', '', '',
+        ].join('\t');
+
+        // Missing name (required) in row 2
+        const row2 = [
+          '',
+          'A test file for bulk upload testing',
+          id2,
+          '{"created":"July 2026","candy":"M&Ms","color":"yellow"}',
+          '', '', '', '', 'pdf', '', '',
+        ].join('\t');
+
+        const fileContent = [header, row1, row2].join('\n');
+
+        await fs.promises.writeFile(filePath, fileContent, 'utf8');
+      });
+
+      test.afterAll(async () => {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      });
+
+      test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing name", async ({ page }) => {
+        // Switch to Bulk Metadata mode, keep default project/data source/storage settings
+        await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
+
+        await checkDataSourcesAndStorageDestinations(page);
+
+        await page.getByRole('button', { name: 'Choose File Button' }).click();
+        const fileInput = page.locator('input[type="file"]');
+        await fileInput.setInputFiles(filePath);
+
+        // TODO: replace with the actual validation-failure text/selector for a missing required field
+        await expect(page.getByText('Validation Failed')).toBeVisible();
+
+        // Validation should not succeed, and the upload button should not appear
+        await expect(page.getByText('Validation Successful!')).not.toBeVisible();
+        await expect(
+          page.getByRole('button', { name: /Upload \d+ Records/ })
+        ).not.toBeVisible();
+
+        // No records should be created — Project Dashboard should not show the file names
+        await page.getByRole("link", { name: "Project Dashboard" }).click();
+        await page.waitForURL(/\/project/);
+        await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+        await expect(page.getByText(file1)).not.toBeVisible();
+      });
     });
   });
 });
