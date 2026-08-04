@@ -174,11 +174,7 @@ try
             options.ApiVersionReader = new UrlSegmentApiVersionReader();
             options.UnsupportedApiVersionStatusCode = StatusCodes.Status400BadRequest;
         })
-        .AddMvc(options =>
-        {
-            options.Conventions.Add(
-                new DefaultApiVersionConvention(NexusApiVersions.Supported, NexusApiVersions.Deprecated));
-        })
+        .AddMvc()
         .AddApiExplorer(options =>
         {
             options.GroupNameFormat = "'v'V";
@@ -355,7 +351,7 @@ try
 
     if (isRuntimeStartup)
     {
-        var customcss = File.ReadAllText(Path.Combine(app.Environment.ContentRootPath, "moon.css"));
+        var customcss = File.ReadAllText("moon.css");
         var hostedLink = Environment.GetEnvironmentVariable("HOSTED_LINK");
 
         // Conditional image hosting
@@ -428,9 +424,7 @@ finally
     Log.CloseAndFlush();
 }
 
-// Top-level statements generate an internal "Program" class by default.
-// Making it public here lets deeplynx.tests host this exact app with
-// WebApplicationFactory<Program> for integration tests - nothing else changes.
+// Expose the generated top-level Program class so integration tests can host this application.
 public partial class Program
 {
 }
