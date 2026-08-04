@@ -1,7 +1,6 @@
 using Asp.Versioning;
 using deeplynx.business;
 using deeplynx.helpers;
-using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.ResponseDTOs;
@@ -129,46 +128,4 @@ public class MaintenanceController : ControllerBase
         }
     }
 
-    /// <summary>
-    ///     Scrape Object Storage To Catalog
-    /// </summary>
-    /// <remarks>
-    ///     Scrapes every file in the given object storage and creates a catalog record for each one.
-    /// </remarks>
-    /// <param name="objectStorageId">The ID of the object storage to be scraped.</param>
-    /// <param name="afterCursor">Cursor returned from a previous call, or omitted to start from the beginning.</param>
-    /// <param name="batchSize">Number of records per upsert batch.</param>
-    /// <param name="maxBatches">Maximum number of batches to process before returning.</param>
-    /// <param name="sensitivityLabelIds">Optional IDs of sensitivity labels to attach to each created record.</param>
-    /// <returns>Number of records processed this call, plus a cursor for the next call (null if complete).</returns>
-    [HttpPost("object-storages/{objectStorageId:long}/scrape", Name = "api_scrape_object_storage_to_catalog")]
-    [MapToApiVersion(2)]
-    [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    [SysAdmin]
-    public async Task<IActionResult> ScrapeObjectStorageToCatalog(
-        long objectStorageId,
-        [FromQuery] string? afterCursor = null,
-        [FromQuery] int batchSize = 500,
-        [FromQuery] int maxBatches = 5,
-        [FromQuery] List<long>? sensitivityLabelIds = null)
-    {
-        long currentUserId = UserContextStorage.UserId;
-        bool isSysAdmin = UserContextStorage.IsSysAdmin;
-        bool isOrgAdmin = UserContextStorage.IsOrgAdmin;
-        bool isProjectAdmin = UserContextStorage.IsProjectAdmin;
-
-        var result = await _maintenanceBusiness.ScrapeObjectStorageToCatalog(
-                objectStorageId,
-                currentUserId,
-                afterCursor,
-                batchSize,
-                maxBatches,
-                sensitivityLabelIds,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin,
-                HttpContext.RequestAborted);
-
-        return Ok(result);
-    }
 }
