@@ -4,6 +4,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 
 namespace deeplynx.api.Controllers;
 
@@ -466,4 +467,105 @@ public class ProjectController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Delete a Project Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
+    /// <returns>True if file was sucessfully deleted</returns>
+    [HttpDelete("{projectId}/logo/{fileName}", Name = "api_delete_project_logo")]
+    [ProjectAdmin]
+    [Sensitivity("delete file")]
+    public async Task<IActionResult> RemoveProjectLogo(
+        long organizationId,
+        long projectId,
+        long? objectStorageId)
+    {
+        try
+        {
+            var success = await _projectBusiness.RemoveLogoFileAsync(organizationId, projectId, objectStorageId);
+
+            if (!success)
+            {
+                return NotFound(new { message = "Active logo file not found or already deleted." });
+            }
+
+            return Ok(new { message = "Active logo file successfully removed." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to remove active logo file for project {projectId}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
+    }
+
+    /// <summary>
+    ///     Get a Project Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
+    /// <returns>File stream of the logo bytes</returns>
+    [HttpGet("{projectId}/logo/image", Name = "api_get_project_image")]
+    public async Task<IActionResult> GetProjectLogoImageV1(
+        long organizationId,
+        long projectId,
+        long? objectStorageId)
+    {
+        try
+        {
+            var result = await _projectBusiness.GetProjectLogoStreamAsync(organizationId, projectId, objectStorageId);
+            if (result == null)
+                return NotFound();
+
+            var (logoStream, fullPath) = result.Value;
+
+
+            var provider = new FileExtensionContentTypeProvider();
+            if (!provider.TryGetContentType(fullPath, out var contentType))
+            {
+                contentType = "application/octet-stream";
+            }
+
+            return File(logoStream, contentType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error retrieving logo image for project {projectId}");
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    /// <summary>
+    ///     Upload a Project Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="objectStorageId">The ID of the object storage to which the file belongs</param>
+    /// <param name="file">The file to upload</param>
+    /// <returns>File path for the logo</returns>
+    [HttpPost("{projectId}/logo", Name = "api_upload_project_logo")]
+    [ProjectAdmin]
+    [Sensitivity("upload file")]
+    public async Task<IActionResult> UploadProjectLogoV1(
+        long organizationId,
+        long projectId,
+        long? objectStorageId,
+        IFormFile file)
+    {
+        try
+        {
+            var logoUri = await _projectBusiness.UploadProjectLogo(organizationId, projectId, objectStorageId, file);
+
+            return Ok(new { message = "Logo uploaded successfully", logoUri });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to upload project logo for project {projectId}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
+    }
+
 }

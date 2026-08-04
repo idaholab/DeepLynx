@@ -7,6 +7,23 @@ namespace deeplynx.business;
 
 public class FileS3Business : IFileBusiness
 {
+    public Task<string?> CalculateFileContentHash(
+        IFormFile file,
+        CancellationToken cancellationToken = default)
+    {
+        // TODO: Implement S3 file hashing in its dedicated follow-up ticket.
+        return Task.FromResult<string?>(null);
+    }
+
+    public Task<string?> CalculateStoredFileContentHash(
+        string fileUri,
+        ObjectStorageConfigDto objectStorageConfig,
+        CancellationToken cancellationToken = default)
+    {
+        // TODO: Implement S3 file hashing in its dedicated follow-up ticket.
+        return Task.FromResult<string?>(null);
+    }
+
     public async Task<string> UploadFile(long organizationId, long projectId, long datasourceId, ObjectStorageConfigDto objectStorageConfig,
         IFormFile file, Guid guid)
     {
@@ -131,5 +148,10 @@ public class FileS3Business : IFileBusiness
         ObjectStorageConfigDto objectStorageConfig)
     {
         return "";
+    }
+
+    public Task<CreateObjectStorageRequestDto> CreateContainer(long organizationId, string? containerName, string? connectionString, bool isDefault = false, bool existingContainer = false)
+    {
+        throw new NotImplementedException();
     }
 }

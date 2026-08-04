@@ -31,7 +31,10 @@ public class QueryBusinessTests : IntegrationTestBase
     private TagBusiness _tagBusiness = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private EncryptionHelper _encryptionHelper = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
     private Mock<IProjectRolePermissionService> _projectRolePermissionServiceMock;
@@ -60,6 +63,8 @@ public class QueryBusinessTests : IntegrationTestBase
         await base.InitializeAsync();
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockAdminService = new Mock<IAdminService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _projectRolePermissionServiceMock = new Mock<IProjectRolePermissionService>();
         _notificationBusiness =
@@ -70,7 +75,8 @@ public class QueryBusinessTests : IntegrationTestBase
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _encryptionHelper = new EncryptionHelper();
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();

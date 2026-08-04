@@ -1,20 +1,25 @@
 // src/app/(home)/organization_management/settings/OrganizationSettings.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
-  LockClosedIcon,
   InformationCircleIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import {
-  getOrganizationLogoUrl,
   uploadOrganizationLogo,
   removeOrganizationLogo,
   updateOrganization,
+  fetchOrganizationLogo,
+  getOrganization,
 } from "@/app/lib/client_service/organization_services.client";
+import StorageSettingsSection from "@/app/(home)/project_management/[id]/settings/components/StorageSettingsSection";
+import CreateStorageModal from "@/app/(home)/organization_management/settings/components/CreateStorageModal";
+import EditStorageModal from "@/app/(home)/organization_management/settings/components/EditStorageModal";
+import DeleteStorageModal from "@/app/(home)/project_management/[id]/settings/components/DeleteStorageModal";
+import ArchiveStorageModal from "@/app/(home)/project_management/[id]/settings/components/ArchiveStorageModal";
 import { useLanguage } from "@/app/contexts/Language";
 import Image from "next/image";
 import OrganizationInsightModelTemplateSection from "./components/OrganizationInsightModelTemplateSection";
@@ -24,6 +29,28 @@ import {
 } from "@/app/lib/themes/organizationTheme";
 import { applyOrganizationTheme } from "@/app/lib/themes/themeMode";
 import { isInsightHidden } from "@/app/lib/feature_flags";
+import { archiveOrganizationObjectStorage, createOrganizationObjectStorage, deleteOrganizationObjectStorage, getAllOrganizationObjectStorages, getDefaultOrganizationObjectStorage, setDefaultOrganizationObjectStorage, updateOrganizationObjectStorage } from "@/app/lib/client_service/object_storage_services.client";
+import { ObjectStorageResponseDto } from "../../types/responseDTOs";
+import { CreateObjectStorageRequestDto, UpdateObjectStorageRequestDto, UpdateOrganizationRequestDto } from "../../types/requestDTOs";
+
+
+type StorageTab = "default" | "manage";
+
+interface AzureObjectConfig {
+  AzureFilePath?: string;
+}
+
+interface StorageConfig {
+  AzureObjectConfig?: AzureObjectConfig;
+}
+
+interface StorageFormData {
+  name: string;
+  config: StorageConfig;
+  default: boolean;
+  createContainerPerProject: boolean;
+  existingContainer?: boolean;
+}
 
 const OrganizationSettings = () => {
   const { organization, setOrganization } = useOrganizationSession();
@@ -57,25 +84,72 @@ const OrganizationSettings = () => {
   } | null>(null);
 
   // Storage states
-  const [storageLocation, setStorageLocation] = useState<string>("org-default");
+  // Storage config fields based on type
+  const [createContainerPerProject, setCreateContainerPerProject] = useState(false);
+  const [existingContainer, setExistingContainer] = useState(false);
+
+  const [activeStorageTab, setActiveStorageTab] =
+    useState<StorageTab>("default");
+  const [availableStorages, setAvailableStorages] = useState<
+    ObjectStorageResponseDto[]
+  >([]);
+  const [defaultStorage, setDefaultStorage] =
+    useState<ObjectStorageResponseDto | null>(null);
+  const [selectedStorageId, setSelectedStorageId] = useState<number | null>(
+    null,
+  );
+  const [isLoadingStorages, setIsLoadingStorages] = useState(true);
+  const [isSavingStorage, setIsSavingStorage] = useState(false);
+
+  // Create/Edit storage modal states
+  const [isCreateStorageModalOpen, setIsCreateStorageModalOpen] =
+    useState(false);
+  const [isEditStorageModalOpen, setIsEditStorageModalOpen] = useState(false);
+  const [editingStorage, setEditingStorage] =
+    useState<ObjectStorageResponseDto | null>(null);
+  const [storageType, setStorageType] = useState<string>("filesystem");
+  const [storageFormData, setStorageFormData] = useState<StorageFormData>({
+    name: "",
+    config: {},
+    default: false,
+    createContainerPerProject: false,
+    existingContainer: false
+  });
+
+  // Storage config fields based on type
+  const [filesystemPath, setFilesystemPath] = useState("");
+  const [azureEndpoint, setAzureEndpoint] = useState("");
+  const [azureBucketName, setAzureBucketName] = useState("");
+
+  // Delete/Archive storage modal states
+  const [deleteStorageId, setDeleteStorageId] = useState<number | null>(null);
+  const [archiveStorageId, setArchiveStorageId] = useState<number | null>(
+    null,
+  );
+  const [archiveAction, setArchiveAction] = useState<boolean>(true);
+
+  // File Transfer states
+  const [disableFileTransfer, setDisableFileTransfer] = useState(false);
+  const [originalDisableFileTransfer, setOriginalDisableFileTransfer] =
+    useState(false);
+  const [isSavingFileTransfer, setIsSavingFileTransfer] = useState(false);
 
   // Load existing logo on mount
   useEffect(() => {
     const loadExistingLogo = async () => {
       if (!organization?.organizationId) {
         setIsCheckingLogo(false);
+        setLogoPreview(null);
         return;
       }
 
       try {
         setIsCheckingLogo(true);
-        const logoUrl = await getOrganizationLogoUrl(
+        const { blobUrl } = await fetchOrganizationLogo(
           organization.organizationId as number,
         );
 
-        if (logoUrl) {
-          setLogoPreview(logoUrl);
-        }
+        setLogoPreview(blobUrl);
       } catch (error) {
         console.error("Error checking for existing logo:", error);
       } finally {
@@ -84,6 +158,12 @@ const OrganizationSettings = () => {
     };
 
     loadExistingLogo();
+
+    return () => {
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+    };
   }, [organization?.organizationId]);
 
   const handleLogoChange = (fileList: FileList | null) => {
@@ -91,8 +171,16 @@ const OrganizationSettings = () => {
 
     const file = fileList[0];
 
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
+    const allowedTypes = [
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "image/webp",
+      "image/gif",
+      "image/svg+xml",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
       toast.error(t.translations.PLEASE_UPLOAD_VALID_IMAGE);
       return;
     }
@@ -104,9 +192,34 @@ const OrganizationSettings = () => {
       return;
     }
 
-    setLogoFile(file);
-    const previewUrl = URL.createObjectURL(file);
-    setLogoPreview(previewUrl);
+    if (!organization?.organizationId) {
+      toast.error("Organization is not loaded.");
+      return;
+    }
+
+    try {
+      // Revoke the previous object URL if it exists
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+
+      // Create and set new preview URL
+      const previewUrl = URL.createObjectURL(file);
+
+      setOrganization({
+        ...organization,
+        logoUrl: previewUrl!,
+      });
+
+      setLogoPreview(previewUrl);
+      setLogoFile(file);
+
+      toast.success(t.translations.LOGO_SELECTED_SUCCESSFULLY);
+
+    } catch (error) {
+      console.error("Failed to process selected logo:", error);
+      toast.error(t.translations.FAILED_TO_UPLOAD_LOGO);
+    }
   };
 
   const handleUploadLogo = async () => {
@@ -118,13 +231,21 @@ const OrganizationSettings = () => {
     try {
       setIsUploading(true);
 
-      const result = await uploadOrganizationLogo({
+      await uploadOrganizationLogo({
         organizationId: organization.organizationId as number,
         file: logoFile,
       });
 
-      // Add timestamp to force browser to reload the image
-      setLogoPreview(`${result.logoUrl}?t=${Date.now()}`);
+      const { blobUrl } = await fetchOrganizationLogo(
+        organization.organizationId as number,
+      );
+
+      setOrganization({
+        ...organization,
+        logoUrl: blobUrl!,
+      });
+
+      setLogoPreview(blobUrl);
       setLogoFile(null);
       toast.success(t.translations.LOGO_UPLOADED_SUCCESSFULLY);
     } catch (error) {
@@ -144,11 +265,20 @@ const OrganizationSettings = () => {
 
     try {
       await removeOrganizationLogo({
-        organizationId: organization.organizationId as number,
+        organizationId: organization.organizationId as number
       });
 
+      setOrganization({
+        ...organization,
+        logoUrl: undefined,
+      });
+
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
       setLogoFile(null);
       setLogoPreview(null);
+
       toast.success(t.translations.LOGO_REMOVED_SUCCESSFULLY);
     } catch (error) {
       console.error("Failed to remove logo:", error);
@@ -157,17 +287,374 @@ const OrganizationSettings = () => {
   };
 
   const handleCancelSelection = async () => {
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+    }
+
     setLogoFile(null);
 
-    // Restore previous logo if it exists
-    if (organization?.organizationId) {
-      const logoUrl = await getOrganizationLogoUrl(
+    if (!organization?.organizationId) {
+      setLogoPreview(null);
+      return;
+    }
+
+    try {
+      const { blobUrl } = await fetchOrganizationLogo(
         organization.organizationId as number,
-      );
-      setLogoPreview(logoUrl);
-    } else {
+      )
+
+      setLogoPreview(blobUrl);
+    } catch (error) {
+      console.error("Failed to restore previous logo:", error);
       setLogoPreview(null);
     }
+  };
+
+  useEffect(() => {
+    async function loadOrgSettings() {
+      if (!organization?.organizationId) return;
+
+      try {
+        const orgData = await getOrganization(organization.organizationId as number);
+        const objectStorage = await getDefaultOrganizationObjectStorage(organization.organizationId as number);
+        setDefaultStorage(objectStorage);
+        setCreateContainerPerProject(orgData.createContainerPerProject ?? false);
+      } catch (error) {
+        console.error("Failed to load organization settings", error);
+      }
+    }
+
+    loadOrgSettings();
+  }, [organization?.organizationId]);
+
+  // Load available storages and default storage for the organization
+  const loadStorages = useCallback(async () => {
+    if (!organization?.organizationId) {
+      setIsLoadingStorages(false);
+      return;
+    }
+
+    try {
+      setIsLoadingStorages(true);
+
+      // Fetch all available storages for the organization
+      const storages = await getAllOrganizationObjectStorages(
+        organization.organizationId as number,
+        false, // Don't hide archived storages
+      );
+
+      // Fetch the current default storage
+      try {
+        const defaultStorageData = await getDefaultOrganizationObjectStorage(
+          organization.organizationId as number,
+        );
+        const orgDefaultStorage =
+          storages.find((storage) => storage.default) ?? null;
+        const effectiveDefaultStorage =
+          orgDefaultStorage ?? defaultStorageData;
+
+        setDefaultStorage(effectiveDefaultStorage);
+        setSelectedStorageId(effectiveDefaultStorage.id as number);
+        setAvailableStorages(
+          storages.map((storage) => ({
+            ...storage,
+            default:
+              String(storage.id) === String(effectiveDefaultStorage.id),
+          })),
+        );
+      } catch (error) {
+        setDefaultStorage(null);
+        setSelectedStorageId(null);
+        setAvailableStorages(storages);
+      }
+    } catch (error) {
+      console.error("Error loading organization storages:", error);
+      toast.error(t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS);
+    } finally {
+      setIsLoadingStorages(false);
+    }
+  }, [
+    organization?.organizationId,
+    t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS,
+  ]);
+
+  useEffect(() => {
+    loadStorages();
+  }, [loadStorages]);
+
+  const handleSaveDefaultStorage = async () => {
+    if (!organization?.organizationId || !selectedStorageId) {
+      toast.error(t.translations.PLEASE_SELECT_A_STORAGE_LOCATION);
+      return;
+    }
+
+    if (defaultStorage?.id === selectedStorageId) {
+      toast.error(t.translations.THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT);
+      return;
+    }
+
+    try {
+      setIsSavingStorage(true);
+
+      await setDefaultOrganizationObjectStorage(
+        organization.organizationId as number,
+        selectedStorageId,
+      );
+
+      const updatedDefault = availableStorages.find(
+        (s) => s.id === selectedStorageId,
+      );
+      if (updatedDefault) {
+        setDefaultStorage({ ...updatedDefault, default: true });
+        setAvailableStorages((currentStorages) =>
+          currentStorages.map((storage) => ({
+            ...storage,
+            default: String(storage.id) === String(selectedStorageId),
+          })),
+        );
+      }
+
+      toast.success(
+        t.translations.DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY,
+      );
+    } catch (error) {
+      console.error("Failed to set default organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_DEFAULT_STORAGE,
+      );
+    } finally {
+      setIsSavingStorage(false);
+    }
+  };
+
+  const resetStorageForm = () => {
+    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
+    setStorageType("filesystem");
+    setFilesystemPath("");
+    setAzureEndpoint("");
+    setAzureBucketName("");
+  };
+
+  const handleCreateStorage = async () => {
+    if (!organization?.organizationId) return;
+
+    if (!storageFormData.name.trim()) {
+      toast.error(t.translations.STORAGE_NAME_IS_REQUIRED);
+      return;
+    }
+
+    // Build config based on storage type
+    let config: Record<string, unknown> = {};
+
+    if (storageType === "filesystem") {
+      if (!filesystemPath.trim()) {
+        toast.error(t.translations.FILESYSTEM_PATH_IS_REQUIRED);
+        return;
+      }
+      config = {
+        mountPath: filesystemPath,
+      };
+    } else if (storageType === "azure_blob") {
+      if (!azureEndpoint.trim() || !azureBucketName.trim()) {
+        toast.error(t.translations.ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED);
+        return;
+      }
+      config = {
+        azureObjectConfig: {
+          azureConnectionString: azureEndpoint,
+          azureContainerName: azureBucketName,
+          existingContainer: storageFormData.existingContainer || false
+        },
+      };
+    } else if (storageType === "aws_s3") {
+      // TODO: Waiting for backend to finalize AWS S3 config structure
+      toast.error("AWS S3 storage configuration is not yet implemented");
+      return;
+    }
+
+    try {
+      const dto: CreateObjectStorageRequestDto = {
+        name: storageFormData.name,
+        config: config,
+        default: storageFormData.default,
+      };
+
+      const updateOrganizationDto: UpdateOrganizationRequestDto = {
+        createContainerPerProject: storageFormData.createContainerPerProject,
+      };
+
+      const createdStorage = await createOrganizationObjectStorage(
+        organization.organizationId as number,
+        dto,
+        storageFormData.default,
+      );
+
+      await updateOrganization(
+        organization.organizationId as number,
+        updateOrganizationDto
+      );
+
+      setCreateContainerPerProject(storageFormData.createContainerPerProject);
+      setExistingContainer(storageFormData.existingContainer as boolean);
+
+      const storageForList = {
+        ...createdStorage,
+        default: storageFormData.default || createdStorage.default,
+      };
+
+      setAvailableStorages((currentStorages) => {
+        const existingStorage = currentStorages.some(
+          (storage) => String(storage.id) === String(storageForList.id),
+        );
+        const nextStorages = existingStorage
+          ? currentStorages.map((storage) =>
+            String(storage.id) === String(storageForList.id)
+              ? storageForList
+              : storage,
+          )
+          : [...currentStorages, storageForList];
+
+        if (!storageForList.default) {
+          return nextStorages;
+        }
+
+        return nextStorages.map((storage) => ({
+          ...storage,
+          default: String(storage.id) === String(storageForList.id),
+        }));
+      });
+
+      if (storageForList.default) {
+        setDefaultStorage(storageForList);
+        setSelectedStorageId(storageForList.id as number);
+      }
+
+      toast.success(t.translations.STORAGE_CREATED_SUCCESSFULLY);
+      setIsCreateStorageModalOpen(false);
+      resetStorageForm();
+    } catch (error) {
+      console.error("Failed to create organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_CREATE_STORAGE,
+      );
+    }
+  };
+
+  const handleEditStorage = async () => {
+    if (!organization?.organizationId || !editingStorage) return;
+    if (editingStorage.isArchived) {
+      toast.error(t.translations.ARCHIVED_STORAGE_CANNOT_BE_EDITED);
+      return;
+    }
+
+    if (!storageFormData.name.trim()) {
+      toast.error(t.translations.STORAGE_NAME_IS_REQUIRED);
+      return;
+    }
+
+    try {
+      const updateObjectStorageDto: UpdateObjectStorageRequestDto = {
+        name: storageFormData.name,
+        default: storageFormData.default,
+        existingContainer: storageFormData.existingContainer,
+      };
+
+      const updateOrganizationDto: UpdateOrganizationRequestDto = {
+        createContainerPerProject: storageFormData.createContainerPerProject,
+      };
+
+      await updateOrganizationObjectStorage(
+        organization.organizationId as number,
+        editingStorage.id as number,
+        updateObjectStorageDto,
+      );
+
+      await updateOrganization(
+        organization.organizationId as number,
+        updateOrganizationDto
+      );
+      setCreateContainerPerProject(storageFormData.createContainerPerProject);
+      setExistingContainer(storageFormData.existingContainer as boolean);
+
+      toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
+      setIsEditStorageModalOpen(false);
+      setEditingStorage(null);
+      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
+      loadStorages();
+    } catch (error) {
+      console.error("Failed to update organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_STORAGE,
+      );
+    }
+  };
+
+  const handleDeleteStorage = async () => {
+    if (!organization?.organizationId || !deleteStorageId) return;
+
+    try {
+      await deleteOrganizationObjectStorage(
+        organization.organizationId as number,
+        deleteStorageId,
+      );
+
+      toast.success(t.translations.STORAGE_DELETE_SUCCESSFULLY);
+      setDeleteStorageId(null);
+      loadStorages();
+    } catch (error) {
+      console.error("Failed to delete organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_DELETE_STORAGE,
+      );
+    }
+  };
+
+  const handleArchiveStorage = async () => {
+    if (!organization?.organizationId || !archiveStorageId) return;
+
+    try {
+      await archiveOrganizationObjectStorage(
+        organization.organizationId as number,
+        archiveStorageId,
+        archiveAction,
+      );
+
+      toast.success(
+        `${t.translations.STORAGE} ${archiveAction ? t.translations.ARCHIVE : t.translations.UNARCHIVE} ${t.translations.SUCCESSFULLY}`,
+      );
+      setArchiveStorageId(null);
+      loadStorages();
+    } catch (error) {
+      console.error("Failed to archive/unarchive organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_ARCHIVE_STORAGE,
+      );
+    }
+  };
+
+  const openEditStorageModal = (storage: ObjectStorageResponseDto) => {
+    if (storage.isArchived) {
+      return;
+    }
+    setEditingStorage(storage);
+    setStorageFormData({
+      name: storage.name,
+      config: {},
+      default: storage.default,
+      createContainerPerProject: createContainerPerProject,
+      existingContainer: existingContainer,
+    });
+    setIsEditStorageModalOpen(true);
   };
 
   // Syncs Theme from session
@@ -241,6 +728,61 @@ const OrganizationSettings = () => {
       setOriginalBannerText(banner);
     }
   }, [organization?.banner]);
+
+  useEffect(() => {
+    const disabled = !!organization?.disableFileTransfer;
+    setDisableFileTransfer(disabled);
+    setOriginalDisableFileTransfer(disabled);
+  }, [organization?.disableFileTransfer]);
+
+  const handleSaveFileTransfer = async () => {
+    if (!organization?.organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
+
+    try {
+      setIsSavingFileTransfer(true);
+
+      await updateOrganization(organization.organizationId as number, {
+        disableFileTransfer,
+      });
+
+      setOriginalDisableFileTransfer(disableFileTransfer);
+      setOrganization({
+        ...organization,
+        disableFileTransfer,
+      });
+
+      toast.success(
+        disableFileTransfer
+          ? t.translations.FILE_TRANSFER_DISABLED_SUCCESSFULLY ||
+          "File transfer disabled for this organization"
+          : t.translations.FILE_TRANSFER_ENABLED_SUCCESSFULLY ||
+          "File transfer enabled for this organization",
+      );
+    } catch (error) {
+      console.error("Failed to update file transfer setting: ", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_FILE_TRANSFER_SETTING,
+      );
+    } finally {
+      setIsSavingFileTransfer(false);
+    }
+  };
+
+  const handleCancelFileTransfer = () => {
+    setDisableFileTransfer(originalDisableFileTransfer);
+    toast.custom(
+      <div className="text-info">
+        <ExclamationTriangleIcon className="size-4" />
+        {t.translations.CHANGES_DISCARDED}
+      </div>,
+    );
+  };
+
 
   const handleSaveBanner = async () => {
     if (!organization?.organizationId) {
@@ -493,11 +1035,10 @@ const OrganizationSettings = () => {
                         <button
                           key={theme.id}
                           type="button"
-                          className={`rounded-lg border p-4 text-left transition ${
-                            selected
-                              ? "border-primary bg-primary/10"
-                              : "border-base-300 bg-base-100 hover:border-primary/40 hover:bg-base-200/40"
-                          }`}
+                          className={`rounded-lg border p-4 text-left transition ${selected
+                            ? "border-primary bg-primary/10"
+                            : "border-base-300 bg-base-100 hover:border-primary/40 hover:bg-base-200/40"
+                            }`}
                           onClick={() => setSelectedThemeName(theme.id)}
                           disabled={isSavingTheme}
                         >
@@ -548,6 +1089,67 @@ const OrganizationSettings = () => {
                     )}
                   </div>
                 </div>
+
+                <div className="divider" />
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="card-title text-lg mb-2">
+                      {t.translations.FILE_TRANSFER}
+                    </h3>
+                    <p className="text-sm text-base-content/60 mt-1">
+                      {t.translations.FILE_TRANSFER_DESCRIPTION}
+                    </p>
+                  </div>
+
+                  <div className="form-control">
+                    <label className="cursor-pointer label flex items-center justify-start w-fit gap-3">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary"
+                        checked={disableFileTransfer}
+                        disabled={isSavingFileTransfer}
+                        onChange={(e) =>
+                          setDisableFileTransfer(e.target.checked)
+                        }
+                      />
+                      <span className="label-text font-semibold">
+                        {t.translations.DISABLE_FILE_TRANSFER}
+                      </span>
+                    </label>
+                    <span className="text-xs text-base-content/60 mt-1">
+                      {t.translations.DISABLE_FILE_TRANSFER_HELPER}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSaveFileTransfer}
+                      disabled={
+                        isSavingFileTransfer ||
+                        disableFileTransfer === originalDisableFileTransfer
+                      }
+                    >
+                      {isSavingFileTransfer && (
+                        <span className="loading loading-spinner loading-xs" />
+                      )}
+                      {t.translations.SAVE}
+                    </button>
+
+                    {disableFileTransfer !== originalDisableFileTransfer && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={handleCancelFileTransfer}
+                        disabled={isSavingFileTransfer}
+                      >
+                        {t.translations.CANCEL}
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -555,56 +1157,39 @@ const OrganizationSettings = () => {
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">
             {/* ============================================================ */}
-            {/*               STORAGE SETTINGS (COMING SOON)                 */}
+            {/*                     STORAGE SETTINGS                        */}
             {/* ============================================================ */}
-            <div className="card bg-base-100 border border-base-300/50 shadow-sm opacity-60">
-              <div className="card-body">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="card-title text-lg flex items-center gap-2">
-                    {t.translations.STORAGE_SETTINGS}
-                    <span className="badge badge-warning badge-sm">
-                      {t.translations.COMING_SOON}
-                    </span>
-                  </h3>
-                  <LockClosedIcon className="w-5 h-5 text-warning" />
-                </div>
-                <p className="text-sm text-base-content/70 mb-4">
-                  {t.translations.SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE}
-                </p>
-
-                <div className="form-control mb-4 pointer-events-none">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      {t.translations.DEFAULT_UNMOUNT_STORAGE}
-                    </span>
-                  </label>
-                  <select
-                    className="select select-bordered"
-                    value={storageLocation}
-                    onChange={(e) => setStorageLocation(e.target.value)}
-                    disabled
-                  >
-                    <option value="org-default">
-                      {t.translations.ORGANIZATION_DEFAULT}
-                    </option>
-                    <option value="s3-west">
-                      {t.translations.S3_US_WEST_2}
-                    </option>
-                    <option value="s3-east">
-                      {t.translations.S3_US_EAST_1}
-                    </option>
-                    <option value="local-cluster">
-                      {t.translations.LOCAL_CLUSTER_STORAGE}
-                    </option>
-                  </select>
-                  <label className="label">
-                    <span className="label-text-alt text-base-content/60">
-                      {t.translations.USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS}
-                    </span>
-                  </label>
+            {isLoadingStorages ? (
+              <div className="card bg-base-100 border border-base-300/50 shadow-sm">
+                <div className="card-body items-center justify-center py-10">
+                  <span className="loading loading-spinner loading-md" />
                 </div>
               </div>
-            </div>
+            ) : (
+              <StorageSettingsSection
+                scope="organization"
+                organizationId={organization?.organizationId ?? undefined}
+                activeTab={activeStorageTab}
+                onChangeTab={setActiveStorageTab}
+                availableStorages={availableStorages}
+                selectedStorageId={selectedStorageId}
+                onSelectStorage={setSelectedStorageId}
+                defaultStorage={defaultStorage}
+                isSavingStorage={isSavingStorage}
+                onSaveDefaultStorage={handleSaveDefaultStorage}
+                onCreateStorage={() => {
+                  resetStorageForm();
+                  setIsCreateStorageModalOpen(true);
+                }}
+                onEditStorage={openEditStorageModal}
+                onToggleArchive={(storage) => {
+                  setArchiveStorageId(storage.id as number);
+                  setArchiveAction(!storage.isArchived);
+                }}
+                onDeleteStorage={(storageId) => setDeleteStorageId(storageId)}
+                t={t}
+              />
+            )}
 
             {!isInsightHidden() && (
               <OrganizationInsightModelTemplateSection
@@ -614,21 +1199,29 @@ const OrganizationSettings = () => {
               />
             )}
           </div>
-        </div>
 
-        {/* Info Banner at Bottom */}
-        <div className="alert alert-info mt-6">
-          <InformationCircleIcon className="h-6 w-6" />
-          <div>
-            <div className="font-bold">
-              {t.translations.ADDITIONAL_SETTINGS_COMING_SOON}
-            </div>
-            <div className="text-sm">
-              {
-                t.translations
-                  .STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT
+          {!isInsightHidden() && (
+            <OrganizationInsightModelTemplateSection
+              organizationId={
+                organization?.organizationId as number | undefined
               }
-            </div>
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Info Banner at Bottom */}
+      <div className="alert alert-info mt-6">
+        <InformationCircleIcon className="h-6 w-6" />
+        <div>
+          <div className="font-bold">
+            {t.translations.ADDITIONAL_SETTINGS_COMING_SOON}
+          </div>
+          <div className="text-sm">
+            {
+              t.translations
+                .STORAGE_CONFIGURATION_AND_ADDITIONAL_ORG_MANAGEMENT_IN_DEVELOPMENT
+            }
           </div>
         </div>
       </div>
@@ -655,14 +1248,54 @@ const OrganizationSettings = () => {
           </div>
         </div>
       </div>
-      {themeToast && (
-        <div className="toast toast-bottom toast-end">
-          <div className={`alert alert-${themeToast.type}`}>
-            {themeToast.message}
+      {
+        themeToast && (
+          <div className="toast toast-bottom toast-end">
+            <div className={`alert alert-${themeToast.type}`}>
+              {themeToast.message}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+
+      <CreateStorageModal
+        isOpen={isCreateStorageModalOpen}
+        onToggle={setIsCreateStorageModalOpen}
+        storageType={storageType}
+        setStorageType={setStorageType}
+        storageFormData={storageFormData}
+        setStorageFormData={setStorageFormData}
+        filesystemPath={filesystemPath}
+        setFilesystemPath={setFilesystemPath}
+        azureEndpoint={azureEndpoint}
+        setAzureEndpoint={setAzureEndpoint}
+        azureBucketName={azureBucketName}
+        setAzureBucketName={setAzureBucketName}
+        onCreate={handleCreateStorage}
+        onResetForm={resetStorageForm}
+      />
+      <EditStorageModal
+        isOpen={isEditStorageModalOpen}
+        onToggle={setIsEditStorageModalOpen}
+        storageFormData={storageFormData}
+        setStorageFormData={setStorageFormData}
+        onEdit={handleEditStorage}
+        setEditingStorage={setEditingStorage}
+      />
+      <DeleteStorageModal
+        isOpen={deleteStorageId !== null}
+        onToggle={(value) => setDeleteStorageId(value ? deleteStorageId : null)}
+        onDelete={handleDeleteStorage}
+      />
+      <ArchiveStorageModal
+        isOpen={archiveStorageId !== null}
+        onToggle={(value) =>
+          setArchiveStorageId(value ? archiveStorageId : null)
+        }
+        archiveAction={archiveAction}
+        onArchive={handleArchiveStorage}
+      />
+    </div >
   );
 };
 

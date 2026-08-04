@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -18,22 +19,32 @@ namespace deeplynx.tests;
 public class ProjectBusinessTests : IntegrationTestBase
 {
     private ClassBusiness _classBusiness = null!;
+    private FileAzureBusiness _fileAzureBusiness;
+    private UserBusiness _userBusiness = null!;
     private DataSourceBusiness _dataSourceBusiness = null!;
+    private EncryptionHelper _encryptionHelper = null!;
     private EventBusiness _eventBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IEdgeBusiness> _mockEdgeBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
+    private Mock<ILogger<AdminService>> _adminServiceLogger;
     private INotificationBusiness _notificationBusiness = null!;
-    private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
+    private IProjectRolePermissionService _permissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
+    private IAdminService _adminService = null!;
+    private Mock<ILogger<ProjectRolePermissionService>> _logger = null!;
+    private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private RoleBusiness _roleBusiness = null!;
     private Mock<IBulkCopyUpsertExecutor> _bulkCopyUpsertExecutor = null!;
     private long cid; // class ID
     private long did; // datasource ID
+    private long os1;
     private long gid; // group ID
     private long gid2;
     private long oid; // org IDs
@@ -57,6 +68,10 @@ public class ProjectBusinessTests : IntegrationTestBase
 
     public override async Task InitializeAsync()
     {
+        Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE="); // 32 bytes
+        Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ=="); // 16 bytes
+
+        _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
         Environment.SetEnvironmentVariable("FILE_STORAGE_METHOD", "filesystem");
         Environment.SetEnvironmentVariable("STORAGE_DIRECTORY", "./storage/");
@@ -68,7 +83,10 @@ public class ProjectBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
-        _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
+        _logger = new Mock<ILogger<ProjectRolePermissionService>>();
+        _permissionService = new ProjectRolePermissionService(Context, _logger.Object);
         _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockEdgeBusiness = new Mock<IEdgeBusiness>();
@@ -76,16 +94,18 @@ public class ProjectBusinessTests : IntegrationTestBase
         _organizationBusiness = new Mock<IOrganizationBusiness>();
 
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(
             Context, _mockEdgeBusiness.Object,
             _mockRecordBusiness.Object, _eventBusiness);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness);
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object);
+            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _fileAzureBusiness);
     }
 
     #region GetProjectStats Tests
@@ -109,8 +129,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         await base.SeedTestDataAsync();
 
         // Add org
-        var testOrg = new Organization { Name = "Test Org" };
-        var deletedOrg = new Organization { Name = "Delete Me" };
+        var testOrg = new Organization { Name = "Test Org", CreateContainerPerProject = false };
+        var deletedOrg = new Organization { Name = "Delete Me", CreateContainerPerProject = false };
         Context.Organizations.AddRange(testOrg, deletedOrg);
         await Context.SaveChangesAsync();
         oid = testOrg.Id;

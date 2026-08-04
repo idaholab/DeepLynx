@@ -149,17 +149,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const { t } = useLanguage();
   const { organization, hasLoaded } = useOrganizationSession();
   const router = useRouter();
-  
+
   const organizationId =
-      organization?.organizationId !== undefined
-        ? Number(organization.organizationId)
-        : null;
-  
+    organization?.organizationId !== undefined
+      ? Number(organization.organizationId)
+      : null;
+
   const { selectedInsightModels, setSelectedInsightModels } = useInsightModelSelection(
-      organizationId,
-      projectId,
+    organizationId,
+    projectId,
   );
-          
+
   // ============= STATE MANAGEMENT =============
   // Record & Tags State
   const [record, setRecord] = useState<HistoricalRecordResponseDto | null>(
@@ -585,6 +585,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     if (!record) return [];
 
     const isDownloadable =
+      !organization?.disableFileTransfer &&
       !!record.uri &&
       record.uri.trim().length > 0 &&
       record.uri.toLowerCase() !== "null";
@@ -619,6 +620,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         copyAriaLabel: t.translations.COPY_RECORD_URI,
         idleIconClassName: "size-6 text-base-content/70",
         copiedIconClassName: "size-6 text-success",
+        isLink: organization?.disableFileTransfer,
       },
       {
         label: t.translations.ORIGINAL_ID,
@@ -660,7 +662,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         value: record.objectStorageId,
       },
     ];
-  }, [record, handleUpdateRecord, t.translations]);
+  }, [
+    record,
+    recordFileType,
+    handleUpdateRecord,
+    t.translations,
+    organization?.disableFileTransfer,
+  ]);
 
   const additionalPropertiesRows = useMemo(() => {
     if (!record?.properties) return [];
@@ -794,7 +802,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   const handleQueueInsightUpload = useCallback(async () => {
     if (isIngestionUnavailable) return;
-    
+
     const uri = record?.uri?.trim();
     if (!uri || !organization?.organizationId) return;
     setIsQueuingInsightUpload(true);
@@ -816,7 +824,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   const handleQueueOntologyEmbeddings = useCallback(async () => {
     if (isEmbeddingModelUnavailable) return;
-    
+
     if (!organization?.organizationId) return;
     setIsQueuingOntologyEmbeddings(true);
     try {
@@ -855,41 +863,41 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         if (isInitial) setIsCheckingLatticeReadiness(true);
 
         const [queryHealth, uploadHealth, embeddingHealth] =
-            await Promise.allSettled([
-              fetchInsightEndpointHealth({
-                organizationId: organization.organizationId as number,
-                projectId,
-                modelConfigId: selectedInsightModels.queryModelConfigId,
-                modelType: "llm",
-              }),
-              fetchInsightEndpointHealth({
-                organizationId: organization.organizationId as number,
-                projectId,
-                modelConfigId: selectedInsightModels.uploadModelConfigId,
-                modelType: "vlm",
-              }),
-              fetchInsightEndpointHealth({
-                organizationId: organization.organizationId as number,
-                projectId,
-                modelConfigId: selectedInsightModels.embeddingModelConfigId,
-                modelType: "embedding",
-              }),
-            ]);
+          await Promise.allSettled([
+            fetchInsightEndpointHealth({
+              organizationId: organization.organizationId as number,
+              projectId,
+              modelConfigId: selectedInsightModels.queryModelConfigId,
+              modelType: "llm",
+            }),
+            fetchInsightEndpointHealth({
+              organizationId: organization.organizationId as number,
+              projectId,
+              modelConfigId: selectedInsightModels.uploadModelConfigId,
+              modelType: "vlm",
+            }),
+            fetchInsightEndpointHealth({
+              organizationId: organization.organizationId as number,
+              projectId,
+              modelConfigId: selectedInsightModels.embeddingModelConfigId,
+              modelType: "embedding",
+            }),
+          ]);
 
         const queryUnavailable =
-            queryHealth.status === "rejected" ||
-            !queryHealth.value.reachable ||
-            !queryHealth.value.model_available;
+          queryHealth.status === "rejected" ||
+          !queryHealth.value.reachable ||
+          !queryHealth.value.model_available;
 
         const uploadUnavailable =
-            uploadHealth.status === "rejected" ||
-            !uploadHealth.value.reachable ||
-            !uploadHealth.value.model_available;
+          uploadHealth.status === "rejected" ||
+          !uploadHealth.value.reachable ||
+          !uploadHealth.value.model_available;
 
         const embeddingUnavailable =
-            embeddingHealth.status === "rejected" ||
-            !embeddingHealth.value.reachable ||
-            !embeddingHealth.value.model_available;
+          embeddingHealth.status === "rejected" ||
+          !embeddingHealth.value.reachable ||
+          !embeddingHealth.value.model_available;
 
         if (cancelled) return;
 
@@ -908,13 +916,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
           return;
         }
-        
+
         const status = await fetchInsightIngestionStatus({
           organizationId: organization.organizationId as number,
           projectId,
           fileId: recordId,
         });
-        
+
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
@@ -927,7 +935,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           }
           return;
         }
-        
+
         if (!recordEmbedPollRef.current) {
           recordEmbedPollRef.current = setInterval(() => {
             void checkLatticeReadiness();
@@ -946,7 +954,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           clearInterval(recordEmbedPollRef.current);
           recordEmbedPollRef.current = null;
         }
-        
+
         console.error("Failed to check Insight status:", error);
       } finally {
         if (!cancelled && isInitial) {
@@ -1022,6 +1030,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   }
 
   const isDownloadable =
+    !organization?.disableFileTransfer &&
     !!record.uri &&
     record.uri.trim().length > 0 &&
     record.uri.toLowerCase() !== "null";
@@ -1497,19 +1506,19 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   {record.name}
                 </h1>
                 {isQueryModelUnavailable && (
-                    <span className="badge badge-warning badge-sm">
-                      Query model unavailable
-                    </span>
+                  <span className="badge badge-warning badge-sm">
+                    Query model unavailable
+                  </span>
                 )}
                 {isUploadModelUnavailable && (
-                    <span className="badge badge-warning badge-sm">
-                      Upload/OCR model unavailable
-                    </span>
+                  <span className="badge badge-warning badge-sm">
+                    Upload/OCR model unavailable
+                  </span>
                 )}
                 {isEmbeddingModelUnavailable && (
-                    <span className="badge badge-warning badge-sm">
-                      Embedding model unavailable
-                    </span>
+                  <span className="badge badge-warning badge-sm">
+                    Embedding model unavailable
+                  </span>
                 )}
               </div>
               {record.classId ? (
