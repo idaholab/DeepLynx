@@ -44,8 +44,6 @@ test.describe("Download an uploaded file", () => {
   let filePath: string;
 
   test.beforeEach(async ({ page }) => {
-    await page.getByRole('link', { name: 'PW Project X' }).click();
-
     // Create the file locally
     filePath = path.join(os.tmpdir(), 'uploaded-test-file');
 

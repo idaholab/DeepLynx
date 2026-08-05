@@ -9,10 +9,6 @@ test.describe("Project Insight", () => {
   });
   test.beforeEach(async ({ page }) => {
     // Navigate to Project Insight via sidebar
-    await page.getByTestId("project-select").click();
-    await page
-      .getByRole("button", { name: "PW Project X", exact: true })
-      .click();
     await page.locator("aside a", { hasText: "Insight" }).click();
     await page.waitForURL(/\/project_insight/);
     // Wait for the heading to confirm client-side render is done.
