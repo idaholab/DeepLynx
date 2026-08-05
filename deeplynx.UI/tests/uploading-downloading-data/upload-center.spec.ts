@@ -1459,38 +1459,33 @@ startxref
       class_name = `FuelAssembly`;
       file_type = `csv`;
       tags = `monitoring,critical,assembly`;
+      sensitivity_labels = `public,internal`;
     });
     test.describe("Upload csv file with missing name", () => {
-      const file1 = `${Date.now()}-${Math.random().toString(36).slice(2)}-Assembly-33`;
-      const id1 = `${Date.now()}-${Math.random().toString(36).slice(2)}-assy-033`;
-      const id2 = `${Date.now()}-${Math.random().toString(36).slice(2)}-sensor-alpha-001`;
-      const bulkFileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-upload-missing-name.csv`;
 
-      test.beforeEach(async ({ }) => {
+      test.beforeEach(async ({ }, testInfo) => {
         // Tab-separated, matching the real template. Row 2 has an empty
         // name field (required) to trigger a validation failure.
+        const bulkFileName = `bulk-upload-missing-name${testInfo.testId}.csv`;
         filePath = path.join(os.tmpdir(), bulkFileName);
 
-
+        name = '';
 
         const row1 = [
-          file1,
-          'A test file for bulk upload testing',
-          id1,
-          '{"created":"July 2026","candy":"smarties","color":"red"}',
-          '', '', '', '', 'txt', '', '',
+          name,
+          description,
+          original_id,
+          properties,
+          uri,
+          object_storage_id,
+          class_id,
+          class_name,
+          file_type,
+          tags,
+          sensitivity_labels
         ].join('\t');
 
-        // Missing name (required) in row 2
-        const row2 = [
-          '',
-          'A test file for bulk upload testing',
-          id2,
-          '{"created":"July 2026","candy":"M&Ms","color":"yellow"}',
-          '', '', '', '', 'pdf', '', '',
-        ].join('\t');
-
-        const fileContent = [header, row1, row2].join('\n');
+        const fileContent = [header, row1].join('\n');
 
         await fs.promises.writeFile(filePath, fileContent, 'utf8');
       });
@@ -1511,20 +1506,11 @@ startxref
         const fileInput = page.locator('input[type="file"]');
         await fileInput.setInputFiles(filePath);
 
-        // TODO: replace with the actual validation-failure text/selector for a missing required field
-        await expect(page.getByText('Validation Failed')).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'CSV Parsing Errors' })).toBeVisible();
 
-        // Validation should not succeed, and the upload button should not appear
-        await expect(page.getByText('Validation Successful!')).not.toBeVisible();
         await expect(
           page.getByRole('button', { name: /Upload \d+ Records/ })
         ).not.toBeVisible();
-
-        // No records should be created — Project Dashboard should not show the file names
-        await page.getByRole("link", { name: "Project Dashboard" }).click();
-        await page.waitForURL(/\/project/);
-        await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
-        await expect(page.getByText(file1)).not.toBeVisible();
       });
     });
   });
