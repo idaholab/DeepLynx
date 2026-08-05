@@ -154,7 +154,7 @@ public class GraphBusiness : IGraphBusiness
         var rootRecord = await _context.Records
             .Include(r => r.Class)
             .Include(r => r.Labels)
-            .FirstOrDefaultAsync(r => r.Id == recordId);
+            .FirstOrDefaultAsync(r => r.Id == recordId && !r.IsArchived);
 
         if (rootRecord == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
 
@@ -279,7 +279,7 @@ public class GraphBusiness : IGraphBusiness
             .Include(e => e.Destination).ThenInclude(r => r.Labels)
             .Include(e => e.Destination).ThenInclude(r => r.Class)
             .Include(e => e.Relationship)
-            .Where(e => !e.IsArchived);
+            .Where(e => !e.IsArchived && !e.Origin.IsArchived && !e.Destination.IsArchived);
 
         if (!isSysAdmin)
         {
