@@ -27,6 +27,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
     private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _mockOrganizationBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
@@ -67,6 +68,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
 
         _relationshipBusiness = new RelationshipBusiness(
             Context, _mockEdgeBusiness.Object, _eventBusiness);
@@ -81,7 +83,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()

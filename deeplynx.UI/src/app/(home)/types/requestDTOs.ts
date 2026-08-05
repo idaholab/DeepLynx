@@ -54,6 +54,7 @@ export type CreateOrganizationRequestDto = {
   name: string;
   description?: string;
   banner?: string;
+  disableFileTransfer?: boolean;
 };
 
 export type UpdateOrganizationRequestDto = {
@@ -63,6 +64,7 @@ export type UpdateOrganizationRequestDto = {
   banner?: string | null;
   theme?: string | null;
   createContainerPerProject?: boolean | null;
+  disableFileTransfer?: boolean;
 };
 
 export type CreateOauthApplicationRequestDto = {
@@ -85,12 +87,14 @@ export type CreateObjectStorageRequestDto = {
   name: string;
   config: Record<string, unknown>;
   default?: boolean;
+  filesDeletable?: boolean;
 };
 
 export type UpdateObjectStorageRequestDto = {
   name: string;
   default: boolean;
   existingContainer?: boolean;
+  filesDeletable?: boolean;
 };
 
 export type CreateClassRequestDto = {

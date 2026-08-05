@@ -55,6 +55,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Default = os.Default,
                 LastUpdatedAt = os.LastUpdatedAt,
                 LastUpdatedBy = os.LastUpdatedBy,
+                FilesDeletable = os.FilesDeletable,
                 IsArchived = os.IsArchived
             }).ToList();
     }
@@ -99,6 +100,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             Default = returnedObjectStorage.Default,
             LastUpdatedAt = returnedObjectStorage.LastUpdatedAt,
             LastUpdatedBy = returnedObjectStorage.LastUpdatedBy,
+            FilesDeletable = returnedObjectStorage.FilesDeletable,
             IsArchived = returnedObjectStorage.IsArchived
         };
     }
@@ -110,11 +112,13 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="projectId">The ID of the project to which the object storage belongs</param>
     /// <param name="dto">A data transfer object with details on the new object storage to be created.</param>
+    /// <param name="createContainer">A bool to create a container</param>
     public async Task<ObjectStorageResponseDto> CreateObjectStorage(
         long currentUserId,
         long organizationId,
         long? projectId,
-        CreateObjectStorageRequestDto dto)
+        CreateObjectStorageRequestDto dto,
+        bool createContainer = true)
     {
         ValidationHelper.ValidateModel(dto);
 
@@ -174,6 +178,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Name = dto.Name,
                 Type = type,
                 Default = dto.Default,
+                FilesDeletable = dto.FilesDeletable,
                 ProjectId = projectId,
                 OrganizationId = organizationId,
                 ConfigEncrypted = SerializeAndEncryptConfig(dto.Config),
@@ -184,25 +189,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             _context.ObjectStorages.Add(newObjectStorage);
             await _context.SaveChangesAsync();
 
-            if (hasAzure && projectId == null)
+            if (hasAzure && createContainer)
             {
-                const int maxContainerNameLength = 63;
-                const int guidLength = 36;
-                const int separatorLength = 1;
-                int maxProjectNameLength = maxContainerNameLength - guidLength - separatorLength;
-
-                string? truncatedProjectName = dto.Config.AzureObjectConfig?.AzureContainerName?.Length > maxProjectNameLength
-                    ? dto.Config.AzureObjectConfig?.AzureContainerName[..maxProjectNameLength]
-                    : dto.Config.AzureObjectConfig?.AzureContainerName ?? "container";
-
-                truncatedProjectName = new string(truncatedProjectName!
-                    .ToLower()
-                    .Where(c => char.IsLetterOrDigit(c) || c == '-')
-                    .ToArray()) ?? "container";
-
-                string guid = Guid.NewGuid().ToString();
-
-                var containerName = $"{truncatedProjectName}-{guid}".ToLower();
+                var containerName = ContainerName.UniqueContainerNameFromString(dto.Config.AzureObjectConfig?.AzureContainerName ?? "container");
 
                 var container = await _fileAzureBusiness.CreateContainer(
                     organizationId: organizationId,
@@ -233,6 +222,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Default = newObjectStorage.Default,
                 LastUpdatedAt = newObjectStorage.LastUpdatedAt,
                 LastUpdatedBy = newObjectStorage.LastUpdatedBy,
+                FilesDeletable = newObjectStorage.FilesDeletable,
                 IsArchived = newObjectStorage.IsArchived
             };
         }
@@ -296,6 +286,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             returnedObjectStorage.Default = dto.Default;
             returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
             returnedObjectStorage.LastUpdatedBy = currentUserId;
+            returnedObjectStorage.FilesDeletable = dto.FilesDeletable;
             await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
@@ -310,6 +301,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Default = returnedObjectStorage.Default,
                 LastUpdatedAt = returnedObjectStorage.LastUpdatedAt,
                 LastUpdatedBy = returnedObjectStorage.LastUpdatedBy,
+                FilesDeletable = returnedObjectStorage.FilesDeletable,
                 IsArchived = returnedObjectStorage.IsArchived
             };
         }
@@ -484,6 +476,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             Default = returnedObjectStorage.Default,
             LastUpdatedAt = returnedObjectStorage.LastUpdatedAt,
             LastUpdatedBy = returnedObjectStorage.LastUpdatedBy,
+            FilesDeletable = returnedObjectStorage.FilesDeletable,
             IsArchived = returnedObjectStorage.IsArchived
         };
     }
@@ -541,6 +534,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Default = returnedObjectStorage.Default,
                 LastUpdatedAt = returnedObjectStorage.LastUpdatedAt,
                 LastUpdatedBy = returnedObjectStorage.LastUpdatedBy,
+                FilesDeletable = returnedObjectStorage.FilesDeletable,
                 IsArchived = returnedObjectStorage.IsArchived
             };
         }
@@ -653,4 +647,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
     }
+
+
 }

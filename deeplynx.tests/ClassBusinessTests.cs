@@ -31,6 +31,7 @@ public class ClassBusinessTests : IntegrationTestBase
     private IProjectRolePermissionService _permissionService = null!;
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private ProjectBusiness _projectBusiness = null!;
     private Mock<IRecordBusiness> _recordBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
@@ -80,6 +81,7 @@ public class ClassBusinessTests : IntegrationTestBase
         _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _roleBusiness = new Mock<IRoleBusiness>();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
 
         _classBusiness = new ClassBusiness(
             Context, _recordBusiness.Object,
@@ -90,7 +92,7 @@ public class ClassBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()

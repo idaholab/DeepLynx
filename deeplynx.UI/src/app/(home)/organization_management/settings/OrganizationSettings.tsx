@@ -50,6 +50,7 @@ interface StorageFormData {
   default: boolean;
   createContainerPerProject: boolean;
   existingContainer?: boolean;
+  filesDeletable: boolean;
 }
 
 const OrganizationSettings = () => {
@@ -113,7 +114,8 @@ const OrganizationSettings = () => {
     config: {},
     default: false,
     createContainerPerProject: false,
-    existingContainer: false
+    existingContainer: false,
+    filesDeletable: true,
   });
 
   // Storage config fields based on type
@@ -127,6 +129,12 @@ const OrganizationSettings = () => {
     null,
   );
   const [archiveAction, setArchiveAction] = useState<boolean>(true);
+
+  // File Transfer states
+  const [disableFileTransfer, setDisableFileTransfer] = useState(false);
+  const [originalDisableFileTransfer, setOriginalDisableFileTransfer] =
+    useState(false);
+  const [isSavingFileTransfer, setIsSavingFileTransfer] = useState(false);
 
   // Load existing logo on mount
   useEffect(() => {
@@ -424,7 +432,7 @@ const OrganizationSettings = () => {
   };
 
   const resetStorageForm = () => {
-    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
+    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false, filesDeletable: true });
     setStorageType("filesystem");
     setFilesystemPath("");
     setAzureEndpoint("");
@@ -473,6 +481,7 @@ const OrganizationSettings = () => {
         name: storageFormData.name,
         config: config,
         default: storageFormData.default,
+        filesDeletable: storageFormData.filesDeletable,
       };
 
       const updateOrganizationDto: UpdateOrganizationRequestDto = {
@@ -555,6 +564,7 @@ const OrganizationSettings = () => {
         name: storageFormData.name,
         default: storageFormData.default,
         existingContainer: storageFormData.existingContainer,
+        filesDeletable: storageFormData.filesDeletable,
       };
 
       const updateOrganizationDto: UpdateOrganizationRequestDto = {
@@ -577,7 +587,7 @@ const OrganizationSettings = () => {
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditStorageModalOpen(false);
       setEditingStorage(null);
-      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
+      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false, filesDeletable: true });
       loadStorages();
     } catch (error) {
       console.error("Failed to update organization storage:", error);
@@ -647,6 +657,7 @@ const OrganizationSettings = () => {
       default: storage.default,
       createContainerPerProject: createContainerPerProject,
       existingContainer: existingContainer,
+      filesDeletable: storage.filesDeletable,
     });
     setIsEditStorageModalOpen(true);
   };
@@ -722,6 +733,72 @@ const OrganizationSettings = () => {
       setOriginalBannerText(banner);
     }
   }, [organization?.banner]);
+
+  useEffect(() => {
+    async function fetchOrg() {
+      const response = await getOrganization(organization?.organizationId as number);
+      setDisableFileTransfer(response.disableFileTransfer as boolean);
+    }
+    fetchOrg();
+  }, [organization?.organizationId]);
+
+  useEffect(() => {
+    const disabled = !!organization?.disableFileTransfer;
+    setDisableFileTransfer(disabled);
+    setOriginalDisableFileTransfer(disabled);
+  }, [organization?.disableFileTransfer]);
+
+  const handleSaveFileTransfer = async () => {
+    if (!organization?.organizationId) {
+      toast.error(t.translations.NO_ORG_SELECTED);
+      return;
+    }
+
+    try {
+      setIsSavingFileTransfer(true);
+
+      await updateOrganization(organization.organizationId as number, {
+        disableFileTransfer: Boolean(disableFileTransfer),
+      });
+
+
+      const updatedOrg = await getOrganization(organization.organizationId as number);
+
+      setOriginalDisableFileTransfer(updatedOrg.disableFileTransfer ?? false);
+      setDisableFileTransfer(updatedOrg.disableFileTransfer ?? false);
+      setOrganization({
+        ...organization,
+        disableFileTransfer,
+      });
+
+      toast.success(
+        disableFileTransfer
+          ? t.translations.FILE_TRANSFER_DISABLED_SUCCESSFULLY ||
+          "File transfer disabled for this organization"
+          : t.translations.FILE_TRANSFER_ENABLED_SUCCESSFULLY ||
+          "File transfer enabled for this organization",
+      );
+    } catch (error) {
+      console.error("Failed to update file transfer setting: ", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_FILE_TRANSFER_SETTING,
+      );
+    } finally {
+      setIsSavingFileTransfer(false);
+    }
+  };
+
+  const handleCancelFileTransfer = () => {
+    setDisableFileTransfer(originalDisableFileTransfer);
+    toast.custom(
+      <div className="text-info">
+        <ExclamationTriangleIcon className="size-4" />
+        {t.translations.CHANGES_DISCARDED}
+      </div>,
+    );
+  };
 
   const handleSaveBanner = async () => {
     if (!organization?.organizationId) {
@@ -1022,6 +1099,67 @@ const OrganizationSettings = () => {
                         type="button"
                         onClick={() => setSelectedThemeName(originalThemeName)}
                         disabled={isSavingTheme}
+                      >
+                        {t.translations.CANCEL}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="divider" />
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="card-title text-lg mb-2">
+                      {t.translations.FILE_TRANSFER}
+                    </h3>
+                    <p className="text-sm text-base-content/60 mt-1">
+                      {t.translations.FILE_TRANSFER_DESCRIPTION}
+                    </p>
+                  </div>
+
+                  <div className="form-control">
+                    <label className="cursor-pointer label flex items-center justify-start w-fit gap-3">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary"
+                        checked={disableFileTransfer}
+                        disabled={isSavingFileTransfer}
+                        onChange={(e) =>
+                          setDisableFileTransfer(e.target.checked)
+                        }
+                      />
+                      <span className="label-text font-semibold">
+                        {t.translations.DISABLE_FILE_TRANSFER}
+                      </span>
+                    </label>
+                    <span className="text-xs text-base-content/60 mt-1">
+                      {t.translations.DISABLE_FILE_TRANSFER_HELPER}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSaveFileTransfer}
+                      disabled={
+                        isSavingFileTransfer ||
+                        disableFileTransfer === originalDisableFileTransfer
+                      }
+                    >
+                      {isSavingFileTransfer && (
+                        <span className="loading loading-spinner loading-xs" />
+                      )}
+                      {t.translations.SAVE}
+                    </button>
+
+                    {disableFileTransfer !== originalDisableFileTransfer && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={handleCancelFileTransfer}
+                        disabled={isSavingFileTransfer}
                       >
                         {t.translations.CANCEL}
                       </button>

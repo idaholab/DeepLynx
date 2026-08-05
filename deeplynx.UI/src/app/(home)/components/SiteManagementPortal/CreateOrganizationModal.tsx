@@ -18,6 +18,7 @@ const CreateOrganization = ({
   const { t } = useLanguage();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [disableFileTransfer, setDisableFileTransfer] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<
@@ -32,6 +33,7 @@ const CreateOrganization = ({
       data = await createOrganization({
         name,
         description,
+        disableFileTransfer,
       });
 
       setToastType("success");
@@ -39,6 +41,7 @@ const CreateOrganization = ({
 
       setName("");
       setDescription("");
+      setDisableFileTransfer(false);
 
       setTimeout(() => {
         onOrganizationCreated();
@@ -107,6 +110,24 @@ const CreateOrganization = ({
               }`}>
               {description.length}/250
             </span>
+
+            {/* Disable File Transfer Checkbox */}
+            <div className="form-control mt-2">
+              <label className="cursor-pointer label flex items-center justify-start w-fit gap-3">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-primary"
+                  checked={disableFileTransfer}
+                  onChange={(e) => setDisableFileTransfer(e.target.checked)}
+                />
+                <span className="label-text font-semibold">
+                  {t.translations.DISABLE_FILE_TRANSFER}
+                </span>
+              </label>
+              <span className="text-xs text-base-content/60 mt-1">
+                {t.translations.DISABLE_FILE_TRANSFER_HELPER}
+              </span>
+            </div>
 
             {/* Modal Actions */}
             <div className="modal-action mt-6">

@@ -16,6 +16,7 @@ interface StorageFormData {
   config: Record<string, any>;
   default: boolean;
   existingContainer?: boolean;
+  filesDeletable: boolean;
 }
 
 interface CreateStorageModalProps {
@@ -85,6 +86,27 @@ const CreateStorageModal = ({
     });
   };
 
+  const filesDeletableToggle = (
+    <div className="form-control mt-4">
+      <label className="cursor-pointer label">
+        <span className="label-text">
+          {t.translations.STORAGE_FILES_DELETABLE}
+        </span>
+        <input
+          type="checkbox"
+          className="checkbox checkbox-primary"
+          checked={storageFormData.filesDeletable}
+          onChange={(e) =>
+            setStorageFormData({
+              ...storageFormData,
+              filesDeletable: e.target.checked,
+            })
+          }
+        />
+      </label>
+    </div>
+  );
+
   return (
     <>
       <input
@@ -100,7 +122,7 @@ const CreateStorageModal = ({
             {t.translations.CREATE_STORAGE}
           </h3>
 
-          {storageType !== "azure_object" && (
+          {!(!isManualSectionOpen && storageType === "azure_object") && (
             <div className="form-control mb-4 w-full md:w-2/3">
               <label className="label">
                 <span className="label-text required">
@@ -132,7 +154,7 @@ const CreateStorageModal = ({
             >
               <option value="filesystem">{t.translations.FILESYSTEM}</option>
               <option value="aws_s3">
-                {t.translations.AWS_S3} (Coming Soon)
+                {t.translations.AWS_S3} (t.translations.COMING_SOON)
               </option>
               <option value="azure_object">
                 {t.translations.AZURE_BLOB_STORAGE}
@@ -159,52 +181,193 @@ const CreateStorageModal = ({
                   {t.translations.ABSOLUTE_PATH_WHERE_FILES_WILL_BE_STORED}
                 </span>
               </label>
+
+              <div className="form-control mb-4">
+                <label className="cursor-pointer label">
+                  <span className="label-text">
+                    {t.translations.SET_AS_DEFAULT_STORAGE}
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-primary"
+                    checked={storageFormData.default}
+                    onChange={(e) =>
+                      setStorageFormData({
+                        ...storageFormData,
+                        default: e.target.checked,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
+              {filesDeletableToggle}
             </div>
           )}
 
           {storageType === "aws_s3" && (
-            <div className="alert alert-warning">
-              <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
-              <div>
-                <p className="font-semibold">
-                  AWS S3 Configuration Coming Soon
-                </p>
-                <p className="text-sm">
-                  The backend configuration for AWS S3 storage is currently
-                  being finalized.
-                </p>
+            <div>
+              <div className="alert alert-warning">
+                <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
+                <div>
+                  <p className="font-semibold">
+                    {t.translations.AWS_S3} (t.translations.COMING_SOON)
+                  </p>
+                  <p className="text-sm">
+                    {t.translations.BACKEND_CONFIG_AWS}
+                  </p>
+                </div>
               </div>
+
+              <div className="form-control mt-4">
+                <label className="cursor-pointer label">
+                  <span className="label-text">
+                    {t.translations.SET_AS_DEFAULT_STORAGE}
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-primary"
+                    checked={storageFormData.default}
+                    onChange={(e) =>
+                      setStorageFormData({
+                        ...storageFormData,
+                        default: e.target.checked,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
+              {filesDeletableToggle}
             </div>
           )}
 
           {storageType === "azure_object" && (
             <>
-              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 mb-4 flex items-center gap-4">
-                <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-                  <StarIcon className="w-5 h-5 text-primary" />
+              {!isManualSectionOpen && (
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 mb-4 flex flex-col gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
+                      <StarIcon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+                        {t.translations.RECOMMENDED}
+                      </p>
+                      <p className="font-semibold">
+                        {t.translations.USE_ORGANIZATION_STORAGE}
+                      </p>
+                      <p className="text-sm text-base-content/70">
+                        {t.translations.CREATE_PROJECT_CONTAINER_HELPER}
+                      </p>
+                    </div>
+
+
+                  </div>
+
+                  <div className="form-control mb-2 w-full md:w-2/3">
+                    <label className="label">
+                      <span className="label-text">
+                        {t.translations.CONTAINER_NAME}
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="my-container"
+                      className="input input-bordered w-full"
+                      value={azureBucketName}
+                      onChange={(e) => setAzureBucketName(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Existing Container Checkbox */}
+                  <div className="form-control mb-2 w-full md:w-2/3">
+                    <label className="cursor-pointer label flex items-center gap-2">
+                      <span className="label-text">{t.translations.USE_EXISTING_CONTAINER}</span>
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary"
+                        checked={storageFormData.existingContainer || false}
+                        onChange={(e) =>
+                          setStorageFormData({
+                            ...storageFormData,
+                            existingContainer: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  {/* New File Path Input */}
+                  <div className="form-control mb-2">
+                    <label className="label">
+                      <span className="label-text mr-2">{t.translations.FILE_PATH}</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., path/to/container/folder"
+                      className="input input-bordered"
+                      value={getAzureFilePath()}
+                      disabled={isFilePathDisabled}
+                      onChange={(e) => setAzureFilePath(e.target.value)}
+                    />
+                  </div>
+
+                  {/* No File Pathing Checkbox */}
+                  <div className="form-control mb-2">
+                    <label className="cursor-pointer label flex items-center space-x-2">
+                      <span>{t.translations.NO_FILE_PATHING}</span>
+                      <input
+                        type="checkbox"
+                        checked={isFilePathDisabled}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setIsFilePathDisabled(checked);
+                          if (checked) {
+                            setAzureFilePath("/");
+                          } else {
+                            setAzureFilePath("");
+                          }
+                        }}
+                        className="checkbox checkbox-primary"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-control mb-4">
+                    <label className="cursor-pointer label">
+                      <span className="label-text">
+                        {t.translations.SET_AS_DEFAULT_STORAGE}
+                      </span>
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary"
+                        checked={storageFormData.default}
+                        onChange={(e) =>
+                          setStorageFormData({
+                            ...storageFormData,
+                            default: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  {filesDeletableToggle}
+
+                  <button
+                    className="btn btn-primary btn-sm shrink-0"
+                    onClick={onCreateFromProjectName}
+                    disabled={isCreatingFromProjectName}
+                  >
+                    {isCreatingFromProjectName && (
+                      <span className="loading loading-spinner loading-xs" />
+                    )}
+                    {t.translations.CREATE_PROJECT_CONTAINER}
+                  </button>
                 </div>
-                <div className="flex-1">
-                  <p className="text-xs font-semibold text-primary uppercase tracking-wide">
-                    {t.translations.RECOMMENDED}
-                  </p>
-                  <p className="font-semibold">
-                    {t.translations.USE_ORGANIZATION_STORAGE}
-                  </p>
-                  <p className="text-sm text-base-content/70">
-                    {t.translations.CREATE_PROJECT_CONTAINER_HELPER}
-                  </p>
-                </div>
-                <button
-                  className="btn btn-primary btn-sm shrink-0"
-                  onClick={onCreateFromProjectName}
-                  disabled={isCreatingFromProjectName}
-                >
-                  {isCreatingFromProjectName && (
-                    <span className="loading loading-spinner loading-xs" />
-                  )}
-                  {t.translations.CREATE_PROJECT_CONTAINER}
-                </button>
-              </div>
+              )}
+
 
               <button
                 type="button"
@@ -256,7 +419,7 @@ const CreateStorageModal = ({
               {/* Existing Container Checkbox */}
               <div className="form-control mb-4 w-full md:w-2/3">
                 <label className="cursor-pointer label flex items-center gap-2">
-                  <span className="label-text">Use Existing Container</span>
+                  <span className="label-text">{t.translations.USE_EXISTING_CONTAINER}</span>
                   <input
                     type="checkbox"
                     className="checkbox checkbox-primary"
@@ -306,27 +469,29 @@ const CreateStorageModal = ({
                   />
                 </label>
               </div>
+
+              <div className="form-control mb-4">
+                <label className="cursor-pointer label">
+                  <span className="label-text">
+                    {t.translations.SET_AS_DEFAULT_STORAGE}
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-primary"
+                    checked={storageFormData.default}
+                    onChange={(e) =>
+                      setStorageFormData({
+                        ...storageFormData,
+                        default: e.target.checked,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
+              {filesDeletableToggle}
             </>
           )}
-
-          <div className="form-control mb-4">
-            <label className="cursor-pointer label">
-              <span className="label-text">
-                {t.translations.SET_AS_DEFAULT_STORAGE}
-              </span>
-              <input
-                type="checkbox"
-                className="checkbox checkbox-primary"
-                checked={storageFormData.default}
-                onChange={(e) =>
-                  setStorageFormData({
-                    ...storageFormData,
-                    default: e.target.checked,
-                  })
-                }
-              />
-            </label>
-          </div>
 
           <div className="modal-action">
             <button
@@ -338,13 +503,15 @@ const CreateStorageModal = ({
             >
               {t.translations.CANCEL}
             </button>
-            <button
-              className="btn btn-primary"
-              onClick={onCreate}
-              disabled={isCreatingFromProjectName}
-            >
-              {t.translations.CREATE}
-            </button>
+            {!(!isManualSectionOpen && storageType === "azure_object") && (
+              <button
+                className="btn btn-primary"
+                onClick={onCreate}
+                disabled={isCreatingFromProjectName}
+              >
+                {t.translations.CREATE}
+              </button>
+            )}
           </div>
         </div>
         <label className="modal-backdrop" onClick={() => onToggle(false)}>
