@@ -9,7 +9,6 @@ using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -3348,6 +3347,10 @@ public class QueryBusinessTests : IntegrationTestBase
         _projectRolePermissionServiceMock
             .Setup(x => x.PermissionInProject(uid, pid, "read", "record"))
             .ReturnsAsync(true);
+
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionsInProjects(uid, It.Is<long[]>(p => p.SequenceEqual(new long[] { pid })), "read", "record"))
+            .ReturnsAsync([pid]);
 
         _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService, _projectRolePermissionServiceMock.Object);
 
