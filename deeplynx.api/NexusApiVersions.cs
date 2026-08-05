@@ -12,11 +12,18 @@ internal static class NexusApiVersions
 
     public static IReadOnlyList<ApiVersion> Supported { get; } =
     [
-        V1,
         V2
     ];
 
-    public static string DefaultOpenApiDocumentName => "v1";
+    public static IReadOnlyList<ApiVersion> Deprecated { get; } =
+    [
+        V1
+    ];
+
+    public static DateTimeOffset V1DeprecatedOn { get; } =
+        new(2026, 8, 5, 0, 0, 0, TimeSpan.Zero);
+
+    public static string DefaultOpenApiDocumentName => "v2";
 
     public static IReadOnlyList<string> OpenApiDocumentNames { get; } =
     [

@@ -16,7 +16,7 @@ namespace deeplynx.api.Controllers.V1;
 ///     This controller provides endpoints to retrieve historical record information and record history.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/records/historical")]
 [Authorize]
 [Tags("Historical Record")]

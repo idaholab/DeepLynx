@@ -584,6 +584,34 @@ public class ClassProjectController : ControllerBase
 }
 ```
 
+Deprecated v1 controller responses also report the deprecation date:
+
+```text
+Deprecation: @1785888000
+```
+
+`Deprecation` uses the RFC 9745 Structured Field Date syntax and represents
+2026-08-05 00:00:00 UTC. No v1 sunset date is currently scheduled, so responses
+do not include a `Sunset` header.
+
+The policy-document `Link` header is intentionally deferred because no
+published policy URL exists yet. When that document is available, v1 responses
+must link to it with `rel="deprecation"`.
+
+#### Header Application Mechanism
+
+Nexus applies the `Deprecation` header through a global MVC
+`IAsyncResultFilter`, registered with `AddControllers` in `Program.cs`. The
+result filter runs within the MVC pipeline after routing and API-version
+resolution, allowing it to inspect the resolved requested version before the
+response body is written. It adds lifecycle headers only when the resolved
+version is v1.
+
+A result filter was selected instead of middleware because the headers apply
+specifically to versioned controller responses. This avoids manually inferring
+the API version from the request path and naturally excludes non-controller
+endpoints such as Scalar, OpenAPI documents, health checks, and SignalR hubs.
+
 If the controller is configured through API versioning conventions instead of attributes, use `HasDeprecatedApiVersion`:
 
 ```csharp
@@ -596,7 +624,8 @@ options.Conventions
     .HasApiVersion(new ApiVersion(2));
 ```
 
-After v1 is deprecated, valid responses for that controller should report both headers:
+After v1 is deprecated, valid responses for that controller should report both
+API versioning headers:
 
 ```text
 api-supported-versions: 2.0
@@ -604,6 +633,113 @@ api-deprecated-versions: 1.0
 ```
 
 Deprecation advertises that a version is on the way out; it does not remove the route. Keep deprecated versions working until the removal is explicitly scheduled, documented, and coordinated with clients.
+
+#### Deprecated API Version Removal Strategy
+
+Use this strategy for every sunset API version. A sunset date authorizes removal
+only after the required consumer, usage, and release checks have passed; reaching
+the date by itself is not sufficient. Perform removal in a dedicated ticket and
+release rather than as part of the deprecation change.
+
+Before removing a version, confirm all of the following:
+
+- The published sunset date has passed and customers received the required
+  advance notifications.
+- Every internal consumer has migrated to a supported version and its contract
+  tests pass.
+- Every operation in the sunset version has a supported-version replacement or
+  an explicitly approved discontinuation.
+- The removal ticket contains an inventory of the affected code, routes,
+  documentation, tests, and owners, along with a rollback plan.
+
+##### Code Removal Checklist
+
+Complete every applicable step so the sunset version is removed from runtime
+routing and from the generated API documentation:
+
+1. Inventory all version references across application code, tests,
+   configuration, generated response URLs, and documentation. Search for the
+   version's `ApiVersion`, `MapToApiVersion`, central version constant, document
+   name, and literal `/api/v{major}` path. Treat the search results as the
+   starting inventory rather than assuming controller attributes are the only
+   exposure.
+2. Delete controller actions and controllers that exist only for the sunset
+   version. Remove its `[ApiVersion(...)]`, `[MapToApiVersion(...)]`, convention
+   registrations, and version-specific badges from controllers that continue
+   to serve supported versions. Remove DTOs, mapping code, and compatibility
+   branches only after confirming that no supported operation uses them.
+3. Update `NexusApiVersions`: remove the sunset version from the supported or
+   deprecated collections, remove its lifecycle dates and constant when no
+   longer referenced, and change `Default` if it points to the removed version.
+   Confirm that the resulting API-version reporting headers advertise only
+   versions that still exist.
+4. Remove or update lifecycle-header filters and other version-specific
+   behavior. If no deprecated versions remain, unregister and delete the
+   lifecycle filter. Otherwise, preserve the filter for the remaining
+   deprecated versions and remove only the sunset version's configuration.
+5. Review manually mapped endpoints and compatibility aliases in `Program.cs`,
+   including health checks, SignalR hubs, OpenAPI aliases, Scalar aliases, and
+   redirects containing the retired version. Migrate or remove each route
+   deliberately; these endpoints are not governed by MVC API-version
+   attributes.
+6. Remove the version's name from `OpenApiDocumentNames`. Nexus uses this list
+   both to register OpenAPI documents in `AddNexusOpenApi` and to populate the
+   Scalar document selector. Ensure `DefaultOpenApiDocumentName` names a
+   supported version, remove any version-specific OpenAPI or Scalar aliases,
+   and verify that requesting the retired document no longer succeeds. Update
+   `OpenApiGenerateDocumentsOptions` in the API project so build-time artifact
+   generation no longer targets the sunset document, remove stale generated
+   artifacts, and coordinate any generated SDK update.
+7. Remove version-specific response and compatibility behavior outside routing.
+   Examples include hard-coded `Location` headers, error-shape branches,
+   serializers, client constants, environment examples, and links containing
+   the retired path.
+8. Update tests to remove frozen-contract coverage that is no longer relevant
+   and add removal regressions. At minimum, verify that:
+   - A representative retired-version API route returns the configured
+     unsupported-version response and cannot invoke a controller action.
+   - API version-reporting headers no longer list the retired version.
+   - The retired OpenAPI document is unavailable.
+   - Supported OpenAPI documents contain only supported operations.
+   - Scalar neither lists nor defaults to the retired document.
+   - Removed manual aliases and hard-coded response URLs do not expose the
+     retired path.
+9. Run the full server and consumer test suites, publish release notes recording
+   the removal, update the deprecation policy, and monitor unsupported-version
+   responses after deployment. Use the ticket's rollback plan if unexpected
+   active consumers are discovered.
+
+##### V1 Removal Application
+
+For the current v1 retirement, the deprecation date is August 5, 2026. No sunset
+date has been scheduled. The Next.js UI and `deeplynx.mcp` remain pinned to v1
+as recorded in `documentation/api-consumer-versioning.md`, so v1 removal is
+blocked until both consumers have migrated and their v2 contract tests pass.
+External v1 usage must also satisfy the approved removal threshold.
+
+The dedicated v1 removal ticket must build and maintain an exact inventory. At
+minimum, review these known code areas:
+
+- `NexusApiVersions.V1`, `Default`, `Deprecated`, the v1 deprecation date,
+  `OpenApiDocumentNames`, and `DefaultOpenApiDocumentName`.
+- All `[ApiVersion(1, ...)]` and `[MapToApiVersion(1)]` attributes and the
+  corresponding v1-only controller actions.
+- `ApiVersionLifecycleHeadersFilter` registration and its v1 header logic.
+- V1 compatibility branches such as
+  `VersionedInvalidModelStateResponseFactory`.
+- The `ApiV1BasePath` routes in `Program.cs`, including health, SignalR,
+  OpenAPI, Scalar, and redirect aliases.
+- The API project's `OpenApiGenerateDocumentsOptions`, the generated
+  `artifacts/openapi/nexus-v1.json` contract, and downstream SDK generation.
+- Literal `/api/v1` response values such as resumable-upload `Location`
+  headers, plus client, configuration, test, and documentation references.
+- V1 header, frozen-contract, OpenAPI, Scalar, unsupported-version, and
+  consumer tests.
+
+After removal, `/api/v1/...` must not resolve to a controller or manually mapped
+endpoint, `/api/openapi/v1.json` must be unavailable, and Scalar must not list a
+v1 document. V2 and later supported routes and documents must continue to pass
+their regression and contract tests.
 
 ### Query Parameters, Filtering, and Pagination
 
