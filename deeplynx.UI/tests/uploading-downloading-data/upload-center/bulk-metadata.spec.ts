@@ -138,4 +138,334 @@ test.describe("Bulk Metadata", () => {
             }
         });
     });
+    test.describe("Bulk Metadata -> Default Settings -> Upload csv file with unexpected info", () => {
+        let filePath: string;
+        let name: string;
+        let description: string;
+        let original_id: string;
+        let properties: string;
+        let uri: string;
+        let object_storage_id: string;
+        let class_id: string;
+        let class_name: string;
+        let file_type: string;
+        let tags: string;
+        let sensitivity_labels: string;
+
+        const header = [
+            'name (required)',
+            'description (required)',
+            'original_id (required)',
+            'properties (required - JSON format)',
+            'uri (optional)',
+            'object_storage_id (optional)',
+            'class_id (optional)',
+            'class_name (optional)',
+            'file_type (optional)',
+            'tags (optional - comma-separated)',
+            'sensitivity_labels (optional - comma-separated)',
+        ].join('\t');
+
+        test.beforeEach(async ({ }, testInfo) => {
+            name = `Assembly 33-${testInfo.testId}`;
+            description = `Assembly 33 Description`;
+            original_id = `assy-033-${testInfo.testId}`;
+            properties = `{"description":"Assembly 33 Description","diversion flag":false,"height":160,"number of fuel pins":72,"number of heat pipes":19,"temperature":1000}`;
+            uri = `https://example.com/assembly/33`;
+            object_storage_id = `1`;
+            class_id = `5`;
+            class_name = `FuelAssembly`;
+            file_type = `csv`;
+            tags = `monitoring,critical,assembly`;
+            sensitivity_labels = `public,internal`;
+        });
+        test.describe("Upload csv file with missing name", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                // Tab-separated, matching the real template. Row 2 has an empty
+                // name field (required) to trigger a validation failure.
+                const bulkFileName = `bulk-upload-missing-name${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                name = '';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing name", async ({ page }) => {
+                // Switch to Bulk Metadata mode, keep default project/data source/storage settings
+                await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
+
+                await checkDataSourcesAndStorageDestinations(page);
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'CSV Parsing Errors' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with missing description", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                // Tab-separated, matching the real template. Row 2 has an empty
+                // name field (required) to trigger a validation failure.
+                const bulkFileName = `bulk-upload-missing-description${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                description = '';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing description", async ({ page }) => {
+                // Switch to Bulk Metadata mode, keep default project/data source/storage settings
+                await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
+
+                await checkDataSourcesAndStorageDestinations(page);
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Errors Found' })).toBeVisible();
+
+                await expect(page.getByRole('heading', { name: 'Error Details:' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with missing original_id", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                // Tab-separated, matching the real template. Row 2 has an empty
+                // name field (required) to trigger a validation failure.
+                const bulkFileName = `bulk-upload-missing-description${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                original_id = '';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing original_id", async ({ page }) => {
+                // Switch to Bulk Metadata mode, keep default project/data source/storage settings
+                await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
+
+                await checkDataSourcesAndStorageDestinations(page);
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Errors Found' })).toBeVisible();
+
+                await expect(page.getByRole('heading', { name: 'Error Details:' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with missing properties", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                // Tab-separated, matching the real template. Row 2 has an empty
+                // name field (required) to trigger a validation failure.
+                const bulkFileName = `bulk-upload-missing-description${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                properties = '';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing properties", async ({ page }) => {
+                // Switch to Bulk Metadata mode, keep default project/data source/storage settings
+                await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
+
+                await checkDataSourcesAndStorageDestinations(page);
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Errors Found' })).toBeVisible();
+
+                await expect(page.getByRole('heading', { name: 'Error Details:' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with missing optional fields", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                // Tab-separated, matching the real template. Row 2 has an empty
+                // name field (required) to trigger a validation failure.
+                const bulkFileName = `bulk-upload-missing-description${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                uri = '';
+                object_storage_id = '';
+                class_id = '';
+                class_name = '';
+                file_type = '';
+                tags = '';
+                sensitivity_labels = '';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing optional fields", async ({ page, request }) => {
+                // Switch to Bulk Metadata mode, keep default project/data source/storage settings
+                await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
+
+                await checkDataSourcesAndStorageDestinations(page);
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).toBeVisible();
+
+                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                await page.getByRole('button', { name: 'Confirm Upload' }).click();
+
+                await page.getByRole('link', { name: 'Project Dashboard' }).click();
+
+                await expect(page.getByRole('link', { name: name })).toBeVisible;
+
+                await page.getByRole('link', { name: name }).click();
+
+                await deleteRecordIfExists({ request }, parseRecordFromUrl(page.url()), orgId);
+
+            });
+        });
+    });
 });
