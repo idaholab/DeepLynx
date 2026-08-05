@@ -25,6 +25,8 @@ test.describe("Bulk Metadata", () => {
         orgId = await getOrgIdByName(request, ORG_NAME);
         await navigateToProjectDashboard(page);
         await navigateToUploadCenter(page);
+        await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
+        await checkDataSourcesAndStorageDestinations(page);
     });
 
     test.describe("Upload bulk records", () => {
@@ -84,9 +86,7 @@ test.describe("Bulk Metadata", () => {
             ];
 
             // Upload the csv file
-            await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
 
-            await checkDataSourcesAndStorageDestinations(page);
 
             await page.getByRole('button', { name: 'Choose File Button' }).click();
             const fileInput = page.locator('input[type="file"]');
@@ -215,11 +215,6 @@ test.describe("Bulk Metadata", () => {
             });
 
             test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing name", async ({ page }) => {
-                // Switch to Bulk Metadata mode, keep default project/data source/storage settings
-                await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
-
-                await checkDataSourcesAndStorageDestinations(page);
-
                 await page.getByRole('button', { name: 'Choose File Button' }).click();
                 const fileInput = page.locator('input[type="file"]');
                 await fileInput.setInputFiles(filePath);
@@ -268,10 +263,6 @@ test.describe("Bulk Metadata", () => {
             });
 
             test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing description", async ({ page }) => {
-                // Switch to Bulk Metadata mode, keep default project/data source/storage settings
-                await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
-
-                await checkDataSourcesAndStorageDestinations(page);
 
                 await page.getByRole('button', { name: 'Choose File Button' }).click();
                 const fileInput = page.locator('input[type="file"]');
@@ -323,10 +314,6 @@ test.describe("Bulk Metadata", () => {
             });
 
             test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing original_id", async ({ page }) => {
-                // Switch to Bulk Metadata mode, keep default project/data source/storage settings
-                await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
-
-                await checkDataSourcesAndStorageDestinations(page);
 
                 await page.getByRole('button', { name: 'Choose File Button' }).click();
                 const fileInput = page.locator('input[type="file"]');
@@ -378,10 +365,6 @@ test.describe("Bulk Metadata", () => {
             });
 
             test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing properties", async ({ page }) => {
-                // Switch to Bulk Metadata mode, keep default project/data source/storage settings
-                await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
-
-                await checkDataSourcesAndStorageDestinations(page);
 
                 await page.getByRole('button', { name: 'Choose File Button' }).click();
                 const fileInput = page.locator('input[type="file"]');
@@ -398,6 +381,8 @@ test.describe("Bulk Metadata", () => {
         });
 
         test.describe("Upload csv file with missing optional fields", () => {
+
+            let createdRecord: { recordId: string; projectId: string } | null;
 
             test.beforeEach(async ({ }, testInfo) => {
                 // Tab-separated, matching the real template. Row 2 has an empty
@@ -438,11 +423,14 @@ test.describe("Bulk Metadata", () => {
                 }
             });
 
-            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing optional fields", async ({ page, request }) => {
-                // Switch to Bulk Metadata mode, keep default project/data source/storage settings
-                await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
+            test.afterEach(async ({ request }) => {
+                await deleteRecordIfExists({ request }, createdRecord, orgId);
+            });
 
-                await checkDataSourcesAndStorageDestinations(page);
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing optional fields", async ({ page, request }) => {
+
+                test.setTimeout(180_000); // buffer time
+                const start = Date.now();
 
                 await page.getByRole('button', { name: 'Choose File Button' }).click();
                 const fileInput = page.locator('input[type="file"]');
@@ -457,14 +445,39 @@ test.describe("Bulk Metadata", () => {
                 await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
                 await page.getByRole('button', { name: 'Confirm Upload' }).click();
 
-                await page.getByRole('link', { name: 'Project Dashboard' }).click();
+                // Verify in Project Dashboard
+                await page.getByRole("link", { name: "Project Dashboard" }).click();
+                await page.waitForURL(/\/project/);
+                await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
 
-                await expect(page.getByRole('link', { name: name })).toBeVisible;
+                await verifyInProject(page, name);
 
-                await page.getByRole('link', { name: name }).click();
 
-                await deleteRecordIfExists({ request }, parseRecordFromUrl(page.url()), orgId);
+                const elapsedMs = Date.now() - start;
+                expect(elapsedMs).toBeLessThan(120_000);
 
+                // Visit the data catalog and resolve each created record's
+                // recordId/projectId so we can clean them up afterward.
+                const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+                const dataCatalogButton = sideBar.getByRole('link').nth(1);
+                await dataCatalogButton.click();
+
+                const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+
+                const recordLink = page.getByRole('link', { name, exact: true }).first();
+                await expect(async () => {
+                    if (await clearTermsButton.isVisible()) {
+                        await clearTermsButton.click();
+                    }
+                    await page.getByRole('textbox', { name: 'Search' }).click();
+                    await page.getByRole('textbox', { name: 'Search' }).fill(name);
+                    await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+                    await expect(recordLink).toBeVisible({ timeout: 3_000 });
+                }).toPass({ timeout: 30_000 });
+
+                await recordLink.click();
+                await page.waitForURL(/\/record\?/);
+                createdRecord = parseRecordFromUrl(page.url());
             });
         });
     });
