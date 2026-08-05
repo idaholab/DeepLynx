@@ -1,11 +1,12 @@
-// tests/provisioning.ts
-import { request, APIRequestContext } from '@playwright/test';
+
+import { test as setup, request, APIRequestContext } from '@playwright/test';
 import jsonWebToken from 'jsonwebtoken';
 import fs from 'fs';
 import { loadEnvConfig } from '@next/env';
 import {
   TestAccount, TestOrg, TestProject, CustomRole, RoleSpec, RolePermissions, Roles,
-  DEFAULT_ROLE_NAME, authFile,
+  DEFAULT_ROLE_NAME, TEST_ACCOUNTS, authFile,
+  scopeCacheFile, roleCacheFile, testUserCacheFile, TestUserCacheEntry, readJsonCache,
 } from './deeplynx-config';
 
 loadEnvConfig(process.cwd());
@@ -19,25 +20,6 @@ function requireEnv(name: string): string {
 const API_URL = requireEnv('BACKEND_BASE_URL');
 const FRONTEND_URL = requireEnv('NEXTAUTH_URL');
 
-const scopeCacheFile = 'playwright/.auth/scopeCache.json';
-const roleCacheFile = 'playwright/.auth/roleCache.json';
-const testUserCacheFile = 'playwright/.auth/testUserCache.json';
-
-interface TestUserCacheEntry {
-  email: string;
-  organizationId?: string;
-  projectId?: string;
-  userId?: string;
-  apiKey?: string;
-  apiSecret?: string;
-}
-
-// ---------------------------------------------------------------------
-// JSON cache files
-// ---------------------------------------------------------------------
-function readJsonCache<T>(file: string): Record<string, T> {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; }
-}
 function writeJsonCache(file: string, data: unknown) {
   fs.mkdirSync('playwright/.auth', { recursive: true });
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
@@ -119,32 +101,10 @@ function getSysApi(): Promise<APIRequestContext> {
   return sysApiPromise;
 }
 
-export async function getApiContext(
-  account: TestAccount,
-): Promise<{ context: APIRequestContext; shouldDispose: boolean }> {
-  if (account.name === 'sysAdmin') {
-    return { context: await getSysApi(), shouldDispose: false };
-  }
-
-  const entry = await ensureAccount(account);
-  if (!entry.apiKey || !entry.apiSecret) {
-    throw new Error(`getApiContext: no API credentials cached for account "${account.name}"`);
-  }
-
-  const anonApi = await request.newContext();
-  const jwt = await generateJwt(anonApi, entry.apiKey, entry.apiSecret);
-  await anonApi.dispose();
-
-  const context = await request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${jwt}` } });
-  return { context, shouldDispose: true };
-}
-
 // --------------------------------
 // Org & project helpers
 // --------------------------------
 interface Scope { id: number; name: string; }
-const orgIdMemo = new Map<TestOrg, Promise<string>>();
-const projectIdMemo = new Map<TestProject, Promise<string>>();
 
 async function findOrgId(sysApi: APIRequestContext, orgName: string): Promise<string | undefined> {
   const res = await sysApi.get(`${API_URL}/organizations?hideArchived=true`);
@@ -159,21 +119,16 @@ async function createOrg(sysApi: APIRequestContext, orgName: string): Promise<st
   return String((await res.json() as Scope).id);
 }
 
-export function ensureOrg(org: TestOrg): Promise<string> {
-  if (!orgIdMemo.has(org)) {
-    orgIdMemo.set(org, (async () => {
-      const scopeCache = readJsonCache<string>(scopeCacheFile);
-      if (scopeCache[org.name]) return scopeCache[org.name];
+async function ensureOrg(org: TestOrg): Promise<string> {
+  const scopeCache = readJsonCache<string>(scopeCacheFile);
+  if (scopeCache[org.name]) return scopeCache[org.name];
 
-      const sysApi = await getSysApi();
-      const existing = await findOrgId(sysApi, org.name);
-      const id = existing ?? await createOrg(sysApi, org.name);
+  const sysApi = await getSysApi();
+  const existing = await findOrgId(sysApi, org.name);
+  const id = existing ?? await createOrg(sysApi, org.name);
 
-      updateJsonCache<string>(scopeCacheFile, (cache) => ({ ...cache, [org.name]: id }));
-      return id;
-    })());
-  }
-  return orgIdMemo.get(org)!;
+  updateJsonCache<string>(scopeCacheFile, (cache) => ({ ...cache, [org.name]: id }));
+  return id;
 }
 
 async function findProjectId(sysApi: APIRequestContext, projectName: string, orgId: string): Promise<string | undefined> {
@@ -189,22 +144,17 @@ async function createProject(sysApi: APIRequestContext, projectName: string, org
   return String((await res.json() as Scope).id);
 }
 
-export function ensureProject(project: TestProject): Promise<string> {
-  if (!projectIdMemo.has(project)) {
-    projectIdMemo.set(project, (async () => {
-      const scopeCache = readJsonCache<string>(scopeCacheFile);
-      if (scopeCache[project.name]) return scopeCache[project.name];
+async function ensureProject(project: TestProject): Promise<string> {
+  const scopeCache = readJsonCache<string>(scopeCacheFile);
+  if (scopeCache[project.name]) return scopeCache[project.name];
 
-      const orgId = await ensureOrg(project.org);
-      const sysApi = await getSysApi();
-      const existing = await findProjectId(sysApi, project.name, orgId);
-      const id = existing ?? await createProject(sysApi, project.name, orgId);
+  const orgId = await ensureOrg(project.org);
+  const sysApi = await getSysApi();
+  const existing = await findProjectId(sysApi, project.name, orgId);
+  const id = existing ?? await createProject(sysApi, project.name, orgId);
 
-      updateJsonCache<string>(scopeCacheFile, (cache) => ({ ...cache, [project.name]: id }));
-      return id;
-    })());
-  }
-  return projectIdMemo.get(project)!;
+  updateJsonCache<string>(scopeCacheFile, (cache) => ({ ...cache, [project.name]: id }));
+  return id;
 }
 
 // --------------------------------
@@ -255,33 +205,26 @@ async function createCustomRole(sysApi: APIRequestContext, orgId: string, role: 
   return roleId;
 }
 
-const roleIdMemo = new Map<string, Promise<string>>();
-
 async function resolveProjectUserRoleId(sysApi: APIRequestContext, orgId: string, role: RoleSpec): Promise<string> {
   const isBuiltIn = role === Roles.user;
   const roleName = isBuiltIn ? DEFAULT_ROLE_NAME : role.name;
   const cacheKey = `${orgId}:${roleName}`;
 
-  if (!roleIdMemo.has(cacheKey)) {
-    roleIdMemo.set(cacheKey, (async () => {
-      if (!isBuiltIn) {
-        const diskCache = readJsonCache<string>(roleCacheFile);
-        if (diskCache[cacheKey]) return diskCache[cacheKey];
-      }
-
-      const existing = await findRoleIdByName(sysApi, orgId, roleName);
-
-      if (isBuiltIn) {
-        if (!existing) throw new Error(`Role "${roleName}" not found for org ${orgId} — expected a built-in org-level role with this name to already exist`);
-        return existing;
-      }
-
-      const id = existing ?? await createCustomRole(sysApi, orgId, role as CustomRole);
-      updateJsonCache<string>(roleCacheFile, (cache) => ({ ...cache, [cacheKey]: id }));
-      return id;
-    })());
+  if (!isBuiltIn) {
+    const diskCache = readJsonCache<string>(roleCacheFile);
+    if (diskCache[cacheKey]) return diskCache[cacheKey];
   }
-  return roleIdMemo.get(cacheKey)!;
+
+  const existing = await findRoleIdByName(sysApi, orgId, roleName);
+
+  if (isBuiltIn) {
+    if (!existing) throw new Error(`Role "${roleName}" not found for org ${orgId} — expected a built-in org-level role with this name to already exist`);
+    return existing;
+  }
+
+  const id = existing ?? await createCustomRole(sysApi, orgId, role as CustomRole);
+  updateJsonCache<string>(roleCacheFile, (cache) => ({ ...cache, [cacheKey]: id }));
+  return id;
 }
 
 // --------------------------------
@@ -329,11 +272,9 @@ async function setOrgAdminStatus(sysApi: APIRequestContext, orgId: string, userI
 }
 
 async function setProjectAdminStatus(
-  sysApi: APIRequestContext, orgId: string, projectId: string, userId: string, isAdmin: boolean, roleId?: string,
+  sysApi: APIRequestContext, orgId: string, projectId: string, userId: string, isAdmin: boolean,
 ): Promise<void> {
-  const params: Record<string, string> = { userId, isProjectAdmin: String(isAdmin) };
-  if (roleId) params.roleId = roleId;
-  const res = await sysApi.put(`${API_URL}/organizations/${orgId}/projects/${projectId}/members`, { params });
+  const res = await sysApi.put(`${API_URL}/organizations/${orgId}/projects/${projectId}/members`, { params: { userId, isProjectAdmin: String(isAdmin) } });
   if (!res.ok()) throw new Error(`Set project admin status failed for user ${userId} project ${projectId} (${res.status()}): ${await res.text()}`);
 }
 
@@ -343,6 +284,23 @@ async function setProjectAdminStatus(
 async function assignRole(
   sysApi: APIRequestContext, userId: string, provision: NonNullable<TestAccount['provision']>, orgId: string, projectId?: string,
 ): Promise<void> {
+
+  if (provision.role && !provision.project) {
+    throw new Error(
+      `assignRole: provision has a "role" set but no "project" — roles are only assignable ` +
+      `via project membership. Add a "project" to this account's provision, or remove "role" ` +
+      `if this account only needs org-level access.`,
+    );
+  }
+
+  if (provision.role && provision.isProjectAdmin) {
+    throw new Error(
+      `assignRole: provision has both "role" and "isProjectAdmin" set for user ${userId} — ` +
+      `project admins are granted access via admin status, not a permission-bearing role. ` +
+      `Remove "role" from this account's provision.`,
+    );
+  }
+
   await addUserToOrg(sysApi, orgId, userId);
   if (provision.isOrgAdmin) {
     await setOrgAdminStatus(sysApi, orgId, userId, true);
@@ -358,14 +316,12 @@ async function assignRole(
       );
     }
 
-    const roleId = provision.role
-      ? await resolveProjectUserRoleId(sysApi, orgId, provision.role)
-      : undefined;
-
-    await addUserToProject(sysApi, orgId, projectId, userId, provision.isProjectAdmin ?? false, roleId);
-
     if (provision.isProjectAdmin) {
-      await setProjectAdminStatus(sysApi, orgId, projectId, userId, true, roleId);
+      await addUserToProject(sysApi, orgId, projectId, userId, true);
+      await setProjectAdminStatus(sysApi, orgId, projectId, userId, true);
+    } else {
+      const roleId = await resolveProjectUserRoleId(sysApi, orgId, provision.role!);
+      await addUserToProject(sysApi, orgId, projectId, userId, false, roleId);
     }
   }
 }
@@ -383,68 +339,69 @@ async function upsertTestAccountCreds(sysApi: APIRequestContext, accountName: st
   return { apiKey: key.apiKey, apiSecret: key.apiSecret, userId };
 }
 
-const accountMemo = new Map<TestAccount, Promise<TestUserCacheEntry>>();
-
-export function ensureAccount(account: TestAccount): Promise<TestUserCacheEntry> {
+async function ensureAccount(account: TestAccount): Promise<void> {
   if (process.env['NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION'] == "true") {
     throw new Error(`Frontend & Backend Authentication must be enabled`);
   }
 
-  if (!accountMemo.has(account)) {
-    accountMemo.set(account, (async () => {
-      // The literal env-backed sysAdmin uses env-var creds, never the test-user-creation API
-      if (account.name === 'sysAdmin') {
-        await getSysApi();
-        return {} as TestUserCacheEntry;
-      }
-
-      const cache = readJsonCache<TestUserCacheEntry>(testUserCacheFile);
-      const cached = cache[account.name];
-
-      if (cached?.apiKey && cached?.apiSecret) {
-        const verifyApi = await request.newContext();
-        try {
-          const jwt = await generateJwt(verifyApi, cached.apiKey, cached.apiSecret);
-          const { email } = await fetchCurrentUser(verifyApi, jwt);
-          await saveStorageState(account.name, jwt, email);
-          return cached;
-        } catch (err) {
-          console.warn(`Cached credentials for "${account.name}" no longer valid, re-provisioning: ${err}`);
-        } finally {
-          await verifyApi.dispose();
-        }
-      }
-
-      const sysApi = await getSysApi();
-      const { apiKey, apiSecret, userId } = await upsertTestAccountCreds(sysApi, account.name);
-
-      const provisionApi = await request.newContext();
-      let email: string;
-      try {
-        const jwt = await generateJwt(provisionApi, apiKey, apiSecret);
-        ({ email } = await fetchCurrentUser(provisionApi, jwt));
-        await saveStorageState(account.name, jwt, email);
-      } finally {
-        await provisionApi.dispose();
-      }
-
-      if (account.isSysAdmin) {
-        await grantSysAdmin(sysApi, userId);
-      }
-
-      let organizationId: string | undefined;
-      let projectId: string | undefined;
-
-      if (account.provision) {
-        organizationId = account.provision.org ? await ensureOrg(account.provision.org) : undefined;
-        projectId = account.provision.project ? await ensureProject(account.provision.project) : undefined;
-        if (organizationId) await assignRole(sysApi, userId, account.provision, organizationId, projectId);
-      }
-
-      const entry: TestUserCacheEntry = { email, organizationId, projectId, userId, apiKey, apiSecret };
-      updateJsonCache<TestUserCacheEntry>(testUserCacheFile, (cache) => ({ ...cache, [account.name]: entry }));
-      return entry;
-    })());
+  // The literal env-backed sysAdmin uses env-var creds, never the test-user-creation API
+  if (account.isSysAdmin && account.name === 'sysAdmin') {
+    await getSysApi();
+    return;
   }
-  return accountMemo.get(account)!;
+
+  const cache = readJsonCache<TestUserCacheEntry>(testUserCacheFile);
+  const cached = cache[account.name];
+
+  if (cached?.apiKey && cached?.apiSecret) {
+    const verifyApi = await request.newContext();
+    try {
+      const jwt = await generateJwt(verifyApi, cached.apiKey, cached.apiSecret);
+      const { email } = await fetchCurrentUser(verifyApi, jwt);
+      await saveStorageState(account.name, jwt, email);
+      return;
+    } catch (err) {
+      console.warn(`Cached credentials for "${account.name}" no longer valid, re-provisioning: ${err}`);
+    } finally {
+      await verifyApi.dispose();
+    }
+  }
+
+  const sysApi = await getSysApi();
+  const { apiKey, apiSecret, userId } = await upsertTestAccountCreds(sysApi, account.name);
+
+  const provisionApi = await request.newContext();
+  let email: string;
+  try {
+    const jwt = await generateJwt(provisionApi, apiKey, apiSecret);
+    ({ email } = await fetchCurrentUser(provisionApi, jwt));
+    await saveStorageState(account.name, jwt, email);
+  } finally {
+    await provisionApi.dispose();
+  }
+
+  if (account.isSysAdmin) {
+    await grantSysAdmin(sysApi, userId);
+  }
+
+  let organizationId: string | undefined;
+  let projectId: string | undefined;
+
+  if (account.provision) {
+    organizationId = account.provision.org ? await ensureOrg(account.provision.org) : undefined;
+    projectId = account.provision.project ? await ensureProject(account.provision.project) : undefined;
+    if (organizationId) await assignRole(sysApi, userId, account.provision, organizationId, projectId);
+  }
+
+  const entry: TestUserCacheEntry = { email, organizationId, projectId, userId, apiKey, apiSecret };
+  updateJsonCache<TestUserCacheEntry>(testUserCacheFile, (cache) => ({ ...cache, [account.name]: entry }));
 }
+
+// --------------------------------
+// Entry point — runs once before any test worker starts.
+// --------------------------------
+setup('provision all test accounts', async () => {
+  for (const account of TEST_ACCOUNTS) {
+    await ensureAccount(account);
+  }
+});

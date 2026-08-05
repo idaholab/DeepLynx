@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test';
 import { createHash } from 'crypto';
+import fs from 'fs';
 
 // ----------------------------------------
-// Configure Global Orgs & Projects
+// Configure Orgs & Projects
 // ----------------------------------------
 export interface TestOrg {
   readonly name: string;
@@ -22,7 +23,7 @@ export const PROJECTS = {
 } as const satisfies Record<string, TestProject>;
 
 // ---------------------------------------------------------------------------
-// Configure Global Roles
+// Configure Roles
 // ---------------------------------------------------------------------------
 export const DEFAULT_ROLE_NAME = 'User';
 
@@ -60,9 +61,7 @@ export type PermissionAction =
 export type RolePermissions = Partial<Record<PermissionResource, PermissionAction[]>>;
 
 export type RolePermissionsInput = Partial<Record<PermissionResource, (PermissionAction | typeof PermissionAction['All'])[]>>;
-
 export interface CustomRole {
-  readonly kind: 'custom';
   readonly name: string;
   readonly permissions: RolePermissions;
 }
@@ -91,8 +90,9 @@ export function defineRole(input: RolePermissionsInput | 'all'): CustomRole {
     Object.entries(resolvedInput).map(([resource, spec]) => [resource, expandActions(spec!)]),
   ) as RolePermissions;
 
+  // Create Hash to limit creating new roles every run. 
   const hash = createHash('sha1').update(stableStringify(expanded)).digest('hex').slice(0, 10);
-  return { kind: 'custom', name: `PW Custom Role ${hash}`, permissions: expanded };
+  return { name: `PW Custom Role ${hash}`, permissions: expanded };
 }
 
 export const ROLES = {
@@ -100,7 +100,7 @@ export const ROLES = {
 } as const satisfies Record<string, CustomRole>;
 
 // ---------------------------------------------------------------------
-// Roles — permission-bearing roles ONLY.
+// Roles
 // ---------------------------------------------------------------------
 export const Roles = {
   user: 'user',
@@ -108,70 +108,77 @@ export const Roles = {
 export type BuiltInRoleName = typeof Roles[keyof typeof Roles];
 export type RoleSpec = BuiltInRoleName | CustomRole;
 
-export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
-  [PermissionResource.Project]: [PermissionAction.Read],
-  [PermissionResource.Organization]: [PermissionAction.Read],
-  [PermissionResource.Record]: [PermissionAction.Read, PermissionAction.Write],
-  [PermissionResource.File]: [PermissionAction.Read, PermissionAction.Write],
-  [PermissionResource.Edge]: [PermissionAction.Read, PermissionAction.Write],
-  [PermissionResource.Tag]: [PermissionAction.Read],
-};
-
 // ---------------------------------------------------------------------------
-// Configure Global Accounts
+// Configure Accounts
 // ---------------------------------------------------------------------------
 export interface Provision {
   org?: TestOrg;
   project?: TestProject;
-  isOrgAdmin?: boolean;     // grants org-admin via PUT /organizations/{orgId}/admin
-  isProjectAdmin?: boolean; // grants project-admin via PUT .../projects/{id}/members
-  role?: RoleSpec;          // baseline role — still assigned even if isProjectAdmin is true (see provisioning.ts)
+  isOrgAdmin?: boolean;
+  isProjectAdmin?: boolean;
+  role?: RoleSpec;
 }
 
 export interface TestAccount {
   readonly name: string;
-  readonly isSysAdmin?: boolean; // grants sysAdmin via PATCH /users/{userId}/admin — global, not org/project-scoped
+  readonly isSysAdmin?: boolean;
   readonly provision?: Provision;
 }
 
-function provisionFingerprint(p: Provision): string {
-  const identity = p.isProjectAdmin ? 'project_admin'
-    : p.isOrgAdmin ? 'org_admin'
-    : p.role ? (typeof p.role === 'string' ? p.role : p.role.name)
-    : 'no-role';
-  return [identity, p.org?.name ?? 'no-org', p.project?.name ?? 'no-project'].join('__').replace(/\s+/g, '-');
-}
-
-export function defineTestAccount(provision: Provision, name?: string): TestAccount {
-  return { name: name ?? `auto-${provisionFingerprint(provision)}`, provision };
+export function defineTestAccount(provision: Provision, name: string): TestAccount {
+  return { name, provision };
 }
 
 export function defineSysAdmin(name: string): TestAccount {
   return { name, isSysAdmin: true };
 }
 
-export function defineOrgAdmin(org: TestOrg, name?: string): TestAccount {
-  return { name: name ?? `auto-orgAdmin-${org.name}`.replace(/\s+/g, '-'), provision: { org, isOrgAdmin: true } };
+export function defineOrgAdmin(org: TestOrg, name: string): TestAccount {
+  return { name, provision: { org, isOrgAdmin: true } };
 }
 
-export function defineProjectAdmin(project: TestProject, name?: string): TestAccount {
-  return {
-    name: name ?? `auto-projectAdmin-${project.name}`.replace(/\s+/g, '-'),
-    provision: { org: project.org, project, isProjectAdmin: true },
-  };
+export function defineProjectAdmin(project: TestProject, name: string): TestAccount {
+  return { name, provision: { org: project.org, project, isProjectAdmin: true } };
 }
 
-// ---------------------------------------------------------------------
-// Built-in accounts
-// ---------------------------------------------------------------------
-export const sysAdmin: TestAccount = { name: 'sysAdmin', isSysAdmin: true }; // env-var creds — see provisioning.ts special case
+export const sysAdmin: TestAccount = { name: 'sysAdmin', isSysAdmin: true }; // Uses env-var creds
 export const orgAdminA: TestAccount = defineOrgAdmin(ORGS.orgA, 'orgAdminA');
 export const orgAdminB: TestAccount = defineOrgAdmin(ORGS.orgB, 'orgAdminB');
 export const projectAdminX: TestAccount = defineProjectAdmin(PROJECTS.projectX, 'projectAdminX');
 export const standardUserX: TestAccount = defineTestAccount({ role: Roles.user, org: ORGS.orgA, project: PROJECTS.projectX }, 'standardUserX');
 export const fullPermissionUserX: TestAccount = defineTestAccount({ role: ROLES.allPermissions, org: ORGS.orgA, project: PROJECTS.projectX }, 'fullPermissionUserX');
 
+export const TEST_ACCOUNTS: TestAccount[] = [
+  sysAdmin,
+  orgAdminA,
+  orgAdminB,
+  projectAdminX,
+  standardUserX,
+  fullPermissionUserX,
+  // Add new accounts here.
+];
+
 export const authFile = (name: string) => `playwright/.auth/${name}.json`;
+
+// ---------------------------------------------------------------------------
+// Cache files
+// ---------------------------------------------------------------------------
+export const scopeCacheFile = 'playwright/.auth/scopeCache.json';
+export const roleCacheFile = 'playwright/.auth/roleCache.json';
+export const testUserCacheFile = 'playwright/.auth/testUserCache.json';
+
+export interface TestUserCacheEntry {
+  email: string;
+  organizationId?: string;
+  projectId?: string;
+  userId?: string;
+  apiKey?: string;
+  apiSecret?: string;
+}
+
+export function readJsonCache<T>(file: string): Record<string, T> {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; }
+}
 
 // ---------------------------------------------------------------------------
 // UI selection helpers
