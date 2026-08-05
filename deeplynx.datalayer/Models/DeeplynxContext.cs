@@ -625,6 +625,8 @@ public partial class DeeplynxContext : DbContext
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
 
+            entity.Property(e => e.FilesDeletable).HasDefaultValue(true);
+
             entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_object_storages_last_updated_by");
 
             // entity.ToTable( e => e.HasCheckConstraint(
