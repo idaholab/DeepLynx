@@ -23,7 +23,7 @@ The repository is organized as a .NET solution with separate projects for API, b
 
 | Project or folder | Responsibility |
 |---|---|
-| `deeplynx.api` | ASP.NET Core API host, controllers, API startup configuration, middleware pipeline, OpenAPI/Scalar configuration. |
+| `deeplynx.api` | ASP.NET Core API host, versioned controllers under `Controllers/V{major}`, API startup configuration, middleware pipeline, OpenAPI/Scalar configuration. |
 | `deeplynx.business` | Domain/business logic implementations. Business classes own validation, EF queries, persistence orchestration, event creation, and domain-specific rules. |
 | `deeplynx.interfaces` | Interfaces for business-layer services. Controllers depend on these interfaces rather than concrete business classes. |
 | `deeplynx.models` | Request DTOs, response DTOs, configuration models, and API-facing data shapes. |
@@ -71,7 +71,7 @@ The resulting API path is:
 /api/v1/organizations/{organizationId}/projects
 ```
 
-Controllers that have not been explicitly versioned are treated as unchanged APIs by the default API version convention. They are currently registered for both v1 and v2 so endpoints without version-specific behavior remain visible and callable from either Scalar document.
+Controllers are organized by major API version under `deeplynx.api/Controllers/V{major}`. Each version has its own controller class and namespace, even when its behavior is initially identical to the preceding version. This keeps each version's complete HTTP contract discoverable in one place and prevents legacy and current actions from accumulating in the same class.
 
 ### API Startup Flow
 
@@ -133,7 +133,12 @@ Controllers should:
 Example:
 
 ```csharp
+using Asp.Versioning;
+
+namespace deeplynx.api.Controllers.V2;
+
 [ApiController]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects")]
 [Authorize]
 public class ProjectController : ControllerBase
@@ -357,36 +362,59 @@ Nexus uses URL-segment API versioning. Public controller routes are shaped as:
 Do not put the `api/v1` prefix in controller `[Route]` attributes. Controller routes should stay resource-focused:
 
 ```csharp
+namespace deeplynx.api.Controllers.V2;
+
 [ApiController]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
 public class ClassProjectController : ControllerBase
 {
 }
 ```
 
-Existing unannotated controllers are registered for the currently supported default versions. Do not add `[ApiVersion(1)]` or `[ApiVersion(2)]` to every controller or action just for consistency. That creates churn without changing behavior.
+Organize controllers by major API version. A resource that is available in v1 and v2 has two files:
 
-When a controller starts supporting a new API version, make that controller's supported versions explicit:
+```text
+deeplynx.api/
+  Controllers/
+    V1/
+      ClassProjectController.cs
+    V2/
+      ClassProjectController.cs
+```
+
+Use the version in both the folder and namespace. The two classes intentionally have the same unversioned class name because the namespace distinguishes them:
 
 ```csharp
+// Controllers/V1/ClassProjectController.cs
+namespace deeplynx.api.Controllers.V1;
+
 [ApiController]
 [ApiVersion(1)]
-[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
 public class ClassProjectController : ControllerBase
 {
     [HttpGet]
-    [MapToApiVersion(1)]
-    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV1(...)
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClasses(...)
     {
         // Existing legacy behavior.
     }
+}
+```
 
+```csharp
+// Controllers/V2/ClassProjectController.cs
+namespace deeplynx.api.Controllers.V2;
+
+[ApiController]
+[ApiVersion(2)]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
+public class ClassProjectController : ControllerBase
+{
     /// <summary>Get Classes</summary>
     [HttpGet]
-    [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV2(...)
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClasses(...)
     {
         // New v2 behavior.
     }
@@ -395,19 +423,20 @@ public class ClassProjectController : ControllerBase
 
 Versioning rules:
 
-- Leave untouched controllers unannotated; they are treated as unchanged APIs and are available in the configured default versions.
-- Once a controller gets version-specific behavior, add explicit `[ApiVersion(1)]` and `[ApiVersion(2)]` at the controller level.
-- If a controller declares only `[ApiVersion(1)]`, its actions are v1 by default; do not add `[MapToApiVersion(1)]` to every action.
-- Use `[MapToApiVersion(...)]` when two actions share the same HTTP verb and route but have version-specific behavior.
-- If an action behaves identically across declared controller versions, one action can serve all declared versions by omitting `[MapToApiVersion]`.
-- If an action is explicitly mapped with `[MapToApiVersion(1)]`, it is v1-only. To keep the same action available in v2, either omit `[MapToApiVersion]` when the controller declares both versions, or map the action to both versions intentionally.
+- Put every new versioned controller in `deeplynx.api/Controllers/V{major}` and use the matching `deeplynx.api.Controllers.V{major}` namespace.
+- Declare exactly one `[ApiVersion(...)]` per controller. The declared major version must match its folder and namespace.
+- Give corresponding controllers and actions the same names across versions. Do not add `V1`, `V2`, or similar suffixes; the namespace supplies the distinction.
+- Keep the complete controller surface for a version in that version's folder. When adding v3, copy the applicable v2 controller into `Controllers/V3` and change it there, including unchanged actions that remain part of the contract.
+- Do not mix actions for multiple API versions in one controller. With one controller per version, `[MapToApiVersion(...)]` is unnecessary and should not be used.
+- Duplicate small amounts of HTTP orchestration across versions when necessary to keep contracts independent. Extract genuinely version-neutral behavior into the business layer or a shared service, not a controller base class that couples versioned HTTP contracts.
 - Keep v1 behavior byte-for-byte compatible unless the ticket explicitly changes the v1 contract.
 - Put breaking response, status-code, route, request DTO, or error-contract changes in a new API version.
 - Add a Scalar version badge to an action introduced or changed in a newer API version. Use the uppercase major-version label and the standard badge styling: `[Badge("V2", BadgePosition.Before, "#72e6a1")]`.
-- Put version badges on the version-specific action, not on the controller. Unchanged actions inherited by the newer version should not be labeled as new.
-- Scalar badges are documentation metadata only. They do not replace `[ApiVersion]` or `[MapToApiVersion]` and do not affect routing.
+- Put version badges on the changed action, not on the controller. An unchanged action copied into the newer version should not be labeled as new.
+- Scalar badges are documentation metadata only. They do not replace `[ApiVersion]` and do not affect routing.
 - Scalar renders operation badges in the endpoint details, but not in the sidebar. Keep operations in their normal functional group and do not duplicate tags solely to display version metadata in the sidebar.
 - Update OpenAPI/Scalar documentation and route smoke tests when adding a new API version.
+- Mirror the production layout in controller tests, for example `deeplynx.tests/Controllers/V1` and `deeplynx.tests/Controllers/V2`, and import the version-specific controller namespace explicitly.
 - Register new public API versions in `deeplynx.api/NexusApiVersions.cs`. This is the source of truth for default API versioning, supported versions, OpenAPI documents, and the Scalar document dropdown:
 
 ```csharp
@@ -483,14 +512,13 @@ using Scalar.AspNetCore;
 
 /// <summary>Create a Class</summary>
 [HttpPost]
-[MapToApiVersion(2)]
 [Badge("V2", BadgePosition.Before, "#72e6a1")]
-public async Task<ActionResult<ClassResponseDto>> CreateClassV2(...)
+public async Task<ActionResult<ClassResponseDto>> CreateClass(...)
 ```
 
-Use the badge label `V{major}`, such as `V2` or `V3`, so version badges remain consistent across controllers. Add the badge only to the version-specific action introduced or materially changed in that version. Do not badge an unchanged action that is inherited by a newer API version.
+Use the badge label `V{major}`, such as `V2` or `V3`, so version badges remain consistent across controllers. Add the badge only to the version-specific action introduced or materially changed in that version. Do not badge an unchanged action copied into a newer version.
 
-The `Badge` annotation affects OpenAPI/Scalar documentation only. It does not assign an API version, constrain a route, or replace `[ApiVersion]` and `[MapToApiVersion]`. The versioned URL communicates which API document and route the user is viewing; the badge highlights the operations that differ in that version.
+The `Badge` annotation affects OpenAPI/Scalar documentation only. It does not assign an API version, constrain a route, or replace `[ApiVersion]`. The versioned URL communicates which API document and route the user is viewing; the badge highlights the operations that differ in that version.
 
 `Program.cs` enables `ReportApiVersions`, so valid versioned controller responses include API version reporting headers:
 
@@ -500,25 +528,36 @@ api-supported-versions: 1.0
 
 `api-deprecated-versions` is only populated when a version is explicitly marked deprecated, such as with a deprecated API version convention or `[ApiVersion(1, Deprecated = true)]`. These headers are expected on versioned controller endpoints. Do not assume they will be present on manually mapped non-controller endpoints such as health checks, SignalR hubs, Scalar, or OpenAPI JSON.
 
-To deprecate a controller version with attributes, mark the version as deprecated on the controller:
+To deprecate a controller version with attributes, mark that version's controller as deprecated. Other versions remain in their own files:
 
 ```csharp
+// Controllers/V1/ClassProjectController.cs
+namespace deeplynx.api.Controllers.V1;
+
 [ApiController]
 [ApiVersion(1, Deprecated = true)]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
+public class ClassProjectController : ControllerBase
+{
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClasses(...)
+    {
+        // Deprecated v1 behavior.
+    }
+}
+```
+
+```csharp
+// Controllers/V2/ClassProjectController.cs
+namespace deeplynx.api.Controllers.V2;
+
+[ApiController]
 [ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
 public class ClassProjectController : ControllerBase
 {
     [HttpGet]
-    [MapToApiVersion(1)]
-    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV1(...)
-    {
-        // Deprecated v1 behavior.
-    }
-
-    [HttpGet]
-    [MapToApiVersion(2)]
-    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV2(...)
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClasses(...)
     {
         // Current v2 behavior.
     }
@@ -528,8 +567,12 @@ public class ClassProjectController : ControllerBase
 If the controller is configured through API versioning conventions instead of attributes, use `HasDeprecatedApiVersion`:
 
 ```csharp
-options.Conventions.Controller<ClassProjectController>()
-    .HasDeprecatedApiVersion(new ApiVersion(1))
+options.Conventions
+    .Controller<deeplynx.api.Controllers.V1.ClassProjectController>()
+    .HasDeprecatedApiVersion(new ApiVersion(1));
+
+options.Conventions
+    .Controller<deeplynx.api.Controllers.V2.ClassProjectController>()
     .HasApiVersion(new ApiVersion(2));
 ```
 
@@ -862,7 +905,7 @@ catch (Exception exc)
 
 Business classes throw exceptions for invalid domain states, missing records, validation failures, dependency conflicts, and failed operations.
 
-Keep these catches when they are required to preserve a frozen v1 contract. Do not remove a broad catch from an action shared by v1 and later versions because doing so silently changes v1 error responses. Split the action by API version before adopting global exception handling for v2 and later.
+Keep these catches when they are required to preserve a frozen v1 contract. Do not remove a broad catch while copying a controller into a newer version if doing so would also alter the v1 controller. Keep the v1 action unchanged and adopt global exception handling only in the controller under `Controllers/V2` or later.
 
 ### Automatic Model-State Validation
 
@@ -1221,7 +1264,7 @@ Use this checklist when adding a new backend resource.
 5. Add an interface in `deeplynx.interfaces`.
 6. Add a business implementation in `deeplynx.business`.
 7. Register the business implementation in `Program.cs`.
-8. Add a controller in `deeplynx.api/Controllers`.
+8. Add a controller in each supported version folder under `deeplynx.api/Controllers/V{major}` and use its matching version namespace and `[ApiVersion]` attribute.
 9. Add `[Authorize]` and the correct `[Auth]`, `[SysAdmin]`, or `[OrgAdmin]` attributes.
 10. Use explicit `ActionResult<T>` types.
 11. Add XML comments for controller methods.
