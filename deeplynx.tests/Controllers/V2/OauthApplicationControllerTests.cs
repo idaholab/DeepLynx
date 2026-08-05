@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Scalar.AspNetCore;
+using V1OauthApplicationController = deeplynx.api.Controllers.V1.OauthApplicationController;
 
 namespace deeplynx.tests.Controllers.V2;
 
@@ -185,7 +186,11 @@ public class OauthApplicationControllerTests : IDisposable
             .Setup(business => business.GetOauthApplication(ApplicationId, true))
             .ThrowsAsync(new InvalidOperationException("database failure"));
 
-        var result = (await _controller.GetOauthApplication(ApplicationId)).Result;
+        var v1Controller = new V1OauthApplicationController(
+            _mockBusiness.Object,
+            Mock.Of<ILogger<V1OauthApplicationController>>());
+
+        var result = (await v1Controller.GetOauthApplication(ApplicationId)).Result;
 
         var error = Assert.IsType<ObjectResult>(result);
         Assert.Equal(500, error.StatusCode);

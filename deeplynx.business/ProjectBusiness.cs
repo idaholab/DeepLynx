@@ -32,6 +32,7 @@ public class ProjectBusiness : IProjectBusiness
     };
 
     private readonly ILogger<ProjectBusiness> _logger;
+    private readonly IFileBusinessFactory _fileBusinessFactory;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly INotificationBusiness _notificationBusiness;
     private readonly IOrganizationBusiness _organizationBusiness;
@@ -57,7 +58,8 @@ public class ProjectBusiness : IProjectBusiness
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
         IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness,
-        IFileBusiness fileAzureBusiness)
+        IFileBusiness fileAzureBusiness,
+        IFileBusinessFactory fileBusinessFactory)
     {
         _context = context;
         _logger = logger;
@@ -69,6 +71,7 @@ public class ProjectBusiness : IProjectBusiness
         _eventBusiness = eventBusiness;
         _organizationBusiness = organizationBusiness;
         _fileAzureBusiness = fileAzureBusiness;
+        _fileBusinessFactory = fileBusinessFactory;
     }
 
     /// <summary>
@@ -727,6 +730,9 @@ public class ProjectBusiness : IProjectBusiness
             throw new KeyNotFoundException($"Project with id {projectId} not found.");
 
         var projectName = project.Name;
+
+        var records = _context.Records.Where(r => r.ProjectId == projectId);
+        await RecordFileHelper.TryDeleteFiles(records, _fileBusinessFactory, _objectStorageBusiness);
 
         _context.Projects.Remove(project);
         await _context.SaveChangesAsync();

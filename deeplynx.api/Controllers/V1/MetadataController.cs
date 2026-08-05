@@ -11,7 +11,7 @@ namespace deeplynx.api.Controllers.V1;
 
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/datasources/{dataSourceId:long}/metadata")]
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Authorize]
 public class MetadataController : ControllerBase
 {

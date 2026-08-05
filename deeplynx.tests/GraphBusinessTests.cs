@@ -23,6 +23,7 @@ public class GraphBusinessTests : IntegrationTestBase
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _mockOrganizationBusiness = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
@@ -65,6 +66,7 @@ public class GraphBusinessTests : IntegrationTestBase
         _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
@@ -88,7 +90,7 @@ public class GraphBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()

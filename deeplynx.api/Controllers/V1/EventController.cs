@@ -15,7 +15,7 @@ namespace deeplynx.api.Controllers.V1
     /// This controller provides an endpoint retrieve project events that match the user's subscriptions.
     /// </remarks>
     [ApiController]
-    [ApiVersion(1)]
+    [ApiVersion(1, Deprecated = true)]
     [Route("events")]
     [Authorize]
     public class EventController : ControllerBase // Inherit from ControllerBase

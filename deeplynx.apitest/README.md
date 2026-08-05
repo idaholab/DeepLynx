@@ -1,6 +1,7 @@
 # 1. Configure your .env
 ### Create a .env file and copy the contents of the .env_sample.
 - Ensure the url is accurate. The URL in the .env_sample is already configured for local testing
+- Keep `DEEPLYNX_URL` on `/api/v1` unless the test suite is being explicitly migrated and reviewed for the v2 response contract. This pin preserves coverage of the frozen, deprecated v1 API.
 - Add your API Key
 - Add your API Secret
 

@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Scalar.AspNetCore;
+using V1UserModelTokenController = deeplynx.api.Controllers.V1.UserModelTokenController;
 
 namespace deeplynx.tests.Controllers.V2;
 
@@ -133,7 +134,11 @@ public class UserModelTokenControllerTests : IDisposable
             .Setup(business => business.GetTokenById(UserId, UserModelTokenId))
             .ThrowsAsync(new UnauthorizedAccessException("access denied"));
 
-        var result = (await _controller.GetTokenById(UserModelTokenId)).Result;
+        var v1Controller = new V1UserModelTokenController(
+            _mockBusiness.Object,
+            Mock.Of<ILogger<V1UserModelTokenController>>());
+
+        var result = (await v1Controller.GetTokenById(UserModelTokenId)).Result;
 
         var forbidden = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);

@@ -1833,6 +1833,7 @@ export const translations = {
       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
         "Set the default unmounted object storage location for this organization.",
       STORAGE_SIZE: "Storage Size",
+      STORAGE_FILES_DELETABLE: "Delete files when the record is deleted",
       SET_UP: "Set Up",
       SETTINGS: "Settings",
       SHOW: "Show",
@@ -4069,6 +4070,7 @@ export const translations = {
       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
         "Establecer la ubicación predeterminada del almacenamiento de objetos no montado para esta organización.",
       STORAGE_SIZE: "Tamaño de almacenamiento",
+      STORAGE_FILES_DELETABLE: "Eliminar archivos al eliminar el registro",
       SET_UP: "Configuración",
       SENSITIVITY_LABELS_COMMA_SEPARATED: "etiquetas de sensibilidad (separadas por comas)",
       SETTINGS: "Configuración",

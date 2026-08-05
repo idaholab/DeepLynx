@@ -17,7 +17,7 @@ namespace deeplynx.api.Controllers.V1;
 ///     This mostly entails one-time jobs that cannot be resolved via EF migration.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Route("maintenance")]
 [Authorize]
 [Tags("Maintenance")]
@@ -42,7 +42,7 @@ public class MaintenanceController : ControllerBase
         _fileBusiness = fileBusiness;
         _logger = logger;
     }
-    
+
     /// <summary>
     ///     Backfill file size properties
     /// </summary>
@@ -70,7 +70,7 @@ public class MaintenanceController : ControllerBase
                 afterRecordId,
                 batchSize,
                 maxBatches);
-            
+
             return Ok(result);
         }
         catch (Exception ex)
@@ -80,7 +80,7 @@ public class MaintenanceController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
 
 
     /// <summary>
@@ -103,7 +103,7 @@ public class MaintenanceController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
+
 
 
     /// <summary>
@@ -127,6 +127,5 @@ public class MaintenanceController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
-    
 
 }
