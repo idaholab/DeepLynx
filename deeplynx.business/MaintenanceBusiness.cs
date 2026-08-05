@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
@@ -111,7 +112,7 @@ public class MaintenanceBusiness : IMaintenanceBusiness
                 if (Directory.Exists(sourcePath))
                     throw new NotSupportedException("Directory/appended records require the follow-up prefix migration.");
                 if (!File.Exists(sourcePath))
-                    throw new FileNotFoundException("The source file does not exist.", sourcePath);
+                    throw new FileNotFoundException("The source file does not exist. Source Path: " + sourcePath);
 
                 var fileName = Path.GetFileName(sourcePath);
                 if (string.IsNullOrWhiteSpace(fileName))
@@ -185,10 +186,19 @@ public class MaintenanceBusiness : IMaintenanceBusiness
     private static void EnsurePathIsInsideMount(string sourcePath, string normalizedMount)
     {
         var mountPrefix = normalizedMount + Path.DirectorySeparatorChar;
-        if (!sourcePath.Equals(normalizedMount, StringComparison.Ordinal) &&
-            !sourcePath.StartsWith(mountPrefix, StringComparison.Ordinal))
+
+        var comparison = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        if (!sourcePath.Equals(normalizedMount, comparison) &&
+            !sourcePath.StartsWith(mountPrefix, comparison))
+        {
             throw new InvalidOperationException("Record URI is outside the configured filesystem mount path.");
+        }
     }
+
+
     /// <summary>
     /// Gets the records that have been uploaded using our old timeseries methods,
     /// enriched with project and datasource info so callers can group/select before migrating.
