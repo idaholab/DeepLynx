@@ -3349,6 +3349,10 @@ public class QueryBusinessTests : IntegrationTestBase
             .Setup(x => x.PermissionInProject(uid, pid, "read", "record"))
             .ReturnsAsync(true);
 
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionsInProjects(uid, It.Is<long[]>(p => p.SequenceEqual(new long[] { pid })), "read", "record"))
+            .ReturnsAsync([pid]);
+
         _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService, _projectRolePermissionServiceMock.Object);
 
         var page1 = await _queryBusiness.QueryBuilderPaginated(
