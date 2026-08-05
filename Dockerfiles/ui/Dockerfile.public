@@ -3,12 +3,10 @@ FROM node:22-alpine AS frontend-build
 
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_API_VERSION=v1
-ARG NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=false
 ARG BACKEND_BASE_URL
 
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_API_VERSION=${NEXT_PUBLIC_API_VERSION}
-ENV NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=${NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION}
 ENV BACKEND_BASE_URL=${BACKEND_BASE_URL}
 
 # Set working directory
@@ -34,19 +32,8 @@ RUN set -eux; \
     test -f "$target/package.json" && grep -q '"version": "4.0.4"' "$target/package.json"; \
     cd / && rm -rf "$tmp"
 
-# Build the frontend. Public browser calls default to the same-origin ingress;
-# reject addresses that cannot work from an HTTPS deployment.
-RUN set -eu; \
-    export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-/api}"; \
-    export NEXT_PUBLIC_API_VERSION="${NEXT_PUBLIC_API_VERSION:-v1}"; \
-    case "$NEXT_PUBLIC_API_URL" in \
-        /*|https://*) ;; \
-        *) echo "NEXT_PUBLIC_API_URL must be a same-origin path or an HTTPS URL, got: $NEXT_PUBLIC_API_URL" >&2; exit 1 ;; \
-    esac; \
-    case "$NEXT_PUBLIC_API_URL" in \
-        *localhost*|*127.0.0.1*) echo "NEXT_PUBLIC_API_URL must not target localhost in a public image" >&2; exit 1 ;; \
-    esac; \
-    npm run build
+# Build the frontend
+RUN npm run build
 
 # Stage 2: Create the final image
 FROM node:22-alpine AS final
