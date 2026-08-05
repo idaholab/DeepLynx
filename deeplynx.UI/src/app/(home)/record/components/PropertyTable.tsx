@@ -56,11 +56,11 @@ function isValidUri(uri: string): boolean {
 }
 
 /** @returns whether the record may be downloaded, redirected, or neither depending on detected URI type. */
-export function uriPermission(uri?: string | null, fileTransfers?: boolean): "download" | "redirect" | "none" {
+export function uriPermission(uri?: string | null, fileTransfers?: boolean): "download" | "redirect" | "none" | "downloadBlocked" {
   if (!uri || !isValidUri(uri)) return "none";
   if (isUrl(uri)) return "redirect";
   if (fileTransfers) return "download";
-  return "none";
+  return "downloadBlocked";
 }
 
 interface PropertyTableProps {
@@ -100,8 +100,9 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
 
   const uriType = uriPermission(uri, !organization?.disableFileTransfer);
   const download = (uriType === "download");
+  const downloadBlocked = (uriType === "downloadBlocked");
   const redirect = (uriType === "redirect");
-  const show = (uri !== undefined)
+  const show = (uri !== undefined);
 
   const searchParams = useSearchParams();
   const [isFolder, setIsFolder] = useState(false);
@@ -111,7 +112,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const recordIdParam = searchParams.get("recordId");
   const projectId = projectIdParam ? Number(projectIdParam) : NaN;
   const recordId = recordIdParam ? Number(recordIdParam) : NaN;
-  const canDownload = download && Number.isFinite(projectId) && Number.isFinite(recordId);
+  const canDownload = !downloadBlocked && Number.isFinite(projectId) && Number.isFinite(recordId);
   const { t } = useLanguage();
 
   useEffect(() => {
@@ -516,7 +517,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                 </a>
               )}
 
-              {show && !redirect && (
+              {show && (download || downloadBlocked) && (
                 <div className="flex items-center gap-3">
                   {/* Status indicator - show during preparation or for presigned URL downloads */}
                   {downloading && (preparingDownload || isPresignedUrl) && !showProgressBar && !isFolder && (
