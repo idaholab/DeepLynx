@@ -350,7 +350,7 @@ try
 
     if (isRuntimeStartup)
     {
-        var customcss = File.ReadAllText("moon.css");
+        var customcss = File.ReadAllText(Path.Combine(app.Environment.ContentRootPath, "moon.css"));
         var hostedLink = Environment.GetEnvironmentVariable("HOSTED_LINK");
 
         // Conditional image hosting
