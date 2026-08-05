@@ -19,7 +19,7 @@ Configure local UI development with:
 
 ```dotenv
 NEXT_PUBLIC_API_URL=http://localhost:5095/api
-NEXT_PUBLIC_API_VERSION=v1
+NEXT_PUBLIC_API_VERSION=v2
 BACKEND_BASE_URL=http://localhost:5095/api
 ```
 
