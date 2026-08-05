@@ -22,9 +22,10 @@ const fileType: FileTypeConfig =
     mimeType: 'application/json',
     content: JSON.stringify({
 
-        Name: "example_file_name",
+        Name: "",
         Description: "Describe this file",
         OriginalId: "unique-original-id",
+        ClassId: "akdlfj",
         Properties: {
             exampleKey: "exampleValue"
         }
@@ -54,6 +55,7 @@ test.describe("File Upload -> Update Existing Record", () => {
         let filePath: string;
         let filePathMetadata: string;
         let createdRecord: { recordId: string; projectId: string } | null = null;
+        let createdRecordMetadata: { recordId: string; projectId: string } | null = null;
 
         test.beforeEach(async () => {
             // Create the file locally
@@ -64,6 +66,7 @@ test.describe("File Upload -> Update Existing Record", () => {
                 await fs.promises.writeFile(filePath, csvContent, 'utf8');
             }
             createdRecord = null;
+            createdRecordMetadata = null;
 
             filePathMetadata = await setUp(fileNameMetadata, fileType.content);
         });
@@ -79,10 +82,12 @@ test.describe("File Upload -> Update Existing Record", () => {
 
         test.afterEach(async ({ request }) => {
             await deleteRecordIfExists({ request }, createdRecord, orgId);
+            await deleteRecordIfExists({ request }, createdRecordMetadata, orgId);
             createdRecord = null;
+            createdRecordMetadata = null;
         });
 
-        test("uploads a timeseries file", async ({ page }) => {
+        test("update with invalid metadata", async ({ page }) => {
             test.setTimeout(120_000); // two minutes buffer time
 
             createdRecord = await clickToBrowse({ page }, fileName, filePath);
@@ -109,7 +114,38 @@ test.describe("File Upload -> Update Existing Record", () => {
 
             await page.getByRole('button', { name: 'Upload', exact: true }).click();
 
-            await expect(page.getByText('File uploaded successfully!')).toBeVisible();
+            // Verify in Project Dashboard
+            await page.getByRole("link", { name: "Project Dashboard" }).click();
+            await page.waitForURL(/\/project/);
+            await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+            await verifyInProject(page, fileName);
+
+            const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+            const dataCatalogButton = sideBar.getByRole('link').nth(1);
+            await dataCatalogButton.click();
+
+            const recordLink = page.getByRole('link', { name: fileName, exact: true }).first();
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                await page.getByRole('textbox', { name: 'Search' }).click();
+                await page.getByRole('textbox', { name: 'Search' }).fill(fileName);
+                await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+                try {
+                    await expect(page.locator('span').filter({ hasText: fileName })).toBeVisible(); // search term success
+                    await expect(recordLink).toBeVisible(); // file visible
+                    break;
+                } catch (error) {
+                    if (attempt === 2) {
+                        throw error;
+                    }
+                }
+            }
+
+            // Navigate into the record (data-catalog -> record page) so we can
+            // read the recordId/projectId out of the URL for cleanup.
+            await recordLink.click();
+            await page.waitForURL(/\/record\?/);
+
+            createdRecordMetadata = parseRecordFromUrl(page.url());
         });
     });
 });
