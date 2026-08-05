@@ -129,7 +129,10 @@ public class GraphBusiness : IGraphBusiness
     }
 
     /// <summary>
-    ///     Gets related records up to 3 levels deep
+    ///     Gets related records up to 3 levels deep. Traversal is strictly scoped to
+    ///     the root record's own project (and therefore its own organization) — edges
+    ///     pointing to records in other projects/orgs are never followed or returned,
+    ///     regardless of what the user otherwise has access to.
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the record belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
@@ -158,51 +161,53 @@ public class GraphBusiness : IGraphBusiness
 
         if (rootRecord == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
 
-        List<long> userProjectIds = new();
-        List<long> userAuthorizedLabels = new();
-        List<long> projectAdminIds = new();
+        // Everything downstream is scoped to exactly this one project — reject up
+        // front if the record doesn't actually live where the caller claims.
+        if (rootRecord.ProjectId != projectId)
+            throw new UnauthorizedAccessException(
+                $"Record with id {recordId} does not belong to project {projectId}");
 
-        // Sys and org admins bypass all sensitivity label checks.
-        // Regular members bypass them only for projects they are project admin of (per-project).
-        bool bypassAllLabels = isSysAdmin || isOrgAdmin;
+        List<long> userAuthorizedLabels = new();
+        var isProjectAdmin = false;
 
         if (isSysAdmin)
         {
-            // Leave userProjectIds null. SysAdmins get a free pass here and in GetGraphEdges.
+            // Full access. SysAdmins skip label filtering here and in GetGraphEdges.
         }
         else if (isOrgAdmin)
         {
-            userProjectIds = await _context.Projects
-                .Where(p => p.OrganizationId == organizationId)
-                .Select(p => p.Id)
-                .ToListAsync();
+            var projectBelongsToOrg = await _context.Projects
+                .AnyAsync(p => p.Id == projectId && p.OrganizationId == organizationId);
 
-            if (!userProjectIds.Contains(rootRecord.ProjectId))
+            if (!projectBelongsToOrg)
                 throw new UnauthorizedAccessException(
                     $"You do not have access to view record with id {recordId}");
+
+            // Org admins skip label filtering (project scoping still applies).
         }
         else
         {
-            userProjectIds = await _context.Projects
-                .Where(p => p.ProjectMembers.Any(pm =>
+            var hasProjectAccess = await _context.Projects
+                .AnyAsync(p => p.Id == projectId && p.ProjectMembers.Any(pm =>
                     pm.UserId == userId ||
-                    (pm.GroupId.HasValue && pm.Group != null && pm.Group.Users.Any(u => u.Id == userId))))
-                .Select(p => p.Id)
-                .ToListAsync();
+                    (pm.GroupId.HasValue && pm.Group != null && pm.Group.Users.Any(u => u.Id == userId))));
 
-            if (!userProjectIds.Contains(rootRecord.ProjectId))
+            if (!hasProjectAccess)
                 throw new UnauthorizedAccessException(
                     $"You do not have access to view record with id {recordId}");
 
-            // label checks are skipped for records in projects where the user is sysAdmin
-            projectAdminIds = await AdminHelper.GetAdminProjectIds(
-                _context, userId, organizationId, userProjectIds);
+            isProjectAdmin = (await AdminHelper.GetAdminProjectIds(
+                _context, userId, organizationId, new List<long> { projectId })).Contains(projectId);
 
-            userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                userId, organizationId, userProjectIds.ToArray(), "read record");
+            // label checks are skipped for records in projects where the user is a project admin
+            if (!isProjectAdmin)
+            {
+                userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                    userId, organizationId, new[] { projectId }, "read record");
+            }
 
-            // Root record label check — skipped if user is project admin of the root's project
-            if (!projectAdminIds.Contains(rootRecord.ProjectId) &&
+            // Root record label check — skipped if user is project admin
+            if (!isProjectAdmin &&
                 rootRecord.Labels.Any() &&
                 !rootRecord.Labels.All(l => userAuthorizedLabels.Contains(l.Id)))
             {
@@ -237,8 +242,8 @@ public class GraphBusiness : IGraphBusiness
 
                 visitedRecords.Add(currentLevelRecordId);
 
-                var outgoingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, projectAdminIds, isSysAdmin, isOrgAdmin, isOutgoing: true);
-                var incomingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, projectAdminIds, isSysAdmin, isOrgAdmin, isOutgoing: false);
+                var outgoingEdges = await GetGraphEdges(currentLevelRecordId, projectId, userAuthorizedLabels, isSysAdmin, isOrgAdmin, isProjectAdmin, isOutgoing: true);
+                var incomingEdges = await GetGraphEdges(currentLevelRecordId, projectId, userAuthorizedLabels, isSysAdmin, isOrgAdmin, isProjectAdmin, isOutgoing: false);
 
                 ProcessEdges(outgoingEdges, nodes, links, visitedEdges, nextLevelRecordIds, true);
                 ProcessEdges(incomingEdges, nodes, links, visitedEdges, nextLevelRecordIds, false);
@@ -255,22 +260,24 @@ public class GraphBusiness : IGraphBusiness
     }
 
     /// <summary>
-    ///     Gets all edges connected to a specific record from the database
+    ///     Gets all edges connected to a specific record from the database. Only
+    ///     edges whose origin AND destination both live in `projectId` are returned —
+    ///     this is what keeps the whole traversal from ever leaving the root's project/org.
     /// </summary>
     /// <param name="recordId">The ID of the record to get edges for</param>
-    /// <param name="userProjectIds">The IDs of the projects the user has access to (ignored for sys admins)</param>
-    /// <param name="userAuthorizedLabels">Sensitivity label IDs the user may read (ignored for sys/org admins)</param>
-    /// <param name="projectAdminIds">Projects where the user is a project admin; label checks are skipped for records in these projects</param>
+    /// <param name="projectId">The single project this traversal is scoped to (the root record's project)</param>
+    /// <param name="userAuthorizedLabels">Sensitivity label IDs the user may read (ignored for sys/org admins and project admins)</param>
     /// <param name="isSysAdmin">Sys admins skip project and label filtering</param>
     /// <param name="isOrgAdmin">Org admins skip label filtering (project scoping still applies)</param>
+    /// <param name="isProjectAdmin">Project admins skip label filtering (project scoping still applies)</param>
     /// <param name="isOutgoing">True for edges going OUT from this record, false for edges coming IN</param>
     private async Task<List<Edge>> GetGraphEdges(
         long recordId,
-        List<long> userProjectIds,
+        long projectId,
         List<long> userAuthorizedLabels,
-        List<long> projectAdminIds,
         bool isSysAdmin,
         bool isOrgAdmin,
+        bool isProjectAdmin,
         bool isOutgoing)
     {
         var query = _context.Edges
@@ -283,21 +290,21 @@ public class GraphBusiness : IGraphBusiness
 
         if (!isSysAdmin)
         {
+            // Hard project boundary — every edge and both endpoints must belong to
+            // the root's project. This alone is what prevents cross-project/org leakage.
             query = query.Where(e =>
-                userProjectIds.Contains(e.ProjectId) &&
-                userProjectIds.Contains(e.Origin.ProjectId) &&
-                userProjectIds.Contains(e.Destination.ProjectId));
-        }
+                e.ProjectId == projectId &&
+                e.Origin.ProjectId == projectId &&
+                e.Destination.ProjectId == projectId);
 
-        if (!isSysAdmin && !isOrgAdmin)
-        {
-            query = query.Where(e =>
-                (projectAdminIds.Contains(e.Origin.ProjectId) ||
-                !e.Origin.Labels.Any() ||
-                e.Origin.Labels.All(l => userAuthorizedLabels.Contains(l.Id))) &&
-                (projectAdminIds.Contains(e.Destination.ProjectId) ||
-                !e.Destination.Labels.Any() ||
-                e.Destination.Labels.All(l => userAuthorizedLabels.Contains(l.Id))));
+            if (!isOrgAdmin && !isProjectAdmin)
+            {
+                query = query.Where(e =>
+                    (!e.Origin.Labels.Any() ||
+                    e.Origin.Labels.All(l => userAuthorizedLabels.Contains(l.Id))) &&
+                    (!e.Destination.Labels.Any() ||
+                    e.Destination.Labels.All(l => userAuthorizedLabels.Contains(l.Id))));
+            }
         }
 
         query = isOutgoing

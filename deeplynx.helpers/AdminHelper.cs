@@ -24,28 +24,6 @@ public static class AdminHelper
                 || pm.Group.Users.Any(gu => gu.Id == userId)));
   }
 
-  public static async Task<List<long>> GetAdminProjectIds(
-  DeeplynxContext context, long userId, long organizationId, List<long> projectIds)
-  {
-    if (projectIds.Count == 0)
-      return new List<long>();
-
-    return await context.ProjectMembers
-        .Where(pm =>
-            pm.IsProjectAdmin &&
-            pm.Project.OrganizationId == organizationId &&
-            projectIds.Contains(pm.ProjectId) &&
-            (
-                // Direct membership
-                pm.UserId == userId ||
-                // Group membership
-                pm.Group.Users.Any(gu => gu.Id == userId)
-            ))
-        .Select(pm => pm.ProjectId)
-        .Distinct()
-        .ToListAsync();
-  }
-
   /// <summary>
   /// Returns true if the user is a sys admin, an org admin within the given organization,
   /// or (optionally) a project admin within the given project — in a single database round-trip.
