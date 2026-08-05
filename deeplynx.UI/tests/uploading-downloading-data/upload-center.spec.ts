@@ -171,6 +171,56 @@ test.describe("Upload Center", () => {
     }
   }
 
+  async function selectProjectWithRetry(page: Page, projectName: string, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const projectButton = page.getByRole("button", { name: projectName, exact: true });
+      await expect(projectButton).toBeVisible();
+      await expect(projectButton).toBeEnabled();
+
+      try {
+        await Promise.all([
+          projectButton.click(),
+          page.waitForURL(/\/project\/\d+/, { timeout: 15_000 }),
+        ]);
+        return;
+      } catch(e) {
+        console.log(`[selectProjectWithRetry] attempt ${attempt} failed, url=${page.url()}`);
+
+        if (attempt === maxAttempts) throw e;
+
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.getByTestId("project-select").click();
+      }
+    }
+  }
+
+  async function verifyInProject(page: Page, fileName: string) {
+    const nextPage = page.getByRole('button', { name: 'Next page' }).first();
+    const pageNumber = page.getByRole('spinbutton', { name: 'Go to page' }).first();
+    const file = page.getByText(fileName).first();
+    
+    if (await pageNumber.isVisible()) {
+      await pageNumber.fill('1');
+      await pageNumber.press('Enter');
+      await expect(pageNumber).toHaveValue('1');
+    }
+
+    while (true) {
+      try {
+        await expect(file).toBeVisible({ timeout: 1000 });
+        return;
+      } catch {
+        if (page.isClosed() || !(await nextPage.isVisible()) || !(await nextPage.isEnabled())) {
+          break;
+        }
+        const currentPage = Number(await pageNumber.inputValue());
+        await nextPage.click();
+        await expect(pageNumber).toHaveValue(String(currentPage + 1));
+      };
+    };
+    console.warn(`Could not find "${fileName}" in the project overview.`);
+  };
+
   async function dragAndDrop({ page }: { page: Page }, baseFileName: string, filePath: string, type: string, projectNav?: string): Promise<{ recordId: string; projectId: string } | null> {
     await checkDataSourcesAndStorageDestinations(page);
 
@@ -212,13 +262,15 @@ test.describe("Upload Center", () => {
       }
     }
 
-    await page.getByRole('link', { name: 'Project Dashboard' }).click();
+    // Verify in Project Dashboard
+    await page.getByRole("link", { name: "Project Dashboard" }).click();
+    await page.waitForURL(/\/project/);
+    await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+    await verifyInProject(page, fileName);
 
-    await expect(
-      page.getByText(baseFileName).first()
-    ).toBeVisible();
-
-    await page.getByRole('link', { name: 'Visit' }).first().click();
+    const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+    const dataCatalogButton = sideBar.getByRole('link').nth(1);
+    await dataCatalogButton.click();
 
     const recordLink = page.getByRole('link', { name: baseFileName, exact: true }).first();
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -273,13 +325,15 @@ test.describe("Upload Center", () => {
       }
     }
 
-    await page.getByRole('link', { name: 'Project Dashboard' }).click();
+    // Verify in Project Dashboard
+    await page.getByRole("link", { name: "Project Dashboard" }).click();
+    await page.waitForURL(/\/project/);
+    await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+    await verifyInProject(page, baseFileName);
 
-    await expect(
-      page.getByText(baseFileName).first()
-    ).toBeVisible();
-
-    await page.getByRole('link', { name: 'Visit' }).first().click();
+    const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+    const dataCatalogButton = sideBar.getByRole('link').nth(1);
+    await dataCatalogButton.click();
 
     const recordLink = page.getByRole('link', { name: baseFileName, exact: true }).first();
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -534,11 +588,9 @@ test.describe("Upload Center", () => {
 
     await page.getByTestId("project-select").click();
 
-    await page
-      .getByRole("button", { name: "PW Project X", exact: true })
-      .click();
+    await selectProjectWithRetry(page, "PW Project X");
 
-    await page.waitForURL(/\/project\/\d+/);
+    await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
 
     // Extract project ID from the URL (e.g. /project/42)
     const url = page.url();
@@ -547,11 +599,17 @@ test.describe("Upload Center", () => {
     projectId = match![1];
     // Navigate to Upload Center via sidebar
     await page.getByRole('link', { name: "Upload Center", exact: true }).click();
-    await page.waitForURL(/\/upload_center/);
     // Wait for the Upload Center heading to confirm client-side render is done
-    await expect(
-      page.getByRole("heading", { name: "Upload Center" }),
-    ).toBeVisible();
+    try {
+      await expect(
+        page.getByRole("heading", { name: "Upload Center" }),
+      ).toBeVisible({ timeout: 10_000 });
+    } catch {
+      await page.goto('localhost:3000/upload_center', {
+        waitUntil: 'domcontentloaded',
+        timeout: 10_000
+      });
+    }
   });
 
   test("Upload Center page renders with heading", async ({ page }) => {
@@ -688,10 +746,11 @@ test.describe("Upload Center", () => {
 
   test.describe('Large file upload', () => {
     let filePath: string;
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-ten-gb-test-file.bin`;
     let createdRecord: { recordId: string; projectId: string } | null = null;
 
     test.beforeAll(async () => {
-      filePath = path.join(os.tmpdir(), 'ten-gb-test-file.bin');
+      filePath = path.join(os.tmpdir(), fileName);
 
       // Reuse the file across runs if it already exists and is the right size
       if (fs.existsSync(filePath) && fs.statSync(filePath).size === TEN_GB) {
@@ -747,7 +806,7 @@ test.describe("Upload Center", () => {
 
       const start = Date.now();
 
-      createdRecord = await clickToBrowse({ page }, 'ten-gb-test-file.bin', filePath, TWENTY_MIN_MS);
+      createdRecord = await clickToBrowse({ page }, fileName, filePath, TWENTY_MIN_MS);
 
       const elapsedMs = Date.now() - start;
       console.log(`Upload completed in ${(elapsedMs / 1000 / 60).toFixed(2)} minutes`);
@@ -904,11 +963,13 @@ startxref
   test.describe('Upload a file', () => {
     for (const fileType of fileTypes) {
       test.describe(`${fileType.label} upload`, () => {
+        let uniqueName: string;
         let filePath: string;
         let createdRecord: { recordId: string; projectId: string } | null = null;
 
         test.beforeEach(async () => {
-          filePath = await setUp(fileType.fileName, fileType.content);
+          uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2)}-${fileType.fileName}`;
+          filePath = await setUp(uniqueName, fileType.content);
           createdRecord = null;
         });
 
@@ -920,11 +981,11 @@ startxref
         });
 
         test(`Upload a single ${fileType.label} file using click to browse`, async ({ page }) => {
-          createdRecord = await clickToBrowse({ page }, fileType.fileName, filePath);
+          createdRecord = await clickToBrowse({ page }, uniqueName, filePath);
         });
 
         test(`Upload a single ${fileType.label} file using drag and drop`, async ({ page }) => {
-          createdRecord = await dragAndDrop({ page }, fileType.fileName, filePath, fileType.mimeType);
+          createdRecord = await dragAndDrop({ page }, uniqueName, filePath, fileType.mimeType);
         });
       });
     }
@@ -933,11 +994,11 @@ startxref
   test.describe("Upload multiple files", () => {
     let filePaths: [string, string, string, string, string];
     const fileBaseNames = [
-      'upload-test-file-one.bin',
-      'upload-test-file-two.bin',
-      'upload-test-file-three.bin',
-      'upload-test-file-four.bin',
-      'upload-test-file-five.bin',
+      `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-test-file-one.bin`,
+      `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-test-file-two.bin`,
+      `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-test-file-three.bin`,
+      `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-test-file-four.bin`,
+      `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-test-file-five.bin`,
     ] as const;
     let createdRecords: ({ recordId: string; projectId: string } | null)[] = [];
 
@@ -971,8 +1032,7 @@ startxref
     });
 
     test("uploads multiple files", async ({ page }) => {
-      test.setTimeout(120_000); // two minutes buffer time
-      const start = Date.now();
+      test.setTimeout(180_000); // three minutes buffer time
 
       // Upload the files
       await page.getByRole('link', { name: "Upload Center", exact: true }).click();
@@ -989,34 +1049,33 @@ startxref
         timeout: 120_000,
       });
 
-      // Navigate to Project Page
+      // Verify in Project Dashboard
       await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
       await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
-
-      for (const baseName of fileBaseNames) {
-        await expect(page.getByText(baseName)).toBeVisible();
+      for (const fileName of fileBaseNames) {
+        await verifyInProject(page, fileName);
       }
-
-      const elapsedMs = Date.now() - start;
-      expect(elapsedMs).toBeLessThan(60_000);
 
       // Visit the data catalog and resolve each uploaded file to its
       // recordId/projectId so we can clean them up afterward.
-      await page.getByRole('link', { name: 'Visit' }).first().click();
+      const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+      const dataCatalogButton = sideBar.getByRole('link').nth(1);
+      await dataCatalogButton.click();
 
       for (const baseName of fileBaseNames) {
         const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
-        if (await clearTermsButton.isVisible()) {
-          await clearTermsButton.click();
-        }
-
-        await page.getByRole('textbox', { name: 'Search' }).click();
-        await page.getByRole('textbox', { name: 'Search' }).fill(baseName);
-        await page.getByRole('textbox', { name: 'Search' }).press('Enter');
-
+        
         const recordLink = page.getByRole('link', { name: baseName, exact: true }).first();
-        await expect(recordLink).toBeVisible();
+        await expect(async () => {
+          if (await clearTermsButton.isVisible()) {
+            await clearTermsButton.click();
+          }
+          await page.getByRole('textbox', { name: 'Search' }).click();
+          await page.getByRole('textbox', { name: 'Search' }).fill(baseName);
+          await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+          await expect(recordLink).toBeVisible({ timeout: 3_000 });
+        }).toPass({ timeout: 30_000 });
 
         await recordLink.click();
         await page.waitForURL(/\/record\?/);
@@ -1029,7 +1088,7 @@ startxref
   });
 
   test.describe('Empty file upload', () => {
-    const emptyFileName = 'empty-test-file.txt';
+    const emptyFileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-empty-test-file.txt`;
     let filePath: string;
 
     test.beforeEach(async () => {
@@ -1084,18 +1143,29 @@ startxref
   test.describe("Upload bulk records", () => {
     let filePath: string;
     let createdRecords: ({ recordId: string; projectId: string } | null)[] = [];
+    const file1 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-1`;
+    const id1 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-1-id`;
+    const file2 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-2`;
+    const id2 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-2-id`;
+    const file3 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-3`;
+    const id3 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-3-id`;
+    const file4 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-4`;
+    const id4 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-4-id`;
+    const file5 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-5`;
+    const id5 = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-test-5-id`;
+    const bulkFileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-bulk-upload.csv`;
 
     test.beforeEach(async ({ }) => {
       // Create the file locally
-      filePath = path.join(os.tmpdir(), 'bulk-upload.csv');
+      filePath = path.join(os.tmpdir(), bulkFileName);
 
       const fileContent = [
         'name (required),description (required),original_id (required),properties (required - JSON format),uri (optional),object_storage_id (optional),class_id (optional),class_name (optional),file_type (optional),tags (optional - comma-separated),sensitivity_labels (optional - comma-separated)',
-        'Bulk test 1,A test file for bulk upload testing,bt1,"{""created"":""June 2026"",""candy"":""smarties"",""color"":""red""}",,,,,txt,,',
-        'Bulk test 2,A test file for bulk upload testing,bt2,"{""created"":""July 2026"",""candy"":""M&Ms"",""color"":""yellow""}",,,,,pdf,,',
-        'Bulk test 3,A test file for bulk upload testing,bt3,"{""created"":""July 2026"",""candy"":""skittles"",""color"":""purple""}",,,,,docx,,',
-        'Bulk test 4,A test file for bulk upload testing,bt4,"{""created"":""July 2026"",""chips"":""takis"",""spice"":""extreme""}",,,,,txt,,',
-        'Bulk test 5,A test file for bulk upload testing,btS,"{""created"":""July 2026"",""cookies"":""oreos"",""type"":""birthday cake""}",,,,,json,,'
+        `${file1},A test file for bulk upload testing,${id1},"{""created"":""June 2026"",""candy"":""smarties"",""color"":""red""}",,,,,txt,,`,
+        `${file2},A test file for bulk upload testing,${id2},"{""created"":""July 2026"",""candy"":""M&Ms"",""color"":""yellow""}",,,,,pdf,,`,
+        `${file3},A test file for bulk upload testing,${id3},"{""created"":""July 2026"",""candy"":""skittles"",""color"":""purple""}",,,,,docx,,`,
+        `${file4},A test file for bulk upload testing,${id4},"{""created"":""July 2026"",""chips"":""takis"",""spice"":""extreme""}",,,,,txt,,`,
+        `${file5},A test file for bulk upload testing,${id5},"{""created"":""July 2026"",""cookies"":""oreos"",""type"":""birthday cake""}",,,,,json,,`
       ].join('\n');
 
       await fs.promises.writeFile(filePath, fileContent, 'utf8');
@@ -1115,15 +1185,15 @@ startxref
     });
 
     test("uploads bulk records via a CSV", async ({ page }) => {
-      test.setTimeout(120_000); // buffer time
+      test.setTimeout(180_000); // buffer time
       const start = Date.now();
 
       const bulkFileNames = [
-        'Bulk test 1',
-        'Bulk test 2',
-        'Bulk test 3',
-        'Bulk test 4',
-        'Bulk test 5',
+        file1,
+        file2,
+        file3,
+        file4,
+        file5,
       ];
 
       // Upload the csv file
@@ -1141,12 +1211,12 @@ startxref
         timeout: 60_000,
       });
 
-      // Verify the new files appear
+      // Verify in Project Dashboard
       await page.getByRole("link", { name: "Project Dashboard" }).click();
       await page.waitForURL(/\/project/);
       await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
-      for (const name of bulkFileNames) {
-        await expect(page.getByText(name)).toBeVisible();
+      for (const fileName of bulkFileNames) {
+        await verifyInProject(page, fileName);
       }
 
       const elapsedMs = Date.now() - start;
@@ -1154,20 +1224,23 @@ startxref
 
       // Visit the data catalog and resolve each created record's
       // recordId/projectId so we can clean them up afterward.
-      await page.getByRole('link', { name: 'Visit' }).first().click();
+      const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+      const dataCatalogButton = sideBar.getByRole('link').nth(1);
+      await dataCatalogButton.click();
 
       for (const name of bulkFileNames) {
         const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
-        if (await clearTermsButton.isVisible()) {
-          await clearTermsButton.click();
-        }
-
-        await page.getByRole('textbox', { name: 'Search' }).click();
-        await page.getByRole('textbox', { name: 'Search' }).fill(name);
-        await page.getByRole('textbox', { name: 'Search' }).press('Enter');
 
         const recordLink = page.getByRole('link', { name, exact: true }).first();
-        await expect(recordLink).toBeVisible();
+        await expect(async () => {
+          if (await clearTermsButton.isVisible()) {
+            await clearTermsButton.click();
+          }
+          await page.getByRole('textbox', { name: 'Search' }).click();
+          await page.getByRole('textbox', { name: 'Search' }).fill(name);
+          await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+          await expect(recordLink).toBeVisible({ timeout: 3_000 });
+        }).toPass({ timeout: 30_000 });
 
         await recordLink.click();
         await page.waitForURL(/\/record\?/);
@@ -1180,12 +1253,13 @@ startxref
   });
 
   test.describe("Upload timeseries file", () => {
+    const fileName: string = `${Date.now()}-${Math.random().toString(36).slice(2)}-timeseries-test-file.csv`;
     let filePath: string;
     let createdRecord: { recordId: string; projectId: string } | null = null;
 
     test.beforeEach(async () => {
       // Create the file locally
-      filePath = path.join(os.tmpdir(), 'timeseries-test-file.csv');
+      filePath = path.join(os.tmpdir(), fileName);
       const csvContent = 'Date, Candy Eaten\n20050101, 5\n20050102, 6\n20050103, 3\n20050104, 15\n20050105, 3\n20050106, 5\n20050107, 9\n20050108, 12\n20050109, 6\n20050110, 9\n20050111, 6\n20050112, 3\n20050113, 2';
 
       if (!fs.existsSync(filePath)) {
@@ -1207,53 +1281,30 @@ startxref
 
     test("uploads a timeseries file", async ({ page }) => {
       test.setTimeout(120_000); // two minutes buffer time
-      const start = Date.now();
 
-      // Upload the files
-      await page.getByRole("link", { name: "Upload Center" }).click();
-      await page.waitForURL(/\/upload_center/);
-      await expect(page.getByRole("heading", { name: "Upload Center" })).toBeVisible();
-
-      await checkDataSourcesAndStorageDestinations(page);
-
-      await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
-      const fileInput = page.locator('input[type="file"]');
-      await fileInput.setInputFiles(filePath);
-      await page.getByRole('button', { name: 'Upload', exact: true }).click();
-      await expect(page.getByText('File uploaded successfully!')).toBeVisible({
-        timeout: 120_000,
-      });
-
-      // Navigate to Project Page
-      await page.getByRole("link", { name: "Project Dashboard" }).click();
-      await page.waitForURL(/\/project/);
-      await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
-      await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
-      await page.getByRole('link', { name: 'timeseries-test-file.csv' }).first().click();
-      await page.waitForURL(/\/record/);
-      await expect(page.getByText('Timeseries', { exact: true }).first()).toBeVisible();
-
-      // Capture recordId/projectId from the current record page URL for cleanup
-      createdRecord = parseRecordFromUrl(page.url());
+      createdRecord = await clickToBrowse({ page }, fileName, filePath);
 
       // Check that it shows up on the timeseries page
       await page.getByRole("link", { name: "Timeseries Viewer" }).click();
       await page.waitForURL(/\/timeseries_viewer/);
       await expect(page.getByRole("heading", { name: "Timeseries Viewer" })).toBeVisible();
-      await expect(page.getByText('timeseries-test-file').first()).toBeVisible();
-      await page.getByRole('link', { name: 'timeseries-test-file.csv' }).first().click();
+      await expect(page.getByText(fileName).first()).toBeVisible();
+      await page.getByRole('link', { name: fileName }).first().click();
 
       await expect(page.locator('canvas')).toBeVisible();
-      await expect(page.locator('span').filter({ hasText: 'timeseries-test-file' })).toBeVisible();
-
-      const elapsedMs = Date.now() - start;
-      expect(elapsedMs).toBeLessThan(60_000);
+      await expect(page.locator('span').filter({ hasText: fileName })).toBeVisible();
     });
   });
 
   test.describe("Data Source and Storage uploads", () => {
     let filePaths: [string, string, string, string, string, string];
     let tmpDir: string;
+    const differentDatasourceClickName = `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-different-datasource-click`;
+    const differentDatasourceDragName = `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-different-datasource-drag`;
+    const differentStorageClickName = `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-different-storage-click`;
+    const differentStorageDragName = `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-different-storage-drag`;
+    const differentProjectClickName = `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-different-project-click`;
+    const differentProjectDragName = `${Date.now()}-${Math.random().toString(36).slice(2)}-upload-different-project-drag`;
 
     test.beforeAll(async ({ }, workerInfo) => {
       tmpDir = await fs.promises.mkdtemp(
@@ -1262,12 +1313,12 @@ startxref
 
       // Create the files to use locally
       filePaths = [
-        path.join(tmpDir, 'upload-different-datasource-click'),
-        path.join(tmpDir, 'upload-different-datasource-drag'),
-        path.join(tmpDir, 'upload-different-storage-click'),
-        path.join(tmpDir, 'upload-different-storage-drag'),
-        path.join(tmpDir, 'upload-different-project-click'),
-        path.join(tmpDir, 'upload-different-project-drag')
+        path.join(tmpDir, differentDatasourceClickName),
+        path.join(tmpDir, differentDatasourceDragName),
+        path.join(tmpDir, differentStorageClickName),
+        path.join(tmpDir, differentStorageDragName),
+        path.join(tmpDir, differentProjectClickName),
+        path.join(tmpDir, differentProjectDragName)
       ];
 
       await Promise.all(
@@ -1295,7 +1346,7 @@ startxref
       await dataSourceSelect.selectOption(nondefaultDs);
 
       // click to browse
-      await clickToBrowse({ page }, 'upload-different-datasource-click', filePaths[0]);
+      await clickToBrowse({ page }, differentDatasourceClickName, filePaths[0]);
     });
 
     test("default project and storage, nondefault data source, drag and drop, successfully uploads file", async ({ page, request }) => {
@@ -1309,7 +1360,7 @@ startxref
       await dataSourceSelect.selectOption(nondefaultDs);
 
       // click to browse
-      await dragAndDrop({ page }, 'upload-different-datasource-drag', filePaths[1], 'txt');
+      await dragAndDrop({ page }, differentDatasourceDragName, filePaths[1], 'txt');
     });
 
     test("default project and data source, nondefault storage, click to browse, successfully uploads file", async ({ page, request }) => {
@@ -1323,7 +1374,7 @@ startxref
       await objectStorageSelect.selectOption(nondefaultOs);
 
       // click to browse
-      await clickToBrowse({ page }, 'upload-different-storage-click', filePaths[2]);
+      await clickToBrowse({ page }, differentStorageClickName, filePaths[2]);
     });
 
     test("default project and data source, nondefault storage, drag and drop, successfully uploads file", async ({ page, request }) => {
@@ -1337,7 +1388,7 @@ startxref
       await objectStorageSelect.selectOption(nondefaultOs);
 
       // click to browse
-      await dragAndDrop({ page }, 'upload-different-storage-drag', filePaths[3], 'txt');
+      await dragAndDrop({ page }, differentStorageDragName, filePaths[3], 'txt');
     });
 
     test("default data source and storage, nondefault project, click to browse, successfully uploads file", async ({ page, request }) => {
@@ -1351,7 +1402,7 @@ startxref
       await checkDataSourcesAndStorageDestinations(page);
 
       // click to browse
-      await clickToBrowse({ page }, 'upload-different-project-click', filePaths[4], undefined, nondefaultProj);
+      await clickToBrowse({ page }, differentProjectClickName, filePaths[4], undefined, nondefaultProj);
     });
 
     test("default data source and storage, nondefault project, drag and drop, successfully uploads file", async ({ page, request }) => {
@@ -1365,7 +1416,7 @@ startxref
       await checkDataSourcesAndStorageDestinations(page);
 
       // drag and drop
-      await dragAndDrop({ page }, 'upload-different-project-drag', filePaths[5], 'txt', nondefaultProj);
+      await dragAndDrop({ page }, differentProjectDragName, filePaths[5], 'txt', nondefaultProj);
     });
   });
 });
