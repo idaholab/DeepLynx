@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 
 namespace deeplynx.models;
@@ -10,4 +11,7 @@ public class UpdateObjectStorageRequestDto
 
     [JsonPropertyName("azureFilePath")]
     public string? AzureFilePath { get; set; } = null!;
+
+    [DefaultValue(true)]
+    [JsonPropertyName("files_deletable")] public bool FilesDeletable { get; set; } = true;
 }

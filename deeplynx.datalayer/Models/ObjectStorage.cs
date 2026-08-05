@@ -37,6 +37,9 @@ public partial class ObjectStorage
     [Column("is_archived")]
     public bool IsArchived { get; set; }
 
+    [Column("files_deletable")]
+    public bool FilesDeletable { get; set; } = true;
+
     [ForeignKey("ProjectId")]
     [InverseProperty("ObjectStorages")]
     public virtual Project? Project { get; set; }

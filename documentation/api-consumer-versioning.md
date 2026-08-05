@@ -11,6 +11,10 @@ For migration safety, both implementations accept a legacy base URL ending in
 `/api/v1`. They reject a base URL ending in another API version, so an
 environment-only edit cannot silently change the response contract.
 
+These are intentional compatibility pins even though v1 is frozen and
+deprecated. v1 remains accessible. Moving either consumer to the
+forward-development v2 contract requires the reviewed cutover described below.
+
 ## Consumer decisions
 
 | Consumer | Current target | Decision and rationale |
