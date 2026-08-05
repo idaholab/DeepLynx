@@ -191,13 +191,19 @@ try
     dataSourceBuilder.UseVector();
     var dataSource = dataSourceBuilder.Build();
 
-    builder.Services.AddDbContext<DeeplynxContext>(
-        options => options.UseNpgsql(dataSource),
+    builder.Services.AddDbContext<DeeplynxContext>(options =>
+         options.UseNpgsql(dataSource, npgsqlOptions =>
+        {
+            npgsqlOptions.CommandTimeout(60);
+        }),
         ServiceLifetime.Transient
     );
 
-    builder.Services.AddDbContext<LatticeContext>(
-        options => options.UseNpgsql(connectionString),
+    builder.Services.AddDbContext<LatticeContext>(options =>
+         options.UseNpgsql(connectionString, npgsqlOptions =>
+        {
+            npgsqlOptions.CommandTimeout(60);
+        }),
         ServiceLifetime.Transient
     );
 
