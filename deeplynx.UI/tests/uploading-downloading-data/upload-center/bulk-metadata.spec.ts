@@ -666,7 +666,7 @@ test.describe("Bulk Metadata", () => {
 
         test.describe("Upload csv file with 1000 character x and succeeds", () => {
 
-            const attributeNames = ["class_id", "class_name", "original_id"] as const;
+            const attributeNames = ["class_id", "class_name", "original_id", "properties"] as const;
 
             attributeNames.forEach(attrName => {
 
@@ -679,13 +679,13 @@ test.describe("Bulk Metadata", () => {
                         const bulkFileName = `bulk-upload-1000-char-${attrName}${testInfo.testId}.csv`;
                         filePath = path.join(os.tmpdir(), bulkFileName);
 
-                        paddedValue = 'a'.repeat(1000);
+                        attrName !== "properties" ? paddedValue = 'a'.repeat(1000) : paddedValue = '{"' + 'a'.repeat(1000) + '":"' + 'b'.repeat(1000) + '"}';
 
                         const row1 = [
                             name,
                             description,
                             attrName === "original_id" ? paddedValue : original_id,
-                            properties,
+                            attrName === "properties" ? paddedValue : properties,
                             uri,
                             object_storage_id,
                             attrName === 'class_id' ? paddedValue : class_id,
