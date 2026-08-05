@@ -724,16 +724,6 @@ public class GraphBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetGraphData_ThrowsUnauthorizedAccessException_WhenUserLacksProjectAccess()
-    {
-        // Arrange - Don't add user to project
-
-        // Act & Assert
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _graphBusiness.GetGraphDataForRecord(oid, pid, record1Id, uid1, 1));
-    }
-
-    [Fact]
     public async Task GetGraphData_WorksWithGroupMembership()
     {
         // Arrange
@@ -987,52 +977,6 @@ public class GraphBusinessTests : IntegrationTestBase
             l.EdgeId == edge.Id);
     }
 
-    [Fact]
-    public async Task GetGraphDataForRecord_Throws_WhenUserIsNotSysAdminAndNotProjectMember()
-    {
-        // Arrange
-        var regularUser = new User
-        {
-            Name = "Regular User",
-            Email = $"regular-{Guid.NewGuid()}@test.com",
-            IsSysAdmin = false,
-            IsActive = true
-        };
-
-        Context.Users.Add(regularUser);
-        await Context.SaveChangesAsync();
-
-        var record = new Record
-        {
-            OrganizationId = oid,
-            ProjectId = pid,
-            DataSourceId = dsid,
-            ClassId = classId,
-            Name = $"Restricted Graph Record {Guid.NewGuid()}",
-            Description = "Record regular non-member should not access",
-            Properties = "{}",
-            OriginalId = Guid.NewGuid().ToString(),
-            LastUpdatedBy = regularUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        Context.Records.Add(record);
-        await Context.SaveChangesAsync();
-
-        Assert.False(Context.ProjectMembers.Any(pm =>
-            pm.UserId == regularUser.Id && pm.ProjectId == pid));
-
-        // Act / Assert
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _graphBusiness.GetGraphDataForRecord(
-                oid,
-                pid,
-                record.Id,
-                regularUser.Id,
-                depth: 1));
-    }
-
     #endregion
 
     #region GetGraphDataForRecord Role & Label Tests
@@ -1074,17 +1018,35 @@ public class GraphBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetGraphData_ThrowsUnauthorized_WhenRecordProjectMismatch()
+    public async Task GetGraphData_ThrowsKeyNotFound_WhenRecordProjectMismatch()
     {
-        // Arrange - caller passes a projectId the record doesn't actually belong to
+        // Arrange - caller passes a projectId the record doesn't actually belong to.
+        // The root-record lookup is now filtered inline by organizationId/projectId,
+        // so a mismatch surfaces as "not found" rather than "unauthorized" — same
+        // externally-visible result either way, just a different exception type.
         var otherProject = new Project { Name = "Other Project", OrganizationId = oid };
         Context.Projects.Add(otherProject);
         await Context.SaveChangesAsync();
 
         // Act & Assert - record1 lives in pid, not otherProject.Id
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _graphBusiness.GetGraphDataForRecord(
                 oid, otherProject.Id, record1Id, uid1, 1, isAdmin: true));
+    }
+
+    [Fact]
+    public async Task GetGraphData_ThrowsKeyNotFound_WhenOrganizationMismatch()
+    {
+        // Arrange - same idea, but the organizationId passed doesn't match the
+        // record's actual org even though projectId is correct
+        var otherOrg = new Organization { Name = "Other Organization" };
+        Context.Organizations.Add(otherOrg);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _graphBusiness.GetGraphDataForRecord(
+                otherOrg.Id, pid, record1Id, uid1, 1, isAdmin: true));
     }
 
     [Fact]
@@ -1215,9 +1177,13 @@ public class GraphBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetGraphData_NonMember_NonAdmin_IsDenied()
+    public async Task GetGraphData_NonMember_NonAdmin_StillReturnsGraph_MembershipEnforcedByMiddleware()
     {
-        // Arrange - user has no project membership and middleware did not mark them admin
+        // Arrange - this method no longer checks project membership itself; that's
+        // middleware's job now. A caller reaching this method with isAdmin: false
+        // and no membership will still get a result as long as label checks pass —
+        // documenting this so the removal of the old in-method membership gate is
+        // an intentional, visible contract rather than a silent gap.
         var stranger = new User
         {
             Name = "Stranger",
@@ -1227,9 +1193,24 @@ public class GraphBusinessTests : IntegrationTestBase
         Context.Users.Add(stranger);
         await Context.SaveChangesAsync();
 
-        // Act & Assert
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _graphBusiness.GetGraphDataForRecord(oid, pid, record1Id, stranger.Id, 1));
+        Context.Edges.Add(new Edge
+        {
+            OriginId = record1Id,
+            DestinationId = record2Id,
+            DataSourceId = dsid,
+            ProjectId = pid,
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _graphBusiness.GetGraphDataForRecord(oid, pid, record1Id, stranger.Id, 1);
+
+        // Assert - no labels on either record, so nothing blocks it; membership
+        // enforcement is expected to happen upstream, not here
+        Assert.Equal(2, result.Nodes.Count);
+        Assert.Single(result.Links);
     }
 
     [Fact]
