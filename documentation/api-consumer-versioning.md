@@ -63,10 +63,10 @@ values are supplied to the public UI image at build time.
 
 ## Consumer decisions
 
-| Consumer | Current target | Decision and rationale |
-| --- | --- | --- |
+| Consumer                             | Current target            | Decision and rationale                                                                                                                                                                                                                                                        |
+| ------------------------------------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Next.js UI proxy and client services | Configurable; v1 fallback | `NEXT_PUBLIC_API_VERSION` selects one version for the entire UI deployment. The backend exposes changed and unchanged endpoints beneath that version. The shared fetch and Axios paths can read legacy error packets and RFC 7807 `detail`, `title`, and validation `errors`. |
-| `deeplynx.mcp` tools | v1 | Pinned in `AuthenticatedHttpClientFactory`. MCP tools keep their current v1 response/error behavior. Moving to v2 requires separately adopting and testing RFC 7807 ProblemDetails handling. |
+| `deeplynx.mcp` tools                 | v1                        | Pinned in `AuthenticatedHttpClientFactory`. MCP tools keep their current v1 response/error behavior. Moving to v2 requires separately adopting and testing RFC 7807 ProblemDetails handling.                                                                                  |
 
 The API server's configured default version is irrelevant to these consumers:
 the UI always composes an explicit `/api/{version}` segment, and every relative

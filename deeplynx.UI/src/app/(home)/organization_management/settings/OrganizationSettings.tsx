@@ -50,6 +50,7 @@ interface StorageFormData {
   default: boolean;
   createContainerPerProject: boolean;
   existingContainer?: boolean;
+  filesDeletable: boolean;
 }
 
 const OrganizationSettings = () => {
@@ -113,7 +114,8 @@ const OrganizationSettings = () => {
     config: {},
     default: false,
     createContainerPerProject: false,
-    existingContainer: false
+    existingContainer: false,
+    filesDeletable: true,
   });
 
   // Storage config fields based on type
@@ -430,7 +432,7 @@ const OrganizationSettings = () => {
   };
 
   const resetStorageForm = () => {
-    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
+    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false, filesDeletable: true });
     setStorageType("filesystem");
     setFilesystemPath("");
     setAzureEndpoint("");
@@ -479,6 +481,7 @@ const OrganizationSettings = () => {
         name: storageFormData.name,
         config: config,
         default: storageFormData.default,
+        filesDeletable: storageFormData.filesDeletable,
       };
 
       const updateOrganizationDto: UpdateOrganizationRequestDto = {
@@ -561,6 +564,7 @@ const OrganizationSettings = () => {
         name: storageFormData.name,
         default: storageFormData.default,
         existingContainer: storageFormData.existingContainer,
+        filesDeletable: storageFormData.filesDeletable,
       };
 
       const updateOrganizationDto: UpdateOrganizationRequestDto = {
@@ -583,7 +587,7 @@ const OrganizationSettings = () => {
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditStorageModalOpen(false);
       setEditingStorage(null);
-      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
+      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false, filesDeletable: true });
       loadStorages();
     } catch (error) {
       console.error("Failed to update organization storage:", error);
@@ -653,6 +657,7 @@ const OrganizationSettings = () => {
       default: storage.default,
       createContainerPerProject: createContainerPerProject,
       existingContainer: existingContainer,
+      filesDeletable: storage.filesDeletable,
     });
     setIsEditStorageModalOpen(true);
   };

@@ -146,6 +146,7 @@ try
     builder.Services.AddControllers(options =>
         {
             options.Conventions.Add(new ApiVersionRoutePrefixConvention("api/v{version:apiVersion}"));
+            options.Filters.Add(new ApiVersionLifecycleHeadersFilter());
         })
         .AddJsonOptions(options =>
         {
@@ -173,10 +174,7 @@ try
             options.ApiVersionReader = new UrlSegmentApiVersionReader();
             options.UnsupportedApiVersionStatusCode = StatusCodes.Status400BadRequest;
         })
-        .AddMvc(options =>
-        {
-            options.Conventions.Add(new DefaultApiVersionConvention(NexusApiVersions.Supported.ToArray()));
-        })
+        .AddMvc()
         .AddApiExplorer(options =>
         {
             options.GroupNameFormat = "'v'V";
@@ -194,13 +192,19 @@ try
     dataSourceBuilder.UseVector();
     var dataSource = dataSourceBuilder.Build();
 
-    builder.Services.AddDbContext<DeeplynxContext>(
-        options => options.UseNpgsql(dataSource),
+    builder.Services.AddDbContext<DeeplynxContext>(options =>
+         options.UseNpgsql(dataSource, npgsqlOptions =>
+        {
+            npgsqlOptions.CommandTimeout(60);
+        }),
         ServiceLifetime.Transient
     );
 
-    builder.Services.AddDbContext<LatticeContext>(
-        options => options.UseNpgsql(connectionString),
+    builder.Services.AddDbContext<LatticeContext>(options =>
+         options.UseNpgsql(connectionString, npgsqlOptions =>
+        {
+            npgsqlOptions.CommandTimeout(60);
+        }),
         ServiceLifetime.Transient
     );
 
@@ -426,9 +430,7 @@ finally
     Log.CloseAndFlush();
 }
 
-// Top-level statements generate an internal "Program" class by default.
-// Making it public here lets deeplynx.tests host this exact app with
-// WebApplicationFactory<Program> for integration tests - nothing else changes.
+// Expose the generated top-level Program class so integration tests can host this application.
 public partial class Program
 {
 }
