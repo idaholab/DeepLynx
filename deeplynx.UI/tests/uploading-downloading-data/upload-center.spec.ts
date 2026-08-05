@@ -1568,5 +1568,60 @@ startxref
         ).not.toBeVisible();
       });
     });
+
+    test.describe("Upload csv file with missing original_id", () => {
+
+      test.beforeEach(async ({ }, testInfo) => {
+        // Tab-separated, matching the real template. Row 2 has an empty
+        // name field (required) to trigger a validation failure.
+        const bulkFileName = `bulk-upload-missing-description${testInfo.testId}.csv`;
+        filePath = path.join(os.tmpdir(), bulkFileName);
+
+        original_id = '';
+
+        const row1 = [
+          name,
+          description,
+          original_id,
+          properties,
+          uri,
+          object_storage_id,
+          class_id,
+          class_name,
+          file_type,
+          tags,
+          sensitivity_labels
+        ].join('\t');
+
+        const fileContent = [header, row1].join('\n');
+
+        await fs.promises.writeFile(filePath, fileContent, 'utf8');
+      });
+
+      test.afterAll(async () => {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      });
+
+      test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing description", async ({ page }) => {
+        // Switch to Bulk Metadata mode, keep default project/data source/storage settings
+        await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
+
+        await checkDataSourcesAndStorageDestinations(page);
+
+        await page.getByRole('button', { name: 'Choose File Button' }).click();
+        const fileInput = page.locator('input[type="file"]');
+        await fileInput.setInputFiles(filePath);
+
+        await expect(page.getByRole('heading', { name: 'Validation Errors Found' })).toBeVisible();
+
+        await expect(page.getByRole('heading', { name: 'Error Details:' })).toBeVisible();
+
+        await expect(
+          page.getByRole('button', { name: /Upload \d+ Records/ })
+        ).not.toBeVisible();
+      });
+    });
   });
 });
