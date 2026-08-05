@@ -335,44 +335,34 @@ public class QueryBusiness : IQueryBusiness
                 return new PaginatedResponse<QueryRecordViewResponseDto>();
             }
 
-            var userProjectAdminStatus = new Dictionary<long, bool>();
+            // Batch fetch admin project IDs
+            var adminProjectIds = await _context.ProjectMembers
+                .Where(pm =>
+                    pm.IsProjectAdmin &&
+                    projectIds.Contains(pm.ProjectId) &&
+                    (
+                        (pm.UserId != null && pm.UserId == currentUserId) ||
+                        pm.Group.Users.Any(u => u.Id == currentUserId)
+                    ))
+                .Select(pm => pm.ProjectId)
+                .Distinct()
+                .ToHashSetAsync();
 
-            var isProjectAdmin = false;
+            var userProjectAdminStatus = projectIds.ToDictionary(pid => pid, adminProjectIds.Contains);
 
-            foreach (var projectId in projectIds)
-            {
-                isProjectAdmin = await _context.ProjectMembers
-                    .AnyAsync(pm =>
-                        pm.ProjectId == projectId &&
-                        pm.IsProjectAdmin &&
-                        (
-                            (pm.UserId != null && pm.UserId == currentUserId) ||
-                            pm.Group.Users.Any(u => u.Id == currentUserId) // group membership
-                        )
-                    );
-
-                userProjectAdminStatus[projectId] = isProjectAdmin;
-            }
-
-            // Filter project IDs based on user permission
             var authorizedProjectIds = new List<long>();
-            foreach (var projectId in projectIds)
+
+            authorizedProjectIds.AddRange(
+                projectIds.Where(p => isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(p)));
+
+            var nonAdminProjects = projectIds.Except(authorizedProjectIds).ToArray();
+
+            if (nonAdminProjects.Any())
             {
-                if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId))
-                {
-                    // Admin access: include project without further permission checks
-                    authorizedProjectIds.Add(projectId);
-                    continue;
-                }
+                var permittedProjects = await _projectRolePermissionService.PermissionsInProjects(
+                    currentUserId, nonAdminProjects, "read", "record");
 
-                // Check read permission for non-admin projects
-                var hasPermission = await _projectRolePermissionService.PermissionInProject(
-                    currentUserId, projectId, "read", "record");
-
-                if (hasPermission)
-                    authorizedProjectIds.Add(projectId);
-                else
-                    Console.WriteLine($"User {currentUserId} lacks read permission on project {projectId}, excluding.");
+                authorizedProjectIds.AddRange(permittedProjects);
             }
 
             if (!authorizedProjectIds.Any())
@@ -380,10 +370,6 @@ public class QueryBusiness : IQueryBusiness
                 Console.WriteLine($"User {currentUserId} has no access to any requested projects.");
                 return new PaginatedResponse<QueryRecordViewResponseDto>();
             }
-
-            var nonAdminProjects = authorizedProjectIds
-                .Where(p => !userProjectAdminStatus.GetValueOrDefault(p))
-                .ToArray();
 
             List<long> authorizedLabelIds = new List<long>();
             if (nonAdminProjects.Any() && !isSysAdmin && !isOrgAdmin)
@@ -396,62 +382,55 @@ public class QueryBusiness : IQueryBusiness
             if (!isSysAdmin && !isOrgAdmin)
             {
                 authorizationFilter = @"
-                    AND (
-                        qr.project_id = ANY(@adminProjects)
-                        OR (
-                            qr.project_id = ANY(@nonAdminProjects)
-                            AND (
-                                NOT EXISTS (
-                                    SELECT 1 FROM deeplynx.record_labels rl WHERE rl.record_id = qr.id
-                                )
-                                OR
-                                NOT EXISTS (
-                                    SELECT 1 FROM deeplynx.record_labels rl2 WHERE rl2.record_id = qr.id AND rl2.label_id != ALL(@authorizedLabelIds)
-                                )
+                AND (
+                    qr.project_id = ANY(@adminProjects)
+                    OR (
+                        qr.project_id = ANY(@nonAdminProjects)
+                        AND (
+                            NOT EXISTS (
+                                SELECT 1 FROM deeplynx.record_labels rl WHERE rl.record_id = qr.id
+                            )
+                            OR
+                            NOT EXISTS (
+                                SELECT 1 FROM deeplynx.record_labels rl2 WHERE rl2.record_id = qr.id AND rl2.label_id != ALL(@authorizedLabelIds)
                             )
                         )
-                    )";
+                    )
+                )";
             }
 
             var sql = $@"
-                SELECT
-                    qr.*,
-                    qr.class_id as ClassId,
-                    qr.class_name as ClassName,
-                    qr.original_id as OriginalId,
-                    qr.data_source_name as DataSourceName,
-                    qr.data_source_id as DataSourceId,
-                    qr.project_name as ProjectName,
-                    qr.project_id as ProjectId,
-                    qr.last_updated_at as LastUpdatedAt,
-                    qr.last_updated_by as LastUpdatedBy,
-                    qr.object_storage_name as ObjectStorageName,
-                    qr.object_storage_id as ObjectStorageId,
-                    qr.id as RecordId,
-                    qr.is_archived as IsArchived
-                FROM deeplynx.query_records qr
-                WHERE qr.is_archived = false
-                AND qr.project_id = ANY(@authorizedProjectIds)
-                AND qr.organization_id = @organizationId
-                {authorizationFilter}";
+            SELECT
+                qr.*,
+                qr.class_id as ClassId,
+                qr.class_name as ClassName,
+                qr.original_id as OriginalId,
+                qr.data_source_name as DataSourceName,
+                qr.data_source_id as DataSourceId,
+                qr.project_name as ProjectName,
+                qr.project_id as ProjectId,
+                qr.last_updated_at as LastUpdatedAt,
+                qr.last_updated_by as LastUpdatedBy,
+                qr.object_storage_name as ObjectStorageName,
+                qr.object_storage_id as ObjectStorageId,
+                qr.id as RecordId,
+                qr.is_archived as IsArchived
+            FROM deeplynx.query_records qr
+            WHERE qr.is_archived = false
+            AND qr.project_id = ANY(@authorizedProjectIds)
+            AND qr.organization_id = @organizationId
+            {authorizationFilter}";
 
             var parameters = new List<NpgsqlParameter>
-            {
-                new NpgsqlParameter("authorizedProjectIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedProjectIds.ToArray() },
-                new NpgsqlParameter("organizationId", organizationId),
-                new NpgsqlParameter("adminProjects", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedProjectIds.Where(p => userProjectAdminStatus.GetValueOrDefault(p)).ToArray() },
-                new NpgsqlParameter("nonAdminProjects", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = nonAdminProjects },
-                new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedLabelIds.ToArray() }
-            };
+        {
+            new NpgsqlParameter("authorizedProjectIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedProjectIds.ToArray() },
+            new NpgsqlParameter("organizationId", organizationId),
+            new NpgsqlParameter("adminProjects", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedProjectIds.Where(p => userProjectAdminStatus.GetValueOrDefault(p)).ToArray() },
+            new NpgsqlParameter("nonAdminProjects", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = nonAdminProjects },
+            new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedLabelIds.ToArray() }
+        };
 
-            if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-            {
-                parameters.Add(new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
-                {
-                    Value = authorizedLabelIds.ToArray()
-                });
-            }
-
+            // Handle dynamic query-building logic (filters, text search, etc.)
             var conditions = new List<string>();
             if (request?.Length > 0)
             {
@@ -471,76 +450,23 @@ public class QueryBusiness : IQueryBusiness
                     }
                     else if (query.Operator == "LIKE")
                     {
-                        var jsonbColumns = new[] { "properties", "tags" };
-
-                        if (jsonbColumns.Contains(query.Filter.ToLower()))
-                        {
-                            if (query.Filter.ToLower() == "tags")
-                                condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' ILIKE @{paramName})";
-                            else
-                                condition = $"EXISTS (SELECT 1 FROM jsonb_each_text(qr.{query.Filter}) WHERE value ILIKE @{paramName})";
-                        }
-                        else
-                        {
-                            condition = $"qr.{query.Filter} ILIKE @{paramName}";
-                        }
+                        condition = $"qr.{query.Filter} ILIKE @{paramName}";
                         parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
                     }
                     else if (query.Operator == "=")
                     {
-                        var jsonbColumns = new[] { "properties", "tags" };
-
-                        if (jsonbColumns.Contains(query.Filter.ToLower()))
-                        {
-                            if (query.Filter.ToLower() == "tags")
-                            {
-                                condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' = @{paramName})";
-                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
-                            }
-                            else
-                            {
-                                condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
-                                parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
-                            }
-                        }
-                        else
-                        {
-                            if (int.TryParse(query.Value, out var intVal))
-                            {
-                                condition = $"qr.{query.Filter} = @{paramName}";
-                                parameters.Add(new NpgsqlParameter(paramName, intVal));
-                            }
-                            else if (DateTime.TryParse(query.Value, out var dateVal))
-                            {
-                                var startOfDay = dateVal.Date;
-                                var startOfNextDay = dateVal.Date.AddDays(1);
-                                var paramName2 = $"p{parameters.Count + 1}";
-                                condition = $"qr.{query.Filter} >= @{paramName} AND qr.{query.Filter} < @{paramName2}";
-                                parameters.Add(new NpgsqlParameter(paramName, startOfDay));
-                                parameters.Add(new NpgsqlParameter(paramName2, startOfNextDay));
-                            }
-                            else
-                            {
-                                condition = $"qr.{query.Filter} = @{paramName}";
-                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
-                            }
-                        }
+                        condition = $"qr.{query.Filter} = @{paramName}";
+                        parameters.Add(new NpgsqlParameter(paramName, query.Value));
                     }
                     else if (query.Operator == ">")
                     {
                         condition = $"qr.{query.Filter} > @{paramName}";
-                        if (DateTime.TryParse(query.Value, out var dateVal))
-                            parameters.Add(new NpgsqlParameter(paramName, dateVal));
-                        else
-                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                        parameters.Add(new NpgsqlParameter(paramName, query.Value));
                     }
                     else if (query.Operator == "<")
                     {
                         condition = $"qr.{query.Filter} < @{paramName}";
-                        if (DateTime.TryParse(query.Value, out var dateVal))
-                            parameters.Add(new NpgsqlParameter(paramName, dateVal));
-                        else
-                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                        parameters.Add(new NpgsqlParameter(paramName, query.Value));
                     }
                     else
                     {
@@ -554,17 +480,7 @@ public class QueryBusiness : IQueryBusiness
 
             if (conditions.Any())
             {
-                sql += " AND (";
-                for (var i = 0; i < conditions.Count; i++)
-                {
-                    if (i > 0)
-                    {
-                        var connector = request[i].Connector?.ToUpper() == "OR" ? " OR " : " AND ";
-                        sql += connector;
-                    }
-                    sql += conditions[i];
-                }
-                sql += ")";
+                sql += " AND (" + string.Join(" AND ", conditions) + ")";
             }
 
             if (!string.IsNullOrWhiteSpace(textSearch))
@@ -576,25 +492,25 @@ public class QueryBusiness : IQueryBusiness
                 parameters.Add(new NpgsqlParameter("originalQuery", textSearch));
 
                 sql += @"
-                    AND (
-                        to_tsvector('english',
-                                coalesce(name, '') || ' ' ||
-                                coalesce(description, '') || ' ' ||
-                                coalesce(class_name, '') || ' ' ||
-                                coalesce(uri, '') || ' ' ||
-                                coalesce(original_id, '') || ' ' ||
-                                coalesce(data_source_name, '') || ' ' ||
-                                coalesce(project_name, '') || ' ' ||
-                                coalesce(properties::text, '') || ' ' ||
-                                coalesce(tags::text, '')
-                            ) @@ to_tsquery('english', @processedQuery)
-                        OR qr.name ILIKE '%' || @originalQuery || '%'
-                        OR qr.description ILIKE '%' || @originalQuery || '%'
-                        OR qr.original_id ILIKE '%' || @originalQuery || '%'
-                        OR qr.data_source_name ILIKE '%' || @originalQuery || '%'
-                        OR qr.project_name ILIKE '%' || @originalQuery || '%'
-                        OR qr.class_name ILIKE '%' || @originalQuery || '%'
-                    )";
+                AND (
+                    to_tsvector('english',
+                            coalesce(name, '') || ' ' ||
+                            coalesce(description, '') || ' ' ||
+                            coalesce(class_name, '') || ' ' ||
+                            coalesce(uri, '') || ' ' ||
+                            coalesce(original_id, '') || ' ' ||
+                            coalesce(data_source_name, '') || ' ' ||
+                            coalesce(project_name, '') || ' ' ||
+                            coalesce(properties::text, '') || ' ' ||
+                            coalesce(tags::text, '')
+                        ) @@ to_tsquery('english', @processedQuery)
+                    OR qr.name ILIKE '%' || @originalQuery || '%'
+                    OR qr.description ILIKE '%' || @originalQuery || '%'
+                    OR qr.original_id ILIKE '%' || @originalQuery || '%'
+                    OR qr.data_source_name ILIKE '%' || @originalQuery || '%'
+                    OR qr.project_name ILIKE '%' || @originalQuery || '%'
+                    OR qr.class_name ILIKE '%' || @originalQuery || '%'
+                )";
             }
 
             sql += " ORDER BY qr.id, qr.last_updated_at DESC";
@@ -606,9 +522,13 @@ public class QueryBusiness : IQueryBusiness
                 currentUserId,
                 organizationId,
                 authorizedProjectIds.ToArray(),
-                isSysAdmin || isOrgAdmin || isProjectAdmin);
+                isSysAdmin || isOrgAdmin || userProjectAdminStatus.Values.Any(x => x));
 
-            return await Paginator.Paginate(paginated, queryRecordResults, r => QueryRecordToResponse(r, isUriAuthorized(r)));
+            return await Paginator.Paginate(
+                paginated,
+                queryRecordResults,
+                record => QueryRecordToResponse(record, isUriAuthorized(record))
+            );
         }
         catch (PostgresException ex) when (ex.SqlState == "42703")
         {
