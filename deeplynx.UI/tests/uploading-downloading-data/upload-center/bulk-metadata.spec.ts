@@ -6,7 +6,7 @@ import * as os from 'os';
 import {
     parseRecordFromUrl, navigateToProjectDashboard, navigateToUploadCenter,
     deleteRecordIfExists, checkDataSourcesAndStorageDestinations, verifyInProject,
-    getOrgIdByName
+    getOrgIdByName, getProjectIdByName, createClass, deleteClassIfExists
 } from "../../helpers/upload-helpers";
 
 
@@ -764,6 +764,112 @@ test.describe("Bulk Metadata", () => {
                         createdRecord = parseRecordFromUrl(page.url());
                     });
                 });
+            });
+        });
+
+        test.describe("Upload csv file with class_id that doesn't match class_name", () => {
+
+            let projectId: string;
+            let classId: string;
+            let createdClassName: string;
+            let mismatchedClassName: string;
+            let createdRecord: { recordId: string; projectId: string } | null;
+
+            test.beforeEach(async ({ request }, testInfo) => {
+                projectId = await getProjectIdByName(request, orgId, "PW Project X");
+
+                createdClassName = `PW Mismatch Test Class ${testInfo.testId}`;
+                classId = await createClass(
+                    request,
+                    projectId,
+                    createdClassName
+                );
+
+                // Deliberately different from the class actually created above,
+                // so class_id and class_name point to two different classes.
+                mismatchedClassName = `Definitely Not The Real Class Name ${testInfo.testId}`;
+
+                const bulkFileName = `bulk-upload-class-id-name-mismatch${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    classId,             // real class_id
+                    mismatchedClassName, // class_name that does NOT correspond to classId
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterEach(async ({ request }) => {
+                await deleteRecordIfExists({ request }, createdRecord, orgId);
+                await deleteClassIfExists({ request }, projectId, classId);
+                await deleteClassIfExists({ request }, projectId, String(Number(classId) + 1));
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with class_id that doesn't match class_name", async ({ page }) => {
+                test.setTimeout(180_000); // buffer time
+                const start = Date.now();
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).toBeVisible();
+
+                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                await page.getByRole('button', { name: 'Confirm Upload' }).click();
+
+                // Verify in Project Dashboard
+                await page.getByRole("link", { name: "Project Dashboard" }).click();
+                await page.waitForURL(/\/project/);
+                await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+
+                await verifyInProject(page, name);
+
+                const elapsedMs = Date.now() - start;
+                expect(elapsedMs).toBeLessThan(120_000);
+
+                const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+                const dataCatalogButton = sideBar.getByRole('link').nth(1);
+                await dataCatalogButton.click();
+
+                const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+
+                const recordLink = page.getByRole('link', { name, exact: true }).first();
+                await expect(async () => {
+                    if (await clearTermsButton.isVisible()) {
+                        await clearTermsButton.click();
+                    }
+                    await page.getByRole('textbox', { name: 'Search' }).click();
+                    await page.getByRole('textbox', { name: 'Search' }).fill(name);
+                    await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+                    await expect(recordLink).toBeVisible({ timeout: 3_000 });
+                }).toPass({ timeout: 30_000 });
+
+                await recordLink.click();
+                await page.waitForURL(/\/record\?/);
+                createdRecord = parseRecordFromUrl(page.url());
             });
         });
     });
