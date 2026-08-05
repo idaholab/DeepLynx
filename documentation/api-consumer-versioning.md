@@ -32,6 +32,35 @@ Because `NEXT_PUBLIC_API_VERSION` and `NEXT_PUBLIC_API_URL` are exposed to
 browser code by Next.js, deployments must provide them when building the UI
 image. `BACKEND_BASE_URL` remains server-only and may use an internal hostname.
 
+### Local Docker Compose
+
+The Compose configuration passes `NEXT_PUBLIC_API_VERSION` to both the UI build
+and its runtime environment, with `v2` as the local default. Put the value in
+the root `.env` file and rebuild the UI:
+
+```dotenv
+NEXT_PUBLIC_API_VERSION=v2
+```
+
+```bash
+docker compose up --build
+```
+
+To select values from the Next.js development file instead, run:
+
+```bash
+docker compose --env-file deeplynx.UI/.env.local up --build
+```
+
+Do not add `.env.local` to the Docker build context. Files matching `.env.*`
+are intentionally ignored so local URLs and secrets cannot be copied into an
+image. Compose reads the file outside the image build and forwards only the
+variables referenced by `docker-compose.yaml`.
+
+For deployed environments, set `NEXT_PUBLIC_API_URL` and
+`NEXT_PUBLIC_API_VERSION` in the corresponding GitHub environment. Those
+values are supplied to the public UI image at build time.
+
 ## Consumer decisions
 
 | Consumer | Current target | Decision and rationale |
