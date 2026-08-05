@@ -856,10 +856,9 @@ public class RecordController : ControllerBase
     {
         try
         {
-            bool isSysAdmin = UserContextStorage.IsSysAdmin;
-            bool isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            bool isAdmin = UserContextStorage.IsSysAdmin || UserContextStorage.IsOrgAdmin;
             var edges = await _graphBusiness.GetGraphDataForRecord(
-                organizationId, projectId, recordId, UserContextStorage.UserId, depth, isSysAdmin);
+                organizationId, projectId, recordId, UserContextStorage.UserId, depth, isAdmin);
             return Ok(edges);
         }
         catch (Exception exc)

@@ -9,5 +9,5 @@ public interface IGraphBusiness
 
     Task<GraphResponse> GetGraphDataForRecord(
         long organizationId, long projectId, long recordId, long userId, int depth,
-        bool isSysAdmin = false, bool isOrgAdmin = false);
+        bool isAdmin = false);
 }

@@ -975,7 +975,7 @@ public class GraphBusinessTests : IntegrationTestBase
             originRecord.Id,
             sysAdminUser.Id,
             depth: 1,
-            isSysAdmin: true);
+            isAdmin: true);
 
         // Assert
         Assert.NotNull(result);
@@ -1038,16 +1038,16 @@ public class GraphBusinessTests : IntegrationTestBase
     #region GetGraphDataForRecord Role & Label Tests
 
     [Fact]
-    public async Task GetGraphData_OrgAdmin_CanViewGraph_WhenNotProjectMember()
+    public async Task GetGraphData_Admin_CanViewGraph_WhenNotProjectMember()
     {
-        // Arrange - middleware determined the user is org admin; user is NOT a project member
-        var orgAdmin = new User
+        // Arrange - middleware determined the user is an admin; user is NOT a project member
+        var admin = new User
         {
-            Name = "Org Admin",
-            Email = $"org-admin-{Guid.NewGuid()}@test.com",
+            Name = "Admin",
+            Email = $"admin-{Guid.NewGuid()}@test.com",
             IsActive = true
         };
-        Context.Users.Add(orgAdmin);
+        Context.Users.Add(admin);
         await Context.SaveChangesAsync();
 
         Context.Edges.Add(new Edge
@@ -1062,11 +1062,11 @@ public class GraphBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         Assert.False(Context.ProjectMembers.Any(pm =>
-            pm.UserId == orgAdmin.Id && pm.ProjectId == pid));
+            pm.UserId == admin.Id && pm.ProjectId == pid));
 
         // Act
         var result = await _graphBusiness.GetGraphDataForRecord(
-            oid, pid, record1Id, orgAdmin.Id, 1, isOrgAdmin: true);
+            oid, pid, record1Id, admin.Id, 1, isAdmin: true);
 
         // Assert
         Assert.Equal(2, result.Nodes.Count);
@@ -1074,41 +1074,30 @@ public class GraphBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetGraphData_OrgAdmin_OfDifferentOrg_IsDenied()
+    public async Task GetGraphData_ThrowsUnauthorized_WhenRecordProjectMismatch()
     {
-        // Arrange - user is org admin of a DIFFERENT org (middleware validated
-        // isOrgAdmin against otherOrg.Id); the record lives in oid
-        var otherOrg = new Organization { Name = "Other Organization" };
-        Context.Organizations.Add(otherOrg);
+        // Arrange - caller passes a projectId the record doesn't actually belong to
+        var otherProject = new Project { Name = "Other Project", OrganizationId = oid };
+        Context.Projects.Add(otherProject);
         await Context.SaveChangesAsync();
 
-        var otherOrgAdmin = new User
-        {
-            Name = "Other Org Admin",
-            Email = $"other-org-admin-{Guid.NewGuid()}@test.com",
-            IsActive = true
-        };
-        Context.Users.Add(otherOrgAdmin);
-        await Context.SaveChangesAsync();
-
-        // Act & Assert - org id is the caller's own org; record's project belongs to oid,
-        // so the org-scoped project list won't contain it
+        // Act & Assert - record1 lives in pid, not otherProject.Id
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _graphBusiness.GetGraphDataForRecord(
-                otherOrg.Id, pid, record1Id, otherOrgAdmin.Id, 1, isOrgAdmin: true));
+                oid, otherProject.Id, record1Id, uid1, 1, isAdmin: true));
     }
 
     [Fact]
-    public async Task GetGraphData_OrgAdmin_BypassesSensitivityLabels()
+    public async Task GetGraphData_Admin_BypassesSensitivityLabels()
     {
-        // Arrange - org admin with no label authorization; connected record is labeled
-        var orgAdmin = new User
+        // Arrange - admin with no label authorization; connected record is labeled
+        var admin = new User
         {
-            Name = "Org Admin Labels",
-            Email = $"org-admin-labels-{Guid.NewGuid()}@test.com",
+            Name = "Admin Labels",
+            Email = $"admin-labels-{Guid.NewGuid()}@test.com",
             IsActive = true
         };
-        Context.Users.Add(orgAdmin);
+        Context.Users.Add(admin);
         await Context.SaveChangesAsync();
 
         var label = new SensitivityLabel
@@ -1139,7 +1128,7 @@ public class GraphBusinessTests : IntegrationTestBase
 
         // Act
         var result = await _graphBusiness.GetGraphDataForRecord(
-            oid, pid, record1Id, orgAdmin.Id, 1, isOrgAdmin: true);
+            oid, pid, record1Id, admin.Id, 1, isAdmin: true);
 
         // Assert - labeled record appears despite no label authorization
         Assert.Contains(result.Nodes, n => n.Id == record2Id);
@@ -1149,7 +1138,7 @@ public class GraphBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetGraphData_Member_LabeledRecord_IsExcludedFromGraph()
     {
-        // Arrange - plain member (no flags), connected record has a label
+        // Arrange - plain member (no admin flag), connected record has a label
         // the user isn't authorized for
         await _projectBusiness.AddMemberToProject(pid, null, uid1, null);
 
@@ -1226,111 +1215,21 @@ public class GraphBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetGraphData_ProjectAdmin_BypassesLabels_InTheirProject()
+    public async Task GetGraphData_NonMember_NonAdmin_IsDenied()
     {
-        // Arrange - user's ProjectMember row has IsProjectAdmin = true;
-        // AdminHelper.GetAdminProjectIds reads this from the DB inside the member branch
-        Context.ProjectMembers.Add(new ProjectMember
+        // Arrange - user has no project membership and middleware did not mark them admin
+        var stranger = new User
         {
-            ProjectId = pid,
-            UserId = uid1,
-            IsProjectAdmin = true
-        });
-        await Context.SaveChangesAsync();
-
-        var label = new SensitivityLabel
-        {
-            Name = "Secret",
-            ProjectId = pid,
-            OrganizationId = oid
+            Name = "Stranger",
+            Email = $"stranger-{Guid.NewGuid()}@test.com",
+            IsActive = true
         };
-        Context.SensitivityLabels.Add(label);
+        Context.Users.Add(stranger);
         await Context.SaveChangesAsync();
 
-        var labeledRecord = await Context.Records
-            .Include(r => r.Labels)
-            .FirstAsync(r => r.Id == record2Id);
-        labeledRecord.Labels.Add(label);
-        await Context.SaveChangesAsync();
-
-        Context.Edges.Add(new Edge
-        {
-            OriginId = record1Id,
-            DestinationId = record2Id,
-            DataSourceId = dsid,
-            ProjectId = pid,
-            OrganizationId = oid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
-        });
-        await Context.SaveChangesAsync();
-
-        // Act - no admin flags: project admin rights are per-project data, not a flag
-        var result = await _graphBusiness.GetGraphDataForRecord(oid, pid, record1Id, uid1, 1);
-
-        // Assert - labeled record visible because user is project admin of pid
-        Assert.Contains(result.Nodes, n => n.Id == record2Id);
-        Assert.Single(result.Links);
-    }
-
-    [Fact]
-    public async Task GetGraphData_ProjectAdmin_DoesNotBypassLabels_InOtherMemberProjects()
-    {
-        // Arrange - admin of project A (pid), plain member of project B.
-        // A labeled record in B must stay hidden.
-        var projectB = new Project { Name = "Project B", OrganizationId = oid };
-        Context.Projects.Add(projectB);
-        await Context.SaveChangesAsync();
-
-        Context.ProjectMembers.AddRange(
-            new ProjectMember { ProjectId = pid, UserId = uid1, IsProjectAdmin = true },
-            new ProjectMember { ProjectId = projectB.Id, UserId = uid1, IsProjectAdmin = false });
-        await Context.SaveChangesAsync();
-
-        var recordInB = new Record
-        {
-            ProjectId = projectB.Id,
-            DataSourceId = dsid,
-            ClassId = classId,
-            OrganizationId = oid,
-            Name = "Record In B",
-            Description = "Labeled record in project B",
-            Properties = "{}",
-            OriginalId = "rB",
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
-        };
-        Context.Records.Add(recordInB);
-        await Context.SaveChangesAsync();
-
-        var label = new SensitivityLabel
-        {
-            Name = "Secret B",
-            ProjectId = projectB.Id,
-            OrganizationId = oid
-        };
-        Context.SensitivityLabels.Add(label);
-        await Context.SaveChangesAsync();
-
-        recordInB.Labels.Add(label);
-        await Context.SaveChangesAsync();
-
-        // Edge from project A's record into project B's labeled record
-        Context.Edges.Add(new Edge
-        {
-            OriginId = record1Id,
-            DestinationId = recordInB.Id,
-            DataSourceId = dsid,
-            ProjectId = pid,
-            OrganizationId = oid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
-        });
-        await Context.SaveChangesAsync();
-
-        // Act
-        var result = await _graphBusiness.GetGraphDataForRecord(oid, pid, record1Id, uid1, 1);
-
-        // Assert - admin rights on A do not waive labels on B
-        Assert.DoesNotContain(result.Nodes, n => n.Id == recordInB.Id);
-        Assert.Empty(result.Links);
+        // Act & Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _graphBusiness.GetGraphDataForRecord(oid, pid, record1Id, stranger.Id, 1));
     }
 
     [Fact]
