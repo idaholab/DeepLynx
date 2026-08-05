@@ -872,6 +872,7 @@ test.describe("Bulk Metadata", () => {
                 createdRecord = parseRecordFromUrl(page.url());
             });
         });
+
         test.describe(`Upload csv file with a random string in uri`, () => {
 
             test.beforeEach(async ({ }, testInfo) => {
@@ -917,6 +918,57 @@ test.describe("Bulk Metadata", () => {
                 await expect(
                     page.getByRole('button', { name: /Upload \d+ Records/ })
                 ).not.toBeVisible();
+            });
+        });
+
+        test.describe(`Upload csv file with object_storage_id that is not in the system`, () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-random-string-uri${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                object_storage_id = '1';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test(`[AUTO] [Bulk Metadata>Default Settings] Upload csv file with object_storage_id that is not in the system`, async ({ page }) => {
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).toBeVisible();
+
+                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                await page.getByRole('button', { name: 'Confirm Upload' }).click();
+
+                await expect(page.getByRole('heading', { name: 'Upload Failed' })).toBeVisible();
             });
         });
     });
