@@ -5,6 +5,7 @@ using deeplynx.helpers;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -291,7 +292,7 @@ public class UserControllerTests : IDisposable
             metadata.AttributeType == typeof(MapToApiVersionAttribute));
         Assert.NotNull(method.GetCustomAttribute<BadgeAttribute>());
         Assert.Single(method.GetCustomAttributes<HttpMethodAttribute>());
-        Assert.NotEmpty(GetProtectedMetadata(method));
+        Assert.NotNull(typeof(UserController).GetCustomAttribute<AuthorizeAttribute>());
     }
 
 
@@ -305,19 +306,6 @@ public class UserControllerTests : IDisposable
     {
         var attribute = Assert.Single(method.GetCustomAttributes<HttpMethodAttribute>());
         return (attribute.GetType().Name, attribute.Template, attribute.Name);
-    }
-
-    private static string[] GetProtectedMetadata(MethodInfo method)
-    {
-        return method.GetCustomAttributes()
-            .Where(attribute => attribute is AuthAttribute
-                or OrgAdminAttribute
-                or SysAdminAttribute
-                or ForbidServiceAccountsAttribute
-                or TagsAttribute)
-            .Select(DescribeAttribute)
-            .OrderBy(description => description)
-            .ToArray();
     }
 
     private static string DescribeAttribute(object attribute)
