@@ -564,24 +564,23 @@ public class ClassProjectController : ControllerBase
 }
 ```
 
-Deprecated v1 controller responses also report lifecycle dates:
+Deprecated v1 controller responses also report the deprecation date:
 
 ```text
 Deprecation: @1785888000
-Sunset: Wed, 30 Sep 2026 23:59:59 GMT
 ```
 
 `Deprecation` uses the RFC 9745 Structured Field Date syntax and represents
-2026-08-05 00:00:00 UTC. `Sunset` uses the RFC 8594 HTTP-date syntax and
-represents the planned v1 removal at 2026-09-30 23:59:59 UTC.
+2026-08-05 00:00:00 UTC. No v1 sunset date is currently scheduled, so responses
+do not include a `Sunset` header.
 
 The policy-document `Link` header is intentionally deferred because no
 published policy URL exists yet. When that document is available, v1 responses
-must link to it with both `rel="deprecation"` and `rel="sunset"`.
+must link to it with `rel="deprecation"`.
 
 #### Header Application Mechanism
 
-Nexus applies the `Deprecation` and `Sunset` headers through a global MVC
+Nexus applies the `Deprecation` header through a global MVC
 `IAsyncResultFilter`, registered with `AddControllers` in `Program.cs`. The
 result filter runs within the MVC pipeline after routing and API-version
 resolution, allowing it to inspect the resolved requested version before the
@@ -605,7 +604,8 @@ options.Conventions
     .HasApiVersion(new ApiVersion(2));
 ```
 
-After v1 is deprecated, valid responses for that controller should report both headers:
+After v1 is deprecated, valid responses for that controller should report both
+API versioning headers:
 
 ```text
 api-supported-versions: 2.0
@@ -691,16 +691,16 @@ routing and from the generated API documentation:
 
 ##### V1 Removal Application
 
-For the current v1 retirement, the deprecation date is August 5, 2026, and the
-sunset date is September 30, 2026. The Next.js UI and `deeplynx.mcp` remain
-pinned to v1 as recorded in `documentation/api-consumer-versioning.md`, so v1
-removal is blocked until both consumers have migrated and their v2 contract
-tests pass. External v1 usage must also satisfy the approved removal threshold.
+For the current v1 retirement, the deprecation date is August 5, 2026. No sunset
+date has been scheduled. The Next.js UI and `deeplynx.mcp` remain pinned to v1
+as recorded in `documentation/api-consumer-versioning.md`, so v1 removal is
+blocked until both consumers have migrated and their v2 contract tests pass.
+External v1 usage must also satisfy the approved removal threshold.
 
 The dedicated v1 removal ticket must build and maintain an exact inventory. At
 minimum, review these known code areas:
 
-- `NexusApiVersions.V1`, `Default`, `Deprecated`, the v1 lifecycle dates,
+- `NexusApiVersions.V1`, `Default`, `Deprecated`, the v1 deprecation date,
   `OpenApiDocumentNames`, and `DefaultOpenApiDocumentName`.
 - All `[ApiVersion(1, ...)]` and `[MapToApiVersion(1)]` attributes and the
   corresponding v1-only controller actions.

@@ -103,15 +103,13 @@ public class ApiVersioningTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task V1Response_HasDeprecationAndSunsetHeaders()
+    public async Task V1Response_HasDeprecationHeaderWithoutSunsetHeader()
     {
         var response = await _client.GetAsync(ApiPath("v1", ProjectTagsRoute));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("@1785888000", Assert.Single(response.Headers.GetValues("Deprecation")));
-        Assert.Equal(
-            "Wed, 30 Sep 2026 23:59:59 GMT",
-            Assert.Single(response.Headers.GetValues("Sunset")));
+        Assert.False(response.Headers.Contains("Sunset"));
     }
 
     [Fact]

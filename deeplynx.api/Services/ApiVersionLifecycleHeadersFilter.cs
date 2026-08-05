@@ -1,4 +1,3 @@
-using System.Globalization;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -21,7 +20,5 @@ internal sealed class ApiVersionLifecycleHeadersFilter : IAsyncResultFilter
 
         headers["Deprecation"] =
             $"@{NexusApiVersions.V1DeprecatedOn.ToUnixTimeSeconds()}";
-        headers["Sunset"] =
-            NexusApiVersions.V1SunsetOn.ToString("R", CultureInfo.InvariantCulture);
     }
 }
