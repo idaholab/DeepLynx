@@ -335,8 +335,6 @@ public class QueryBusiness : IQueryBusiness
                 return new PaginatedResponse<QueryRecordViewResponseDto>();
             }
 
-            var userProjectAdminStatus = new Dictionary<long, bool>();
-
             // Batch fetch admin project IDs
             var adminProjectIds = await _context.ProjectMembers
                 .Where(pm =>
@@ -350,30 +348,21 @@ public class QueryBusiness : IQueryBusiness
                 .Distinct()
                 .ToHashSetAsync();
 
-            // Populate the dictionary with admin status
-            foreach (var projectId in projectIds)
-            {
-                userProjectAdminStatus[projectId] = adminProjectIds.Contains(projectId);
-            }
+            var userProjectAdminStatus = projectIds.ToDictionary(pid => pid, adminProjectIds.Contains);
 
-            // Filter project IDs based on user permissions
             var authorizedProjectIds = new List<long>();
-            foreach (var projectId in projectIds)
+
+            authorizedProjectIds.AddRange(
+                projectIds.Where(p => isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(p)));
+
+            var nonAdminProjects = projectIds.Except(authorizedProjectIds).ToArray();
+
+            if (nonAdminProjects.Any())
             {
-                if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId, false))
-                {
-                    authorizedProjectIds.Add(projectId);
-                    continue;
-                }
+                var permittedProjects = await _projectRolePermissionService.PermissionsInProjects(
+                    currentUserId, nonAdminProjects, "read", "record");
 
-                // Check read permission for non-admin projects
-                var hasPermission = await _projectRolePermissionService.PermissionInProject(
-                    currentUserId, projectId, "read", "record");
-
-                if (hasPermission)
-                {
-                    authorizedProjectIds.Add(projectId);
-                }
+                authorizedProjectIds.AddRange(permittedProjects);
             }
 
             if (!authorizedProjectIds.Any())
@@ -381,10 +370,6 @@ public class QueryBusiness : IQueryBusiness
                 Console.WriteLine($"User {currentUserId} has no access to any requested projects.");
                 return new PaginatedResponse<QueryRecordViewResponseDto>();
             }
-
-            var nonAdminProjects = authorizedProjectIds
-                .Where(p => !userProjectAdminStatus.GetValueOrDefault(p))
-                .ToArray();
 
             List<long> authorizedLabelIds = new List<long>();
             if (nonAdminProjects.Any() && !isSysAdmin && !isOrgAdmin)
