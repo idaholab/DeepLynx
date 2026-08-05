@@ -13,4 +13,5 @@ public class OrganizationResponseDto
     public bool? RequireSensitivityLabel { get; set; }
     public string Theme { get; set; } = "default";
     public bool? CreateContainerPerProject { get; set; } = false;
+    public bool? DisableFileTransfer { get; set; } = false;
 }
