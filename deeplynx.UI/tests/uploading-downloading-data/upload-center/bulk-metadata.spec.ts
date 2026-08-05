@@ -168,22 +168,20 @@ test.describe("Bulk Metadata", () => {
 
         test.beforeEach(async ({ }, testInfo) => {
             name = `Assembly 33-${testInfo.testId}`;
-            description = `Assembly 33 Description`;
+            description = 'Assembly 33 Description';
             original_id = `assy-033-${testInfo.testId}`;
-            properties = `{"description":"Assembly 33 Description","diversion flag":false,"height":160,"number of fuel pins":72,"number of heat pipes":19,"temperature":1000}`;
-            uri = `https://example.com/assembly/33`;
-            object_storage_id = `1`;
-            class_id = `5`;
-            class_name = `FuelAssembly`;
-            file_type = `csv`;
-            tags = `monitoring,critical,assembly`;
-            sensitivity_labels = `public,internal`;
+            properties = '{"description":"Assembly 33 Description","diversion flag":false,"height":160,"number of fuel pins":72,"number of heat pipes":19,"temperature":1000}';
+            uri = '';
+            object_storage_id = '';
+            class_id = '';
+            class_name = '';
+            file_type = '';
+            tags = '';
+            sensitivity_labels = '';
         });
         test.describe("Upload csv file with missing name", () => {
 
             test.beforeEach(async ({ }, testInfo) => {
-                // Tab-separated, matching the real template. Row 2 has an empty
-                // name field (required) to trigger a validation failure.
                 const bulkFileName = `bulk-upload-missing-name${testInfo.testId}.csv`;
                 filePath = path.join(os.tmpdir(), bulkFileName);
 
@@ -230,8 +228,6 @@ test.describe("Bulk Metadata", () => {
         test.describe("Upload csv file with missing description", () => {
 
             test.beforeEach(async ({ }, testInfo) => {
-                // Tab-separated, matching the real template. Row 2 has an empty
-                // name field (required) to trigger a validation failure.
                 const bulkFileName = `bulk-upload-missing-description${testInfo.testId}.csv`;
                 filePath = path.join(os.tmpdir(), bulkFileName);
 
@@ -281,8 +277,6 @@ test.describe("Bulk Metadata", () => {
         test.describe("Upload csv file with missing original_id", () => {
 
             test.beforeEach(async ({ }, testInfo) => {
-                // Tab-separated, matching the real template. Row 2 has an empty
-                // name field (required) to trigger a validation failure.
                 const bulkFileName = `bulk-upload-missing-orig-id${testInfo.testId}.csv`;
                 filePath = path.join(os.tmpdir(), bulkFileName);
 
@@ -332,8 +326,6 @@ test.describe("Bulk Metadata", () => {
         test.describe("Upload csv file with missing properties", () => {
 
             test.beforeEach(async ({ }, testInfo) => {
-                // Tab-separated, matching the real template. Row 2 has an empty
-                // name field (required) to trigger a validation failure.
                 const bulkFileName = `bulk-upload-missing-props${testInfo.testId}.csv`;
                 filePath = path.join(os.tmpdir(), bulkFileName);
 
@@ -385,18 +377,8 @@ test.describe("Bulk Metadata", () => {
             let createdRecord: { recordId: string; projectId: string } | null;
 
             test.beforeEach(async ({ }, testInfo) => {
-                // Tab-separated, matching the real template. Row 2 has an empty
-                // name field (required) to trigger a validation failure.
                 const bulkFileName = `bulk-upload-missing-optional-fields${testInfo.testId}.csv`;
                 filePath = path.join(os.tmpdir(), bulkFileName);
-
-                uri = '';
-                object_storage_id = '';
-                class_id = '';
-                class_name = '';
-                file_type = '';
-                tags = '';
-                sensitivity_labels = '';
 
                 const row1 = [
                     name,
@@ -484,8 +466,6 @@ test.describe("Bulk Metadata", () => {
         test.describe("Upload csv file with wrong properties format on one record", () => {
 
             test.beforeEach(async ({ }, testInfo) => {
-                // Tab-separated, matching the real template. Row 2 has an empty
-                // name field (required) to trigger a validation failure.
                 const bulkFileName = `bulk-upload-wrong-props${testInfo.testId}.csv`;
                 filePath = path.join(os.tmpdir(), bulkFileName);
 
@@ -548,8 +528,6 @@ test.describe("Bulk Metadata", () => {
         test.describe("Upload csv file with wrong properties format on multiple record", () => {
 
             test.beforeEach(async ({ }, testInfo) => {
-                // Tab-separated, matching the real template. Row 2 has an empty
-                // name field (required) to trigger a validation failure.
                 const bulkFileName = `bulk-upload-wrong-props${testInfo.testId}.csv`;
                 filePath = path.join(os.tmpdir(), bulkFileName);
 
@@ -627,11 +605,10 @@ test.describe("Bulk Metadata", () => {
         test.describe("Upload csv file with 1000 character Name", () => {
 
             test.beforeEach(async ({ }, testInfo) => {
-                // Tab-separated, matching the real template. Row 2 has an empty
-                // name field (required) to trigger a validation failure.
                 const bulkFileName = `bulk-upload-1000-char-name${testInfo.testId}.csv`;
                 filePath = path.join(os.tmpdir(), bulkFileName);
 
+                name = '';
                 for (let i = 0; i < 1000; i++) {
                     name += 'a';
                 }
@@ -677,6 +654,155 @@ test.describe("Bulk Metadata", () => {
                 await page.getByRole('button', { name: 'Confirm Upload' }).click();
 
                 await expect(page.getByRole('heading', { name: 'Upload Failed' })).toBeVisible();
+            });
+        });
+        test.describe("Upload csv file with 1000 character Description", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-1000-char-name${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                description = '';
+                for (let i = 0; i < 1000; i++) {
+                    description += 'a';
+                }
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with 1000 character Description", async ({ page }) => {
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).toBeVisible();
+
+                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                await page.getByRole('button', { name: 'Confirm Upload' }).click();
+
+                await expect(page.getByRole('heading', { name: 'Upload Failed' })).toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with 1000 character class_id", () => {
+
+            let createdRecord: { recordId: string; projectId: string } | null;
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-1000-char-class-id${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                for (let i = 0; i < 1000; i++) {
+                    class_id += 'a';
+                }
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test.afterEach(async ({ request }) => {
+                await deleteRecordIfExists({ request }, createdRecord, orgId);
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with 1000 character class_id", async ({ page }) => {
+
+                test.setTimeout(180_000); // buffer time
+                const start = Date.now();
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).toBeVisible();
+
+                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                await page.getByRole('button', { name: 'Confirm Upload' }).click();
+
+                // Verify in Project Dashboard
+                await page.getByRole("link", { name: "Project Dashboard" }).click();
+                await page.waitForURL(/\/project/);
+                await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+
+                await verifyInProject(page, name);
+
+
+                const elapsedMs = Date.now() - start;
+                expect(elapsedMs).toBeLessThan(120_000);
+
+                // Visit the data catalog and resolve each created record's
+                // recordId/projectId so we can clean them up afterward.
+                const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+                const dataCatalogButton = sideBar.getByRole('link').nth(1);
+                await dataCatalogButton.click();
+
+                const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+
+                const recordLink = page.getByRole('link', { name, exact: true }).first();
+                await expect(async () => {
+                    if (await clearTermsButton.isVisible()) {
+                        await clearTermsButton.click();
+                    }
+                    await page.getByRole('textbox', { name: 'Search' }).click();
+                    await page.getByRole('textbox', { name: 'Search' }).fill(name);
+                    await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+                    await expect(recordLink).toBeVisible({ timeout: 3_000 });
+                }).toPass({ timeout: 30_000 });
+
+                await recordLink.click();
+                await page.waitForURL(/\/record\?/);
+                createdRecord = parseRecordFromUrl(page.url());
             });
         });
     });
