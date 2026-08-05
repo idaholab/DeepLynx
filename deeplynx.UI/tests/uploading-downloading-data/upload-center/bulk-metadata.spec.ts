@@ -602,112 +602,65 @@ test.describe("Bulk Metadata", () => {
             });
         });
 
-        test.describe("Upload csv file with 1000 character Name", () => {
+        test.describe("Upload csv file with 1000 character x and fails", () => {
 
-            test.beforeEach(async ({ }, testInfo) => {
-                const bulkFileName = `bulk-upload-1000-char-name${testInfo.testId}.csv`;
-                filePath = path.join(os.tmpdir(), bulkFileName);
+            const attributeNames = ["name", "description"] as const;
 
-                name = '';
-                for (let i = 0; i < 1000; i++) {
-                    name += 'a';
-                }
+            attributeNames.forEach(attrName => {
 
-                const row1 = [
-                    name,
-                    description,
-                    original_id,
-                    properties,
-                    uri,
-                    object_storage_id,
-                    class_id,
-                    class_name,
-                    file_type,
-                    tags,
-                    sensitivity_labels
-                ].join('\t');
+                test.describe(`Upload csv file with 1000 character ${attrName}`, () => {
 
-                const fileContent = [header, row1].join('\n');
+                    let paddedValue: string;
 
-                await fs.promises.writeFile(filePath, fileContent, 'utf8');
-            });
+                    test.beforeEach(async ({ }, testInfo) => {
+                        const bulkFileName = `bulk-upload-1000-char-${attrName}${testInfo.testId}.csv`;
+                        filePath = path.join(os.tmpdir(), bulkFileName);
 
-            test.afterAll(async () => {
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
-                }
-            });
+                        paddedValue = 'a'.repeat(1000);
 
-            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with 1000 character Name", async ({ page }) => {
+                        const row1 = [
+                            attrName === 'name' ? paddedValue : name,
+                            attrName === 'description' ? paddedValue : description,
+                            original_id,
+                            properties,
+                            uri,
+                            object_storage_id,
+                            class_id,
+                            class_name,
+                            file_type,
+                            tags,
+                            sensitivity_labels
+                        ].join('\t');
 
-                await page.getByRole('button', { name: 'Choose File Button' }).click();
-                const fileInput = page.locator('input[type="file"]');
-                await fileInput.setInputFiles(filePath);
+                        const fileContent = [header, row1].join('\n');
 
-                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+                        await fs.promises.writeFile(filePath, fileContent, 'utf8');
+                    });
 
-                await expect(
-                    page.getByRole('button', { name: /Upload \d+ Records/ })
-                ).toBeVisible();
+                    test.afterAll(async () => {
+                        if (fs.existsSync(filePath)) {
+                            fs.unlinkSync(filePath);
+                        }
+                    });
 
-                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
-                await page.getByRole('button', { name: 'Confirm Upload' }).click();
+                    test(`[AUTO] [Bulk Metadata>Default Settings] Upload csv file with 1000 character ${attrName}`, async ({ page }) => {
 
-                await expect(page.getByRole('heading', { name: 'Upload Failed' })).toBeVisible();
-            });
-        });
-        test.describe("Upload csv file with 1000 character Description", () => {
+                        await page.getByRole('button', { name: 'Choose File Button' }).click();
+                        const fileInput = page.locator('input[type="file"]');
+                        await fileInput.setInputFiles(filePath);
 
-            test.beforeEach(async ({ }, testInfo) => {
-                const bulkFileName = `bulk-upload-1000-char-name${testInfo.testId}.csv`;
-                filePath = path.join(os.tmpdir(), bulkFileName);
+                        await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
 
-                description = '';
-                for (let i = 0; i < 1000; i++) {
-                    description += 'a';
-                }
+                        await expect(
+                            page.getByRole('button', { name: /Upload \d+ Records/ })
+                        ).toBeVisible();
 
-                const row1 = [
-                    name,
-                    description,
-                    original_id,
-                    properties,
-                    uri,
-                    object_storage_id,
-                    class_id,
-                    class_name,
-                    file_type,
-                    tags,
-                    sensitivity_labels
-                ].join('\t');
+                        await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                        await page.getByRole('button', { name: 'Confirm Upload' }).click();
 
-                const fileContent = [header, row1].join('\n');
-
-                await fs.promises.writeFile(filePath, fileContent, 'utf8');
-            });
-
-            test.afterAll(async () => {
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
-                }
-            });
-
-            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with 1000 character Description", async ({ page }) => {
-
-                await page.getByRole('button', { name: 'Choose File Button' }).click();
-                const fileInput = page.locator('input[type="file"]');
-                await fileInput.setInputFiles(filePath);
-
-                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
-
-                await expect(
-                    page.getByRole('button', { name: /Upload \d+ Records/ })
-                ).toBeVisible();
-
-                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
-                await page.getByRole('button', { name: 'Confirm Upload' }).click();
-
-                await expect(page.getByRole('heading', { name: 'Upload Failed' })).toBeVisible();
+                        await expect(page.getByRole('heading', { name: 'Upload Failed' })).toBeVisible();
+                    });
+                });
             });
         });
 
