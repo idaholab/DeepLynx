@@ -21,18 +21,18 @@ The goal is consistency:
 
 The repository is organized as a .NET solution with separate projects for API, business logic, interfaces, models, data access, helpers, tests, API tests, documentation, and MCP tooling.
 
-| Project or folder | Responsibility |
-|---|---|
-| `deeplynx.api` | ASP.NET Core API host, versioned controllers under `Controllers/V{major}`, API startup configuration, middleware pipeline, OpenAPI/Scalar configuration. |
-| `deeplynx.business` | Domain/business logic implementations. Business classes own validation, EF queries, persistence orchestration, event creation, and domain-specific rules. |
-| `deeplynx.interfaces` | Interfaces for business-layer services. Controllers depend on these interfaces rather than concrete business classes. |
-| `deeplynx.models` | Request DTOs, response DTOs, configuration models, and API-facing data shapes. |
-| `deeplynx.datalayer` | Entity Framework contexts, entity models, migrations, database version checks, and migration runner support. |
-| `deeplynx.helpers` | Shared middleware, auth helpers, validation helpers, cache helpers, clients, exceptions, SignalR hubs, and cross-cutting utilities. |
-| `deeplynx.tests` | .NET integration/unit tests, especially business-layer tests backed by Testcontainers. |
-| `deeplynx.apitest` | Python API-level tests. |
-| `documentation` | Architecture notes, ADRs, and developer documentation. |
-| `deeplynx.mcp` | MCP server and tools. Keep this separate from normal API behavior unless the change explicitly touches MCP. |
+| Project or folder     | Responsibility                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deeplynx.api`        | ASP.NET Core API host, versioned controllers under `Controllers/V{major}`, API startup configuration, middleware pipeline, OpenAPI/Scalar configuration.  |
+| `deeplynx.business`   | Domain/business logic implementations. Business classes own validation, EF queries, persistence orchestration, event creation, and domain-specific rules. |
+| `deeplynx.interfaces` | Interfaces for business-layer services. Controllers depend on these interfaces rather than concrete business classes.                                     |
+| `deeplynx.models`     | Request DTOs, response DTOs, configuration models, and API-facing data shapes.                                                                            |
+| `deeplynx.datalayer`  | Entity Framework contexts, entity models, migrations, database version checks, and migration runner support.                                              |
+| `deeplynx.helpers`    | Shared middleware, auth helpers, validation helpers, cache helpers, clients, exceptions, SignalR hubs, and cross-cutting utilities.                       |
+| `deeplynx.tests`      | .NET integration/unit tests, especially business-layer tests backed by Testcontainers.                                                                    |
+| `deeplynx.apitest`    | Python API-level tests.                                                                                                                                   |
+| `documentation`       | Architecture notes, ADRs, and developer documentation.                                                                                                    |
+| `deeplynx.mcp`        | MCP server and tools. Keep this separate from normal API behavior unless the change explicitly touches MCP.                                               |
 
 ## Backend Layering Rules
 
@@ -79,7 +79,9 @@ The resulting paths are:
 /api/v2/organizations/{organizationId}/projects
 ```
 
-Controllers are organized by major API version under `deeplynx.api/Controllers/V{major}`. Each version has its own controller class and namespace, even when its behavior is initially identical to the preceding version. This keeps each version's complete HTTP contract discoverable in one place and prevents legacy and current actions from accumulating in the same class.
+Controllers that have not been explicitly versioned are treated as unchanged APIs by `DefaultApiVersionConvention`. They are currently registered for both v1 and v2 so endpoints without version-specific behavior remain visible and callable from either Scalar document. Do not add endpoints to an unannotated shared controller: doing so would also expand the frozen v1 API. First make the controller's supported versions explicit and map new work only to v2 or later.
+
+v1 is supported, frozen, and deprecated. Do not modify v1 controllers or actions, and do not remove their legacy `try`/`catch`. New endpoints and breaking contract changes belong in v2 or later.
 
 ### API Startup Flow
 
@@ -185,18 +187,18 @@ Controllers should return the most specific HTTP status code that describes the 
 
 #### Successful Responses
 
-| Scenario | Preferred response | Use when |
-|---|---:|---|
-| Read one resource | `200 OK` | The resource exists and is returned in the response body. |
-| Read a collection | `200 OK` | The request succeeds, even when the collection is empty. Return an empty array/list rather than `404`. |
-| Create resource | `201 Created` | A new resource was created. Include the created response DTO. Use `CreatedAtRoute` when there is a route that can fetch the new resource. |
-| Create action without a stable fetch route | `200 OK` | A resource or workflow result is created, but the API does not expose a clean location route. This matches several existing controller patterns. |
-| Full update | `200 OK` | The updated resource is returned. |
-| Partial update, archive, or unarchive | `200 OK` | The updated resource or a status message is returned. |
-| Delete with response message | `200 OK` | The API returns a message such as `{ message = "Deleted project 123" }`. |
-| Delete without response body | `204 No Content` | The delete succeeds and there is nothing useful to return. |
-| Long-running operation accepted | `202 Accepted` | Work has started but is not complete, such as background extraction, ingestion, or queued processing. Include a status ID or polling location when available. |
-| File download or stream | `200 OK` | The file exists and the response contains the stream with appropriate content type and length where possible. |
+| Scenario                                   | Preferred response | Use when                                                                                                                                                      |
+| ------------------------------------------ | -----------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read one resource                          |           `200 OK` | The resource exists and is returned in the response body.                                                                                                     |
+| Read a collection                          |           `200 OK` | The request succeeds, even when the collection is empty. Return an empty array/list rather than `404`.                                                        |
+| Create resource                            |      `201 Created` | A new resource was created. Include the created response DTO. Use `CreatedAtRoute` when there is a route that can fetch the new resource.                     |
+| Create action without a stable fetch route |           `200 OK` | A resource or workflow result is created, but the API does not expose a clean location route. This matches several existing controller patterns.              |
+| Full update                                |           `200 OK` | The updated resource is returned.                                                                                                                             |
+| Partial update, archive, or unarchive      |           `200 OK` | The updated resource or a status message is returned.                                                                                                         |
+| Delete with response message               |           `200 OK` | The API returns a message such as `{ message = "Deleted project 123" }`.                                                                                      |
+| Delete without response body               |   `204 No Content` | The delete succeeds and there is nothing useful to return.                                                                                                    |
+| Long-running operation accepted            |     `202 Accepted` | Work has started but is not complete, such as background extraction, ingestion, or queued processing. Include a status ID or polling location when available. |
+| File download or stream                    |           `200 OK` | The file exists and the response contains the stream with appropriate content type and length where possible.                                                 |
 
 Example create response with a route:
 
@@ -216,25 +218,25 @@ return Ok(projects);
 
 #### Client Error Responses
 
-| Scenario | Preferred response | Use when |
-|---|---:|---|
-| Invalid body, query, or route value | `400 Bad Request` | The request cannot be processed because caller-provided input is invalid. |
-| Missing or invalid authentication | `401 Unauthorized` | The caller is not authenticated. Middleware usually handles this. |
-| Authenticated but not allowed | `403 Forbidden` | The caller is authenticated but lacks the required role, permission, or admin status. Middleware usually handles this. |
-| Resource not found | `404 Not Found` | The requested entity does not exist, belongs to a different scope, or is intentionally hidden by archive filtering. |
-| Wrong HTTP method | `405 Method Not Allowed` | ASP.NET Core usually handles this automatically when routes are configured correctly. |
-| Conflict with current state | `409 Conflict` | The request is valid, but cannot be completed because of current server state, such as dependent data, duplicate unique values, or state transitions that are not allowed. |
-| Unsupported media type | `415 Unsupported Media Type` | The request content type is not supported. ASP.NET Core usually handles this for body binding. |
-| Validation shape is correct but semantic validation fails | `400 Bad Request` or `409 Conflict` | Use `400` for invalid input. Use `409` when the input is valid but conflicts with existing state. |
+| Scenario                                                  |                  Preferred response | Use when                                                                                                                                                                   |
+| --------------------------------------------------------- | ----------------------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invalid body, query, or route value                       |                   `400 Bad Request` | The request cannot be processed because caller-provided input is invalid.                                                                                                  |
+| Missing or invalid authentication                         |                  `401 Unauthorized` | The caller is not authenticated. Middleware usually handles this.                                                                                                          |
+| Authenticated but not allowed                             |                     `403 Forbidden` | The caller is authenticated but lacks the required role, permission, or admin status. Middleware usually handles this.                                                     |
+| Resource not found                                        |                     `404 Not Found` | The requested entity does not exist, belongs to a different scope, or is intentionally hidden by archive filtering.                                                        |
+| Wrong HTTP method                                         |            `405 Method Not Allowed` | ASP.NET Core usually handles this automatically when routes are configured correctly.                                                                                      |
+| Conflict with current state                               |                      `409 Conflict` | The request is valid, but cannot be completed because of current server state, such as dependent data, duplicate unique values, or state transitions that are not allowed. |
+| Unsupported media type                                    |        `415 Unsupported Media Type` | The request content type is not supported. ASP.NET Core usually handles this for body binding.                                                                             |
+| Validation shape is correct but semantic validation fails | `400 Bad Request` or `409 Conflict` | Use `400` for invalid input. Use `409` when the input is valid but conflicts with existing state.                                                                          |
 
 #### Server and Dependency Error Responses
 
-| Scenario | Preferred response | Use when |
-|---|---:|---|
-| Unexpected server failure | `500 Internal Server Error` | An unhandled or unexpected backend failure occurred. Log details and return a safe message. |
-| Upstream service failed | `502 Bad Gateway` | A dependency such as Insight or another service failed or returned an unusable response. |
-| Upstream service unavailable | `503 Service Unavailable` | A required dependency is temporarily unavailable and the request may succeed later. |
-| Upstream timeout | `504 Gateway Timeout` | A dependency did not respond in time. |
+| Scenario                     |          Preferred response | Use when                                                                                    |
+| ---------------------------- | --------------------------: | ------------------------------------------------------------------------------------------- |
+| Unexpected server failure    | `500 Internal Server Error` | An unhandled or unexpected backend failure occurred. Log details and return a safe message. |
+| Upstream service failed      |           `502 Bad Gateway` | A dependency such as Insight or another service failed or returned an unusable response.    |
+| Upstream service unavailable |   `503 Service Unavailable` | A required dependency is temporarily unavailable and the request may succeed later.         |
+| Upstream timeout             |       `504 Gateway Timeout` | A dependency did not respond in time.                                                       |
 
 #### Response Body Rules
 
@@ -261,11 +263,11 @@ Use names that describe the operation and resource. Avoid vague names such as `a
 
 Most resources are scoped at one of these levels:
 
-| Scope | Route pattern |
-|---|---|
-| Organization | `organizations/{organizationId:long}/...` |
-| Project | `organizations/{organizationId:long}/projects/{projectId:long}/...` |
-| User/global | Resource-specific routes that do not include `organizationId` or `projectId`. Protected with `[SysAdmin]`, `[OrgAdmin(unscoped: true)]`, or left unauthorized when appropriate. |
+| Scope        | Route pattern                                                                                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Organization | `organizations/{organizationId:long}/...`                                                                                                                                       |
+| Project      | `organizations/{organizationId:long}/projects/{projectId:long}/...`                                                                                                             |
+| User/global  | Resource-specific routes that do not include `organizationId` or `projectId`. Protected with `[SysAdmin]`, `[OrgAdmin(unscoped: true)]`, or left unauthorized when appropriate. |
 
 When a route needs authorization based on organization or project membership, include the relevant route IDs so `AuthMiddleware` can evaluate permissions.
 
@@ -375,7 +377,7 @@ Nexus uses URL-segment API versioning. Public controller routes are shaped as:
 /api/v{version}/...
 ```
 
-v1 is supported but **FROZEN and deprecated**. It remains accessible, and no removal date is implied. Do not modify v1 controllers or actions, add v1 endpoints, or strip their legacy `try`/`catch`. v2 is the forward-development version: new endpoints and breaking changes, including RFC 7807 error-contract changes, belong in v2 or later.
+v1 is supported but **FROZEN and deprecated**. It remains accessible. Do not modify v1 controllers or actions, add v1 endpoints, or strip their legacy `try`/`catch`. v2 is the forward-development version: new endpoints and breaking changes, including RFC 7807 error-contract changes, belong in v2 or later.
 
 Do not put the `api/v1` prefix in controller `[Route]` attributes. Controller routes should stay resource-focused:
 
@@ -441,7 +443,6 @@ public class ClassProjectController : ControllerBase
 
 Versioning rules:
 
-
 - Put every new versioned controller in `deeplynx.api/Controllers/V{major}` and use the matching `deeplynx.api.Controllers.V{major}` namespace.
 - Declare exactly one `[ApiVersion(...)]` per controller. The declared major version must match its folder and namespace.
 - Give corresponding controllers and actions the same names across versions. Do not add `V1`, `V2`, or similar suffixes; the namespace supplies the distinction.
@@ -457,7 +458,6 @@ Versioning rules:
 - Update OpenAPI/Scalar documentation and route smoke tests when adding a new API version.
 - Mirror the production layout in controller tests, for example `deeplynx.tests/Controllers/V1` and `deeplynx.tests/Controllers/V2`, and import the version-specific controller namespace explicitly.
 - Register new public API versions in `deeplynx.api/NexusApiVersions.cs`. This is the source of truth for default API versioning, supported versions, OpenAPI documents, and the Scalar document dropdown:
-
 
 ```csharp
 public static ApiVersion V1 { get; } = new(1);
@@ -757,14 +757,14 @@ Dependency injection registrations live in `deeplynx.api/Program.cs`.
 
 Current common lifetimes:
 
-| Registration | Lifetime | Notes |
-|---|---|---|
-| `DeeplynxContext` | Transient | Main EF context. Configured with Npgsql and pgvector support. |
-| `StagingContext` | Transient | Staging EF context. |
-| Business interfaces | Transient | Most `I...Business` services are transient. |
-| `IBulkCopyUpsertExecutor` | Scoped | Bulk database operation helper. |
-| `ISensitivityLabelService` | Scoped | Sensitivity-label service. |
-| Typed HTTP clients | Managed by `AddHttpClient` | Example: `InsightServiceClient`. |
+| Registration               | Lifetime                   | Notes                                                         |
+| -------------------------- | -------------------------- | ------------------------------------------------------------- |
+| `DeeplynxContext`          | Transient                  | Main EF context. Configured with Npgsql and pgvector support. |
+| `StagingContext`           | Transient                  | Staging EF context.                                           |
+| Business interfaces        | Transient                  | Most `I...Business` services are transient.                   |
+| `IBulkCopyUpsertExecutor`  | Scoped                     | Bulk database operation helper.                               |
+| `ISensitivityLabelService` | Scoped                     | Sensitivity-label service.                                    |
+| Typed HTTP clients         | Managed by `AddHttpClient` | Example: `InsightServiceClient`.                              |
 
 ### DI Rules
 
@@ -946,17 +946,17 @@ The global `BadRequestExceptionHandler` handles uncaught `ValidationException` a
 
 For v2 and later actions, allow exceptions to reach the registered global handlers. The handlers own exception logging, response status selection, and the Problem Details envelope.
 
-| Exception or condition | Current global status | Notes |
-|---|---:|---|
-| `ValidationException` | `400 Bad Request` | Request body fails data annotation or long ID validation. Message is passed through to the client unsanitized — keep it client-safe. |
-| `ArgumentException` | `500 Internal Server Error` | Intentionally falls through to the fallback handler pending the throw-site audit described in `BadRequestExceptionHandler`; the response detail is sanitized outside Development. |
-| `InvalidRequestException` | `400 Bad Request` | Domain request is malformed or unsupported. Message is passed through to the client unsanitized — keep it client-safe (no env-var names, file paths, SQL fragments, internal IDs). |
-| `KeyNotFoundException` | `404 Not Found` | Requested entity does not exist or is hidden by archive filtering. |
-| `NoResultsException` | `404 Not Found` | Query succeeded but no result exists when one is required. |
-| `DependencyDeletionException` | `409 Conflict` | Delete is blocked by dependent records. |
-| `InvalidOperationException` | `500 Internal Server Error` | Currently falls through to the fallback handler. Introduce or use a specifically mapped exception when the operation should produce `409` or `400`. |
+| Exception or condition                              |       Current global status | Notes                                                                                                                                                                                              |
+| --------------------------------------------------- | --------------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValidationException`                               |           `400 Bad Request` | Request body fails data annotation or long ID validation. Message is passed through to the client unsanitized — keep it client-safe.                                                               |
+| `ArgumentException`                                 | `500 Internal Server Error` | Intentionally falls through to the fallback handler pending the throw-site audit described in `BadRequestExceptionHandler`; the response detail is sanitized outside Development.                  |
+| `InvalidRequestException`                           |           `400 Bad Request` | Domain request is malformed or unsupported. Message is passed through to the client unsanitized — keep it client-safe (no env-var names, file paths, SQL fragments, internal IDs).                 |
+| `KeyNotFoundException`                              |             `404 Not Found` | Requested entity does not exist or is hidden by archive filtering.                                                                                                                                 |
+| `NoResultsException`                                |             `404 Not Found` | Query succeeded but no result exists when one is required.                                                                                                                                         |
+| `DependencyDeletionException`                       |              `409 Conflict` | Delete is blocked by dependent records.                                                                                                                                                            |
+| `InvalidOperationException`                         | `500 Internal Server Error` | Currently falls through to the fallback handler. Introduce or use a specifically mapped exception when the operation should produce `409` or `400`.                                                |
 | External service failure without a specific handler | `500 Internal Server Error` | Currently reaches the fallback. Add a client-safe exception type and global handler when the contract requires `502 Bad Gateway` or `504 Gateway Timeout`; do not translate it in a v2 controller. |
-| Unexpected `Exception` | `500 Internal Server Error` | The fallback handler logs the exception and sanitizes the response outside Development. |
+| Unexpected `Exception`                              | `500 Internal Server Error` | The fallback handler logs the exception and sanitizes the response outside Development.                                                                                                            |
 
 ### V2 and Later Controller Pattern
 
@@ -1026,12 +1026,12 @@ Middleware may short-circuit requests for authentication, authorization, context
 
 Expected middleware responses:
 
-| Condition | Status |
-|---|---:|
-| Missing or invalid authenticated user | `401 Unauthorized` |
-| Authenticated user lacks required role permission | `403 Forbidden` |
-| Required organization/project context is missing | `400 Bad Request` |
-| Required organization admin or system admin access is missing | `403 Forbidden` |
+| Condition                                                     |             Status |
+| ------------------------------------------------------------- | -----------------: |
+| Missing or invalid authenticated user                         | `401 Unauthorized` |
+| Authenticated user lacks required role permission             |    `403 Forbidden` |
+| Required organization/project context is missing              |  `400 Bad Request` |
+| Required organization admin or system admin access is missing |    `403 Forbidden` |
 
 Middleware should return small JSON error objects and avoid leaking internal implementation details.
 
@@ -1151,14 +1151,14 @@ Logging conventions:
 
 ### Logging Levels
 
-| Level | Use for |
-|---|---|
-| `LogTrace` | Very detailed temporary diagnostics. Avoid in normal application code. |
-| `LogDebug` | Developer diagnostics that are safe but too noisy for normal operations. |
-| `LogInformation` | Application lifecycle, startup, migrations, successful major background operations. |
-| `LogWarning` | Expected failures such as validation errors, not-found cases, blocked deletes, or denied domain operations. |
-| `LogError` | Unexpected exceptions, failed dependencies, failed persistence operations, and unrecoverable request failures. |
-| `LogCritical` | Application-level failures that require immediate attention or cause shutdown. |
+| Level            | Use for                                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- |
+| `LogTrace`       | Very detailed temporary diagnostics. Avoid in normal application code.                                         |
+| `LogDebug`       | Developer diagnostics that are safe but too noisy for normal operations.                                       |
+| `LogInformation` | Application lifecycle, startup, migrations, successful major background operations.                            |
+| `LogWarning`     | Expected failures such as validation errors, not-found cases, blocked deletes, or denied domain operations.    |
+| `LogError`       | Unexpected exceptions, failed dependencies, failed persistence operations, and unrecoverable request failures. |
+| `LogCritical`    | Application-level failures that require immediate attention or cause shutdown.                                 |
 
 ### Structured Logging
 

@@ -101,7 +101,7 @@ Controllers contain no conditional business logic, no data access, and no valida
 
 #### Frozen v1 Controller Shape
 
-v1 is supported, frozen, and deprecated, with no removal date implied. Its controller-level `try`/`catch`, logging, status codes, and error bodies are part of the preserved legacy contract. Do not modify v1 controllers or actions, add v1 endpoints, or strip their catches.
+v1 is supported, frozen, and deprecated. Its controller-level `try`/`catch`, logging, status codes, and error bodies are part of the preserved legacy contract. Do not modify v1 controllers or actions, add v1 endpoints, or strip their catches.
 
 The following is the legacy v1 shape and must not be used for new development:
 

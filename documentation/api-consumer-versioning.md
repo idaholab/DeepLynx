@@ -12,9 +12,8 @@ For migration safety, both implementations accept a legacy base URL ending in
 environment-only edit cannot silently change the response contract.
 
 These are intentional compatibility pins even though v1 is frozen and
-deprecated. v1 remains accessible with no announced removal date. Moving either
-consumer to the forward-development v2 contract requires the reviewed cutover
-described below.
+deprecated. v1 remains accessible. Moving either consumer to the
+forward-development v2 contract requires the reviewed cutover described below.
 
 ## Consumer decisions
 

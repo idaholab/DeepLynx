@@ -152,7 +152,7 @@ After validating the callback, exchange the authorization code for an access tok
 
 ** Token Exchange Endpoint **
 
-**NOTE:** The backend `/exchange` endpoint requires an explicit API version segment. The examples use v2, the forward-development API. The frozen and deprecated v1 contract remains accessible at `/api/v1/oauth/exchange`, with no announced removal date. The frontend `/authorize` proxy is not a versioned backend controller route and remains `/api/oauth/authorize`.
+**NOTE:** The backend `/exchange` endpoint requires an explicit API version segment. The examples use v2, the forward-development API. The frozen and deprecated v1 contract remains accessible at `/api/v1/oauth/exchange`. The frontend `/authorize` proxy is not a versioned backend controller route and remains `/api/oauth/authorize`.
 
 ```
 POST {backendUrl}/api/v2/oauth/exchange

@@ -76,8 +76,7 @@ unambiguous.
 
 #### Hard Rules
 
-- **v1 is FROZEN and deprecated.** It remains accessible, and no removal date is
-  implied.
+- **v1 is FROZEN and deprecated.** It remains accessible.
 - **Do not modify v1 controllers or actions.** Do not add v1 endpoints, develop
   new behavior in v1, migrate v1 to v2 conventions, or strip `try`/`catch` from
   v1 code.
