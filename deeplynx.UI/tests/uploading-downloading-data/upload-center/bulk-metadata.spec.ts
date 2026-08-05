@@ -711,98 +711,102 @@ test.describe("Bulk Metadata", () => {
             });
         });
 
-        test.describe("Upload csv file with 1000 character class_id", () => {
+        test.describe("Upload csv file with 1000 character x and succeeds", () => {
 
-            let createdRecord: { recordId: string; projectId: string } | null;
+            const attributeNames = ["class_id", "class_name"] as const;
 
-            test.beforeEach(async ({ }, testInfo) => {
-                const bulkFileName = `bulk-upload-1000-char-class-id${testInfo.testId}.csv`;
-                filePath = path.join(os.tmpdir(), bulkFileName);
+            attributeNames.forEach(attrName => {
 
-                for (let i = 0; i < 1000; i++) {
-                    class_id += 'a';
-                }
+                test.describe(`Upload csv file with 1000 character ${attrName}`, () => {
 
-                const row1 = [
-                    name,
-                    description,
-                    original_id,
-                    properties,
-                    uri,
-                    object_storage_id,
-                    class_id,
-                    class_name,
-                    file_type,
-                    tags,
-                    sensitivity_labels
-                ].join('\t');
+                    let createdRecord: { recordId: string; projectId: string } | null;
+                    let paddedValue: string;
 
-                const fileContent = [header, row1].join('\n');
+                    test.beforeEach(async ({ }, testInfo) => {
+                        const bulkFileName = `bulk-upload-1000-char-${attrName}${testInfo.testId}.csv`;
+                        filePath = path.join(os.tmpdir(), bulkFileName);
 
-                await fs.promises.writeFile(filePath, fileContent, 'utf8');
-            });
+                        paddedValue = 'a'.repeat(1000);
 
-            test.afterAll(async () => {
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
-                }
-            });
+                        const row1 = [
+                            name,
+                            description,
+                            original_id,
+                            properties,
+                            uri,
+                            object_storage_id,
+                            attrName === 'class_id' ? paddedValue : class_id,
+                            attrName === 'class_name' ? paddedValue : class_name,
+                            file_type,
+                            tags,
+                            sensitivity_labels
+                        ].join('\t');
 
-            test.afterEach(async ({ request }) => {
-                await deleteRecordIfExists({ request }, createdRecord, orgId);
-            });
+                        const fileContent = [header, row1].join('\n');
 
-            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with 1000 character class_id", async ({ page }) => {
+                        await fs.promises.writeFile(filePath, fileContent, 'utf8');
+                    });
 
-                test.setTimeout(180_000); // buffer time
-                const start = Date.now();
+                    test.afterAll(async () => {
+                        if (fs.existsSync(filePath)) {
+                            fs.unlinkSync(filePath);
+                        }
+                    });
 
-                await page.getByRole('button', { name: 'Choose File Button' }).click();
-                const fileInput = page.locator('input[type="file"]');
-                await fileInput.setInputFiles(filePath);
+                    test.afterEach(async ({ request }) => {
+                        await deleteRecordIfExists({ request }, createdRecord, orgId);
+                    });
 
-                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+                    test(`[AUTO] [Bulk Metadata>Default Settings] Upload csv file with 1000 character ${attrName}`, async ({ page }) => {
 
-                await expect(
-                    page.getByRole('button', { name: /Upload \d+ Records/ })
-                ).toBeVisible();
+                        test.setTimeout(180_000); // buffer time
+                        const start = Date.now();
 
-                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
-                await page.getByRole('button', { name: 'Confirm Upload' }).click();
+                        await page.getByRole('button', { name: 'Choose File Button' }).click();
+                        const fileInput = page.locator('input[type="file"]');
+                        await fileInput.setInputFiles(filePath);
 
-                // Verify in Project Dashboard
-                await page.getByRole("link", { name: "Project Dashboard" }).click();
-                await page.waitForURL(/\/project/);
-                await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+                        await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
 
-                await verifyInProject(page, name);
+                        await expect(
+                            page.getByRole('button', { name: /Upload \d+ Records/ })
+                        ).toBeVisible();
 
+                        await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                        await page.getByRole('button', { name: 'Confirm Upload' }).click();
 
-                const elapsedMs = Date.now() - start;
-                expect(elapsedMs).toBeLessThan(120_000);
+                        // Verify in Project Dashboard
+                        await page.getByRole("link", { name: "Project Dashboard" }).click();
+                        await page.waitForURL(/\/project/);
+                        await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
 
-                // Visit the data catalog and resolve each created record's
-                // recordId/projectId so we can clean them up afterward.
-                const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
-                const dataCatalogButton = sideBar.getByRole('link').nth(1);
-                await dataCatalogButton.click();
+                        await verifyInProject(page, name);
 
-                const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+                        const elapsedMs = Date.now() - start;
+                        expect(elapsedMs).toBeLessThan(120_000);
 
-                const recordLink = page.getByRole('link', { name, exact: true }).first();
-                await expect(async () => {
-                    if (await clearTermsButton.isVisible()) {
-                        await clearTermsButton.click();
-                    }
-                    await page.getByRole('textbox', { name: 'Search' }).click();
-                    await page.getByRole('textbox', { name: 'Search' }).fill(name);
-                    await page.getByRole('textbox', { name: 'Search' }).press('Enter');
-                    await expect(recordLink).toBeVisible({ timeout: 3_000 });
-                }).toPass({ timeout: 30_000 });
+                        const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+                        const dataCatalogButton = sideBar.getByRole('link').nth(1);
+                        await dataCatalogButton.click();
 
-                await recordLink.click();
-                await page.waitForURL(/\/record\?/);
-                createdRecord = parseRecordFromUrl(page.url());
+                        const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+
+                        const recordLink = page.getByRole('link', { name, exact: true }).first();
+                        await expect(async () => {
+                            if (await clearTermsButton.isVisible()) {
+                                await clearTermsButton.click();
+                            }
+                            await page.getByRole('textbox', { name: 'Search' }).click();
+                            await page.getByRole('textbox', { name: 'Search' }).fill(name);
+                            await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+                            await expect(recordLink).toBeVisible({ timeout: 3_000 });
+                        }).toPass({ timeout: 30_000 });
+
+                        await recordLink.click();
+                        await page.waitForURL(/\/record\?/);
+                        createdRecord = parseRecordFromUrl(page.url());
+                    });
+                });
             });
         });
     });
