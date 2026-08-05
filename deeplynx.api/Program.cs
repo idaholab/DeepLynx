@@ -316,28 +316,32 @@ try
     }
 
     app.MapControllers(); // Last
-
+                          //Health check endpoint
+    app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
+        .ExcludeFromDescription(); // hide from docs
 
     // Check if the notification service is enabled (defaults to false if not set)
     if (Environment.GetEnvironmentVariable("ENABLE_NOTIFICATION_SERVICE") == "true")
+        app.MapHub<EventNotificationHub>("/eventNotificationHub"); // endpoint for real-time notifications with SignalR
 
-        /* ╔════════════════════════════╗
-           ║   Scalar Configuration     ║
-           ╚════════════════════════════╝ */
-        // Always using scalar:
-        //if (app.Environment.IsDevelopment()) { ...
-        // app.UseOpenApi();
+    /* ╔════════════════════════════╗
+       ║   Scalar Configuration     ║
+       ╚════════════════════════════╝ */
+    // Always using scalar:
+    //if (app.Environment.IsDevelopment()) { ...
+    // app.UseOpenApi();
+    app.MapOpenApi();
 
-        if (isRuntimeStartup)
-        {
-            var customcss = File.ReadAllText("moon.css");
-            var hostedLink = Environment.GetEnvironmentVariable("HOSTED_LINK");
+    if (isRuntimeStartup)
+    {
+        var customcss = File.ReadAllText("moon.css");
+        var hostedLink = Environment.GetEnvironmentVariable("HOSTED_LINK");
 
-            // Conditional image hosting
-            var imageSrc = "/images/lynx-white.png";
+        // Conditional image hosting
+        var imageSrc = "/images/lynx-white.png";
 
-            // Build the HTML content with our image src string interpolation
-            var scalarHeaderContent = $@"
+        // Build the HTML content with our image src string interpolation
+        var scalarHeaderContent = $@"
     <div class='references-header'>
       <header class='header t-doc__header'>
         <div class='header-container'>
@@ -354,24 +358,24 @@ try
       </header>
     </div>";
 
-            app.MapScalarApiReference(options =>
+        app.MapScalarApiReference(options =>
+        {
+            options
+                .WithDarkMode()
+                .WithBaseServerUrl(basePath.ToString())
+                .WithTheme(ScalarTheme.Kepler)
+                .WithTitle("DeepLynx Nexus API")
+                .WithCustomCss(customcss)
+                .AddHeaderContent(scalarHeaderContent);
+
+
+            if (!string.IsNullOrEmpty(hostedLink))
             {
-                options
-                    .WithDarkMode()
-                    .WithBaseServerUrl(basePath.ToString())
-                    .WithTheme(ScalarTheme.Kepler)
-                    .WithTitle("DeepLynx Nexus API")
-                    .WithCustomCss(customcss)
-                    .AddHeaderContent(scalarHeaderContent);
-
-
-                if (!string.IsNullOrEmpty(hostedLink))
-                {
-                    var hostedLinkWithApi = string.Concat(hostedLink + "/api/v1");
-                    options.Servers = new List<ScalarServer> { new(hostedLinkWithApi) };
-                }
-            });
-        }
+                var hostedLinkWithApi = string.Concat(hostedLink + "/api/v1");
+                options.Servers = new List<ScalarServer> { new(hostedLinkWithApi) };
+            }
+        });
+    }
 
     app.Run();
 }
