@@ -5,9 +5,8 @@ import * as path from 'path';
 import * as os from 'os';
 import {
     extractProjectIdFromURL, getOrgIdByName, navigateToProjectDashboard, navigateToUploadCenter,
-    deleteRecordIfExists, checkDataSourcesAndStorageDestinations, clickToBrowse, FileTypeConfig, createFakeHdf5, createFakeTdms,
-    createMinimalDocx, createMinimalXlsx, createZip, setUp, dragAndDrop, verifyInProject, parseRecordFromUrl, getNonDefaultProject,
-    getNonDefault, checkDataSources, checkStorageDestinations
+    deleteRecordIfExists, checkDataSourcesAndStorageDestinations, clickToBrowse, FileTypeConfig,
+    setUp, verifyInProject, parseRecordFromUrl
 } from "../../helpers/upload-helpers";
 
 
