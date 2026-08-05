@@ -2,6 +2,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Nodes;
 
 namespace deeplynx.business;
 
@@ -131,5 +132,42 @@ public class FileS3Business : IFileBusiness
         ObjectStorageConfigDto objectStorageConfig)
     {
         return "";
+    }
+
+    /// <summary>
+    /// Scrapes at most (batchSize * maxBatches) objects from an S3 storage, starting from the given cursor.
+    /// </summary>
+    /// <param name="awsConnectionString">Config.AwsConnectionString, e.g. s3://bucket/prefix?region=...&accessKey=...&secretKey=...</param>
+    /// <param name="objectStorageId">The ID of the object storage being scraped</param>
+    /// <param name="cursor">Continuation token from a previous call, or null to start from the beginning</param>
+    /// <param name="batchSize">Number of records per batch (matches BulkCreateRecords batch size upstream)</param>
+    /// <param name="maxBatches">Maximum number of batches to process before returning, bounding this call's duration</param>
+    /// <param name="cancellationToken">Token checked between pages</param>
+    public static async Task<ScrapeResult> ScrapeS3(
+        string awsConnectionString,
+        long objectStorageId,
+        string? cursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        return new ScrapeResult();
+    }
+
+    public async Task<ScrapeResult> ScrapeAsync(
+        ObjectStorageDecryptedDto objectStorage,
+        string? afterCursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        return await ScrapeS3(
+            objectStorage.Config.AwsConnectionString
+                ?? throw new InvalidOperationException("S3 storage is missing its connection string."),
+            objectStorage.Id,
+            afterCursor,
+            batchSize,
+            maxBatches,
+            cancellationToken);
     }
 }

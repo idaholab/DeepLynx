@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using System.IO.Pipelines;
+using System.Text.Json.Nodes;
 using System.Threading.Channels;
 
 namespace deeplynx.business;
@@ -824,6 +825,93 @@ public class FileFilesystemBusiness : IFileBusiness
 
         var meta = JsonConvert.DeserializeObject<dynamic>(await File.ReadAllTextAsync(metaPath));
         return (string)meta.FileName;
+    }
+
+    /// <summary>
+    /// Scrapes at most (batchSize * maxBatches) files from a file system storage, startingafter the given cursor.
+    /// </summary>
+    /// <param name="mountPath">Root path to scan</param>
+    /// <param name="objectStorageId">The ID of the object storage being scraped</param>
+    /// <param name="cursor">Relative path to resume after, from a previous call, or null to start from the beginning</param>
+    /// <param name="batchSize">Number of records per batch</param>
+    /// <param name="maxBatches">Maximum number of batches to process before returning</param>
+    /// <param name="cancellationToken">Token checked periodically during the directory walk</param>
+    /// <exception cref="DirectoryNotFoundException"></exception>
+    public static Task<ScrapeResult> ScrapeFileSystem(
+        string mountPath,
+        long objectStorageId,
+        string? cursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Directory.Exists(mountPath))
+            throw new DirectoryNotFoundException($"Mount path '{mountPath}' does not exist.");
+
+        var result = new ScrapeResult();
+        var recordsWanted = (long)batchSize * maxBatches;
+
+        var allRelativePaths = Directory.EnumerateFiles(mountPath, "*", SearchOption.AllDirectories)
+            .Select(p => Path.GetRelativePath(mountPath, p))
+            .OrderBy(p => p, StringComparer.Ordinal)
+            .ToList();
+
+        var startIndex = 0;
+        if (!string.IsNullOrEmpty(cursor))
+        {
+            // Resume just after the last path we returned previously.
+            var cursorIndex = allRelativePaths.BinarySearch(cursor, StringComparer.Ordinal);
+            startIndex = cursorIndex >= 0 ? cursorIndex + 1 : ~cursorIndex;
+        }
+
+        var slice = allRelativePaths.Skip(startIndex).Take((int)Math.Min(recordsWanted, int.MaxValue)).ToList();
+
+        foreach (var relativePath in slice)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var fullPath = Path.Combine(mountPath, relativePath);
+            var fileInfo = new FileInfo(fullPath);
+
+            var properties = new JsonObject
+            {
+                ["lastModified"] = fileInfo.LastWriteTimeUtc.ToString("o")
+            };
+
+            result.Records.Add(new CreateRecordRequestDto
+            {
+                Name = fileInfo.Name,
+                Description = "File scraped from filesystem",
+                ObjectStorageId = objectStorageId,
+                Uri = fullPath,
+                Properties = properties,
+                OriginalId = fullPath,
+                FileType = string.IsNullOrEmpty(fileInfo.Extension) ? null : fileInfo.Extension.TrimStart('.'),
+                FileSize = fileInfo.Length
+            });
+        }
+
+        var reachedEnd = startIndex + slice.Count >= allRelativePaths.Count;
+        result.NextCursor = reachedEnd ? null : slice.LastOrDefault();
+
+        return Task.FromResult(result);
+    }
+
+    public async Task<ScrapeResult> ScrapeAsync(
+        ObjectStorageDecryptedDto objectStorage,
+        string? afterCursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        return await ScrapeFileSystem(
+            objectStorage.Config.MountPath
+                ?? throw new InvalidOperationException("Filesystem storage is missing a mount path."),
+            objectStorage.Id,
+            afterCursor,
+            batchSize,
+            maxBatches,
+            cancellationToken);
     }
 
 }

@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.IO.Pipelines;
+using System.Text.Json.Nodes;
 using System.Threading.Channels;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -1051,6 +1052,114 @@ public class FileAzureBusiness : IFileBusiness
         }
 
         return fileName;
+    }
+
+    /// <summary>
+    /// Scrapes at most (batchSize * maxBatches) blobs from an Azure Blob storage, starting from the given cursor.
+    /// </summary>
+    /// <param name="config">Config.AzureObjectConfig</param>
+    /// <param name="objectStorageId">The ID of the object storage being scraped</param>
+    /// <param name="cursor">Continuation token from a previous call, or null to start from the beginning</param>
+    /// <param name="batchSize">Number of records per batch</param>
+    /// <param name="maxBatches">Maximum number of batches to process before returning</param>
+    /// <param name="cancellationToken">Token checked between pages</param>
+    /// <exception cref="InvalidOperationException"></exception>
+    public static async Task<ScrapeResult> ScrapeAzureBlob(
+        AzureObjectConfigDto config,
+        long objectStorageId,
+        string? cursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(config.AzureConnectionString))
+            throw new InvalidOperationException("AzureObjectConfig is missing a connection string.");
+        if (string.IsNullOrWhiteSpace(config.AzureContainerName))
+            throw new InvalidOperationException("AzureObjectConfig is missing a container name.");
+
+        var containerClient = new BlobContainerClient(config.AzureConnectionString, config.AzureContainerName);
+
+        var result = new ScrapeResult();
+        var currentBatch = new List<CreateRecordRequestDto>(batchSize);
+        var batchesCompleted = 0;
+        string? continuationToken = cursor;
+
+        var pageable = containerClient.GetBlobsAsync(cancellationToken: cancellationToken)
+            .AsPages(continuationToken);
+
+        await foreach (var page in pageable)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            foreach (var blobItem in page.Values)
+            {
+                var properties = new JsonObject
+                {
+                    ["lastModified"] = blobItem.Properties.LastModified?.ToString("o"),
+                    ["contentType"] = blobItem.Properties.ContentType,
+                    ["etag"] = blobItem.Properties.ETag?.ToString()
+                };
+
+                var extension = Path.GetExtension(blobItem.Name);
+
+                currentBatch.Add(new CreateRecordRequestDto
+                {
+                    Name = Path.GetFileName(blobItem.Name),
+                    Description = blobItem.Name,
+                    ObjectStorageId = objectStorageId,
+                    Uri = blobItem.Name,
+                    Properties = properties,
+                    OriginalId = blobItem.Name,
+                    FileType = string.IsNullOrEmpty(extension) ? null : extension.TrimStart('.'),
+                    FileSize = blobItem.Properties.ContentLength ?? 0
+                });
+
+                if (currentBatch.Count >= batchSize)
+                {
+                    result.Records.AddRange(currentBatch);
+                    currentBatch = new List<CreateRecordRequestDto>(batchSize);
+                    batchesCompleted++;
+                }
+            }
+
+            continuationToken = page.ContinuationToken;
+
+            if (batchesCompleted >= maxBatches && !string.IsNullOrEmpty(continuationToken))
+            {
+                break;
+            }
+
+            if (string.IsNullOrEmpty(continuationToken))
+            {
+                break;
+            }
+        }
+
+        if (currentBatch.Count > 0)
+        {
+            result.Records.AddRange(currentBatch);
+        }
+
+        result.NextCursor = string.IsNullOrEmpty(continuationToken) ? null : continuationToken;
+
+        return result;
+    }
+
+    public async Task<ScrapeResult> ScrapeAsync(
+        ObjectStorageDecryptedDto objectStorage,
+        string? afterCursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        return await ScrapeAzureBlob(
+            objectStorage.Config.AzureObjectConfig
+                ?? throw new InvalidOperationException("Azure Blob storage is missing its configuration."),
+            objectStorage.Id,
+            afterCursor,
+            batchSize,
+            maxBatches,
+            cancellationToken);
     }
 }
 
