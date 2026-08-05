@@ -1,0 +1,10 @@
+{
+  "Name": "example_file_name",
+  "Description": "Describe this file",
+  "OriginalId": "unique-original-id",
+  "ClassName": "optional: Class Example",
+  "ClassId": null,
+  "Properties": {
+    "exampleKey": "exampleValue"
+  }
+}
