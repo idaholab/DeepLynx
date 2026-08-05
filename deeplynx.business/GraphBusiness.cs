@@ -220,9 +220,7 @@ public class GraphBusiness : IGraphBusiness
 
 
     /// <summary>
-    ///     Gets all edges connected to a specific record from the database. Only
-    ///     edges whose origin AND destination both live in `projectId` are returned —
-    ///     this is what keeps the whole traversal from ever leaving the root's project/org.
+    ///     Gets all edges connected to a specific record from the database. Project Scoped
     /// </summary>
     /// <param name="recordId">The ID of the record to get edges for</param>
     /// <param name="projectId">The single project this traversal is scoped to (the root record's project)</param>
@@ -244,9 +242,6 @@ public class GraphBusiness : IGraphBusiness
             .Include(e => e.Relationship)
             .Where(e => !e.IsArchived && !e.Origin.IsArchived && !e.Destination.IsArchived);
 
-        // Hard project boundary — every edge and both endpoints must belong to the
-        // root's project. This alone is what prevents cross-project/org leakage,
-        // regardless of admin status.
         query = query.Where(e =>
             e.ProjectId == projectId &&
             e.Origin.ProjectId == projectId &&
