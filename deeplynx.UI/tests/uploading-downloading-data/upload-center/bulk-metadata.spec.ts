@@ -666,7 +666,7 @@ test.describe("Bulk Metadata", () => {
 
         test.describe("Upload csv file with 1000 character x and succeeds", () => {
 
-            const attributeNames = ["class_id", "class_name"] as const;
+            const attributeNames = ["class_id", "class_name", "original_id"] as const;
 
             attributeNames.forEach(attrName => {
 
@@ -684,7 +684,7 @@ test.describe("Bulk Metadata", () => {
                         const row1 = [
                             name,
                             description,
-                            original_id,
+                            attrName === "original_id" ? paddedValue : original_id,
                             properties,
                             uri,
                             object_storage_id,
