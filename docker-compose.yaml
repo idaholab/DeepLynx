@@ -36,7 +36,8 @@ services:
     networks:
       - nexus-network
     depends_on:
-      - server
+      server:
+        condition: service_healthy
 
   docs:
     build:
@@ -49,7 +50,8 @@ services:
     networks:
       - nexus-network
     depends_on:
-      - server
+      server:
+        condition: service_healthy
 
   server:
     build:
@@ -92,6 +94,13 @@ services:
       - nexus-network
     volumes:
       - object_storage:/data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:5000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+      start_interval: 2s
     depends_on:
       nx-postgres:
         condition: service_healthy
@@ -133,7 +142,8 @@ services:
     networks:
       - nexus-network
     depends_on:
-      - server
+      server:
+        condition: service_healthy
 
   insight-rabbitmq:
     profiles: [insight]

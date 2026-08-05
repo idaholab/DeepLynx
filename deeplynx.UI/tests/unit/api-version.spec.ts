@@ -60,6 +60,13 @@ test("normalizes API bases without duplicating the api segment", () => {
   }
 });
 
+test("supports a same-origin API path for browser deployments", () => {
+  process.env.NEXT_PUBLIC_API_VERSION = "v1";
+
+  expect(getNexusApiBaseUrl("/api")).toBe("/api");
+  expect(withNexusApiVersion("/api")).toBe("/api/v1");
+});
+
 test("builds Scalar and OAuth URLs with the configured version", () => {
   process.env.NEXT_PUBLIC_API_VERSION = "v2";
   const baseUrl = "http://localhost:5095/api";

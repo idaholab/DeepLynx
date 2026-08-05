@@ -6,6 +6,11 @@ docker-compose.yaml
 
 *.bak
 *.env
+# Next.js automatically loads .env.local and similar files during `next build`.
+# Never send developer overrides (or their secrets) to a container build.
+**/.env
+**/.env.*
+!**/.env_sample
 *.log
 *.zip
 *.log

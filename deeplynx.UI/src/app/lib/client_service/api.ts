@@ -4,11 +4,35 @@ import axios from "axios";
 import { getSession } from "next-auth/react";
 import type { Session } from "next-auth";
 import { getApiErrorMessage } from "../api-error";
-import { withNexusApiVersion } from "../api-version";
+import {
+  getDefaultNexusApiVersion,
+  withNexusApiVersion,
+} from "../api-version";
+
+const apiVersion = getDefaultNexusApiVersion();
+const apiBaseURL = withNexusApiVersion(
+  process.env.NEXT_PUBLIC_API_URL ?? "",
+);
 
 const api = axios.create({
-  baseURL: withNexusApiVersion(process.env.NEXT_PUBLIC_API_URL ?? ""),
+  baseURL: apiBaseURL,
 });
+
+console.info("[Nexus API] configuration", {
+  version: apiVersion,
+  baseURL: apiBaseURL,
+});
+
+/** Return the intended route without logging query values, headers, or bodies. */
+function getRequestRoute(baseURL: string, requestUrl?: string): string {
+  const routeWithoutQuery = (requestUrl ?? "").split(/[?#]/, 1)[0];
+
+  if (/^https?:\/\//i.test(routeWithoutQuery)) {
+    return routeWithoutQuery;
+  }
+
+  return `${baseURL.replace(/\/+$/, "")}/${routeWithoutQuery.replace(/^\/+/, "")}`;
+}
 
 // ----------------------------------------------------------------------------
 // Single-flight session lookup
@@ -43,6 +67,12 @@ async function getSessionOnce(): Promise<Session | null> {
 
 // Request interceptor to add token
 api.interceptors.request.use(async (config) => {
+  console.info("[Nexus API] request", {
+    method: (config.method ?? "GET").toUpperCase(),
+    route: getRequestRoute(config.baseURL ?? apiBaseURL, config.url),
+    version: apiVersion,
+  });
+
   // Skip auth header if frontend authentication is disabled
   const isAuthDisabled =
     process.env.NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION === "true";
