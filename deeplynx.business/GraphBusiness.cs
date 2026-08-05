@@ -129,10 +129,7 @@ public class GraphBusiness : IGraphBusiness
     }
 
     /// <summary>
-    ///     Gets related records up to 3 levels deep. Traversal is strictly scoped to
-    ///     the root record's own project (and therefore its own organization) — edges
-    ///     pointing to records in other projects/orgs are never followed or returned,
-    ///     regardless of what the user otherwise has access to.
+    ///     Gets related records up to 3 levels deep within a project scope
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the record belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
