@@ -27,6 +27,7 @@ public class EdgeBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _mockOrganizationBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
@@ -71,6 +72,7 @@ public class EdgeBusinessTests : IntegrationTestBase
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyExecutor);
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
         _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _sensitivityLabelService);
@@ -85,7 +87,7 @@ public class EdgeBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()

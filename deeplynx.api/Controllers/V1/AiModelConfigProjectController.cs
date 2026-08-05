@@ -16,7 +16,7 @@ namespace deeplynx.api.Controllers.V1;
 ///     This controller provides endpoints to create, update, delete, and retrieve AI Model Configurations
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/ai-model-configs")]
 [Authorize]
 [Tags("Project - AI Model Config")]

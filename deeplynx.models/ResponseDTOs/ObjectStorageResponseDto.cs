@@ -5,6 +5,7 @@ public class ObjectStorageResponseDto
     public long Id { get; set; }
     public string Name { get; set; }
     public string Type { get; set; }
+    public bool FilesDeletable { get; set; }
     public long? ProjectId { get; set; }
     public long? OrganizationId { get; set; }
     public bool Default { get; set; }

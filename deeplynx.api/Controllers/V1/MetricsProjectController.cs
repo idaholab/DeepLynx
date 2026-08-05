@@ -15,7 +15,7 @@ namespace deeplynx.api.Controllers.V1;
 ///     This controller provides endpoints to populate the DeepLynx metrics pages for Nexus project admins.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/metrics")]
 [Authorize]
 [Tags("Project - Metrics")]
