@@ -723,12 +723,12 @@ public class GraphBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetGraphData_ThrowsAccessViolationException_WhenUserLacksProjectAccess()
+    public async Task GetGraphData_ThrowsUnauthorizedAccessException_WhenUserLacksProjectAccess()
     {
         // Arrange - Don't add user to project
 
         // Act & Assert
-        await Assert.ThrowsAsync<AccessViolationException>(() =>
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _graphBusiness.GetGraphDataForRecord(oid, pid, record1Id, uid1, 1));
     }
 
@@ -1022,7 +1022,7 @@ public class GraphBusinessTests : IntegrationTestBase
             pm.UserId == regularUser.Id && pm.ProjectId == pid));
 
         // Act / Assert
-        await Assert.ThrowsAsync<AccessViolationException>(() =>
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _graphBusiness.GetGraphDataForRecord(
                 oid,
                 pid,

@@ -79,6 +79,12 @@ public class RecordController : ControllerBase
         }
     }
 
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
     /// <summary>
     ///     Get All Records Paginated
     /// </summary>
@@ -133,6 +139,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Paginated full text records search
@@ -171,6 +182,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Full text records search
@@ -242,6 +258,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Get Records by Original IDs
@@ -287,6 +308,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Get a Record
@@ -331,6 +357,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Get Record Count for a Data Source
@@ -363,6 +394,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Create a Record
@@ -409,6 +445,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Bulk Create Records
@@ -455,6 +496,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Update a Record
@@ -491,6 +537,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Delete a Record
@@ -520,6 +571,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Archive or Unarchive a Record
@@ -558,6 +614,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Attach a Tag to a Record
@@ -590,6 +651,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Unattach a Tag from a Record
@@ -622,6 +688,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Bulk Attach Tags to Records
@@ -661,6 +732,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Bulk Unattach Tags From Records
@@ -700,6 +776,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Attach a Sensitivity Label to a Record
@@ -732,6 +813,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Bulk attach sensitivity label(s) to records
@@ -769,6 +855,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Unattach a sensitivity label from a Record
@@ -801,6 +892,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Get Edges by Record
@@ -837,6 +933,11 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 
     /// <summary>
     ///     Get Graph Data for Record
@@ -856,8 +957,10 @@ public class RecordController : ControllerBase
     {
         try
         {
+            bool isSysAdmin = UserContextStorage.IsSysAdmin;
+            bool isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var edges = await _graphBusiness.GetGraphDataForRecord(
-                organizationId, projectId, recordId, UserContextStorage.UserId, depth);
+                organizationId, projectId, recordId, UserContextStorage.UserId, depth, isSysAdmin);
             return Ok(edges);
         }
         catch (Exception exc)
@@ -867,4 +970,9 @@ public class RecordController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+<<<<<<< Updated upstream:deeplynx.api/Controllers/RecordController.cs
+=======
+
+
+>>>>>>> Stashed changes:deeplynx.api/Controllers/V1/RecordController.cs
 }

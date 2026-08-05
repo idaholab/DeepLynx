@@ -8,5 +8,6 @@ public interface IGraphBusiness
         long currentUserId, long organizationId, long projectId, long recordId, bool isOrigin, int page, int pageSize);
 
     Task<GraphResponse> GetGraphDataForRecord(
-        long organizationId, long projectId, long recordId, long userId, int depth);
+        long organizationId, long projectId, long recordId, long userId, int depth,
+        bool isSysAdmin = false, bool isOrgAdmin = false);
 }
