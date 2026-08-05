@@ -21,6 +21,7 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
 {
     private EventBusiness _eventBusiness;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private HistoricalRecordBusiness _historicalRecordBusiness = null!;
     private UserBusiness _userBusiness;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -32,8 +33,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     private ISensitivityLabelService _sensitivityLabelService = null!;
     private EncryptionHelper _encryptionHelper = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
-
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
 
@@ -66,6 +68,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _historicalRecordBusiness = new HistoricalRecordBusiness(Context, _sensitivityLabelService);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockAdminService = new Mock<IAdminService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
@@ -74,7 +78,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _tagBusiness = new TagBusiness(Context, _eventBusiness);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();

@@ -18,6 +18,7 @@ namespace deeplynx.tests;
 public class ClassBusinessTests : IntegrationTestBase
 {
     private ClassBusiness _classBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IDataSourceBusiness> _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -76,10 +77,11 @@ public class ClassBusinessTests : IntegrationTestBase
             Context, _recordBusiness.Object,
             _relationshipBusiness.Object, _eventBusiness);
 
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
     }
 
     protected override async Task SeedTestDataAsync()
