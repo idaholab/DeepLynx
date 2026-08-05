@@ -16,7 +16,7 @@ public class CreateObjectStorageRequestDto
     [JsonPropertyName("default")] public bool Default { get; set; }
 
     [DefaultValue(true)]
-    [JsonPropertyName("files_deletable")] public bool FilesDeletable { get; set; } = true;
+    [JsonPropertyName("filesDeletable")] public bool FilesDeletable { get; set; } = true;
 }
 
 public class ObjectStorageConfigDto
