@@ -6,8 +6,6 @@ docker-compose.yaml
 
 *.bak
 *.env
-# Prevent Next.js developer overrides such as .env.local entering image builds.
-**/.env.*
 *.log
 *.zip
 *.log

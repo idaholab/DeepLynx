@@ -48,12 +48,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0.9 AS final
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Npgsql can load the Kerberos/GSSAPI library even when password authentication
-# is used. Curl is used by the Compose readiness check below.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl libgssapi-krb5-2 && \
-    rm -rf /var/lib/apt/lists/*
-
 # Copy the published backend code from the build stage
 COPY --from=build /app/publish .
 COPY deeplynx.api/moon.css .

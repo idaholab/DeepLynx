@@ -36,8 +36,7 @@ services:
     networks:
       - nexus-network
     depends_on:
-      server:
-        condition: service_healthy
+      - server
 
   docs:
     build:
@@ -50,8 +49,7 @@ services:
     networks:
       - nexus-network
     depends_on:
-      server:
-        condition: service_healthy
+      - server
 
   server:
     build:
@@ -94,13 +92,6 @@ services:
       - nexus-network
     volumes:
       - object_storage:/data
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:5000/api/v1/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 12
-      start_period: 60s
-      start_interval: 2s
     depends_on:
       nx-postgres:
         condition: service_healthy
@@ -114,7 +105,7 @@ services:
       - POSTGRES_PASSWORD=nexuscore
       - POSTGRES_DB=deeplynx
     ports:
-      - "5433:5432"
+      - "5432:5432"
     networks:
       - nexus-network
     volumes:
@@ -142,8 +133,7 @@ services:
     networks:
       - nexus-network
     depends_on:
-      server:
-        condition: service_healthy
+      - server
 
   insight-rabbitmq:
     profiles: [insight]

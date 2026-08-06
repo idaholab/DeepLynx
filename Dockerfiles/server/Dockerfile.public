@@ -30,9 +30,7 @@ WORKDIR /usr/src/app
 
 # Fix vulnerability
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        libgnutls30t64=3.8.3-1.1ubuntu3.6 \
-        libgssapi-krb5-2 && \
+    apt-get install -y libgnutls30t64=3.8.3-1.1ubuntu3.6 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the published backend code
