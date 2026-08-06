@@ -167,6 +167,67 @@ export function parseRecordFromUrl(url: string): { recordId: string; projectId: 
     }
 }
 
+
+// Resolves a project name within an org to its numeric ID (as a string).
+export async function getProjectIdByName(
+    request: APIRequestContext, orgId: string, projectName: string
+): Promise<string> {
+    const BASE_URL = 'http://localhost:5095/api/v1';
+    const res = await request.fetch(`${BASE_URL}/organizations/${orgId}/projects`);
+    if (!res.ok()) throw new Error(`Failed to fetch projects: ${res.status()}`);
+    const projects: { id: number | string; name: string }[] = await res.json();
+    const match = projects.find((p) => p.name === projectName);
+    if (!match) {
+        throw new Error(`Could not find project named "${projectName}" in org ${orgId}`);
+    }
+    return String(match.id);
+}
+
+// Creates a project-level class via the API and returns its ID.
+export async function createClass(
+    request: APIRequestContext,
+    projectId: string,
+    name: string,
+    options?: { description?: string; properties?: Record<string, unknown> }
+): Promise<string> {
+    const BASE_URL = 'http://localhost:5095/api/v1';
+    const res = await request.post(
+        `${BASE_URL}/projects/${projectId}/classes`,
+        {
+            data: {
+                name,
+                description: options?.description ?? null,
+                properties: options?.properties ?? null,
+            },
+        }
+    );
+    if (!res.ok()) {
+        throw new Error(`Failed to create class "${name}": ${res.status()} ${await res.text()}`);
+    }
+    const created = await res.json();
+    return String(created.id);
+}
+
+// Cleanup counterpart, mirroring deleteRecordIfExists. Uses the
+// project-scoped delete endpoint to match creation.
+export async function deleteClassIfExists(
+    { request }: { request: APIRequestContext },
+    projectId: string,
+    classId: string | null,
+) {
+    if (!classId) return;
+    const url = `http://localhost:5095/api/v1/projects/${projectId}/classes/${classId}`;
+    try {
+        const response = await request.delete(url);
+        if (!response.ok()) {
+            console.warn(`Failed to delete class ${classId}: ${response.status()} ${await response.text()}`);
+        }
+    } catch (err) {
+        console.warn(`Error deleting class ${classId}:`, err);
+    }
+}
+
+
 export async function deleteRecordIfExists(
     { request }: { request: import('@playwright/test').APIRequestContext },
     record: { recordId: string; projectId: string } | null,
