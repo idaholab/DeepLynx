@@ -730,6 +730,14 @@ const OrganizationSettings = () => {
   }, [organization?.banner]);
 
   useEffect(() => {
+    async function fetchOrg() {
+      const response = await getOrganization(organization?.organizationId as number);
+      setDisableFileTransfer(response.disableFileTransfer as boolean);
+    }
+    fetchOrg();
+  }, [organization?.organizationId]);
+
+  useEffect(() => {
     const disabled = !!organization?.disableFileTransfer;
     setDisableFileTransfer(disabled);
     setOriginalDisableFileTransfer(disabled);
@@ -745,10 +753,13 @@ const OrganizationSettings = () => {
       setIsSavingFileTransfer(true);
 
       await updateOrganization(organization.organizationId as number, {
-        disableFileTransfer,
+        disableFileTransfer: Boolean(disableFileTransfer),
       });
 
-      setOriginalDisableFileTransfer(disableFileTransfer);
+      const updatedOrg = await getOrganization(organization.organizationId as number);
+
+      setOriginalDisableFileTransfer(updatedOrg.disableFileTransfer ?? false);
+      setDisableFileTransfer(updatedOrg.disableFileTransfer ?? false);
       setOrganization({
         ...organization,
         disableFileTransfer,
