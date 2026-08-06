@@ -11,7 +11,7 @@ namespace deeplynx.api.Controllers.V1;
 
 [Route("organizations/{organizationId:long}/tags")]
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Authorize]
 [ForbidServiceAccounts] // service accounts can only act on the project level
 [Tags("Organization - Tag")]

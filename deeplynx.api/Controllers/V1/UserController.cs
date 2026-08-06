@@ -11,7 +11,7 @@ namespace deeplynx.api.Controllers.V1;
 
 [ApiController]
 
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Route("users")]
 [Authorize]
 public class UserController : ControllerBase

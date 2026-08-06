@@ -1703,7 +1703,7 @@ public class RecordBusiness : IRecordBusiness
         var recordName = returnedRecord.Name;
         var recordDataSourceId = returnedRecord.DataSourceId;
 
-        await DeleteAttachedFileIfPresent(returnedRecord);
+        await RecordFileHelper.TryDeleteFiles(query, _fileBusinessFactory, _objectStorageBusiness);
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
 
@@ -2398,56 +2398,5 @@ public class RecordBusiness : IRecordBusiness
             Properties = r.IsDBNull(iProp) ? null : r.GetString(iProp),
             Uri = r.IsDBNull(iUri) ? null : r.GetString(iUri)
         };
-    }
-
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
-    private async Task DeleteAttachedFileIfPresent(Record record)
-    {
-        // Guard condition: only file-backed records should delete storage.
-        // ObjectStorageId + Uri + FileType is a practical signal for a DeepLynx file upload.
-        if (!record.ObjectStorageId.HasValue ||
-            string.IsNullOrWhiteSpace(record.Uri) ||
-            string.IsNullOrWhiteSpace(record.FileType))
-        {
-            return;
-        }
-
-        var objectStorage = await _objectStorageBusiness
-            .GetDecryptedObjectStorage(record.ObjectStorageId.Value);
-
-        var storageBusiness = _fileBusinessFactory
-            .CreateFileBusiness(objectStorage.Type);
-
-        var dto = new RecordResponseDto
-        {
-            Id = record.Id,
-            Description = record.Description,
-            Uri = record.Uri,
-            Properties = record.Properties,
-            ObjectStorageId = record.ObjectStorageId,
-            OriginalId = record.OriginalId,
-            Name = record.Name,
-            ClassId = record.ClassId,
-            DataSourceId = record.DataSourceId,
-            ProjectId = record.ProjectId,
-            OrganizationId = record.OrganizationId,
-            LastUpdatedBy = record.LastUpdatedBy,
-            LastUpdatedAt = record.LastUpdatedAt,
-            IsArchived = record.IsArchived,
-            FileType = record.FileType,
-            FileSize = record.FileSize
-        };
-
-        await InvalidateProjectStorageSizeCache(record.ProjectId);
-
-        await storageBusiness.DeleteFile(dto, objectStorage.Config);
-    }
-    private static async Task InvalidateProjectStorageSizeCache(long projectId)
-    {
-        await CacheService.Instance.DeleteAsync(
-            CacheKeys.ProjectStorageSize(projectId));
     }
 }

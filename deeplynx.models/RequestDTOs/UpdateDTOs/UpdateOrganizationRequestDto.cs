@@ -18,4 +18,5 @@ public class UpdateOrganizationRequestDto
     [JsonConverter(typeof(JsonStringEnumConverter<OrganizationTheme>))]
     public OrganizationTheme? Theme { get; set; }
     public bool? CreateContainerPerProject { get; set; } = false;
+    public bool? DisableFileTransfer { get; set; } = false;
 }

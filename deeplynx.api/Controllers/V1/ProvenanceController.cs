@@ -15,7 +15,7 @@ namespace deeplynx.api.Controllers.V1;
 ///     This controller provides endpoints to retrieve individual provenance records and provenance history for a record.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/records/provenance")]
 [Authorize]
 [Tags("Provenance")]

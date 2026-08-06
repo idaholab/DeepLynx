@@ -174,6 +174,7 @@ export type ObjectStorageResponseDto = {
   lastUpdatedAt: string;
   lastUpdatedBy: string;
   isArchived: boolean;
+  filesDeletable: boolean;
 };
 
 export type OrganizationResponseDto = {
