@@ -41,7 +41,8 @@ Uncomment this section if a screenshot is needed.
 - [ ] _All_ future TODOs are captured in issues or jira tickets
 - [ ] I have read the [CONTRIBUTING](../blob/develop/CONTRIBUTING.md) document.
 - [ ] All relevant repo and/or project documentation has been updated to reflect the changes in this PR.
-- [ ] Unit tests in `deeplynx.tests` have been added and/or modified to cover the changes in this PR.
+- [ ] Unit tests in `deeplynx.tests` have been added and/or modified to cover backend changes in this PR.
+- [ ] Frontend tests in `deeplynx.UI/tests` have been run and modified if changes in this PR break things.
 - [ ] Changes have been tested in a local build and in the docker app.
 - [ ] A test deployment of the code has been run and smoke tested.
 - [ ] All new and existing tests pass.
