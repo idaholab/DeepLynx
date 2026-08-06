@@ -1,4 +1,4 @@
-export const DEFAULT_NEXUS_API_VERSION = "v1" as const;
+// src/app/lib/api-version.ts
 
 const API_VERSION_PATTERN = /^v[1-9]\d*$/i;
 const VERSIONED_API_SUFFIX = /\/api\/(v[1-9]\d*)$/i;
@@ -16,11 +16,21 @@ export function normalizeNexusApiVersion(version: string): string {
   return normalizedVersion;
 }
 
-/** Return the environment-selected API version, with v1 as a safe fallback. */
+/**
+ * Return the environment-selected API version.
+ * NEXT_PUBLIC_API_VERSION must be set by the environment (dev, test, preflight,
+ * and production all enforce this at build time) — there is no hardcoded fallback.
+ */
 export function getDefaultNexusApiVersion(): string {
-  return normalizeNexusApiVersion(
-    process.env.NEXT_PUBLIC_API_VERSION || DEFAULT_NEXUS_API_VERSION,
-  );
+  const version = process.env.NEXT_PUBLIC_API_VERSION;
+
+  if (!version) {
+    throw new Error(
+      "NEXT_PUBLIC_API_VERSION is not set. This must be provided by the build environment.",
+    );
+  }
+
+  return normalizeNexusApiVersion(version);
 }
 
 /** Normalize an environment-provided origin or API URL to its /api base path. */
