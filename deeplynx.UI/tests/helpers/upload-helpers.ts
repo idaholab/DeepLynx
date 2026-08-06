@@ -337,12 +337,8 @@ export async function dragAndDrop({ page }: { page: Page }, baseFileName: string
     ).toBeVisible();
 
     if (projectNav) {
-        try {
-            await page.getByRole('button', { name: projectNav }).first().click();
-        } catch {
-            await page.getByTestId("project-select").click();
-            await page.getByRole('button', { name: projectNav }).first().click();
-        }
+        await page.getByTestId("project-select").click();
+        await page.getByRole('button', { name: projectNav }).first().click();
     }
 
     // Verify in Project Dashboard
@@ -410,12 +406,8 @@ export async function clickToBrowse(
     ).toBeVisible(uploadTimeoutMs ? { timeout: uploadTimeoutMs } : undefined);
 
     if (projectNav) {
-        try {
-            await page.getByRole('button', { name: projectNav }).first().click();
-        } catch {
-            await page.getByTestId("project-select").click();
-            await page.getByRole('button', { name: projectNav }).first().click();
-        }
+        await page.getByTestId("project-select").click();
+        await page.getByRole('button', { name: projectNav }).first().click();
     }
 
     // Verify in Project Dashboard
@@ -692,14 +684,6 @@ export function createFakeTdms(): Buffer {
 
     const filler = Buffer.from('Fake TDMS content for upload test purposes only.', 'utf8');
     return Buffer.concat([lead, filler]);
-}
-
-export async function navigateToProjectDashboard(page: Page) {
-    await page.getByTestId("project-select").click();
-
-    await selectProjectWithRetry(page, "PW Project X");
-
-    await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
 }
 
 export async function extractProjectIdFromURL(page: Page) {

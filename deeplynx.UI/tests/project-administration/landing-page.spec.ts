@@ -1,16 +1,9 @@
 import { test, expect } from "../fixtures";
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Landing Page", () => {
-  test.use({
-    actingUser: sysAdmin,
-    actingOrg: "PW Org A",
-  });
-
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
-  });
-
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA})
+  
   test("displays welcome message for local developer", async ({ page }) => {
     await expect(
       page.getByRole("heading", { name: /Welcome Back/ }),

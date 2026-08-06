@@ -1,8 +1,8 @@
 import { test, expect } from "../fixtures";
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Settings Page", () => {
-  test.use({ actingUser: sysAdmin, actingOrg: "PW Org A", actingProject: "PW Project X" });
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX });
   test.beforeEach(async ({ page }) => {
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     // Wait for the User Settings heading to confirm the page has loaded

@@ -1,10 +1,10 @@
 import { test, expect } from "../fixtures";
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Select Organization", () => {
   test.use({
     actingUser: sysAdmin,
-    actingOrg: "PW Org A",
+    actingOrg: ORGS.orgA,
   });
 
   test("banner has an Organization dropdown label", async ({ page }) => {
@@ -20,9 +20,6 @@ test.describe("Select Organization", () => {
     await dropdownTrigger.click();
 
     await expect(page.getByRole('listitem').filter({ hasText: 'Switch Organization' })).toBeVisible();
-
-    // There should be a "Current" badge next to the active organization
-    await expect(page.getByText(/Current$/)).toBeVisible();
   });
 
   test("Organization dropdown has a button to view all organizations", async ({

@@ -1,12 +1,12 @@
 import { test, expect } from "../../fixtures";
-import { sysAdmin } from "../../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../../deeplynx-config";
 import { randomBytes } from "crypto";
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as zlib from 'zlib';
 import {
-    extractProjectIdFromURL, getOrgIdByName, navigateToProjectDashboard, navigateToUploadCenter,
+    extractProjectIdFromURL, getOrgIdByName, navigateToUploadCenter,
     deleteRecordIfExists, checkDataSourcesAndStorageDestinations, clickToBrowse, FileTypeConfig, createFakeHdf5, createFakeTdms,
     createMinimalDocx, createMinimalXlsx, createZip, setUp, dragAndDrop, verifyInProject, parseRecordFromUrl, getNonDefaultProject,
     getNonDefault, checkDataSources, checkStorageDestinations, CreatedMetadata, toSafeFileName, getClass, buildMetadata
@@ -19,7 +19,7 @@ const TWENTY_MIN_MS = 20 * 60 * 1000;
 
 let projectId: string;
 let orgId: string;
-const ORG_NAME = "PW Org A";
+const ORG_NAME = ORGS.orgA;
 
 const fileTypes: FileTypeConfig[] = [
     {
@@ -150,17 +150,15 @@ test.describe("File Upload -> New Record", () => {
     test.use({
         actingUser: sysAdmin,
         actingOrg: ORG_NAME,
-        actingProject: "PW Project X",
+        actingProject: PROJECTS.projectX,
     });
 
     test.beforeAll(async ({ page, request }) => {
-        orgId = await getOrgIdByName(request, ORG_NAME);
-        await navigateToProjectDashboard(page);
+        orgId = await getOrgIdByName(request, ORGS.orgA.name);
         projectId = await extractProjectIdFromURL(page);
     });
 
     test.beforeEach(async ({ page }) => {
-        await navigateToProjectDashboard(page);
         await navigateToUploadCenter(page);
     })
 

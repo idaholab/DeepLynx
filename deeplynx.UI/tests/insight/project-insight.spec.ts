@@ -1,18 +1,14 @@
 import { test, expect } from "../fixtures";
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Project Insight", () => {
   test.use({
     actingUser: sysAdmin,
-    actingOrg: "PW Org A",
-    actingProject: "PW Project X",
+    actingOrg: ORGS.orgA,
+    actingProject: PROJECTS.projectX,
   });
   test.beforeEach(async ({ page }) => {
     // Navigate to Project Insight via sidebar
-    await page.getByTestId("project-select").click();
-    await page
-      .getByRole("button", { name: "PW Project X", exact: true })
-      .click();
     await page.locator("aside a", { hasText: "Insight" }).click();
     await page.waitForURL(/\/project_insight/);
     // Wait for the heading to confirm client-side render is done.
