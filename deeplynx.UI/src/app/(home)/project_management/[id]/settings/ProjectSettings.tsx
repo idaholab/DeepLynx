@@ -61,6 +61,7 @@ interface StorageFormData {
   config: StorageConfig;
   default: boolean;
   existingContainer?: boolean;
+  filesDeletable: boolean;
 }
 
 type StorageTab = "default" | "manage";
@@ -100,7 +101,8 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     name: "",
     config: {},
     default: false,
-    existingContainer: false
+    existingContainer: false,
+    filesDeletable: true,
   });
 
   // Storage config fields based on type
@@ -397,7 +399,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   };
 
   const resetStorageForm = () => {
-    setStorageFormData({ name: "", config: {}, default: false, existingContainer: false });
+    setStorageFormData({ name: "", config: {}, default: false, existingContainer: false, filesDeletable: true });
     setStorageType("filesystem");
     setFilesystemPath("");
     setAzureEndpoint("");
@@ -446,6 +448,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         name: storageFormData.name,
         config: config,
         default: storageFormData.default,
+        filesDeletable: storageFormData.filesDeletable,
       };
 
       const createdStorage = await createProjectObjectStorage(
@@ -592,7 +595,8 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       const objectStorageDto: UpdateObjectStorageRequestDto = {
         name: storageFormData.name,
         default: storageFormData.default,
-        existingContainer: storageFormData.existingContainer
+        existingContainer: storageFormData.existingContainer,
+        filesDeletable: storageFormData.filesDeletable,
       };
 
       const projectRequestDto: UpdateProjectRequestDto = {
@@ -620,7 +624,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditModalOpen(false);
       setEditingStorage(null);
-      setStorageFormData({ name: "", config: {}, default: false, existingContainer: false });
+      setStorageFormData({ name: "", config: {}, default: false, existingContainer: false, filesDeletable: true });
       loadStorages();
     } catch (error) {
       console.error("Failed to update storage:", error);
@@ -692,7 +696,8 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       name: storage.name,
       config: {},
       default: storage.default,
-      existingContainer: existingContainer
+      existingContainer: existingContainer,
+      filesDeletable: storage.filesDeletable,
     });
     setIsEditModalOpen(true);
   };

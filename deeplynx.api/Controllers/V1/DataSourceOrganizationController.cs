@@ -16,7 +16,7 @@ namespace deeplynx.api.Controllers.V1;
 ///     This controller provides endpoints to create, update, delete, and retrieve data source information.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Route("organizations/{organizationId:long}/datasources")]
 [Authorize]
 [ForbidServiceAccounts] // service accounts can only act on the project level

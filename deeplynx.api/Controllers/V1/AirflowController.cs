@@ -11,7 +11,7 @@ namespace deeplynx.api.Controllers.V1;
 
 [ApiController]
 
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Route("airflow")]
 [Authorize]
 [ForbidServiceAccounts] // service accounts can only act on the project level

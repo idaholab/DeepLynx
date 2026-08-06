@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
@@ -9,6 +10,8 @@ using deeplynx.helpers.exceptions;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -21,6 +24,7 @@ namespace deeplynx.tests;
 [Collection("Test Suite Collection")]
 public class RecordBusinessTests : IntegrationTestBase
 {
+    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "RecordBusinessTests");
     private EventBusiness _eventBusiness;
     private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -39,6 +43,14 @@ public class RecordBusinessTests : IntegrationTestBase
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private FileBusiness _fileBusiness = null!;
+    private DataSourceBusiness _dataSourceBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private OlapBusiness _olapBusiness = null!;
+    private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
+    private ClassBusiness _classBusiness = null!;
     public long cid; // class ID
     public long did; // datasource ID
     public long did2;
@@ -95,6 +107,40 @@ public class RecordBusinessTests : IntegrationTestBase
             _sensitivityLabelService,
             _provenanceBusiness.Object,
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
+        _relationshipBusiness = new Mock<IRelationshipBusiness>();
+        _classBusiness = new ClassBusiness(Context,
+            _recordBusiness,
+            _relationshipBusiness.Object,
+            _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
+
+        var realFileFilesystemBusiness =
+        new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(realFileFilesystemBusiness);
+
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness,
+            _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+        _insightBusiness = new Mock<IInsightBusiness>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
+        );
     }
 
     #region RecordResponseDto Tests
@@ -367,7 +413,10 @@ public class RecordBusinessTests : IntegrationTestBase
         cid = testClass.Id;
 
         // Add object storage
-        var config = new JsonObject();
+        var config = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
         var objectStorage = new ObjectStorage
         {
             Name = "Object Storage 1",
@@ -1835,6 +1884,71 @@ public class RecordBusinessTests : IntegrationTestBase
             _recordBusiness.DeleteRecord(uid, organizationId, pid, 999L));
 
         Assert.Contains("Record with id 999 is archived or not found", exception.Message);
+    }
+
+    #endregion
+
+    #region Integration DeleteRecord Tests
+
+    [Fact]
+    public async Task DeleteRecord_FileDeleted_DeletesRecordFile()
+    {
+        // Create record file
+        var file = CreateMockFile("file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, organizationId, pid, did, osid, file);
+
+        // Attempt to delete record and file
+        var result = await _recordBusiness.DeleteRecord(uid, organizationId, pid, record.Id);
+        Assert.True(result);
+
+        // Check file
+        Assert.False(File.Exists(record.Uri));
+
+        // Verify record was actually deleted from database
+        var deletedRecord = await Context.Records.FindAsync(record.Id);
+        Assert.Null(deletedRecord);
+    }
+
+    [Fact]
+    public async Task DeleteRecord_FileSaved_DeletesRecordNotFile()
+    {
+        // Disable file deletion
+        var os = await Context.ObjectStorages.FindAsync(osid);
+        os!.FilesDeletable = false;
+        await Context.SaveChangesAsync();
+
+        // Create record file
+        var file = CreateMockFile("not_file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, organizationId, pid, did, osid, file);
+
+        // Delete record but not file
+        var result = await _recordBusiness.DeleteRecord(uid, organizationId, pid, record.Id);
+        Assert.True(result);
+
+        // Check file
+        Assert.True(File.Exists(record.Uri));
+
+        // Verify record was actually deleted from database
+        var deletedRecord = await Context.Records.FindAsync(record.Id);
+        Assert.Null(deletedRecord);
+    }
+
+    private static FormFile CreateMockFile(string fileName, string content = "Mock File")
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
+
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
     }
 
     #endregion

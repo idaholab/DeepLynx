@@ -87,7 +87,6 @@ test.describe("Bulk Metadata", () => {
 
             // Upload the csv file
 
-
             await page.getByRole('button', { name: 'Choose File Button' }).click();
             const fileInput = page.locator('input[type="file"]');
             await fileInput.setInputFiles(filePath);

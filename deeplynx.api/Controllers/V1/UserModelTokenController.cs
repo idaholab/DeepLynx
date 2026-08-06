@@ -18,7 +18,7 @@ namespace deeplynx.api.Controllers.V1;
 ///     scoped to the currently authenticated user.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Route("model-tokens")]
 [Authorize]
 [Tags("User Model Token")]
