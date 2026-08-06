@@ -148,4 +148,23 @@ public class MaintenanceController : ControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Copy regular file records from mounted filesystem storage to Azure Blob Storage.
+    /// </summary>
+    /// <remarks>
+    /// Dry-run is enabled by default. Source files are retained and records are changed only
+    /// after the uploaded blob passes length and SHA-256 verification.
+    /// </remarks>
+    [HttpPost("files/migrate-to-azure", Name = "api_migrate_filesystem_records_to_azure")]
+    [MapToApiVersion(2)]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [SysAdmin]
+    public async Task<ActionResult<FileStorageMigrationResponseDto>> MigrateFilesystemRecordsToAzure(
+        [FromBody] FileStorageMigrationRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _maintenanceBusiness.MigrateFilesystemRecordsToAzure(request, cancellationToken);
+        return Ok(result);
+    }
 }
