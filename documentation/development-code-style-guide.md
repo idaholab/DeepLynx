@@ -29,8 +29,7 @@ The repository is organized as a .NET solution with separate projects for API, b
 | `deeplynx.models`     | Request DTOs, response DTOs, configuration models, and API-facing data shapes.                                                                            |
 | `deeplynx.datalayer`  | Entity Framework contexts, entity models, migrations, database version checks, and migration runner support.                                              |
 | `deeplynx.helpers`    | Shared middleware, auth helpers, validation helpers, cache helpers, clients, exceptions, SignalR hubs, and cross-cutting utilities.                       |
-| `deeplynx.tests`      | .NET integration/unit tests, especially business-layer tests backed by Testcontainers.                                                                    |
-| `deeplynx.apitest`    | Python API-level tests.                                                                                                                                   |
+| `deeplynx.tests`      | .NET integration/unit tests, for business layer, helpers, and controllers backed by Testcontainers.                                                       |
 | `documentation`       | Architecture notes, ADRs, and developer documentation.                                                                                                    |
 | `deeplynx.mcp`        | MCP server and tools. Keep this separate from normal API behavior unless the change explicitly touches MCP.                                               |
 

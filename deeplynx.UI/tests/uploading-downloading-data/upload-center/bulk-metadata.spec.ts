@@ -6,7 +6,7 @@ import * as os from 'os';
 import {
     parseRecordFromUrl, navigateToProjectDashboard, navigateToUploadCenter,
     deleteRecordIfExists, checkDataSourcesAndStorageDestinations, verifyInProject,
-    getOrgIdByName
+    getOrgIdByName, getProjectIdByName, createClass, deleteClassIfExists
 } from "../../helpers/upload-helpers";
 
 
@@ -25,6 +25,8 @@ test.describe("Bulk Metadata", () => {
         orgId = await getOrgIdByName(request, ORG_NAME);
         await navigateToProjectDashboard(page);
         await navigateToUploadCenter(page);
+        await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
+        await checkDataSourcesAndStorageDestinations(page);
     });
 
     test.describe("Upload bulk records", () => {
@@ -84,9 +86,6 @@ test.describe("Bulk Metadata", () => {
             ];
 
             // Upload the csv file
-            await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
-
-            await checkDataSourcesAndStorageDestinations(page);
 
             await page.getByRole('button', { name: 'Choose File Button' }).click();
             const fileInput = page.locator('input[type="file"]');
@@ -136,6 +135,840 @@ test.describe("Bulk Metadata", () => {
                 // Go back to the catalog to search for the next record
                 await page.goBack();
             }
+        });
+    });
+    test.describe("Bulk Metadata -> Default Settings -> Upload csv file with unexpected info", () => {
+        let filePath: string;
+        let name: string;
+        let description: string;
+        let original_id: string;
+        let properties: string;
+        let uri: string;
+        let object_storage_id: string;
+        let class_id: string;
+        let class_name: string;
+        let file_type: string;
+        let tags: string;
+        let sensitivity_labels: string;
+
+        const header = [
+            'name (required)',
+            'description (required)',
+            'original_id (required)',
+            'properties (required - JSON format)',
+            'uri (optional)',
+            'object_storage_id (optional)',
+            'class_id (optional)',
+            'class_name (optional)',
+            'file_type (optional)',
+            'tags (optional - comma-separated)',
+            'sensitivity_labels (optional - comma-separated)',
+        ].join('\t');
+
+        test.beforeEach(async ({ }, testInfo) => {
+            name = `Assembly 33-${testInfo.testId}`;
+            description = 'Assembly 33 Description';
+            original_id = `assy-033-${testInfo.testId}`;
+            properties = '{"description":"Assembly 33 Description","diversion flag":false,"height":160,"number of fuel pins":72,"number of heat pipes":19,"temperature":1000}';
+            uri = '';
+            object_storage_id = '';
+            class_id = '';
+            class_name = '';
+            file_type = '';
+            tags = '';
+            sensitivity_labels = '';
+        });
+        test.describe("Upload csv file with missing name", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-missing-name${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                name = '';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing name", async ({ page }) => {
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'CSV Parsing Errors' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with missing description", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-missing-description${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                description = '';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing description", async ({ page }) => {
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Errors Found' })).toBeVisible();
+
+                await expect(page.getByRole('heading', { name: 'Error Details:' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with missing original_id", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-missing-orig-id${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                original_id = '';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing original_id", async ({ page }) => {
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Errors Found' })).toBeVisible();
+
+                await expect(page.getByRole('heading', { name: 'Error Details:' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with missing properties", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-missing-props${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                properties = '';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing properties", async ({ page }) => {
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Errors Found' })).toBeVisible();
+
+                await expect(page.getByRole('heading', { name: 'Error Details:' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with missing optional fields", () => {
+
+            let createdRecord: { recordId: string; projectId: string } | null;
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-missing-optional-fields${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test.afterEach(async ({ request }) => {
+                await deleteRecordIfExists({ request }, createdRecord, orgId);
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with missing optional fields", async ({ page }) => {
+
+                test.setTimeout(180_000); // buffer time
+                const start = Date.now();
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).toBeVisible();
+
+                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                await page.getByRole('button', { name: 'Confirm Upload' }).click();
+
+                // Verify in Project Dashboard
+                await page.getByRole("link", { name: "Project Dashboard" }).click();
+                await page.waitForURL(/\/project/);
+                await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+
+                await verifyInProject(page, name);
+
+
+                const elapsedMs = Date.now() - start;
+                expect(elapsedMs).toBeLessThan(120_000);
+
+                // Visit the data catalog and resolve each created record's
+                // recordId/projectId so we can clean them up afterward.
+                const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+                const dataCatalogButton = sideBar.getByRole('link').nth(1);
+                await dataCatalogButton.click();
+
+                const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+
+                const recordLink = page.getByRole('link', { name, exact: true }).first();
+                await expect(async () => {
+                    if (await clearTermsButton.isVisible()) {
+                        await clearTermsButton.click();
+                    }
+                    await page.getByRole('textbox', { name: 'Search' }).click();
+                    await page.getByRole('textbox', { name: 'Search' }).fill(name);
+                    await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+                    await expect(recordLink).toBeVisible({ timeout: 3_000 });
+                }).toPass({ timeout: 30_000 });
+
+                await recordLink.click();
+                await page.waitForURL(/\/record\?/);
+                createdRecord = parseRecordFromUrl(page.url());
+            });
+        });
+
+        test.describe("Upload csv file with wrong properties format on one record", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-wrong-props${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+                properties = 'this is: not a json';
+                const row2 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1, row2].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with wrong format for properties on one record", async ({ page }) => {
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Errors Found' })).toBeVisible();
+
+                await expect(page.getByRole('heading', { name: 'Error Details:' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with wrong properties format on multiple record", () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-wrong-props${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                properties = 'this is not a json';
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+                properties = 'this is: not a json';
+                const row2 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                properties = '{still: not a json';
+                const row3 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1, row2, row3].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with wrong format for properties on multiple record", async ({ page }) => {
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Errors Found' })).toBeVisible();
+
+                await expect(page.getByRole('heading', { name: 'Error Details:' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe("Upload csv file with 1000 character x and fails", () => {
+
+            const attributeNames = ["name", "description"] as const;
+
+            attributeNames.forEach(attrName => {
+
+                test.describe(`Upload csv file with 1000 character ${attrName}`, () => {
+
+                    let paddedValue: string;
+
+                    test.beforeEach(async ({ }, testInfo) => {
+                        const bulkFileName = `bulk-upload-1000-char-${attrName}${testInfo.testId}.csv`;
+                        filePath = path.join(os.tmpdir(), bulkFileName);
+
+                        paddedValue = 'a'.repeat(1000);
+
+                        const row1 = [
+                            attrName === 'name' ? paddedValue : name,
+                            attrName === 'description' ? paddedValue : description,
+                            original_id,
+                            properties,
+                            uri,
+                            object_storage_id,
+                            class_id,
+                            class_name,
+                            file_type,
+                            tags,
+                            sensitivity_labels
+                        ].join('\t');
+
+                        const fileContent = [header, row1].join('\n');
+
+                        await fs.promises.writeFile(filePath, fileContent, 'utf8');
+                    });
+
+                    test.afterAll(async () => {
+                        if (fs.existsSync(filePath)) {
+                            fs.unlinkSync(filePath);
+                        }
+                    });
+
+                    test(`[AUTO] [Bulk Metadata>Default Settings] Upload csv file with 1000 character ${attrName}`, async ({ page }) => {
+
+                        await page.getByRole('button', { name: 'Choose File Button' }).click();
+                        const fileInput = page.locator('input[type="file"]');
+                        await fileInput.setInputFiles(filePath);
+
+                        await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+
+                        await expect(
+                            page.getByRole('button', { name: /Upload \d+ Records/ })
+                        ).toBeVisible();
+
+                        await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                        await page.getByRole('button', { name: 'Confirm Upload' }).click();
+
+                        await expect(page.getByRole('heading', { name: 'Upload Failed' })).toBeVisible();
+                    });
+                });
+            });
+        });
+
+        test.describe("Upload csv file with 1000 character x and succeeds", () => {
+
+            const attributeNames = ["class_id", "class_name", "original_id", "properties", "uri", "sensitivity_label", "tag", "file_type"] as const;
+
+            attributeNames.forEach(attrName => {
+
+                test.describe(`Upload csv file with 1000 character ${attrName}`, () => {
+
+                    let createdRecord: { recordId: string; projectId: string } | null;
+                    let paddedValue: string;
+
+                    test.beforeEach(async ({ }, testInfo) => {
+                        const bulkFileName = `bulk-upload-1000-char-${attrName}${testInfo.testId}.csv`;
+                        filePath = path.join(os.tmpdir(), bulkFileName);
+
+                        attrName === "properties"
+                            ? paddedValue = '{"' + 'a'.repeat(1000) + '":"' + 'b'.repeat(1000) + '"}'
+                            : attrName === "uri"
+                                ? paddedValue = 'https://example.com/' + 'a'.repeat(1000 - 'https://example.com/'.length)
+                                : paddedValue = 'a'.repeat(1000);
+
+                        const row1 = [
+                            name,
+                            description,
+                            attrName === "original_id" ? paddedValue : original_id,
+                            attrName === "properties" ? paddedValue : properties,
+                            attrName === "uri" ? paddedValue : uri,
+                            object_storage_id,
+                            attrName === 'class_id' ? paddedValue : class_id,
+                            attrName === 'class_name' ? paddedValue : class_name,
+                            attrName === 'file_type' ? paddedValue : file_type,
+                            attrName === "tag" ? paddedValue : tags,
+                            attrName === "sensitivity_label" ? paddedValue : sensitivity_labels
+                        ].join('\t');
+
+                        const fileContent = [header, row1].join('\n');
+
+                        await fs.promises.writeFile(filePath, fileContent, 'utf8');
+                    });
+
+                    test.afterAll(async () => {
+                        if (fs.existsSync(filePath)) {
+                            fs.unlinkSync(filePath);
+                        }
+                    });
+
+                    test.afterEach(async ({ request }) => {
+                        await deleteRecordIfExists({ request }, createdRecord, orgId);
+                    });
+
+                    test(`[AUTO] [Bulk Metadata>Default Settings] Upload csv file with 1000 character ${attrName}`, async ({ page }) => {
+
+                        test.setTimeout(180_000); // buffer time
+                        const start = Date.now();
+
+                        await page.getByRole('button', { name: 'Choose File Button' }).click();
+                        const fileInput = page.locator('input[type="file"]');
+                        await fileInput.setInputFiles(filePath);
+
+                        await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+
+                        await expect(
+                            page.getByRole('button', { name: /Upload \d+ Records/ })
+                        ).toBeVisible();
+
+                        await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                        await page.getByRole('button', { name: 'Confirm Upload' }).click();
+
+                        // Verify in Project Dashboard
+                        await page.getByRole("link", { name: "Project Dashboard" }).click();
+                        await page.waitForURL(/\/project/);
+                        await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+
+                        await verifyInProject(page, name);
+
+                        const elapsedMs = Date.now() - start;
+                        expect(elapsedMs).toBeLessThan(120_000);
+
+                        const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+                        const dataCatalogButton = sideBar.getByRole('link').nth(1);
+                        await dataCatalogButton.click();
+
+                        const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+
+                        const recordLink = page.getByRole('link', { name, exact: true }).first();
+                        await expect(async () => {
+                            if (await clearTermsButton.isVisible()) {
+                                await clearTermsButton.click();
+                            }
+                            await page.getByRole('textbox', { name: 'Search' }).click();
+                            await page.getByRole('textbox', { name: 'Search' }).fill(name);
+                            await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+                            await expect(recordLink).toBeVisible({ timeout: 3_000 });
+                        }).toPass({ timeout: 30_000 });
+
+                        await recordLink.click();
+                        await page.waitForURL(/\/record\?/);
+                        createdRecord = parseRecordFromUrl(page.url());
+                    });
+                });
+            });
+        });
+
+        test.describe("Upload csv file with class_id that doesn't match class_name", () => {
+
+            let projectId: string;
+            let classId: string;
+            let createdClassName: string;
+            let mismatchedClassName: string;
+            let createdRecord: { recordId: string; projectId: string } | null;
+
+            test.beforeEach(async ({ request }, testInfo) => {
+                projectId = await getProjectIdByName(request, orgId, "PW Project X");
+
+                createdClassName = `PW Mismatch Test Class ${testInfo.testId}`;
+                classId = await createClass(
+                    request,
+                    projectId,
+                    createdClassName
+                );
+
+                // Deliberately different from the class actually created above,
+                // so class_id and class_name point to two different classes.
+                mismatchedClassName = `Definitely Not The Real Class Name ${testInfo.testId}`;
+
+                const bulkFileName = `bulk-upload-class-id-name-mismatch${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    classId,             // real class_id
+                    mismatchedClassName, // class_name that does NOT correspond to classId
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterEach(async ({ request }) => {
+                await deleteRecordIfExists({ request }, createdRecord, orgId);
+                await deleteClassIfExists({ request }, projectId, classId);
+                await deleteClassIfExists({ request }, projectId, String(Number(classId) + 1));
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test("[AUTO] [Bulk Metadata>Default Settings] Upload csv file with class_id that doesn't match class_name", async ({ page }) => {
+                test.setTimeout(180_000); // buffer time
+                const start = Date.now();
+
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).toBeVisible();
+
+                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                await page.getByRole('button', { name: 'Confirm Upload' }).click();
+
+                // Verify in Project Dashboard
+                await page.getByRole("link", { name: "Project Dashboard" }).click();
+                await page.waitForURL(/\/project/);
+                await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+
+                await verifyInProject(page, name);
+
+                const elapsedMs = Date.now() - start;
+                expect(elapsedMs).toBeLessThan(120_000);
+
+                const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+                const dataCatalogButton = sideBar.getByRole('link').nth(1);
+                await dataCatalogButton.click();
+
+                const clearTermsButton = page.getByRole('button', { name: 'Clear search' });
+
+                const recordLink = page.getByRole('link', { name, exact: true }).first();
+                await expect(async () => {
+                    if (await clearTermsButton.isVisible()) {
+                        await clearTermsButton.click();
+                    }
+                    await page.getByRole('textbox', { name: 'Search' }).click();
+                    await page.getByRole('textbox', { name: 'Search' }).fill(name);
+                    await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+                    await expect(recordLink).toBeVisible({ timeout: 3_000 });
+                }).toPass({ timeout: 30_000 });
+
+                await recordLink.click();
+                await page.waitForURL(/\/record\?/);
+                createdRecord = parseRecordFromUrl(page.url());
+            });
+        });
+
+        test.describe(`Upload csv file with a random string in uri`, () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-random-string-uri${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                uri = 'alsdjflkajdfljkadf';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test(`[AUTO] [Bulk Metadata>Default Settings] Upload csv file with a random string in uri`, async ({ page }) => {
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Errors Found' })).toBeVisible();
+
+                await expect(page.getByRole('heading', { name: 'Error Details:' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).not.toBeVisible();
+            });
+        });
+
+        test.describe(`Upload csv file with object_storage_id that is not in the system`, () => {
+
+            test.beforeEach(async ({ }, testInfo) => {
+                const bulkFileName = `bulk-upload-random-string-uri${testInfo.testId}.csv`;
+                filePath = path.join(os.tmpdir(), bulkFileName);
+
+                object_storage_id = '1';
+
+                const row1 = [
+                    name,
+                    description,
+                    original_id,
+                    properties,
+                    uri,
+                    object_storage_id,
+                    class_id,
+                    class_name,
+                    file_type,
+                    tags,
+                    sensitivity_labels
+                ].join('\t');
+
+                const fileContent = [header, row1].join('\n');
+
+                await fs.promises.writeFile(filePath, fileContent, 'utf8');
+            });
+
+            test.afterAll(async () => {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            });
+
+            test(`[AUTO] [Bulk Metadata>Default Settings] Upload csv file with object_storage_id that is not in the system`, async ({ page }) => {
+                await page.getByRole('button', { name: 'Choose File Button' }).click();
+                const fileInput = page.locator('input[type="file"]');
+                await fileInput.setInputFiles(filePath);
+
+                await expect(page.getByRole('heading', { name: 'Validation Successful!' })).toBeVisible();
+
+                await expect(
+                    page.getByRole('button', { name: /Upload \d+ Records/ })
+                ).toBeVisible();
+
+                await page.getByRole('button', { name: /Upload \d+ Records/ }).click();
+                await page.getByRole('button', { name: 'Confirm Upload' }).click();
+
+                await expect(page.getByRole('heading', { name: 'Upload Failed' })).toBeVisible();
+            });
         });
     });
 });

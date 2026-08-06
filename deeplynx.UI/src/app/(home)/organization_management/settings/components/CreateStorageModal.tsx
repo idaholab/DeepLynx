@@ -122,7 +122,7 @@ const CreateStorageModal = ({
             <div className="alert alert-warning">
               <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
               <div>
-                <p className="font-semibold">{t.translations.AWS_S3} (t.translations.COMING_SOON)</p>
+                <p className="font-semibold">{t.translations.AWS_S3} ({t.translations.COMING_SOON})</p>
                 <p className="text-sm">
                   {t.translations.BACKEND_CONFIG_AWS}
                 </p>
