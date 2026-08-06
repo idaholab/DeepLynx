@@ -59,7 +59,7 @@ function getCachedAccountEntry(accountName: string) {
 
 let sysApiPromise: Promise<APIRequestContext> | undefined;
 
-// Mirrors global.setup.ts's own sysAdmin JWT — kept intentionally tiny and
+// Mirrors setup.ts's own sysAdmin JWT — kept intentionally tiny and
 // separate rather than shared, since this is the one bit of "provisioning-ish"
 // logic fixtures need (an authenticated request context), not account/org/
 // role creation.
