@@ -1,3 +1,5 @@
+// tests/unit/api-version.spec.ts
+
 import { expect, test } from "@playwright/test";
 import {
   appendNexusApiPath,
@@ -54,9 +56,7 @@ test("normalizes API bases without duplicating the api segment", () => {
     "http://localhost:5095/api/v1",
   ]) {
     expect(getNexusApiBaseUrl(baseUrl)).toBe("http://localhost:5095/api");
-    expect(withNexusApiVersion(baseUrl)).toBe(
-      "http://localhost:5095/api/v2",
-    );
+    expect(withNexusApiVersion(baseUrl)).toBe("http://localhost:5095/api/v2");
   }
 });
 
