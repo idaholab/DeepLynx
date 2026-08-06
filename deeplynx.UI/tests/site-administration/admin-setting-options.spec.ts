@@ -18,7 +18,6 @@ test.describe("SysAdmin settings visibility", () => {
 
   test("sees the sysAdmin settings link", async ({ page }) => {
     await expect(page.getByRole("link", { name: "Admin Settings" })).toBeVisible();
-    await page.pause();
   });
 
   test("sees the organization settings link", async ({ page }) => {

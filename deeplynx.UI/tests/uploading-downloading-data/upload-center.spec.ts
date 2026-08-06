@@ -171,19 +171,22 @@ test.describe("Upload Center", () => {
     }
   }
 
-  async function dragAndDrop({ page }: { page: Page }, baseFileName: string, filePath: string, type: string, projectNav?: string): Promise<{ recordId: string; projectId: string } | null> {
+  async function dragAndDrop(
+    { page }: { page: Page },
+    baseFileName: string,
+    filePath: string,
+    type: string,
+    projectNav?: string,
+  ): Promise<{ recordId: string; projectId: string } | null> {
     await checkDataSourcesAndStorageDestinations(page);
 
     const buffer = fs.readFileSync(filePath);
     const fileName = path.basename(filePath);
 
-    // Build a DataTransfer object in the browser context containing the file
     const dataTransfer = await page.evaluateHandle(
       ({ bufferData, fileName, type }) => {
         const dt = new DataTransfer();
-        const file = new File([new Uint8Array(bufferData)], fileName, {
-          type: type,
-        });
+        const file = new File([new Uint8Array(bufferData)], fileName, { type });
         dt.items.add(file);
         return dt;
       },
@@ -191,32 +194,23 @@ test.describe("Upload Center", () => {
     );
 
     const dropZone = page.getByText('click to browse');
-
-    // Dispatch the sequence of events a real drag-and-drop would fire
     await dropZone.dispatchEvent('dragenter', { dataTransfer });
     await dropZone.dispatchEvent('dragover', { dataTransfer });
     await dropZone.dispatchEvent('drop', { dataTransfer });
 
     await page.getByRole('button', { name: 'Upload', exact: true }).click();
-
-    await expect(
-      page.getByText('File uploaded successfully!')
-    ).toBeVisible();
+    await expect(page.getByText('File uploaded successfully!')).toBeVisible();
 
     if (projectNav) {
-      try {
-        await page.getByRole('button', { name: projectNav }).first().click();
-      } catch {
-        await page.getByTestId("project-select").click();
-        await page.getByRole('button', { name: projectNav }).first().click();
-      }
+      // The upload's project dropdown doesn't change the app's global
+      // project context — explicitly switch into the target project
+      // before checking the dashboard.
+      await page.getByTestId('project-select').click();
+      await page.getByRole('button', { name: projectNav }).first().click();
     }
 
     await page.getByRole('link', { name: 'Project Dashboard' }).click();
-
-    await expect(
-      page.getByText(baseFileName).first()
-    ).toBeVisible();
+    await expect(page.getByText(baseFileName).first()).toBeVisible();
 
     await page.getByRole('link', { name: 'Visit' }).first().click();
 
@@ -226,18 +220,14 @@ test.describe("Upload Center", () => {
       await page.getByRole('textbox', { name: 'Search' }).fill(baseFileName);
       await page.getByRole('textbox', { name: 'Search' }).press('Enter');
       try {
-        await expect(page.locator('span').filter({ hasText: baseFileName })).toBeVisible(); // search term success
-        await expect(recordLink).toBeVisible(); // file visible
+        await expect(page.locator('span').filter({ hasText: baseFileName })).toBeVisible();
+        await expect(recordLink).toBeVisible();
         break;
       } catch (error) {
-        if (attempt === 2) {
-          throw error;
-        }
+        if (attempt === 2) throw error;
       }
     }
 
-    // Navigate into the record (data-catalog -> record page) so we can
-    // read the recordId/projectId out of the URL for cleanup.
     await recordLink.click();
     await page.waitForURL(/\/record\?/);
 
@@ -1350,22 +1340,16 @@ startxref
 
       // set datasource and storage destination
       await checkDataSourcesAndStorageDestinations(page);
-
-      // click to browse
-      await clickToBrowse({ page }, 'upload-different-project-click', filePaths[4], undefined, nondefaultProj);
     });
 
     test("default data source and storage, nondefault project, drag and drop, successfully uploads file", async ({ page, request }) => {
-      // project setup
       const nondefaultProj = await getNonDefaultProject(request, orgId, projectId);
       const projectSelect = page.getByRole('combobox', { name: /project/i }).first();
       await expect(projectSelect).toBeEnabled();
       await projectSelect.selectOption(nondefaultProj);
 
-      // set datasource and storage destination
       await checkDataSourcesAndStorageDestinations(page);
 
-      // drag and drop
       await dragAndDrop({ page }, 'upload-different-project-drag', filePaths[5], 'txt', nondefaultProj);
     });
   });

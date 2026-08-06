@@ -340,8 +340,6 @@ async function upsertTestAccountCreds(sysApi: APIRequestContext, accountName: st
 }
 
 async function ensureAccount(account: TestAccount): Promise<void> {
-  console.log('DEBUG NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION:', JSON.stringify(process.env['NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION']));
-
   if (process.env['NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION'] == "true") {
     throw new Error(`Frontend & Backend Authentication must be enabled`);
   }

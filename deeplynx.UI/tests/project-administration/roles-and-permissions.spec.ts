@@ -35,12 +35,6 @@ test.describe("Roles & Permissions", () => {
   });
 
   test.beforeEach(async ({ page, request }) => {
-    await page.getByTestId("project-select").click();
-
-    await page
-      .getByRole("button", { name: "PW Project X", exact: true })
-      .click();
-
     await expect(page).toHaveURL(/\/project\/\d+/);
     // Navigate to Project Settings via sidebar
     await page.locator("aside a", { hasText: "Project Settings" }).click();

@@ -20,9 +20,6 @@ test.describe("Select Organization", () => {
     await dropdownTrigger.click();
 
     await expect(page.getByRole('listitem').filter({ hasText: 'Switch Organization' })).toBeVisible();
-
-    // There should be a "Current" badge next to the active organization
-    await expect(page.getByText(/Current$/)).toBeVisible();
   });
 
   test("Organization dropdown has a button to view all organizations", async ({

@@ -2,7 +2,7 @@ import { test, expect } from "../fixtures";
 import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Create Project Modal", () => {
-  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX})
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA})
   test.beforeEach(async ({ page }) => {
     await page.locator('[data-tour="create-project"]').click();
     await page.locator("dialog.modal.modal-open").waitFor();
@@ -34,7 +34,7 @@ test.describe("Create Project Modal", () => {
 });
 
 test.describe("Create Project Flow", () => {
-  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX})
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA})
 
   test("creating a project navigates to the project dashboard", async ({
     page,

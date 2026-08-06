@@ -2,7 +2,7 @@ import { test, expect } from "../fixtures";
 import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Landing Page", () => {
-  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX})
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA})
   
   test("displays welcome message for local developer", async ({ page }) => {
     await expect(

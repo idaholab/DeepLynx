@@ -9,12 +9,6 @@ test.describe("Project Dashboard", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.getByTestId("project-select").click();
-
-    await page
-      .getByRole("button", { name: "PW Project X", exact: true })
-      .click();
-
     await expect(page).toHaveURL(/\/project\/\d+/);
   });
 

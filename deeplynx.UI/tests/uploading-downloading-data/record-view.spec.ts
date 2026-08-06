@@ -1,7 +1,7 @@
 import { test, expect } from "../fixtures";
 import { sysAdmin, ORGS, PROJECTS } from '../deeplynx-config';
 
-test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX });
+test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA });
 
 test.describe("Add Record Modal", () => {
   test.beforeEach(async ({ page }) => {

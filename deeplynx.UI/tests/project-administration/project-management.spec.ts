@@ -8,12 +8,6 @@ test.describe("Project Management", () => {
     actingProject: PROJECTS.projectX,
   });
   test.beforeEach(async ({ page }) => {
-    await page.getByTestId("project-select").click();
-
-    await page
-      .getByRole("button", { name: "PW Project X", exact: true })
-      .click();
-
     await expect(page).toHaveURL(/\/project\/\d+/);
     // Navigate to Project Management via sidebar
     await page.locator("aside a", { hasText: "Project Settings" }).click();
