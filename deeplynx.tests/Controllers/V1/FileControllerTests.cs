@@ -278,7 +278,91 @@ public class FileControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // StartUpdateUpload Tests
+    // =========================================================================
+
+    #region StartUpdateUpload Tests
+
+    [Fact]
+    public async Task StartUpdateUpload_Returns200_WithUploadSession()
+    {
+        // Arrange
+        var request = new FileUploadInitRequestDto { FileName = "updated.zip", FileSize = 600_000_000 };
+        var expected = new FileUploadSessionResponseDto { UploadId = UploadId, ChunkSize = 5_000_000, TotalChunks = 120 };
+
+        _mockFileBusiness
+            .Setup(b => b.StartUpdateUpload(UserId, OrgId, ProjectId, RecordId, request))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _fileController.StartUpdateUpload(OrgId, ProjectId, RecordId, request);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task StartUpdateUpload_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        var request = new FileUploadInitRequestDto { FileName = "updated.zip", FileSize = 600_000_000 };
+
+        _mockFileBusiness
+            .Setup(b => b.StartUpdateUpload(
+                It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                It.IsAny<FileUploadInitRequestDto>()))
+            .ThrowsAsync(new Exception("start update error"));
+
+        // Act
+        var actionResult = await _fileController.StartUpdateUpload(OrgId, ProjectId, RecordId, request);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while starting update upload for file {request.FileName}", message);
+        Assert.Contains("start update error", message);
+    }
+
+    [Fact]
+    public async Task StartUpdateUpload_PassesArgumentsToBusinessLayer()
+    {
+        // Arrange
+        var request = new FileUploadInitRequestDto { FileName = "updated.zip", FileSize = 600_000_000 };
+        var expected = new FileUploadSessionResponseDto { UploadId = UploadId, ChunkSize = 5_000_000, TotalChunks = 120 };
+
+        _mockFileBusiness
+            .Setup(b => b.StartUpdateUpload(UserId, OrgId, ProjectId, RecordId, request))
+            .ReturnsAsync(expected);
+
+        // Act
+        await _fileController.StartUpdateUpload(OrgId, ProjectId, RecordId, request);
+
+        // Assert
+        _mockFileBusiness.Verify(
+            b => b.StartUpdateUpload(UserId, OrgId, ProjectId, RecordId, request),
+            Times.Once);
+    }
+
+    [Fact]
+    public void StartUpdateUpload_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(FileController.StartUpdateUpload),
+            "organizationId", "projectId", "recordId", "request");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+    // =========================================================================
     // CompleteUpdateUpload Tests
+
     // =========================================================================
 
     #region CompleteUpdateUpload Tests
@@ -367,10 +451,87 @@ public class FileControllerTests : IDisposable
     }
 
     #endregion
-    // =========================================================================
-    // UpdateFileContentHash Tests
 
     // =========================================================================
+    // CancelUpdateUpload Tests
+    // =========================================================================
+
+    #region CancelUpdateUpload Tests
+
+    [Fact]
+    public async Task CancelUpdateUpload_Returns200_WithMessage()
+    {
+        // Arrange
+        _mockFileBusiness
+            .Setup(b => b.CancelUpdateUpload(UserId, OrgId, ProjectId, RecordId, UploadId))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var actionResult = await _fileController.CancelUpdateUpload(OrgId, ProjectId, RecordId, UploadId);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(
+            $"Upload {UploadId} cancelled successfully",
+            GetMessageFromResultValue(result.Value));
+    }
+
+    [Fact]
+    public async Task CancelUpdateUpload_Returns500_OnUnexpectedException()
+    {
+        // Arrange
+        _mockFileBusiness
+            .Setup(b => b.CancelUpdateUpload(
+                It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<string>()))
+            .ThrowsAsync(new Exception("cancel update error"));
+
+        // Act
+        var actionResult = await _fileController.CancelUpdateUpload(OrgId, ProjectId, RecordId, UploadId);
+
+        // Assert
+        var result = Assert.IsType<ObjectResult>(actionResult);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, result.StatusCode);
+
+        var message = Assert.IsType<string>(result.Value);
+        Assert.Contains($"An error occurred while cancelling update upload {UploadId}", message);
+        Assert.Contains("cancel update error", message);
+    }
+
+    [Fact]
+    public async Task CancelUpdateUpload_PassesArgumentsToBusinessLayer()
+    {
+        // Arrange
+        _mockFileBusiness
+            .Setup(b => b.CancelUpdateUpload(UserId, OrgId, ProjectId, RecordId, UploadId))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _fileController.CancelUpdateUpload(OrgId, ProjectId, RecordId, UploadId);
+
+        // Assert
+        _mockFileBusiness.Verify(
+            b => b.CancelUpdateUpload(UserId, OrgId, ProjectId, RecordId, UploadId),
+            Times.Once);
+    }
+
+    [Fact]
+    public void CancelUpdateUpload_HasHttpDelete()
+    {
+        var method = GetControllerMethod(
+            nameof(FileController.CancelUpdateUpload),
+            "organizationId", "projectId", "recordId", "uploadId");
+
+        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
+    }
+
+    #endregion
+    // =========================================================================
+    // UpdateFileContentHash Tests
+    // =========================================================================
+
 
     #region UpdateFileContentHash Tests
 

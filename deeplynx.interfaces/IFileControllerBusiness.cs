@@ -87,6 +87,13 @@ public interface IFileControllerBusiness
         FileUploadInitRequestDto request,
         CreateRecordFileUploadRequestDto? metadata);
 
+    Task<FileUploadSessionResponseDto> StartUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadInitRequestDto request);
+
     // Upload chunk
     Task<string> UploadChunk(
         long organizationId,
@@ -120,6 +127,13 @@ public interface IFileControllerBusiness
         long? vlmConfigId,
         long? embeddingModelConfigId,
         string? userJwt);
+
+    Task CancelUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string uploadId);
 
     // Cancel upload
     Task CancelUpload(

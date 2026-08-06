@@ -429,6 +429,20 @@ public class FileBusiness : IFileControllerBusiness
         };
     }
 
+    public async Task<FileUploadSessionResponseDto> StartUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadInitRequestDto request)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        return await StartUpload(organizationId, projectId, record.DataSourceId, record.ObjectStorageId, request);
+    }
+
     /// <summary>
     ///     Upload File Chunk
     /// </summary>
@@ -633,6 +647,20 @@ public class FileBusiness : IFileControllerBusiness
         await InvalidateProjectStorageSizeCache(projectId);
 
         return updatedRecord;
+    }
+
+    public async Task CancelUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string uploadId)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        await CancelUpload(currentUserId, organizationId, projectId, record.DataSourceId, record.ObjectStorageId, uploadId);
     }
 
     /// <summary>
