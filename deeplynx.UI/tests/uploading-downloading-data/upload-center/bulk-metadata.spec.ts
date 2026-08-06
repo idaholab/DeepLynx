@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import {
-    parseRecordFromUrl, navigateToProjectDashboard, navigateToUploadCenter,
+    parseRecordFromUrl, navigateToUploadCenter,
     deleteRecordIfExists, checkDataSourcesAndStorageDestinations, verifyInProject,
     getOrgIdByName, getProjectIdByName, createClass, deleteClassIfExists
 } from "../../helpers/upload-helpers";
@@ -21,7 +21,6 @@ test.describe("Bulk Metadata", () => {
 
     test.beforeEach(async ({ page, request }) => {
         orgId = await getOrgIdByName(request, ORGS.orgA.name);
-        await navigateToProjectDashboard(page);
         await navigateToUploadCenter(page);
         await page.getByRole('radio', { name: 'Bulk Metadata' }).click();
         await checkDataSourcesAndStorageDestinations(page);

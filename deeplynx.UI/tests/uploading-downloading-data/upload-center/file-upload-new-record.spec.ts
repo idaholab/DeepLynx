@@ -6,7 +6,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as zlib from 'zlib';
 import {
-    extractProjectIdFromURL, getOrgIdByName, navigateToProjectDashboard, navigateToUploadCenter,
+    extractProjectIdFromURL, getOrgIdByName, navigateToUploadCenter,
     deleteRecordIfExists, checkDataSourcesAndStorageDestinations, clickToBrowse, FileTypeConfig, createFakeHdf5, createFakeTdms,
     createMinimalDocx, createMinimalXlsx, createZip, setUp, dragAndDrop, verifyInProject, parseRecordFromUrl, getNonDefaultProject,
     getNonDefault, checkDataSources, checkStorageDestinations, CreatedMetadata, toSafeFileName, getClass, buildMetadata
@@ -155,12 +155,10 @@ test.describe("File Upload -> New Record", () => {
 
     test.beforeAll(async ({ page, request }) => {
         orgId = await getOrgIdByName(request, ORGS.orgA.name);
-        await navigateToProjectDashboard(page);
         projectId = await extractProjectIdFromURL(page);
     });
 
     test.beforeEach(async ({ page }) => {
-        await navigateToProjectDashboard(page);
         await navigateToUploadCenter(page);
     })
 

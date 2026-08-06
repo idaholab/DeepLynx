@@ -1,6 +1,6 @@
 import { test, expect } from "../../fixtures";
 import { sysAdmin, ORGS, PROJECTS } from "../../deeplynx-config";
-import { navigateToProjectDashboard, navigateToUploadCenter } from "../../helpers/upload-helpers";
+import { navigateToUploadCenter } from "../../helpers/upload-helpers";
 
 test.describe("Check Upload Center UI Visibility", () => {
 
@@ -11,7 +11,6 @@ test.describe("Check Upload Center UI Visibility", () => {
     });
 
     test.beforeEach(async ({ page }) => {
-        await navigateToProjectDashboard(page);
         await navigateToUploadCenter(page);
     });
 

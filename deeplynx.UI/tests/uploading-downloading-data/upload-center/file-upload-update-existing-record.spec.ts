@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import {
-    extractProjectIdFromURL, getOrgIdByName, navigateToProjectDashboard, navigateToUploadCenter,
+    extractProjectIdFromURL, getOrgIdByName, navigateToUploadCenter,
     deleteRecordIfExists, checkDataSourcesAndStorageDestinations, clickToBrowse, FileTypeConfig,
     setUp, verifyInProject, parseRecordFromUrl
 } from "../../helpers/upload-helpers";
@@ -40,7 +40,6 @@ test.describe("File Upload -> Update Existing Record", () => {
 
     test.beforeEach(async ({ page, request }) => {
         orgId = await getOrgIdByName(request, ORGS.orgA.name);
-        await navigateToProjectDashboard(page);
         projectId = await extractProjectIdFromURL(page);
         await navigateToUploadCenter(page);
     });
