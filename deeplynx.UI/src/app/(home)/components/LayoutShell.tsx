@@ -445,7 +445,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                   <QuestionMarkCircleIcon className="size-10" />
                 </Link>
               </li>
-              <span className="text-xs font-bold text-base-200/50">v0.6.1</span>
+              <span className="text-xs font-bold text-base-200/50">v0.7.2</span>
             </ul>
           </aside>
         </div>
