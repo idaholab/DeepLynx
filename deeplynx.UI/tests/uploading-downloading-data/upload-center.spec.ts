@@ -1028,6 +1028,166 @@ startxref
     });
   });
 
+
+  test.describe("Update existing record with valid metadata", () => {
+    let originalFilePath: string;
+    let replacementFilePath: string;
+    let metadataFilePath: string;
+    let createdRecord: {
+      recordId: string;
+      projectId: string;
+    } | null = null;
+
+    const originalFileName = "update-record-original.txt";
+    const replacementFileName = "update-record-replacement.txt";
+
+    test.beforeEach(async () => {
+      originalFilePath = path.join(os.tmpdir(), originalFileName);
+      replacementFilePath = path.join(os.tmpdir(), replacementFileName);
+      metadataFilePath = path.join(
+        os.tmpdir(),
+        "update-record-metadata.json",
+      );
+
+      await fs.promises.writeFile(
+        originalFilePath,
+        "Original file contents",
+        "utf8",
+      );
+
+      await fs.promises.writeFile(
+        replacementFilePath,
+        "Updated file contents",
+        "utf8",
+      );
+
+      await fs.promises.writeFile(
+        metadataFilePath,
+        JSON.stringify(
+          {
+            Name: replacementFileName,
+            Description: "Updated record created by Playwright",
+            OriginalId: `playwright-update-${Date.now()}`,
+            ClassId: 1,
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+    });
+
+    test.afterEach(async ({ request }) => {
+      for (const filePath of [
+        originalFilePath,
+        replacementFilePath,
+        metadataFilePath,
+      ]) {
+        if (filePath && fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+
+      await deleteRecordIfExists({ request }, createdRecord, orgId);
+      createdRecord = null;
+    });
+
+    test("updates an existing record using valid metadata", async ({
+      page,
+    }) => {
+      // Create the record that will later be updated.
+      createdRecord = await clickToBrowse(
+        { page },
+        originalFileName,
+        originalFilePath,
+      );
+
+      expect(createdRecord).not.toBeNull();
+
+      // Return to Upload Center.
+      await page
+        .getByRole("link", { name: "Upload Center", exact: true })
+        .click();
+
+      await page.waitForURL(/\/upload_center/);
+
+      await expect(
+        page.getByRole("heading", { name: "File Upload" }),
+      ).toBeVisible();
+
+      await checkDataSourcesAndStorageDestinations(page);
+
+      const uploadInput = page.locator('input[type="file"][multiple]');
+
+      await uploadInput.setInputFiles(replacementFilePath);
+
+      await expect(
+        page.getByText(`File 1: ${replacementFileName}`),
+      ).toBeVisible({ timeout: 15_000 });
+
+      await expect(
+        page.getByRole("radio", {
+          name: "Update Existing Record",
+          exact: true,
+        }),
+      ).toBeVisible({ timeout: 15000 });
+
+      await page
+        .getByRole("radio", {
+          name: "Update Existing Record",
+          exact: true,
+        })
+        .click();
+
+      const existingRecordButton = page.getByRole("button", {
+        name: new RegExp(originalFileName, "i"),
+      });
+
+      await expect(existingRecordButton).toBeVisible({ timeout: 15_000 });
+      await existingRecordButton.click();
+
+      const metadataInput = page.locator(
+        'input[type="file"]:not([multiple])',
+      );
+
+      await metadataInput.setInputFiles(metadataFilePath);
+
+      await page.getByRole("button", { name: "Upload", exact: true }).click();
+      await expect(
+        page.getByText("Record file updated successfully."),
+      ).toBeVisible({ timeout: 15_000 });
+
+      await page
+        .getByRole("link", { name: "Project Dashboard", exact: true })
+        .click();
+
+      await expect(
+        page.getByText(replacementFileName).first(),
+      ).toBeVisible({ timeout: 15_000 });
+
+      await page.getByRole("link", { name: "Visit" }).first().click();
+
+      const searchBox = page.getByRole("textbox", { name: "Search" });
+
+      await searchBox.fill(replacementFileName);
+      await searchBox.press("Enter");
+
+      const updatedRecord = page
+        .getByRole("link", {
+          name: replacementFileName,
+          exact: true,
+        })
+        .first();
+
+      await expect(updatedRecord).toBeVisible({ timeout: 15_000 });
+      await updatedRecord.click();
+
+      await expect(
+        page.getByText("Last Updated At"),
+      ).toBeVisible({ timeout: 15_000 });
+    });
+  });
+
   test.describe('Empty file upload', () => {
     const emptyFileName = 'empty-test-file.txt';
     let filePath: string;
