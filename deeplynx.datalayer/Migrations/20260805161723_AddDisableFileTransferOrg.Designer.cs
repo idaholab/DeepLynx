@@ -12,7 +12,7 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260805220455_AddDisableFileTransferOrg")]
+    [Migration("20260805161723_AddDisableFileTransferOrg")]
     partial class AddDisableFileTransferOrg
     {
         /// <inheritdoc />
