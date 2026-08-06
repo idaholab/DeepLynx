@@ -1,10 +1,36 @@
-import { test } from "../../fixtures";
+import { test, expect } from "../../fixtures";
 import { sysAdmin } from "../../deeplynx-config";
-import { navigateToProjectDashboard, navigateToUploadCenter } from "../../helpers/upload-helpers";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import {
+    extractProjectIdFromURL, getOrgIdByName, navigateToProjectDashboard, navigateToUploadCenter,
+    deleteRecordIfExists, checkDataSourcesAndStorageDestinations, clickToBrowse, FileTypeConfig,
+    setUp, verifyInProject, parseRecordFromUrl
+} from "../../helpers/upload-helpers";
 
 
+let projectId: string;
 let orgId: string;
 const ORG_NAME = "PW Org A";
+
+const fileType: FileTypeConfig =
+{
+    label: 'JSON',
+    fileName: 'test-file.json',
+    mimeType: 'application/json',
+    content: JSON.stringify({
+
+        Name: "",
+        Description: "Describe this file",
+        OriginalId: "unique-original-id",
+        ClassId: "akdlfj",
+        Properties: {
+            exampleKey: "exampleValue"
+        }
+
+    }, null, 2),
+};
 
 test.describe("File Upload -> Update Existing Record", () => {
 
@@ -14,11 +40,111 @@ test.describe("File Upload -> Update Existing Record", () => {
         actingProject: "PW Project X",
     });
 
-    test.beforeEach(async ({ page }) => {
-        navigateToProjectDashboard(page);
-        navigateToUploadCenter(page);
+    test.beforeEach(async ({ page, request }) => {
+        orgId = await getOrgIdByName(request, ORG_NAME);
+        await navigateToProjectDashboard(page);
+        projectId = await extractProjectIdFromURL(page);
+        await navigateToUploadCenter(page);
     });
 
 
-    //Future Tests Dealing with Updating Existing Records
+    test.describe("Upload timeseries file then update said file's metadata", () => {
+        const fileName: string = `${Date.now()}-${Math.random().toString(36).slice(2)}-timeseries-test-file.csv`;
+        const fileNameMetadata: string = `${Date.now()}-${Math.random().toString(36).slice(2)}-timeseries-test-file-metadata.json`;
+        let filePath: string;
+        let filePathMetadata: string;
+        let createdRecord: { recordId: string; projectId: string } | null = null;
+        let createdRecordMetadata: { recordId: string; projectId: string } | null = null;
+
+        test.beforeEach(async () => {
+            // Create the file locally
+            filePath = path.join(os.tmpdir(), fileName);
+            const csvContent = 'Date, Candy Eaten\n20050101, 5\n20050102, 6\n20050103, 3\n20050104, 15\n20050105, 3\n20050106, 5\n20050107, 9\n20050108, 12\n20050109, 6\n20050110, 9\n20050111, 6\n20050112, 3\n20050113, 2';
+
+            if (!fs.existsSync(filePath)) {
+                await fs.promises.writeFile(filePath, csvContent, 'utf8');
+            }
+            createdRecord = null;
+            createdRecordMetadata = null;
+
+            filePathMetadata = await setUp(fileNameMetadata, fileType.content);
+        });
+
+        test.afterAll(async () => {
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+            if (fs.existsSync(filePathMetadata)) {
+                fs.unlinkSync(filePathMetadata);
+            }
+        });
+
+        test.afterEach(async ({ request }) => {
+            await deleteRecordIfExists({ request }, createdRecord, orgId);
+            await deleteRecordIfExists({ request }, createdRecordMetadata, orgId);
+            createdRecord = null;
+            createdRecordMetadata = null;
+        });
+
+        test("update with invalid metadata", async ({ page }) => {
+            test.setTimeout(120_000); // two minutes buffer time
+
+            createdRecord = await clickToBrowse({ page }, fileName, filePath);
+            await navigateToUploadCenter(page);
+
+            await expect(page.getByRole('button', { name: 'File Upload Drag and Drop' })).toBeVisible();
+            await checkDataSourcesAndStorageDestinations(page);
+
+            await page.getByRole('button', { name: 'File Upload Drag and Drop Area and Button' }).click();
+
+            const fileInput = page.locator('input[type="file"]');
+            await fileInput.setInputFiles(filePath);
+
+            await expect(page.getByRole('radio', { name: 'Update Existing Record' })).toBeVisible();
+            await page.getByRole('radio', { name: 'Update Existing Record' }).click();
+
+            await expect(page.getByRole('button', { name: fileName })).toBeVisible();
+            await page.getByRole('button', { name: fileName }).click();
+
+            await page.getByRole('button', { name: "Metadata File Optional" }).click();
+
+            const fileInputMetadata = page.getByRole('button', { name: 'Metadata File Optional' });
+            await fileInputMetadata.setInputFiles(filePathMetadata);
+
+            await page.getByRole('button', { name: 'Upload', exact: true }).click();
+
+            // Verify in Project Dashboard
+            await page.getByRole("link", { name: "Project Dashboard" }).click();
+            await page.waitForURL(/\/project/);
+            await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
+            await verifyInProject(page, fileName);
+
+            const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
+            const dataCatalogButton = sideBar.getByRole('link').nth(1);
+            await dataCatalogButton.click();
+
+            const recordLink = page.getByRole('link', { name: fileName, exact: true }).first();
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                await page.getByRole('textbox', { name: 'Search' }).click();
+                await page.getByRole('textbox', { name: 'Search' }).fill(fileName);
+                await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+                try {
+                    await expect(page.locator('span').filter({ hasText: fileName })).toBeVisible(); // search term success
+                    await expect(recordLink).toBeVisible(); // file visible
+                    break;
+                } catch (error) {
+                    if (attempt === 2) {
+                        throw error;
+                    }
+                }
+            }
+
+            // Navigate into the record (data-catalog -> record page) so we can
+            // read the recordId/projectId out of the URL for cleanup.
+            await recordLink.click();
+            await page.waitForURL(/\/record\?/);
+
+            createdRecordMetadata = parseRecordFromUrl(page.url());
+        });
+    });
 });

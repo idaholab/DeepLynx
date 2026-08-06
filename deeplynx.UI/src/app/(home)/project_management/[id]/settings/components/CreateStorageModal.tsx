@@ -154,7 +154,7 @@ const CreateStorageModal = ({
             >
               <option value="filesystem">{t.translations.FILESYSTEM}</option>
               <option value="aws_s3">
-                {t.translations.AWS_S3} (t.translations.COMING_SOON)
+                {t.translations.AWS_S3} ({t.translations.COMING_SOON})
               </option>
               <option value="azure_object">
                 {t.translations.AZURE_BLOB_STORAGE}
@@ -211,7 +211,7 @@ const CreateStorageModal = ({
                 <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
                 <div>
                   <p className="font-semibold">
-                    {t.translations.AWS_S3} (t.translations.COMING_SOON)
+                    {t.translations.AWS_S3} ({t.translations.COMING_SOON})
                   </p>
                   <p className="text-sm">
                     {t.translations.BACKEND_CONFIG_AWS}

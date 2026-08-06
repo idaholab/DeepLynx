@@ -16,6 +16,15 @@ type Organization = {
     name: string;
 };
 
+export interface CreatedMetadata {
+  Name?: string | null;
+  Description?: string | null;
+  OriginalId?: string | null;
+  ClassId?: number | null;
+  ClassName?: string | null;
+  Properties?: Record<string, string> | null;
+}
+
 // ---------------------------------------------------------------------
 // Single source of truth for every uploadable file type.
 // Add a new format by adding one entry here — no new test blocks needed.
@@ -167,6 +176,67 @@ export function parseRecordFromUrl(url: string): { recordId: string; projectId: 
     }
 }
 
+
+// Resolves a project name within an org to its numeric ID (as a string).
+export async function getProjectIdByName(
+    request: APIRequestContext, orgId: string, projectName: string
+): Promise<string> {
+    const BASE_URL = 'http://localhost:5095/api/v1';
+    const res = await request.fetch(`${BASE_URL}/organizations/${orgId}/projects`);
+    if (!res.ok()) throw new Error(`Failed to fetch projects: ${res.status()}`);
+    const projects: { id: number | string; name: string }[] = await res.json();
+    const match = projects.find((p) => p.name === projectName);
+    if (!match) {
+        throw new Error(`Could not find project named "${projectName}" in org ${orgId}`);
+    }
+    return String(match.id);
+}
+
+// Creates a project-level class via the API and returns its ID.
+export async function createClass(
+    request: APIRequestContext,
+    projectId: string,
+    name: string,
+    options?: { description?: string; properties?: Record<string, unknown> }
+): Promise<string> {
+    const BASE_URL = 'http://localhost:5095/api/v1';
+    const res = await request.post(
+        `${BASE_URL}/projects/${projectId}/classes`,
+        {
+            data: {
+                name,
+                description: options?.description ?? null,
+                properties: options?.properties ?? null,
+            },
+        }
+    );
+    if (!res.ok()) {
+        throw new Error(`Failed to create class "${name}": ${res.status()} ${await res.text()}`);
+    }
+    const created = await res.json();
+    return String(created.id);
+}
+
+// Cleanup counterpart, mirroring deleteRecordIfExists. Uses the
+// project-scoped delete endpoint to match creation.
+export async function deleteClassIfExists(
+    { request }: { request: APIRequestContext },
+    projectId: string,
+    classId: string | null,
+) {
+    if (!classId) return;
+    const url = `http://localhost:5095/api/v1/projects/${projectId}/classes/${classId}`;
+    try {
+        const response = await request.delete(url);
+        if (!response.ok()) {
+            console.warn(`Failed to delete class ${classId}: ${response.status()} ${await response.text()}`);
+        }
+    } catch (err) {
+        console.warn(`Error deleting class ${classId}:`, err);
+    }
+}
+
+
 export async function deleteRecordIfExists(
     { request }: { request: import('@playwright/test').APIRequestContext },
     record: { recordId: string; projectId: string } | null,
@@ -315,6 +385,10 @@ export async function clickToBrowse(
     filePath: string,
     uploadTimeoutMs?: number,
     projectNav?: string,
+    metadataPath?: string,
+    error?: { type: string; message: string; },
+    options?: CreatedMetadata,
+    usableClass?: { id: number; name: string; },
 ): Promise<{ recordId: string; projectId: string } | null> {
     await checkDataSourcesAndStorageDestinations(page);
 
@@ -322,6 +396,12 @@ export async function clickToBrowse(
 
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(filePath);
+
+    if (metadataPath) {
+      await selectMetadata(page, metadataPath, error, options);
+      if (error && error.type !== 'none')
+        return null;
+    }
 
     await page.getByRole('button', { name: 'Upload', exact: true }).click();
 
@@ -340,21 +420,45 @@ export async function clickToBrowse(
 
     // Verify in Project Dashboard
     await page.getByRole("link", { name: "Project Dashboard" }).click();
+    const resolvedName = options ? String(options.Name) : baseFileName;
     await page.waitForURL(/\/project/);
     await expect(page.getByRole('heading', { name: 'Project Overview' })).toBeVisible();
-    await verifyInProject(page, baseFileName);
+    await verifyInProject(page, resolvedName);
+
+    if (error && error.type === 'none' && error.message === 'class info missing') {
+      const recordInfo = page.getByText(`${resolvedName}Class: ${usableClass?.name}Last Edited:`);
+      await expect(recordInfo).toBeVisible();
+    } else if (error && error.type === 'none' && error.message === 'long id') {
+      await page.getByText(resolvedName).first().click();
+      const row = page.locator('.grid.grid-cols-12').filter({
+        has: page.locator('.col-span-4', { hasText: /^Original ID$/ })
+      });
+
+      await expect(row.locator('.col-span-7')).toHaveText(String(options?.OriginalId));
+      await page.getByRole('link', { name: 'Project Dashboard' }).click();
+    } else if (error && error.type === 'none' && error.message === 'long properties') {
+      await page.getByText(resolvedName).first().click();
+      const propertiesObj = options?.Properties ?? {};
+      const propertyKeys = Object.keys(propertiesObj);
+      const propertyKey = propertyKeys[0];
+      const propertyValue = propertiesObj[propertyKey];
+
+      await expect(page.getByText(propertyKey)).toBeVisible();
+      await expect(page.getByText(propertyValue)).toBeVisible();
+      await page.getByRole('link', { name: 'Project Dashboard' }).click();
+    }
 
     const sideBar = page.getByRole('list').filter({ hasText: /^$/ });
     const dataCatalogButton = sideBar.getByRole('link').nth(1);
     await dataCatalogButton.click();
 
-    const recordLink = page.getByRole('link', { name: baseFileName, exact: true }).first();
+    const recordLink = page.getByRole('link', { name: resolvedName, exact: true }).first();
     for (let attempt = 1; attempt <= 2; attempt++) {
         await page.getByRole('textbox', { name: 'Search' }).click();
-        await page.getByRole('textbox', { name: 'Search' }).fill(baseFileName);
+        await page.getByRole('textbox', { name: 'Search' }).fill(resolvedName);
         await page.getByRole('textbox', { name: 'Search' }).press('Enter');
         try {
-            await expect(page.locator('span').filter({ hasText: baseFileName })).toBeVisible(); // search term success
+            await expect(page.locator('span').filter({ hasText: resolvedName })).toBeVisible(); // search term success
             await expect(recordLink).toBeVisible(); // file visible
             break;
         } catch (error) {
@@ -621,3 +725,56 @@ export async function navigateToUploadCenter(page: Page) {
         });
     }
 }
+
+async function selectMetadata(page: Page, metadataPath: string, error?: { type: string; message: string; }, options?: CreatedMetadata) {
+    const metadataInput = page.getByRole('button', { name: 'Metadata File Optional' });
+    const previewBox = page.locator('.h-31');
+    await metadataInput.click();
+    await metadataInput.setInputFiles(metadataPath);
+
+    if (error && error.type === 'preview') {
+      await expect(page.getByText(error.message)).toBeVisible();
+      return;
+    } else if (error && error.type === 'exception') {
+      await expect(previewBox.getByText(String(options?.Name))).toBeVisible();
+      await page.getByRole('button', { name: 'Upload', exact: true }).click();
+      await expect(page.getByText(error.message)).toBeVisible();
+      return;
+    }
+    await expect(previewBox.getByText(`Name: ${options?.Name}`)).toBeVisible();
+  }
+
+export function toSafeFileName(name: string): string {
+    if (name.length <= 200) return name;
+    return `${name.slice(0, 200)}.json`;
+};
+
+export async function getClass(request: APIRequestContext, projectId: string) {
+    const fetchUrl = `http://localhost:5095/api/v1/projects/${projectId}/classes?hideArchived=true`;
+    const res = await request.fetch(fetchUrl);
+    if (!res.ok()) throw new Error(`Failed to fetch classes: ${res.status()}`);
+    const classes = await res.json();
+    return {
+        id: classes[0].id, 
+        name: classes[0].name
+    };
+  }
+
+export async function buildMetadata(options: Record<string, any> = {}): Promise<CreatedMetadata> {
+    const base: CreatedMetadata = {
+        Name: options.Name,
+        Description: options.Description,
+        OriginalId: options.OriginalId,
+        ClassId: options.ClassId,
+        ClassName: options.ClassName,
+        Properties: options.Properties
+    };
+
+    for (const key of Object.keys(base) as (keyof CreatedMetadata)[]) {
+        if (base[key] === undefined) {
+            delete base[key];
+        }
+    }
+
+    return base;
+  }
