@@ -625,6 +625,8 @@ public partial class DeeplynxContext : DbContext
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
 
+            entity.Property(e => e.FilesDeletable).HasDefaultValue(true);
+
             entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_object_storages_last_updated_by");
 
             // entity.ToTable( e => e.HasCheckConstraint(
@@ -1568,46 +1570,7 @@ public partial class DeeplynxContext : DbContext
 
         modelBuilder.Entity<EmbeddingLogs>(entity =>
         {
-            entity.ToTable("embeddings_logs", schema: "dl_vector");
-
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Id)
-                .HasColumnName("id")
-                .IsRequired();
-
-            entity.Property(e => e.RecordId)
-                .HasColumnName("record_id")
-                .IsRequired();
-
-            entity.Property(e => e.JobId)
-                .HasColumnName("job_id")
-                .IsRequired();
-
-            entity.Property(e => e.Stage)
-                .HasColumnName("stage")
-                .IsRequired();
-
-            entity.Property(e => e.Status)
-                .HasColumnName("status")
-                .HasConversion<string>()
-                .IsRequired();
-
-            entity.Property(e => e.Worker)
-                .HasColumnName("worker")
-                .IsRequired();
-
-            entity.Property(e => e.Progress)
-                .HasColumnName("progress")
-                .IsRequired();
-
-            entity.Property(e => e.Error)
-                .HasColumnName("error")
-                .IsRequired();
-
-            entity.Property(e => e.Timestamp)
-                .HasColumnName("timestamp")
-                .IsRequired();
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
         });
 
         modelBuilder.Entity<OntologyVector>(entity =>

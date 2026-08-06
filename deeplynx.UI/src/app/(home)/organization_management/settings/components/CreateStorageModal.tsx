@@ -17,6 +17,7 @@ interface StorageFormData {
   default: boolean;
   createContainerPerProject: boolean;
   existingContainer?: boolean;
+  filesDeletable: boolean;
 }
 
 interface CreateStorageModalProps {
@@ -121,7 +122,7 @@ const CreateStorageModal = ({
             <div className="alert alert-warning">
               <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
               <div>
-                <p className="font-semibold">{t.translations.AWS_S3} (t.translations.COMING_SOON)</p>
+                <p className="font-semibold">{t.translations.AWS_S3} ({t.translations.COMING_SOON})</p>
                 <p className="text-sm">
                   {t.translations.BACKEND_CONFIG_AWS}
                 </p>
@@ -209,6 +210,23 @@ const CreateStorageModal = ({
                 }
               />
               <span className="label-text">{t.translations.SET_AS_DEFAULT_STORAGE}</span>
+            </label>
+          </div>
+
+          <div className="form-control mb-4">
+            <label className="cursor-pointer label flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-primary"
+                checked={storageFormData.filesDeletable}
+                onChange={(e) =>
+                  setStorageFormData({
+                    ...storageFormData,
+                    filesDeletable: e.target.checked,
+                  })
+                }
+              />
+              <span className="label-text">{t.translations.STORAGE_FILES_DELETABLE}</span>
             </label>
           </div>
 

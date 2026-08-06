@@ -146,6 +146,7 @@ try
     builder.Services.AddControllers(options =>
         {
             options.Conventions.Add(new ApiVersionRoutePrefixConvention("api/v{version:apiVersion}"));
+            options.Filters.Add(new ApiVersionLifecycleHeadersFilter());
         })
         .AddJsonOptions(options =>
         {
@@ -191,13 +192,19 @@ try
     dataSourceBuilder.UseVector();
     var dataSource = dataSourceBuilder.Build();
 
-    builder.Services.AddDbContext<DeeplynxContext>(
-        options => options.UseNpgsql(dataSource),
+    builder.Services.AddDbContext<DeeplynxContext>(options =>
+         options.UseNpgsql(dataSource, npgsqlOptions =>
+        {
+            npgsqlOptions.CommandTimeout(60);
+        }),
         ServiceLifetime.Transient
     );
 
-    builder.Services.AddDbContext<LatticeContext>(
-        options => options.UseNpgsql(connectionString),
+    builder.Services.AddDbContext<LatticeContext>(options =>
+         options.UseNpgsql(connectionString, npgsqlOptions =>
+        {
+            npgsqlOptions.CommandTimeout(60);
+        }),
         ServiceLifetime.Transient
     );
 
@@ -350,7 +357,7 @@ try
 
     if (isRuntimeStartup)
     {
-        var customcss = File.ReadAllText("moon.css");
+        var customcss = File.ReadAllText(Path.Combine(app.Environment.ContentRootPath, "moon.css"));
         var hostedLink = Environment.GetEnvironmentVariable("HOSTED_LINK");
 
         // Conditional image hosting

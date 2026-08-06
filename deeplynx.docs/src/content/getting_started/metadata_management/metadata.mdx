@@ -9,11 +9,13 @@ If you are looking to upload many metadata records at once, Nexus can support th
 
 1. Paste raw JSON into the request body here:
 
-`{{your.nexus.url}}/api/v1/projects/{projectId}/datasources/{dataSourceId}/metadata/CreateMetadata`
+`{{your.nexus.url}}/api/v2/organizations/{organizationId}/projects/{projectId}/datasources/{dataSourceId}/metadata`
 
 2. Provide a JSON file here:
 
-`{{your.nexus.url}}/api/v1/projects/{projectId}/datasources/{dataSourceId}/metadata/CreateMetadataFromFile`
+`{{your.nexus.url}}/api/v2/organizations/{organizationId}/projects/{projectId}/datasources/{dataSourceId}/metadata/file`
+
+These examples use v2, the forward-development API. The frozen and deprecated v1 routes remain accessible by replacing `/api/v2` with `/api/v1`.
 
 **Note:** Bulk uploading metadata will be enabled in a future release.
 For **deployed instances**, replace `{your_nexus_url}` with the URL of your Nexus deployment (e.g., `https://deeplynx.inl.gov`).
@@ -165,8 +167,6 @@ the generation of JSON so you do not need to know their IDs in the Nexus databas
 the natural key references metadata in the same JSON object, then if it doesn't find one, it checks the database for 
 any records that have those natural keys. If a record with the natural key already exists in the database, Nexus will 
 update the existing record with the fields that were provided in the JSON.
-
-
 
 
 

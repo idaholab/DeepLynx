@@ -15,7 +15,7 @@ namespace deeplynx.api.Controllers.V1;
 ///     This controller provides endpoints to retrieve historical edge information and edge history.
 /// </remarks>
 [ApiController]
-[ApiVersion(1)]
+[ApiVersion(1, Deprecated = true)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/edges/historical")]
 [Authorize]
 [Tags("Historical Edge")]

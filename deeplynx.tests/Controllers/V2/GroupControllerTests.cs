@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Scalar.AspNetCore;
+using V1GroupController = deeplynx.api.Controllers.V1.GroupController;
 
 namespace deeplynx.tests.Controllers.V2;
 
@@ -218,7 +219,11 @@ public class GroupControllerTests : IDisposable
             .Setup(business => business.GetGroup(OrganizationId, GroupId, true))
             .ThrowsAsync(new InvalidOperationException("database failure"));
 
-        var result = (await _controller.GetGroup(OrganizationId, GroupId)).Result;
+        var v1Controller = new V1GroupController(
+            _mockGroupBusiness.Object,
+            Mock.Of<ILogger<V1GroupController>>());
+
+        var result = (await v1Controller.GetGroup(OrganizationId, GroupId)).Result;
 
         var error = Assert.IsType<ObjectResult>(result);
         Assert.Equal(500, error.StatusCode);

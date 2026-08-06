@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Scalar.AspNetCore;
+using V1OauthHandshakeController = deeplynx.api.Controllers.V1.OauthHandshakeController;
 
 namespace deeplynx.tests.Controllers.V2;
 
@@ -138,7 +139,11 @@ public class OauthHandshakeControllerTests : IDisposable
                 null))
             .ThrowsAsync(new InvalidOperationException("invalid grant"));
 
-        var result = await _controller.Exchange(
+        var v1Controller = new V1OauthHandshakeController(
+            _mockBusiness.Object,
+            Mock.Of<ILogger<V1OauthHandshakeController>>());
+
+        var result = await v1Controller.Exchange(
             Code,
             ClientId,
             ClientSecret,

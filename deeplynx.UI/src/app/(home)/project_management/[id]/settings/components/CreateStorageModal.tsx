@@ -16,6 +16,7 @@ interface StorageFormData {
   config: Record<string, any>;
   default: boolean;
   existingContainer?: boolean;
+  filesDeletable: boolean;
 }
 
 interface CreateStorageModalProps {
@@ -85,6 +86,27 @@ const CreateStorageModal = ({
     });
   };
 
+  const filesDeletableToggle = (
+    <div className="form-control mt-4">
+      <label className="cursor-pointer label">
+        <span className="label-text">
+          {t.translations.STORAGE_FILES_DELETABLE}
+        </span>
+        <input
+          type="checkbox"
+          className="checkbox checkbox-primary"
+          checked={storageFormData.filesDeletable}
+          onChange={(e) =>
+            setStorageFormData({
+              ...storageFormData,
+              filesDeletable: e.target.checked,
+            })
+          }
+        />
+      </label>
+    </div>
+  );
+
   return (
     <>
       <input
@@ -132,7 +154,7 @@ const CreateStorageModal = ({
             >
               <option value="filesystem">{t.translations.FILESYSTEM}</option>
               <option value="aws_s3">
-                {t.translations.AWS_S3} (t.translations.COMING_SOON)
+                {t.translations.AWS_S3} ({t.translations.COMING_SOON})
               </option>
               <option value="azure_object">
                 {t.translations.AZURE_BLOB_STORAGE}
@@ -179,6 +201,7 @@ const CreateStorageModal = ({
                 </label>
               </div>
 
+              {filesDeletableToggle}
             </div>
           )}
 
@@ -188,7 +211,7 @@ const CreateStorageModal = ({
                 <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
                 <div>
                   <p className="font-semibold">
-                    {t.translations.AWS_S3} (t.translations.COMING_SOON)
+                    {t.translations.AWS_S3} ({t.translations.COMING_SOON})
                   </p>
                   <p className="text-sm">
                     {t.translations.BACKEND_CONFIG_AWS}
@@ -214,6 +237,8 @@ const CreateStorageModal = ({
                   />
                 </label>
               </div>
+
+              {filesDeletableToggle}
             </div>
           )}
 
@@ -327,6 +352,8 @@ const CreateStorageModal = ({
                       />
                     </label>
                   </div>
+
+                  {filesDeletableToggle}
 
                   <button
                     className="btn btn-primary btn-sm shrink-0"
@@ -461,6 +488,8 @@ const CreateStorageModal = ({
                   />
                 </label>
               </div>
+
+              {filesDeletableToggle}
             </>
           )}
 
