@@ -1,5 +1,5 @@
 import { test, expect } from "../../fixtures";
-import { sysAdmin } from "../../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../../deeplynx-config";
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -9,20 +9,18 @@ import {
     getOrgIdByName, getProjectIdByName, createClass, deleteClassIfExists
 } from "../../helpers/upload-helpers";
 
-
-const ORG_NAME = "PW Org A";
 let orgId: string;
 
 test.describe("Bulk Metadata", () => {
 
     test.use({
         actingUser: sysAdmin,
-        actingOrg: ORG_NAME,
-        actingProject: "PW Project X",
+        actingOrg: ORGS.orgA,
+        actingProject: PROJECTS.projectX,
     });
 
     test.beforeEach(async ({ page, request }) => {
-        orgId = await getOrgIdByName(request, ORG_NAME);
+        orgId = await getOrgIdByName(request, ORGS.orgA.name);
         await navigateToProjectDashboard(page);
         await navigateToUploadCenter(page);
         await page.getByRole('radio', { name: 'Bulk Metadata' }).click();

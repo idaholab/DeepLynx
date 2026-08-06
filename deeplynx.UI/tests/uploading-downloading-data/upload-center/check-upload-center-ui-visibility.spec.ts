@@ -1,16 +1,13 @@
 import { test, expect } from "../../fixtures";
-import { sysAdmin } from "../../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../../deeplynx-config";
 import { navigateToProjectDashboard, navigateToUploadCenter } from "../../helpers/upload-helpers";
-
-
-const ORG_NAME = "PW Org A";
 
 test.describe("Check Upload Center UI Visibility", () => {
 
     test.use({
         actingUser: sysAdmin,
-        actingOrg: ORG_NAME,
-        actingProject: "PW Project X",
+        actingOrg: ORGS.orgA,
+        actingProject: PROJECTS.projectX,
     });
 
     test.beforeEach(async ({ page }) => {
