@@ -24,7 +24,7 @@ import {
   SensitivityLabelsDto,
   TagResponseDto,
 } from "../types/responseDTOs";
-import PropertyTable from "./components/PropertyTable";
+import PropertyTable, { uriPermission } from "./components/PropertyTable";
 import RecordLoading from "./loading";
 
 // Components
@@ -584,11 +584,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
 
-    const isDownloadable =
-      !organization?.disableFileTransfer &&
-      !!record.uri &&
-      record.uri.trim().length > 0 &&
-      record.uri.toLowerCase() !== "null";
+    const uriType = uriPermission(record.uri, !organization?.disableFileTransfer);
+    const isDownloadable = (uriType === "download");
+    const isRedirectable = (uriType === "redirect");
 
     return [
       { label: t.translations.RECORD_ID, value: record.id },
@@ -620,7 +618,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         copyAriaLabel: t.translations.COPY_RECORD_URI,
         idleIconClassName: "size-6 text-base-content/70",
         copiedIconClassName: "size-6 text-success",
-        isLink: organization?.disableFileTransfer,
+        isLink: isRedirectable,
       },
       {
         label: t.translations.ORIGINAL_ID,
@@ -1029,12 +1027,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
-  const isDownloadable =
-    !organization?.disableFileTransfer &&
-    !!record.uri &&
-    record.uri.trim().length > 0 &&
-    record.uri.toLowerCase() !== "null";
-
   const isInsightSupported = isInsightSupportedFileType(
     recordFileType,
     record?.uri,
@@ -1082,7 +1074,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             <PropertyTable
               title={t.translations.SYSTEM_PROPERTIES}
               rows={systemPropertiesRows}
-              download={isDownloadable}
+              uri={record.uri ?? ""}
               recordName={record.name}
             />
             <PropertyTable
