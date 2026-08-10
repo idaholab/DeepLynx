@@ -115,8 +115,9 @@ public class RecordBusinessTests : IntegrationTestBase
             _mockPermissionService.Object,
             _mockAdminService.Object);
 
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
         var realFileFilesystemBusiness =
-        new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+        new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
 
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("filesystem"))

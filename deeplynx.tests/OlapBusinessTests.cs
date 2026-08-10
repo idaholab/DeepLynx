@@ -163,8 +163,9 @@ public class OlapBusinessTests : IntegrationTestBase, IClassFixture<OlapAzuriteF
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
 
         // Wire up the real filesystem implementation via the factory mock
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
         var realFileFilesystemBusiness =
-            new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+            new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("filesystem"))
             .Returns(realFileFilesystemBusiness);

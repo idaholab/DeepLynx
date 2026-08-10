@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 namespace deeplynx.tests.Controllers.V2;
 
@@ -31,6 +32,7 @@ public class FileControllerTests : IDisposable
     private const long DataSourceId = 20L;
     private const long ObjectStorageId = 30L;
     private const long RecordId = 7L;
+    private const string DirectUrl = "https://storage.example.com";
     private const string UploadId = "upload-abc-123";
     private const string UserJwt = "test-jwt-token";
 
@@ -43,6 +45,18 @@ public class FileControllerTests : IDisposable
             _mockFileBusiness.Object,
             _mockLogger.Object
         );
+
+        var mockUrlHelper = new Mock<IUrlHelper>();
+        mockUrlHelper
+            .Setup(u => u.Action(It.IsAny<UrlActionContext>()))
+            .Returns(DirectUrl);
+
+        _fileController.Url = mockUrlHelper.Object;
+
+        _fileController.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
 
         UserContextStorage.UserId = UserId;
         UserContextStorage.Token = UserJwt;
@@ -431,7 +445,7 @@ public class FileControllerTests : IDisposable
         const string expectedUrl = "https://storage.example.com/signed-url";
 
         _mockFileBusiness
-            .Setup(b => b.GenerateDownloadURL(UserId, OrgId, ProjectId, RecordId))
+            .Setup(b => b.GenerateDownloadURL(UserId, OrgId, ProjectId, RecordId, DirectUrl))
             .ReturnsAsync(expectedUrl);
 
         // Act
@@ -446,7 +460,7 @@ public class FileControllerTests : IDisposable
     {
         // Arrange
         _mockFileBusiness
-            .Setup(b => b.GenerateDownloadURL(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>()))
+            .Setup(b => b.GenerateDownloadURL(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<string>()))
             .ThrowsAsync(new Exception("url error"));
 
         // Act & Assert
@@ -458,7 +472,7 @@ public class FileControllerTests : IDisposable
     {
         // Arrange
         _mockFileBusiness
-            .Setup(b => b.GenerateDownloadURL(UserId, OrgId, ProjectId, RecordId))
+            .Setup(b => b.GenerateDownloadURL(UserId, OrgId, ProjectId, RecordId, DirectUrl))
             .ReturnsAsync("https://storage.example.com/signed-url");
 
         // Act
@@ -466,7 +480,7 @@ public class FileControllerTests : IDisposable
 
         // Assert
         _mockFileBusiness.Verify(
-            b => b.GenerateDownloadURL(UserId, OrgId, ProjectId, RecordId),
+            b => b.GenerateDownloadURL(UserId, OrgId, ProjectId, RecordId, DirectUrl),
             Times.Once);
     }
 

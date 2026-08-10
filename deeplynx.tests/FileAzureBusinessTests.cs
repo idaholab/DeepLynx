@@ -149,7 +149,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
 
         // Initialize FileBusinessFactory mocks
-        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
         var realFileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
