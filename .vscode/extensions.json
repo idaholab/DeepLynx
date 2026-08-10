@@ -2,6 +2,7 @@
     "recommendations": [
         "ms-dotnettools.csdevkit",
         "hbenl.vscode-test-explorer",
-        "tekumara.typos-vscode"
+        "tekumara.typos-vscode",
+        "ms-playwright.playwright",
     ]
 }

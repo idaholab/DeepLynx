@@ -1,14 +1,9 @@
 import { test, expect } from "../fixtures";
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 test.describe("Create Project Modal", () => {
-  test.use({
-    actingUser: sysAdmin,
-    actingOrg: "PW Org A",
-  });
-
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA})
   test.beforeEach(async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.locator('[data-tour="create-project"]').click();
     await page.locator("dialog.modal.modal-open").waitFor();
   });
@@ -39,17 +34,11 @@ test.describe("Create Project Modal", () => {
 });
 
 test.describe("Create Project Flow", () => {
-  test.use({
-    actingUser: sysAdmin,
-    actingOrg: "PW Org A",
-  });
-
-  test.setTimeout(60_000);
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA})
 
   test("creating a project navigates to the project dashboard", async ({
     page,
   }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.locator('[data-tour="create-project"]').click();
 
     const modal = page.locator("dialog.modal.modal-open");

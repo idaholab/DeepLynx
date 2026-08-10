@@ -409,12 +409,8 @@ export async function dragAndDrop(
   await expect(page.getByText("File uploaded successfully!")).toBeVisible();
 
   if (projectNav) {
-    try {
-      await page.getByRole("button", { name: projectNav }).first().click();
-    } catch {
-      await page.getByTestId("project-select").click();
-      await page.getByRole("button", { name: projectNav }).first().click();
-    }
+    await page.getByTestId("project-select").click();
+    await page.getByRole("button", { name: projectNav }).first().click();
   }
 
   // Verify in Project Dashboard

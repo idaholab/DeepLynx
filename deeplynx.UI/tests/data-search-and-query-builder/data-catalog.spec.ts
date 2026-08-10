@@ -1,8 +1,8 @@
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 import { test, expect } from "../fixtures";
 
 test.use({ actingUser: sysAdmin});
-test.use({ actingOrg: "PW Org A"});
+test.use({ actingOrg: ORGS.orgA});
 
 test.describe("Data Catalog - All Records", () => {
   test.beforeEach(async ({ page }) => {

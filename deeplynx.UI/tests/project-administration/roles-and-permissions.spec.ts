@@ -1,5 +1,5 @@
 import { test, expect, APIRequestContext, Page } from "../fixtures";
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS} from "../deeplynx-config";
 import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
 import { testApiUrl } from "../api-url";
 
@@ -30,17 +30,11 @@ async function getOrgIdByName(
 test.describe("Roles & Permissions", () => {
   test.use({
     actingUser: sysAdmin,
-    actingOrg: "PW Org A",
-    actingProject: "PW Project X",
+    actingOrg: ORGS.orgA,
+    actingProject: PROJECTS.projectX,
   });
 
   test.beforeEach(async ({ page, request }) => {
-    await page.getByTestId("project-select").click();
-
-    await page
-      .getByRole("button", { name: "PW Project X", exact: true })
-      .click();
-
     await expect(page).toHaveURL(/\/project\/\d+/);
     // Navigate to Project Settings via sidebar
     await page.locator("aside a", { hasText: "Project Settings" }).click();
