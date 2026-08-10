@@ -555,7 +555,8 @@ public class FileAzureBusiness : IFileBusiness
     public async Task<string> GenerateDownloadUrl(
         RecordResponseDto record,
         ObjectStorageConfigDto objectStorageConfig,
-        int expirationHours = 1)
+        int expirationHours = 1,
+        string? directUrl = null)
     {
         if (record.Uri == null)
         {

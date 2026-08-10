@@ -307,15 +307,54 @@ public class FileBusiness : IFileControllerBusiness
     }
 
     /// <summary>
+    ///     Download a File
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="token">The token ensuring valid/safe extraction of the record information</param>
+    /// <returns>The file stream for download</returns>
+    public async Task<FileStreamResult> DownloadFileDirect(long organizationId, long projectId, long recordId, string token)
+    {
+        FileFilesystemBusiness fileBusiness = (FileFilesystemBusiness)_factory.CreateFileBusiness("filesystem");
+        // This check must come first for correct authentication
+        if (!fileBusiness.IsValidDownloadToken(token, recordId))
+            throw new ArgumentException("Invalid token for direct record file access.");
+
+        var record = await _context.Records
+            .Where(r => r.ProjectId == projectId
+                        && r.Id == recordId
+                        && r.OrganizationId == organizationId)
+            .FirstOrDefaultAsync();
+
+        if (record == null)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+
+        if (objectStorage.Type != "filesystem")
+            throw new ArgumentException("Record's object storage must be filesystem for direct downloads.");
+
+        var dto = new RecordResponseDto{
+            Uri = record.Uri,
+            Name = record.Name,
+        };
+        return await fileBusiness.DownloadFile(dto, objectStorage.Config);
+    }
+
+    /// <summary>
     ///     Generate Download URL
     /// </summary>
     /// <param name="currentUserId">The ID of the requesting user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="directUrl">The direct download URL expecting this token for the record file</param>
     /// <returns>The file stream for download</returns>
     public async Task<string> GenerateDownloadURL(long currentUserId, long organizationId, long projectId,
-        long recordId)
+        long recordId, string? directUrl = null)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
@@ -324,7 +363,7 @@ public class FileBusiness : IFileControllerBusiness
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
-        return await fileBusiness.GenerateDownloadUrl(record, objectStorage.Config);
+        return await fileBusiness.GenerateDownloadUrl(record, objectStorage.Config, directUrl: directUrl);
     }
 
     /// <summary>

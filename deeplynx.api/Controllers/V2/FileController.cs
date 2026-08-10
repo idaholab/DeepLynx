@@ -217,6 +217,32 @@ public class FileController : ControllerBase
 
 
     /// <summary>
+    ///     Download file with token auth
+    ///     Allows direct browsers downloads on the front-end with token authentication.
+    ///     To be used with the generate URL endpoint for filesystem object storage.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="token">The token ensuring valid/safe extraction of the record information</param>
+    /// <returns>The file stream for download</returns>
+    [HttpGet("{recordId:long}/direct", Name = "api_download_file_direct")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    // Auth satisfied by `GenerateDownloadUrl` route and checked with the token
+    [AllowAnonymous]
+    public async Task<IActionResult> DownloadFileDirect(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromQuery] string token)
+    {
+        var fileStreamResult = await _fileBusiness.DownloadFileDirect(organizationId, projectId, recordId, token);
+        return fileStreamResult;
+    }
+
+
+
+    /// <summary>
     ///     Generate Download URL
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -233,7 +259,13 @@ public class FileController : ControllerBase
         long recordId)
     {
         var currentUserId = UserContextStorage.UserId;
-        var fileStreamResult = await _fileBusiness.GenerateDownloadURL(currentUserId, organizationId, projectId, recordId);
+        var directUrl = Url.Action(
+            nameof(DownloadFileDirect),
+            null, // infer controller
+            values: new { organizationId, projectId, recordId },
+            protocol: Request.Scheme
+        );
+        var fileStreamResult = await _fileBusiness.GenerateDownloadURL(currentUserId, organizationId, projectId, recordId, directUrl);
         return fileStreamResult;
     }
 

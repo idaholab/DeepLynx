@@ -11,6 +11,8 @@ using Newtonsoft.Json;
 using System.IO.Pipelines;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
+using Microsoft.AspNetCore.DataProtection;
+using System.Security.Cryptography;
 
 namespace deeplynx.business;
 
@@ -20,17 +22,22 @@ public class FileFilesystemBusiness : IFileBusiness
     private readonly DeeplynxContext _context;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly IRecordBusiness _recordBusiness;
+    private readonly ITimeLimitedDataProtector _downloadProtector;
 
     public FileFilesystemBusiness(
         DeeplynxContext context,
         IObjectStorageBusiness objectStorageBusiness,
         IClassBusiness classBusiness,
-        IRecordBusiness recordBusiness)
+        IRecordBusiness recordBusiness,
+        IDataProtectionProvider dataProtectionProvider)
     {
         _context = context;
         _objectStorageBusiness = objectStorageBusiness;
         _classBusiness = classBusiness;
         _recordBusiness = recordBusiness;
+        _downloadProtector = dataProtectionProvider
+            .CreateProtector("DownloadTokens")
+            .ToTimeLimitedDataProtector();
     }
 
     public async Task<string?> CalculateFileContentHash(
@@ -345,9 +352,42 @@ public class FileFilesystemBusiness : IFileBusiness
 
 
     public async Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,
-        int expirationHours = 1)
+        int expirationHours = 1, string? directUrl = null)
     {
-        throw new NotImplementedException("Generate download urls is not implemented for filesystem");
+        if (string.IsNullOrWhiteSpace(record.Uri))
+            throw new ArgumentException("Record Uri is null.");
+        if (!File.Exists(record.Uri))
+            throw new FileNotFoundException("The requested file does not exist.", record.Uri);
+        if (string.IsNullOrEmpty(directUrl))
+            throw new ArgumentException("Direct download URL is null.");
+
+        var hours = new TimeSpan(hours: expirationHours, minutes: 0, seconds: 0);
+        var payload = $"{record.Id}";
+        var token = _downloadProtector.Protect(payload, hours);
+        return $"{directUrl}?token={token}";
+    }
+
+    /// <summary>
+    /// Validates a download token
+    /// </summary>
+    /// <param name="token"></param>
+    /// <param name="expectedRecordId"></param>
+    /// <returns>`true` if the download token is valid and `false` otherwise</returns>
+    public bool IsValidDownloadToken(string token, long expectedRecordId)
+    {
+        try
+        {
+            var payload = _downloadProtector.Unprotect(token);
+            return long.TryParse(payload, out var recordId) && recordId == expectedRecordId;
+        }
+        catch (CryptographicException)
+        {
+            return false; // tampered or wrong key
+        }
+        catch (Exception)
+        {
+            return false; // expired or malformed
+        }
     }
 
     /// <summary>

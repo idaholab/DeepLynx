@@ -53,6 +53,12 @@ public interface IFileControllerBusiness
         bool isOrgAdmin,
         bool isProjectAdmin);
 
+    Task<FileStreamResult> DownloadFileDirect(
+        long organizationId,
+        long projectId,
+        long recordId,
+        string token);
+
     // Download appended file
     Task<FileStreamResult> DownloadAppendedFile(
         long currentUserId,
@@ -69,7 +75,8 @@ public interface IFileControllerBusiness
         long currentUserId,
         long organizationId,
         long projectId,
-        long recordId);
+        long recordId,
+        string? directUrl = null);
 
     // Delete file
     Task<bool> DeleteFile(
