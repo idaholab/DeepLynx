@@ -12,6 +12,7 @@ interface StorageConfig {
 }
 
 interface StorageFormData {
+  id: number;
   name: string;
   config: StorageConfig;
   default: boolean;
@@ -129,7 +130,7 @@ const EditStorageModal = ({
               onClick={() => {
                 onToggle(false);
                 setEditingStorage(null);
-                setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, filesDeletable: true });
+                setStorageFormData({ id: -1, name: "", config: {}, default: false, createContainerPerProject: false, filesDeletable: true });
               }}
             >
               {t.translations.CANCEL}

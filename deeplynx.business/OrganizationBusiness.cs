@@ -126,8 +126,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             Banner = organization.Banner,
             Theme = organization.Theme,
             CreateContainerPerProject = organization.CreateContainerPerProject,
-            DisableFileTransfer = organization.DisableFileTransfer
-
+            DisableFileTransfer = organization.DisableFileTransfer,
+            ObjectStorageId = organization.ObjectStorageId
         };
     }
 
@@ -198,7 +198,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             RequireSensitivityLabel = organization.RequireSensitivityLabel,
             Theme = organization.Theme,
             CreateContainerPerProject = organization.CreateContainerPerProject,
-            DisableFileTransfer = organization.DisableFileTransfer
+            DisableFileTransfer = organization.DisableFileTransfer,
+            ObjectStorageId = organization.ObjectStorageId
         };
     }
 
@@ -252,6 +253,11 @@ public class OrganizationBusiness : IOrganizationBusiness
             organization.DisableFileTransfer = dto.DisableFileTransfer.Value;
         }
 
+        if (dto.ObjectStorageId != null)
+        {
+            organization.ObjectStorageId = dto.ObjectStorageId;
+        }
+
         organization.Name = dto.Name ?? organization.Name;
         organization.Description = dto.Description ?? organization.Description;
         organization.DefaultOrg = dto.DefaultOrg ?? organization.DefaultOrg;
@@ -292,7 +298,8 @@ public class OrganizationBusiness : IOrganizationBusiness
             RequireSensitivityLabel = organization.RequireSensitivityLabel,
             Theme = organization.Theme,
             CreateContainerPerProject = organization.CreateContainerPerProject,
-            DisableFileTransfer = organization.DisableFileTransfer
+            DisableFileTransfer = organization.DisableFileTransfer,
+            ObjectStorageId = organization.ObjectStorageId
         };
     }
 
