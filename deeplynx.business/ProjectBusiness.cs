@@ -160,7 +160,8 @@ public class ProjectBusiness : IProjectBusiness
             LastUpdatedAt = project.LastUpdatedAt,
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
-            RequireSensitivityLabel = dto.RequireSensitivityLabel
+            RequireSensitivityLabel = dto.RequireSensitivityLabel,
+            ObjectStorageId = project.ObjectStorageId
         };
 
         var organization = await _context.Organizations
@@ -591,27 +592,30 @@ public class ProjectBusiness : IProjectBusiness
     /// <exception cref="KeyNotFoundException">Returned if project not found or is archived</exception>
     public async Task<ProjectResponseDto> GetProject(long organizationId, long projectId, bool hideArchived = true)
     {
-        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
+        var project = await _context.Projects
+            .Where(o => o.Id == projectId)
+            .FirstOrDefaultAsync();
 
-        // If no projects are cached update the Cache
-        if (cachedProjectList == null || !cachedProjectList.Any())
+        if (project == null)
+            throw new KeyNotFoundException($"Project with id {projectId} does not exist");
+
+        if (hideArchived && project.IsArchived)
+            throw new KeyNotFoundException($"Project with id {projectId} is archived");
+
+        return new ProjectResponseDto
         {
-            await RefreshProjectsCache();
-            cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
-
-            if (cachedProjectList == null) cachedProjectList = new List<ProjectResponseDto>();
-        }
-
-        var cachedProject =
-            cachedProjectList.FirstOrDefault(p => p.Id == projectId && p.OrganizationId == organizationId);
-
-        if (hideArchived && cachedProject != null)
-            if (cachedProject.IsArchived)
-                cachedProject = null;
-
-        if (cachedProject == null) throw new KeyNotFoundException($"Project with id {projectId} not found");
-
-        return cachedProject;
+            Id = project.Id,
+            Name = project.Name,
+            Description = project.Description,
+            Abbreviation = project.Abbreviation,
+            LastUpdatedAt = project.LastUpdatedAt,
+            LastUpdatedBy = project.LastUpdatedBy,
+            IsArchived = project.IsArchived,
+            OrganizationId = project.OrganizationId,
+            Banner = project.Banner,
+            RequireSensitivityLabel = project.RequireSensitivityLabel,
+            ObjectStorageId = project.ObjectStorageId
+        };
     }
 
     /// <summary>
@@ -655,6 +659,9 @@ public class ProjectBusiness : IProjectBusiness
         if (dto.RequireSensitivityLabel != null)
             project.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
 
+        if (dto.ObjectStorageId != null)
+            project.ObjectStorageId = dto.ObjectStorageId;
+
         project.Name = dto.Name ?? project.Name;
         project.Description = dto.Description ?? project.Description;
         project.Abbreviation = dto.Abbreviation ?? project.Abbreviation;
@@ -689,6 +696,7 @@ public class ProjectBusiness : IProjectBusiness
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
             RequireSensitivityLabel = project.RequireSensitivityLabel,
+            ObjectStorageId = project.ObjectStorageId
         };
 
         // Update the Project Cache List
