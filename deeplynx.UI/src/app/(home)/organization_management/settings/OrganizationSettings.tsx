@@ -108,7 +108,7 @@ const OrganizationSettings = () => {
   const [isEditStorageModalOpen, setIsEditStorageModalOpen] = useState(false);
   const [editingStorage, setEditingStorage] =
     useState<ObjectStorageResponseDto | null>(null);
-  const [storageType, setStorageType] = useState<string>("filesystem");
+  const [storageType, setStorageType] = useState<string>("azure_blob");
   const [storageFormData, setStorageFormData] = useState<StorageFormData>({
     name: "",
     config: {},
@@ -433,7 +433,7 @@ const OrganizationSettings = () => {
 
   const resetStorageForm = () => {
     setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false, filesDeletable: true });
-    setStorageType("filesystem");
+    setStorageType("azure_blob");
     setFilesystemPath("");
     setAzureEndpoint("");
     setAzureBucketName("");

@@ -58,6 +58,8 @@ const CreateStorageModal = ({
 }: CreateStorageModalProps) => {
   const { t } = useLanguage();
 
+  const isLocalEnv = process.env.NEXT_PUBLIC_API_URL?.includes("localhost")
+
   const [isFilePathDisabled, setIsFilePathDisabled] = useState(false);
   const [isManualSectionOpen, setIsManualSectionOpen] = useState(false);
 
@@ -152,17 +154,19 @@ const CreateStorageModal = ({
               value={storageType}
               onChange={(e) => setStorageType(e.target.value)}
             >
-              <option value="filesystem">{t.translations.FILESYSTEM}</option>
-              <option value="aws_s3">
-                {t.translations.AWS_S3} ({t.translations.COMING_SOON})
-              </option>
               <option value="azure_object">
                 {t.translations.AZURE_BLOB_STORAGE}
+              </option>
+              {isLocalEnv && (
+                <option value="filesystem">{t.translations.FILESYSTEM}</option>
+              )}
+              <option value="aws_s3">
+                {t.translations.AWS_S3} ({t.translations.COMING_SOON})
               </option>
             </select>
           </div>
 
-          {storageType === "filesystem" && (
+          {storageType === "filesystem" && isLocalEnv && (
             <div className="form-control mb-4 w-full md:w-2/3">
               <label className="label">
                 <span className="label-text">
