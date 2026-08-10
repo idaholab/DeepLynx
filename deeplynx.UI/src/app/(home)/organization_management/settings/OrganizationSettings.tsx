@@ -328,10 +328,10 @@ const OrganizationSettings = () => {
         const storages = await getAllOrganizationObjectStorages(organization.organizationId as number, false);
 
         const orgDefaultStorage = storages.find(
-          (storage) => String(storage.id) === String(orgData.objectStorageId)
+          (storage) => String(storage.id) === String(orgData.defaultObjectStorageId)
         ) ?? null;
 
-        const defaultStorageId = orgData?.objectStorageId;
+        const defaultStorageId = orgData?.defaultObjectStorageId;
 
         if (defaultStorageId) {
           effectiveDefaultStorage = storages.find(
@@ -342,7 +342,7 @@ const OrganizationSettings = () => {
         }
 
         if (!effectiveDefaultStorage) {
-          console.warn("No default storage found based on objectStorageId.");
+          console.warn("No default storage found based on defaultObjectStorageId.");
         }
 
         setDefaultStorage(defaultStorage);
@@ -382,7 +382,7 @@ const OrganizationSettings = () => {
 
         const orgData = await getOrganization(organization.organizationId as number);
 
-        const defaultStorageId = orgData?.objectStorageId;
+        const defaultStorageId = orgData?.defaultObjectStorageId;
 
         if (defaultStorageId) {
           effectiveDefaultStorage = storages.find(
@@ -435,7 +435,7 @@ const OrganizationSettings = () => {
 
       await updateOrganization(
         organization.organizationId as number,
-        { objectStorageId: selectedStorageId }
+        { defaultObjectStorageId: selectedStorageId }
       );
 
       const updatedDefault = availableStorages.find((s) => s.id === selectedStorageId);
@@ -534,7 +534,7 @@ const OrganizationSettings = () => {
         await updateOrganization(
           organization.organizationId as number,
           {
-            objectStorageId: createdStorage.id as number,
+            defaultObjectStorageId: createdStorage.id as number,
           }
         );
       }
@@ -627,7 +627,7 @@ const OrganizationSettings = () => {
           organization.organizationId as number,
           {
             ...updateOrganizationDto,
-            objectStorageId: editingStorage.id as number,
+            defaultObjectStorageId: editingStorage.id as number,
           }
         );
       }

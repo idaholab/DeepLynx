@@ -42,8 +42,8 @@ public partial class Organization
     public bool CreateContainerPerProject { get; set; } = false;
     [Column("disable_file_transfer")]
     public bool DisableFileTransfer { get; set; } = false;
-    [Column("object_storage_id")]
-    public int? ObjectStorageId { get; set; } = null;
+    [Column("default_object_storage_id")]
+    public int? DefaultObjectStorageId { get; set; } = null;
 
     [InverseProperty("Organization")]
     public virtual ICollection<Group> Groups { get; set; } = new List<Group>();

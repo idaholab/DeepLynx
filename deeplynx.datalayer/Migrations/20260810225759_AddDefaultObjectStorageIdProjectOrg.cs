@@ -5,20 +5,20 @@
 namespace deeplynx.datalayer.Migrations
 {
     /// <inheritdoc />
-    public partial class AddObjectStorageIdProjectOrg : Migration
+    public partial class AddDefaultObjectStorageIdProjectOrg : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<int>(
-                name: "object_storage_id",
+                name: "default_object_storage_id",
                 schema: "deeplynx",
                 table: "projects",
                 type: "integer",
                 nullable: true);
 
             migrationBuilder.AddColumn<int>(
-                name: "object_storage_id",
+                name: "default_object_storage_id",
                 schema: "deeplynx",
                 table: "organizations",
                 type: "integer",
@@ -29,12 +29,12 @@ namespace deeplynx.datalayer.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "object_storage_id",
+                name: "default_object_storage_id",
                 schema: "deeplynx",
                 table: "projects");
 
             migrationBuilder.DropColumn(
-                name: "object_storage_id",
+                name: "default_object_storage_id",
                 schema: "deeplynx",
                 table: "organizations");
         }

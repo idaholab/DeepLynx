@@ -14,5 +14,5 @@ public class CreateProjectRequestDto
     public string? Banner { get; set; }
 
     public bool? RequireSensitivityLabel { get; set; }
-    public int? ObjectStorageId { get; set; }
+    public int? DefaultObjectStorageId { get; set; }
 }

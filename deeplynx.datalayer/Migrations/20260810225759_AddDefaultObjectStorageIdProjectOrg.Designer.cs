@@ -12,8 +12,8 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260810153523_AddObjectStorageIdProjectOrg")]
-    partial class AddObjectStorageIdProjectOrg
+    [Migration("20260810225759_AddDefaultObjectStorageIdProjectOrg")]
+    partial class AddDefaultObjectStorageIdProjectOrg
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1426,6 +1426,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("create_container_per_project");
 
+                    b.Property<int?>("DefaultObjectStorageId")
+                        .HasColumnType("integer")
+                        .HasColumnName("default_object_storage_id");
+
                     b.Property<bool>("DefaultOrg")
                         .HasColumnType("boolean")
                         .HasColumnName("default_org");
@@ -1458,10 +1462,6 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
-
-                    b.Property<int?>("ObjectStorageId")
-                        .HasColumnType("integer")
-                        .HasColumnName("object_storage_id");
 
                     b.Property<bool>("RequireSensitivityLabel")
                         .HasColumnType("boolean")
@@ -1651,6 +1651,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("banner");
 
+                    b.Property<int?>("DefaultObjectStorageId")
+                        .HasColumnType("integer")
+                        .HasColumnName("default_object_storage_id");
+
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
@@ -1680,10 +1684,6 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
-
-                    b.Property<int?>("ObjectStorageId")
-                        .HasColumnType("integer")
-                        .HasColumnName("object_storage_id");
 
                     b.Property<long>("OrganizationId")
                         .HasColumnType("bigint")

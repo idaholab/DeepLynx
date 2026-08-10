@@ -127,7 +127,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             Theme = organization.Theme,
             CreateContainerPerProject = organization.CreateContainerPerProject,
             DisableFileTransfer = organization.DisableFileTransfer,
-            ObjectStorageId = organization.ObjectStorageId
+            DefaultObjectStorageId = organization.DefaultObjectStorageId
         };
     }
 
@@ -199,7 +199,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             Theme = organization.Theme,
             CreateContainerPerProject = organization.CreateContainerPerProject,
             DisableFileTransfer = organization.DisableFileTransfer,
-            ObjectStorageId = organization.ObjectStorageId
+            DefaultObjectStorageId = organization.DefaultObjectStorageId
         };
     }
 
@@ -253,9 +253,9 @@ public class OrganizationBusiness : IOrganizationBusiness
             organization.DisableFileTransfer = dto.DisableFileTransfer.Value;
         }
 
-        if (dto.ObjectStorageId != null)
+        if (dto.DefaultObjectStorageId != null)
         {
-            organization.ObjectStorageId = dto.ObjectStorageId;
+            organization.DefaultObjectStorageId = dto.DefaultObjectStorageId;
         }
 
         organization.Name = dto.Name ?? organization.Name;
@@ -299,7 +299,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             Theme = organization.Theme,
             CreateContainerPerProject = organization.CreateContainerPerProject,
             DisableFileTransfer = organization.DisableFileTransfer,
-            ObjectStorageId = organization.ObjectStorageId
+            DefaultObjectStorageId = organization.DefaultObjectStorageId
         };
     }
 

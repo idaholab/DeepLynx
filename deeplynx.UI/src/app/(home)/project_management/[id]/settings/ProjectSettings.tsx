@@ -192,7 +192,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
           project.id as number,
         );
 
-        const defaultStorageId = projectData?.objectStorageId;
+        const defaultStorageId = projectData?.defaultObjectStorageId;
 
         if (defaultStorageId) {
           effectiveDefaultStorage = storages.find(
@@ -203,7 +203,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         }
 
         if (!effectiveDefaultStorage) {
-          console.warn("No default storage found based on objectStorageId.");
+          console.warn("No default storage found based on defaultObjectStorageId.");
         }
       } catch (error) {
         console.error("Failed to fetch project data or default storage:", error);
@@ -384,7 +384,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       await updateProject(
         organization.organizationId as number,
         project.id as number,
-        { organizationId: organization.organizationId as number, objectStorageId: selectedStorageId }
+        { organizationId: organization.organizationId as number, defaultObjectStorageId: selectedStorageId }
       );
 
       const updatedDefault = availableStorages.find(
@@ -481,7 +481,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       if (storageFormData.default) {
         const projectUpdateDto: UpdateProjectRequestDto = {
           organizationId: organization.organizationId as number,
-          objectStorageId: createdStorage.id as number,
+          defaultObjectStorageId: createdStorage.id as number,
         };
 
         await updateProject(
@@ -568,7 +568,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       if (shouldSetAsDefault) {
         const projectUpdateDto: UpdateProjectRequestDto = {
           organizationId: organization.organizationId as number,
-          objectStorageId: createdStorage.id as number,
+          defaultObjectStorageId: createdStorage.id as number,
         };
 
         await updateProject(
@@ -662,7 +662,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
       if (storageFormData.default) {
         const projectUpdateDto: UpdateProjectRequestDto = {
           organizationId: organization.organizationId as number,
-          objectStorageId: editingStorage.id as number,
+          defaultObjectStorageId: editingStorage.id as number,
         };
 
         await updateProject(

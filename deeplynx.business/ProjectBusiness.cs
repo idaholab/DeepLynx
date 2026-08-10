@@ -161,7 +161,7 @@ public class ProjectBusiness : IProjectBusiness
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
             RequireSensitivityLabel = dto.RequireSensitivityLabel,
-            ObjectStorageId = project.ObjectStorageId
+            DefaultObjectStorageId = project.DefaultObjectStorageId
         };
 
         var organization = await _context.Organizations
@@ -614,7 +614,7 @@ public class ProjectBusiness : IProjectBusiness
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
             RequireSensitivityLabel = project.RequireSensitivityLabel,
-            ObjectStorageId = project.ObjectStorageId
+            DefaultObjectStorageId = project.DefaultObjectStorageId
         };
     }
 
@@ -659,8 +659,8 @@ public class ProjectBusiness : IProjectBusiness
         if (dto.RequireSensitivityLabel != null)
             project.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
 
-        if (dto.ObjectStorageId != null)
-            project.ObjectStorageId = dto.ObjectStorageId;
+        if (dto.DefaultObjectStorageId != null)
+            project.DefaultObjectStorageId = dto.DefaultObjectStorageId;
 
         project.Name = dto.Name ?? project.Name;
         project.Description = dto.Description ?? project.Description;
@@ -696,7 +696,7 @@ public class ProjectBusiness : IProjectBusiness
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
             RequireSensitivityLabel = project.RequireSensitivityLabel,
-            ObjectStorageId = project.ObjectStorageId
+            DefaultObjectStorageId = project.DefaultObjectStorageId
         };
 
         // Update the Project Cache List
