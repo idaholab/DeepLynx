@@ -65,6 +65,7 @@ export type UpdateOrganizationRequestDto = {
   theme?: string | null;
   createContainerPerProject?: boolean | null;
   disableFileTransfer?: boolean;
+  objectStorageId?: number | null
 };
 
 export type CreateOauthApplicationRequestDto = {
@@ -92,7 +93,7 @@ export type CreateObjectStorageRequestDto = {
 
 export type UpdateObjectStorageRequestDto = {
   name: string;
-  default: boolean;
+  default?: boolean;
   existingContainer?: boolean;
   filesDeletable?: boolean;
 };
@@ -211,6 +212,7 @@ export type UpdateProjectRequestDto = {
   abbreviation?: string;
   banner?: string | null;
   filePath?: string | null;
+  objectStorageId?: number | null
 };
 
 export type RecordSearchRequestDto = {
