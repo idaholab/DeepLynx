@@ -151,7 +151,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         // Initialize FileBusinessFactory mocks
         var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
         var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
-        var realFileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        var realFileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper, protectProvider);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(realFileAzureBusiness);
@@ -187,7 +187,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             _mockAdminService.Object);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
-        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper, protectProvider);
 
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
 
@@ -201,7 +201,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             _olapBusiness,
             _objectStorageBusiness,
             NullLogger<FileBusiness>.Instance,
-            _eventBusiness
+            _eventBusiness,
+            protectProvider
         );
     }
 

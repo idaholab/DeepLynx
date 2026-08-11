@@ -124,8 +124,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
 
-        var realProtectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
-        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, realProtectProvider);
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
 
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
@@ -160,7 +160,6 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
 
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
 
-        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
         _fileBusiness = new FileFilesystemBusiness(Context, _mockObjectStorageBusiness.Object, _mockClassBusiness.Object,
             _mockRecordBusiness.Object, protectProvider);
 
@@ -176,7 +175,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             _olapBusiness,
             _objectStorageBusiness,
             NullLogger<FileBusiness>.Instance,
-            _eventBusiness
+            _eventBusiness,
+            protectProvider
         );
 
     }
@@ -549,124 +549,6 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             Assert.False(Directory.Exists(_testDirectory));
         }
     }
-
-    #region GenerateDownloadUrl Tests
-
-    [Fact]
-    public async Task GenerateDownloadUrl_Success_ReturnsValidSasUri()
-    {
-        // Arrange
-        var guid = Guid.NewGuid();
-        var fileName = "mock_valid_sas.txt";
-        var mockFile = CreateMockFile(fileName, "MOCK CONTENT");
-
-        // Upload file first
-        var uri = await _fileBusiness.UploadFile(
-            oid, pid, did, _objectStorageConfig, mockFile, guid);
-
-        var recordDto = new RecordResponseDto
-        {
-            Uri = uri,
-            Name = fileName,
-        };
-
-        // Act
-        var result = await _fileBusiness.GenerateDownloadUrl(
-            recordDto, _objectStorageConfig, expirationHours: 1, directUrl: "https://example.com");
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.StartsWith("https://example.com?token=", result);
-    }
-
-    [Fact]
-    public async Task GenerateDownloadUrl_Success_ValidatesToken()
-    {
-        // Arrange
-        var guid = Guid.NewGuid();
-        var fileName = "mock_sas_valid_token.txt";
-        var mockFile = CreateMockFile(fileName, "MOCK CONTENT");
-
-        // Upload file first
-        var uri = await _fileBusiness.UploadFile(
-            oid, pid, did, _objectStorageConfig, mockFile, guid);
-
-        var recordDto = new RecordResponseDto
-        {
-            Uri = uri,
-            Name = fileName,
-        };
-
-        // Act
-        var result = await _fileBusiness.GenerateDownloadUrl(
-            recordDto, _objectStorageConfig, expirationHours: 1, directUrl: "https://example.com");
-
-        var token = result.Split("https://example.com?token=")[1];
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(_fileBusiness.IsValidDownloadToken(token, recordDto.Id));
-    }
-
-    [Fact]
-    public async Task GenerateDownloadUrl_Failure_ValidatesTokenModified()
-    {
-        // Arrange
-        var guid = Guid.NewGuid();
-        var fileName = "mock_sas_modified_token.txt";
-        var mockFile = CreateMockFile(fileName, "MOCK CONTENT");
-
-        // Upload file first
-        var uri = await _fileBusiness.UploadFile(
-            oid, pid, did, _objectStorageConfig, mockFile, guid);
-
-        var recordDto = new RecordResponseDto
-        {
-            Uri = uri,
-            Name = fileName,
-        };
-
-        // Act
-        var result = await _fileBusiness.GenerateDownloadUrl(
-            recordDto, _objectStorageConfig, expirationHours: 1, directUrl: "https://example.com");
-
-        var token = result.Split("https://example.com?token=")[1];
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.False(_fileBusiness.IsValidDownloadToken(token + "modified", recordDto.Id));
-    }
-
-    [Fact]
-    public async Task GenerateDownloadUrl_Failure_ValidatesTokenRecordDifferent()
-    {
-        // Arrange
-        var guid = Guid.NewGuid();
-        var fileName = "mock_sas_invalid_record.txt";
-        var mockFile = CreateMockFile(fileName, "MOCK CONTENT");
-
-        // Upload file first
-        var uri = await _fileBusiness.UploadFile(
-            oid, pid, did, _objectStorageConfig, mockFile, guid);
-
-        var recordDto = new RecordResponseDto
-        {
-            Uri = uri,
-            Name = fileName,
-        };
-
-        // Act
-        var result = await _fileBusiness.GenerateDownloadUrl(
-            recordDto, _objectStorageConfig, expirationHours: 1, directUrl: "https://example.com");
-
-        var token = result.Split("https://example.com?token=")[1];
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.False(_fileBusiness.IsValidDownloadToken(token, recordDto.Id + 1));
-    }
-
-    #endregion
 
     #region GetStorageSize Tests
 
@@ -2300,24 +2182,6 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Id = l.Id,
                 Name = l.Name
             }).ToList() ?? new List<RecordLabelDto>()
-        };
-    }
-
-    private static FormFile CreateMockFile(string fileName, string content)
-    {
-        var bytes = Encoding.UTF8.GetBytes(content);
-        var stream = new MemoryStream(bytes)
-        {
-            Position = 0
-        };
-        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
-            ? "text/csv"
-            : "text/plain";
-
-        return new FormFile(stream, 0, bytes.Length, "file", fileName)
-        {
-            Headers = new HeaderDictionary(),
-            ContentType = contentType
         };
     }
 }

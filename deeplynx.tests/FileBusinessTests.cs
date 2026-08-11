@@ -17,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace deeplynx.tests;
 
@@ -52,6 +53,8 @@ public class FileBusinessTests : IntegrationTestBase
     private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
+    private ObjectStorageConfigDto _osConfig = null!;
+    private ITimeLimitedDataProtector _downloadProtector = null!;
 
     public long did; // datasource ID
     public long oid; // organization ID
@@ -122,7 +125,10 @@ public class FileBusinessTests : IntegrationTestBase
         _mockPermissionService.Object,
         _mockAdminService.Object);
 
-        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        var protectProvider = new EphemeralDataProtectionProvider();
+        _downloadProtector = protectProvider
+            .CreateProtector(RecordUrlHelper.DownloadProtector)
+            .ToTimeLimitedDataProtector();
         var realFileFilesystemBusiness =
             new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
 
@@ -140,7 +146,8 @@ public class FileBusinessTests : IntegrationTestBase
             _olapBusiness,
             _objectStorageBusiness,
             NullLogger<FileBusiness>.Instance,
-            _eventBusiness
+            _eventBusiness,
+            protectProvider
         );
     }
 
@@ -183,7 +190,7 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         did = dataSource.Id;
 
-        var osConfig = new ObjectStorageConfigDto
+        _osConfig = new ObjectStorageConfigDto
         {
             MountPath = _testDirectory
         };
@@ -194,7 +201,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = pid,
             OrganizationId = oid,
             Type = "filesystem",
-            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(osConfig),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(_osConfig),
             Default = true
         };
 
@@ -238,6 +245,25 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     #region Helpers
+
+
+    private static FormFile CreateMockFile(string fileName, string content)
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
+
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
+    }
 
     private IFormFile CreateFormFile(string content)
     {
@@ -291,6 +317,100 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         return record;
+    }
+
+    #endregion
+
+    #region GenerateDownloadUrl Tests
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_ReturnsValidSasUri()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.StartsWith("https://example.com?token=", result);
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_ValidatesToken()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        var token = result.Split("https://example.com?token=")[1];
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("filesystem", RecordUrlHelper.ValidateObjectStorageType(_downloadProtector, token, recordDto.Id));
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Failure_ValidatesTokenModified()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        var token = "MODIFIED" + result.Split("https://example.com?token=")[1];
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Null(RecordUrlHelper.ValidateObjectStorageType(_downloadProtector, token, recordDto.Id));
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Failure_ValidatesTokenRecordDifferent()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        var token = result.Split("https://example.com?token=")[1];
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Null(RecordUrlHelper.ValidateObjectStorageType(_downloadProtector, token, recordDto.Id + 1));
     }
 
     #endregion
