@@ -135,8 +135,7 @@ function UploadProgressToast(props: UploadProgressToastProps) {
   const remainingBytes = Math.max(totalBytes - bytesUploaded, 0);
   const speedLabel = formatSpeed(props.speedBytesPerSec);
 
-  // Falls back to props.message (e.g. "Preparing upload...") when byte
-  // totals aren't known yet — same fallback behavior as the old chunk version.
+  // Falls back to props.message (e.g. "Preparing upload...") when byte totals aren't known yet.
   const byteSummary = hasByteInfo
     ? `${formatBytes(bytesUploaded)} / ${formatBytes(totalBytes)}${speedLabel ? ` · ${speedLabel}` : ""}`
     : props.message;

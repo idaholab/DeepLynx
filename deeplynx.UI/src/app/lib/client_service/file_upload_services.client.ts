@@ -15,29 +15,17 @@ import { CreateRecordFileUploadRequestDto } from "@/app/(home)/types/requestDTOs
 // ============================================================================
 
 export const CHUNK_THRESHOLD = 500 * 1024 * 1024; // 500MB threshold to determine regular or chunked upload
+const MAX_CONCURRENT_CHUNKS = 4;            // Upload 4 chunks simultaneously
+const MAX_RETRIES = 3;                      // Retry failed chunks up to 3 times
 const DEFAULT_MAX_CONCURRENT_FILES = 5;
-
-// ---- Chunked upload config --------------------------------------------------
-// Concurrency is FIXED at 4 workers for the whole upload — this is not
-// adaptive. Only chunk size adapts, based on a throughput estimate shared
-// across all 4 workers. This is a deliberate simplification versus a fully
-// adaptive pool: if 4 concurrent chunks turns out to be systematically too
-// many for real-world connections (many chunks timing out/erroring around
-// the same time, not just occasional ones), that's a sign this fixed value
-// needs revisiting — but the tradeoff was chosen to avoid the added
-// complexity and untested tuning of also making pool size adaptive.
-const CHUNK_CONCURRENCY = 4;
-const MIN_CHUNK_SIZE = 256 * 1024;          // floor so retries can't shrink to near-zero progress
-const INITIAL_CHUNK_SIZE = 4 * 1024 * 1024; // deliberately smaller than the ceiling so sizing has room
-// to ramp up or down instead of starting pinned at max
-const TARGET_CHUNK_DURATION_S = 15;         // aim for each chunk to take roughly this long
-const CHUNK_TIMEOUT_MS = 60_000;            // per-chunk timeout; ~half the reference tool's ~120s proxy budget
-const TIMEOUT_MAX_SHRINKS = 6;              // safety cap on repeated timeout->shrink->retry cycles for one claim
-const MAX_RETRIES = 3;                      // non-timeout failure retries per chunk, same offset/size
-const SIZING_EMA_ALPHA = 0.3;               // smooths the PER-WORKER sample used to decide next chunk size
-const DISPLAY_EMA_ALPHA = 0.35;             // smooths the AGGREGATE sample used for the user-facing speed
-const PROGRESS_TICK_MS = 400;               // how often we sample aggregate bytes for display, independent
-// of when any individual chunk happens to finish
+const MIN_CHUNK_SIZE = 256 * 1024;          // Floor so retries can't shrink to near-zero progress
+const INITIAL_CHUNK_SIZE = 4 * 1024 * 1024; // Smaller than ceiling so chunks have room to ramp
+const TARGET_CHUNK_DURATION_S = 15;         // Aim for each chunk to take roughly this long
+const CHUNK_TIMEOUT_MS = 60_000;            // Per-chunk timeout
+const TIMEOUT_MAX_SHRINKS = 6;              // Safety cap on repeated timeout -> shrink -> retry cycles for one claim
+const SIZING_EMA_ALPHA = 0.3;               // Smooths the PER-WORKER sample used to decide next chunk size
+const DISPLAY_EMA_ALPHA = 0.35;             // Smooths the AGGREGATE sample used for the user-facing speed
+const PROGRESS_TICK_MS = 400;               // How often to sample aggregate bytes for display
 
 export type BatchUploadProgressEvent = {
   completed: number;
@@ -138,7 +126,7 @@ export function cancelCurrentUpload(): void {
 }
 
 // ============================================================================
-// REGULAR UPLOAD (< 500MB) — unchanged
+// REGULAR UPLOAD (< 500MB)
 // ============================================================================
 
 async function uploadFileRegular({
@@ -194,24 +182,10 @@ async function uploadFileRegular({
 // ============================================================================
 
 // Shared state claimed from by all 4 workers for a single file's upload.
-// Safe under JS's single-threaded execution: claimNext() never awaits
-// between reading and updating the cursor, so two workers can't claim
-// overlapping byte ranges.
-//
-// IMPORTANT: `sizingThroughputEMA` tracks ONE WORKER's rate at a time (it's
-// fed one sample per completed chunk, by whichever worker just finished).
-// Under concurrency this is roughly totalBandwidth / CHUNK_CONCURRENCY, NOT
-// the real aggregate transfer rate — that's correct and useful for sizing
-// decisions (each worker's next chunk should be sized to what THAT worker
-// can push in ~15s), but it must never be shown to the user as "upload
-// speed," or it reads as a small, oddly-static number that doesn't match
-// how fast the file is actually going up. Aggregate, user-facing speed is
-// computed separately by AggregateSpeedSampler below, from real wall-clock
-// byte deltas, independent of how chunk completions happen to cluster.
 class ChunkClaimState {
   cursor = 0;                 // next byte offset not yet claimed
   nextChunkNumber = 0;        // next chunk index not yet claimed
-  bytesCompleted = 0;         // sum of bytes from CONFIRMED (server-acked) chunks only
+  bytesCompleted = 0;         // sum of bytes from confirmed chunks only
   chunkSize: number;
   sizingThroughputEMA: number | null = null;
   failed: Error | DOMException | null = null;
@@ -239,19 +213,12 @@ class ChunkClaimState {
   }
 
   onChunkTimeout() {
-    // Shared shrink: affects whatever the NEXT claim (by any of the 4
-    // workers) will use. The worker that actually timed out also shrinks
-    // its own in-flight retry separately — see uploadClaimWithRetry.
+    // Shared shrink: affects whatever the next claim (by any of the 4 workers) will use.
     this.chunkSize = clampChunkSize(this.chunkSize / 2, this.maxChunkSize);
   }
 }
 
-// Samples cumulative confirmed bytes on a fixed wall-clock interval,
-// independent of when any individual chunk happens to complete. This is
-// what makes the displayed speed reflect the REAL aggregate rate across all
-// concurrent workers, and makes progress updates arrive smoothly and
-// regularly instead of in bursts whenever chunk completions happen to
-// cluster together.
+// Samples cumulative confirmed bytes on a fixed wall-clock interval.
 class AggregateSpeedSampler {
   private lastBytes = 0;
   private lastTime = performance.now();
@@ -307,13 +274,6 @@ async function uploadFileChunked({
 
     uploadId = session.uploadId;
 
-    // ASSUMPTION (needs backend confirmation): session.chunkSize is an
-    // INITIAL/MAXIMUM size, not a fixed contract, and chunkNumber only
-    // needs to be numerically correct for server-side reassembly — the
-    // backend does NOT need chunks to arrive in chunkNumber order. With 4
-    // concurrent workers, requests WILL complete out of order. If the
-    // backend assembles strictly by arrival order rather than by the
-    // chunkNumber field, this breaks and must fall back to sequential.
     const maxChunkSize = Math.max(MIN_CHUNK_SIZE, session.chunkSize);
     const initialChunkSize = Math.min(INITIAL_CHUNK_SIZE, maxChunkSize);
 
@@ -334,7 +294,7 @@ async function uploadFileChunked({
       objectStorageId,
       uploadId,
       fileName: file.name,
-      totalChunks: chunksSent, // actual count sent, may differ from session.totalChunks
+      totalChunks: chunksSent,
       metadataFile
     });
 
@@ -392,10 +352,6 @@ async function startChunkedUpload(
   return data;
 }
 
-// ---- Concurrent adaptive upload: fixed pool of CHUNK_CONCURRENCY workers,
-// all claiming from one shared cursor, all reporting into one shared
-// throughput estimate that sets chunk size for whoever claims next.
-
 async function uploadChunksConcurrentAdaptive(
   file: File,
   uploadId: string,
@@ -416,12 +372,9 @@ async function uploadChunksConcurrentAdaptive(
   const reportProgress = (speedBytesPerSec: number) => {
     const remainingBytes = state.totalBytes - state.bytesCompleted;
     const estimatedRemainingChunks = state.chunkSize > 0 ? Math.ceil(remainingBytes / state.chunkSize) : 0;
-    // totalChunks is an ESTIMATE that fluctuates as chunkSize adapts — do
-    // not treat it as a stable denominator. bytesUploaded/totalBytes is the
-    // stable measure.
     onProgress?.({
       percentComplete: Math.round((state.bytesCompleted / state.totalBytes) * 1000) / 10,
-      chunksCompleted: state.nextChunkNumber, // claimed, not necessarily all confirmed yet
+      chunksCompleted: state.nextChunkNumber,
       totalChunks: state.nextChunkNumber + estimatedRemainingChunks,
       currentBatch: state.nextChunkNumber,
       uploadId,
@@ -432,12 +385,6 @@ async function uploadChunksConcurrentAdaptive(
     });
   };
 
-  // Reports progress on a fixed wall-clock cadence, independent of when any
-  // individual worker's chunk happens to finish. This is what fixes both:
-  //   1. speed being a misleading single-worker rate (sampler measures real
-  //      aggregate bytes-over-time across all workers combined), and
-  //   2. progress appearing to "jump" in clusters (updates now arrive every
-  //      PROGRESS_TICK_MS regardless of how bunched chunk completions are).
   const tickInterval = setInterval(() => {
     const speed = speedSampler.sample(state.bytesCompleted);
     reportProgress(speed);
@@ -449,7 +396,7 @@ async function uploadChunksConcurrentAdaptive(
       if (state.failed) return;
 
       const claim = state.claimNext();
-      if (!claim) return; // nothing left to claim — this worker is done
+      if (!claim) return;
 
       const chunk = file.slice(claim.offset, claim.offset + claim.size);
       const success = await uploadClaimWithRetry(
@@ -458,15 +405,12 @@ async function uploadChunksConcurrentAdaptive(
         parentSignal
       );
 
-      if (!success) return; // state.failed is set; other workers will notice and stop too
-      // Deliberately NOT calling reportProgress() here — the interval tick
-      // above is the sole driver of UI updates now, so cadence stays smooth
-      // and consistent regardless of how chunk completions happen to bunch.
+      if (!success) return;
     }
   };
 
   try {
-    const workers = Array.from({ length: CHUNK_CONCURRENCY }, () => worker());
+    const workers = Array.from({ length: MAX_CONCURRENT_CHUNKS }, () => worker());
     await Promise.all(workers);
   } finally {
     clearInterval(tickInterval);
@@ -479,15 +423,12 @@ async function uploadChunksConcurrentAdaptive(
     throw state.failed;
   }
 
-  // Final tick so the UI lands on an exact 100%/accurate-final-bytes state
-  // rather than whatever the last interval tick happened to catch mid-flight.
   reportProgress(0);
 
   return state.nextChunkNumber;
 }
 
-// Uploads ONE claimed byte range with its own timeout/retry handling,
-// independent of what the other 3 workers are doing concurrently.
+// Uploads ONE claimed byte range with its own timeout/retry handling, independent of what the other 3 workers are doing concurrently.
 async function uploadClaimWithRetry(
   args: {
     organizationId: number | string;
@@ -553,9 +494,7 @@ async function uploadClaimWithRetry(
           return false;
         }
         const newSize = clampChunkSize(currentChunk.size / 2, args.maxChunkSize);
-        // Re-slice THIS worker's in-flight attempt too — not just the
-        // shared estimate — so the retry itself uses the smaller size
-        // rather than resending the same oversized chunk.
+        // Re-slice this worker's in-flight attempt too — not just the shared estimate — so the retry itself uses the smaller size.
         currentChunk = currentChunk.slice(0, newSize);
         console.warn(`Chunk ${args.chunkNumber} timed out after ${CHUNK_TIMEOUT_MS}ms; retrying at ${newSize} bytes.`);
         continue;
