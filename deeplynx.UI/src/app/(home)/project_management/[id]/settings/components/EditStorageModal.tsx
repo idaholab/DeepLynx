@@ -13,6 +13,7 @@ interface StorageConfig {
   AzureObjectConfig?: AzureObjectConfig;
 }
 interface StorageFormData {
+  id: number;
   name: string;
   config: StorageConfig;
   default: boolean;
@@ -146,7 +147,6 @@ const EditStorageModal = ({
                 type="checkbox"
                 className="checkbox checkbox-primary"
                 checked={storageFormData.default}
-                disabled={editingStorage?.projectId == null}
                 onChange={(e) =>
                   setStorageFormData({
                     ...storageFormData,
@@ -185,7 +185,7 @@ const EditStorageModal = ({
               onClick={() => {
                 onToggle(false);
                 setEditingStorage(null);
-                setStorageFormData({ name: "", config: {}, default: false, filesDeletable: true });
+                setStorageFormData({ id: -1, name: "", config: {}, default: false, filesDeletable: true });
                 setIsFilePathDisabled(false);
               }}
             >

@@ -327,6 +327,7 @@ export const translations = {
       DEFAULT_PROJECT_BADGE: "Default (Project)",
       DEFAULT_ORGANIZATION_BADGE: "Default (Organization)",
       DEFAULT_STORAGE: "Delete Storage",
+      DEFAULT_STORAGE_CANNOT_BE_DELETED_OR_ARCHIVED: "Switch to another object storage before deleting/archiving this one.",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
         "This will be the default storage for data sources in this project",
       DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY:
@@ -2487,6 +2488,7 @@ export const translations = {
       DEFAULT_PROJECT_BADGE: "Predeterminado (Proyecto)",
       DEFAULT_ORGANIZATION_BADGE: "Predeterminado (Organización)",
       DEFAULT_STORAGE: "Eliminar almacenamiento",
+      DEFAULT_STORAGE_CANNOT_BE_DELETED_OR_ARCHIVED: "Cambie a otro almacenamiento de objetos antes de eliminar/archivar este.",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
         "Este será el almacenamiento predeterminado para las fuentes de datos en este proyecto",
       DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY:

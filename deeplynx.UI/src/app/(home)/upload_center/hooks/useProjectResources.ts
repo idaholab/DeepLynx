@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getAllDataSources } from "@/app/lib/client_service/data_source_services.client";
 import { getAllProjectObjectStorages } from "@/app/lib/client_service/object_storage_services.client";
-import { getAllProjects } from "@/app/lib/client_service/projects_services.client";
+import { getAllProjects, getProject } from "@/app/lib/client_service/projects_services.client";
 import {
   DataSourceResponseDto,
   ObjectStorageResponseDto,
@@ -92,20 +92,25 @@ export function useProjectResources(organizationId?: number) {
           );
           setObjectstorage(objectStorage);
 
-          let defaultStorage = objectStorage.find(
-            (os) => os.default === true && os.projectId === Number(projectId),
-          );
+          const projectData = await getProject(organizationId, Number(projectId));
+          const defaultStorageId = projectData?.defaultObjectStorageId;
+
+          let defaultStorage = null;
+
+          if (defaultStorageId) {
+            defaultStorage = objectStorage.find(
+              (os) => String(os.id) === String(defaultStorageId)
+            );
+          }
 
           if (!defaultStorage) {
-            defaultStorage = objectStorage.find(
-              (os) => os.default === true && os.projectId == null && os.organizationId === organizationId,
-            );
+            if (objectStorage.length === 1) {
+              defaultStorage = objectStorage[0];
+            }
           }
 
           if (defaultStorage) {
             setObjectstorageId(String(defaultStorage.id));
-          } else if (objectStorage.length === 1) {
-            setObjectstorageId(String(objectStorage[0].id));
           }
         } catch (error) {
           console.error("Error fetching object storage:", error);

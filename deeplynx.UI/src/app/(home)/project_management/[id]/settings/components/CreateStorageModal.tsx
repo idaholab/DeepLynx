@@ -12,6 +12,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 
 interface StorageFormData {
+  id: number;
   name: string;
   config: Record<string, any>;
   default: boolean;
