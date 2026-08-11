@@ -45,7 +45,7 @@ public class ClassBusiness : IClassBusiness
         _projectRolePermissionService = projectRolePermissionService;
         _adminService = adminService;
     }
-
+    
     /// <summary>
     ///     Retrieves all classes
     /// </summary>
@@ -142,6 +142,122 @@ public class ClassBusiness : IClassBusiness
                 IsArchived = c.IsArchived
             })
             .ToListAsync();
+    }
+
+    /// <summary>
+    ///     Retrieves all classes
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the classes belong</param>
+    /// <param name="currentUserId">The ID of the user</param>
+    /// <param name="projectIds">(optional) The ID(s) of the project(s) to filter classes by</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived classes from the result</param>
+    /// <param name="isSysAdmin">Flag indicating whether you are a system admin</param>
+    /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin</param>
+    /// <returns>A paginated list of classes</returns>
+    public async Task<PaginatedResponse<ClassResponseDto>> GetAllClassesPaginated(
+        long currentUserId,
+        long organizationId,
+        long[]? projectIds,
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false)
+    {
+        var userProjectAdminStatus = new Dictionary<long, bool>();
+
+        if (projectIds?.Length > 0)
+        {
+            var adminProjectIds = await _context.ProjectMembers
+                .Where(pm =>
+                    pm.IsProjectAdmin &&
+                    projectIds.Contains(pm.ProjectId) &&
+                    (
+                        (pm.UserId != null && pm.UserId == currentUserId) ||
+                        pm.Group!.Users.Any(u => u.Id == currentUserId)
+                    ))
+                .Select(pm => pm.ProjectId)
+                .Distinct()
+                .ToHashSetAsync();
+
+            foreach (var projectId in projectIds)
+            {
+                userProjectAdminStatus[projectId] = adminProjectIds.Contains(projectId);
+            }
+        }
+
+        var authorizedProjectIds = new List<long>();
+        foreach (var projectId in projectIds ?? [])
+        {
+            if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId, false))
+            {
+                authorizedProjectIds.Add(projectId);
+                continue;
+            }
+
+            var hasPermission = await _projectRolePermissionService.PermissionInProject(
+                currentUserId, projectId, "read", "class");
+
+            if (hasPermission)
+                authorizedProjectIds.Add(projectId);
+        }
+
+        if (projectIds != null && authorizedProjectIds.Count == 0)
+        {
+            return new PaginatedResponse<ClassResponseDto>
+            {
+                Items = [],
+                PageNumber = paginatedRequestDto.PageNumber,
+                PageSize = paginatedRequestDto.PageSize,
+                TotalCount = 0
+            };
+        }
+
+        var query = _context.Classes
+            .Where(c => c.OrganizationId == organizationId)
+            .AsQueryable();
+
+        if (projectIds != null && projectIds.Length > 0)
+        {
+            query = query.Where(c =>
+                (c.ProjectId.HasValue && authorizedProjectIds.Contains(c.ProjectId.Value)) ||
+                !c.ProjectId.HasValue);
+        }
+        else
+        {
+            query = query.Where(c => c.ProjectId == null);
+        }
+
+        if (hideArchived)
+            query = query.Where(c => !c.IsArchived);
+
+        var totalCount = await query.CountAsync();
+
+        var classes = await query
+            .OrderBy(c => c.Id)
+            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
+            .Take(paginatedRequestDto.PageSize)
+            .Select(c => new ClassResponseDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Description = c.Description,
+                Properties = c.Properties,
+                Uuid = c.Uuid,
+                ProjectId = c.ProjectId,
+                OrganizationId = c.OrganizationId,
+                LastUpdatedAt = c.LastUpdatedAt,
+                LastUpdatedBy = c.LastUpdatedBy,
+                IsArchived = c.IsArchived
+            })
+            .ToListAsync();
+
+        return new PaginatedResponse<ClassResponseDto>
+        {
+            Items = classes,
+            PageNumber = paginatedRequestDto.PageNumber,
+            PageSize = paginatedRequestDto.PageSize,
+            TotalCount = totalCount
+        };
     }
 
     /// <summary>

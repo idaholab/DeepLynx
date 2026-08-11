@@ -18,6 +18,7 @@ namespace deeplynx.api.Controllers.V2;
 /// </remarks>
 [ApiController]
 [ApiVersion(2)]
+[ApiVersion(3)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/records")]
 [Authorize]
 public class RecordController : ControllerBase

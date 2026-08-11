@@ -5,6 +5,7 @@ namespace deeplynx.interfaces;
 public interface IClassBusiness
 {
     Task<List<ClassResponseDto>> GetAllClasses(long currentUserId, long organizationId, long[]? projectIds, bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false);
+    Task<PaginatedResponse<ClassResponseDto>> GetAllClassesPaginated(long currentUserId, long organizationId, long[]? projectIds, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false);
     Task<ClassResponseDto> GetClass(long organizationId, long? projectId, long classId, bool hideArchived);
 
     Task<ClassResponseDto> CreateClass(
