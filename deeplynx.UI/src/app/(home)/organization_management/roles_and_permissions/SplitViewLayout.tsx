@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import {
   CheckIcon,
   PencilIcon,
@@ -63,6 +64,13 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   const [activePermissionTab, setActivePermissionTab] = useState<string>(
     t.translations.RESOURCE_PERMISSIONS,
   );
+  const handleTabChange = (tab: string) => {
+    if (isEditingPermissions) {
+      toast.error("Please save or cancel your changes before switching tabs");
+      return;
+    }
+    setActivePermissionTab(tab);
+  };
 
   const splitPermissionCategories = useMemo(() => {
     const withoutLabelId: PermissionCategory[] = [];
@@ -360,7 +368,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
               <Tabs
                 tabs={permissionTabs}
                 activeTab={activePermissionTab}
-                onTabChange={setActivePermissionTab}
+                onTabChange={handleTabChange}
               />
             </div>
           </>
