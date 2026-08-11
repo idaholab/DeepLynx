@@ -29,7 +29,7 @@ import {
 } from "@/app/lib/themes/organizationTheme";
 import { applyOrganizationTheme } from "@/app/lib/themes/themeMode";
 import { isInsightHidden } from "@/app/lib/feature_flags";
-import { archiveOrganizationObjectStorage, createOrganizationObjectStorage, deleteOrganizationObjectStorage, getAllOrganizationObjectStorages, getDefaultOrganizationObjectStorage, setDefaultOrganizationObjectStorage, updateOrganizationObjectStorage } from "@/app/lib/client_service/object_storage_services.client";
+import { archiveOrganizationObjectStorage, createOrganizationObjectStorage, deleteOrganizationObjectStorage, getAllOrganizationObjectStorages, getDefaultOrganizationObjectStorage, updateOrganizationObjectStorage } from "@/app/lib/client_service/object_storage_services.client";
 import { ObjectStorageResponseDto } from "../../types/responseDTOs";
 import { CreateObjectStorageRequestDto, UpdateObjectStorageRequestDto, UpdateOrganizationRequestDto } from "../../types/requestDTOs";
 
