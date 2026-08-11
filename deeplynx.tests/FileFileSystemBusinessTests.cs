@@ -666,24 +666,6 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         Assert.False(_fileBusiness.IsValidDownloadToken(token, recordDto.Id + 1));
     }
 
-    private static FormFile CreateMockFile(string fileName, string content)
-    {
-        var bytes = Encoding.UTF8.GetBytes(content);
-        var stream = new MemoryStream(bytes)
-        {
-            Position = 0
-        };
-        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
-            ? "text/csv"
-            : "text/plain";
-
-        return new FormFile(stream, 0, bytes.Length, "file", fileName)
-        {
-            Headers = new HeaderDictionary(),
-            ContentType = contentType
-        };
-    }
-
     #endregion
 
     #region GetStorageSize Tests
@@ -2321,5 +2303,21 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         };
     }
 
+    private static FormFile CreateMockFile(string fileName, string content)
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
 
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
+    }
 }
