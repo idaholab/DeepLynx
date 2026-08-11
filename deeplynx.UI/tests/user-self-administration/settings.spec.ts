@@ -1,5 +1,18 @@
-import { test, expect } from "../fixtures";
+import { test, expect, Page } from "../fixtures";
 import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
+import { Locator } from "@playwright/test";
+
+async function seedLocalStorage(page: Page, selector: Locator, key: string, value: string) {
+  await page.evaluate(({ key, value }) => { window.localStorage.setItem(key, value); }, { key: key, value: value });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  try {
+    await expect(selector).toBeVisible();
+  } catch {
+    await page.getByRole('list').filter({ hasText: 'Usa estos identificadores al' }).getByRole('button').click();
+    await page.getByRole('link', { name: 'Configuración', exact: true }).click();
+    await expect(selector).toBeVisible();
+  }
+}
 
 test.describe("Settings Page", () => {
   test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX });
@@ -72,5 +85,25 @@ test.describe("Settings Page", () => {
     await expect(html).toHaveAttribute('data-theme', 'default-dark');
     await darkModeSelector.locator('label').click();
     await expect(html).toHaveAttribute('data-theme', 'default');
+  });
+
+  test("Change language to español", async ({ page }) => {
+    const languageSelector = page.getByText('LanguageChoose your preferred languageEnglishEspañol');
+    await languageSelector.getByRole('combobox').selectOption('es');
+
+    const lang = await page.evaluate(() => localStorage.getItem('lang'));
+    expect(lang).toBe('es');
+    await expect(page.getByRole('heading', { name: 'Configuración de usuario' })).toBeVisible();
+  });
+
+  test("Change language to english", async ({ page }) => {
+    const languageSelector = page.getByText('IdiomaElige tu idioma preferidoEnglishEspañol');
+    await seedLocalStorage(page, languageSelector, 'lang', 'es');
+
+    await languageSelector.getByRole('combobox').selectOption('en');
+
+    const lang = await page.evaluate(() => localStorage.getItem('lang'));
+    expect(lang).toBe('en');
+    await expect(page.getByRole('heading', { name: 'User Settings' })).toBeVisible();
   });
 });
