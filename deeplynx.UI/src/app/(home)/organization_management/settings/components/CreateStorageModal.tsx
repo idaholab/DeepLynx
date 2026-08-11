@@ -12,6 +12,7 @@ interface StorageConfig {
 }
 
 interface StorageFormData {
+  id: number;
   name: string;
   config: StorageConfig;
   default: boolean;

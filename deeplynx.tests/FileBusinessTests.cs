@@ -201,6 +201,14 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         osid = objectStorage.Id;
 
+        project.DefaultObjectStorageId = (int?)osid;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
+        organization.DefaultObjectStorageId = (int?)osid;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var testClass = new Class
         {
             Name = "File",
@@ -1321,8 +1329,18 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         var orgOsId = orgObjectStorage.Id;
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         // Upload using org default
@@ -1633,8 +1651,18 @@ public class FileBusinessTests : IntegrationTestBase
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var content = "Delete test";
@@ -1742,8 +1770,18 @@ public class FileBusinessTests : IntegrationTestBase
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var session = await _fileBusiness.StartUpload(
@@ -3256,9 +3294,19 @@ public class FileBusinessTests : IntegrationTestBase
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         // Remove project-level default
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var request = new FileUploadInitRequestDto
@@ -3457,8 +3505,18 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         var orgOsId = orgObjectStorage.Id;
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var session = await _fileBusiness.StartUpload(
@@ -3542,9 +3600,19 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         var orgOsId = orgObjectStorage.Id;
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         // Disable project default
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var content = "Test file content";
@@ -3583,6 +3651,16 @@ public class FileBusinessTests : IntegrationTestBase
         foreach (var storage in allStorages) storage.Default = false;
         await Context.SaveChangesAsync();
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = null;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = null;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var request = new FileUploadInitRequestDto
         {
             FileName = "no-default.txt",
@@ -3594,7 +3672,7 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusiness.StartUpload(oid, pid, did, null, request)
         );
 
-        Assert.Contains("Default object storage not found", exception.Message);
+        Assert.Contains("Default object storage not set", exception.Message);
     }
 
     #endregion
