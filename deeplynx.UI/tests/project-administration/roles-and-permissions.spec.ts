@@ -1,31 +1,92 @@
 import { test, expect, APIRequestContext, Page } from "../fixtures";
-import { sysAdmin, ORGS, PROJECTS} from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS, orgAdminA } from "../deeplynx-config";
 import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
-
-type Organization = {
-  id: number;
-  name: string;
-};
+import { getOrgIdByName } from "../helpers/api";
+import { getProjectIdByName } from "../helpers/upload-helpers";
 
 let orgId: string;
 
-// Resolves an org name (e.g. "PW Org A") to its numeric ID (as a string,
-// to match how projectId/URLs are handled throughout this file). We can
-// no longer assume orgId === "1" now that fixtures let tests run as
-// accounts scoped to arbitrary orgs.
-async function getOrgIdByName(
-  request: APIRequestContext, orgName: string
-): Promise<string> {
-  const BASE_URL = 'http://localhost:5095/api/v1';
-  const res = await request.fetch(`${BASE_URL}/organizations`);
-  if (!res.ok()) throw new Error(`Failed to fetch organizations: ${res.status()}`);
-  const orgs: Organization[] = await res.json();
-  const match = orgs.find((org) => org.name === orgName);
-  if (!match) {
-    throw new Error(`Could not find organization named "${orgName}" in ${JSON.stringify(orgs)}`);
-  }
-  return String(match.id);
+// Adjust this base URL to match whichever environment the test config points at.
+const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:5095";
+
+async function navigateToProjLevelSensitivityLabelPermissions(page: Page) {
+  await page.getByRole('link', { name: 'Project Settings' }).click();
+  await page.getByText('Roles & Permissions').click();
+  await page.getByRole('button', { name: 'User ORG User role with' }).click();
+  await page.getByText('Sensitivity Labels', { exact: true }).click();
 }
+
+test.describe("Org Admin editing Permissions of Proj level SLs", () => {
+  test.use({
+    actingUser: orgAdminA,
+    actingOrg: ORGS.orgA,
+    actingProject: PROJECTS.projectX,
+  });
+
+  // Unique per test run so parallel runs / reruns never collide on name.
+  let uniqueLabelName: string;
+  let createdLabelId: number;
+  let apiContext: APIRequestContext;
+  let projectId: string;
+
+  test.beforeAll(async ({ request }, testInfo) => {
+    // NOTE: adjust auth header/token retrieval to match how your test
+    // fixtures normally authenticate API calls (e.g. a helper that logs
+    // in orgAdminA and returns a bearer token). Swap ACCESS_TOKEN below.
+    apiContext = request;
+    orgId = await getOrgIdByName(request, ORGS.orgA.name);
+    projectId = await getProjectIdByName(request, orgId, PROJECTS.projectX.name);
+    uniqueLabelName = `Test SL-${testInfo.testId}`;
+
+    const createResponse = await apiContext.post(
+      `${API_BASE_URL}/api/v1/projects/${projectId}/labels`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.TEST_ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        data: {
+          name: uniqueLabelName,
+          description: "Created by Playwright test - safe to delete",
+        },
+      },
+    );
+
+    expect(createResponse.ok()).toBeTruthy();
+    const created = await createResponse.json();
+    createdLabelId = created.id;
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (!createdLabelId) return;
+    apiContext = request;
+
+    const deleteResponse = await apiContext.delete(
+      `${API_BASE_URL}/api/v1/projects/${projectId}/labels/${createdLabelId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.TEST_ACCESS_TOKEN}`,
+        },
+      },
+    );
+
+    expect(deleteResponse.ok()).toBeTruthy();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await expect(page).toHaveURL(/\/project\/\d+/);
+    await navigateToProjLevelSensitivityLabelPermissions(page);
+  });
+
+  test("Org Admin can edit proj level sensitivity label permissions", async ({ page }) => {
+    await page.getByRole('button', { name: 'Edit Permissions' }).click();
+    await page.getByText('Resource Permissions', { exact: true }).click();
+    await expect(page.locator('div').filter({ hasText: 'Please save' }).first()).toBeVisible();
+    await page.getByTitle(`Permission to delete ${uniqueLabelName} labeled files`).getByLabel('delete file').check();
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(page.locator('div').filter({ hasText: 'Permissions updated' }).first()).toBeVisible();
+  });
+});
 
 test.describe("Roles & Permissions", () => {
   test.use({
