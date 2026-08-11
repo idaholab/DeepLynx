@@ -12,6 +12,7 @@ using Newtonsoft.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 using deeplynx.helpers.Cache;
 using System.Runtime.CompilerServices;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace deeplynx.business;
 
@@ -28,7 +29,7 @@ public class FileBusiness : IFileControllerBusiness
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly ILogger<FileBusiness> _logger;
     private readonly IEventBusiness _eventBusiness;
-
+    private readonly ITimeLimitedDataProtector _downloadProtector;
 
     // NOTE: Chunked upload methods currently only support filesystem storage.
     // When Azure/S3 chunked uploads are needed, refactor these methods to 
@@ -43,7 +44,8 @@ public class FileBusiness : IFileControllerBusiness
         IOlapBusiness olapBusiness,
         IObjectStorageBusiness objectStorageBusiness,
         ILogger<FileBusiness> logger,
-        IEventBusiness eventBusiness)
+        IEventBusiness eventBusiness,
+        IDataProtectionProvider dataProtectionProvider)
     {
         _context = context;
         _factory = factory;
@@ -55,6 +57,9 @@ public class FileBusiness : IFileControllerBusiness
         _objectStorageBusiness = objectStorageBusiness;
         _logger = logger;
         _eventBusiness = eventBusiness;
+        _downloadProtector = dataProtectionProvider
+            .CreateProtector(RecordUrlHelper.DownloadProtector)
+            .ToTimeLimitedDataProtector();
 
         var chunkSizeStr = Environment.GetEnvironmentVariable("RECOMMENDED_CHUNK_SIZE")
                            ?? throw new InvalidOperationException(
@@ -316,10 +321,9 @@ public class FileBusiness : IFileControllerBusiness
     /// <returns>The file stream for download</returns>
     public async Task<FileStreamResult> DownloadFileDirect(long organizationId, long projectId, long recordId, string token)
     {
-        FileFilesystemBusiness fileBusiness = (FileFilesystemBusiness)_factory.CreateFileBusiness("filesystem");
         // This check must come first for correct authentication
-        if (!fileBusiness.IsValidDownloadToken(token, recordId))
-            throw new ArgumentException("Invalid token for direct record file access.");
+        var storageType = RecordUrlHelper.ValidateObjectStorageType(_downloadProtector, token, recordId)
+            ?? throw new ArgumentException("Invalid token for direct record file access.");
 
         var record = await _context.Records
             .Where(r => r.ProjectId == projectId
@@ -334,8 +338,10 @@ public class FileBusiness : IFileControllerBusiness
 
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
 
-        if (objectStorage.Type != "filesystem")
-            throw new ArgumentException("Record's object storage must be filesystem for direct downloads.");
+        if (objectStorage.Type != storageType)
+            throw new ArgumentException("Record's storage type must match token's storage type.");
+
+        var fileBusiness = _factory.CreateFileBusiness(storageType);
 
         var dto = new RecordResponseDto{
             Uri = record.Uri,

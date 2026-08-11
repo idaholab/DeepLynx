@@ -36,7 +36,7 @@ public class FileFilesystemBusiness : IFileBusiness
         _classBusiness = classBusiness;
         _recordBusiness = recordBusiness;
         _downloadProtector = dataProtectionProvider
-            .CreateProtector("DownloadTokens")
+            .CreateProtector(RecordUrlHelper.DownloadProtector)
             .ToTimeLimitedDataProtector();
     }
 
@@ -354,40 +354,10 @@ public class FileFilesystemBusiness : IFileBusiness
     public async Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,
         int expirationHours = 1, string? directUrl = null)
     {
-        if (string.IsNullOrWhiteSpace(record.Uri))
-            throw new ArgumentException("Record Uri is null.");
         if (!File.Exists(record.Uri))
             throw new FileNotFoundException("The requested file does not exist.", record.Uri);
-        if (string.IsNullOrEmpty(directUrl))
-            throw new ArgumentException("Direct download URL is null.");
 
-        var hours = new TimeSpan(hours: expirationHours, minutes: 0, seconds: 0);
-        var payload = $"{record.Id}";
-        var token = _downloadProtector.Protect(payload, hours);
-        return $"{directUrl}?token={token}";
-    }
-
-    /// <summary>
-    /// Validates a download token
-    /// </summary>
-    /// <param name="token"></param>
-    /// <param name="expectedRecordId"></param>
-    /// <returns>`true` if the download token is valid and `false` otherwise</returns>
-    public bool IsValidDownloadToken(string token, long expectedRecordId)
-    {
-        try
-        {
-            var payload = _downloadProtector.Unprotect(token);
-            return long.TryParse(payload, out var recordId) && recordId == expectedRecordId;
-        }
-        catch (CryptographicException)
-        {
-            return false; // tampered or wrong key
-        }
-        catch (Exception)
-        {
-            return false; // expired or malformed
-        }
+        return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, "filesystem", directUrl, record.Id, record.Uri, expirationHours);
     }
 
     /// <summary>
