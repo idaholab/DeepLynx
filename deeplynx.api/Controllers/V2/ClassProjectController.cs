@@ -51,7 +51,7 @@ public class ClassProjectController : ControllerBase
     public async Task<ActionResult<PaginatedResponse<ClassResponseDto>>> GetAllClasses(
         long projectId,
         [FromQuery] bool hideArchived = true,
-        PaginatedRequestDto? paginatedRequestDto = null)
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
         paginatedRequestDto ??= new PaginatedRequestDto();
         var currentUserId = UserContextStorage.UserId;
