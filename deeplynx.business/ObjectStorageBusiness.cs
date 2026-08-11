@@ -419,9 +419,30 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage.IsArchived)
             throw new InvalidOperationException($"Object storage with id {objectStorageId} is already archived");
 
-        if (returnedObjectStorage.Default)
-            throw new InvalidOperationException("Default object storage cannot be archived." +
-                                                " Please assign new default storage before archiving.");
+        long? defaultObjectStorageId = null;
+        if (projectId.HasValue)
+        {
+            var project = await _context.Projects
+                .Where(p => p.Id == projectId.Value && p.OrganizationId == organizationId)
+                .Select(p => new { p.DefaultObjectStorageId })
+                .FirstOrDefaultAsync();
+
+            if (project != null)
+                defaultObjectStorageId = project.DefaultObjectStorageId;
+        }
+        else
+        {
+            var organization = await _context.Organizations
+                .Where(o => o.Id == organizationId)
+                .Select(o => new { o.DefaultObjectStorageId })
+                .FirstOrDefaultAsync();
+
+            if (organization != null)
+                defaultObjectStorageId = organization.DefaultObjectStorageId;
+        }
+
+        if (defaultObjectStorageId == objectStorageId)
+            throw new InvalidOperationException("Default object storage cannot be archived. Please assign new default storage before archiving.");
 
         // Organization os cannot be updated from a project level
         if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
@@ -464,9 +485,32 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (!returnedObjectStorage.IsArchived)
             throw new InvalidOperationException($"Object storage with id {objectStorageId} is not archived");
 
-        if (returnedObjectStorage.Default)
+        long? defaultObjectStorageId = null;
+        if (projectId.HasValue)
+        {
+            var project = await _context.Projects
+                .Where(p => p.Id == projectId.Value && p.OrganizationId == organizationId)
+                .Select(p => new { p.DefaultObjectStorageId })
+                .FirstOrDefaultAsync();
+
+            if (project != null)
+                defaultObjectStorageId = project.DefaultObjectStorageId;
+        }
+        else
+        {
+            var organization = await _context.Organizations
+                .Where(o => o.Id == organizationId)
+                .Select(o => new { o.DefaultObjectStorageId })
+                .FirstOrDefaultAsync();
+
+            if (organization != null)
+                defaultObjectStorageId = organization.DefaultObjectStorageId;
+        }
+
+        if (defaultObjectStorageId == objectStorageId)
             throw new InvalidOperationException("Default object storage cannot be archived." +
                                                 " Please assign new default storage before archiving.");
+
         // Organization os cannot be updated from a project level
         if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
             throw new InvalidOperationException(
@@ -560,8 +604,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         var query = _context.ObjectStorages
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
-        if (projectId.HasValue)
-            query = query.Where(os => os.ProjectId == projectId);
 
         var returnedObjectStorage = await query.FirstOrDefaultAsync();
         if (returnedObjectStorage is null || returnedObjectStorage.IsArchived)

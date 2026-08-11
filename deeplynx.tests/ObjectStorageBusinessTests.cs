@@ -811,6 +811,16 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task Archive_Fails_IfObjectStorageIsDefault()
     {
         // Act & Assert
+        var organization = Context.Organizations.First(o => o.Id == organizationId);
+        organization.DefaultObjectStorageId = (int?)os1;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)os1;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _objectStorageBusiness.ArchiveObjectStorage(uid, organizationId, pid, os1));
         Assert.Contains(
