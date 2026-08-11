@@ -93,7 +93,7 @@ export function useProjectResources(organizationId?: number) {
           setObjectstorage(objectStorage);
 
           const projectData = await getProject(organizationId, Number(projectId));
-          const defaultStorageId = projectData?.objectStorageId;
+          const defaultStorageId = projectData?.defaultObjectStorageId;
 
           let defaultStorage = null;
 
