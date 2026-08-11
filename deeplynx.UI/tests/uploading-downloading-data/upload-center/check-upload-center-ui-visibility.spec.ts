@@ -38,6 +38,16 @@ test.describe("Check Upload Center UI Visibility", () => {
         ).toBeVisible();
     });
 
+    test("File Upload radio is selected by default", async ({ page }) => {
+        await expect(
+            page.getByRole("radio", { name: "File Upload" }),
+        ).toBeChecked();
+
+        await expect(
+            page.getByRole("radio", { name: "Bulk Metadata" }),
+        ).not.toBeChecked();
+    });
+
     test("File Upload is the default mode", async ({ page }) => {
         // In file upload mode, the drag & drop zone is visible
         await expect(
