@@ -8,12 +8,26 @@ const SUCCESS_DURATION_MS = 3000;
 const ERROR_DURATION_MS = 5000;
 const MESSAGE_DURATION_MS = 3000;
 
+function formatBytes(bytes: number): string {
+  if (!isFinite(bytes) || bytes < 0) return "0 B";
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${Math.round(bytes)} B`;
+}
+
+function formatSpeed(bytesPerSec?: number): string | null {
+  if (!bytesPerSec || !isFinite(bytesPerSec) || bytesPerSec <= 0) return null;
+  return `${formatBytes(bytesPerSec)}/s`;
+}
+
 export type UploadToastState = {
   title: string;
   message: string;
   percent?: number;
-  chunksCompleted?: number;
-  totalChunks?: number;
+  bytesUploaded?: number;
+  totalBytes?: number;
+  speedBytesPerSec?: number;
   isCancelling?: boolean;
   onCancel?: () => void;
   cancelDisabled?: boolean;
@@ -108,22 +122,25 @@ type UploadProgressToastProps = UploadToastState & {
 
 function UploadProgressToast(props: UploadProgressToastProps) {
   const { t } = useLanguage();
-  const chunksLabel = t.translations.CHUNKS;
-  const leftLabel = t.translations.LEFT;
   const progress =
     typeof props.percent === "number"
       ? Math.max(0, Math.min(100, props.percent))
       : 0;
   const hasProgress = typeof props.percent === "number";
-  const hasChunkInfo =
-    typeof props.chunksCompleted === "number" &&
-    typeof props.totalChunks === "number";
-  const completedChunks = props.chunksCompleted ?? 0;
-  const totalChunks = props.totalChunks ?? 0;
-  const remainingChunks = Math.max(totalChunks - completedChunks, 0);
-  const chunkSummary = hasChunkInfo
-    ? `${completedChunks} / ${totalChunks} ${chunksLabel}`
+  const hasByteInfo =
+    typeof props.bytesUploaded === "number" &&
+    typeof props.totalBytes === "number";
+  const bytesUploaded = props.bytesUploaded ?? 0;
+  const totalBytes = props.totalBytes ?? 0;
+  const remainingBytes = Math.max(totalBytes - bytesUploaded, 0);
+  const speedLabel = formatSpeed(props.speedBytesPerSec);
+
+  // Falls back to props.message (e.g. "Preparing upload...") when byte
+  // totals aren't known yet — same fallback behavior as the old chunk version.
+  const byteSummary = hasByteInfo
+    ? `${formatBytes(bytesUploaded)} / ${formatBytes(totalBytes)}${speedLabel ? ` · ${speedLabel}` : ""}`
     : props.message;
+
   const status = props.isCancelling
     ? t.translations.CANCELLING_SHORT
     : hasProgress
@@ -146,9 +163,9 @@ function UploadProgressToast(props: UploadProgressToastProps) {
             <ChevronDownIcon className="size-4" />
           </button>
         </div>
-        {hasChunkInfo && (
+        {hasByteInfo && (
           <p className="mt-1 text-[11px] text-base-content/65">
-            {remainingChunks} {leftLabel}
+            {formatBytes(remainingBytes)} {t.translations.LEFT}
           </p>
         )}
       </div>
@@ -177,7 +194,7 @@ function UploadProgressToast(props: UploadProgressToastProps) {
           max="100"
         />
       )}
-      <p className="mt-1 text-[11px] text-base-content/65">{chunkSummary}</p>
+      <p className="mt-1 text-[11px] text-base-content/65">{byteSummary}</p>
       {props.isCancelling && (
         <p className="mt-1 text-[11px] font-medium text-warning">
           {t.translations.CANCELLING_SHORT}

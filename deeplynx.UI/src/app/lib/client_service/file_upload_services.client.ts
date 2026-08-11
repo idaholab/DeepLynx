@@ -16,9 +16,13 @@ import { CreateRecordFileUploadRequestDto } from "@/app/(home)/types/requestDTOs
 // ============================================================================
 
 export const CHUNK_THRESHOLD = 500 * 1024 * 1024; // 500MB threshold to determine regular or chunked upload
-const MAX_CONCURRENT_CHUNKS = 4;            // Upload 4 chunks simultaneously
 const MAX_RETRIES = 3;                      // Retry failed chunks up to 3 times
 const DEFAULT_MAX_CONCURRENT_FILES = 5;
+const MIN_CHUNK_SIZE = 256 * 1024;          // floor so retries can't shrink to near-zero progress
+const TARGET_CHUNK_DURATION_S = 15;         // aim for each chunk to take roughly this long
+const CHUNK_TIMEOUT_MS = 60_000;            // per-chunk timeout; ~half the reference tool's ~120s proxy budget
+const TIMEOUT_MAX_SHRINKS = 6;              // safety cap on repeated timeout->shrink->retry cycles
+const EMA_ALPHA = 0.3;                      // smoothing factor for throughput estimate
 
 export type BatchUploadProgressEvent = {
   completed: number;
@@ -202,25 +206,13 @@ async function uploadFileChunked({
 
     uploadId = session.uploadId;
 
-    const chunks = splitFileIntoChunks(file, session.chunkSize);
+    const maxChunkSize = Math.max(MIN_CHUNK_SIZE, session.chunkSize);
 
-    // Verify the chunk count matches backend expectation
-    if (chunks.length !== session.totalChunks) {
-      console.warn(
-        `Chunk count mismatch: frontend calculated ${chunks.length}, ` +
-        `backend expected ${session.totalChunks}. Using backend value.`
-      );
-    }
-
-    await uploadChunksInBatches(
-      chunks,
+    const chunksSent = await uploadChunksSequentialAdaptive(
+      file,
       uploadId,
-      {
-        organizationId,
-        projectId,
-        dataSourceId,
-        objectStorageId,
-      },
+      maxChunkSize,
+      { organizationId, projectId, dataSourceId, objectStorageId },
       abortController.signal,
       onProgress
     );
@@ -232,16 +224,20 @@ async function uploadFileChunked({
       objectStorageId,
       uploadId,
       fileName: file.name,
-      totalChunks: session.totalChunks,
+      totalChunks: chunksSent,
       metadataFile
     });
 
     onProgress?.({
       percentComplete: 100,
-      chunksCompleted: chunks.length,
-      totalChunks: chunks.length,
-      currentBatch: Math.ceil(chunks.length / MAX_CONCURRENT_CHUNKS),
+      chunksCompleted: chunksSent,
+      totalChunks: chunksSent,
+      currentBatch: chunksSent,
       uploadId,
+      bytesUploaded: file.size,
+      totalBytes: file.size,
+      chunkSize: maxChunkSize,
+      speedBytesPerSec: 0,
     });
 
     return result;
@@ -291,115 +287,185 @@ async function startChunkedUpload(
   return data;
 }
 
-function splitFileIntoChunks(file: File, chunkSize: number): Blob[] {
-  const chunks: Blob[] = [];
-  let offset = 0;
+// ---- Sequential adaptive upload loop ---------------------------------------
+// Replaces the old splitFileIntoChunks + uploadChunksInBatches pair. Chunks
+// are sliced on-the-fly since size can change chunk-to-chunk; there is no
+// fixed chunk array up front.
 
-  while (offset < file.size) {
-    const end = Math.min(offset + chunkSize, file.size);
-    chunks.push(file.slice(offset, end));
-    offset = end;
-  }
-
-  return chunks;
-}
-
-async function uploadChunksInBatches(
-  chunks: Blob[],
+async function uploadChunksSequentialAdaptive(
+  file: File,
   uploadId: string,
+  maxChunkSize: number,
   options: {
     organizationId: number | string;
     projectId: number | string;
     dataSourceId?: number | string;
     objectStorageId?: number | string;
   },
-  signal: AbortSignal,
+  parentSignal: AbortSignal,
   onProgress?: (progress: UploadProgressEvent) => void
-) {
-  let chunksCompleted = 0;
-  const totalChunks = chunks.length;
+): Promise<number> {
+  let offset = 0;
+  let chunkSize = maxChunkSize;
+  let chunkNumber = 0;
+  let throughputEMA: number | null = null;
 
-  for (let i = 0; i < chunks.length; i += MAX_CONCURRENT_CHUNKS) {
-
-    // CHECK IF ABORTED
-    if (signal.aborted) {
-      throw new DOMException('Upload cancelled', 'AbortError');
+  while (offset < file.size) {
+    if (parentSignal.aborted) {
+      throw new DOMException("Upload cancelled", "AbortError");
     }
 
-    const batch = chunks.slice(i, i + MAX_CONCURRENT_CHUNKS);
-    const currentBatch = Math.floor(i / MAX_CONCURRENT_CHUNKS) + 1;
+    const end = Math.min(offset + chunkSize, file.size);
+    const chunk = file.slice(offset, end);
 
-    // Upload batch in parallel
-    const batchPromises = batch.map((chunk, batchIndex) => {
-      const chunkNumber = i + batchIndex;
-      return uploadSingleChunk({
-        ...options,
-        uploadId,
-        chunk,
-        chunkNumber,
-      }, signal);
-    });
+    const { success, elapsedMs, shrunkTo } = await uploadSingleChunkAdaptive(
+      { ...options, uploadId, chunk, chunkNumber, maxChunkSize },
+      chunkSize,
+      parentSignal
+    );
 
-    // Wait for batch to complete
-    await Promise.all(batchPromises);
+    if (!success) {
+      // Non-timeout failure exhausted its retries inside
+      // uploadSingleChunkAdaptive and threw; this branch shouldn't be
+      // reached, but guard anyway rather than looping forever.
+      throw new Error(`Chunk ${chunkNumber} failed and could not be recovered.`);
+    }
 
-    // Update after batch completes
-    chunksCompleted += batch.length;
-    const percentComplete = (chunksCompleted / totalChunks) * 100;
+    if (shrunkTo != null) {
+      // A timeout occurred and the chunk was retried at a smaller size;
+      // adopt that smaller size going forward rather than immediately
+      // trying to grow back, so a flaky patch of network doesn't
+      // oscillate the size on every request.
+      chunkSize = shrunkTo;
+      throughputEMA = null; // discard stale throughput history after a shrink
+    } else {
+      const throughput = chunk.size / (elapsedMs / 1000);
+      throughputEMA = updateEMA(throughputEMA, throughput);
+      chunkSize = nextChunkSizeFromThroughput(throughputEMA, chunkSize, maxChunkSize);
+    }
+
+    offset = end;
+    chunkNumber += 1;
+
+    const remainingBytes = file.size - offset;
+    // totalChunks is an ESTIMATE that will fluctuate as chunkSize adapts —
+    // do not treat it as a stable denominator. Prefer bytesUploaded/totalBytes
+    // for UI that needs a stable, monotonic progress measure.
+    const estimatedRemainingChunks = chunkSize > 0 ? Math.ceil(remainingBytes / chunkSize) : 0;
 
     onProgress?.({
-      percentComplete: Math.round(percentComplete * 10) / 10,
-      chunksCompleted,
-      totalChunks,
-      currentBatch,
+      percentComplete: Math.round((offset / file.size) * 1000) / 10,
+      chunksCompleted: chunkNumber,
+      totalChunks: chunkNumber + estimatedRemainingChunks,
+      currentBatch: chunkNumber,
       uploadId,
+      bytesUploaded: offset,
+      totalBytes: file.size,
+      chunkSize,
+      speedBytesPerSec: throughputEMA ?? 0,
     });
   }
+
+  return chunkNumber;
 }
 
-async function uploadSingleChunk(options: ChunkUploadOptions, signal: AbortSignal): Promise<void> {
-  const { organizationId, projectId, dataSourceId, objectStorageId, uploadId, chunk, chunkNumber } = options;
+// Uploads one chunk with a timeout. On timeout, shrinks the chunk and
+// retries the SAME byte range at the smaller size (up to TIMEOUT_MAX_SHRINKS
+// times). On non-timeout failure (5xx, network error), retries the same
+// byte range at the same size with linear backoff (existing MAX_RETRIES
+// behavior), matching prior behavior for that failure class.
+async function uploadSingleChunkAdaptive(
+  args: {
+    organizationId: number | string;
+    projectId: number | string;
+    dataSourceId?: number | string;
+    objectStorageId?: number | string;
+    uploadId: string;
+    chunk: Blob;
+    chunkNumber: number;
+    maxChunkSize: number;
+  },
+  initialChunkSize: number,
+  parentSignal: AbortSignal
+): Promise<{ success: boolean; elapsedMs: number; shrunkTo: number | null }> {
+  let currentChunk = args.chunk;
+  let currentSize = initialChunkSize;
+  let shrinkAttempts = 0;
+  let retryAttempts = 0;
+  let didShrink = false;
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    if (signal.aborted) {
-      throw new DOMException('Upload cancelled', 'AbortError');
+  while (true) {
+    if (parentSignal.aborted) {
+      throw new DOMException("Upload cancelled", "AbortError");
     }
+
+    // Combine the parent (user-initiated cancel) signal with a per-chunk
+    // timeout signal so either one can abort this specific request.
+    const chunkController = new AbortController();
+    const onParentAbort = () => chunkController.abort("cancelled");
+    parentSignal.addEventListener("abort", onParentAbort);
+    const timeoutId = setTimeout(() => chunkController.abort("timeout"), CHUNK_TIMEOUT_MS);
+
+    const startedAt = performance.now();
     try {
       const form = new FormData();
-      form.append("chunk", chunk);
-      form.append("uploadId", uploadId);
-      form.append("chunkNumber", String(chunkNumber));
+      form.append("chunk", currentChunk);
+      form.append("uploadId", args.uploadId);
+      form.append("chunkNumber", String(args.chunkNumber));
 
       const params: Record<string, number | string> = {};
-      if (dataSourceId != null) params.dataSourceId = dataSourceId;
-      if (objectStorageId != null) params.objectStorageId = objectStorageId;
+      if (args.dataSourceId != null) params.dataSourceId = args.dataSourceId;
+      if (args.objectStorageId != null) params.objectStorageId = args.objectStorageId;
 
       await api.post(
-        `/organizations/${organizationId}/projects/${projectId}/files/upload/chunk`,
+        `/organizations/${args.organizationId}/projects/${args.projectId}/files/upload/chunk`,
         form,
-        {
-          params,
-          signal: signal,
-        }
+        { params, signal: chunkController.signal }
       );
 
-      return;
+      clearTimeout(timeoutId);
+      parentSignal.removeEventListener("abort", onParentAbort);
+      return {
+        success: true,
+        elapsedMs: performance.now() - startedAt,
+        shrunkTo: didShrink ? currentSize : null,
+      };
     } catch (error) {
-      if (signal.aborted) {
-        throw new DOMException('Upload cancelled', 'AbortError');
+      clearTimeout(timeoutId);
+      parentSignal.removeEventListener("abort", onParentAbort);
+
+      if (parentSignal.aborted) {
+        throw new DOMException("Upload cancelled", "AbortError");
       }
 
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw error;
+      const timedOut = chunkController.signal.reason === "timeout";
+
+      if (timedOut) {
+        shrinkAttempts += 1;
+        if (shrinkAttempts > TIMEOUT_MAX_SHRINKS) {
+          throw new Error(
+            `Chunk ${args.chunkNumber} kept timing out even after shrinking ${TIMEOUT_MAX_SHRINKS} times.`
+          );
+        }
+        currentSize = clampChunkSize(currentSize / 2, args.maxChunkSize);
+        // Re-slice the same starting byte at the new, smaller size.
+        // NOTE: caller passed `chunk` already sliced at the old size, so we
+        // re-derive from it — this only works because Blob.slice on an
+        // already-sliced chunk still refers to the correct underlying bytes.
+        currentChunk = currentChunk.slice(0, currentSize);
+        didShrink = true;
+        console.warn(`Chunk ${args.chunkNumber} timed out after ${CHUNK_TIMEOUT_MS}ms; retrying at ${currentSize} bytes.`);
+        continue;
       }
 
-      console.warn(`Chunk ${chunkNumber} failed (attempt ${attempt}/${MAX_RETRIES})`);
-
-      if (attempt === MAX_RETRIES) {
-        throw new Error(`Chunk ${chunkNumber} failed after ${MAX_RETRIES} attempts`);
+      // Non-timeout failure: same retry/backoff behavior as before.
+      retryAttempts += 1;
+      console.warn(`Chunk ${args.chunkNumber} failed (attempt ${retryAttempts}/${MAX_RETRIES})`);
+      if (retryAttempts >= MAX_RETRIES) {
+        throw new Error(`Chunk ${args.chunkNumber} failed after ${MAX_RETRIES} attempts`);
       }
-
-      await sleep(1000 * attempt);
+      await sleep(1000 * retryAttempts);
+      continue;
     }
   }
 }
@@ -454,6 +520,23 @@ export async function cancelChunkedUpload(options: {
 // ============================================================================
 // UTILITIES
 // ============================================================================
+function clampChunkSize(size: number, maxChunkSize: number): number {
+  return Math.min(maxChunkSize, Math.max(MIN_CHUNK_SIZE, Math.round(size)));
+}
+
+function updateEMA(prevEMA: number | null, sample: number, alpha = EMA_ALPHA): number {
+  if (prevEMA == null || !isFinite(prevEMA)) return sample;
+  return alpha * sample + (1 - alpha) * prevEMA;
+}
+
+function nextChunkSizeFromThroughput(
+  throughputBytesPerSec: number | null,
+  fallback: number,
+  maxChunkSize: number
+): number {
+  if (!throughputBytesPerSec || !isFinite(throughputBytesPerSec)) return fallback;
+  return clampChunkSize(throughputBytesPerSec * TARGET_CHUNK_DURATION_S, maxChunkSize);
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
