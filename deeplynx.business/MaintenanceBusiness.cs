@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
@@ -42,6 +43,174 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         _recordBusiness = recordBusiness;
         _dataSourceBusiness = dataSourceBusiness;
     }
+
+    /// <summary>
+    /// Copies regular file-backed records from a mounted filesystem object storage to Azure Blob Storage.
+    /// Source files are never deleted. Each record is updated only after its destination SHA-256 is verified.
+    /// Directory/appended records are intentionally skipped by this minimal migration.
+    /// </summary>
+    public async Task<FileStorageMigrationResponseDto> MigrateFilesystemRecordsToAzure(
+        FileStorageMigrationRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidationHelper.ValidateModel(request);
+
+        if (request.SourceObjectStorageId == request.TargetObjectStorageId)
+            throw new ArgumentException("Source and target object storage IDs must be different.");
+
+        var sourceStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(request.SourceObjectStorageId);
+        var targetStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(request.TargetObjectStorageId);
+
+        if (sourceStorage.Type != "filesystem")
+            throw new ArgumentException("Source object storage must have type 'filesystem'.");
+        if (targetStorage.Type != "azure_object")
+            throw new ArgumentException("Target object storage must have type 'azure_object'.");
+        if (sourceStorage.OrganizationId != request.OrganizationId || targetStorage.OrganizationId != request.OrganizationId)
+            throw new ArgumentException("Source and target object storages must belong to the requested organization.");
+        if (string.IsNullOrWhiteSpace(sourceStorage.Config.MountPath))
+            throw new InvalidOperationException("Source filesystem mount path is missing.");
+        if (targetStorage.Config.AzureObjectConfig == null)
+            throw new InvalidOperationException("Target Azure object storage configuration is missing.");
+
+        var azureConfig = targetStorage.Config.AzureObjectConfig;
+        if (string.IsNullOrWhiteSpace(azureConfig.AzureConnectionString) ||
+            string.IsNullOrWhiteSpace(azureConfig.AzureContainerName))
+            throw new InvalidOperationException("Target Azure connection string or container name is missing.");
+
+        var container = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+        if (!request.DryRun)
+            await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+
+        var query = _context.Records
+            .AsNoTracking()
+            .Where(r => r.OrganizationId == request.OrganizationId &&
+                        r.ObjectStorageId == request.SourceObjectStorageId &&
+                        r.Uri != null);
+
+        if (request.RecordId.HasValue)
+            query = query.Where(r => r.Id == request.RecordId.Value);
+        else if (request.AfterRecordId.HasValue)
+            query = query.Where(r => r.Id > request.AfterRecordId.Value);
+
+        var records = await query
+            .OrderBy(r => r.Id)
+            .Take(request.BatchSize)
+            .ToListAsync(cancellationToken);
+
+        var response = new FileStorageMigrationResponseDto
+        {
+            DryRun = request.DryRun,
+            Scanned = records.Count,
+            LastRecordId = records.Count == 0 ? request.AfterRecordId : records[^1].Id
+        };
+
+        var normalizedMount = Path.GetFullPath(sourceStorage.Config.MountPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        foreach (var record in records)
+        {
+            var item = new FileStorageMigrationItemDto
+            {
+                RecordId = record.Id,
+                SourceUri = record.Uri
+            };
+            response.Items.Add(item);
+
+            try
+            {
+                var sourcePath = Path.GetFullPath(record.Uri!);
+                EnsurePathIsInsideMount(sourcePath, normalizedMount);
+
+                if (Directory.Exists(sourcePath))
+                    throw new NotSupportedException("Directory/appended records require the follow-up prefix migration.");
+                if (!File.Exists(sourcePath))
+                    throw new FileNotFoundException("The source file does not exist. Source Path: " + sourcePath);
+
+                var fileName = Path.GetFileName(sourcePath);
+                if (string.IsNullOrWhiteSpace(fileName))
+                    throw new InvalidOperationException("Could not determine the source file name.");
+
+                var destinationUri =
+                    $"organization_{record.OrganizationId}/project_{record.ProjectId}/datasource_{record.DataSourceId}/{fileName}";
+                item.DestinationUri = destinationUri;
+
+                if (request.DryRun)
+                {
+                    item.Status = "ready";
+                    continue;
+                }
+
+                string sourceHash;
+                await using (var hashStream = new FileStream(
+                                 sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                                 bufferSize: 1024 * 1024, useAsync: true))
+                {
+                    sourceHash = await Sha256HashHelper.ComputeHexAsync(hashStream, cancellationToken);
+                }
+
+                var blob = container.GetBlobClient(destinationUri);
+                await using (var uploadStream = new FileStream(
+                                 sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                                 bufferSize: 1024 * 1024, useAsync: true))
+                {
+                    await blob.UploadAsync(uploadStream, overwrite: true, cancellationToken: cancellationToken);
+                }
+
+                var blobProperties = await blob.GetPropertiesAsync(cancellationToken: cancellationToken);
+                var sourceLength = new FileInfo(sourcePath).Length;
+                if (blobProperties.Value.ContentLength != sourceLength)
+                    throw new InvalidDataException("Destination content length does not match the source file.");
+
+                var download = await blob.DownloadStreamingAsync(cancellationToken: cancellationToken);
+                await using var destinationStream = download.Value.Content;
+                var destinationHash = await Sha256HashHelper.ComputeHexAsync(destinationStream, cancellationToken);
+                if (!string.Equals(sourceHash, destinationHash, StringComparison.Ordinal))
+                    throw new InvalidDataException("Destination SHA-256 does not match the source file.");
+
+                // Optimistic predicate: do not overwrite a record changed while its file was being copied.
+                var updated = await _context.Records
+                    .Where(r => r.Id == record.Id &&
+                                r.ObjectStorageId == request.SourceObjectStorageId &&
+                                r.Uri == record.Uri)
+                    .ExecuteUpdateAsync(setters => setters
+                            .SetProperty(r => r.Uri, destinationUri)
+                            .SetProperty(r => r.ObjectStorageId, request.TargetObjectStorageId)
+                            .SetProperty(r => r.FileContentHash, sourceHash),
+                        cancellationToken);
+
+                if (updated != 1)
+                    throw new InvalidOperationException("Record changed during migration; its database locator was not updated.");
+
+                item.Status = "migrated";
+                response.Migrated++;
+            }
+            catch (Exception ex)
+            {
+                item.Status = "failed";
+                item.Error = ex.Message;
+                response.Failed++;
+            }
+        }
+
+        return response;
+    }
+
+    private static void EnsurePathIsInsideMount(string sourcePath, string normalizedMount)
+    {
+        var mountPrefix = normalizedMount + Path.DirectorySeparatorChar;
+
+        var comparison = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        if (!sourcePath.Equals(normalizedMount, comparison) &&
+            !sourcePath.StartsWith(mountPrefix, comparison))
+        {
+            throw new InvalidOperationException("Record URI is outside the configured filesystem mount path.");
+        }
+    }
+
+
     /// <summary>
     /// Gets the records that have been uploaded using our old timeseries methods,
     /// enriched with project and datasource info so callers can group/select before migrating.
@@ -172,7 +341,6 @@ public class MaintenanceBusiness : IMaintenanceBusiness
             throw new Exception($"Failed to export record {recordId} to file: {ex.Message}", ex);
         }
     }
-
 
     /// <summary>
     ///     Scrapes files from a given object storage and creates records for them. 
