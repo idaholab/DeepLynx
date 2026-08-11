@@ -230,18 +230,13 @@ public class FileFilesystemBusiness : IFileBusiness
 
         if (record.Uri == null)
             throw new ArgumentException("Record Uri is null");
-        if (string.IsNullOrWhiteSpace(objectStorageConfig?.MountPath))
-            throw new ArgumentException("Mounted path configuration is missing");
 
-        var fullPath = record.Uri.StartsWith("/")
-            ? record.Uri
-            : "/" + record.Uri;
+        var fullPath = record.Uri.TrimEnd('/', '\\');
 
         if (!Directory.Exists(fullPath))
             throw new DirectoryNotFoundException($"Directory '{fullPath}' not found.");
 
-        string lastFolderName = Path.GetFileName(record.Uri.TrimEnd('/', '\\'));
-
+        string lastFolderName = Path.GetFileName(fullPath);
         int underscoreIndex = lastFolderName.LastIndexOf('_');
         string suffix = underscoreIndex >= 0 && underscoreIndex < lastFolderName.Length - 1
             ? lastFolderName.Substring(underscoreIndex + 1)
@@ -259,10 +254,6 @@ public class FileFilesystemBusiness : IFileBusiness
                 await using var pipeStream = pipe.Writer.AsStream(leaveOpen: true);
                 using var archive = new ZipArchive(pipeStream, ZipArchiveMode.Create, leaveOpen: true);
 
-                // Bounded channel for producer-consumer coordination.
-                // Items carry EITHER buffered content (small files) OR just a
-                // file path (large files, streamed by the consumer at write time).
-                // Worst-case buffered memory ~= capacity * MaxBufferedFileSize.
                 var channel = Channel.CreateBounded<(string EntryName, byte[]? Content, string? FilePath)>(
                     new BoundedChannelOptions(128)
                     {
@@ -271,8 +262,6 @@ public class FileFilesystemBusiness : IFileBusiness
                         SingleWriter = false
                     });
 
-                // Producer: concurrently read small files into memory; enqueue
-                // large files as path-only items so they are never fully buffered.
                 var producer = Task.Run(async () =>
                 {
                     try
@@ -286,21 +275,16 @@ public class FileFilesystemBusiness : IFileBusiness
                             },
                             async (filePath, ct) =>
                             {
-                                var entryName = Path.GetRelativePath(fullPath, filePath).Replace('\\', '/');
+                                var entryName = Path.GetRelativePath(fullPath, filePath).Replace(Path.DirectorySeparatorChar, '/');
                                 var length = new FileInfo(filePath).Length;
 
                                 if (length <= MaxBufferedFileSize)
                                 {
-                                    // Small file: buffer raw bytes. Note: no
-                                    // pre-deflating here — the ZipArchive entry
-                                    // stream handles compression on write, so
-                                    // pre-compressing would double-deflate.
                                     var bytes = await File.ReadAllBytesAsync(filePath, ct);
                                     await channel.Writer.WriteAsync((entryName, bytes, null), ct);
                                 }
                                 else
                                 {
-                                    // Large file: defer the read to the consumer.
                                     await channel.Writer.WriteAsync((entryName, null, filePath), ct);
                                 }
                             });
@@ -314,7 +298,6 @@ public class FileFilesystemBusiness : IFileBusiness
                     }
                 }, cancellationToken);
 
-                // Consumer: single sequential writer to the ZipArchive.
                 var consumer = Task.Run(async () =>
                 {
                     await foreach (var (entryName, content, filePath) in channel.Reader.ReadAllAsync(cancellationToken))
@@ -328,8 +311,6 @@ public class FileFilesystemBusiness : IFileBusiness
                         }
                         else
                         {
-                            // Stream the large file straight from disk into the
-                            // zip entry — never fully materialized in memory.
                             await using var fileStream = new FileStream(
                                 filePath!,
                                 FileMode.Open,
@@ -343,7 +324,6 @@ public class FileFilesystemBusiness : IFileBusiness
                     }
                 }, cancellationToken);
 
-                // Await both producer and consumer
                 await Task.WhenAll(producer, consumer);
             }
             catch (Exception ex)
