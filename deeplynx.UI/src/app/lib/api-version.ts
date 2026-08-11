@@ -18,13 +18,21 @@ export function normalizeNexusApiVersion(version: string): string {
 
 /**
  * Return the environment-selected API version.
- * NEXT_PUBLIC_API_VERSION must be set by the environment (dev, test, preflight,
- * and production all enforce this at build time) — there is no hardcoded fallback.
+ * NEXT_PUBLIC_API_VERSION must be set by the environment (dev, test, and
+ * production all enforce this at build time) — there is no hardcoded fallback.
+ *
+ * Exception: CI_PREFLIGHT builds only verify that the app compiles and never
+ * ship or run against real traffic, so they're allowed a placeholder version
+ * instead of failing the build.
  */
 export function getDefaultNexusApiVersion(): string {
   const version = process.env.NEXT_PUBLIC_API_VERSION;
 
   if (!version) {
+    if (process.env.CI_PREFLIGHT === "true") {
+      return "v2";
+    }
+
     throw new Error(
       "NEXT_PUBLIC_API_VERSION is not set. This must be provided by the build environment.",
     );
