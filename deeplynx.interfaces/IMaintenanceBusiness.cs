@@ -8,6 +8,10 @@ public interface IMaintenanceBusiness
 
     Task<bool> ExportDuckDbTableToFile(long recordId);
 
+    Task<FileStorageMigrationResponseDto> MigrateFilesystemRecordsToAzure(
+        FileStorageMigrationRequestDto request,
+        CancellationToken cancellationToken = default);
+
     Task<ScrapeObjectStorageResponseDto> ScrapeObjectStorageToCatalog(
         long objectStorageId,
         long currentUserId,
