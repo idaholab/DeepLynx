@@ -746,6 +746,86 @@ public class ClassBusinessTests : IntegrationTestBase
         Assert.Equal(100, result.PageSize);
     }
 
+    [Fact]
+    public async Task GetAllClassesPaginated_PageSizeNegativeOne_ReturnsAllClasses_IgnoringPageNumber()
+    {
+        // Arrange - pid has 3 unarchived classes total; ask for a page far beyond that range
+        var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], sentinel, true, true);
+
+        // Assert - PageNumber is ignored entirely, every matching class comes back on "page 1"
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(3, result.PageSize);
+        Assert.Contains(result.Items, c => c.Id == cid1);
+        Assert.Contains(result.Items, c => c.Id == cid5);
+        Assert.DoesNotContain(result.Items, c => c.Id == cid2);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_PageSizeNegativeOne_RespectsHideArchivedAndProjectFilters()
+    {
+        // Act - request everything, but with hideArchived = false so class2 should be included
+        var result = await _classBusiness.GetAllClassesPaginated(
+            uid, oid, [pid], DefaultPagination(pageSize: -1), false, true);
+
+        // Assert - "return all" still applies the same filters as the paginated path
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Contains(result.Items, c => c.Id == cid2 && c.IsArchived);
+        Assert.DoesNotContain(result.Items, c => c.Id == cid4); // pid2, not requested
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_PageSizeNegativeOne_NoAuthorizedProjects_ReturnsEmptyPaginatedResponse()
+    {
+        // Act - unauthorized project short-circuit should take priority over the "return all" sentinel
+        var result = await _classBusiness.GetAllClassesPaginated(
+            uid, oid, [999], DefaultPagination(pageSize: -1), false, false, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(-1, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+    {
+        // Arrange - pid has 3 unarchived classes total
+        var zeroSize = DefaultPagination(pageNumber: 1, pageSize: 0);
+
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], zeroSize, true, true);
+
+        // Assert - Items is empty, but TotalCount still reflects the full matching set
+        Assert.Empty(result.Items);
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_PageSizeZero_OnAnyPageNumber_StillReturnsEmptyItems()
+    {
+        // Arrange - Skip(N * 0) is always Skip(0), so any page number should behave identically
+        var zeroSizePageThree = DefaultPagination(pageNumber: 3, pageSize: 0);
+
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], zeroSizePageThree, true, true);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
     #endregion
 
     #region GetClass Tests

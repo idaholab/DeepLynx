@@ -150,10 +150,11 @@ public class ClassBusiness : IClassBusiness
     /// <param name="organizationId">The ID of the organization to which the classes belong</param>
     /// <param name="currentUserId">The ID of the user</param>
     /// <param name="projectIds">(optional) The ID(s) of the project(s) to filter classes by</param>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching classes are returned unpaginated</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived classes from the result</param>
     /// <param name="isSysAdmin">Flag indicating whether you are a system admin</param>
     /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin</param>
-    /// <returns>A paginated list of classes</returns>
+    /// <returns>A paginated list of classes, or all classes if no pagination is specified</returns>
     public async Task<PaginatedResponse<ClassResponseDto>> GetAllClassesPaginated(
         long currentUserId,
         long organizationId,
@@ -163,6 +164,8 @@ public class ClassBusiness : IClassBusiness
         bool isSysAdmin = false,
         bool isOrgAdmin = false)
     {
+        var returnAll = paginatedRequestDto.PageSize == -1;
+
         var userProjectAdminStatus = new Dictionary<long, bool>();
 
         if (projectIds?.Length > 0)
@@ -230,10 +233,38 @@ public class ClassBusiness : IClassBusiness
         if (hideArchived)
             query = query.Where(c => !c.IsArchived);
 
+        var orderedQuery = query.OrderBy(c => c.Id);
+
+        if (returnAll)
+        {
+            var allClasses = await orderedQuery
+                .Select(c => new ClassResponseDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    Description = c.Description,
+                    Properties = c.Properties,
+                    Uuid = c.Uuid,
+                    ProjectId = c.ProjectId,
+                    OrganizationId = c.OrganizationId,
+                    LastUpdatedAt = c.LastUpdatedAt,
+                    LastUpdatedBy = c.LastUpdatedBy,
+                    IsArchived = c.IsArchived
+                })
+                .ToListAsync();
+
+            return new PaginatedResponse<ClassResponseDto>
+            {
+                Items = allClasses,
+                PageNumber = 1,
+                PageSize = allClasses.Count,
+                TotalCount = allClasses.Count
+            };
+        }
+
         var totalCount = await query.CountAsync();
 
-        var classes = await query
-            .OrderBy(c => c.Id)
+        var classes = await orderedQuery
             .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
             .Take(paginatedRequestDto.PageSize)
             .Select(c => new ClassResponseDto
