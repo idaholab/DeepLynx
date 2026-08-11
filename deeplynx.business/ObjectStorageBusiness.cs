@@ -126,6 +126,8 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         var hasAzure = dto.Config.AzureObjectConfig is not null;
         var hasAws = dto.Config.AwsConnectionString is not null;
 
+        var isLocalEnv = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("BACKEND_BASE_URL"));
+
         var populatedCount = new[]
         {
             hasFilesystem,
@@ -138,7 +140,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 $"Exactly one config must be provided, you provided {populatedCount}. Check for empty strings and/or objects.");
 
         string type;
-        if (hasFilesystem)
+        if (hasFilesystem && isLocalEnv)
         {
             if (string.IsNullOrWhiteSpace(dto.Config.MountPath))
                 throw new ArgumentException("Mount path cannot be empty string");

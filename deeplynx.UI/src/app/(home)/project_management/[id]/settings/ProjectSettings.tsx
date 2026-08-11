@@ -98,7 +98,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStorage, setEditingStorage] =
     useState<ObjectStorageResponseDto | null>(null);
-  const [storageType, setStorageType] = useState<string>("filesystem");
+  const [storageType, setStorageType] = useState<string>("azure_object");
   const [storageFormData, setStorageFormData] = useState<StorageFormData>({
     id: -1,
     name: "",
@@ -415,7 +415,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
 
   const resetStorageForm = () => {
     setStorageFormData({ id: -1, name: "", config: {}, default: false, existingContainer: false, filesDeletable: true });
-    setStorageType("filesystem");
+    setStorageType("azure_object");
     setFilesystemPath("");
     setAzureEndpoint("");
     setAzureBucketName("");
