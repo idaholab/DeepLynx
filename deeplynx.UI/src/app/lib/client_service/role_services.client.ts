@@ -245,16 +245,19 @@ export async function removePermissionFromRole(
  */
 export async function setPermissionsForRole(
   organizationId: number,
-  projectId: number,
+  projectId: number | null,
   roleId: number,
-  permissionIds: number[]
+  permissionIds: number[],
+  isOrgRole: boolean
 ): Promise<{ message: string }> {
   try {
-    const res = await api.put(
-      `/organizations/${organizationId}/projects/${projectId}/roles/${roleId}/permissions`,
-      permissionIds,
-      { headers: { "Content-Type": "application/json" } }
-    );
+    const url = isOrgRole
+      ? `/organizations/${organizationId}/roles/${roleId}/permissions`
+      : `/organizations/${organizationId}/projects/${projectId}/roles/${roleId}/permissions`;
+
+    const res = await api.put(url, permissionIds, {
+      headers: { "Content-Type": "application/json" },
+    });
     return res.data;
   } catch (error) {
     console.error(`Error setting permissions for role ${roleId}:`, error);
