@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using System.ComponentModel;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace deeplynx.business;
 
@@ -23,13 +24,18 @@ public class FileAzureBusiness : IFileBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly EncryptionHelper _encryptionHelper;
+    private readonly ITimeLimitedDataProtector _downloadProtector;
 
     public FileAzureBusiness(
         DeeplynxContext context,
-        EncryptionHelper encryptionHelper)
+        EncryptionHelper encryptionHelper,
+        IDataProtectionProvider dataProtectionProvider)
     {
         _context = context;
         _encryptionHelper = encryptionHelper;
+        _downloadProtector = dataProtectionProvider
+            .CreateProtector(RecordUrlHelper.DownloadProtector)
+            .ToTimeLimitedDataProtector();
     }
 
     public async Task<string?> CalculateFileContentHash(
@@ -544,13 +550,16 @@ public class FileAzureBusiness : IFileBusiness
     }
 
     /// <summary>
-    /// Generates a pre-signed URL (SAS token) for downloading a file directly from Azure Blob Storage
+    /// Generates a pre-signed URL (SAS token) for downloading a file directly from Azure Blob Storage.
+    /// Falls back to generic download URL that allows downloading records directly if SAS is disabled.
     /// </summary>
     /// <param name="record"></param>
     /// <param name="objectStorageConfig"></param>
     /// <param name="expirationHours">Hours until the SAS token expires (default: 1)</param>
+    /// <param name="directUrl">Direct download URL for token auth (default: null)</param>
     /// <returns>Pre-signed URL with SAS token for direct download</returns>
     /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
     public async Task<string> GenerateDownloadUrl(
         RecordResponseDto record,
@@ -589,11 +598,10 @@ public class FileAzureBusiness : IFileBusiness
             throw new FileNotFoundException($"File not found: {record.Uri}");
         }
 
-        // Check if the blob client can generate SAS URI
+        // Fall back to generic download if SAS fails
         if (!blobClient.CanGenerateSasUri)
         {
-            await DownloadFile(record, objectStorageConfig);
-            return "Cannot Create SAS URI";
+            return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, "azure_object", directUrl, record.Id, record.Uri, expirationHours);
         }
 
         // Create SAS builder with read permissions
