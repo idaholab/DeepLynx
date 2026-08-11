@@ -115,6 +115,13 @@ public class FileBusiness : IFileControllerBusiness
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
         var guid = Guid.NewGuid();
 
+        var project = await _context.Projects.FindAsync(projectId) ?? throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+        if (objectStorage.Config.AzureObjectConfig == null)
+            objectStorage.Config.AzureObjectConfig = new AzureObjectConfigDto();
+
+        objectStorage.Config.AzureObjectConfig.AzureFilePath = project.FilePath ?? string.Empty;
+
         var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, objectStorage.Config, file, guid);
 
         var recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
@@ -167,7 +174,7 @@ public class FileBusiness : IFileControllerBusiness
             ClassName = resolvedClass.Name,
             FileType = fileType,
             Uri = uri,
-            FileSize = fileSize
+            FileSize = fileSize,
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
@@ -219,6 +226,7 @@ public class FileBusiness : IFileControllerBusiness
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
         var guid = Guid.NewGuid();
 
+        var fileContentHash = await fileBusiness.CalculateFileContentHash(file);
         var uri = await fileBusiness.UpdateFile(record, objectStorage.Config, file, guid);
 
         var fileSize = file.Length;
@@ -232,7 +240,7 @@ public class FileBusiness : IFileControllerBusiness
             Name = file.FileName,
             Uri = uri,
             FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
-            FileSize = fileSize
+            FileSize = fileSize,
         };
 
         var updatedRecord = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
@@ -476,6 +484,7 @@ public class FileBusiness : IFileControllerBusiness
 
         var uri = await fileBusiness.CompleteUpload(organizationId, projectId, realDataSourceId,
             objectStorage.Config, request, guid);
+        var fileContentHash = await fileBusiness.CalculateStoredFileContentHash(uri, objectStorage.Config);
 
         var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
@@ -836,6 +845,7 @@ public class FileBusiness : IFileControllerBusiness
             var fileName = await fileBusiness.GetFileNameTus(organizationId, projectId, realDataSourceId, uploadId, objectStorage.Config);
             var uri = await fileBusiness.CompleteUploadTus(organizationId, projectId, realDataSourceId,
                 objectStorage.Config, uploadId, guid, fileName);
+            var fileContentHash = await fileBusiness.CalculateStoredFileContentHash(uri, objectStorage.Config);
 
             var fileExtension = Path.GetExtension(fileName).TrimStart('.').ToLower();
             var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");

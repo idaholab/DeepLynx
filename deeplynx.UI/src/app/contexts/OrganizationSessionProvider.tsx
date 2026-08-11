@@ -18,6 +18,7 @@ export interface OrganizationSession {
   logoUrl?: string;
   banner?: string | null;
   themeName?: string | null;
+  disableFileTransfer?: boolean;
 }
 
 interface OrganizationSessionContextType {
@@ -96,6 +97,7 @@ export const OrganizationSessionProvider = ({
             ...prev,
             banner: fullOrg.banner ?? null,
             themeName: fullOrg.theme ?? "default",
+            disableFileTransfer: fullOrg.disableFileTransfer ?? false,
           };
           const serialized = JSON.stringify(updated);
           localStorage.setItem("organizationSession", serialized);

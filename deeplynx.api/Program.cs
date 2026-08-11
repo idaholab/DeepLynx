@@ -172,15 +172,22 @@ try
     dataSourceBuilder.UseVector();
     var dataSource = dataSourceBuilder.Build();
 
-    builder.Services.AddDbContext<DeeplynxContext>(
-        options => options.UseNpgsql(dataSource),
+    builder.Services.AddDbContext<DeeplynxContext>(options =>
+         options.UseNpgsql(dataSource, npgsqlOptions =>
+        {
+            npgsqlOptions.CommandTimeout(120);
+        }),
         ServiceLifetime.Transient
     );
 
-    builder.Services.AddDbContext<LatticeContext>(
-        options => options.UseNpgsql(connectionString),
-        ServiceLifetime.Transient
-    );
+    builder.Services.AddDbContext<LatticeContext>(options =>
+          options.UseNpgsql(connectionString, npgsqlOptions =>
+         {
+             npgsqlOptions.CommandTimeout(120);
+         }),
+         ServiceLifetime.Transient
+     );
+
 
     builder.Services.AddSignalR(); // Used for event system pub/sub and notifications
 
@@ -188,17 +195,14 @@ try
     builder.Services.AddTransient<IRecordCollectionBusiness, RecordCollectionBusiness>();
     builder.Services.AddTransient<IObjectStorageBusiness, ObjectStorageBusiness>();
     builder.Services.AddTransient<IClassBusiness, ClassBusiness>();
-    builder.Services.AddTransient<IProjectBusiness, ProjectBusiness>();
     builder.Services.AddTransient<IEdgeBusiness, EdgeBusiness>();
     builder.Services.AddTransient<IDataSourceBusiness, DataSourceBusiness>();
     builder.Services.AddTransient<IRelationshipBusiness, RelationshipBusiness>();
     builder.Services.AddTransient<ITagBusiness, TagBusiness>();
     builder.Services.AddTransient<IOlapBusiness, OlapBusiness>();
     builder.Services.AddTransient<IMetricsBusiness, MetricsBusiness>();
-    builder.Services.AddTransient<IMaintenanceBusiness, MaintenanceBusiness>();
     builder.Services.AddTransient<IUserBusiness, UserBusiness>();
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
-    builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
     builder.Services.AddTransient<ITokenBusiness, TokenBusiness>();
     builder.Services.AddTransient<IOauthApplicationBusiness, OauthApplicationBusiness>();
     builder.Services.AddTransient<IProvenanceBusiness, ProvenanceBusiness>();
@@ -210,13 +214,17 @@ try
     // builder.Services.AddTransient<ISubscriptionBusiness, SubscriptionBusiness>();
     builder.Services.AddTransient<FileBusiness>();
     builder.Services.AddTransient<FileFilesystemBusiness>();
+    builder.Services.AddTransient<IFileBusiness, FileAzureBusiness>();
     builder.Services.AddTransient<FileAzureBusiness>();
     builder.Services.AddTransient<FileS3Business>();
     builder.Services.AddTransient<IFileBusinessFactory, FileBusinessFactory>();
     builder.Services.AddTransient<IOrganizationBusiness, OrganizationBusiness>();
+    builder.Services.AddTransient<IProjectBusiness, ProjectBusiness>();
+    builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
     builder.Services.AddTransient<IGroupBusiness, GroupBusiness>();
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
+    builder.Services.AddTransient<IMaintenanceBusiness, MaintenanceBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
@@ -315,8 +323,7 @@ try
     }
 
     app.MapControllers(); // Last
-
-    //Health check endpoint
+                          //Health check endpoint
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
         .ExcludeFromDescription(); // hide from docs
 

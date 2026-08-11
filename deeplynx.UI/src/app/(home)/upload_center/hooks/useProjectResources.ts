@@ -15,12 +15,12 @@ export function useProjectResources(organizationId?: number) {
   const [projects, setProjects] = useState<ProjectResponseDto[]>([]);
   const [projectId, setProjectId] = useState<string>("");
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  
+
   // Data Sources
   const [dataSources, setDataSources] = useState<DataSourceResponseDto[]>([]);
   const [dataSourceId, setDataSourceId] = useState<string>("");
   const [isLoadingDataSources, setIsLoadingDataSources] = useState(false);
-  
+
   // Object Storage
   const [objectStorage, setObjectstorage] = useState<ObjectStorageResponseDto[]>([]);
   const [objectStorageId, setObjectstorageId] = useState<string>("");
@@ -91,7 +91,20 @@ export function useProjectResources(organizationId?: number) {
             Number(projectId)
           );
           setObjectstorage(objectStorage);
-          if (objectStorage.length === 1) {
+
+          let defaultStorage = objectStorage.find(
+            (os) => os.default === true && os.projectId === Number(projectId),
+          );
+
+          if (!defaultStorage) {
+            defaultStorage = objectStorage.find(
+              (os) => os.default === true && os.projectId == null && os.organizationId === organizationId,
+            );
+          }
+
+          if (defaultStorage) {
+            setObjectstorageId(String(defaultStorage.id));
+          } else if (objectStorage.length === 1) {
             setObjectstorageId(String(objectStorage[0].id));
           }
         } catch (error) {
@@ -115,13 +128,13 @@ export function useProjectResources(organizationId?: number) {
     projectId,
     isLoadingProjects,
     setProjectId,
-    
+
     // Data Sources
     dataSources,
     dataSourceId,
     isLoadingDataSources,
     setDataSourceId,
-    
+
     // Object Storage
     objectStorage,
     objectStorageId,

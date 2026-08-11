@@ -1,5 +1,6 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -16,6 +17,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 {
     private BulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ClassBusiness _classBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IDataSourceBusiness> _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private InvitationBusiness _invitationBusiness = null!;
@@ -23,11 +25,14 @@ public class InvitationBusinessTests : IntegrationTestBase
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<ILogger<OrganizationBusiness>> _mockOrgLogger = null!;
-    private Mock<INotificationBusiness> _notificationBusiness = null!;
+    private Mock<INotificationBusiness> _mockNotificationBusiness = null!;
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IRecordBusiness> _recordBusiness = null!;
+    private INotificationBusiness _notificationBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private Mock<IRoleBusiness> _roleBusiness = null!;
     private UserBusiness _userBusiness = null!;
@@ -50,7 +55,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        
+
         _mockInvitationLogger = new Mock<ILogger<InvitationBusiness>>();
         _recordBusiness = new Mock<IRecordBusiness>();
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
@@ -59,10 +64,14 @@ public class InvitationBusinessTests : IntegrationTestBase
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _userBusiness = new UserBusiness(Context);
-        _notificationBusiness = new Mock<INotificationBusiness>();
+        _mockNotificationBusiness = new Mock<INotificationBusiness>();
+        _notificationBusiness =
+            new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockOrgLogger = new Mock<ILogger<OrganizationBusiness>>();
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
-        _eventBusiness = new EventBusiness(Context, _notificationBusiness.Object, _bulkCopyUpsertExecutor);
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _eventBusiness = new EventBusiness(Context, _mockNotificationBusiness.Object, _bulkCopyUpsertExecutor);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _roleBusiness = new Mock<IRoleBusiness>();
         _organizationBusiness = new OrganizationBusiness(
@@ -72,14 +81,16 @@ public class InvitationBusinessTests : IntegrationTestBase
             Context, _recordBusiness.Object,
             _relationshipBusiness.Object, _eventBusiness);
 
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness, _mockFileAzureBusiness.Object);
 
         _invitationBusiness = new InvitationBusiness(
             Context,
-            _notificationBusiness.Object,
+            _mockNotificationBusiness.Object,
             _projectBusiness,
             _organizationBusiness,
             _userBusiness,
@@ -198,7 +209,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -209,7 +220,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         // Assert
         Assert.True(result);
         Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(userEmail, "Existing User 2", It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
             Times.Once);
     }
@@ -219,7 +230,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var userEmail = "ExistIng.User2@TEST.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -237,7 +248,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var userEmail = "existing.user@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -252,7 +263,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.Equal(1, orgUserCount); // Should still only have one entry
 
         // CRITICAL: No email should be sent when user is already in org
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
                 It.IsAny<long?>()),
             Times.Never);
@@ -263,7 +274,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -281,7 +292,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.Equal(rid, projectMember.RoleId);
 
         // Email should be sent when user is newly added to project
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(userEmail, "Existing User 2", It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
             Times.Once);
     }
@@ -291,7 +302,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var userEmail = "existing.user@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -316,7 +327,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.Equal(1, projectMemberCount); // Should still only have one entry
 
         // CRITICAL: No email should be sent when user is already in project
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
                 It.IsAny<long?>()),
             Times.Never);
@@ -327,7 +338,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -378,7 +389,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.NotNull(directMembership); // Direct membership now exists
 
         // CRITICAL: Email should be sent about the direct role assignment
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(userEmail, "Existing User 2", false, oid, pid),
             Times.Once);
     }
@@ -388,7 +399,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange - Email send failure should NOT cause failure for existing users
         var userEmail = "existing.user2@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(false);
 
@@ -409,7 +420,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public async Task InviteByUserId_Success_WhenUserExistsAndNotInOrg_SendsEmail()
     {
         // Arrange
-        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+        _mockNotificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
                 It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -420,7 +431,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         // Assert
         Assert.True(result);
         Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail("existing.user2@test.com", "Existing User 2", It.IsAny<bool>(), It.IsAny<long?>(),
                 It.IsAny<long?>()), Times.Once);
     }
@@ -429,7 +440,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public async Task InviteByUserId_Success_WhenUserExistsAndNotInProject_SendsEmail()
     {
         // Arrange
-        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+        _mockNotificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
                 It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -447,7 +458,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.Equal(rid, projectMember.RoleId);
 
         // Email should be sent when user is newly added to project
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
                 It.IsAny<long?>()),
             Times.Once);
@@ -457,7 +468,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public async Task InviteByUserId_Success_WhenEmailSendFails()
     {
         // Arrange - Email send failure should NOT cause failure for existing users
-        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+        _mockNotificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
                 It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(false);
 
@@ -485,7 +496,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region New User by Email - Transaction with Rollback
 
     [Fact]
@@ -493,7 +504,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var newUserEmail = "newuser@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -513,7 +524,7 @@ public class InvitationBusinessTests : IntegrationTestBase
             await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == newUser.Id && ou.OrganizationId == oid));
 
         // CRITICAL: New users always get email
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
             Times.Once);
     }
@@ -523,7 +534,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var newUserEmail = "newuser@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -546,7 +557,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.Equal(rid, projectMember.RoleId);
 
         // CRITICAL: New users always get email
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
             Times.Once);
     }
@@ -556,7 +567,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange - CRITICAL TEST: Email failure should rollback new user creation
         var newUserEmail = "newuser@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(false);
 
@@ -586,7 +597,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange - CRITICAL TEST: Email failure should rollback new user and project membership
         var newUserEmail = "newuser@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(newUserEmail, newUserEmail, It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(false);
 
@@ -617,7 +628,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region CreateAndAddServiceAccountToProject Tests
 
     [Fact]
@@ -670,7 +681,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         // Assert
         var accounts = await Context.Users
-            .Where(u => u.AccountType == AccountType.Service && 
+            .Where(u => u.AccountType == AccountType.Service &&
                         (u.Name == "Service Account A" || u.Name == "Service Account B"))
             .ToListAsync();
 
@@ -713,7 +724,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public async Task InviteByGroup_Success_WhenGroupExistsAndNotInProject_SendsEmailsToAllMembers()
     {
         // Arrange
-        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+        _mockNotificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
                 It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -736,10 +747,10 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.Equal(rid, projectMember.RoleId);
 
         // CRITICAL: Verify emails sent to all group members (none were in project before)
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail("existing.user@test.com", "Existing User", It.IsAny<bool>(), It.IsAny<long?>(),
                 It.IsAny<long?>()), Times.Once);
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail("existing.user2@test.com", "Existing User 2", It.IsAny<bool>(), It.IsAny<long?>(),
                 It.IsAny<long?>()), Times.Once);
     }
@@ -748,7 +759,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public async Task InviteByGroup_Success_WhenSomeUsersAlreadyInProject_OnlySendsEmailToNewUsers()
     {
         // Arrange
-        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+        _mockNotificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
                 It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -776,10 +787,10 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.True(result);
 
         // CRITICAL: Only user2 should receive email (user1 was already in project)
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail("existing.user@test.com", "Existing User", It.IsAny<bool>(), It.IsAny<long?>(),
                 It.IsAny<long?>()), Times.Never);
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail("existing.user2@test.com", "Existing User 2", It.IsAny<bool>(), It.IsAny<long?>(),
                 It.IsAny<long?>()), Times.Once);
     }
@@ -788,7 +799,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public async Task InviteByGroup_Success_WhenGroupAlreadyInProject_NoEmailsSent()
     {
         // Arrange
-        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+        _mockNotificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
                 It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -813,7 +824,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.Equal(1, projectMemberCount); // Should not duplicate
 
         // CRITICAL: No emails should be sent since group is already in project
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(),
                 It.IsAny<long?>()),
             Times.Never);
@@ -823,7 +834,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     public async Task InviteByGroup_Success_WhenEmailSendFails_BestEffort()
     {
         // Arrange - Email failures should NOT cause group invitation to fail
-        _notificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
+        _mockNotificationBusiness.Setup(n => n.SendEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(),
                 It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(false);
 
@@ -902,7 +913,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 
         Assert.Contains("Roles do not exist for organization users", exception.Message);
     }
-    
+
     [Fact]
     public async Task Invite_Fails_WhenGroupIdProvidedForOrgInvitation()
     {
@@ -923,7 +934,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -942,7 +953,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.True(await Context.OrganizationUsers.AnyAsync(ou => ou.UserId == uid2 && ou.OrganizationId == oid2));
 
         // Both invitations should send emails since user is new to each org
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
             Times.Exactly(2));
     }
@@ -952,7 +963,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     {
         // Arrange
         var userEmail = "existing.user2@test.com";
-        _notificationBusiness.Setup(n =>
+        _mockNotificationBusiness.Setup(n =>
                 n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
             .ReturnsAsync(true);
 
@@ -979,7 +990,7 @@ public class InvitationBusinessTests : IntegrationTestBase
         Assert.Equal(rid, projectMember2.RoleId);
 
         // Both invitations should send emails since user is new to each project
-        _notificationBusiness.Verify(
+        _mockNotificationBusiness.Verify(
             n => n.SendEmail(userEmail, It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()),
             Times.Exactly(2));
     }

@@ -18,7 +18,7 @@
         <PackageReference Include="FluentAssertions" Version="8.8.0" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication" Version="2.3.9" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.3.9" />
-        <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.3" />
+        <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.4" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.2" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.2" />
         <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.2" />

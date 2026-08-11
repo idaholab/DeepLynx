@@ -147,6 +147,7 @@ public class AuthMiddleware
         }
 
         var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
 
         // Handle SysAdmin attribute
         if (sysAdminAttr != null)
@@ -162,7 +163,6 @@ public class AuthMiddleware
             return;
         }
 
-        // Extract organization and project IDs
         long? organizationId = null;
         var projectIds = new List<long>();
         long? capturedOrgId = null;
@@ -176,14 +176,27 @@ public class AuthMiddleware
             projectIds.Add(tempProjectId);
 
         if (context.Request.Query.TryGetValue("projectIds", out var queryProjectIds))
+        {
             foreach (var idValue in queryProjectIds)
-                if (!string.IsNullOrEmpty(idValue))
+            {
+                var ids = idValue.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var id in ids)
                 {
-                    var ids = idValue.Split(',', StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var id in ids)
-                        if (long.TryParse(id.Trim(), out var parsedId) && !projectIds.Contains(parsedId))
-                            projectIds.Add(parsedId);
+                    if (long.TryParse(id.Trim(), out var parsedId) && !projectIds.Contains(parsedId))
+                        projectIds.Add(parsedId);
                 }
+            }
+        }
+
+        if (projectIds.Any())
+        {
+            organizationId = await organizationService.ResolveOrganizationIdFromProjectsAsync(projectIds, organizationId);
+        }
+        else if (organizationId.HasValue)
+        {
+            organizationId = await organizationService.CheckExistence(null, organizationId);
+        }
+
 
         // Handle OrgAdmin attribute
         if (orgAdminAttr != null)
@@ -408,7 +421,7 @@ public class AuthMiddleware
             // IsProjectAdmin is pre-populated by UserContextMiddleware
         }
 
-        if (isSysAdmin)
+        if (isSysAdmin || isOrgAdmin)
         {
             await _next(context);
             return;

@@ -1410,6 +1410,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("banner");
 
+                    b.Property<bool>("CreateContainerPerProject")
+                        .HasColumnType("boolean")
+                        .HasColumnName("create_container_per_project");
+
                     b.Property<bool>("DefaultOrg")
                         .HasColumnType("boolean")
                         .HasColumnName("default_org");
@@ -1417,6 +1421,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<bool>("DisableFileTransfer")
+                        .HasColumnType("boolean")
+                        .HasColumnName("disable_file_transfer");
 
                     b.Property<bool>("IsArchived")
                         .ValueGeneratedOnAdd()
@@ -1630,6 +1638,11 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<string>("FilePath")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_path");
 
                     b.Property<bool>("IsArchived")
                         .ValueGeneratedOnAdd()

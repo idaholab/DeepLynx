@@ -12,7 +12,7 @@ public interface IObjectStorageBusiness
 
     Task<ObjectStorageResponseDto> CreateObjectStorage(
         long currentUserId, long organizationId, long? projectId,
-        CreateObjectStorageRequestDto dto);
+        CreateObjectStorageRequestDto dto, bool createContainer = true);
 
     Task<ObjectStorageResponseDto> UpdateObjectStorage(
         long currentUserId, long organizationId, long? projectId,
