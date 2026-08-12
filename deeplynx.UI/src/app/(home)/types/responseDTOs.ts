@@ -190,6 +190,7 @@ export type OrganizationResponseDto = {
   theme?: string;
   createContainerPerProject: boolean;
   disableFileTransfer?: boolean;
+  defaultObjectStorageId?: number
 };
 
 export type PermissionResponseDto = {
@@ -227,6 +228,7 @@ export type ProjectResponseDto = {
   isArchived: boolean;
   organizationId: number | string;
   banner?: string;
+  defaultObjectStorageId?: number | null;
 };
 
 export type ProjectStatResponseDto = {
