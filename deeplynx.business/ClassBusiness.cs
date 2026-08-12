@@ -705,7 +705,7 @@ public class ClassBusiness : IClassBusiness
         return classes;
     }
 
-    #region GetAllClasses (V1 - DEPRECATED, remove once v1 class endpoints are sunset)
+    #region Deprecated
 
     /// <summary>
     ///     [DEPRECATED - V1 ONLY] Retrieves all classes without pagination.
