@@ -153,7 +153,7 @@ export default function UploadCenterClient() {
 
     (async () => {
       try {
-        const classes = await getAllClasses(Number(projectId), true);
+        const { items: classes } = await getAllClasses(Number(projectId), true);
         if (cancelled) return;
         setAvailableClasses(classes);
       } catch (error) {

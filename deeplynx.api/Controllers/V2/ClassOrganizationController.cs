@@ -45,20 +45,23 @@ public class ClassOrganizationController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the class's project belongs</param>
     /// <param name="projects">(Optional)An array of project IDs within the organization to filter by</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived classes from the result (Default true)</param>
-    /// <returns>List of class response DTOs</returns>
+    /// <param name="paginatedRequestDto"> Pagination parameters</param>
+    /// <returns>Paginated list of class response DTOs</returns>
     [HttpGet(Name = "api_get_all_classes_organization")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "class")]
-    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetAllClasses(
+    public async Task<ActionResult<PaginatedResponse<ClassResponseDto>>> GetAllClasses(
         long organizationId,
         [FromQuery] long[]? projects,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+        paginatedRequestDto ??= new PaginatedRequestDto();
         var currentUserId = UserContextStorage.UserId;
         var isSysAdmin = UserContextStorage.IsSysAdmin;
         var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-        var classes = await _classBusiness.GetAllClasses(
-            currentUserId, organizationId, projects, hideArchived, isSysAdmin, isOrgAdmin);
+        var classes = await _classBusiness.GetAllClassesPaginated(
+            currentUserId, organizationId, projects, paginatedRequestDto, hideArchived, isSysAdmin, isOrgAdmin);
         return Ok(classes);
     }
 

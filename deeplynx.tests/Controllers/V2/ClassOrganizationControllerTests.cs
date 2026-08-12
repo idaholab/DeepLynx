@@ -19,7 +19,7 @@ namespace deeplynx.tests.Controllers.V2;
 ///     Implements IDisposable to reset UserContextStorage statics after every test,
 ///     preventing static state leaking across classes when the runner reuses threads.
 /// </summary>
-public class ClassOrganizationControllerTests : IDisposable
+public class  ClassOrganizationControllerTests : IDisposable
 {
     private readonly Mock<IClassBusiness> _mockClassBusiness;
     private readonly Mock<ILogger<ClassOrganizationController>> _mockLogger;
@@ -61,10 +61,17 @@ public class ClassOrganizationControllerTests : IDisposable
     [Fact]
     public async Task GetAllClasses_Returns200_WithList()
     {
-        var expected = new List<ClassResponseDto> { new(), new() };
+        var expected = new PaginatedResponse<ClassResponseDto>
+        {
+            Items = new List<ClassResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
-        _mockClassBusiness.Setup(b => b.GetAllClasses(UserId, OrgId, ProjectIdsConst, true))
-                     .ReturnsAsync(expected);
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                UserId, OrgId, ProjectIdsConst, It.IsAny<PaginatedRequestDto>(), true, false, false))
+            .ReturnsAsync(expected);
 
         var result = (await _classOrganizationController.GetAllClasses(
             OrgId, ProjectIdsConst, true)).Result as OkObjectResult;
@@ -77,23 +84,31 @@ public class ClassOrganizationControllerTests : IDisposable
     [Fact]
     public async Task GetAllClasses_Returns200_WithEmptyList()
     {
-        _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
-                     .ReturnsAsync([]);
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(),
+                         It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                     .ReturnsAsync(new PaginatedResponse<ClassResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
         var result = (await _classOrganizationController.GetAllClasses(
             OrgId, null, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<ClassResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<ClassResponseDto>>(result.Value);
     }
 
     [Fact]
     public async Task GetAllClasses_ThrowsException_WhenBusinessThrows()
     {
-        _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(),
+                         It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _classOrganizationController.GetAllClasses(
@@ -103,12 +118,68 @@ public class ClassOrganizationControllerTests : IDisposable
     [Fact]
     public async Task GetAllClasses_PassesIdsAndHideArchivedToBusinessLayer()
     {
-        _mockClassBusiness.Setup(b => b.GetAllClasses(UserId, OrgId, ProjectIdsConst, false))
-                     .ReturnsAsync([]);
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         UserId, OrgId, ProjectIdsConst, It.IsAny<PaginatedRequestDto>(), false, false, false))
+                     .ReturnsAsync(new PaginatedResponse<ClassResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
         await _classOrganizationController.GetAllClasses(OrgId, ProjectIdsConst, hideArchived: false);
 
-        _mockClassBusiness.Verify(b => b.GetAllClasses(UserId, OrgId, ProjectIdsConst, false), Times.Once);
+        _mockClassBusiness.Verify(b => b.GetAllClassesPaginated(
+            UserId, OrgId, ProjectIdsConst, It.IsAny<PaginatedRequestDto>(), false, false, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllClasses_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         UserId, OrgId, ProjectIdsConst,
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+                         true, false, false))
+                     .ReturnsAsync(new PaginatedResponse<ClassResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        await _classOrganizationController.GetAllClasses(OrgId, ProjectIdsConst, true);
+
+        _mockClassBusiness.Verify(b => b.GetAllClassesPaginated(
+            UserId, OrgId, ProjectIdsConst,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+            true, false, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllClasses_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var pagination = new PaginatedRequestDto { PageNumber = 4, PageSize = 50 };
+
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         UserId, OrgId, ProjectIdsConst,
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+                         true, false, false))
+                     .ReturnsAsync(new PaginatedResponse<ClassResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 4,
+                         PageSize = 50,
+                         TotalCount = 0
+                     });
+
+        await _classOrganizationController.GetAllClasses(OrgId, ProjectIdsConst, true, pagination);
+
+        _mockClassBusiness.Verify(b => b.GetAllClassesPaginated(
+            UserId, OrgId, ProjectIdsConst,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+            true, false, false), Times.Once);
     }
 
     #endregion
@@ -448,7 +519,7 @@ public class ClassOrganizationControllerTests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(ClassOrganizationController.GetAllClasses),
-            "organizationId", "projects", "hideArchived");
+            "organizationId", "projects", "hideArchived", "paginatedRequestDto");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
         AssertHasAuthAttribute(method, "read", "class");

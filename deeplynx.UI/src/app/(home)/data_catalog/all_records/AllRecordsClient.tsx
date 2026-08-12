@@ -540,7 +540,7 @@ export default function DataCatalogClient({
       const projectIds = effectiveProjectIds.map(Number).filter(Number.isFinite);
 
       try {
-        const classes = await getAllClassesOrg(organizationId, projectIds, true);
+        const { items: classes } = await getAllClassesOrg(organizationId, projectIds, true);
 
         setAvailableClassNames(
           Array.from(new Set(classes.map((item) => item.name).filter(Boolean))),
