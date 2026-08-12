@@ -26,6 +26,7 @@ const MAX_TIMEOUT_RETRIES = 2;              // Retry the same claimed range at m
 const SIZING_EMA_ALPHA = 0.3;               // Smooths the PER-WORKER sample used to decide next chunk size
 const DISPLAY_EMA_ALPHA = 0.35;             // Smooths the AGGREGATE sample used for the user-facing speed
 const PROGRESS_TICK_MS = 400;               // How often to sample aggregate bytes for display
+const SPEED_STALE_AFTER_MS = 5_000;
 
 export type BatchUploadProgressEvent = {
   completed: number;
@@ -590,19 +591,44 @@ async function parseMetadataFile(file?: File | null): Promise<CreateRecordFileUp
 class AggregateSpeedSampler {
   private lastBytes = 0;
   private lastTime = performance.now();
+  private lastProgressTime = performance.now();
   private smoothedSpeed: number | null = null;
 
   sample(currentBytes: number): number {
     const now = performance.now();
-    const dtSeconds = (now - this.lastTime) / 1000;
-    if (dtSeconds <= 0) return this.smoothedSpeed ?? 0;
 
-    const instantSpeed = (currentBytes - this.lastBytes) / dtSeconds;
+    if (currentBytes === this.lastBytes) {
+      if (
+        now - this.lastProgressTime >
+        SPEED_STALE_AFTER_MS
+      ) {
+        return 0;
+      }
+
+      return this.smoothedSpeed ?? 0;
+    }
+
+    const dtSeconds =
+      (now - this.lastTime) / 1000;
+
+    if (dtSeconds <= 0) {
+      return this.smoothedSpeed ?? 0;
+    }
+
+    const instantSpeed =
+      (currentBytes - this.lastBytes) / dtSeconds;
+
     this.smoothedSpeed =
-      this.smoothedSpeed == null ? instantSpeed : DISPLAY_EMA_ALPHA * instantSpeed + (1 - DISPLAY_EMA_ALPHA) * this.smoothedSpeed;
+      this.smoothedSpeed == null
+        ? instantSpeed
+        : DISPLAY_EMA_ALPHA * instantSpeed +
+        (1 - DISPLAY_EMA_ALPHA) *
+        this.smoothedSpeed;
 
     this.lastBytes = currentBytes;
     this.lastTime = now;
+    this.lastProgressTime = now;
+
     return this.smoothedSpeed;
   }
 }
