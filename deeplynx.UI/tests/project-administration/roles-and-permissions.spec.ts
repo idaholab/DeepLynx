@@ -1,5 +1,5 @@
 import { test, expect, APIRequestContext, Page } from "../fixtures";
-import { sysAdmin, ORGS, PROJECTS, orgAdminA } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS, orgAdminA, projectAdminX } from "../deeplynx-config";
 import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
 import { getOrgIdByName } from "../helpers/api";
 import { getProjectIdByName } from "../helpers/upload-helpers";
@@ -85,6 +85,23 @@ test.describe("Org Admin editing Permissions of Proj level SLs", () => {
     await page.getByTitle(`Permission to delete ${uniqueLabelName} labeled files`).getByLabel('delete file').check();
     await page.getByRole('button', { name: 'Save Changes' }).click();
     await expect(page.locator('div').filter({ hasText: 'Permissions updated' }).first()).toBeVisible();
+  });
+});
+
+test.describe("Project Admin editing Permissions of Proj level SLs on Org level roles", () => {
+  test.use({
+    actingUser: projectAdminX,
+    actingOrg: ORGS.orgA,
+    actingProject: PROJECTS.projectX,
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await expect(page).toHaveURL(/\/project\/\d+/);
+    await navigateToProjLevelSensitivityLabelPermissions(page);
+  });
+
+  test("Project Admin can't edit proj level sensitivity label permissions for Org level roles", async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Edit Permissions' })).toBeDisabled();
   });
 });
 
