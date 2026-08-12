@@ -27,6 +27,9 @@ public static class ContainerName
 
         string guid = Guid.NewGuid().ToString();
 
-        return $"{truncatedInputString}-{guid}".ToLower();
+        string finalString = $"{truncatedInputString}-{guid}".ToLower().Replace("--", "-");
+
+
+        return finalString;
     }
 }
