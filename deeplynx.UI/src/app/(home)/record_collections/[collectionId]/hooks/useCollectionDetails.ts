@@ -157,10 +157,11 @@ export function useCollectionDetails({
   useEffect(() => {
     const loadRecordMetadataNames = async () => {
       try {
-        const [classes, dataSources] = await Promise.all([
+        const [classesResponse, dataSources] = await Promise.all([
           getAllClasses(projectId, false),
           getAllDataSources(projectId, false),
         ]);
+        const classes = classesResponse.items;
 
         setClassNameById(
           Object.fromEntries(classes.map((item) => [item.id, item.name])),
