@@ -350,7 +350,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
                   </li>
                 ) : (
                   projects.map((proj) => (
-                    <li key={proj.name}>
+                    <li key={proj.id}>
                       <button
                         onClick={() => handleProjectClick(proj)}
                         className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${isProjectActive(proj.id)
