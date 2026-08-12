@@ -29,8 +29,7 @@ The repository is organized as a .NET solution with separate projects for API, b
 | `deeplynx.models`     | Request DTOs, response DTOs, configuration models, and API-facing data shapes.                                                                            |
 | `deeplynx.datalayer`  | Entity Framework contexts, entity models, migrations, database version checks, and migration runner support.                                              |
 | `deeplynx.helpers`    | Shared middleware, auth helpers, validation helpers, cache helpers, clients, exceptions, SignalR hubs, and cross-cutting utilities.                       |
-| `deeplynx.tests`      | .NET integration/unit tests, especially business-layer tests backed by Testcontainers.                                                                    |
-| `deeplynx.apitest`    | Python API-level tests.                                                                                                                                   |
+| `deeplynx.tests`      | .NET integration/unit tests, for business layer, helpers, and controllers backed by Testcontainers.                                                       |
 | `documentation`       | Architecture notes, ADRs, and developer documentation.                                                                                                    |
 | `deeplynx.mcp`        | MCP server and tools. Keep this separate from normal API behavior unless the change explicitly touches MCP.                                               |
 
@@ -712,9 +711,10 @@ routing and from the generated API documentation:
 ##### V1 Removal Application
 
 For the current v1 retirement, the deprecation date is August 5, 2026. No sunset
-date has been scheduled. The Next.js UI and `deeplynx.mcp` remain pinned to v1
-as recorded in `documentation/api-consumer-versioning.md`, so v1 removal is
-blocked until both consumers have migrated and their v2 contract tests pass.
+date has been scheduled. The Next.js UI is deployment-configurable and currently
+targets v2 in the standard local and Dev configurations, while `deeplynx.mcp`
+remains pinned to v1 as recorded in `documentation/api-consumer-versioning.md`.
+V1 removal is blocked until MCP has migrated and its v2 contract tests pass.
 External v1 usage must also satisfy the approved removal threshold.
 
 The dedicated v1 removal ticket must build and maintain an exact inventory. At

@@ -179,6 +179,10 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Context.ObjectStorages.Add(objectStorage);
         await Context.SaveChangesAsync();
         os1 = objectStorage.Id;
+
+        testOrg.DefaultObjectStorageId = (int?)os1;
+        Context.Organizations.Update(testOrg);
+        await Context.SaveChangesAsync();
     }
 
     private void AssertRolePermissions(

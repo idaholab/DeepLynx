@@ -1,32 +1,69 @@
-/**
- * The Nexus API version used by the UI.
- *
- * Changing this constant is an API-contract cutover. In particular, moving to
- * v2 requires the UI's non-2xx handling to support RFC 7807 ProblemDetails.
- */
-export const NEXUS_API_VERSION = "v1" as const;
-export const NEXUS_API_PATH = `/api/${NEXUS_API_VERSION}`;
+// src/app/lib/api-version.ts
 
-const VERSIONED_API_SUFFIX = /\/api\/(v[^/]+)$/i;
+const API_VERSION_PATTERN = /^v[1-9]\d*$/i;
+const VERSIONED_API_SUFFIX = /\/api\/(v[1-9]\d*)$/i;
+
+/** Return a normalized API version, rejecting malformed URL segments. */
+export function normalizeNexusApiVersion(version: string): string {
+  const normalizedVersion = version.trim().toLowerCase();
+
+  if (!API_VERSION_PATTERN.test(normalizedVersion)) {
+    throw new Error(
+      `Invalid Nexus API version "${version}"; expected "v" followed by a positive integer`,
+    );
+  }
+
+  return normalizedVersion;
+}
 
 /**
- * Compose the reviewed API version with an environment-provided origin/base
- * path. A trailing /api/v1 is accepted for backwards-compatible deployments,
- * but a different embedded version is rejected instead of silently overriding
- * the code-level pin.
+ * Return the environment-selected API version.
+ * NEXT_PUBLIC_API_VERSION must be set by the environment (dev, test, preflight,
+ * and production all enforce this at build time) — there is no hardcoded fallback.
  */
-export function withNexusApiVersion(baseUrl: string): string {
+export function getDefaultNexusApiVersion(): string {
+  const version = process.env.NEXT_PUBLIC_API_VERSION;
+
+  if (!version) {
+    throw new Error(
+      "NEXT_PUBLIC_API_VERSION is not set. This must be provided by the build environment.",
+    );
+  }
+
+  return normalizeNexusApiVersion(version);
+}
+
+/** Normalize an environment-provided origin or API URL to its /api base path. */
+export function getNexusApiBaseUrl(baseUrl: string): string {
   const base = baseUrl.trim().replace(/\/+$/, "");
-  const embeddedVersion = base.match(VERSIONED_API_SUFFIX)?.[1];
 
-  if (embeddedVersion) {
-    if (embeddedVersion.toLowerCase() !== NEXUS_API_VERSION) {
-      throw new Error(
-        `Nexus API URL embeds ${embeddedVersion}; this consumer is pinned to ${NEXUS_API_VERSION}`,
-      );
-    }
+  if (VERSIONED_API_SUFFIX.test(base)) {
+    return base.replace(VERSIONED_API_SUFFIX, "/api");
+  }
+
+  if (/\/api$/i.test(base)) {
     return base;
   }
 
-  return `${base}${NEXUS_API_PATH}`;
+  return `${base}/api`;
+}
+
+/**
+ * Compose an API version with an environment-provided origin or /api base path.
+ * Host-only and legacy versioned base URLs remain supported during migration.
+ * The entire UI targets the single version selected by the environment.
+ */
+export function withNexusApiVersion(baseUrl: string): string {
+  return `${getNexusApiBaseUrl(baseUrl)}/${getDefaultNexusApiVersion()}`;
+}
+
+/** Append an endpoint path to an already-versioned Nexus API base URL. */
+export function appendNexusApiPath(apiBaseUrl: string, path: string): string {
+  const base = apiBaseUrl.trim().replace(/\/+$/, "");
+  return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
+}
+
+/** Build the Scalar documentation URL, whose version follows /api/scalar. */
+export function getNexusScalarUrl(baseUrl: string): string {
+  return `${getNexusApiBaseUrl(baseUrl)}/scalar/${getDefaultNexusApiVersion()}`;
 }

@@ -1,20 +1,16 @@
 import { test, expect } from "../../fixtures";
-import { sysAdmin } from "../../deeplynx-config";
-import { navigateToProjectDashboard, navigateToUploadCenter } from "../../helpers/upload-helpers";
-
-
-const ORG_NAME = "PW Org A";
+import { sysAdmin, ORGS, PROJECTS } from "../../deeplynx-config";
+import { navigateToUploadCenter } from "../../helpers/upload-helpers";
 
 test.describe("Check Upload Center UI Visibility", () => {
 
     test.use({
         actingUser: sysAdmin,
-        actingOrg: ORG_NAME,
-        actingProject: "PW Project X",
+        actingOrg: ORGS.orgA,
+        actingProject: PROJECTS.projectX,
     });
 
     test.beforeEach(async ({ page }) => {
-        await navigateToProjectDashboard(page);
         await navigateToUploadCenter(page);
     });
 
@@ -40,6 +36,16 @@ test.describe("Check Upload Center UI Visibility", () => {
         await expect(
             page.getByRole("radio", { name: "Bulk Metadata" }),
         ).toBeVisible();
+    });
+
+    test("File Upload radio is selected by default", async ({ page }) => {
+        await expect(
+            page.getByRole("radio", { name: "File Upload" }),
+        ).toBeChecked();
+
+        await expect(
+            page.getByRole("radio", { name: "Bulk Metadata" }),
+        ).not.toBeChecked();
     });
 
     test("File Upload is the default mode", async ({ page }) => {

@@ -153,6 +153,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         var project3 = new Project { Name = "Test Project 3", OrganizationId = oid2 };
         Context.Projects.Add(project);
         Context.Projects.Add(project2);
+        Context.Projects.Add(project3);
         await Context.SaveChangesAsync();
         pid = project.Id;
         pid2 = project2.Id;
@@ -414,6 +415,17 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task GetObjectStorage_Success_CanIncludeArchived()
     {
         // Act
+
+        var organization = Context.Organizations.First(o => o.Id == organizationId);
+        organization.DefaultObjectStorageId = (int?)os2;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)os2;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var objectStorage = await _objectStorageBusiness.GetObjectStorage(
             organizationId, pid, archivedOs, false);
 
@@ -626,11 +638,11 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     [Fact]
     public async Task Update_Success_ReturnsUpdatedFilesDeletable()
     {
-        var dto = new UpdateObjectStorageRequestDto{ Name = "Updated Name", FilesDeletable = true };
+        var dto = new UpdateObjectStorageRequestDto { Name = "Updated Name", FilesDeletable = true };
         var os = await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, null, os7, dto);
         Assert.True(os.FilesDeletable);
 
-        dto = new UpdateObjectStorageRequestDto{ Name = "Updated Name", FilesDeletable = false };
+        dto = new UpdateObjectStorageRequestDto { Name = "Updated Name", FilesDeletable = false };
         os = await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, null, os7, dto);
         Assert.False(os.FilesDeletable);
     }
@@ -799,6 +811,16 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task Archive_Fails_IfObjectStorageIsDefault()
     {
         // Act & Assert
+        var organization = Context.Organizations.First(o => o.Id == organizationId);
+        organization.DefaultObjectStorageId = (int?)os1;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)os1;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _objectStorageBusiness.ArchiveObjectStorage(uid, organizationId, pid, os1));
         Assert.Contains(
@@ -897,6 +919,17 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task GetDefaultObjectStorage_Success_ReturnsDefaultObject()
     {
         // Act
+
+        var organization = Context.Organizations.First(o => o.Id == organizationId);
+        organization.DefaultObjectStorageId = (int?)os1;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)os1;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
             organizationId, pid);
 
@@ -909,6 +942,12 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task GetDefaultObjectStorage_Success_ReturnsDefaultObjectInOrganization()
     {
         // Act
+
+        var organization = Context.Organizations.First(o => o.Id == organizationId);
+        organization.DefaultObjectStorageId = (int?)os6;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
             organizationId, null);
 
@@ -924,13 +963,23 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _objectStorageBusiness.GetDefaultObjectStorage(oid3, null));
-        Assert.Contains("Default object storage not found", exception.Message);
+        Assert.Contains("Default object storage not set", exception.Message);
     }
 
     [Fact]
     public async Task GetDefaultObjectStorage_Success_ReturnsDefaultObjectInherited()
     {
         // Act
+        var organization = Context.Organizations.First(o => o.Id == oid2);
+        organization.DefaultObjectStorageId = (int?)os10;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid3);
+        project.DefaultObjectStorageId = (int?)os10;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
             oid2, pid3);
 
@@ -953,17 +1002,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(newDefaultObjectStorage);
         Assert.Equal(os2, newDefaultObjectStorage.Id);
-        Assert.True(newDefaultObjectStorage.Default);
-
-        // Clear the change tracker to force a fresh query from the database
-        Context.ChangeTracker.Clear();
-
-        var oldDefaultObjectStorage = await Context.ObjectStorages
-            .Where(os => os.Id == os1 && os.ProjectId == pid)
-            .FirstOrDefaultAsync();
-        Assert.NotNull(oldDefaultObjectStorage);
-        Assert.Equal(os1, oldDefaultObjectStorage.Id);
-        Assert.False(oldDefaultObjectStorage.Default);
     }
 
     [Fact]
@@ -977,16 +1015,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(newDefaultObjectStorage);
         Assert.Equal(os7, newDefaultObjectStorage.Id);
-        Assert.True(newDefaultObjectStorage.Default);
-
-        // Clear the change tracker to force a fresh query from the database
-        Context.ChangeTracker.Clear();
-
-        var oldDefaultObjectStorage = await Context.ObjectStorages
-            .Where(os => os.Id == os6 && os.OrganizationId == organizationId).FirstOrDefaultAsync();
-        Assert.NotNull(oldDefaultObjectStorage);
-        Assert.Equal(os6, oldDefaultObjectStorage.Id);
-        Assert.False(oldDefaultObjectStorage.Default);
     }
 
     [Fact]

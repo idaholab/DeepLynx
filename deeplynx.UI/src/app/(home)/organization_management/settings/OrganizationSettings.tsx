@@ -29,7 +29,7 @@ import {
 } from "@/app/lib/themes/organizationTheme";
 import { applyOrganizationTheme } from "@/app/lib/themes/themeMode";
 import { isInsightHidden } from "@/app/lib/feature_flags";
-import { archiveOrganizationObjectStorage, createOrganizationObjectStorage, deleteOrganizationObjectStorage, getAllOrganizationObjectStorages, getDefaultOrganizationObjectStorage, setDefaultOrganizationObjectStorage, updateOrganizationObjectStorage } from "@/app/lib/client_service/object_storage_services.client";
+import { archiveOrganizationObjectStorage, createOrganizationObjectStorage, deleteOrganizationObjectStorage, getAllOrganizationObjectStorages, getDefaultOrganizationObjectStorage, updateOrganizationObjectStorage } from "@/app/lib/client_service/object_storage_services.client";
 import { ObjectStorageResponseDto } from "../../types/responseDTOs";
 import { CreateObjectStorageRequestDto, UpdateObjectStorageRequestDto, UpdateOrganizationRequestDto } from "../../types/requestDTOs";
 
@@ -45,6 +45,7 @@ interface StorageConfig {
 }
 
 interface StorageFormData {
+  id: number;
   name: string;
   config: StorageConfig;
   default: boolean;
@@ -108,8 +109,9 @@ const OrganizationSettings = () => {
   const [isEditStorageModalOpen, setIsEditStorageModalOpen] = useState(false);
   const [editingStorage, setEditingStorage] =
     useState<ObjectStorageResponseDto | null>(null);
-  const [storageType, setStorageType] = useState<string>("filesystem");
+  const [storageType, setStorageType] = useState<string>("azure_blob");
   const [storageFormData, setStorageFormData] = useState<StorageFormData>({
+    id: -1,
     name: "",
     config: {},
     default: false,
@@ -317,9 +319,33 @@ const OrganizationSettings = () => {
       if (!organization?.organizationId) return;
 
       try {
+        let effectiveDefaultStorage: ObjectStorageResponseDto | null = null;
+
         const orgData = await getOrganization(organization.organizationId as number);
-        const objectStorage = await getDefaultOrganizationObjectStorage(organization.organizationId as number);
-        setDefaultStorage(objectStorage);
+
+        const defaultStorageData = await getDefaultOrganizationObjectStorage(organization.organizationId as number)
+
+        const storages = await getAllOrganizationObjectStorages(organization.organizationId as number, false);
+
+        const orgDefaultStorage = storages.find(
+          (storage) => String(storage.id) === String(orgData.defaultObjectStorageId)
+        ) ?? null;
+
+        const defaultStorageId = orgData?.defaultObjectStorageId;
+
+        if (defaultStorageId) {
+          effectiveDefaultStorage = storages.find(
+            (storage) => String(storage.id) === String(defaultStorageId),
+          ) ?? defaultStorageData ?? orgDefaultStorage ?? null;
+        } else {
+          effectiveDefaultStorage = defaultStorageData ?? orgDefaultStorage ?? null;
+        }
+
+        if (!effectiveDefaultStorage) {
+          console.warn("No default storage found based on defaultObjectStorageId.");
+        }
+
+        setDefaultStorage(defaultStorage);
         setCreateContainerPerProject(orgData.createContainerPerProject ?? false);
       } catch (error) {
         console.error("Failed to load organization settings", error);
@@ -339,46 +365,55 @@ const OrganizationSettings = () => {
     try {
       setIsLoadingStorages(true);
 
-      // Fetch all available storages for the organization
       const storages = await getAllOrganizationObjectStorages(
         organization.organizationId as number,
-        false, // Don't hide archived storages
+        false,
       );
 
-      // Fetch the current default storage
+      let effectiveDefaultStorage: typeof storages[0] | null = null;
       try {
+
         const defaultStorageData = await getDefaultOrganizationObjectStorage(
           organization.organizationId as number,
         );
+
         const orgDefaultStorage =
           storages.find((storage) => storage.default) ?? null;
-        const effectiveDefaultStorage =
-          orgDefaultStorage ?? defaultStorageData;
 
-        setDefaultStorage(effectiveDefaultStorage);
-        setSelectedStorageId(effectiveDefaultStorage.id as number);
-        setAvailableStorages(
-          storages.map((storage) => ({
-            ...storage,
-            default:
-              String(storage.id) === String(effectiveDefaultStorage.id),
-          })),
-        );
+        const orgData = await getOrganization(organization.organizationId as number);
+
+        const defaultStorageId = orgData?.defaultObjectStorageId;
+
+        if (defaultStorageId) {
+          effectiveDefaultStorage = storages.find(
+            (storage) => String(storage.id) === String(defaultStorageId),
+          ) ?? null;
+        } else {
+          effectiveDefaultStorage = defaultStorageData ?? orgDefaultStorage ?? null
+        }
+
+        if (!effectiveDefaultStorage) {
+          effectiveDefaultStorage = storages.find((storage) => storage.default) ?? null;
+        }
       } catch (error) {
-        setDefaultStorage(null);
-        setSelectedStorageId(null);
-        setAvailableStorages(storages);
+        effectiveDefaultStorage = storages.find((storage) => storage.default) ?? null;
       }
+
+      setDefaultStorage(effectiveDefaultStorage);
+      setSelectedStorageId(effectiveDefaultStorage?.id as number ?? null);
+      setAvailableStorages(
+        storages.map((storage) => ({
+          ...storage,
+          default: String(storage.id) === String(effectiveDefaultStorage?.id),
+        })),
+      );
     } catch (error) {
       console.error("Error loading organization storages:", error);
       toast.error(t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS);
     } finally {
       setIsLoadingStorages(false);
     }
-  }, [
-    organization?.organizationId,
-    t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS,
-  ]);
+  }, [organization?.organizationId, t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS]);
 
   useEffect(() => {
     loadStorages();
@@ -398,14 +433,12 @@ const OrganizationSettings = () => {
     try {
       setIsSavingStorage(true);
 
-      await setDefaultOrganizationObjectStorage(
+      await updateOrganization(
         organization.organizationId as number,
-        selectedStorageId,
+        { defaultObjectStorageId: selectedStorageId }
       );
 
-      const updatedDefault = availableStorages.find(
-        (s) => s.id === selectedStorageId,
-      );
+      const updatedDefault = availableStorages.find((s) => s.id === selectedStorageId);
       if (updatedDefault) {
         setDefaultStorage({ ...updatedDefault, default: true });
         setAvailableStorages((currentStorages) =>
@@ -416,9 +449,7 @@ const OrganizationSettings = () => {
         );
       }
 
-      toast.success(
-        t.translations.DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY,
-      );
+      toast.success(t.translations.DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY);
     } catch (error) {
       console.error("Failed to set default organization storage:", error);
       toast.error(
@@ -432,8 +463,8 @@ const OrganizationSettings = () => {
   };
 
   const resetStorageForm = () => {
-    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false, filesDeletable: true });
-    setStorageType("filesystem");
+    setStorageFormData({ id: -1, name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false, filesDeletable: false });
+    setStorageType("azure_blob");
     setFilesystemPath("");
     setAzureEndpoint("");
     setAzureBucketName("");
@@ -467,7 +498,7 @@ const OrganizationSettings = () => {
         azureObjectConfig: {
           azureConnectionString: azureEndpoint,
           azureContainerName: azureBucketName,
-          existingContainer: storageFormData.existingContainer || false
+          existingContainer: storageFormData.existingContainer || false,
         },
       };
     } else if (storageType === "aws_s3") {
@@ -496,8 +527,17 @@ const OrganizationSettings = () => {
 
       await updateOrganization(
         organization.organizationId as number,
-        updateOrganizationDto
+        updateOrganizationDto,
       );
+
+      if (storageFormData.default) {
+        await updateOrganization(
+          organization.organizationId as number,
+          {
+            defaultObjectStorageId: createdStorage.id as number,
+          }
+        );
+      }
 
       setCreateContainerPerProject(storageFormData.createContainerPerProject);
       setExistingContainer(storageFormData.existingContainer as boolean);
@@ -579,15 +619,26 @@ const OrganizationSettings = () => {
 
       await updateOrganization(
         organization.organizationId as number,
-        updateOrganizationDto
+        updateOrganizationDto,
       );
+
+      if (storageFormData.default) {
+        await updateOrganization(
+          organization.organizationId as number,
+          {
+            ...updateOrganizationDto,
+            defaultObjectStorageId: editingStorage.id as number,
+          }
+        );
+      }
+
       setCreateContainerPerProject(storageFormData.createContainerPerProject);
       setExistingContainer(storageFormData.existingContainer as boolean);
 
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
       setIsEditStorageModalOpen(false);
       setEditingStorage(null);
-      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false, filesDeletable: true });
+      setStorageFormData({ id: -1, name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false, filesDeletable: false });
       loadStorages();
     } catch (error) {
       console.error("Failed to update organization storage:", error);
@@ -601,6 +652,11 @@ const OrganizationSettings = () => {
 
   const handleDeleteStorage = async () => {
     if (!organization?.organizationId || !deleteStorageId) return;
+
+    if (defaultStorage?.id === deleteStorageId) {
+      toast.error(t.translations.DEFAULT_STORAGE_CANNOT_BE_DELETED_OR_ARCHIVED);
+      return;
+    }
 
     try {
       await deleteOrganizationObjectStorage(
@@ -624,6 +680,12 @@ const OrganizationSettings = () => {
   const handleArchiveStorage = async () => {
     if (!organization?.organizationId || !archiveStorageId) return;
 
+
+    if (archiveAction && defaultStorage?.id === archiveStorageId) {
+      toast.error(t.translations.DEFAULT_STORAGE_CANNOT_BE_DELETED_OR_ARCHIVED);
+      return;
+    }
+
     try {
       await archiveOrganizationObjectStorage(
         organization.organizationId as number,
@@ -646,12 +708,14 @@ const OrganizationSettings = () => {
     }
   };
 
+
   const openEditStorageModal = (storage: ObjectStorageResponseDto) => {
     if (storage.isArchived) {
       return;
     }
     setEditingStorage(storage);
     setStorageFormData({
+      id: storage.id as number,
       name: storage.name,
       config: {},
       default: storage.default,
