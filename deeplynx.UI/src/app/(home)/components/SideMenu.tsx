@@ -232,6 +232,9 @@ const SideMenu: React.FC<SideMenuProps> = ({
     if (targetPath === "/upload_center" && organization?.disableFileTransfer)
       return true;
 
+    // No project selected and in data catalog side bar should be disabled
+    if (pathname === "/data_catalog/all_records" && !activeProject) return true;
+
     return false;
   };
 
@@ -347,7 +350,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
                   </li>
                 ) : (
                   projects.map((proj) => (
-                    <li key={proj.id}>
+                    <li key={proj.name}>
                       <button
                         onClick={() => handleProjectClick(proj)}
                         className={`w-full text-left py-2 px-4 rounded transition text-sm flex items-center ${isProjectActive(proj.id)
