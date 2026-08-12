@@ -709,7 +709,7 @@ public class ClassBusiness : IClassBusiness
 
     /// <summary>
     ///     [DEPRECATED - V1 ONLY] Retrieves all classes without pagination.
-    ///     Superseded by <see cref="GetAllClassesPaginated"/>. Do not call this from new (v2) code;
+    ///     Superseded by <see cref="GetAllClassesPaginated"/>. Do not call this from new controller versions;
     ///     it exists solely to back the deprecated v1 class controllers and should be deleted once
     ///     those v1 endpoints are sunset.
     /// </summary>
