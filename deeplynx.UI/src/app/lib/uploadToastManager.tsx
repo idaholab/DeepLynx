@@ -29,6 +29,7 @@ export type UploadToastState = {
   totalBytes?: number;
   speedBytesPerSec?: number;
   isCancelling?: boolean;
+  isFinalizing?: boolean;
   onCancel?: () => void;
   cancelDisabled?: boolean;
 };
@@ -136,15 +137,19 @@ function UploadProgressToast(props: UploadProgressToastProps) {
   const speedLabel = formatSpeed(props.speedBytesPerSec);
 
   // Falls back to props.message (e.g. "Preparing upload...") when byte totals aren't known yet.
-  const byteSummary = hasByteInfo
-    ? `${formatBytes(bytesUploaded)} / ${formatBytes(totalBytes)}${speedLabel ? ` · ${speedLabel}` : ""}`
-    : props.message;
+  const byteSummary = props.isFinalizing
+    ? t.translations.FINALIZING_UPLOAD_MESSAGE
+    : hasByteInfo
+      ? `${formatBytes(bytesUploaded)} / ${formatBytes(totalBytes)}${speedLabel ? ` · ${speedLabel}` : ""}`
+      : props.message;
 
   const status = props.isCancelling
     ? t.translations.CANCELLING_SHORT
-    : hasProgress
-      ? `${t.translations.UPLOADING_PERCENT_PREFIX} ${Math.round(progress)}%`
-      : props.title;
+    : props.isFinalizing
+      ? t.translations.FINALIZING_UPLOAD
+      : hasProgress
+        ? `${t.translations.UPLOADING_PERCENT_PREFIX} ${Math.round(progress)}%`
+        : props.title;
 
   if (props.minimized) {
     return (

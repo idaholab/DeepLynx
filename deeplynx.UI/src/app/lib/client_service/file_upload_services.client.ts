@@ -276,17 +276,8 @@ async function uploadFileChunked({
       onProgress
     );
 
-    const result = await completeChunkedUpload({
-      organizationId,
-      projectId,
-      dataSourceId,
-      objectStorageId,
-      uploadId,
-      fileName: file.name,
-      totalChunks: chunksSent,
-      metadataFile
-    });
-
+    // All bytes have been uploaded. The backend may now take some time
+    // to assemble/finalize the uploaded chunks.
     onProgress?.({
       percentComplete: 100,
       chunksCompleted: chunksSent,
@@ -297,6 +288,18 @@ async function uploadFileChunked({
       totalBytes: file.size,
       chunkSize: maxChunkSize,
       speedBytesPerSec: 0,
+      isFinalizing: true,
+    });
+
+    const result = await completeChunkedUpload({
+      organizationId,
+      projectId,
+      dataSourceId,
+      objectStorageId,
+      uploadId,
+      fileName: file.name,
+      totalChunks: chunksSent,
+      metadataFile
     });
 
     return result;

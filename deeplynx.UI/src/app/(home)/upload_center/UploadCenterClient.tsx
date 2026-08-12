@@ -326,8 +326,9 @@ export default function UploadCenterClient() {
         bytesUploaded: progress.bytesUploaded,
         totalBytes: progress.totalBytes,
         speedBytesPerSec: progress.speedBytesPerSec,
+        isFinalizing: progress.isFinalizing,
         isCancelling: cancelling,
-        onCancel: progress.uploadId ? cancelFromToast : undefined,
+        onCancel: progress.uploadId && !progress.isFinalizing ? cancelFromToast : undefined,
         cancelDisabled: cancelling,
       });
     };
