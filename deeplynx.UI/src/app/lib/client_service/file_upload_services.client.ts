@@ -218,35 +218,6 @@ class ChunkClaimState {
   }
 }
 
-// Samples cumulative confirmed bytes on a fixed wall-clock interval.
-class AggregateSpeedSampler {
-  private lastBytes = 0;
-  private lastTime = performance.now();
-  private smoothedSpeed: number | null = null;
-
-  sample(currentBytes: number): number {
-    const now = performance.now();
-    const dtSeconds = (now - this.lastTime) / 1000;
-    if (dtSeconds <= 0) return this.smoothedSpeed ?? 0;
-
-    const instantSpeed = (currentBytes - this.lastBytes) / dtSeconds;
-    this.smoothedSpeed =
-      this.smoothedSpeed == null ? instantSpeed : DISPLAY_EMA_ALPHA * instantSpeed + (1 - DISPLAY_EMA_ALPHA) * this.smoothedSpeed;
-
-    this.lastBytes = currentBytes;
-    this.lastTime = now;
-    return this.smoothedSpeed;
-  }
-}
-
-function clampChunkSize(size: number, maxChunkSize: number): number {
-  return Math.min(maxChunkSize, Math.max(MIN_CHUNK_SIZE, Math.round(size)));
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function uploadFileChunked({
   file,
   organizationId,
@@ -563,6 +534,10 @@ export async function cancelChunkedUpload(options: {
 // UTILITIES
 // ============================================================================
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function parseMetadataFile(file?: File | null): Promise<CreateRecordFileUploadRequestDto | undefined> {
   if (!file) return undefined;
 
@@ -576,4 +551,28 @@ async function parseMetadataFile(file?: File | null): Promise<CreateRecordFileUp
   } catch {
     throw new Error("Failed to parse metadata file.")
   }
+}
+
+class AggregateSpeedSampler {
+  private lastBytes = 0;
+  private lastTime = performance.now();
+  private smoothedSpeed: number | null = null;
+
+  sample(currentBytes: number): number {
+    const now = performance.now();
+    const dtSeconds = (now - this.lastTime) / 1000;
+    if (dtSeconds <= 0) return this.smoothedSpeed ?? 0;
+
+    const instantSpeed = (currentBytes - this.lastBytes) / dtSeconds;
+    this.smoothedSpeed =
+      this.smoothedSpeed == null ? instantSpeed : DISPLAY_EMA_ALPHA * instantSpeed + (1 - DISPLAY_EMA_ALPHA) * this.smoothedSpeed;
+
+    this.lastBytes = currentBytes;
+    this.lastTime = now;
+    return this.smoothedSpeed;
+  }
+}
+
+function clampChunkSize(size: number, maxChunkSize: number): number {
+  return Math.min(maxChunkSize, Math.max(MIN_CHUNK_SIZE, Math.round(size)));
 }
