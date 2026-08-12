@@ -429,6 +429,20 @@ public class FileBusiness : IFileControllerBusiness
         };
     }
 
+    public async Task<FileUploadSessionResponseDto> StartUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadInitRequestDto request)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        return await StartUpload(organizationId, projectId, record.DataSourceId, record.ObjectStorageId, request);
+    }
+
     /// <summary>
     ///     Upload File Chunk
     /// </summary>
@@ -560,6 +574,93 @@ public class FileBusiness : IFileControllerBusiness
         await InvalidateProjectStorageSizeCache(projectId);
 
         return createdRecord;
+    }
+
+    /// <summary>
+    ///     Complete Chunked File Upload and replace an existing file record
+    /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="request">File upload completion request DTO</param>
+    /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if the record is embedded</param>
+    /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if the record is embedded</param>
+    /// <param name="userJwt">User JWT for Insight embedding calls</param>
+    /// <returns>Record response DTO containing updated file information</returns>
+    public async Task<RecordResponseDto> CompleteUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadCompleteRequestDto request,
+        long? vlmConfigId = null,
+        long? embeddingModelConfigId = null,
+        string? userJwt = null)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+        var guid = Guid.NewGuid();
+
+        var uri = await fileBusiness.CompleteUpload(organizationId, projectId, record.DataSourceId,
+            objectStorage.Config, request, guid);
+        var fileContentHash = await fileBusiness.CalculateStoredFileContentHash(uri, objectStorage.Config);
+        var fileSize = await fileBusiness.GetFileSize(uri, objectStorage.Config);
+        var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
+
+        await fileBusiness.DeleteFile(record, objectStorage.Config);
+
+        var updateRecordRequest = new UpdateRecordRequestDto
+        {
+            Properties = new JsonObject
+            {
+                ["fileType"] = fileExtension
+            },
+            Name = request.FileName,
+            Uri = uri,
+            FileType = fileExtension,
+            FileSize = fileSize,
+            FileContentHash = fileContentHash,
+            ReplaceFileContentHash = true
+        };
+
+        var updatedRecord = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
+            updateRecordRequest);
+
+        if (record.Embedded)
+        {
+            var vlmConfig =
+                await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
+            var embeddingModelConfig =
+                await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
+
+            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, currentUserId,
+                                                    vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
+        }
+
+        await InvalidateProjectStorageSizeCache(projectId);
+
+        return updatedRecord;
+    }
+
+    public async Task CancelUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string uploadId)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        await CancelUpload(currentUserId, organizationId, projectId, record.DataSourceId, record.ObjectStorageId, uploadId);
     }
 
     /// <summary>
