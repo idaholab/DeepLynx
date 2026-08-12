@@ -8,19 +8,20 @@ import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvid
 import {
   archiveProject,
   fetchProjectLogo,
+  getProject,
   removeProjectLogo,
   updateProject,
   uploadProjectLogo,
 } from "@/app/lib/client_service/projects_services.client";
 import {
   getAllProjectObjectStorages,
-  getDefaultProjectObjectStorage,
   setDefaultProjectObjectStorage,
   createProjectObjectStorage,
   createProjectAzureContainer,
   updateProjectObjectStorage,
   deleteProjectObjectStorage,
   archiveProjectObjectStorage,
+  getDefaultProjectObjectStorage,
 } from "@/app/lib/client_service/object_storage_services.client";
 import {
   ProjectResponseDto,
@@ -42,6 +43,7 @@ import RemoveLogoModal from "./components/RemoveLogoModal";
 import { useLanguage } from "@/app/contexts/Language";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { isInsightHidden } from "@/app/lib/feature_flags";
+import { uuidv4 } from "zod";
 
 interface ProjectSettingsProps {
   project: ProjectResponseDto | null;
@@ -57,6 +59,7 @@ interface StorageConfig {
 }
 
 interface StorageFormData {
+  id: number;
   name: string;
   config: StorageConfig;
   default: boolean;
@@ -96,8 +99,9 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStorage, setEditingStorage] =
     useState<ObjectStorageResponseDto | null>(null);
-  const [storageType, setStorageType] = useState<string>("filesystem");
+  const [storageType, setStorageType] = useState<string>("azure_object");
   const [storageFormData, setStorageFormData] = useState<StorageFormData>({
+    id: -1,
     name: "",
     config: {},
     default: false,
@@ -163,42 +167,57 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     try {
       setIsLoadingStorages(true);
 
-      // Fetch all available storages for the project
       const storages = await getAllProjectObjectStorages(
         organization.organizationId as number,
         project.id as number,
-        false, // Don't hide archived storages
+        false,
       );
 
-      // Fetch the current default storage
+      let effectiveDefaultStorage: ObjectStorageResponseDto | null = null;
+
       try {
         const defaultStorageData = await getDefaultProjectObjectStorage(
           organization.organizationId as number,
           project.id as number,
         );
+
         const projectDefaultStorage =
           storages.find(
             (storage) =>
               storage.default &&
               Number(storage.projectId) === Number(project.id),
           ) ?? null;
-        const effectiveDefaultStorage =
-          projectDefaultStorage ?? defaultStorageData;
 
-        setDefaultStorage(effectiveDefaultStorage);
-        setSelectedStorageId(effectiveDefaultStorage.id as number);
-        setAvailableStorages(
-          storages.map((storage) => ({
-            ...storage,
-            default:
-              String(storage.id) === String(effectiveDefaultStorage.id),
-          })),
+        const projectData = await getProject(
+          organization.organizationId as number,
+          project.id as number,
         );
+
+        const defaultStorageId = projectData?.defaultObjectStorageId;
+
+        if (defaultStorageId) {
+          effectiveDefaultStorage = storages.find(
+            (storage) => String(storage.id) === String(defaultStorageId),
+          ) ?? defaultStorageData ?? projectDefaultStorage ?? null;
+        } else {
+          effectiveDefaultStorage = defaultStorageData ?? projectDefaultStorage ?? null;
+        }
+
+        if (!effectiveDefaultStorage) {
+          console.warn("No default storage found based on defaultObjectStorageId.");
+        }
       } catch (error) {
-        setDefaultStorage(null);
-        setSelectedStorageId(null);
-        setAvailableStorages(storages);
+        console.error("Failed to fetch project data or default storage:", error);
       }
+
+      setDefaultStorage(effectiveDefaultStorage);
+      setSelectedStorageId(effectiveDefaultStorage?.id as number ?? null);
+      setAvailableStorages(
+        storages.map((storage) => ({
+          ...storage,
+          default: String(storage.id) === String(effectiveDefaultStorage?.id),
+        })),
+      );
     } catch (error) {
       console.error("Error loading storages:", error);
       toast.error(t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS);
@@ -363,13 +382,12 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     try {
       setIsSavingStorage(true);
 
-      await setDefaultProjectObjectStorage(
+      await updateProject(
         organization.organizationId as number,
         project.id as number,
-        selectedStorageId,
+        { organizationId: organization.organizationId as number, defaultObjectStorageId: selectedStorageId }
       );
 
-      // Update the default storage state
       const updatedDefault = availableStorages.find(
         (s) => s.id === selectedStorageId,
       );
@@ -383,9 +401,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         );
       }
 
-      toast.success(
-        t.translations.DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY,
-      );
+      toast.success(t.translations.DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY);
     } catch (error) {
       console.error("Failed to set default storage:", error);
       toast.error(
@@ -399,8 +415,8 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   };
 
   const resetStorageForm = () => {
-    setStorageFormData({ name: "", config: {}, default: false, existingContainer: false, filesDeletable: true });
-    setStorageType("filesystem");
+    setStorageFormData({ id: -1, name: "", config: {}, default: false, existingContainer: false, filesDeletable: true });
+    setStorageType("azure_object");
     setFilesystemPath("");
     setAzureEndpoint("");
     setAzureBucketName("");
@@ -430,10 +446,19 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         toast.error(t.translations.ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED);
         return;
       }
+
+      let containerName = storageFormData.existingContainer
+        ? azureBucketName
+        : uniqueContainerNameFromString(azureBucketName);
+
+      if (azureBucketName == null || azureBucketName == "") {
+        containerName = uniqueContainerNameFromString(project.name)
+      }
+
       config = {
         azureObjectConfig: {
           azureConnectionString: azureEndpoint,
-          azureContainerName: azureBucketName,
+          azureContainerName: containerName,
           existingContainer: storageFormData.existingContainer || false
         },
       };
@@ -457,6 +482,30 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         dto,
         storageFormData.default,
       );
+
+      const projectRequestDto: UpdateProjectRequestDto = {
+        organizationId: organization.organizationId as number,
+        filePath: storageFormData.config.AzureObjectConfig?.AzureFilePath
+      };
+
+      if (storageFormData.default) {
+        const projectUpdateDto: UpdateProjectRequestDto = {
+          organizationId: organization.organizationId as number,
+          defaultObjectStorageId: createdStorage.id as number,
+        };
+
+        await updateProject(
+          organization.organizationId as number,
+          project.id as number,
+          projectUpdateDto,
+        );
+      }
+
+      await updateProject(
+        organization.organizationId as number,
+        project.id as number,
+        projectRequestDto
+      )
 
       setExistingContainer(storageFormData.existingContainer as boolean)
 
@@ -512,7 +561,13 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     try {
       setIsCreatingAzureContainer(true);
 
-      var containerName = azureBucketName ?? null
+      let containerName = storageFormData.existingContainer
+        ? azureBucketName
+        : uniqueContainerNameFromString(azureBucketName);
+
+      if (azureBucketName == null || azureBucketName == "") {
+        containerName = uniqueContainerNameFromString(project.name)
+      }
 
       const createdStorage = await createProjectAzureContainer(
         organization.organizationId as number,
@@ -522,19 +577,26 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         containerName,
       );
 
-      setExistingContainer(storageFormData.existingContainer as boolean)
 
       const shouldSetAsDefault = storageFormData.default;
       let storageForList = createdStorage;
 
       if (shouldSetAsDefault) {
-        await setDefaultProjectObjectStorage(
+        const projectUpdateDto: UpdateProjectRequestDto = {
+          organizationId: organization.organizationId as number,
+          defaultObjectStorageId: createdStorage.id as number,
+        };
+
+        await updateProject(
           organization.organizationId as number,
           project.id as number,
-          createdStorage.id as number,
+          projectUpdateDto,
         );
+
         storageForList = { ...createdStorage, default: true };
       }
+
+      setExistingContainer(storageFormData.existingContainer as boolean)
 
       setAvailableStorages((currentStorages) => {
         const existingStorage = currentStorages.some(
@@ -579,8 +641,8 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   };
 
   const handleEditStorage = async () => {
-    if (!organization?.organizationId || !project?.id || !editingStorage)
-      return;
+    if (!organization?.organizationId || !project?.id || !editingStorage) return;
+
     if (editingStorage.isArchived) {
       toast.error(t.translations.ARCHIVED_STORAGE_CANNOT_BE_EDITED);
       return;
@@ -599,9 +661,9 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         filesDeletable: storageFormData.filesDeletable,
       };
 
-      const projectRequestDto: UpdateProjectRequestDto = {
+      const projectUpdateFilePathDto: UpdateProjectRequestDto = {
         organizationId: organization.organizationId as number,
-        filePath: storageFormData.config.AzureObjectConfig?.AzureFilePath
+        filePath: storageFormData.config.AzureObjectConfig?.AzureFilePath,
       };
 
       if (editingStorage.projectId != null) {
@@ -613,18 +675,38 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
         );
       }
 
+      if (storageFormData.default) {
+        const projectUpdateDto: UpdateProjectRequestDto = {
+          organizationId: organization.organizationId as number,
+          defaultObjectStorageId: editingStorage.id as number,
+        };
+
+        await updateProject(
+          organization.organizationId as number,
+          project.id as number,
+          projectUpdateDto,
+        );
+      }
+
       await updateProject(
         organization.organizationId as number,
         project.id as number,
-        projectRequestDto
-      )
+        projectUpdateFilePathDto,
+      );
 
-      setExistingContainer(storageFormData.existingContainer as boolean)
+      setExistingContainer(storageFormData.existingContainer as boolean);
 
       toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
+
       setIsEditModalOpen(false);
       setEditingStorage(null);
-      setStorageFormData({ name: "", config: {}, default: false, existingContainer: false, filesDeletable: true });
+      setStorageFormData({
+        id: -1,
+        name: "",
+        config: {},
+        default: false,
+        existingContainer: false, filesDeletable: true,
+      });
       loadStorages();
     } catch (error) {
       console.error("Failed to update storage:", error);
@@ -637,8 +719,12 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   };
 
   const handleDeleteStorage = async () => {
-    if (!organization?.organizationId || !project?.id || !deleteStorageId)
+    if (!organization?.organizationId || !project?.id || !deleteStorageId) return;
+
+    if (defaultStorage?.id === deleteStorageId) {
+      toast.error(t.translations.DEFAULT_STORAGE_CANNOT_BE_DELETED_OR_ARCHIVED);
       return;
+    }
 
     try {
       await deleteProjectObjectStorage(
@@ -661,8 +747,12 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
   };
 
   const handleArchiveStorage = async () => {
-    if (!organization?.organizationId || !project?.id || !archiveStorageId)
+    if (!organization?.organizationId || !project?.id || !archiveStorageId) return;
+
+    if (archiveAction && defaultStorage?.id === archiveStorageId) {
+      toast.error(t.translations.DEFAULT_STORAGE_CANNOT_BE_DELETED_OR_ARCHIVED);
       return;
+    }
 
     try {
       await archiveProjectObjectStorage(
@@ -693,6 +783,7 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     }
     setEditingStorage(storage);
     setStorageFormData({
+      id: storage.id as number,
       name: storage.name,
       config: {},
       default: storage.default,
@@ -701,6 +792,30 @@ const ProjectSettings = ({ project, setProject }: ProjectSettingsProps) => {
     });
     setIsEditModalOpen(true);
   };
+
+
+  function uniqueContainerNameFromString(inputString: string): string {
+    const maxContainerNameLength = 63;
+    const guidLength = 36;
+    const separatorLength = 1;
+    const maxInputStringLength = maxContainerNameLength - guidLength - separatorLength;
+
+    let truncatedInputString = inputString.length > maxInputStringLength
+      ? inputString.substring(0, maxInputStringLength)
+      : inputString;
+
+    truncatedInputString = truncatedInputString
+      .toLowerCase()
+      .split('')
+      .filter(c => /[a-z0-9-]/.test(c))
+      .join('');
+
+    const guid = uuidv4();
+
+    let finalString = `${truncatedInputString}-${guid}`.toLowerCase().replace("--", "-")
+
+    return finalString;
+  }
 
   if (isCheckingLogo || isLoadingStorages) {
     return (

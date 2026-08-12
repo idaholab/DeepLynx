@@ -9,7 +9,7 @@ import {
   fetchOrganizationLogo,
   getAllOrganizationsForUser,
 } from "@/app/lib/client_service/organization_services.client";
-import { withNexusApiVersion } from "@/app/lib/api-version";
+import { getNexusScalarUrl } from "@/app/lib/api-version";
 import { isRunHidden } from "@/app/lib/feature_flags";
 import {
   AdjustmentsHorizontalIcon,
@@ -345,9 +345,9 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
               <li className="mt-5 id-tooltip group relative">
                 <Link
                   target="_blank"
-                  href={`${withNexusApiVersion(
+                  href={getNexusScalarUrl(
                     process.env.NEXT_PUBLIC_API_URL ?? "",
-                  )}/scalar`}
+                  )}
                   prefetch={false}
                 >
                   <CommandLineIcon className="size-10" />

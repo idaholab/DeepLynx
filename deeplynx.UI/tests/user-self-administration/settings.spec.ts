@@ -73,4 +73,34 @@ test.describe("Settings Page", () => {
     await darkModeSelector.locator('label').click();
     await expect(html).toHaveAttribute('data-theme', 'default');
   });
+
+  test("Change language to español", async ({ page }) => {
+    const languageSelector = page.getByText('LanguageChoose your preferred languageEnglishEspañol');
+    await languageSelector.getByRole('combobox').selectOption('es');
+
+    const lang = await page.evaluate(() => localStorage.getItem('lang'));
+    expect(lang).toBe('es');
+    await expect(page.getByRole('heading', { name: 'Configuración de usuario' })).toBeVisible();
+  });
+
+  test("Change language to english", async ({ page }) => {
+    const languageSelector = page.getByText('IdiomaElige tu idioma preferidoEnglishEspañol');
+    
+    // start in spanish
+    await page.evaluate(() => { window.localStorage.setItem('lang', 'es'); });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    try {
+      await expect(languageSelector).toBeVisible();
+    } catch {
+      await page.getByRole('list').filter({ hasText: 'Usa estos identificadores al' }).getByRole('button').click();
+      await page.getByRole('link', { name: 'Configuración', exact: true }).click();
+      await expect(languageSelector).toBeVisible();
+    }
+
+    await languageSelector.getByRole('combobox').selectOption('en');
+
+    const lang = await page.evaluate(() => localStorage.getItem('lang'));
+    expect(lang).toBe('en');
+    await expect(page.getByRole('heading', { name: 'User Settings' })).toBeVisible();
+  });
 });
