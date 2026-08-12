@@ -22,7 +22,7 @@ const MIN_CHUNK_SIZE = 256 * 1024;          // Floor so retries can't shrink to 
 const INITIAL_CHUNK_SIZE = 4 * 1024 * 1024; // Smaller than ceiling so chunks have room to ramp
 const TARGET_CHUNK_DURATION_S = 15;         // Aim for each chunk to take roughly this long
 const CHUNK_TIMEOUT_MS = 60_000;            // Per-chunk timeout
-const TIMEOUT_MAX_SHRINKS = 6;              // Safety cap on repeated timeout -> shrink -> retry cycles for one claim
+const MAX_TIMEOUT_RETRIES = 2;              // Retry the same claimed range at most twice after timeouts
 const SIZING_EMA_ALPHA = 0.3;               // Smooths the PER-WORKER sample used to decide next chunk size
 const DISPLAY_EMA_ALPHA = 0.35;             // Smooths the AGGREGATE sample used for the user-facing speed
 const PROGRESS_TICK_MS = 400;               // How often to sample aggregate bytes for display
@@ -178,7 +178,7 @@ async function uploadFileRegular({
 }
 
 // ============================================================================
-// CHUNKED UPLOAD (>= 500MB) — fixed concurrency (4 workers), adaptive size
+// CHUNKED UPLOAD (> 500MB) — fixed concurrency (4 workers), adaptive size
 // ============================================================================
 
 // Shared state claimed from by all 4 workers for a single file's upload.
@@ -186,6 +186,7 @@ class ChunkClaimState {
   cursor = 0;                 // next byte offset not yet claimed
   nextChunkNumber = 0;        // next chunk index not yet claimed
   bytesCompleted = 0;         // sum of bytes from confirmed chunks only
+  chunksCompleted = 0;        // number of chunks confirmed by the server
   chunkSize: number;
   sizingThroughputEMA: number | null = null;
   failed: Error | DOMException | null = null;
@@ -206,10 +207,26 @@ class ChunkClaimState {
 
   onChunkSuccess(bytes: number, elapsedMs: number) {
     this.bytesCompleted += bytes;
+    this.chunksCompleted += 1;
+
     const throughput = bytes / (elapsedMs / 1000);
     this.sizingThroughputEMA =
-      this.sizingThroughputEMA == null ? throughput : SIZING_EMA_ALPHA * throughput + (1 - SIZING_EMA_ALPHA) * this.sizingThroughputEMA;
-    this.chunkSize = clampChunkSize((this.sizingThroughputEMA ?? throughput) * TARGET_CHUNK_DURATION_S, this.maxChunkSize);
+      this.sizingThroughputEMA == null
+        ? throughput
+        : SIZING_EMA_ALPHA * throughput +
+        (1 - SIZING_EMA_ALPHA) * this.sizingThroughputEMA;
+
+    const desiredChunkSize = clampChunkSize(
+      (this.sizingThroughputEMA ?? throughput) * TARGET_CHUNK_DURATION_S,
+      this.maxChunkSize,
+    );
+
+    // Grow conservatively so one unusually fast sample cannot cause a huge jump.
+    this.chunkSize = Math.min(
+      desiredChunkSize,
+      this.chunkSize * 2,
+      this.maxChunkSize,
+    );
   }
 
   onChunkTimeout() {
@@ -345,8 +362,8 @@ async function uploadChunksConcurrentAdaptive(
     const estimatedRemainingChunks = state.chunkSize > 0 ? Math.ceil(remainingBytes / state.chunkSize) : 0;
     onProgress?.({
       percentComplete: Math.round((state.bytesCompleted / state.totalBytes) * 1000) / 10,
-      chunksCompleted: state.nextChunkNumber,
-      totalChunks: state.nextChunkNumber + estimatedRemainingChunks,
+      chunksCompleted: state.chunksCompleted,
+      totalChunks: state.chunksCompleted + estimatedRemainingChunks,
       currentBatch: state.nextChunkNumber,
       uploadId,
       bytesUploaded: state.bytesCompleted,
@@ -371,7 +388,7 @@ async function uploadChunksConcurrentAdaptive(
 
       const chunk = file.slice(claim.offset, claim.offset + claim.size);
       const success = await uploadClaimWithRetry(
-        { ...options, uploadId, chunk, chunkNumber: claim.chunkNumber, maxChunkSize },
+        { ...options, uploadId, chunk, chunkNumber: claim.chunkNumber },
         state,
         parentSignal
       );
@@ -409,13 +426,12 @@ async function uploadClaimWithRetry(
     uploadId: string;
     chunk: Blob;
     chunkNumber: number;
-    maxChunkSize: number;
   },
   state: ChunkClaimState,
   parentSignal: AbortSignal
 ): Promise<boolean> {
-  let currentChunk = args.chunk;
-  let shrinkAttempts = 0;
+  const chunk = args.chunk;
+  let timeoutAttempts = 0;
   let retryAttempts = 0;
 
   while (true) {
@@ -424,12 +440,16 @@ async function uploadClaimWithRetry(
     const chunkController = new AbortController();
     const onParentAbort = () => chunkController.abort("cancelled");
     parentSignal.addEventListener("abort", onParentAbort);
-    const timeoutId = setTimeout(() => chunkController.abort("timeout"), CHUNK_TIMEOUT_MS);
+    const timeoutId = setTimeout(
+      () => chunkController.abort("timeout"),
+      CHUNK_TIMEOUT_MS,
+    );
 
     const startedAt = performance.now();
+
     try {
       const form = new FormData();
-      form.append("chunk", currentChunk);
+      form.append("chunk", chunk);
       form.append("uploadId", args.uploadId);
       form.append("chunkNumber", String(args.chunkNumber));
 
@@ -443,42 +463,56 @@ async function uploadClaimWithRetry(
         { params, signal: chunkController.signal }
       );
 
-      clearTimeout(timeoutId);
-      parentSignal.removeEventListener("abort", onParentAbort);
-      state.onChunkSuccess(currentChunk.size, performance.now() - startedAt);
+      state.onChunkSuccess(chunk.size, performance.now() - startedAt);
       return true;
     } catch (error) {
-      clearTimeout(timeoutId);
-      parentSignal.removeEventListener("abort", onParentAbort);
-
       if (parentSignal.aborted) return false;
 
       const timedOut = chunkController.signal.reason === "timeout";
 
       if (timedOut) {
-        shrinkAttempts += 1;
-        state.onChunkTimeout(); // shrinks the SHARED size for future claims too
-        if (shrinkAttempts > TIMEOUT_MAX_SHRINKS) {
+        timeoutAttempts += 1;
+
+        // Only future claims adapt. This already-claimed byte range stays immutable and is 
+        // retried with the exact same blob so no bytes can be skipped.
+        state.onChunkTimeout();
+
+        console.warn(
+          `Chunk ${args.chunkNumber} timed out after ${CHUNK_TIMEOUT_MS}ms; ` +
+          `retrying the same ${chunk.size}-byte range. ` +
+          `Future chunks will use approximately ${state.chunkSize} bytes.`
+        );
+
+        if (timeoutAttempts >= MAX_TIMEOUT_RETRIES) {
           state.failed = new Error(
-            `Chunk ${args.chunkNumber} kept timing out even after shrinking ${TIMEOUT_MAX_SHRINKS} times.`
+            `Chunk ${args.chunkNumber} timed out after ${MAX_TIMEOUT_RETRIES} attempts.`
           );
           return false;
         }
-        const newSize = clampChunkSize(currentChunk.size / 2, args.maxChunkSize);
-        // Re-slice this worker's in-flight attempt too — not just the shared estimate — so the retry itself uses the smaller size.
-        currentChunk = currentChunk.slice(0, newSize);
-        console.warn(`Chunk ${args.chunkNumber} timed out after ${CHUNK_TIMEOUT_MS}ms; retrying at ${newSize} bytes.`);
+
         continue;
       }
 
       retryAttempts += 1;
-      console.warn(`Chunk ${args.chunkNumber} failed (attempt ${retryAttempts}/${MAX_RETRIES})`);
+      console.warn(
+        `Chunk ${args.chunkNumber} failed (attempt ${retryAttempts}/${MAX_RETRIES})`
+      );
+
       if (retryAttempts >= MAX_RETRIES) {
-        state.failed = error instanceof Error ? error : new Error(`Chunk ${args.chunkNumber} failed after ${MAX_RETRIES} attempts`);
+        state.failed =
+          error instanceof Error
+            ? error
+            : new Error(
+              `Chunk ${args.chunkNumber} failed after ${MAX_RETRIES} attempts`
+            );
         return false;
       }
+
       await sleep(1000 * retryAttempts);
       continue;
+    } finally {
+      clearTimeout(timeoutId);
+      parentSignal.removeEventListener("abort", onParentAbort);
     }
   }
 }
