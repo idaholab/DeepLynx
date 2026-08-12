@@ -9,8 +9,11 @@ public class UpdateProjectRequestDto
     [MaxLength(250)] public string? Description { get; set; }
 
     public string? Abbreviation { get; set; }
-    
+
     public string? Banner { get; set; }
-    
+
     public bool? RequireSensitivityLabel { get; set; }
+
+    public string? FilePath { get; set; }
+    public int? DefaultObjectStorageId { get; set; }
 }

@@ -13,6 +13,9 @@
 
     <ItemGroup>
         <PackageReference Include="Apache.Arrow.Flight.AspNetCore" Version="22.1.0" />
+        <PackageReference Include="Asp.Versioning.Http" Version="8.1.0" />
+        <PackageReference Include="Asp.Versioning.Mvc" Version="8.1.0" />
+        <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
         <PackageReference Include="DotNetEnv" Version="3.1.1" />
         <PackageReference Include="Grpc.AspNetCore" Version="2.80.0" />
         <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.80.0" />

@@ -537,26 +537,31 @@ export default function DataCatalogClient({
 
     const fetchMetadataForProjectScope = async () => {
       const organizationId = Number(organization.organizationId);
-      const projectIds = effectiveProjectIds
-        .map(Number)
-        .filter(Number.isFinite);
+      const projectIds = effectiveProjectIds.map(Number).filter(Number.isFinite);
 
-      const [classes, tags] = await Promise.all([
-        getAllClassesOrg(organizationId, projectIds, true),
-        getAllTagsOrg(organizationId, projectIds, true),
-      ]);
+      try {
+        const classes = await getAllClassesOrg(organizationId, projectIds, true);
 
-      setAvailableClassNames(
-        Array.from(new Set(classes.map((item) => item.name).filter(Boolean))),
-      );
+        setAvailableClassNames(
+          Array.from(new Set(classes.map((item) => item.name).filter(Boolean))),
+        );
+      } catch (error) {
+        console.error("Failed to fetch classes:", error);
+      }
 
-      setAvailableTags(
-        tags.map((tag) => ({
-          id: tag.id,
-          name: tag.name,
-          projectId: tag.projectId ?? null,
-        })),
-      );
+      try {
+        const tags = await getAllTagsOrg(organizationId, projectIds, true);
+
+        setAvailableTags(
+          tags.map((tag) => ({
+            id: tag.id,
+            name: tag.name,
+            projectId: tag.projectId ?? null,
+          })),
+        );
+      } catch (error) {
+        console.error("Failed to fetch tags:", error);
+      }
     };
 
     fetchMetadataForProjectScope().catch((error) => {
@@ -914,7 +919,7 @@ export default function DataCatalogClient({
                 }
               }}
             >
-              {isBulkMode ? "Cancel Selection" : "Select Records"}
+              {isBulkMode ? t.translations.CANCEL_SELECTION : t.translations.SELECTED_RECORDS}
             </button>
             {isBulkMode && (
               <button
@@ -993,13 +998,12 @@ export default function DataCatalogClient({
               <div className="divide-y divide-base-200 overflow-hidden rounded-box border border-base-300/50 bg-base-100 shadow-sm">
                 {times(6).map((i) => (
                   <article
-                      key={i}
-                    className={`grid grid-cols-1 gap-3 p-4 ${
-                      isBulkMode
-                        ? "md:grid-cols-[auto_minmax(0,1fr)_auto]"
-                        : "md:grid-cols-[minmax(0,1fr)_auto]"
-                    }`}
-                    >
+                    key={i}
+                    className={`grid grid-cols-1 gap-3 p-4 ${isBulkMode
+                      ? "md:grid-cols-[auto_minmax(0,1fr)_auto]"
+                      : "md:grid-cols-[minmax(0,1fr)_auto]"
+                      }`}
+                  >
                     {isBulkMode && (
                       <div className="flex items-start pt-1">
                         <Skeleton width={20} height={20} />

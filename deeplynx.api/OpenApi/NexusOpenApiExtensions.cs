@@ -1,6 +1,10 @@
 using System.Text.Json.Nodes;
+using deeplynx.api;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using Scalar.AspNetCore;
 
 namespace deeplynx.api.OpenApi;
 
@@ -8,13 +12,32 @@ internal static class NexusOpenApiExtensions
 {
     public static IServiceCollection AddNexusOpenApi(this IServiceCollection services)
     {
-        services.AddOpenApi(options =>
+        foreach (var documentName in NexusApiVersions.OpenApiDocumentNames)
+            services.AddNexusOpenApiDocument(documentName);
+
+        return services;
+    }
+
+    private static IServiceCollection AddNexusOpenApiDocument(this IServiceCollection services, string documentName)
+    {
+        services.AddOpenApi(documentName, options =>
         {
+            options.AddScalarTransformers();
+
+            options.ShouldInclude = apiDescription =>
+                string.Equals(apiDescription.GroupName, documentName, StringComparison.OrdinalIgnoreCase);
+
+            options.AddOperationTransformer((operation, context, cancellationToken) =>
+            {
+                ApplyDeprecation(operation, context.Description.IsDeprecated());
+                return Task.CompletedTask;
+            });
+
             options.AddDocumentTransformer((document, context, cancellationToken) =>
             {
                 document.Info = new OpenApiInfo
                 {
-                    Version = "v1",
+                    Version = context.DocumentName,
                     Title = "DeepLynx Nexus API",
                     Description =
                         "DeepLynx Nexus API for managing organizational data and relationships. Endpoints are organized by Organization-level (/api/organizations/{organizationId}) and Project-level (/api/projects/{projectId}) scopes.",
@@ -29,33 +52,28 @@ internal static class NexusOpenApiExtensions
                 {
                     new()
                     {
-                        Url = "http://localhost:5095/api/v1/",
+                        Url = "http://localhost:5095",
                         Description = "Local Development"
                     },
                     new()
                     {
-                        Url = "http://localhost:5000/api/v1/",
+                        Url = "http://localhost:5000",
                         Description = "Docker Environment"
                     },
                     new()
                     {
-                        Url = "https://deeplynx.inl.gov/api/v1/",
+                        Url = "https://deeplynx.inl.gov",
                         Description = "Production"
                     },
                     new()
                     {
-                        Url = "https://deeplynx.dev.inl.gov/api/v1/",
+                        Url = "https://deeplynx.dev.inl.gov",
                         Description = "Develop"
                     },
                     new()
                     {
-                        Url = "https://deeplynx-test.dev.inl.gov/api/v1/",
+                        Url = "https://deeplynx-test.dev.inl.gov",
                         Description = "Test"
-                    },
-                    new()
-                    {
-                        Url = "http://localhost:5095/api/v1/",
-                        Description = "Local Development"
                     }
                 };
                 document.ExternalDocs = new OpenApiExternalDocs
@@ -64,7 +82,7 @@ internal static class NexusOpenApiExtensions
                     Url = new Uri("https://deeplynx.inl.gov/docs")
                 };
 
-                document.Tags = new HashSet<OpenApiTag>
+                var tags = new List<OpenApiTag>
                 {
                     new() { Name = "Organization", Description = "Organization management" },
                     new() { Name = "Project", Description = "Project management" },
@@ -83,7 +101,7 @@ internal static class NexusOpenApiExtensions
                     new() { Name = "Organization - Class", Description = "Organization-level class operations" },
                     new() { Name = "Project - Class", Description = "Project-level class operations" },
                     new() { Name = "Record", Description = "Record management" },
-                    new() { Name = "Record Collection", Description = "Record Collection management"},
+                    new() { Name = "Record Collection", Description = "Record Collection management" },
                     new() { Name = "File", Description = "File operations" },
                     new() { Name = "Provenance", Description = "Data Provenance" },
                     new() { Name = "Metadata", Description = "Metadata operations" },
@@ -114,107 +132,16 @@ internal static class NexusOpenApiExtensions
                     new() { Name = "Maintenance", Description = "Maintenance" }
                 };
 
-                var tagGroups = new JsonArray
-                {
-                    new JsonObject
-                    {
-                        ["name"] = "Administration",
-                        ["tags"] = new JsonArray { "Organization", "Project", "User", "Group", "Service Accounts", "Test Accounts" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "AI Services",
-                        ["tags"] = new JsonArray
-                        {
-                            "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token",
-                            "Insight"
-                        }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Authentication",
-                        ["tags"] = new JsonArray { "OauthHandshake", "Token", "OauthApplication" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Class",
-                        ["tags"] = new JsonArray { "Organization - Class", "Project - Class" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Data",
-                        ["tags"] = new JsonArray
-                            { "Record", "Record Collection", "Historical Record", "Edge", "Historical Edge", "File", "Metadata", "Provenance" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "DataSource",
-                        ["tags"] = new JsonArray { "Organization - DataSource", "Project - DataSource" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Events",
-                        ["tags"] = new JsonArray { "Event" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Object Storage",
-                        ["tags"] = new JsonArray { "Organization - Object Storage", "Project - Object Storage" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Permission",
-                        ["tags"] = new JsonArray { "Organization - Permission", "Project - Permission" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Query",
-                        ["tags"] = new JsonArray { "Query", "Saved Search" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Relationship",
-                        ["tags"] = new JsonArray { "Organization - Relationship", "Project - Relationship" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Role",
-                        ["tags"] = new JsonArray { "Organization - Role", "Project - Role" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Sensitivity Label",
-                        ["tags"] = new JsonArray { "Organization - Sensitivity Label", "Project - Sensitivity Label" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Tag",
-                        ["tags"] = new JsonArray { "Organization - Tag", "Project - Tag" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Olap",
-                        ["tags"] = new JsonArray { "Olap" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Metrics",
-                        ["tags"] = new JsonArray { "Metrics", "Organization - Metrics", "Project - Metrics" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Integrations",
-                        ["tags"] = new JsonArray { "Airflow" }
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "Other",
-                        ["tags"] = new JsonArray { "Notification", "Maintenance" }
-                    }
-                };
+                var usedTagNames = GetUsedTagNames(document);
+                document.Tags = tags
+                    .Where(tag => tag.Name is not null && usedTagNames.Contains(tag.Name))
+                    .ToHashSet();
+
+                var tagGroups = CreateTagGroups(usedTagNames);
 
                 document.Extensions ??= new Dictionary<string, IOpenApiExtension>();
-                document.Extensions["x-tagGroups"] = new JsonNodeExtension(tagGroups);
+                if (tagGroups.Count > 0)
+                    document.Extensions["x-tagGroups"] = new JsonNodeExtension(tagGroups);
 
                 document.Components ??= new OpenApiComponents();
                 document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
@@ -332,6 +259,91 @@ internal static class NexusOpenApiExtensions
         });
 
         return services;
+    }
+
+    internal static void ApplyDeprecation(OpenApiOperation operation, bool isDeprecated)
+    {
+        if (isDeprecated)
+            operation.Deprecated = true;
+    }
+
+    private static HashSet<string> GetUsedTagNames(OpenApiDocument document)
+    {
+        var usedTagNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (document.Paths is null)
+            return usedTagNames;
+
+        foreach (var pathItem in document.Paths.Values)
+        {
+            if (pathItem is null)
+                continue;
+
+            if (pathItem.Operations is null)
+                continue;
+
+            foreach (var operation in pathItem.Operations.Values)
+            {
+                if (operation is null)
+                    continue;
+
+                foreach (var tag in operation.Tags ?? Enumerable.Empty<OpenApiTagReference>())
+                {
+                    if (!string.IsNullOrWhiteSpace(tag.Name))
+                        usedTagNames.Add(tag.Name);
+                }
+            }
+        }
+
+        return usedTagNames;
+    }
+
+    private static JsonArray CreateTagGroups(ISet<string> usedTagNames)
+    {
+        var tagGroups = new (string Name, string[] Tags)[]
+        {
+            ("Administration", ["Organization", "Project", "User", "Group", "Service Accounts", "Test Accounts"]),
+            ("AI Services",
+            [
+                "Lattice", "Organization - AI Model Config", "Project - AI Model Config", "User Model Token", "Insight"
+            ]),
+            ("Authentication", ["OauthHandshake", "Token", "OauthApplication"]),
+            ("Class", ["Organization - Class", "Project - Class"]),
+            ("Data", ["Record", "Record Collection", "Historical Record", "Edge", "Historical Edge", "File", "Metadata", "Provenance"]),
+            ("DataSource", ["Organization - DataSource", "Project - DataSource"]),
+            ("Events", ["Event"]),
+            ("Object Storage", ["Organization - Object Storage", "Project - Object Storage"]),
+            ("Permission", ["Organization - Permission", "Project - Permission"]),
+            ("Query", ["Query", "Saved Search"]),
+            ("Relationship", ["Organization - Relationship", "Project - Relationship"]),
+            ("Role", ["Organization - Role", "Project - Role"]),
+            ("Sensitivity Label", ["Organization - Sensitivity Label", "Project - Sensitivity Label"]),
+            ("Tag", ["Organization - Tag", "Project - Tag"]),
+            ("Olap", ["Olap"]),
+            ("Metrics", ["Metrics", "Organization - Metrics", "Project - Metrics"]),
+            ("Integrations", ["Airflow"]),
+            ("Other", ["Notification", "Maintenance"])
+        };
+
+        var filteredGroups = new JsonArray();
+        foreach (var (name, tags) in tagGroups)
+        {
+            var usedTags = tags
+                .Where(usedTagNames.Contains)
+                .Select(tag => JsonValue.Create(tag))
+                .ToArray<JsonNode?>();
+
+            if (usedTags.Length == 0)
+                continue;
+
+            filteredGroups.Add(new JsonObject
+            {
+                ["name"] = name,
+                ["tags"] = new JsonArray(usedTags)
+            });
+        }
+
+        return filteredGroups;
     }
 
     private static void RemoveRedundantJsonContentTypes(IDictionary<string, OpenApiMediaType>? content, bool removePlainText = false)

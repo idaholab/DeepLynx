@@ -4,15 +4,13 @@
 import AvatarCell from "@/app/(home)/components/Avatar";
 import { RoleGate } from "@/app/(home)/rbac/RBACComponents";
 import { CreateOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
-import { OrganizationResponseDto } from "@/app/(home)/types/responseDTOs";
+import { OrganizationResponseDto, UserResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import {
   createOrganization,
-  getAllOrganizationsForUser,
 } from "@/app/lib/client_service/organization_services.client";
 import { getAllProjects } from "@/app/lib/client_service/projects_services.client";
-import { getAllUsers } from "@/app/lib/client_service/user_services.client";
 import {
   ArrowRightIcon,
   Cog6ToothIcon,
@@ -31,69 +29,65 @@ interface OrgWithCounts extends OrganizationResponseDto {
 
 interface Props {
   session: Session;
+  organizations: OrganizationResponseDto[];
+  initialUsersByOrg: Record<number, UserResponseDto[]>;
 }
 
-const SelectOrgClient = ({ session }: Props) => {
+const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) => {
+
   const router = useRouter();
   const { t } = useLanguage();
   const { setOrganization } = useOrganizationSession();
-  const [organizations, setOrganizations] = useState<OrgWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [orgsWithCounts, setOrgsWithCounts] = useState<OrgWithCounts[]>([]);
+
+  useEffect(() => {
+    async function fetchProjectCounts() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const orgsWithProjectCounts = await Promise.all(
+          organizations.map(async (org) => {
+            try {
+              const projects = await getAllProjects(org.id as number, true);
+              return {
+                ...org,
+                projectCount: projects.length,
+                userCount: initialUsersByOrg[Number(org.id)]?.length || 0,
+              };
+            } catch (innerError) {
+              console.error(`Error fetching projects for org ${org.id}`, innerError);
+              return {
+                ...org,
+                projectCount: 0,
+                userCount: initialUsersByOrg[Number(org.id)]?.length || 0,
+              };
+            }
+          })
+        );
+
+        setOrgsWithCounts(orgsWithProjectCounts);
+      } catch (error) {
+        console.error("Failed to fetch project counts:", error);
+        setError(t.translations.FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProjectCounts();
+  }, [organizations, initialUsersByOrg, t]);
 
   // Form state
   const [formData, setFormData] = useState<CreateOrganizationRequestDto>({
     name: "",
     description: "",
+    disableFileTransfer: false,
   });
-
-  useEffect(() => {
-    fetchOrganizationsWithCounts();
-  }, []);
-
-  const fetchOrganizationsWithCounts = async () => {
-    try {
-      setLoading(true);
-
-      // Fetch all organizations
-      const orgs = await getAllOrganizationsForUser(true);
-
-      // Fetch project and user counts for each organization
-      const orgsWithCounts = await Promise.all(
-        orgs.map(async (org) => {
-          try {
-            const [projects, users] = await Promise.all([
-              getAllProjects(org.id as number, true),
-              getAllUsers(org.id),
-            ]);
-
-            return {
-              ...org,
-              projectCount: projects.length,
-              userCount: users.length,
-            };
-          } catch (err) {
-            console.error(`Failed to fetch data for org ${org.id}:`, err);
-            return {
-              ...org,
-              projectCount: 0,
-              userCount: 0,
-            };
-          }
-        }),
-      );
-
-      setOrganizations(orgsWithCounts);
-    } catch (err) {
-      console.error("Failed to fetch organizations:", err);
-      setError(t.translations.FAILED_TO_LOAD_ORGANIZATIONS_TRY_AGAIN);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,12 +97,10 @@ const SelectOrgClient = ({ session }: Props) => {
     try {
       await createOrganization(formData);
 
-      // Reset form and close modal
-      setFormData({ name: "", description: "" });
+      setFormData({ name: "", description: "", disableFileTransfer: false });
       setIsModalOpen(false);
 
-      // Refresh the organizations list
-      await fetchOrganizationsWithCounts();
+      router.refresh();
     } catch (err) {
       console.error("Failed to create organization:", err);
       setCreateError(t.translations.FAILED_TO_CREATE_ORGANIZATION_TRY_AGAIN);
@@ -201,7 +193,7 @@ const SelectOrgClient = ({ session }: Props) => {
                     </p>
                   </div>
                 ) : (
-                  organizations.map((org) => (
+                  orgsWithCounts.map((org) => (
                     <div
                       key={org.id}
                       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 hover:bg-base-200 rounded-lg transition-colors"
@@ -290,7 +282,7 @@ const SelectOrgClient = ({ session }: Props) => {
                 onClick={() => {
                   setIsModalOpen(false);
                   setCreateError(null);
-                  setFormData({ name: "", description: "" });
+                  setFormData({ name: "", description: "", disableFileTransfer: false });
                 }}
               >
                 <XMarkIcon className="size-5" />
@@ -328,6 +320,30 @@ const SelectOrgClient = ({ session }: Props) => {
                 disabled={isCreating}
               />
 
+              {/* Disable File Transfer Checkbox */}
+              <div className="form-control">
+                <label className="cursor-pointer label flex items-center justify-start w-fit gap-3">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-primary"
+                    checked={formData.disableFileTransfer || false}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        disableFileTransfer: e.target.checked,
+                      })
+                    }
+                    disabled={isCreating}
+                  />
+                  <span className="font-bold text-lg text-base-content/60">
+                    {t.translations.DISABLE_FILE_TRANSFER}
+                  </span>
+                </label>
+                <span className="text-xs text-base-content/60 mt-1">
+                  {t.translations.DISABLE_FILE_TRANSFER_HELPER}
+                </span>
+              </div>
+
               <div className="modal-action mt-6">
                 <button
                   type="button"
@@ -335,7 +351,7 @@ const SelectOrgClient = ({ session }: Props) => {
                   onClick={() => {
                     setIsModalOpen(false);
                     setCreateError(null);
-                    setFormData({ name: "", description: "" });
+                    setFormData({ name: "", description: "", disableFileTransfer: false });
                   }}
                   disabled={isCreating}
                 >

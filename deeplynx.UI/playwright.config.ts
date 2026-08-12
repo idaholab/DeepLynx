@@ -28,19 +28,22 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
+    { name: 'setup', testMatch: /.setup\.ts/ }, // Creates all the defied orgs, projects, test accounts, and roles before test run. 
     {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
     },
-
     {
       name: "firefox",
       use: { ...devices["Desktop Firefox"] },
+      dependencies: ['setup'],
     },
 
     {
       name: "webkit",
       use: { ...devices["Desktop Safari"] },
+      dependencies: ['setup'],
     },
   ],
 

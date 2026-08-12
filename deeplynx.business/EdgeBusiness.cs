@@ -181,7 +181,7 @@ public class EdgeBusiness : IEdgeBusiness
         if (dto.OriginId == dto.DestinationId)
             throw new ValidationException("Destination and origin IDs cannot be the same");
 
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId);
 
         var originRecordExists = _context.Records.Any(r => r.Id == dto.OriginId);
         if (!originRecordExists) throw new KeyNotFoundException($"Origin record with id {dto.OriginId} not found");
@@ -190,7 +190,40 @@ public class EdgeBusiness : IEdgeBusiness
         if (!destinationRecordExists)
             throw new KeyNotFoundException($"Destination record with id {dto.DestinationId} not found");
 
-        var edge = new Edge
+        var edge = await FindEdge(organizationId, null, dto.OriginId, dto.DestinationId);
+
+        if (edge != null && edge.IsArchived == true)
+        {
+            await UnarchiveEdge(currentUserId, organizationId, projectId, null, dto.OriginId, dto.DestinationId);
+
+            return new EdgeResponseDto
+            {
+                Id = edge.Id,
+                OriginOriginalId = edge.Origin?.OriginalId,
+                DestinationOriginalId = edge.Destination?.OriginalId,
+                Properties = edge.Properties,
+                OriginId = edge.OriginId,
+                DestinationId = edge.DestinationId,
+                RelationshipId = edge.RelationshipId,
+                DataSourceId = edge.DataSourceId,
+                ProjectId = edge.ProjectId,
+                OrganizationId = edge.OrganizationId,
+                LastUpdatedAt = edge.LastUpdatedAt,
+                LastUpdatedBy = edge.LastUpdatedBy,
+                IsArchived = false
+            };
+        }
+
+        if (!dto.RelationshipId.HasValue && !string.IsNullOrEmpty(dto.RelationshipName))
+        {
+            var relationship = await _context.Relationships
+                .FirstOrDefaultAsync(r =>
+                    r.OrganizationId == organizationId &&
+                    r.Name.ToLower() == dto.RelationshipName.ToLower()) ?? throw new ValidationException($"Relationship with name '{dto.RelationshipName}' not found in organization {organizationId}");
+            dto.RelationshipId = relationship.Id;
+        }
+
+        edge = new Edge
         {
             Properties = dto.Properties?.ToString(),
             OriginId = dto.OriginId.Value,
@@ -272,7 +305,7 @@ public class EdgeBusiness : IEdgeBusiness
         if (invalidEdges.Any())
             throw new ArgumentException("All edges must have valid OriginId and DestinationId before bulk creation.");
 
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId);
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
         await using var tx = await conn.BeginTransactionAsync();
@@ -659,7 +692,6 @@ public class EdgeBusiness : IEdgeBusiness
         if (edge == null)
         {
             if (edgeId != null) throw new KeyNotFoundException($"Edge with id {edgeId} not found");
-            throw new KeyNotFoundException($"Edge with origin {originId} and destination {destinationId} not found");
         }
 
         return edge;

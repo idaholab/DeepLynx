@@ -79,12 +79,14 @@ export async function getDefaultOrganizationObjectStorage(
  */
 export async function createOrganizationObjectStorage(
     organizationId: number,
-    dto: CreateObjectStorageRequestDto
+    dto: CreateObjectStorageRequestDto,
+    makeDefault: boolean = false
 ): Promise<ObjectStorageResponseDto> {
     try {
         const res = await api.post<ObjectStorageResponseDto>(
             `/organizations/${organizationId}/storages`,
-            dto
+            dto,
+            { params: { makeDefault } }
         );
         return res.data;
     } catch (error) {
@@ -381,6 +383,32 @@ export async function setDefaultProjectObjectStorage(
         return res.data;
     } catch (error) {
         console.error(`Error setting default project object storage ${objectStorageId}:`, error);
+        throw error;
+    }
+}
+
+export async function createProjectAzureContainer(
+    organizationId: number,
+    projectId: number,
+    existingContainer: boolean,
+    storageType: string = "azure_object",
+    containerName?: string | null,
+): Promise<ObjectStorageResponseDto> {
+    try {
+        const res = await api.post<ObjectStorageResponseDto>(
+            `/organizations/${organizationId}/projects/${projectId}/storages/container`,
+            null,
+            {
+                params: {
+                    storageType,
+                    existingContainer,
+                    containerName,
+                },
+            },
+        );
+        return res.data;
+    } catch (error) {
+        console.error(`Error creating ${storageType} container for project ${projectId}:`, error);
         throw error;
     }
 }

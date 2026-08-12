@@ -18,6 +18,7 @@ namespace deeplynx.tests;
 public class EdgeBusinessTests : IntegrationTestBase
 {
     private ClassBusiness _classBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private DataSourceBusiness _dataSourceBusiness = null!;
     private EdgeBusiness _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
@@ -26,12 +27,15 @@ public class EdgeBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _mockOrganizationBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     public long destinationRecordId;
     public long destinationRecordId2;
@@ -60,25 +64,30 @@ public class EdgeBusinessTests : IntegrationTestBase
         _mockObjectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyExecutor);
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
         _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _sensitivityLabelService);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness, _mockRecordBusiness.Object,
-            _eventBusiness);
+            _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
-            _mockRelationshipBusiness.Object, _eventBusiness);
+            _mockRelationshipBusiness.Object, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -263,6 +272,84 @@ public class EdgeBusinessTests : IntegrationTestBase
         // Ensure that edge create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
+
+        var actualEvent = eventList[0];
+
+        Assert.Equal(pid, actualEvent.ProjectId);
+        Assert.Equal("create", actualEvent.Operation);
+        Assert.Equal("edge", actualEvent.EntityType);
+        Assert.Equal(result.Id, actualEvent.EntityId);
+    }
+
+    [Fact]
+    public async Task CreateNullRelatipnshipIdEdge_Success_ReturnsCorrectValues()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        var dto = new CreateEdgeRequestDto
+        {
+            OriginId = (int)originRecordId,
+            DestinationId = (int)destinationRecordId,
+            RelationshipId = null,
+            RelationshipName = "Relationship 1"
+        };
+
+        // Act
+        var result = await _edgeBusiness.CreateEdge(uid1, oid, pid, dsid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(relationshipId, result.RelationshipId);
+        Assert.Equal(relationshipId, result.RelationshipId);
+        Assert.Equal(originRecordId, result.OriginId);
+        Assert.Equal(destinationRecordId, result.DestinationId);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.Equal(dsid, result.DataSourceId);
+        Assert.Equal(uid1, result.LastUpdatedBy);
+
+        // Ensure that edge create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Single(eventList);
+
+        var actualEvent = eventList[0];
+
+        Assert.Equal(pid, actualEvent.ProjectId);
+        Assert.Equal("create", actualEvent.Operation);
+        Assert.Equal("edge", actualEvent.EntityType);
+        Assert.Equal(result.Id, actualEvent.EntityId);
+    }
+
+    [Fact]
+    public async Task CreateEdgeUnarchiveEdgeCreateEdge_Success_ReturnsCorrectValues()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        var dto = new CreateEdgeRequestDto
+        {
+            OriginId = (int)originRecordId,
+            DestinationId = (int)destinationRecordId,
+            RelationshipId = (int)relationshipId
+        };
+
+        // Act
+        await _edgeBusiness.CreateEdge(uid1, oid, pid, dsid, dto);
+        await _edgeBusiness.ArchiveEdge(uid1, oid, pid, null, dto.OriginId, dto.DestinationId);
+        var result = await _edgeBusiness.CreateEdge(uid1, oid, pid, dsid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(relationshipId, result.RelationshipId);
+        Assert.Equal(originRecordId, result.OriginId);
+        Assert.Equal(destinationRecordId, result.DestinationId);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.Equal(dsid, result.DataSourceId);
+        Assert.Equal(uid1, result.LastUpdatedBy);
+
+        // Ensure that edge create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.NotEmpty(eventList);
 
         var actualEvent = eventList[0];
 
@@ -1306,7 +1393,7 @@ public class EdgeBusinessTests : IntegrationTestBase
         Assert.Equal("parsed-record-001", result.OriginOriginalId);
         Assert.Equal("parsed-record-002", result.DestinationOriginalId);
     }
-    
+
     private async Task SetRecordOriginalIds()
     {
         var origin = await Context.Records.FindAsync(originRecordId);

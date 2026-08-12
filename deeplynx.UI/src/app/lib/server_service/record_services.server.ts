@@ -2,8 +2,9 @@
 import "server-only";
 import { RecordResponseDto } from "../../(home)/types/responseDTOs";
 import { UpdateRecordRequestDto } from "../../(home)/types/requestDTOs";
+import { apiErrorFromResponse } from "../api-error";
+import { backendApiUrl } from "./backend-api-url.server";
 
-const BASE = process.env.BACKEND_BASE_URL!;
 const SERVICE_TOKEN = process.env.SERVICE_TOKEN || "";
 
 /** Always return a HeadersInit (avoid union types) */
@@ -14,7 +15,7 @@ function authHeaders(): HeadersInit {
 }
 
 async function asJson<T>(res: Response): Promise<T> {
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+  if (!res.ok) throw await apiErrorFromResponse(res);
   return (await res.json()) as T;
 }
 
@@ -28,12 +29,16 @@ export async function getAllRecordsServer(
   hideArchived: boolean = true
 ): Promise<RecordResponseDto[]> {
   const params = new URLSearchParams();
-  if (dataSourceId !== undefined) params.append('dataSourceId', String(dataSourceId));
+  if (dataSourceId !== undefined) {
+    params.append("dataSourceId", String(dataSourceId));
+  }
   if (fileType) params.append('fileType', fileType);
   params.append('hideArchived', String(hideArchived));
 
   const res = await fetch(
-    `${BASE}/organizations/${organizationId}/projects/${projectId}/records?${params.toString()}`,
+    backendApiUrl(
+      `organizations/${organizationId}/projects/${projectId}/records?${params.toString()}`,
+    ),
     {
       headers: authHeaders(),
       cache: "no-store",
@@ -52,7 +57,9 @@ export async function getRecordServer(
   params.append('hideArchived', String(hideArchived));
 
   const res = await fetch(
-    `${BASE}/organizations/${organizationId}/projects/${projectId}/records/${recordId}?${params.toString()}`,
+    backendApiUrl(
+      `organizations/${organizationId}/projects/${projectId}/records/${recordId}?${params.toString()}`,
+    ),
     {
       headers: authHeaders(),
       cache: "no-store",
@@ -72,7 +79,9 @@ export async function getRecordsByTagsServer(
   params.append("hideArchived", hideArchived.toString());
 
   const res = await fetch(
-    `${BASE}/organizations/${organizationId}/projects/${projectId}/records/by-tags?${params.toString()}`,
+    backendApiUrl(
+      `organizations/${organizationId}/projects/${projectId}/records/by-tags?${params.toString()}`,
+    ),
     {
       headers: authHeaders(),
       cache: "no-store",
@@ -88,7 +97,9 @@ export async function updateRecordServer(
   updateData: UpdateRecordRequestDto
 ): Promise<RecordResponseDto> {
   const res = await fetch(
-    `${BASE}/organizations/${organizationId}/projects/${projectId}/records/${recordId}`,
+    backendApiUrl(
+      `organizations/${organizationId}/projects/${projectId}/records/${recordId}`,
+    ),
     {
       method: "PUT",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -105,7 +116,9 @@ export async function deleteRecordServer(
   recordId: number
 ): Promise<{ message: string }> {
   const res = await fetch(
-    `${BASE}/organizations/${organizationId}/projects/${projectId}/records/${recordId}`,
+    backendApiUrl(
+      `organizations/${organizationId}/projects/${projectId}/records/${recordId}`,
+    ),
     {
       method: "DELETE",
       headers: authHeaders(),
@@ -125,7 +138,9 @@ export async function archiveRecordServer(
   params.append('archive', String(archive));
 
   const res = await fetch(
-    `${BASE}/organizations/${organizationId}/projects/${projectId}/records/${recordId}?${params.toString()}`,
+    backendApiUrl(
+      `organizations/${organizationId}/projects/${projectId}/records/${recordId}?${params.toString()}`,
+    ),
     {
       method: "PATCH",
       headers: authHeaders(),

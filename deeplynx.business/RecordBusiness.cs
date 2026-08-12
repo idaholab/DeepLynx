@@ -1,6 +1,7 @@
 using System.Data;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.exceptions;
@@ -16,6 +17,8 @@ namespace deeplynx.business;
 
 public class RecordBusiness : IRecordBusiness
 {
+    private static readonly Regex Sha256HexRegex = new("^[a-fA-F0-9]{64}$", RegexOptions.Compiled);
+
     private readonly IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
@@ -136,6 +139,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = r.IsArchived,
             FileType = r.FileType,
             FileSize = r.FileSize,
+            FileContentHash = r.FileContentHash,
             Tags = r.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -367,6 +371,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = r.IsArchived,
             FileType = r.FileType,
             FileSize = r.FileSize,
+            FileContentHash = r.FileContentHash,
             Tags = [.. r.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -514,6 +519,7 @@ public class RecordBusiness : IRecordBusiness
                 IsArchived = r.IsArchived,
                 FileType = r.FileType,
                 FileSize = r.FileSize,
+                FileContentHash = r.FileContentHash,
                 Tags = r.Tags.Select(t => new RecordTagDto
                 {
                     Id = t.Id,
@@ -587,6 +593,7 @@ public class RecordBusiness : IRecordBusiness
             FileType = record.FileType,
             FileSize = record.FileSize,
             Embedded = record.Embedded,
+            FileContentHash = record.FileContentHash,
             Tags = record.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -1013,7 +1020,7 @@ public class RecordBusiness : IRecordBusiness
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         ValidationHelper.ValidateModel(dto);
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId);
 
         if (dto.Properties == null)
             throw new ArgumentNullException(nameof(dto.Properties), "Properties cannot be null");
@@ -1063,6 +1070,7 @@ public class RecordBusiness : IRecordBusiness
                 LastUpdatedBy = currentUserId,
                 FileType = dto.FileType,
                 FileSize = dto.FileSize,
+                FileContentHash = dto.FileContentHash,
                 OrganizationId = organizationId,
                 Embedded = embedded
             };
@@ -1070,9 +1078,25 @@ public class RecordBusiness : IRecordBusiness
             _context.Records.Add(record);
             await _context.SaveChangesAsync();
 
+            if (dto.Tags != null)
+            {
+                dto.Tags = dto.Tags.Select(tag => string.IsNullOrWhiteSpace(tag) ? null : tag).ToList();
+            }
+
+            // Filter out tags that are null or empty
+            var filteredTags = dto.Tags?
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .ToList();
+
+            // If all tags are null or empty, set filteredTags to null
+            if (filteredTags == null || filteredTags.Count == 0)
+            {
+                filteredTags = null;
+            }
+
             // Process tags (can be created on-the-fly)
             var tags = await ProcessTags(
-                currentUserId, organizationId, projectId, record.Id, dto.Tags);
+                currentUserId, organizationId, projectId, record.Id, filteredTags);
 
             if (sensitivityLabelIds?.Count > 0)
             {
@@ -1129,6 +1153,7 @@ public class RecordBusiness : IRecordBusiness
                 IsArchived = record.IsArchived,
                 FileType = record.FileType,
                 FileSize = record.FileSize,
+                FileContentHash = record.FileContentHash,
                 Tags = tags,
                 Labels = record.Labels.Select(l => new RecordLabelDto
                 {
@@ -1178,7 +1203,7 @@ public class RecordBusiness : IRecordBusiness
         bool isOrgAdmin = false,
         bool isProjectAdmin = false)
     {
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId);
 
         if (records.Count == 0) throw new Exception("Unable to bulk create records: no records selected for creation");
 
@@ -1275,7 +1300,7 @@ public class RecordBusiness : IRecordBusiness
               file_size         = COALESCE(EXCLUDED.file_size, records.file_size),
               last_updated_by   = EXCLUDED.last_updated_by
         RETURNING id, organization_id, project_id, data_source_id, original_id, name, class_id, 
-            object_storage_id, file_type, file_size, last_updated_by, description, properties, uri;";
+            object_storage_id, file_type, file_size, file_content_hash, last_updated_by, description, properties, uri;";
 
         var inserted = await _bulkCopyUpsertExecutor.CopyUpsertAsync(
             conn, tx,
@@ -1678,7 +1703,7 @@ public class RecordBusiness : IRecordBusiness
         var recordName = returnedRecord.Name;
         var recordDataSourceId = returnedRecord.DataSourceId;
 
-        await DeleteAttachedFileIfPresent(returnedRecord);
+        await RecordFileHelper.TryDeleteFiles(query, _fileBusinessFactory, _objectStorageBusiness);
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
 
@@ -1768,6 +1793,8 @@ public class RecordBusiness : IRecordBusiness
         returnedRecord.LastUpdatedBy = currentUserId;
         returnedRecord.FileType = dto.FileType ?? returnedRecord.FileType;
         returnedRecord.FileSize = dto.FileSize ?? returnedRecord.FileSize;
+        if (dto.ReplaceFileContentHash)
+            returnedRecord.FileContentHash = dto.FileContentHash;
 
         _context.Records.Update(returnedRecord);
         await _context.SaveChangesAsync();
@@ -1814,6 +1841,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = returnedRecord.IsArchived,
             FileType = returnedRecord.FileType,
             FileSize = returnedRecord.FileSize,
+            FileContentHash = returnedRecord.FileContentHash,
             Tags = new List<RecordTagDto>(),
             Labels = returnedRecord.Labels.Select(l => new RecordLabelDto
             {
@@ -1821,6 +1849,86 @@ public class RecordBusiness : IRecordBusiness
                 Name = l.Name
             }).ToList()
         };
+    }
+
+    /// <summary>
+    ///     Updates the stored whole-file content hash for a file record.
+    /// </summary>
+    public async Task<RecordResponseDto> UpdateFileContentHash(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        UpdateFileContentHashRequestDto dto)
+    {
+        ValidationHelper.ValidateModel(dto);
+
+        if (!string.Equals(dto.HashAlgorithm, "SHA-256", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Only SHA-256 file content hashes are supported.");
+
+        if (!Sha256HexRegex.IsMatch(dto.HashHex))
+            throw new ArgumentException("HashHex must be a 64-character hexadecimal SHA-256 value.");
+
+        if (dto.ContentLength is < 0)
+            throw new ArgumentException("ContentLength cannot be negative.");
+
+        var record = await _context.Records
+            .FirstOrDefaultAsync(r => r.Id == recordId
+                                      && r.OrganizationId == organizationId
+                                      && r.ProjectId == projectId
+                                      && !r.IsArchived);
+
+        if (record == null)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        if (dto.ContentLength.HasValue
+            && record.FileSize.HasValue
+            && dto.ContentLength.Value != record.FileSize.Value)
+            throw new InvalidOperationException(
+                $"Content length {dto.ContentLength.Value} does not match record file size {record.FileSize.Value}.");
+
+        var normalizedHash = dto.HashHex.ToLowerInvariant();
+        var updated = !string.Equals(record.FileContentHash, normalizedHash, StringComparison.Ordinal);
+
+        if (updated)
+        {
+            record.FileContentHash = normalizedHash;
+            record.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            record.LastUpdatedBy = currentUserId;
+
+            _context.Records.Update(record);
+            await _context.SaveChangesAsync();
+
+            await _eventBusiness.CreateEvent(
+                currentUserId,
+                organizationId,
+                projectId,
+                new CreateEventRequestDto
+                {
+                    EntityType = "record",
+                    EntityId = record.Id,
+                    EntityName = record.Name,
+                    Operation = "update",
+                    Properties = "{\"fileContentHash\":\"updated\"}",
+                    DataSourceId = record.DataSourceId
+                });
+
+            if (!await _provenanceBusiness.CreateProvenanceRecord(
+                    record.Id,
+                    "update-file-content-hash",
+                    currentUserId,
+                    null))
+                _logger.LogWarning(
+                    "Failed to create provenance record for file content hash update on record {RecordId}",
+                    record.Id);
+        }
+
+        return await GetRecord(
+            currentUserId,
+            organizationId,
+            projectId,
+            record.Id,
+            true);
     }
 
     /// <summary>
@@ -1834,7 +1942,7 @@ public class RecordBusiness : IRecordBusiness
     public async Task<int> GetRecordsCountByDataSource(
         long organizationId, long projectId, long dataSourceId, bool hideArchived)
     {
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId,
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId,
             hideArchived);
         var recordQuery = _context.Records
             .Where(r => r.OrganizationId == organizationId && r.ProjectId == projectId &&
@@ -1955,6 +2063,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = r.IsArchived,
             FileType = r.FileType,
             FileSize = r.FileSize,
+            FileContentHash = r.FileContentHash,
             Tags = r.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -2237,6 +2346,7 @@ public class RecordBusiness : IRecordBusiness
             IsArchived = record.IsArchived,
             FileType = record.FileType,
             FileSize = record.FileSize,
+            FileContentHash = record.FileContentHash,
             Tags = record.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
@@ -2265,6 +2375,7 @@ public class RecordBusiness : IRecordBusiness
         var iObj = r.GetOrdinal("object_storage_id");
         var iType = r.GetOrdinal("file_type");
         var iSize = r.GetOrdinal("file_size");
+        var iHash = r.GetOrdinal("file_content_hash");
         var iUser = r.GetOrdinal("last_updated_by");
         var iDesc = r.GetOrdinal("description");
         var iProp = r.GetOrdinal("properties");
@@ -2281,61 +2392,11 @@ public class RecordBusiness : IRecordBusiness
             ObjectStorageId = r.IsDBNull(iObj) ? null : r.GetInt64(iObj),
             FileType = r.IsDBNull(iType) ? null : r.GetString(iType),
             FileSize = r.IsDBNull(iSize) ? null : r.GetInt64(iSize),
+            FileContentHash = r.IsDBNull(iHash) ? null : r.GetString(iHash),
             LastUpdatedBy = r.IsDBNull(iUser) ? null : r.GetInt64(iUser),
             Description = r.IsDBNull(iDesc) ? null : r.GetString(iDesc),
             Properties = r.IsDBNull(iProp) ? null : r.GetString(iProp),
             Uri = r.IsDBNull(iUri) ? null : r.GetString(iUri)
         };
-    }
-
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
-    private async Task DeleteAttachedFileIfPresent(Record record)
-    {
-        // Guard condition: only file-backed records should delete storage.
-        // ObjectStorageId + Uri + FileType is a practical signal for a DeepLynx file upload.
-        if (!record.ObjectStorageId.HasValue ||
-            string.IsNullOrWhiteSpace(record.Uri) ||
-            string.IsNullOrWhiteSpace(record.FileType))
-        {
-            return;
-        }
-
-        var objectStorage = await _objectStorageBusiness
-            .GetDecryptedObjectStorage(record.ObjectStorageId.Value);
-
-        var storageBusiness = _fileBusinessFactory
-            .CreateFileBusiness(objectStorage.Type);
-
-        var dto = new RecordResponseDto
-        {
-            Id = record.Id,
-            Description = record.Description,
-            Uri = record.Uri,
-            Properties = record.Properties,
-            ObjectStorageId = record.ObjectStorageId,
-            OriginalId = record.OriginalId,
-            Name = record.Name,
-            ClassId = record.ClassId,
-            DataSourceId = record.DataSourceId,
-            ProjectId = record.ProjectId,
-            OrganizationId = record.OrganizationId,
-            LastUpdatedBy = record.LastUpdatedBy,
-            LastUpdatedAt = record.LastUpdatedAt,
-            IsArchived = record.IsArchived,
-            FileType = record.FileType,
-            FileSize = record.FileSize
-        };
-
-        await InvalidateProjectStorageSizeCache(record.ProjectId);
-
-        await storageBusiness.DeleteFile(dto, objectStorage.Config);
-    }
-    private static async Task InvalidateProjectStorageSizeCache(long projectId)
-    {
-        await CacheService.Instance.DeleteAsync(
-            CacheKeys.ProjectStorageSize(projectId));
     }
 }

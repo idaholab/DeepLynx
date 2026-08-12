@@ -97,6 +97,7 @@ export type RecordResponseDto = {
   isArchived?: boolean;
   fileType?: string | null;
   fileSize?: number | null;
+  fileContentHash?: string | null;
   tags?: { id: number | null; name: string }[];
   labels?: { id: number | null; name: string }[];
 };
@@ -168,10 +169,12 @@ export type ObjectStorageResponseDto = {
   name: string;
   type: string;
   projectId: number | string;
+  organizationId: number | string;
   default: boolean;
   lastUpdatedAt: string;
   lastUpdatedBy: string;
   isArchived: boolean;
+  filesDeletable: boolean;
 };
 
 export type OrganizationResponseDto = {
@@ -181,9 +184,13 @@ export type OrganizationResponseDto = {
   lastUpdatedAt?: Date;
   lastUpdatedBy?: string | null;
   isArchived: boolean;
+  logoUrl: string | undefined
   defaultOrg?: boolean;
   banner?: string;
   theme?: string;
+  createContainerPerProject: boolean;
+  disableFileTransfer?: boolean;
+  defaultObjectStorageId?: number
 };
 
 export type PermissionResponseDto = {
@@ -221,6 +228,7 @@ export type ProjectResponseDto = {
   isArchived: boolean;
   organizationId: number | string;
   banner?: string;
+  defaultObjectStorageId?: number | null;
 };
 
 export type ProjectStatResponseDto = {
