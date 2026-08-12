@@ -3,8 +3,8 @@ import { sysAdmin } from "../deeplynx-config";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { testApiUrl } from "../api-url";
 
-const BACKEND_URL = "http://localhost:5000/api/v1";
 const SOURCE_PDF_PATH = path.resolve(__dirname, "genesis-mission.pdf");
 
 type Organization = {
@@ -56,7 +56,9 @@ async function deleteRecordIfExists(
   orgId: string,
 ) {
   if (!record) return;
-  const url = BACKEND_URL + `/organizations/${orgId}/projects/${record.projectId}/records/${record.recordId}`;
+  const url = testApiUrl(
+    `/organizations/${orgId}/projects/${record.projectId}/records/${record.recordId}`,
+  );
   try {
     const response = await request.delete(url);
     if (!response.ok()) {
@@ -70,7 +72,7 @@ async function deleteRecordIfExists(
 async function getOrgIdByName(
   request: APIRequestContext, orgName: string
 ): Promise<string> {
-  const res = await request.fetch(`${BACKEND_URL}/organizations`);
+  const res = await request.fetch(testApiUrl("/organizations"));
   if (!res.ok()) throw new Error(`Failed to fetch organizations: ${res.status()}`);
   const orgs: Organization[] = await res.json();
   const match = orgs.find((org) => org.name === orgName);
@@ -88,8 +90,10 @@ async function getRecordsByName(
   projectId: string,
   fileName: string,
 ): Promise<RecordSummary[]> {
-  const url = `${BACKEND_URL}/organizations/${orgId}/projects/${projectId}/records`
-    + `?hideArchived=true&isInsightEligible=false`;
+  const url = testApiUrl(
+    `/organizations/${orgId}/projects/${projectId}/records` +
+      `?hideArchived=true&isInsightEligible=false`,
+  );
   const res = await request.fetch(url);
   if (!res.ok()) throw new Error(`Failed to fetch records: ${res.status()}`);
   const records = await res.json();
