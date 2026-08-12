@@ -1,5 +1,5 @@
 import { test, expect } from "../fixtures";
-import { sysAdmin, ORGS, PROJECTS, TEST_ACCOUNTS } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 const SETTINGS_URL = "http://localhost:3000/settings";
 
