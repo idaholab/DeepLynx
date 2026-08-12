@@ -582,6 +582,11 @@ public class FileAzureBusiness : IFileBusiness
             objectStorageConfig.AzureObjectConfig.AzureConnectionString,
             objectStorageConfig.AzureObjectConfig.AzureContainerName);
 
+        if (!containerClient.CanGenerateSasUri)
+        {
+            return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, "azure_object", directUrl, record.Id, record.Uri, expirationHours);
+        }
+
         // Verify container exists
         if (!await containerClient.ExistsAsync())
         {
