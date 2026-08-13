@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Text.Json;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
@@ -18,6 +19,22 @@ public class ClassBusiness : IClassBusiness
     private readonly IAdminService _adminService;
 
     private readonly IRelationshipBusiness _relationshipBusiness;
+
+    // Converts a class to a response DTO. Used an expression for IQuerable.
+    static private readonly Expression<Func<Class, ClassResponseDto>> ClassToResponse = c =>
+    new()
+    {
+        Id = c.Id,
+        Name = c.Name,
+        Description = c.Description,
+        Properties = c.Properties,
+        Uuid = c.Uuid,
+        ProjectId = c.ProjectId,
+        OrganizationId = c.OrganizationId,
+        LastUpdatedAt = c.LastUpdatedAt,
+        LastUpdatedBy = c.LastUpdatedBy,
+        IsArchived = c.IsArchived
+    };
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ClassBusiness" /> class.
@@ -66,8 +83,6 @@ public class ClassBusiness : IClassBusiness
         bool isSysAdmin = false,
         bool isOrgAdmin = false)
     {
-        var returnAll = paginatedRequestDto.PageSize == -1;
-
         var userProjectAdminStatus = new Dictionary<long, bool>();
 
         if (projectIds?.Length > 0)
@@ -137,60 +152,7 @@ public class ClassBusiness : IClassBusiness
 
         var orderedQuery = query.OrderBy(c => c.Id);
 
-        if (returnAll)
-        {
-            var allClasses = await orderedQuery
-                .Select(c => new ClassResponseDto
-                {
-                    Id = c.Id,
-                    Name = c.Name,
-                    Description = c.Description,
-                    Properties = c.Properties,
-                    Uuid = c.Uuid,
-                    ProjectId = c.ProjectId,
-                    OrganizationId = c.OrganizationId,
-                    LastUpdatedAt = c.LastUpdatedAt,
-                    LastUpdatedBy = c.LastUpdatedBy,
-                    IsArchived = c.IsArchived
-                })
-                .ToListAsync();
-
-            return new PaginatedResponse<ClassResponseDto>
-            {
-                Items = allClasses,
-                PageNumber = 1,
-                PageSize = allClasses.Count,
-                TotalCount = allClasses.Count
-            };
-        }
-
-        var totalCount = await query.CountAsync();
-
-        var classes = await orderedQuery
-            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
-            .Take(paginatedRequestDto.PageSize)
-            .Select(c => new ClassResponseDto
-            {
-                Id = c.Id,
-                Name = c.Name,
-                Description = c.Description,
-                Properties = c.Properties,
-                Uuid = c.Uuid,
-                ProjectId = c.ProjectId,
-                OrganizationId = c.OrganizationId,
-                LastUpdatedAt = c.LastUpdatedAt,
-                LastUpdatedBy = c.LastUpdatedBy,
-                IsArchived = c.IsArchived
-            })
-            .ToListAsync();
-
-        return new PaginatedResponse<ClassResponseDto>
-        {
-            Items = classes,
-            PageNumber = paginatedRequestDto.PageNumber,
-            PageSize = paginatedRequestDto.PageSize,
-            TotalCount = totalCount
-        };
+        return await orderedQuery.Select(ClassToResponse).ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
