@@ -79,8 +79,111 @@ public class ProjectBusiness : IProjectBusiness
     /// </summary>
     /// <param name="userId">ID of user querying projects</param>
     /// <param name="organizationId">(Required)Organization ID within which to constrain returned projects</param>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching projects are returned unpaginated</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived projects from the result</param>
+    /// <returns>A paginated list of projects, or all projects if no pagination is specified</returns>
+    public async Task<PaginatedResponse<ProjectResponseDto>> GetAllProjectsPaginated(
+        long userId,
+        long organizationId,
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true)
+    {
+        var returnAll = paginatedRequestDto.PageSize == -1;
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null) throw new ArgumentException($"User with id {userId} not found.");
+
+        var isOrgAdmin = await _context.OrganizationUsers
+            .AnyAsync(ou => ou.UserId == userId
+                            && ou.OrganizationId == organizationId
+                            && ou.IsOrgAdmin);
+
+        var projectQuery = _context.Projects
+            .Where(p => p.OrganizationId == organizationId
+                        && (!hideArchived || !p.IsArchived));
+
+        if (!user.IsSysAdmin && !isOrgAdmin)
+            projectQuery = projectQuery.Where(p =>
+                p.ProjectMembers.Any(pm =>
+                    pm.UserId == userId ||
+                    (pm.GroupId.HasValue && pm.Group != null && pm.Group.Users.Any(u => u.Id == userId))
+                )
+            );
+
+        var orderedQuery = projectQuery.OrderBy(p => p.Id);
+
+        if (returnAll)
+        {
+            var allProjects = await orderedQuery
+                .Select(p => new ProjectResponseDto
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Description = p.Description,
+                    Abbreviation = p.Abbreviation,
+                    LastUpdatedAt = p.LastUpdatedAt,
+                    LastUpdatedBy = p.LastUpdatedBy,
+                    IsArchived = p.IsArchived,
+                    OrganizationId = p.OrganizationId,
+                    Banner = p.Banner,
+                    RequireSensitivityLabel = p.RequireSensitivityLabel,
+                    DefaultObjectStorageId = p.DefaultObjectStorageId
+                })
+                .ToListAsync();
+
+            return new PaginatedResponse<ProjectResponseDto>
+            {
+                Items = allProjects,
+                PageNumber = 1,
+                PageSize = allProjects.Count,
+                TotalCount = allProjects.Count
+            };
+        }
+
+        var totalCount = await projectQuery.CountAsync();
+
+        var projects = await orderedQuery
+            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
+            .Take(paginatedRequestDto.PageSize)
+            .Select(p => new ProjectResponseDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Description = p.Description,
+                Abbreviation = p.Abbreviation,
+                LastUpdatedAt = p.LastUpdatedAt,
+                LastUpdatedBy = p.LastUpdatedBy,
+                IsArchived = p.IsArchived,
+                OrganizationId = p.OrganizationId,
+                Banner = p.Banner,
+                RequireSensitivityLabel = p.RequireSensitivityLabel,
+                DefaultObjectStorageId = p.DefaultObjectStorageId
+            })
+            .ToListAsync();
+
+        return new PaginatedResponse<ProjectResponseDto>
+        {
+            Items = projects,
+            PageNumber = paginatedRequestDto.PageNumber,
+            PageSize = paginatedRequestDto.PageSize,
+            TotalCount = totalCount
+        };
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all projects without pagination.
+    ///     Superseded by <see cref="GetAllProjectsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 project controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="userId">ID of user querying projects</param>
+    /// <param name="organizationId">(Required)Organization ID within which to constrain returned projects</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived projects from the result</param>
     /// <returns>A list of projects</returns>
+    [Obsolete("V1-only. Used by deprecated v1 project endpoints. Superseded by GetAllProjectsPaginated. " +
+              "Remove once v1 project endpoints are sunset.", error: false)]
     public async Task<IEnumerable<ProjectResponseDto>> GetAllProjects(
         long userId,
         long organizationId,
@@ -120,6 +223,8 @@ public class ProjectBusiness : IProjectBusiness
         })
             .ToListAsync();
     }
+
+    #endregion
 
     /// <summary>
     ///     Creates a new project based on the data transfer object supplied.
