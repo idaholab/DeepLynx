@@ -156,6 +156,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             }
         };
 
+        // This object storage cannot create SAS URLs
+        // Look at CreateLimitedConnectionString for implementation details
         _objectStorageConfigNoSas = new ObjectStorageConfigDto
         {
             AzureObjectConfig = new AzureObjectConfigDto
