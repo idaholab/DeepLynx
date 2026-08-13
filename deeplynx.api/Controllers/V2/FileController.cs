@@ -259,11 +259,17 @@ public class FileController : ControllerBase
         long recordId)
     {
         var currentUserId = UserContextStorage.UserId;
+
+        var scheme = Request.Headers.TryGetValue("X-Forwarded-Proto", out var forwardedProto)
+            && !string.IsNullOrEmpty(forwardedProto)
+            ? forwardedProto.ToString()
+            : Request.Scheme;
+
         var directUrl = Url.Action(
             nameof(DownloadFileDirect),
             null, // infer controller
             values: new { organizationId, projectId, recordId },
-            protocol: Request.Scheme
+            protocol: scheme
         );
         var fileStreamResult = await _fileBusiness.GenerateDownloadURL(currentUserId, organizationId, projectId, recordId, directUrl);
         return fileStreamResult;
