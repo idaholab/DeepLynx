@@ -15,6 +15,7 @@ public class EdgeBusiness : IEdgeBusiness
 {
     private readonly IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor;
     private readonly DeeplynxContext _context;
+    private readonly IProjectRolePermissionService _projectRolePermissionService;
     private readonly IEventBusiness _eventBusiness;
 
     private readonly ISensitivityLabelService _sensitivityLabelService;
@@ -29,16 +30,181 @@ public class EdgeBusiness : IEdgeBusiness
     public EdgeBusiness(
         DeeplynxContext context, IEventBusiness eventBusiness,
         IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
-        ISensitivityLabelService sensitivityLabelService)
+        ISensitivityLabelService sensitivityLabelService,
+        IProjectRolePermissionService projectRolePermissionService)
     {
         _context = context;
         _eventBusiness = eventBusiness;
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
+        _projectRolePermissionService = projectRolePermissionService;
         _sensitivityLabelService = sensitivityLabelService;
     }
 
     /// <summary>
-    ///     Retrieves all edges for a specific project and (optionally) datasource
+    ///     Retrieves all edges
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the edges belong</param>
+    /// <param name="currentUserId">The ID of the user</param>
+    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter edges</param>
+    /// <param name="projectIds">(optional) The ID(s) of the project(s) to filter edges by</param>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching edges are returned unpaginated</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived edges from the result</param>
+    /// <param name="isSysAdmin">Flag indicating whether you are a system admin</param>
+    /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin</param>
+    /// <returns>A paginated list of edges, or all edges if no pagination is specified</returns>
+    public async Task<PaginatedResponse<EdgeResponseDto>> GetAllEdgesPaginated(
+        long currentUserId,
+        long organizationId,
+        long[]? projectIds,
+        PaginatedRequestDto? paginatedRequestDto,
+        long? dataSourceId = null,
+        bool hideArchived = true,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false)
+    {
+        var returnAll = paginatedRequestDto?.PageSize == -1;
+
+        var userProjectAdminStatus = new Dictionary<long, bool>();
+
+        if (projectIds?.Length > 0)
+        {
+            var adminProjectIds = await _context.ProjectMembers
+                .Where(pm =>
+                    pm.IsProjectAdmin &&
+                    projectIds.Contains(pm.ProjectId) &&
+                    (
+                        (pm.UserId != null && pm.UserId == currentUserId) ||
+                        pm.Group!.Users.Any(u => u.Id == currentUserId)
+                    ))
+                .Select(pm => pm.ProjectId)
+                .Distinct()
+                .ToHashSetAsync();
+
+            foreach (var projectId in projectIds)
+            {
+                userProjectAdminStatus[projectId] = adminProjectIds.Contains(projectId);
+            }
+        }
+
+
+        var authorizedProjectIds = new List<long>();
+        foreach (var projectId in projectIds ?? [])
+        {
+            if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId, false))
+            {
+                authorizedProjectIds.Add(projectId);
+                continue;
+            }
+
+            var hasPermission = await _projectRolePermissionService.PermissionInProject(
+                currentUserId, projectId, "read", "edge");
+
+            if (hasPermission)
+                authorizedProjectIds.Add(projectId);
+        }
+
+        if (projectIds != null && authorizedProjectIds.Count == 0)
+        {
+            return new PaginatedResponse<EdgeResponseDto>
+            {
+                Items = [],
+                PageNumber = paginatedRequestDto.PageNumber,
+                PageSize = paginatedRequestDto.PageSize,
+                TotalCount = 0
+            };
+        }
+
+        var query = _context.Edges
+            .Include(e => e.Origin)
+            .Include(e => e.Destination)
+            .Where(e => e.OrganizationId == organizationId)
+            .AsQueryable();
+
+        if (projectIds != null && projectIds.Length > 0)
+        {
+            query = query.Where(e => authorizedProjectIds.Contains(e.ProjectId));
+        }
+        else
+        {
+            query = query.Where(e => e.ProjectId == null);
+        }
+
+        if (dataSourceId.HasValue)
+            query = query.Where(e => e.DataSourceId == dataSourceId.Value);
+
+        if (hideArchived)
+            query = query.Where(e => !e.IsArchived);
+
+        var orderedQuery = query.OrderBy(e => e.Id);
+
+        if (returnAll)
+        {
+            var allEdges = await orderedQuery
+                .Select(e => new EdgeResponseDto
+                {
+                    Id = e.Id,
+                    OriginOriginalId = e.Origin.OriginalId,
+                    DestinationOriginalId = e.Destination.OriginalId,
+                    Properties = e.Properties,
+                    OriginId = e.OriginId,
+                    DestinationId = e.DestinationId,
+                    RelationshipId = e.RelationshipId,
+                    DataSourceId = e.DataSourceId,
+                    ProjectId = e.ProjectId,
+                    OrganizationId = e.OrganizationId,
+                    LastUpdatedAt = e.LastUpdatedAt,
+                    LastUpdatedBy = e.LastUpdatedBy,
+                    IsArchived = e.IsArchived
+                })
+                .ToListAsync();
+
+            return new PaginatedResponse<EdgeResponseDto>
+            {
+                Items = allEdges,
+                PageNumber = 1,
+                PageSize = allEdges.Count,
+                TotalCount = allEdges.Count
+            };
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var edges = await orderedQuery
+            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
+            .Take(paginatedRequestDto.PageSize)
+            .Select(e => new EdgeResponseDto
+            {
+                Id = e.Id,
+                OriginOriginalId = e.Origin.OriginalId,
+                DestinationOriginalId = e.Destination.OriginalId,
+                Properties = e.Properties,
+                OriginId = e.OriginId,
+                DestinationId = e.DestinationId,
+                RelationshipId = e.RelationshipId,
+                DataSourceId = e.DataSourceId,
+                ProjectId = e.ProjectId,
+                OrganizationId = e.OrganizationId,
+                LastUpdatedAt = e.LastUpdatedAt,
+                LastUpdatedBy = e.LastUpdatedBy,
+                IsArchived = e.IsArchived
+            })
+            .ToListAsync();
+
+
+        return new PaginatedResponse<EdgeResponseDto>
+        {
+            Items = edges,
+            PageNumber = paginatedRequestDto.PageNumber,
+            PageSize = paginatedRequestDto.PageSize,
+            TotalCount = totalCount
+        };
+    }
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all edges without pagination.
+    ///     Superseded by <see cref="GetAllEdgesPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 edge controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
     /// </summary>
     /// <param name="currentUserId">The ID of the currentUser making the request</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -46,6 +212,8 @@ public class EdgeBusiness : IEdgeBusiness
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter edges</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived edges from the result</param>
     /// <returns>A list of edges based on the applied filters.</returns>
+    [Obsolete("V1-only. Used by deprecated v1 edge endpoints. Superseded by GetAllEdgesPaginated. " +
+              "Remove once v1 edge endpoints are sunset.", error: false)]
     public async Task<List<EdgeResponseDto>> GetAllEdges(
         long currentUserId,
         long organizationId,

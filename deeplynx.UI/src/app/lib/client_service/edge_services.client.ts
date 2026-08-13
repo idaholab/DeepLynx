@@ -1,7 +1,7 @@
 'use client';
 
 import { CreateEdgeRequestDto, UpdateEdgeRequestDto } from "@/app/(home)/types/requestDTOs";
-import { EdgeResponseDto } from "@/app/(home)/types/responseDTOs";
+import { EdgeResponseDto, PaginatedResponse } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 
@@ -17,12 +17,14 @@ export const getAllEdges = async (
     organizationId: number,
     projectId: number,
     dataSourceId?: number,
-    hideArchived: boolean = true
-): Promise<EdgeResponseDto[]> => {
+    hideArchived: boolean = true,
+    pageNumber: number = 1,
+    pageSize: number = -1
+): Promise<PaginatedResponse<EdgeResponseDto[]>> => {
     try {
         const res = await api.get(
             `/organizations/${organizationId}/projects/${projectId}/edges`,
-            { params: { dataSourceId, hideArchived } }
+            { params: { dataSourceId, hideArchived, pageNumber, pageSize } }
         );
         return res.data;
     } catch (error) {

@@ -4,8 +4,20 @@ namespace deeplynx.interfaces;
 
 public interface IEdgeBusiness
 {
+    [Obsolete("V1-only. Used by deprecated v1 edge endpoints. Superseded by GetAllEdgesPaginated. " +
+              "Remove once v1 edge endpoints are sunset.", error: false)]
     Task<List<EdgeResponseDto>> GetAllEdges(
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived);
+
+    Task<PaginatedResponse<EdgeResponseDto>> GetAllEdgesPaginated(
+        long currentUserId,
+        long organizationId,
+        long[]? projectIds,
+        PaginatedRequestDto? paginatedRequestDto,
+        long? dataSourceId = null,
+        bool hideArchived = true,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false);
 
     Task<EdgeResponseDto> GetEdge(
         long currentUserId, long organizationId, long projectId, long? edgeId, long? originId, long? destinationId, bool hideArchived);
