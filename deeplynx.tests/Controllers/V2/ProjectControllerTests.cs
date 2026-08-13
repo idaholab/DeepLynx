@@ -67,14 +67,17 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task GetAllProjects_Returns200_WithList()
     {
-        var expected = new List<ProjectResponseDto>
+        var expected = new PaginatedResponse<ProjectResponseDto>
         {
-            new(),
-            new()
+            Items = new List<ProjectResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
         };
 
-        _mockBusiness.Setup(b => b.GetAllProjects(UserId, OrgId, true))
-                     .ReturnsAsync(expected);
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                UserId, OrgId, It.IsAny<PaginatedRequestDto>(), true))
+            .ReturnsAsync(expected);
 
         var result = (await _controller.GetAllProjects(OrgId, true)).Result as OkObjectResult;
 
@@ -86,22 +89,30 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task GetAllProjects_Returns200_WithEmptyList()
     {
-        _mockBusiness.Setup(b => b.GetAllProjects(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
-                     .ReturnsAsync([]);
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>()))
+                     .ReturnsAsync(new PaginatedResponse<ProjectResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
         var result = (await _controller.GetAllProjects(OrgId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<ProjectResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<ProjectResponseDto>>(result.Value);
     }
 
     [Fact]
-    public async Task GetAllProjects_Returns500_OnUnexpectedException()
+    public async Task GetAllProjects_ThrowsException_WhenBusinessThrows()
     {
-        _mockBusiness.Setup(b => b.GetAllProjects(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _controller.GetAllProjects(OrgId, true));
@@ -112,12 +123,68 @@ public class ProjectControllerTests : IDisposable
     {
         UserContextStorage.UserId = 77L;
 
-        _mockBusiness.Setup(b => b.GetAllProjects(77L, OrgId, false))
-                     .ReturnsAsync([]);
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                         77L, OrgId, It.IsAny<PaginatedRequestDto>(), false))
+                     .ReturnsAsync(new PaginatedResponse<ProjectResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
         await _controller.GetAllProjects(OrgId, hideArchived: false);
 
-        _mockBusiness.Verify(b => b.GetAllProjects(77L, OrgId, false), Times.Once);
+        _mockBusiness.Verify(b => b.GetAllProjectsPaginated(
+            77L, OrgId, It.IsAny<PaginatedRequestDto>(), false), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllProjects_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                         UserId, OrgId,
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+                         true))
+                     .ReturnsAsync(new PaginatedResponse<ProjectResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        await _controller.GetAllProjects(OrgId, true);
+
+        _mockBusiness.Verify(b => b.GetAllProjectsPaginated(
+            UserId, OrgId,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+            true), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllProjects_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var pagination = new PaginatedRequestDto { PageNumber = 4, PageSize = 50 };
+
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                         UserId, OrgId,
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+                         true))
+                     .ReturnsAsync(new PaginatedResponse<ProjectResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 4,
+                         PageSize = 50,
+                         TotalCount = 0
+                     });
+
+        await _controller.GetAllProjects(OrgId, true, pagination);
+
+        _mockBusiness.Verify(b => b.GetAllProjectsPaginated(
+            UserId, OrgId,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+            true), Times.Once);
     }
 
     #endregion
@@ -131,14 +198,17 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task GetAllProjectsByUser_Returns200_WithList()
     {
-        var expected = new List<ProjectResponseDto>
+        var expected = new PaginatedResponse<ProjectResponseDto>
         {
-            new(),
-            new()
+            Items = new List<ProjectResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
         };
 
-        _mockBusiness.Setup(b => b.GetAllProjects(OtherUserId, OrgId, true))
-                     .ReturnsAsync(expected);
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                OtherUserId, OrgId, It.IsAny<PaginatedRequestDto>(), true))
+            .ReturnsAsync(expected);
 
         var result = (await _controller.GetAllProjectsByUser(
             OrgId, OtherUserId, true)).Result as OkObjectResult;
@@ -151,23 +221,31 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task GetAllProjectsByUser_Returns200_WithEmptyList()
     {
-        _mockBusiness.Setup(b => b.GetAllProjects(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
-                     .ReturnsAsync([]);
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>()))
+                     .ReturnsAsync(new PaginatedResponse<ProjectResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
         var result = (await _controller.GetAllProjectsByUser(
             OrgId, OtherUserId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<ProjectResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<ProjectResponseDto>>(result.Value);
     }
 
     [Fact]
-    public async Task GetAllProjectsByUser_Returns500_OnUnexpectedException()
+    public async Task GetAllProjectsByUser_ThrowsException_WhenBusinessThrows()
     {
-        _mockBusiness.Setup(b => b.GetAllProjects(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _controller.GetAllProjectsByUser(
@@ -177,13 +255,69 @@ public class ProjectControllerTests : IDisposable
     [Fact]
     public async Task GetAllProjectsByUser_PassesProvidedUserIdAndHideArchivedToBusinessLayer()
     {
-        _mockBusiness.Setup(b => b.GetAllProjects(OtherUserId, OrgId, false))
-                     .ReturnsAsync([]);
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                         OtherUserId, OrgId, It.IsAny<PaginatedRequestDto>(), false))
+                     .ReturnsAsync(new PaginatedResponse<ProjectResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
         await _controller.GetAllProjectsByUser(
             OrgId, OtherUserId, hideArchived: false);
 
-        _mockBusiness.Verify(b => b.GetAllProjects(OtherUserId, OrgId, false), Times.Once);
+        _mockBusiness.Verify(b => b.GetAllProjectsPaginated(
+            OtherUserId, OrgId, It.IsAny<PaginatedRequestDto>(), false), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsByUser_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                         OtherUserId, OrgId,
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+                         true))
+                     .ReturnsAsync(new PaginatedResponse<ProjectResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        await _controller.GetAllProjectsByUser(OrgId, OtherUserId, true);
+
+        _mockBusiness.Verify(b => b.GetAllProjectsPaginated(
+            OtherUserId, OrgId,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+            true), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsByUser_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var pagination = new PaginatedRequestDto { PageNumber = 4, PageSize = 50 };
+
+        _mockBusiness.Setup(b => b.GetAllProjectsPaginated(
+                         OtherUserId, OrgId,
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+                         true))
+                     .ReturnsAsync(new PaginatedResponse<ProjectResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 4,
+                         PageSize = 50,
+                         TotalCount = 0
+                     });
+
+        await _controller.GetAllProjectsByUser(OrgId, OtherUserId, true, pagination);
+
+        _mockBusiness.Verify(b => b.GetAllProjectsPaginated(
+            OtherUserId, OrgId,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+            true), Times.Once);
     }
 
     #endregion
@@ -742,7 +876,8 @@ public class ProjectControllerTests : IDisposable
         var method = GetControllerMethod(
             nameof(ProjectController.GetAllProjects),
             "organizationId",
-            "hideArchived");
+            "hideArchived",
+            "paginatedRequestDto");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
         AssertHasAuthAttribute(method, "read", "project");
@@ -756,7 +891,8 @@ public class ProjectControllerTests : IDisposable
             nameof(ProjectController.GetAllProjectsByUser),
             "organizationId",
             "userId",
-            "hideArchived");
+            "hideArchived",
+            "paginatedRequestDto");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
         AssertHasAuthAttribute(method, "read", "project");
