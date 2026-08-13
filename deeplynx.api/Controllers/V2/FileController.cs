@@ -260,10 +260,8 @@ public class FileController : ControllerBase
     {
         var currentUserId = UserContextStorage.UserId;
 
-        var scheme = Request.Headers.TryGetValue("X-Forwarded-Proto", out var forwardedProto)
-            && !string.IsNullOrEmpty(forwardedProto)
-            ? forwardedProto.ToString()
-            : Request.Scheme;
+        var isLocalEnv = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("BACKEND_BASE_URL"));
+        var scheme = isLocalEnv ? "http" : "https";
 
         var directUrl = Url.Action(
             nameof(DownloadFileDirect),
