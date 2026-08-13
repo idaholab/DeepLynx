@@ -82,12 +82,18 @@ public class GroupControllerTests : IDisposable
     [Fact]
     public async Task GetGroupMembers_ReturnsMembers()
     {
-        var expected = new List<UserResponseDto> { new() { Id = MemberId } };
+        var expected = new PaginatedResponse<UserResponseDto>
+        {
+            Items = new List<UserResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
         _mockGroupBusiness
-            .Setup(business => business.GetGroupMembers(OrganizationId, GroupId))
+            .Setup(business => business.GetGroupMembersPaginated(OrganizationId, GroupId, It.IsAny<PaginatedRequestDto>()))
             .ReturnsAsync(expected);
 
-        var result = (await _controller.GetGroupMembers(OrganizationId, GroupId)).Result;
+        var result = (await _controller.GetGroupMembers(OrganizationId, GroupId, It.IsAny<PaginatedRequestDto>())).Result;
 
         AssertOkObject(result, expected);
     }
