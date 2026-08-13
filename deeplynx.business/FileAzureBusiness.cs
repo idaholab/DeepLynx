@@ -103,7 +103,7 @@ public class FileAzureBusiness : IFileBusiness
             : $"{baseFilePath.TrimEnd('/')}/{guid}_{file.FileName}";
 
         var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
-        await containerClient.CreateIfNotExistsAsync();
+        // await containerClient.CreateIfNotExistsAsync();
 
         var blobClient = containerClient.GetBlobClient(filePath);
 
@@ -264,17 +264,17 @@ public class FileAzureBusiness : IFileBusiness
             objectStorageConfig.AzureObjectConfig.AzureConnectionString,
             objectStorageConfig.AzureObjectConfig.AzureContainerName);
 
-        if (!await container.ExistsAsync())
-        {
-            throw new InvalidOperationException("Azure Object Storage container does not exist");
-        }
+        // if (!await container.ExistsAsync())
+        // {
+        //     throw new InvalidOperationException("Azure Object Storage container does not exist");
+        // }
 
         var blob = container.GetBlobClient(record.Uri);
 
-        if (!await blob.ExistsAsync())
-        {
-            throw new FileNotFoundException($"File not found: {record.Uri}");
-        }
+        // if (!await blob.ExistsAsync())
+        // {
+        //     throw new FileNotFoundException($"File not found: {record.Uri}");
+        // }
 
         // Get blob properties for content length
         var properties = await blob.GetPropertiesAsync();
