@@ -156,7 +156,8 @@ test.describe("Settings Page", () => {
       await row.getByRole('button', { name: 'Delete API key' }).click();
       await expect(page.getByText('API Keypair deleted')).toBeVisible();
       await expect(page.getByText(key)).not.toBeVisible();
-      await expect(rows).toHaveCount(previousCount - 1);      
+      await expect(rows).toHaveCount(previousCount - 1);    
+      await expect(rows.getByText(String(previousCount))).not.toBeVisible();
     });
   });
 });
