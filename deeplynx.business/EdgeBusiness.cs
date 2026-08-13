@@ -46,7 +46,7 @@ public class EdgeBusiness : IEdgeBusiness
     /// <param name="organizationId">The ID of the organization to which the edges belong</param>
     /// <param name="currentUserId">The ID of the user</param>
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter edges</param>
-    /// <param name="projectIds">(optional) The ID(s) of the project(s) to filter edges by</param>
+    /// <param name="projectId">(optional) The ID of the project to filter edges by</param>
     /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching edges are returned unpaginated</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived edges from the result</param>
     /// <param name="isSysAdmin">Flag indicating whether you are a system admin</param>
@@ -55,7 +55,7 @@ public class EdgeBusiness : IEdgeBusiness
     public async Task<PaginatedResponse<EdgeResponseDto>> GetAllEdgesPaginated(
         long currentUserId,
         long organizationId,
-        long[]? projectIds,
+        long projectId,
         PaginatedRequestDto? paginatedRequestDto,
         long? dataSourceId = null,
         bool hideArchived = true,
@@ -64,70 +64,41 @@ public class EdgeBusiness : IEdgeBusiness
     {
         var returnAll = paginatedRequestDto?.PageSize == -1;
 
-        var userProjectAdminStatus = new Dictionary<long, bool>();
+        bool isUserProjectAdmin = false;
 
-        if (projectIds?.Length > 0)
+        isUserProjectAdmin = await _context.ProjectMembers
+            .AnyAsync(pm =>
+                pm.IsProjectAdmin &&
+                pm.ProjectId == projectId &&
+                (
+                    (pm.UserId != null && pm.UserId == currentUserId) ||
+                    pm.Group!.Users.Any(u => u.Id == currentUserId)
+                ));
+
+        bool isAuthorized = isSysAdmin || isOrgAdmin || isUserProjectAdmin;
+
+        if (!isAuthorized)
         {
-            var adminProjectIds = await _context.ProjectMembers
-                .Where(pm =>
-                    pm.IsProjectAdmin &&
-                    projectIds.Contains(pm.ProjectId) &&
-                    (
-                        (pm.UserId != null && pm.UserId == currentUserId) ||
-                        pm.Group!.Users.Any(u => u.Id == currentUserId)
-                    ))
-                .Select(pm => pm.ProjectId)
-                .Distinct()
-                .ToHashSetAsync();
-
-            foreach (var projectId in projectIds)
-            {
-                userProjectAdminStatus[projectId] = adminProjectIds.Contains(projectId);
-            }
-        }
-
-
-        var authorizedProjectIds = new List<long>();
-        foreach (var projectId in projectIds ?? [])
-        {
-            if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId, false))
-            {
-                authorizedProjectIds.Add(projectId);
-                continue;
-            }
-
-            var hasPermission = await _projectRolePermissionService.PermissionInProject(
+            isAuthorized = await _projectRolePermissionService.PermissionInProject(
                 currentUserId, projectId, "read", "edge");
 
-            if (hasPermission)
-                authorizedProjectIds.Add(projectId);
-        }
-
-        if (projectIds != null && authorizedProjectIds.Count == 0)
-        {
-            return new PaginatedResponse<EdgeResponseDto>
+            if (!isAuthorized)
             {
-                Items = [],
-                PageNumber = paginatedRequestDto.PageNumber,
-                PageSize = paginatedRequestDto.PageSize,
-                TotalCount = 0
-            };
+                return new PaginatedResponse<EdgeResponseDto>
+                {
+                    Items = [],
+                    PageNumber = paginatedRequestDto.PageNumber,
+                    PageSize = paginatedRequestDto.PageSize,
+                    TotalCount = 0
+                };
+            }
         }
 
         var query = _context.Edges
             .Include(e => e.Origin)
             .Include(e => e.Destination)
-            .Where(e => e.OrganizationId == organizationId)
+            .Where(e => e.OrganizationId == organizationId && e.ProjectId == projectId)
             .AsQueryable();
-
-        if (projectIds != null && projectIds.Length > 0)
-        {
-            query = query.Where(e => authorizedProjectIds.Contains(e.ProjectId));
-        }
-        else
-        {
-            query = query.Where(e => e.ProjectId == null);
-        }
 
         if (dataSourceId.HasValue)
             query = query.Where(e => e.DataSourceId == dataSourceId.Value);

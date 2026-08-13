@@ -12,7 +12,7 @@ public interface IEdgeBusiness
     Task<PaginatedResponse<EdgeResponseDto>> GetAllEdgesPaginated(
         long currentUserId,
         long organizationId,
-        long[]? projectIds,
+        long projectId,
         PaginatedRequestDto? paginatedRequestDto,
         long? dataSourceId = null,
         bool hideArchived = true,

@@ -49,17 +49,18 @@ public class EdgeController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "edge")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<EdgeResponseDto>>> GetAllEdges(
+    public async Task<ActionResult<PaginatedResponse<EdgeResponseDto>>> GetAllEdges(
         long organizationId,
         long projectId,
         [FromQuery] long? dataSourceId = null,
         [FromQuery] bool hideArchived = true,
         [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+        paginatedRequestDto ??= new PaginatedRequestDto();
         var currentUserId = UserContextStorage.UserId;
         var isSysAdmin = UserContextStorage.IsSysAdmin;
         var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-        var edges = await _edgeBusiness.GetAllEdgesPaginated(currentUserId, organizationId, [projectId], paginatedRequestDto, dataSourceId, hideArchived, isSysAdmin, isOrgAdmin);
+        var edges = await _edgeBusiness.GetAllEdgesPaginated(currentUserId, organizationId, projectId, paginatedRequestDto, dataSourceId, hideArchived, isSysAdmin, isOrgAdmin);
         return Ok(edges);
     }
 
