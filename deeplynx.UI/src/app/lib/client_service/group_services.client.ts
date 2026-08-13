@@ -2,7 +2,7 @@
 "use client";
 
 import { CreateGroupRequestDto, UpdateGroupRequestDto } from "@/app/(home)/types/requestDTOs";
-import { GroupResponseDto, UserResponseDto } from "@/app/(home)/types/responseDTOs";
+import { GroupResponseDto, PaginatedResponse, UserResponseDto } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 
@@ -57,15 +57,20 @@ export async function getGroup(
  * Get all members of a group
  * @param organizationId - The ID of the organization
  * @param groupId - The ID of the group
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
  * @returns Promise with array of UserResponseDto
  */
 export async function getGroupMembers(
   organizationId: number,
-  groupId: number
-): Promise<UserResponseDto[]> {
+  groupId: number,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<UserResponseDto>> {
   try {
     const res = await api.get(
-      `/organizations/${organizationId}/groups/${groupId}/users`
+      `/organizations/${organizationId}/groups/${groupId}/users`,
+      { params: { pageNumber, pageSize } }
     );
     return res.data;
   } catch (error) {
