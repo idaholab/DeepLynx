@@ -1,6 +1,7 @@
 import { test, expect, APIRequestContext, Page } from "../fixtures";
 import { sysAdmin, ORGS, PROJECTS} from "../deeplynx-config";
 import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
+import { testApiUrl } from "../api-url";
 
 type Organization = {
   id: number;
@@ -16,8 +17,7 @@ let orgId: string;
 async function getOrgIdByName(
   request: APIRequestContext, orgName: string
 ): Promise<string> {
-  const BASE_URL = 'http://localhost:5095/api/v1';
-  const res = await request.fetch(`${BASE_URL}/organizations`);
+  const res = await request.fetch(testApiUrl("/organizations"));
   if (!res.ok()) throw new Error(`Failed to fetch organizations: ${res.status()}`);
   const orgs: Organization[] = await res.json();
   const match = orgs.find((org) => org.name === orgName);
@@ -53,8 +53,9 @@ test.describe("Roles & Permissions", () => {
     request: APIRequestContext, projectId: string | undefined, page: Page, orgId: string,
   ) {
     if (!projectId) return;
-    const BASE_URL = 'http://localhost:5095/api/v1';
-    const getAllUrl = `${BASE_URL}/organizations/${orgId}/projects/${projectId}/roles?hideArchived=true`;
+    const getAllUrl = testApiUrl(
+      `/organizations/${orgId}/projects/${projectId}/roles?hideArchived=true`,
+    );
     try {
       let res = await request.fetch(getAllUrl);
       if (!res.ok()) throw new Error(`Failed to fetch roles: ${res.status()}`);

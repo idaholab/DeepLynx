@@ -190,11 +190,21 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             _context.ObjectStorages.Add(newObjectStorage);
             await _context.SaveChangesAsync();
 
-            if (hasAzure && createContainer)
+            if (hasAzure && createContainer && !dto.Config.AzureObjectConfig.ExistingContainer)
             {
-                var containerName = ContainerName.UniqueContainerNameFromString(dto.Config.AzureObjectConfig?.AzureContainerName ?? "container");
+                string containerName;
+                if (projectId == null)
+                {
+                    containerName = ContainerName.UniqueContainerNameFromString(dto.Config.AzureObjectConfig?.AzureContainerName ?? "container");
+                }
+                else
+                {
+                    containerName = dto.Config.AzureObjectConfig?.AzureContainerName ?? ContainerName.UniqueContainerNameFromString("container");
+                }
 
-                var container = await _fileAzureBusiness.CreateContainer(
+                dto.Config.AzureObjectConfig?.AzureContainerName = containerName;
+
+                await _fileAzureBusiness.CreateContainer(
                     organizationId: organizationId,
                     containerName: containerName,
                     connectionString: dto.Config.AzureObjectConfig?.AzureConnectionString,

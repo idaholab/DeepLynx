@@ -4,7 +4,11 @@ namespace deeplynx.interfaces;
 
 public interface IClassBusiness
 {
+    [Obsolete("V1-only. Used by deprecated v1 class endpoints. Superseded by GetAllClassesPaginated. " +
+              "Remove once v1 class endpoints are sunset.", error: false)]
     Task<List<ClassResponseDto>> GetAllClasses(long currentUserId, long organizationId, long[]? projectIds, bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false);
+    
+    Task<PaginatedResponse<ClassResponseDto>> GetAllClassesPaginated(long currentUserId, long organizationId, long[]? projectIds, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false);
     Task<ClassResponseDto> GetClass(long organizationId, long? projectId, long classId, bool hideArchived);
 
     Task<ClassResponseDto> CreateClass(

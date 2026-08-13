@@ -1,5 +1,5 @@
 import "server-only";
-import { withNexusApiVersion } from "../api-version";
+import { appendNexusApiPath, withNexusApiVersion } from "../api-version";
 
 let backendApiBaseUrl: string | null = null;
 
@@ -21,5 +21,5 @@ export function getBackendApiBaseUrl(): string {
 }
 
 export function backendApiUrl(path: string): string {
-  return `${getBackendApiBaseUrl()}${path.startsWith("/") ? "" : "/"}${path}`;
+  return appendNexusApiPath(getBackendApiBaseUrl(), path);
 }

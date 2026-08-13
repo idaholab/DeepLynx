@@ -81,12 +81,12 @@ const RecentRecordsCard: React.FC<Props> = ({
         const fetchActiveClasses = async () => {
             try {
                 const projectIds = selectedProjects.map((id) => Number(id));
-                const classesArrays = await Promise.all(
+                const classesResponses = await Promise.all(
                     projectIds.map((projectId) => getAllClasses(projectId, true))
                 );
                 if (cancelled) return;
 
-                const allClasses = classesArrays.flat();
+                const allClasses = classesResponses.flatMap((res) => res.items);
                 const classNamesSet = new Set(allClasses.map((cls) => cls.name));
                 setActiveClassNames(classNamesSet);
             } catch (error) {
