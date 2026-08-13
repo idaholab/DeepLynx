@@ -29,8 +29,8 @@ test.describe("Settings Page", () => {
   });
 
   test("Name and Email labels are displayed", async ({ page }) => {
-    await expect(page.getByText("Name")).toBeVisible();
-    await expect(page.getByText("Email")).toBeVisible();
+    await expect(page.getByText("Name", { exact: true })).toBeVisible();
+    await expect(page.getByText("Email", { exact: true })).toBeVisible();
   });
 
   test("Preferences section is visible", async ({ page }) => {
