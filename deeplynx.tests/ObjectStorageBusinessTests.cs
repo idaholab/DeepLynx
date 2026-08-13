@@ -65,7 +65,8 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         await base.InitializeAsync();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
-        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper, protectProvider);
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _fileAzureBusiness);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();

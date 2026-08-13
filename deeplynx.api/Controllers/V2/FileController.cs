@@ -259,11 +259,15 @@ public class FileController : ControllerBase
         long recordId)
     {
         var currentUserId = UserContextStorage.UserId;
+
+        var isLocalEnv = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("BACKEND_BASE_URL"));
+        var scheme = isLocalEnv ? "http" : "https";
+
         var directUrl = Url.Action(
             nameof(DownloadFileDirect),
             null, // infer controller
             values: new { organizationId, projectId, recordId },
-            protocol: Request.Scheme
+            protocol: scheme
         );
         var fileStreamResult = await _fileBusiness.GenerateDownloadURL(currentUserId, organizationId, projectId, recordId, directUrl);
         return fileStreamResult;

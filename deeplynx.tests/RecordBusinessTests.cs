@@ -140,7 +140,8 @@ public class RecordBusinessTests : IntegrationTestBase
             _olapBusiness,
             _objectStorageBusiness,
             NullLogger<FileBusiness>.Instance,
-            _eventBusiness
+            _eventBusiness,
+            protectProvider
         );
     }
 
