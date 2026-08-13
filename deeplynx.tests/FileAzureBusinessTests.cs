@@ -1538,9 +1538,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         var token = result.Split("?token=")[1];
         Assert.NotNull(token);
 
-        var storage = RecordUrlHelper.ValidateObjectStorageType(_downloadProtector, token, rid);
-        Assert.NotNull(storage);
-        Assert.Equal("azure_object", storage);
+        var valid = RecordUrlHelper.IsValidToken(_downloadProtector, token, rid);
+        Assert.True(valid);
     }
 
     [Fact]

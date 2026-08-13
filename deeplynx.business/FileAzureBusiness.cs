@@ -589,7 +589,7 @@ public class FileAzureBusiness : IFileBusiness
         {
             // TODO(DL-2856): uploading/downloading Azure files from SAS fallback URL will fail
             //                because of permission issues when checking blob/container exists
-            return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, "azure_object", directUrl, record.Id, record.Uri, expirationHours);
+            return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, directUrl, record.Id, record.Uri, expirationHours);
         }
 
         // Verify container exists
@@ -613,7 +613,7 @@ public class FileAzureBusiness : IFileBusiness
         {
             // TODO(DL-2856): uploading/downloading Azure files from SAS fallback URL will fail
             //                because of permission issues when checking blob/container exists
-            return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, "azure_object", directUrl, record.Id, record.Uri, expirationHours);
+            return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, directUrl, record.Id, record.Uri, expirationHours);
         }
 
         // Create SAS builder with read permissions

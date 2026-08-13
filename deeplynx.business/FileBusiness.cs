@@ -322,8 +322,8 @@ public class FileBusiness : IFileControllerBusiness
     public async Task<FileStreamResult> DownloadFileDirect(long organizationId, long projectId, long recordId, string token)
     {
         // This check must come first for correct authentication
-        var storageType = RecordUrlHelper.ValidateObjectStorageType(_downloadProtector, token, recordId)
-            ?? throw new ArgumentException("Invalid token for direct record file access.");
+        if (!RecordUrlHelper.IsValidToken(_downloadProtector, token, recordId))
+            throw new ArgumentException("Invalid token for direct record file access.");
 
         var record = await _context.Records
             .Where(r => r.ProjectId == projectId
@@ -337,11 +337,7 @@ public class FileBusiness : IFileControllerBusiness
         if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
 
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
-
-        if (objectStorage.Type != storageType)
-            throw new ArgumentException("Record's storage type must match token's storage type.");
-
-        var fileBusiness = _factory.CreateFileBusiness(storageType);
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
 
         var dto = new RecordResponseDto{
             Uri = record.Uri,

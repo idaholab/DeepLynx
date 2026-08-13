@@ -357,7 +357,7 @@ public class FileFilesystemBusiness : IFileBusiness
         if (!File.Exists(record.Uri))
             throw new FileNotFoundException("The requested file does not exist.", record.Uri);
 
-        return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, "filesystem", directUrl, record.Id, record.Uri, expirationHours);
+        return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, directUrl, record.Id, record.Uri, expirationHours);
     }
 
     /// <summary>

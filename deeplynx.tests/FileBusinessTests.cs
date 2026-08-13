@@ -364,7 +364,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("filesystem", RecordUrlHelper.ValidateObjectStorageType(_downloadProtector, token, recordDto.Id));
+        Assert.True(RecordUrlHelper.IsValidToken(_downloadProtector, token, recordDto.Id));
     }
 
     [Fact]
@@ -387,7 +387,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(result);
-        Assert.Null(RecordUrlHelper.ValidateObjectStorageType(_downloadProtector, token, recordDto.Id));
+        Assert.False(RecordUrlHelper.IsValidToken(_downloadProtector, token, recordDto.Id));
     }
 
     [Fact]
@@ -410,7 +410,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(result);
-        Assert.Null(RecordUrlHelper.ValidateObjectStorageType(_downloadProtector, token, recordDto.Id + 1));
+        Assert.False(RecordUrlHelper.IsValidToken(_downloadProtector, token, recordDto.Id + 1));
     }
 
     #endregion
