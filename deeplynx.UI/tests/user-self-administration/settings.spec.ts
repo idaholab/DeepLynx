@@ -148,10 +148,15 @@ test.describe("Settings Page", () => {
     });
 
     test("delete an API key", async ({ page }) => {
+      const rows = page.locator('.space-y-3 > div');
+      await expect(rows.getByText('1', { exact: true })).toBeVisible();
+      const previousCount = await rows.count();
+
       const row = page.locator('.flex.items-center.gap-3').filter({ has: page.locator('code', { hasText: key }) });
       await row.getByRole('button', { name: 'Delete API key' }).click();
       await expect(page.getByText('API Keypair deleted')).toBeVisible();
       await expect(page.getByText(key)).not.toBeVisible();
+      await expect(rows).toHaveCount(previousCount - 1);      
     });
   });
 });
