@@ -154,6 +154,100 @@ public class GroupBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetAllGroupsPaginated Tests
+
+    [Fact]
+    public async Task GetAllGroupsPaginated_ExcludesArchived_WhenHideArchivedTrue()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _groupBusiness.GetAllGroupsPaginated(oid, paginatedRequest, hideArchived: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Items, g => Assert.False(g.IsArchived));
+        Assert.Contains(result.Items, g => g.Id == gid);
+        Assert.DoesNotContain(result.Items, g => g.Id == gid2);
+    }
+
+    [Fact]
+    public async Task GetAllGroupsPaginated_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _groupBusiness.GetAllGroupsPaginated(oid, paginatedRequest, hideArchived: false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Contains(result.Items, g => g.IsArchived);
+        Assert.Contains(result.Items, g => g.Id == gid);
+        Assert.Contains(result.Items, g => g.Id == gid2);
+    }
+
+    [Fact]
+    public async Task GetAllGroupsPaginated_FiltersByOrganizationId()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _groupBusiness.GetAllGroupsPaginated(oid, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Items, g => Assert.Equal(oid, g.OrganizationId));
+        Assert.Contains(result.Items, g => g.Id == gid);
+    }
+
+    [Fact]
+    public async Task GetAllGroupsPaginated_ReturnsAll_WhenPageSizeIsMinusOne()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 5, PageSize = -1 };
+
+        // Act
+        var result = await _groupBusiness.GetAllGroupsPaginated(oid, paginatedRequest, hideArchived: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
+        Assert.Equal(result.TotalCount, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllGroupsPaginated_PaginatesCorrectly()
+    {
+        // Arrange
+        var pageSize = 1;
+        var firstPageRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = pageSize };
+        var secondPageRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = pageSize };
+
+        // Act
+        var firstPage = await _groupBusiness.GetAllGroupsPaginated(oid, firstPageRequest, hideArchived: true);
+        var secondPage = await _groupBusiness.GetAllGroupsPaginated(oid, secondPageRequest, hideArchived: true);
+
+        // Assert
+        Assert.NotNull(firstPage);
+        Assert.NotNull(secondPage);
+
+        Assert.Equal(firstPage.TotalCount, secondPage.TotalCount);
+
+        Assert.Equal(pageSize, firstPage.Items.Count);
+        Assert.True(secondPage.Items.Count <= pageSize);
+
+        var firstPageIds = firstPage.Items.Select(g => g.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(g => g.Id).ToHashSet();
+
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    #endregion
+
     #region GetGroup Tests
 
     [Fact]
