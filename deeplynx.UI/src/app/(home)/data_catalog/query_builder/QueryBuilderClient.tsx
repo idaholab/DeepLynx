@@ -623,7 +623,7 @@ function useFilterData(
     const loadClasses = async () => {
       try {
         setIsLoadingClasses(true);
-        const data = await getAllClassesOrg(organizationId, projects);
+        const { items: data } = await getAllClassesOrg(organizationId, projects);
         setClasses(data);
       } catch (error) {
         console.error("Failed to fetch classes:", error);
@@ -920,7 +920,8 @@ export default function QueryBuilderClient({
     const projectIds = selectedProjects.map(Number);
     if (field === "class_name") {
       try {
-        setClasses(await getAllClassesOrg(organizationId, projectIds));
+        const { items } = await getAllClassesOrg(organizationId, projectIds);
+        setClasses(items);
       } catch (err) {
         console.error("Failed to fetch classes:", err);
       }
