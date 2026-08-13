@@ -28,6 +28,7 @@ public class FileBusinessTests : IntegrationTestBase
     private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "FileBusinessChunkedTests");
     private ClassBusiness _classBusiness = null!;
     private DataSourceBusiness _dataSourceBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IEdgeBusiness> _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private UserBusiness _userBusiness = null!;
@@ -96,9 +97,10 @@ public class FileBusinessTests : IntegrationTestBase
 
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness,
             _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
 
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _sensitivityLabelService = new SensitivityLabelService(Context);
@@ -112,9 +114,13 @@ public class FileBusinessTests : IntegrationTestBase
             _provenanceBusiness.Object,
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
 
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness.Object, _eventBusiness);
+        _classBusiness = new ClassBusiness(Context,
+        _recordBusiness,
+        _relationshipBusiness.Object,
+        _eventBusiness,
+        _mockPermissionService.Object,
+        _mockAdminService.Object);
 
         var realFileFilesystemBusiness =
             new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
@@ -194,6 +200,14 @@ public class FileBusinessTests : IntegrationTestBase
         Context.ObjectStorages.Add(objectStorage);
         await Context.SaveChangesAsync();
         osid = objectStorage.Id;
+
+        project.DefaultObjectStorageId = (int?)osid;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
+        organization.DefaultObjectStorageId = (int?)osid;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
 
         var testClass = new Class
         {
@@ -1218,6 +1232,48 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task UpdateFile_WithFilesystemHashing_ReplacesPreviousContentHash()
+    {
+        await using var originalStream = new MemoryStream(Encoding.UTF8.GetBytes("original"));
+        var originalFile = new FormFile(
+            originalStream,
+            0,
+            originalStream.Length,
+            "file",
+            "original.txt");
+        var originalRecord = await _fileBusiness.UploadFile(
+            uid,
+            oid,
+            pid,
+            did,
+            osid,
+            originalFile);
+
+        var storedRecord = await Context.Records.FindAsync(originalRecord.Id);
+        storedRecord!.FileContentHash = new string('a', 64);
+        await Context.SaveChangesAsync();
+
+        await using var updatedStream = new MemoryStream(Encoding.UTF8.GetBytes("updated"));
+        var updatedFile = new FormFile(
+            updatedStream,
+            0,
+            updatedStream.Length,
+            "file",
+            "updated.txt");
+
+        var updatedRecord = await _fileBusiness.UpdateFile(
+            uid,
+            oid,
+            pid,
+            originalRecord.Id,
+            updatedFile);
+
+        const string expectedHash = "27eb5e51506c911f6fc4bb345c0d9db6f60415fceab7c18e1e9b862637415777";
+        Assert.Equal(expectedHash, updatedRecord.FileContentHash);
+        Assert.Equal(expectedHash, (await Context.Records.FindAsync(originalRecord.Id))!.FileContentHash);
+    }
+
+    [Fact]
     public async Task UpdateFile_WithProjectDefault_WorksCorrectly()
     {
         // Arrange: Upload using project default
@@ -1273,8 +1329,18 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         var orgOsId = orgObjectStorage.Id;
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         // Upload using org default
@@ -1585,8 +1651,18 @@ public class FileBusinessTests : IntegrationTestBase
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var content = "Delete test";
@@ -1694,8 +1770,18 @@ public class FileBusinessTests : IntegrationTestBase
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var session = await _fileBusiness.StartUpload(
@@ -2357,7 +2443,105 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CompleteUpdateUpload_ReplacesChunkUploadedFileContent()
+    {
+        var initialContent = "original content";
+        var initialSession = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            new FileUploadInitRequestDto { FileName = "original.txt", FileSize = Encoding.UTF8.GetByteCount(initialContent) });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("original "), initialSession.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), initialSession.UploadId, 1);
+
+        var initialCompleteRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = initialSession.UploadId,
+            FileName = "original.txt",
+            TotalChunks = 2
+        };
+
+        var initialRecord = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, initialCompleteRequest);
+        var originalUri = initialRecord.Uri;
+
+        var updatedContent = "updated content";
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid,
+            oid,
+            pid,
+            initialRecord.Id,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = Encoding.UTF8.GetByteCount(updatedContent) });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("updated "), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "updated.txt",
+            TotalChunks = 2
+        };
+
+        var updatedRecord = await _fileBusiness.CompleteUpdateUpload(uid, oid, pid, initialRecord.Id, completeRequest);
+        var downloadedFile = await _fileBusiness.DownloadFile(uid, oid, pid, updatedRecord.Id);
+
+        using var reader = new StreamReader(downloadedFile.FileStream);
+        var downloadedContent = await reader.ReadToEndAsync();
+
+        Assert.Equal(initialRecord.Id, updatedRecord.Id);
+        Assert.Equal("updated.txt", updatedRecord.Name);
+        Assert.Equal(osid, updatedRecord.ObjectStorageId);
+        Assert.Equal(did, updatedRecord.DataSourceId);
+        Assert.Equal(Encoding.UTF8.GetByteCount(updatedContent), updatedRecord.FileSize);
+        Assert.True(File.Exists(updatedRecord.Uri));
+        Assert.Equal(updatedContent, await File.ReadAllTextAsync(updatedRecord.Uri));
+        Assert.Equal(updatedContent, downloadedContent);
+        Assert.False(File.Exists(originalUri));
+    }
+
+    [Fact]
+    public async Task CancelUpdateUpload_CleansUpUploadSession()
+    {
+        var initialContent = "original content";
+        var initialStream = new MemoryStream(Encoding.UTF8.GetBytes(initialContent));
+        var initialFile = new FormFile(initialStream, 0, initialStream.Length, "file", "original.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var initialRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, initialFile);
+
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid,
+            oid,
+            pid,
+            initialRecord.Id,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = 2048 });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("chunk0"), session.UploadId, 0);
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"org_{oid}",
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        Assert.True(Directory.Exists(uploadPath));
+        Assert.True(File.Exists(Path.Combine(uploadPath, "0.part")));
+
+        await _fileBusiness.CancelUpdateUpload(uid, oid, pid, initialRecord.Id, session.UploadId);
+
+        Assert.False(Directory.Exists(uploadPath));
+    }
+
+    [Fact]
     public async Task CompleteUpload_CsvFile_AssignsTimeseriesClassAndExtractsColumns()
+
     {
         // Arrange
         var csvContent = "timestamp,temperature,humidity\n2024-01-01,22.5,60.1\n2024-01-02,23.0,58.3";
@@ -2634,7 +2818,7 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert: Upload directory should be deleted
         Assert.False(Directory.Exists(uploadPath));
     }
-    
+
     [Fact]
     public async Task CompleteUpload_WithAzureBlobObjectStorage_GetsFileSizeFromStorageBusiness()
     {
@@ -2678,6 +2862,13 @@ public class FileBusinessTests : IntegrationTestBase
                 blobUri,
                 It.IsAny<ObjectStorageConfigDto>()))
             .ReturnsAsync(expectedFileSize);
+
+        azureFileBusiness
+            .Setup(x => x.CalculateStoredFileContentHash(
+                blobUri,
+                It.IsAny<ObjectStorageConfigDto>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
 
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("azure_object"))
@@ -2725,7 +2916,7 @@ public class FileBusinessTests : IntegrationTestBase
 
         _fileBusinessFactory.Verify(x => x.CreateFileBusiness("azure_object"), Times.Once);
     }
-    
+
     [Fact]
     public async Task CompleteUpload_MetadataNoClassInformation_ReturnsDefault()
     {
@@ -3201,9 +3392,19 @@ public class FileBusinessTests : IntegrationTestBase
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         // Remove project-level default
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var request = new FileUploadInitRequestDto
@@ -3402,8 +3603,18 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         var orgOsId = orgObjectStorage.Id;
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var session = await _fileBusiness.StartUpload(
@@ -3487,9 +3698,19 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         var orgOsId = orgObjectStorage.Id;
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         // Disable project default
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
         projectStorage.Default = false;
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
         var content = "Test file content";
@@ -3528,6 +3749,16 @@ public class FileBusinessTests : IntegrationTestBase
         foreach (var storage in allStorages) storage.Default = false;
         await Context.SaveChangesAsync();
 
+        var organization = Context.Organizations.First(o => o.Id == oid);
+        organization.DefaultObjectStorageId = null;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = null;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var request = new FileUploadInitRequestDto
         {
             FileName = "no-default.txt",
@@ -3539,7 +3770,7 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusiness.StartUpload(oid, pid, did, null, request)
         );
 
-        Assert.Contains("Default object storage not found", exception.Message);
+        Assert.Contains("Default object storage not set", exception.Message);
     }
 
     #endregion
@@ -5946,4 +6177,3 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
 }
-

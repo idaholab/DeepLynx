@@ -7,6 +7,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
+using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.Configuration;
@@ -16,35 +17,58 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
+using deeplynx.helpers.BigData;
 
 namespace deeplynx.tests;
 
 [Collection("Test Suite Collection")]
 public class ProjectBusinessTests : IntegrationTestBase
 {
+    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "ProjectBusinessTests");
     private ClassBusiness _classBusiness = null!;
-    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "ProjectBusinessLogoTests");
+    private FileAzureBusiness _fileAzureBusiness;
+    private UserBusiness _userBusiness = null!;
     private DataSourceBusiness _dataSourceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
     private EventBusiness _eventBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IEdgeBusiness> _mockEdgeBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
-    private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
+    private Mock<ILogger<AdminService>> _adminServiceLogger;
     private INotificationBusiness _notificationBusiness = null!;
     private IProjectRolePermissionService _permissionService = null!;
     private Mock<IAdminService> _mockAdminService = null!;
+    private IAdminService _adminService = null!;
     private Mock<ILogger<ProjectRolePermissionService>> _logger = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private RoleBusiness _roleBusiness = null!;
     private Mock<IBulkCopyUpsertExecutor> _bulkCopyUpsertExecutor = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness;
+    private RecordBusiness _recordBusiness;
+    private TagBusiness _tagBusiness = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private SensitivityLabelService _sensitivityLabelService = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private FileBusiness _fileBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private OlapBusiness _olapBusiness = null!;
+    private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private long cid; // class ID
     private long did; // datasource ID
     private long os1;
+    private long osid;
     private long gid; // group ID
     private long gid2;
     private long oid; // org IDs
@@ -83,27 +107,76 @@ public class ProjectBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _mockAdminService = new Mock<IAdminService>();
+        _adminServiceLogger = new Mock<ILogger<AdminService>>();
+        _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _logger = new Mock<ILogger<ProjectRolePermissionService>>();
         _permissionService = new ProjectRolePermissionService(Context, _logger.Object);
-        _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockEdgeBusiness = new Mock<IEdgeBusiness>();
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
 
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
+        _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(
             Context, _mockEdgeBusiness.Object,
-            _mockRecordBusiness.Object, _eventBusiness, _permissionService, _mockAdminService.Object);
+            _recordBusiness, _eventBusiness, _permissionService, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
-            Context, _mockRecordBusiness.Object,
-            _mockRelationshipBusiness.Object, _eventBusiness);
+            Context, _recordBusiness,
+            _mockRelationshipBusiness.Object, _eventBusiness, _permissionService, _adminService);
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(realFileFilesystemBusiness);
+
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
-            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness);
+            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _fileAzureBusiness, _fileBusinessFactory.Object);
+
+        _relationshipBusiness = new Mock<IRelationshipBusiness>();
+
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
+
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _insightBusiness = new Mock<IInsightBusiness>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
+        );
     }
 
     #region GetProjectStats Tests
@@ -369,6 +442,25 @@ public class ProjectBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Add object storage
+        var config = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+        var objectStorageFs = new ObjectStorage
+        {
+            Name = "Object Storage 1",
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.ObjectStorages.Add(objectStorageFs);
+        await Context.SaveChangesAsync();
+        osid = objectStorageFs.Id;
+
+        // Add object storage
         var os1Config = new JsonObject
         {
             ["MountPath"] = "../data/duckdb"
@@ -473,7 +565,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(dto.Name, project.Name);
         var classResult = await _classBusiness.GetAllClasses(
-            oid, [project.Id], true);
+            uid, oid, [project.Id], true);
 
         Assert.Equal(3, classResult.Count);
 
@@ -841,6 +933,63 @@ public class ProjectBusinessTests : IntegrationTestBase
                 _projectBusiness.DeleteProject(uid, oid, nonExistentId));
 
         Assert.Contains($"Project with id {nonExistentId} not found.", exception.Message);
+    }
+
+    #endregion
+
+    #region Integration DeleteProject Tests
+
+    [Fact]
+    public async Task DeleteProject_FileDeleted_DeletesProjectFile()
+    {
+        // Create record file
+        var file = CreateMockFile("file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Delete project and files
+        var result = await _projectBusiness.DeleteProject(uid, oid, pid);
+        Assert.True(result);
+
+        // Check file
+        Assert.False(File.Exists(record.Uri));
+    }
+
+    [Fact]
+    public async Task DeleteProject_FileSaved_DeletesProjectNotFile()
+    {
+        // Disable file deletion
+        var os = await Context.ObjectStorages.FindAsync(osid);
+        os!.FilesDeletable = false;
+        await Context.SaveChangesAsync();
+
+        // Create record file
+        var file = CreateMockFile("not_file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Delete project but not files
+        var result = await _projectBusiness.DeleteProject(uid, oid, pid);
+        Assert.True(result);
+
+        // Check file
+        Assert.True(File.Exists(record.Uri));
+    }
+
+    private static FormFile CreateMockFile(string fileName, string content = "Mock File")
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
+
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
     }
 
     #endregion
@@ -1373,7 +1522,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     public async Task RemoveMemberFromProject_CanRemoveUser()
     {
         // Act
-        var result = await _projectBusiness.RemoveMemberFromProject(pid, uid, null);
+        var result = await _projectBusiness.RemoveMemberFromProject(pid, uid, null, null);
 
         // Assert
         Assert.True(result);
@@ -1383,13 +1532,31 @@ public class ProjectBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task RemoveSelfFromProject_CannotRemoveUser()
+    {
+        //Arrange
+        var currentUserId = uid;
+
+        // Act
+        var result = await _projectBusiness.RemoveMemberFromProject(pid, uid, null, currentUserId);
+
+        // Assert
+        Assert.False(result);
+
+        // Verify the user is still a member of the project
+        var projectMember = await Context.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.ProjectId == pid && pm.UserId == uid);
+        Assert.NotNull(projectMember);
+    }
+
+    [Fact]
     public async Task RemoveMemberFromProject_CanRemoveGroup()
     {
         // Add group to project first - we don't seed this data as of now for groups
         await _projectBusiness.AddMemberToProject(pid3, null, null, gid);
 
         // Act
-        var result = await _projectBusiness.RemoveMemberFromProject(pid3, null, gid);
+        var result = await _projectBusiness.RemoveMemberFromProject(pid3, null, gid, null);
 
         // Assert
         Assert.True(result);
@@ -1403,7 +1570,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<ArgumentException>(() => _projectBusiness.RemoveMemberFromProject(pid, 1, 1)
+            await Assert.ThrowsAsync<ArgumentException>(() => _projectBusiness.RemoveMemberFromProject(pid, 1, 1, null)
             );
         Assert.Equal("Please provide only one of User ID or Group ID, not both", exception.Message);
     }
@@ -1413,7 +1580,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<ArgumentException>(() => _projectBusiness.RemoveMemberFromProject(pid, null, null)
+            await Assert.ThrowsAsync<ArgumentException>(() => _projectBusiness.RemoveMemberFromProject(pid, null, null, null)
             );
         Assert.Equal("One of either User ID or Group ID must be provided", exception.Message);
     }
@@ -1424,7 +1591,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _projectBusiness.RemoveMemberFromProject(pid, uid2, null)
+                _projectBusiness.RemoveMemberFromProject(pid, uid2, null, null)
             );
         Assert.Equal($"User with id {uid2} is not a member of project {pid}", exception.Message);
     }
@@ -1435,7 +1602,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Act & Assert
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _projectBusiness.RemoveMemberFromProject(pid, null, gid2)
+                _projectBusiness.RemoveMemberFromProject(pid, null, gid2, null)
             );
         Assert.Equal($"Group with id {gid2} is not a member of project {pid}", exception.Message);
     }
@@ -1446,7 +1613,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Act & Assert
         const long nonExistentProjectId = 999999;
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _projectBusiness.RemoveMemberFromProject(nonExistentProjectId, uid, null)
+            _projectBusiness.RemoveMemberFromProject(nonExistentProjectId, uid, null, null)
         );
         Assert.Equal($"User with id {uid} is not a member of project {nonExistentProjectId}", exception.Message);
     }
@@ -1457,7 +1624,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Act & Assert (user exists but is not a member of the project)
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-                _projectBusiness.RemoveMemberFromProject(pid3, uid, null)
+                _projectBusiness.RemoveMemberFromProject(pid3, uid, null, null)
             );
         Assert.Equal($"User with id {uid} is not a member of project {pid3}", exception.Message);
     }

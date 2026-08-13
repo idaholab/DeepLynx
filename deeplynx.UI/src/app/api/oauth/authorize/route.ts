@@ -1,6 +1,7 @@
 // src/app/api/oauth/authorize/route.ts
 import { auth } from "../../../../../auth";
 import { NextRequest, NextResponse } from "next/server";
+import { backendApiUrl } from "../../../lib/server_service/backend-api-url.server";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,11 +19,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // User is authenticated - forward request to C# backend
-    const backendUrl = process.env.BACKEND_BASE_URL || "http://localhost:5095/api/v1";
-
     // Build the target URL with properly formatted query parameters
-    const targetUrl = new URL(`${backendUrl}/oauth/authorize`);
+    const targetUrl = new URL(backendApiUrl("/oauth/authorize"));
 
     // Copy all query parameters from the incoming request
     request.nextUrl.searchParams.forEach((value, key) => {

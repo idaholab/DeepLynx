@@ -49,6 +49,8 @@ public class RecordResponseDto
 
     [Column("file_size")] public long? FileSize { get; set; }
 
+    [Column("file_content_hash")] public string? FileContentHash { get; set; }
+
     [NotMapped] public ICollection<RecordTagDto> Tags { get; set; } = new List<RecordTagDto>();
     [NotMapped] public ICollection<RecordLabelDto> Labels { get; set; } = new List<RecordLabelDto>();
     

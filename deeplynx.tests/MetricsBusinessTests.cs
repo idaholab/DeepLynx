@@ -11,104 +11,106 @@ using Record = deeplynx.datalayer.Models.Record;
 using deeplynx.helpers.Cache;
 
 namespace deeplynx.tests;
- 
+
 // Fixture for Azurite container
 public class MetricsAzuriteFixture : IAsyncLifetime
 {
     private AzuriteContainer _azuriteContainer = null!;
- 
+
     public string AzuriteConnectionString { get; private set; } = null!;
- 
+
     public async Task InitializeAsync()
     {
         _azuriteContainer = new AzuriteBuilder()
             .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
             .Build();
- 
+
         await _azuriteContainer.StartAsync();
         AzuriteConnectionString = _azuriteContainer.GetConnectionString();
     }
- 
+
     public async Task DisposeAsync()
     {
         await _azuriteContainer.DisposeAsync();
     }
 }
- 
+
 [Collection("Test Suite Collection")]
 public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAzuriteFixture>
 {
     private readonly MetricsAzuriteFixture _azuriteFixture;
     private readonly string _filesystemBasePath = Path.Combine(Path.GetTempPath(), "MetricsBusinessTests");
-    
+
     private MetricsBusiness _metricsBusiness = null!;
     private IFileBusinessFactory _fileBusinessFactory = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
- 
+
     // Organization IDs
     private long _org1Id;
     private long _org2Id;
- 
+
     // Project IDs
     private long _org1Proj1Id; // Org1, Project1
     private long _org1Proj2Id; // Org1, Project2
     private long _org2Proj1Id; // Org2, Project1
     private long _org2Proj2Id; // Org2, Project2
- 
+
     // Filesystem Object Storage IDs
     private long _fsOrg1Proj1StorageId;
     private long _fsOrg2Proj1StorageId;
     private long _fsOrg2Proj2StorageId;
- 
+
     // Azure Object Storage IDs
     private long _azureOrg1Proj1StorageId;
     private long _azureOrg2Proj1StorageId;
     private long _azureOrg2Proj2StorageId;
- 
+
     // User ID
     private long _userId;
-    
+
     private long _dsOrg1Proj1Id;
     private long _dsOrg2Proj1Id;
     private long _dsOrg2Proj2Id;
- 
+
     public MetricsBusinessTests(TestSuiteFixture fixture, MetricsAzuriteFixture azuriteFixture) : base(fixture)
     {
         _azuriteFixture = azuriteFixture;
     }
- 
+
     public override async Task InitializeAsync()
     {
         // Set up encryption keys
         Environment.SetEnvironmentVariable("ENCRYPTION_KEY", "SU5TRUNVUkVfREVWX0tFWV8zMl9CWVRFU19MT05HISE=");
         Environment.SetEnvironmentVariable("ENCRYPTION_IV", "SU5TRUNVUkVfREVWX0lWIQ==");
-        
+
         _encryptionHelper = new EncryptionHelper();
-        
+
         await base.InitializeAsync();
- 
+
         // Create filesystem directory
         Directory.CreateDirectory(_filesystemBasePath);
-        
+
         // Ensure all seeded data is committed before initializing business layer
         await Context.SaveChangesAsync();
- 
+
         // Initialize business layer
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
-        
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
+
         var fileBusinessFactory = new Mock<IFileBusinessFactory>();
         var filesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, null!, null!);
-        var azureBusiness = new FileAzureBusiness();
-        
+        var azureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+
         fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(filesystemBusiness);
         fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(azureBusiness);
-        
+
         _fileBusinessFactory = fileBusinessFactory.Object;
-        
+
         _metricsBusiness = new MetricsBusiness(Context);
     }
- 
+
     public override async Task DisposeAsync()
     {
         // Clean up filesystem
@@ -123,7 +125,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
                 // Ignore cleanup errors
             }
         }
- 
+
         // Clean up Azure containers
         var blobServiceClient = new BlobServiceClient(_azuriteFixture.AzuriteConnectionString);
         await foreach (var containerItem in blobServiceClient.GetBlobContainersAsync())
@@ -131,10 +133,10 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
             var container = blobServiceClient.GetBlobContainerClient(containerItem.Name);
             await container.DeleteIfExistsAsync();
         }
- 
+
         await base.DisposeAsync();
     }
- 
+
     protected override async Task SeedTestDataAsync()
     {
         await base.SeedTestDataAsync();
@@ -375,7 +377,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         // Org1 Project1 blobs (4KB total)
         var org1Proj1Container = new BlobContainerClient(
-            _azuriteFixture.AzuriteConnectionString, 
+            _azuriteFixture.AzuriteConnectionString,
             "org1-proj1-container");
         await org1Proj1Container.CreateIfNotExistsAsync();
         await UploadBlobAsync(org1Proj1Container, $"organization_{_org1Id}/project_{_org1Proj1Id}/file1.txt", 2048); // 2KB
@@ -383,7 +385,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         // Org2 Project1 blobs (6KB total)
         var org2Proj1Container = new BlobContainerClient(
-            _azuriteFixture.AzuriteConnectionString, 
+            _azuriteFixture.AzuriteConnectionString,
             "org2-proj1-container");
         await org2Proj1Container.CreateIfNotExistsAsync();
         await UploadBlobAsync(org2Proj1Container, $"organization_{_org2Id}/project_{_org2Proj1Id}/file1.txt", 3072); // 3KB
@@ -391,7 +393,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         // Org2 Project2 blobs (9KB total)
         var org2Proj2Container = new BlobContainerClient(
-            _azuriteFixture.AzuriteConnectionString, 
+            _azuriteFixture.AzuriteConnectionString,
             "org2-proj2-container");
         await org2Proj2Container.CreateIfNotExistsAsync();
         await UploadBlobAsync(org2Proj2Container, $"organization_{_org2Id}/project_{_org2Proj2Id}/file1.txt", 4096); // 4KB
@@ -418,7 +420,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
             IsArchived = false
         };
         Context.DataSources.Add(dsOrg2Proj1);
-        
+
         // Archived data source for Org2 Project1
         var arcOrg2Proj1Id = new DataSource
         {
@@ -450,11 +452,11 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.DataSources.Add(dsOrg1OrgLevel);
 
         await Context.SaveChangesAsync();
-        
+
         _dsOrg1Proj1Id = dsOrg1Proj1.Id;
         _dsOrg2Proj1Id = dsOrg2Proj1.Id;
         _dsOrg2Proj2Id = dsOrg2Proj2.Id;
-        
+
         // ========== RECORDS ==========
         var records = new List<Record>
         {
@@ -619,9 +621,9 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.Records.AddRange(records);
         await Context.SaveChangesAsync();
     }
- 
+
     #region Helper Methods
- 
+
     private async Task UploadBlobAsync(BlobContainerClient container, string blobName, long sizeInBytes)
     {
         var blob = container.GetBlobClient(blobName);
@@ -640,7 +642,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = _userId
         };
-        
+
         Context.Projects.Add(project);
         await Context.SaveChangesAsync();
 
@@ -651,10 +653,10 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
             ProjectId = project.Id,
             IsArchived = false
         };
-        
+
         Context.DataSources.Add(dataSource);
         await Context.SaveChangesAsync();
-        
+
         return (project.Id, dataSource.Id);
     }
 
@@ -683,11 +685,11 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
             LastUpdatedBy = _userId
         };
     }
- 
+
     #endregion
- 
+
     #region Get_StorageSize Tests
-    
+
     // Verifies that project storage size is calculated by summing FileSize values from active records with null FileSize excluded.
     [Fact]
     public async Task GetProjectStorageSize_ExcludesNullFileSizes()
@@ -705,7 +707,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         Assert.Equal(300, result.Bytes);
     }
-    
+
     // Verifies that archived records are excluded from project storage size.
     [Fact]
     public async Task GetProjectStorageSize_ExcludesArchivedRecords()
@@ -722,7 +724,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         Assert.Equal(100, result.Bytes);
     }
-    
+
     // Verifies that object storage size only sums records matching the requested ObjectStorageId.
     [Fact]
     public async Task GetObjectStorageSize_SumsOnlyMatchingObjectStorage()
@@ -743,7 +745,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         Assert.Equal(300, result.Bytes);
     }
-    
+
     // Verifies that organization storage size sums FileSize values across projects in the organization.
     [Fact]
     public async Task GetOrganizationStorageSize_SumsProjectsInOrganization()
@@ -761,7 +763,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         Assert.Equal(300, result.Bytes);
     }
-    
+
     // Verifies that system storage size sums FileSize values across all organizations.
     [Fact]
     public async Task GetSystemStorageSize_SumsAllProjects()
@@ -779,7 +781,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         Assert.Equal(300, result.Bytes);
     }
-    
+
     // Check if 0 is returned if no records are matched
     [Fact]
     public async Task GetProjectStorageSize_ReturnsZero_WhenNoMatchingRecordsExist()
@@ -792,7 +794,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         Assert.Equal(0, result.Bytes);
     }
-    
+
     // Verifies that project storage size returns the cached value instead of recalculating from DB.
     [Fact]
     public async Task GetProjectStorageSize_ReturnsCachedValue_WhenCacheHit()
@@ -828,9 +830,9 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
             await CacheService.Instance.DeleteAsync(cacheKey);
         }
     }
-    
+
     #endregion
-    
+
     #region GetSystemDataSourceCount Tests
 
     [Fact]
@@ -840,7 +842,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         var dataSources = Context.DataSources.ToList();
         Context.DataSources.RemoveRange(dataSources);
         await Context.SaveChangesAsync();
-        
+
         // Act
         var count = await _metricsBusiness.GetSystemDataSourceCount();
 
@@ -870,13 +872,13 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Assert.Equal(4, countWithoutArchived);
     }
 
-     #endregion
+    #endregion
 
     #region GetProjectDataSourceCount Tests
 
     [Fact]
     public async Task GetProjectDataSourceCount_ReturnsCount_ForProject()
-    { 
+    {
         // Act
         var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj1Id);
 
@@ -903,7 +905,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
             .ToList();
         Context.DataSources.RemoveRange(org2Proj2DataSources);
         await Context.SaveChangesAsync();
-        
+
         // Act - project 2 has no data sources
         var count = await _metricsBusiness.GetProjectDataSourceCount(_org2Proj2Id);
 
@@ -966,7 +968,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
             .ToList();
         Context.DataSources.RemoveRange(org2DataSources);
         await Context.SaveChangesAsync();
-        
+
         // Act - org 2 has no data sources
         var count = await _metricsBusiness.GetOrganizationDataSourceCount(_org2Id, null);
 
@@ -975,7 +977,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     }
 
     #endregion
-    
+
     #region GetRecordCount Tests
 
     // ── Single projectId overload ─────────────────────────────────────────────
@@ -994,7 +996,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     {
         // Org1 Project1: 3 active + 1 archived = 4
         var countActive = await _metricsBusiness.GetRecordCount(_org1Id, (long?)_org1Proj1Id, hideArchived: true);
-        var countAll    = await _metricsBusiness.GetRecordCount(_org1Id, (long?)_org1Proj1Id, hideArchived: false);
+        var countAll = await _metricsBusiness.GetRecordCount(_org1Id, (long?)_org1Proj1Id, hideArchived: false);
 
         Assert.Equal(3, countActive);
         Assert.Equal(4, countAll);
@@ -1065,7 +1067,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     public async Task GetRecordCount_MultipleProjectIds_SingleEntry_MatchesSingleProjectOverload()
     {
         // Array overload with one project ID must agree with the single-ID overload
-        var countArray  = await _metricsBusiness.GetRecordCount(_org2Id, new[] { _org2Proj1Id }, hideArchived: true);
+        var countArray = await _metricsBusiness.GetRecordCount(_org2Id, new[] { _org2Proj1Id }, hideArchived: true);
         var countSingle = await _metricsBusiness.GetRecordCount(_org2Id, (long?)_org2Proj1Id, hideArchived: true);
 
         Assert.Equal(countSingle, countArray);
@@ -1099,7 +1101,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     {
         // Active (9) + archived (Org1 Proj1: 1, Org2 Proj1: 1) = 11
         var countActive = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
-        var countAll    = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: false);
+        var countAll = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: false);
 
         Assert.Equal(9, countActive);
         Assert.Equal(11, countAll);
@@ -1131,7 +1133,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     }
 
     #endregion
-    
+
     #region GetFileCount Tests
 
     // ── Single project ────────────────────────────────────────────────────────
@@ -1152,10 +1154,10 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         await Context.SaveChangesAsync();
 
         Context.Records.AddRange(
-            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
-            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
-            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
-            new DlRecord { Name ="R4", OriginalId = "4", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj2Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
+            new DlRecord { Name = "R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name = "R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name = "R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name = "R4", OriginalId = "4", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj2Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
         );
         await Context.SaveChangesAsync();
 
@@ -1175,9 +1177,9 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         await Context.SaveChangesAsync();
 
         Context.Records.AddRange(
-            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
-            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
-            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj2Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
+            new DlRecord { Name = "R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name = "R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name = "R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj2Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
         );
         await Context.SaveChangesAsync();
 
@@ -1193,7 +1195,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     {
         // Org1 Proj1: 2 active files + 1 archived file = 3
         var countActive = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: true);
-        var countAll    = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: false);
+        var countAll = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: false);
 
         Assert.Equal(2, countActive);
         Assert.Equal(3, countAll);
@@ -1203,7 +1205,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     public async Task GetFileCount_SingleProject_NeverCountsRecordsWithNullUri()
     {
         // Even with hideArchived: false, records without a URI must never appear
-        var fileCount   = await _metricsBusiness.GetFileCount(_org2Id, new[] { _org2Proj1Id }, hideArchived: false);
+        var fileCount = await _metricsBusiness.GetFileCount(_org2Id, new[] { _org2Proj1Id }, hideArchived: false);
         var recordCount = await _metricsBusiness.GetRecordCount(_org2Id, new[] { _org2Proj1Id }, hideArchived: false);
 
         // file count must be strictly less than record count because Org2 Proj1 has null-URI records
@@ -1274,7 +1276,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     {
         // Active (7) + archived files (Org1 Proj1: 1, Org2 Proj1: 1) = 9
         var countActive = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
-        var countAll    = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: false);
+        var countAll = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: false);
 
         Assert.Equal(7, countActive);
         Assert.Equal(9, countAll);
@@ -1312,7 +1314,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     public async Task GetFileCount_IsAlwaysLessThanOrEqualToRecordCount()
     {
         // File count can never exceed record count since it is a strict subset
-        var fileCount   = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
+        var fileCount = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
         var recordCount = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
 
         Assert.True(fileCount <= recordCount);
@@ -1326,7 +1328,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         foreach (var r in allRecords) r.Uri ??= "localhost:8090/backfilled.pdf";
         await Context.SaveChangesAsync();
 
-        var fileCount   = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
+        var fileCount = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
         var recordCount = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
 
         Assert.Equal(recordCount, fileCount);
@@ -1341,8 +1343,8 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         await Context.SaveChangesAsync();
 
         Context.Records.AddRange(
-            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
-            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = null }
+            new DlRecord { Name = "R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name = "R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = null }
         );
         await Context.SaveChangesAsync();
 
@@ -1361,7 +1363,7 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Context.DataSources.Add(ds);
         await Context.SaveChangesAsync();
 
-        Context.Records.Add(new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = null });
+        Context.Records.Add(new DlRecord { Name = "R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = null });
         await Context.SaveChangesAsync();
 
         // Act
@@ -1386,9 +1388,9 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         await Context.SaveChangesAsync();
 
         Context.Records.AddRange(
-            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds1.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
-            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org2Id, ProjectId = proj2.Id, DataSourceId = ds2.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
-            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org2Id, ProjectId = proj2.Id, DataSourceId = ds2.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
+            new DlRecord { Name = "R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds1.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name = "R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org2Id, ProjectId = proj2.Id, DataSourceId = ds2.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name = "R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org2Id, ProjectId = proj2.Id, DataSourceId = ds2.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "application/json" }
         );
         await Context.SaveChangesAsync();
 
@@ -1409,11 +1411,11 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
 
         // 5 records but only 2 distinct file types
         Context.Records.AddRange(
-            new DlRecord { Name ="R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
-            new DlRecord { Name ="R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
-            new DlRecord { Name ="R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
-            new DlRecord { Name ="R4", OriginalId = "4", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
-            new DlRecord { Name ="R5", OriginalId = "5", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" }
+            new DlRecord { Name = "R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name = "R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name = "R3", OriginalId = "3", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name = "R4", OriginalId = "4", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" },
+            new DlRecord { Name = "R5", OriginalId = "5", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" }
         );
         await Context.SaveChangesAsync();
 

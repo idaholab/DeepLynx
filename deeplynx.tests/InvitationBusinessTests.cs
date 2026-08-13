@@ -1,5 +1,6 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.BigData;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -16,6 +17,7 @@ public class InvitationBusinessTests : IntegrationTestBase
 {
     private BulkCopyUpsertExecutor _bulkCopyUpsertExecutor = null!;
     private ClassBusiness _classBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IDataSourceBusiness> _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private InvitationBusiness _invitationBusiness = null!;
@@ -27,10 +29,13 @@ public class InvitationBusinessTests : IntegrationTestBase
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
     private OrganizationBusiness _organizationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IRecordBusiness> _recordBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private Mock<IRoleBusiness> _roleBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private UserBusiness _userBusiness = null!;
     private Mock<ILogger<InvitationBusiness>> _mockInvitationLogger = null!;
     public long gid; // group ID
@@ -65,20 +70,27 @@ public class InvitationBusinessTests : IntegrationTestBase
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockOrgLogger = new Mock<ILogger<OrganizationBusiness>>();
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _eventBusiness = new EventBusiness(Context, _mockNotificationBusiness.Object, _bulkCopyUpsertExecutor);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _roleBusiness = new Mock<IRoleBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
         _organizationBusiness = new OrganizationBusiness(
             Context, _eventBusiness, _roleBusiness.Object, _mockOrgLogger.Object, _objectStorageBusiness.Object);
 
         _classBusiness = new ClassBusiness(
             Context, _recordBusiness.Object,
-            _relationshipBusiness.Object, _eventBusiness);
+            _relationshipBusiness.Object, _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
+
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
 
         _invitationBusiness = new InvitationBusiness(
             Context,

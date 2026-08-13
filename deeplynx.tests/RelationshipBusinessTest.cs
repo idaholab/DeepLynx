@@ -16,6 +16,7 @@ namespace deeplynx.tests;
 public class RelationshipBusinessTests : IntegrationTestBase
 {
     private ClassBusiness _classBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private DataSourceBusiness _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private Mock<IEdgeBusiness> _mockEdgeBusiness = null!;
@@ -26,6 +27,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
     private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _mockOrganizationBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
@@ -65,6 +67,8 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _mockObjectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
 
         _relationshipBusiness = new RelationshipBusiness(
             Context, _mockEdgeBusiness.Object, _eventBusiness);
@@ -74,12 +78,12 @@ public class RelationshipBusinessTests : IntegrationTestBase
 
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
-            _relationshipBusiness, _eventBusiness);
+            _relationshipBusiness, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()

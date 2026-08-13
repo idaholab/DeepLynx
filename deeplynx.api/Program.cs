@@ -145,6 +145,7 @@ try
     builder.Services.AddControllers(options =>
         {
             options.Conventions.Add(new ApiVersionRoutePrefixConvention("api/v{version:apiVersion}"));
+            options.Filters.Add(new ApiVersionLifecycleHeadersFilter());
         })
         .AddJsonOptions(options =>
         {
@@ -170,11 +171,9 @@ try
             options.ReportApiVersions = true;
             options.AssumeDefaultVersionWhenUnspecified = true;
             options.ApiVersionReader = new UrlSegmentApiVersionReader();
+            options.UnsupportedApiVersionStatusCode = StatusCodes.Status400BadRequest;
         })
-        .AddMvc(options =>
-        {
-            options.Conventions.Add(new DefaultApiVersionConvention(NexusApiVersions.Supported.ToArray()));
-        })
+        .AddMvc()
         .AddApiExplorer(options =>
         {
             options.GroupNameFormat = "'v'V";
@@ -192,13 +191,19 @@ try
     dataSourceBuilder.UseVector();
     var dataSource = dataSourceBuilder.Build();
 
-    builder.Services.AddDbContext<DeeplynxContext>(
-        options => options.UseNpgsql(dataSource),
+    builder.Services.AddDbContext<DeeplynxContext>(options =>
+         options.UseNpgsql(dataSource, npgsqlOptions =>
+        {
+            npgsqlOptions.CommandTimeout(60);
+        }),
         ServiceLifetime.Transient
     );
 
-    builder.Services.AddDbContext<LatticeContext>(
-        options => options.UseNpgsql(connectionString),
+    builder.Services.AddDbContext<LatticeContext>(options =>
+         options.UseNpgsql(connectionString, npgsqlOptions =>
+        {
+            npgsqlOptions.CommandTimeout(60);
+        }),
         ServiceLifetime.Transient
     );
 
@@ -208,17 +213,14 @@ try
     builder.Services.AddTransient<IRecordCollectionBusiness, RecordCollectionBusiness>();
     builder.Services.AddTransient<IObjectStorageBusiness, ObjectStorageBusiness>();
     builder.Services.AddTransient<IClassBusiness, ClassBusiness>();
-    builder.Services.AddTransient<IProjectBusiness, ProjectBusiness>();
     builder.Services.AddTransient<IEdgeBusiness, EdgeBusiness>();
     builder.Services.AddTransient<IDataSourceBusiness, DataSourceBusiness>();
     builder.Services.AddTransient<IRelationshipBusiness, RelationshipBusiness>();
     builder.Services.AddTransient<ITagBusiness, TagBusiness>();
     builder.Services.AddTransient<IOlapBusiness, OlapBusiness>();
     builder.Services.AddTransient<IMetricsBusiness, MetricsBusiness>();
-    builder.Services.AddTransient<IMaintenanceBusiness, MaintenanceBusiness>();
     builder.Services.AddTransient<IUserBusiness, UserBusiness>();
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
-    builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
     builder.Services.AddTransient<ITokenBusiness, TokenBusiness>();
     builder.Services.AddTransient<IOauthApplicationBusiness, OauthApplicationBusiness>();
     builder.Services.AddTransient<IOauthDeviceAuthorizationBusiness, OauthDeviceAuthorizationBusiness>();
@@ -231,13 +233,17 @@ try
     // builder.Services.AddTransient<ISubscriptionBusiness, SubscriptionBusiness>();
     builder.Services.AddTransient<FileBusiness>();
     builder.Services.AddTransient<FileFilesystemBusiness>();
+    builder.Services.AddTransient<IFileBusiness, FileAzureBusiness>();
     builder.Services.AddTransient<FileAzureBusiness>();
     builder.Services.AddTransient<FileS3Business>();
     builder.Services.AddTransient<IFileBusinessFactory, FileBusinessFactory>();
     builder.Services.AddTransient<IOrganizationBusiness, OrganizationBusiness>();
+    builder.Services.AddTransient<IProjectBusiness, ProjectBusiness>();
+    builder.Services.AddTransient<IInvitationBusiness, InvitationBusiness>();
     builder.Services.AddTransient<IGroupBusiness, GroupBusiness>();
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
+    builder.Services.AddTransient<IMaintenanceBusiness, MaintenanceBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
     builder.Services.AddTransient<IOrgRolePermissionService, OrgRolePermissionService>();
@@ -283,7 +289,7 @@ try
        ╚════════════════════════════╝ */
     if (isRuntimeStartup)
     {
-        await DatabaseVersionChecker.CheckDatabaseVersion(connectionString);
+        await PgvectorExtensionValidator.EnsureExtensionAsync(connectionString);
         EncryptionHelper.CheckEncryptionConfig();
     }
 
@@ -320,6 +326,7 @@ try
     app.UseStaticFiles();
     app.UseRouting();
     app.UseExceptionHandler(); // Runs registered IExceptionHandlers; must precede middleware that may throw
+    app.UseMiddleware<UnsupportedApiVersionResponseMiddleware>(NexusApiVersions.Supported);
     app.UseCors("AllowAll");
 
     if (isRuntimeStartup)
@@ -353,7 +360,7 @@ try
 
     if (isRuntimeStartup)
     {
-        var customcss = File.ReadAllText("moon.css");
+        var customcss = File.ReadAllText(Path.Combine(app.Environment.ContentRootPath, "moon.css"));
         var hostedLink = Environment.GetEnvironmentVariable("HOSTED_LINK");
 
         // Conditional image hosting
@@ -424,4 +431,9 @@ catch (Exception ex) when (ex is not HostAbortedException && ex.Source != "Micro
 finally
 {
     Log.CloseAndFlush();
+}
+
+// Expose the generated top-level Program class so integration tests can host this application.
+public partial class Program
+{
 }

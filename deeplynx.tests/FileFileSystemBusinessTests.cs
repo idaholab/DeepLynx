@@ -59,6 +59,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
     private UserBusiness _userBusiness = null!;
     private SensitivityLabelBusiness _sensitivityLabelBusiness = null!;
     private NotificationBusiness _notificationBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IAdminService> _mockAdminService = null!;
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
@@ -118,8 +119,9 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _sensitivityLabelBusiness = null!;
         _objectStorageBusiness = null!;
         _notificationBusiness = null!;
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
 
         var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
@@ -140,8 +142,16 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             _objectStorageBusiness,
             _fileBusinessFactory.Object);
 
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+
+        _classBusiness = new ClassBusiness(Context,
+          _recordBusiness,
+          _mockRelationshipBusiness.Object,
+          _eventBusiness,
+          _mockPermissionService.Object,
+          _mockAdminService.Object);
+
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+
         _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object,
             _recordBusiness, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
@@ -273,6 +283,108 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _recordId = record.Id;
     }
 
+
+    [Fact]
+    public async Task CalculateFileContentHash_ReturnsSha256ForUploadBytes()
+    {
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("abc"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "hash.txt");
+
+        var result = await _fileBusiness.CalculateFileContentHash(file);
+
+        Assert.Equal(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            result);
+    }
+
+    [Fact]
+    public async Task CalculateStoredFileContentHash_ReturnsSha256ForStoredFile()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        var filePath = Path.Combine(_testDirectory, $"{Guid.NewGuid()}_stored-hash.txt");
+        await File.WriteAllTextAsync(filePath, "abc");
+
+        try
+        {
+            var result = await _fileBusiness.CalculateStoredFileContentHash(
+                filePath,
+                _objectStorageConfig);
+
+            Assert.Equal(
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                result);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task UploadFile_ThroughFileBusiness_PersistsContentHash()
+    {
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("abc"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "hash.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var result = await _realFileBusiness.UploadFile(
+            _userId,
+            organizationId,
+            pid,
+            _dataSourceId,
+            _fileSystemObjectStorageId,
+            file);
+
+        Assert.Equal(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            result.FileContentHash);
+
+        var storedRecord = await Context.Records.FindAsync(result.Id);
+        Assert.Equal(result.FileContentHash, storedRecord!.FileContentHash);
+    }
+
+    [Fact]
+    public async Task UpdateFile_ThroughFileBusiness_ReplacesContentHash()
+    {
+        await using var originalStream = new MemoryStream(Encoding.UTF8.GetBytes("abc"));
+        var originalFile = new FormFile(
+            originalStream,
+            0,
+            originalStream.Length,
+            "file",
+            "original.txt");
+
+        var originalRecord = await _realFileBusiness.UploadFile(
+            _userId,
+            organizationId,
+            pid,
+            _dataSourceId,
+            _fileSystemObjectStorageId,
+            originalFile);
+
+        await using var updatedStream = new MemoryStream(Encoding.UTF8.GetBytes("def"));
+        var updatedFile = new FormFile(
+            updatedStream,
+            0,
+            updatedStream.Length,
+            "file",
+            "updated.txt");
+
+        var updatedRecord = await _realFileBusiness.UpdateFile(
+            _userId,
+            organizationId,
+            pid,
+            originalRecord.Id,
+            updatedFile);
+
+        Assert.Equal(
+            "cb8379ac2098aa165029e3938a51da0bcecfc008fd6795f401178647f96c5b34",
+            updatedRecord.FileContentHash);
+        Assert.NotEqual(originalRecord.FileContentHash, updatedRecord.FileContentHash);
+    }
 
     [Fact]
     public async Task UploadFile_ShouldSaveFileAndReturnPath()

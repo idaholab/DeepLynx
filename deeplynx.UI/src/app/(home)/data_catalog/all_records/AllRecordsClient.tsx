@@ -537,26 +537,31 @@ export default function DataCatalogClient({
 
     const fetchMetadataForProjectScope = async () => {
       const organizationId = Number(organization.organizationId);
-      const projectIds = effectiveProjectIds
-        .map(Number)
-        .filter(Number.isFinite);
+      const projectIds = effectiveProjectIds.map(Number).filter(Number.isFinite);
 
-      const [classes, tags] = await Promise.all([
-        getAllClassesOrg(organizationId, projectIds, true),
-        getAllTagsOrg(organizationId, projectIds, true),
-      ]);
+      try {
+        const { items: classes } = await getAllClassesOrg(organizationId, projectIds, true);
 
-      setAvailableClassNames(
-        Array.from(new Set(classes.map((item) => item.name).filter(Boolean))),
-      );
+        setAvailableClassNames(
+          Array.from(new Set(classes.map((item) => item.name).filter(Boolean))),
+        );
+      } catch (error) {
+        console.error("Failed to fetch classes:", error);
+      }
 
-      setAvailableTags(
-        tags.map((tag) => ({
-          id: tag.id,
-          name: tag.name,
-          projectId: tag.projectId ?? null,
-        })),
-      );
+      try {
+        const tags = await getAllTagsOrg(organizationId, projectIds, true);
+
+        setAvailableTags(
+          tags.map((tag) => ({
+            id: tag.id,
+            name: tag.name,
+            projectId: tag.projectId ?? null,
+          })),
+        );
+      } catch (error) {
+        console.error("Failed to fetch tags:", error);
+      }
     };
 
     fetchMetadataForProjectScope().catch((error) => {
@@ -995,8 +1000,8 @@ export default function DataCatalogClient({
                   <article
                     key={i}
                     className={`grid grid-cols-1 gap-3 p-4 ${isBulkMode
-                        ? "md:grid-cols-[auto_minmax(0,1fr)_auto]"
-                        : "md:grid-cols-[minmax(0,1fr)_auto]"
+                      ? "md:grid-cols-[auto_minmax(0,1fr)_auto]"
+                      : "md:grid-cols-[minmax(0,1fr)_auto]"
                       }`}
                   >
                     {isBulkMode && (

@@ -36,6 +36,13 @@ public interface IFileControllerBusiness
         long? embeddingModelConfigId,
         string? userJwt);
 
+    Task<RecordResponseDto> UpdateFileContentHash(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        UpdateFileContentHashRequestDto dto);
+
     // Download file
     Task<FileStreamResult> DownloadFile(
         long currentUserId,
@@ -80,6 +87,13 @@ public interface IFileControllerBusiness
         FileUploadInitRequestDto request,
         CreateRecordFileUploadRequestDto? metadata);
 
+    Task<FileUploadSessionResponseDto> StartUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadInitRequestDto request);
+
     // Upload chunk
     Task<string> UploadChunk(
         long organizationId,
@@ -103,6 +117,23 @@ public interface IFileControllerBusiness
         bool embed,
         long? vlmConfigId,
         long? embeddingModelConfigId);
+
+    Task<RecordResponseDto> CompleteUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadCompleteRequestDto request,
+        long? vlmConfigId,
+        long? embeddingModelConfigId,
+        string? userJwt);
+
+    Task CancelUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string uploadId);
 
     // Cancel upload
     Task CancelUpload(

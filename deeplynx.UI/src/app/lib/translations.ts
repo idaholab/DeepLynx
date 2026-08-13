@@ -124,8 +124,10 @@ export const translations = {
       AWS_S3: "AWS S3",
       AXIS_SELECTION: "Axis Selection",
       AZURE_BLOB_STORAGE: "Azure Blob Storage",
+      AZURE_DEFAULT_CONNECTION_STRING: "Azure Default Connection String",
       BACK: "Back",
       BACK_TO_CLASS_SELECTION: "← Back to class selection",
+      BACKEND_CONFIG_AWS: "The backend configuration for AWS S3 storage is currently being finalized.",
       BANNER_EXAMPLE_CUI:
         'e.g. "This organization space contains CUI/ECI data that must be protected accordingly."',
       BANNER_TEXT: "Banner Text",
@@ -162,6 +164,7 @@ export const translations = {
         "cannot define additional sensitivity labels",
       CANNOT_DEFINE_NEW_LABELS: "cannot define new labels",
       CANNOT_DEFINE_NEW_TAGS: "cannot define new tags",
+      CANNOT_REMOVE_SELF_FROM_PROJECT: "You cannot remove yourself from a project",
       CANT_SWITCH_TO_SINGLE_FILE: "Can't switch to single-file",
       CHANGES_DISCARDED: "Changes discarded",
       CHANGE_LOGO: "Change Logo",
@@ -222,6 +225,7 @@ export const translations = {
         "Configure branding and manage your project",
       CONFIRM_BULK_UPLOAD: "Confirm Bulk Upload",
       CONFIRM_UPLOAD: "Confirm Upload",
+      CONNECT_STORAGE_MANUALLY_INSTEAD: "Connect storage manually instead",
       CONNECTION_STRING: "Connection String",
       CONNECTIONS: "Connections",
       CONNECTOR: "Connector",
@@ -237,6 +241,7 @@ export const translations = {
       COPY_VALUE: "Copy value",
       CREATE: "Create",
       CREATE_AND_APPLY: "Create & Apply",
+      CREATE_CONTAINER_PER_PROJECT: "Create Container Per Project",
       CREATE_EDIT_MANAGE_STORAGE_LOCATIONS:
         "Create, edit, and manage your storage locations",
       CREATE_GROUP: "Create Group",
@@ -255,6 +260,8 @@ export const translations = {
       CREATE_OAUTH_APPLICATION: "Create OAuth Application",
       CREATE_OBJECT_STORAGE: "Create Object Storage",
       CREATE_ORGANIZATION: "Create Organization",
+      CREATE_PROJECT_CONTAINER_HELPER: "Create an organization-managed container in Azure Blob Storage. This is the fastest and easiest way to get started.",
+      CREATE_PROJECT_CONTAINER: "Create Project Container",
       CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
         "Create your first organization to get started.",
       CREATE_PROJECT: "Create New Project",
@@ -313,9 +320,14 @@ export const translations = {
       DESTINATION: "Destination",
       DESTINATION_CLASS: "Destination Class",
       DELETE_SAVED_SEARCH_WARNING: "will be permanently removed. This cannot be undone.",
+      DISABLE_FILE_TRANSFER: "Disable File Transfers",
+      DISABLE_FILE_TRANSFER_HELPER: "Members won't be able to upload or download files through this organization.",
       DONE: "Done",
       DEFAULT_BADGE: "Default",
+      DEFAULT_PROJECT_BADGE: "Default (Project)",
+      DEFAULT_ORGANIZATION_BADGE: "Default (Organization)",
       DEFAULT_STORAGE: "Delete Storage",
+      DEFAULT_STORAGE_CANNOT_BE_DELETED_OR_ARCHIVED: "Switch to another object storage before deleting/archiving this one.",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
         "This will be the default storage for data sources in this project",
       DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY:
@@ -368,6 +380,7 @@ export const translations = {
       EDIT_MATRIX: "Edit Matrix",
       EDIT_OAUTH_APP: "Edit OAuth Application",
       ENTER: "Enter",
+      ENTER_AZURE_CONNECTION_STRING: "Enter Azure Connection String",
       EDIT_ORGANIZATION: "Edit Organization",
       EDIT_PERMISSIONS: "Edit Permissions",
       EDIT_PERMISSIONS_ACROSS_ROLES_MATRIX_VIEW:
@@ -476,8 +489,10 @@ export const translations = {
       FAILED_TO_UPDATE_STORAGE: "Failed to update storage",
       FAILED_TO_UPDATE_TAGS: "Failed to update tags",
       FAILED_TO_UPLOAD_LOGO: "Failed to upload logo",
+      FAILED_TO_UPDATE_FILE_TRANSFER_SETTING: "Failed to update file transfer setting",
       FILE: "File",
       FILE_A_BUG: "File A Bug",
+      FILE_PATH: "File Path",
       FILTER_BY_DATA_SOURCE: "Filter by data source...",
       FILTER_BY_ENTITY_NAME: "Filter by entity name...",
       FILTER_BY_ENTITY_TYPE: "Filter by entity type...",
@@ -492,9 +507,15 @@ export const translations = {
       FILE_NAME: "File name:",
       FILE_SIZE: "File Size",
       FILE_SIZE_MUST_BE_5MB: "File size must be less than 5MB",
+      FILE_TRANSFER: "File Transfer",
+      FILE_TRANSFER_DESCRIPTION: "Control whether members of this organization can upload or download files.",
+      FILE_TRANSFER_DISABLED_SUCCESSFULLY: "File transfer disabled for this organization",
+      FILE_TRANSFER_ENABLED_SUCCESSFULLY: "File transfer enabled for this organization",
       FILE_TYPE: "File Type",
       FILE_UPLOAD: "File Upload",
       FILE_UPLOADED_SUCCESSFULLY: "File uploaded successfully!",
+      FINALIZING_UPLOAD: "Finalizing upload...",
+      FINALIZING_UPLOAD_MESSAGE: "Your file has finished uploading. Please wait while it is finalized.",
       FILES_LABEL: "files",
       FILESYSTEM: "Filesystem",
       FILESYSTEM_PATH: "Filesystem Path",
@@ -728,6 +749,7 @@ export const translations = {
       INSIGHT_TEMPLATE_MANAGE_TAB: "Manage Templates",
       INTERACTIVE_ZOOM_SLIDER: "Interactive zoom slider",
       INVALID_EMAIL_ERROR: "That doesn’t look like a valid email address",
+      INVALID_FILE_PATH: "Invalid File Path",
       INVALID_JASON: "Invalid JSON.",
       INVALID_JSON_ARRAY_SYNTAX:
         "Invalid JSON format - must be valid array syntax",
@@ -1039,6 +1061,7 @@ export const translations = {
       NO_FILES_AVAILABLE: "No files available.",
       NO_FILES_FOUND: "No files found.",
       NO_FILE_CHOSEN: "No file chosen",
+      NO_FILE_PATHING: "No file pathing",
       NO_FILES_SELECTED_YET: "No files selected yet.",
       NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD:
         "No historical versions were found for this record.",
@@ -1451,6 +1474,7 @@ export const translations = {
       RUNNING: "Running",
       RECENT_ACTIVITY: "Recent Activity",
       RECENTLY_ADDED_RECORDS: "Recently Added Records",
+      RECOMMENDED: "Recommended",
       RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND:
         "Recommended: PNG with transparent background",
       RECORD: "Record",
@@ -1828,6 +1852,7 @@ export const translations = {
       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
         "Set the default unmounted object storage location for this organization.",
       STORAGE_SIZE: "Storage Size",
+      STORAGE_FILES_DELETABLE: "Delete files when the record is deleted",
       SET_UP: "Set Up",
       SETTINGS: "Settings",
       SHOW: "Show",
@@ -1998,6 +2023,8 @@ export const translations = {
       UPLOAD_CENTER: "Upload Center",
       UPLOAD_CENTER_DESCRIPTION:
         "Choose an upload mode, configure destination resources, then upload.",
+      UPLOAD_CENTER_DISABLED: "File transfer is disabled for this organization",
+      UPLOAD_CENTER_DISABLED_DETAIL: "An administrator has disabled file uploads and downloads for this organization.",
       UPLOAD_FAILED_CHECK_FILE_CARD: "Upload failed. Check the file card.",
       UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW:
         "Upload failed. Please check the error details below.",
@@ -2019,6 +2046,8 @@ export const translations = {
       URI_PLACEHOLDER: "uri",
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Used as the default when creating new data sources for projects.",
+      USE_EXISTING_CONTAINER: "Use Existing Container",
+      USE_ORGANIZATION_STORAGE: "Use Organization Storage",
       USE_SELECTOR_TO_ADD_LABELS: "Use the selector above to add labels.",
       USE_SELECTOR_TO_ADD_TAGS: "Use the selector above to add tags.",
       USER: "User",
@@ -2271,8 +2300,10 @@ export const translations = {
       AWS_S3: "AWS S3",
       AXIS_SELECTION: "Selección de Ejes",
       AZURE_BLOB_STORAGE: "Azure Blob Storage",
+      AZURE_DEFAULT_CONNECTION_STRING: "Cadena de conexión predeterminada de Azure",
       BACK: "Atrás",
       BACK_TO_CLASS_SELECTION: "← Volver a la seleccion de clase",
+      BACKEND_CONFIG_AWS: "La configuración del backend para el almacenamiento AWS S3 está actualmente en proceso de finalización.",
       BANNER_EXAMPLE_CUI:
         'Ej. "Este espacio de la organización contiene datos CUI/ECI que deben protegerse adecuadamente."',
       BANNER_TEXT: "Texto del banner",
@@ -2309,6 +2340,7 @@ export const translations = {
         "no pueden definir etiquetas de sensitividad adicionales",
       CANNOT_DEFINE_NEW_LABELS: "no pueden definir nuevas etiquetas",
       CANNOT_DEFINE_NEW_TAGS: "no pueden definir nuevas etiquetas",
+      CANNOT_REMOVE_SELF_FROM_PROJECT: "No puedes eliminarte a ti mismo de un proyecto",
       CANT_SWITCH_TO_SINGLE_FILE: "No se puede cambiar a archivo único",
       CHANGES_DISCARDED: "Cambios descartados",
       CHANGE_LOGO: "Cambiar logotipo",
@@ -2362,6 +2394,7 @@ export const translations = {
         "Configura la identidad visual y administra tu proyecto",
       CONFIRM_BULK_UPLOAD: "Confirmar carga masiva",
       CONFIRM_UPLOAD: "Confirmar carga",
+      CONNECT_STORAGE_MANUALLY_INSTEAD: "Conectar el almacenamiento manualmente en su lugar",
       CONNECTION_STRING: "Cadena de conexión",
       CONNECTIONS: "Conexiones",
       CONNECTOR: "Conector",
@@ -2377,6 +2410,7 @@ export const translations = {
       COPY_VALUE: "Copiar valor",
       CREATE: "Crear",
       CREATE_AND_APPLY: "Crear y aplicar",
+      CREATE_CONTAINER_PER_PROJECT: "Crear contenedor por proyecto",
       CREATE_EDIT_MANAGE_STORAGE_LOCATIONS:
         "Crear, editar y administrar tus ubicaciones de almacenamiento",
       CREATE_GROUP: "Crear grupo",
@@ -2406,6 +2440,8 @@ export const translations = {
       CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
         "Crea tu primera organización para comenzar.",
       CREATE_PROJECT: "Crear nuevo proyecto",
+      CREATE_PROJECT_CONTAINER_HELPER: "Cree un contenedor administrado por la organización en Azure Blob Storage. Esta es la forma más rápida y sencilla de empezar.",
+      CREATE_PROJECT_CONTAINER: "Crear contenedor de proyecto",
       CREATE_CLASS: "Crear clase",
       CREATE_RELATIONSHIP: "Crear relacion",
       CREATE_ROLE: "Crear un rol",
@@ -2440,6 +2476,8 @@ export const translations = {
       DATA_TYPE: "Tipo de dato",
       DELETE_SAVED_SEARCH: "¿Eliminar búsqueda guardada?",
       DELETE_SAVED_SEARCH_WARNING: "se eliminará permanentemente. Esta acción no se puede deshacer.",
+      DISABLE_FILE_TRANSFER: "Desactivar la transferencia de archivos",
+      DISABLE_FILE_TRANSFER_HELPER: "Los miembros no podrán cargar ni descargar archivos a través de esta organización.",
       DONE: "Hecho",
       DATA_SCHEMA_DESCRIPTION: "Creación y administración de clases y relaciones para asignarlas a registros y aristas.",
       DEFINE_WHICH_CLASSES_CAN_CONNECT_AND_HOW_EDGE_SHOULD_READ: "Define qué clases pueden conectarse y cómo debe interpretarse esa relación.",
@@ -2465,7 +2503,10 @@ export const translations = {
       DEFAULT_DATA_SOURCE: "Fuente de datos predeterminada",
       DEEPLYNX_LOGO: "Logotipo de DeepLynx",
       DEFAULT_BADGE: "Predeterminado",
+      DEFAULT_PROJECT_BADGE: "Predeterminado (Proyecto)",
+      DEFAULT_ORGANIZATION_BADGE: "Predeterminado (Organización)",
       DEFAULT_STORAGE: "Eliminar almacenamiento",
+      DEFAULT_STORAGE_CANNOT_BE_DELETED_OR_ARCHIVED: "Cambie a otro almacenamiento de objetos antes de eliminar/archivar este.",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
         "Este será el almacenamiento predeterminado para las fuentes de datos en este proyecto",
       DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY:
@@ -2534,6 +2575,7 @@ export const translations = {
       EMAIL_ADDRESS: "Correo electrónico",
       EMAIL_ADDRESSES: "Correos electrónicos",
       ENTER: "Ingresar",
+      ENTER_AZURE_CONNECTION_STRING: "Ingrese la cadena de conexión de Azure",
       EMAIL_INVITATION_DESCRIPTION:
         "Se enviará un correo de invitación con instrucciones para unirse a la organización. El usuario podrá acceder a todos los recursos de la organización una vez que acepte la invitación.",
       EMAIL_INVITATIONS: "Invitaciones por correo electrónico",
@@ -2645,6 +2687,7 @@ export const translations = {
       FAILED_TO_UPDATE_STORAGE: "No se pudo actualizar el almacenamiento",
       FAILED_TO_UPDATE_TAGS: "Error al actualizar las etiquetas",
       FAILED_TO_UPLOAD_LOGO: "No se pudo subir el logotipo",
+      FAILED_TO_UPDATE_FILE_TRANSFER_SETTING: "No se pudo actualizar la configuración de transferencia de archivos.",
       FILE_A_BUG: "Reportar un error",
       FILE_CARD_TITLE: "Archivo {index}: {name}",
       FILE_COUNT: "Conteo de archivos",
@@ -2654,9 +2697,15 @@ export const translations = {
       FILTER_ALL_RESULTS: "Filtrar todos los resultados",
       FILTER_OPTIONS: "Opciones de filtro",
       FILE_SIZE_MUST_BE_5MB: "El tamaño del archivo debe ser menor a 5 MB",
+      FILE_TRANSFER: "Transferencia de archivos",
+      FILE_TRANSFER_DESCRIPTION: "Controla si los miembros de esta organización pueden subir o descargar archivos.",
+      FILE_TRANSFER_DISABLED_SUCCESSFULLY: "Transferencia de archivos deshabilitada para esta organización.",
+      FILE_TRANSFER_ENABLED_SUCCESSFULLY: "Transferencia de archivos habilitada para esta organización.",
       FILE_TYPE: "Tipo de archivo",
       FILE_UPLOAD: "Carga de archivos",
       FILE_UPLOADED_SUCCESSFULLY: "¡Archivo cargado correctamente!",
+      FINALIZING_UPLOAD: "Finalizando la carga...",
+      FINALIZING_UPLOAD_MESSAGE: "Tu archivo ha terminado de subirse. Por favor, espera mientras se finaliza.",
       FILES_LABEL: "archivos",
       FILESYSTEM: "Sistema de archivos",
       FILESYSTEM_PATH: "Ruta del sistema de archivos",
@@ -2666,6 +2715,7 @@ export const translations = {
       FILTER_BY: "Filtrar por",
       FILTERED_BY: "Filtrado por: ",
       FILE: "Archivo",
+      FILE_PATH: "Ruta del archivo",
       FOUND: "Encontrados",
       FOR_CURRENT_USER: "Para el usuario actual",
       FROM: "de",
@@ -2906,6 +2956,7 @@ export const translations = {
       INTERACTIVE_ZOOM_SLIDER: "Control deslizante de zoom interactivo",
       INVALID_EMAIL_ERROR:
         "Eso no parece una dirección de correo electrónico válida",
+      INVALID_FILE_PATH: "Ruta de archivo inválida",
       INVALID_JASON: "JSON inválido.",
       INVALID_JSON_ARRAY_SYNTAX:
         "Formato JSON invalido - debe ser una sintaxis valida de arreglo",
@@ -3240,6 +3291,7 @@ export const translations = {
       NO_FILES_AVAILABLE: "No hay archivos disponibles.",
       NO_FILES_FOUND: "No se encontraron archivos.",
       NO_FILE_CHOSEN: "Ningún archivo seleccionado",
+      NO_FILE_PATHING: "Sin ruta de archivo",
       NO_FILES_SELECTED_YET: "Aún no se han seleccionado archivos.",
       NO_HISTORICAL_VERSIONS_FOUND_FOR_RECORD:
         "No se encontraron versiones históricas para este registro.",
@@ -3660,6 +3712,7 @@ export const translations = {
       READ: "leer",
       RECENT_ACTIVITY: "Actividad reciente",
       RECENTLY_ADDED_RECORDS: "Registros añadidos recientemente",
+      RECOMMENDED: "Recomendado",
       RECOMMENDED_PNG_WITH_TRANSPARENT_BACKGROUND:
         "Recomendado: PNG con fondo transparente",
       RECORD: "Registro",
@@ -4055,6 +4108,7 @@ export const translations = {
       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
         "Establecer la ubicación predeterminada del almacenamiento de objetos no montado para esta organización.",
       STORAGE_SIZE: "Tamaño de almacenamiento",
+      STORAGE_FILES_DELETABLE: "Eliminar archivos al eliminar el registro",
       SET_UP: "Configuración",
       SENSITIVITY_LABELS_COMMA_SEPARATED: "etiquetas de sensibilidad (separadas por comas)",
       SETTINGS: "Configuración",
@@ -4234,6 +4288,8 @@ export const translations = {
       UPLOAD_CENTER: "Centro de carga",
       UPLOAD_CENTER_DESCRIPTION:
         "Elige un modo de carga, configura los recursos de destino y luego carga.",
+      UPLOAD_CENTER_DISABLED: "La transferencia de archivos está deshabilitada para esta organización.",
+      UPLOAD_CENTER_DISABLED_DETAIL: "Un administrador ha deshabilitado la carga y descarga de archivos para esta organización.",
       UPLOAD_FAILED_CHECK_FILE_CARD:
         "La carga falló. Revise la tarjeta del archivo.",
       UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW:
@@ -4259,6 +4315,9 @@ export const translations = {
       UPDATED: "actualizado",
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Se usa como valor predeterminado al crear nuevas fuentes de datos para los proyectos.",
+      USE_EXISTING_CONTAINER: "Usar contenedor existente",
+      USE_ORGANIZATION_STORAGE:
+        "Utilizar el almacenamiento de la organización",
       USE_SELECTOR_TO_ADD_LABELS:
         "Usa el selector de arriba para agregar etiquetas de sensibilidad.",
       USE_SELECTOR_TO_ADD_TAGS:

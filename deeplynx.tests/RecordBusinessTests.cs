@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
@@ -9,6 +10,8 @@ using deeplynx.helpers.exceptions;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -21,6 +24,7 @@ namespace deeplynx.tests;
 [Collection("Test Suite Collection")]
 public class RecordBusinessTests : IntegrationTestBase
 {
+    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "RecordBusinessTests");
     private EventBusiness _eventBusiness;
     private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -28,14 +32,25 @@ public class RecordBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private RecordBusiness _recordBusiness;
     private TagBusiness _tagBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private UserBusiness _userBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
     private SensitivityLabelService _sensitivityLabelService = null!;
     private EncryptionHelper _encryptionHelper = null!;
     private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private FileBusiness _fileBusiness = null!;
+    private DataSourceBusiness _dataSourceBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private OlapBusiness _olapBusiness = null!;
+    private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
+    private ClassBusiness _classBusiness = null!;
     public long cid; // class ID
     public long did; // datasource ID
     public long did2;
@@ -69,6 +84,8 @@ public class RecordBusinessTests : IntegrationTestBase
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _sensitivityLabelService = new SensitivityLabelService(Context);
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockAdminService = new Mock<IAdminService>();
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _notificationBusiness =
@@ -77,8 +94,9 @@ public class RecordBusinessTests : IntegrationTestBase
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
-        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _recordBusiness = new RecordBusiness(
             Context,
@@ -89,6 +107,40 @@ public class RecordBusinessTests : IntegrationTestBase
             _sensitivityLabelService,
             _provenanceBusiness.Object,
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
+        _relationshipBusiness = new Mock<IRelationshipBusiness>();
+        _classBusiness = new ClassBusiness(Context,
+            _recordBusiness,
+            _relationshipBusiness.Object,
+            _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
+
+        var realFileFilesystemBusiness =
+        new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(realFileFilesystemBusiness);
+
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness,
+            _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+        _insightBusiness = new Mock<IInsightBusiness>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness
+        );
     }
 
     #region RecordResponseDto Tests
@@ -119,6 +171,7 @@ public class RecordBusinessTests : IntegrationTestBase
             LastUpdatedBy = uid,
             IsArchived = false,
             FileType = "pdf",
+            FileContentHash = "abc123",
             Tags = tags
         };
 
@@ -137,8 +190,139 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal(uid, dto.LastUpdatedBy);
         Assert.False(dto.IsArchived);
         Assert.Equal("pdf", dto.FileType);
+        Assert.Equal("abc123", dto.FileContentHash);
         Assert.Single(dto.Tags);
         Assert.Equal("Test Tag", dto.Tags.First().Name);
+    }
+
+    #endregion
+
+    #region File Content Hash Tests
+
+    [Fact]
+    public async Task UpdateFileContentHash_WithMatchingRecord_StoresNormalizedSha256Hash()
+    {
+        var recordId = await CreateFileRecord(fileSize: 1234);
+        var hash = new string('a', 64);
+
+        var result = await _recordBusiness.UpdateFileContentHash(
+            uid,
+            organizationId,
+            pid,
+            recordId,
+            new UpdateFileContentHashRequestDto
+            {
+                HashHex = hash.ToUpperInvariant(),
+                ContentLength = 1234
+            });
+
+        var storedRecord = await Context.Records.FindAsync(recordId);
+
+        Assert.Equal(recordId, result.Id);
+        Assert.Equal(hash, result.FileContentHash);
+        Assert.Equal(hash, storedRecord!.FileContentHash);
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHash_WithMismatchedContentLength_ThrowsInvalidOperationException()
+    {
+        var recordId = await CreateFileRecord(fileSize: 100);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _recordBusiness.UpdateFileContentHash(
+                uid,
+                organizationId,
+                pid,
+                recordId,
+                new UpdateFileContentHashRequestDto
+                {
+                    HashHex = new string('1', 64),
+                    ContentLength = 101
+                }));
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHash_WithExistingSameHash_IsIdempotent()
+    {
+        var hash = new string('b', 64);
+        var recordId = await CreateFileRecord(fileContentHash: hash);
+
+        var result = await _recordBusiness.UpdateFileContentHash(
+            uid,
+            organizationId,
+            pid,
+            recordId,
+            new UpdateFileContentHashRequestDto
+            {
+                HashHex = hash
+            });
+
+        Assert.Equal(hash, result.FileContentHash);
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHash_WhenRecordDoesNotExist_ThrowsKeyNotFoundException()
+    {
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordBusiness.UpdateFileContentHash(
+                uid,
+                organizationId,
+                pid,
+                long.MaxValue,
+                new UpdateFileContentHashRequestDto
+                {
+                    HashHex = new string('c', 64)
+                }));
+    }
+
+    [Theory]
+    [InlineData("MD5", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("SHA-256", "not-a-sha")]
+    public async Task UpdateFileContentHash_WithInvalidHashRequest_ThrowsArgumentException(
+        string algorithm,
+        string hashHex)
+    {
+        var recordId = await CreateFileRecord();
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _recordBusiness.UpdateFileContentHash(
+                uid,
+                organizationId,
+                pid,
+                recordId,
+                new UpdateFileContentHashRequestDto
+                {
+                    HashAlgorithm = algorithm,
+                    HashHex = hashHex
+                }));
+    }
+
+    private async Task<long> CreateFileRecord(
+        string? fileContentHash = null,
+        long? fileSize = null)
+    {
+        var record = new Record
+        {
+            Name = $"File Record {Guid.NewGuid()}",
+            Description = "File content hash test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = $"file-{Guid.NewGuid()}",
+            FileType = "pdf",
+            FileSize = fileSize,
+            FileContentHash = fileContentHash,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        return record.Id;
     }
 
     #endregion
@@ -229,7 +413,10 @@ public class RecordBusinessTests : IntegrationTestBase
         cid = testClass.Id;
 
         // Add object storage
-        var config = new JsonObject();
+        var config = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
         var objectStorage = new ObjectStorage
         {
             Name = "Object Storage 1",
@@ -1697,6 +1884,71 @@ public class RecordBusinessTests : IntegrationTestBase
             _recordBusiness.DeleteRecord(uid, organizationId, pid, 999L));
 
         Assert.Contains("Record with id 999 is archived or not found", exception.Message);
+    }
+
+    #endregion
+
+    #region Integration DeleteRecord Tests
+
+    [Fact]
+    public async Task DeleteRecord_FileDeleted_DeletesRecordFile()
+    {
+        // Create record file
+        var file = CreateMockFile("file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, organizationId, pid, did, osid, file);
+
+        // Attempt to delete record and file
+        var result = await _recordBusiness.DeleteRecord(uid, organizationId, pid, record.Id);
+        Assert.True(result);
+
+        // Check file
+        Assert.False(File.Exists(record.Uri));
+
+        // Verify record was actually deleted from database
+        var deletedRecord = await Context.Records.FindAsync(record.Id);
+        Assert.Null(deletedRecord);
+    }
+
+    [Fact]
+    public async Task DeleteRecord_FileSaved_DeletesRecordNotFile()
+    {
+        // Disable file deletion
+        var os = await Context.ObjectStorages.FindAsync(osid);
+        os!.FilesDeletable = false;
+        await Context.SaveChangesAsync();
+
+        // Create record file
+        var file = CreateMockFile("not_file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, organizationId, pid, did, osid, file);
+
+        // Delete record but not file
+        var result = await _recordBusiness.DeleteRecord(uid, organizationId, pid, record.Id);
+        Assert.True(result);
+
+        // Check file
+        Assert.True(File.Exists(record.Uri));
+
+        // Verify record was actually deleted from database
+        var deletedRecord = await Context.Records.FindAsync(record.Id);
+        Assert.Null(deletedRecord);
+    }
+
+    private static FormFile CreateMockFile(string fileName, string content = "Mock File")
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
+
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
     }
 
     #endregion

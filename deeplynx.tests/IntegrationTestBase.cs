@@ -256,4 +256,16 @@ public class IntegrationTestBase : IAsyncLifetime
     {
         await CleanDatabaseAsync();
     }
+
+    /// <summary>
+    ///     Builds a request path for a given API version, e.g.
+    ///     ApiPath("v2", "organizations/1/projects/2/permissions") returns
+    ///     "/api/v2/organizations/1/projects/2/permissions".
+    ///     Centralizing this here means if the URL scheme changes again, there's
+    ///     exactly one place to update it instead of every test file.
+    /// </summary>
+    protected static string ApiPath(string apiVersion, string relative)
+    {
+        return $"/api/{apiVersion}/{relative.TrimStart('/')}";
+    }
 }

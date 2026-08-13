@@ -228,6 +228,13 @@ const SideMenu: React.FC<SideMenuProps> = ({
     // On org portal, disable anything not explicitly allowed
     if (isOrgPortalRoute && !orgAllowedPaths.includes(targetPath)) return true;
 
+    // Upload Center is disabled when the organization has file transfer disabled
+    if (targetPath === "/upload_center" && organization?.disableFileTransfer)
+      return true;
+
+    // No project selected and in data catalog side bar should be disabled
+    if (pathname === "/data_catalog/all_records" && !activeProject) return true;
+
     return false;
   };
 
@@ -319,7 +326,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
                 )}
               </div>
               {!isCollapsed && (
-                <button className="btn btn-ghost btn-xs btn-circle flex-shrink-0">
+                <button data-testid="project-select" className="btn btn-ghost btn-xs btn-circle flex-shrink-0">
                   {isProjectsExpanded ? (
                     <ChevronUpIcon className="size-4" />
                   ) : (

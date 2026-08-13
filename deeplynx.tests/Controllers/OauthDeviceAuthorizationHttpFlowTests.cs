@@ -4,7 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using deeplynx.api.Controllers;
+using deeplynx.api.Controllers.V1;
 using deeplynx.business;
 using deeplynx.datalayer;
 using deeplynx.datalayer.Models;
@@ -34,6 +34,8 @@ public class OauthDeviceAuthorizationHttpFlowTests : IntegrationTestBase
     private const string HostedLink = "https://nexus.example.com";
     private const string VerificationUri = HostedLink + "/oauth/device/verify";
 
+    private readonly TestSuiteFixture _fixture;
+
     private HttpClient _httpClient = null!;
     private WebApplication _app = null!;
 
@@ -43,6 +45,7 @@ public class OauthDeviceAuthorizationHttpFlowTests : IntegrationTestBase
 
     public OauthDeviceAuthorizationHttpFlowTests(TestSuiteFixture fixture) : base(fixture)
     {
+        _fixture = fixture;
     }
 
     public override async Task InitializeAsync()
@@ -217,13 +220,16 @@ public class OauthDeviceAuthorizationHttpFlowTests : IntegrationTestBase
     private async Task StartTestNexusAsync()
     {
         var port = GetFreePort();
-        var builder = WebApplication.CreateBuilder();
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = "Test"
+        });
 
         builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
         builder.Services.AddControllers()
             .AddApplicationPart(typeof(TokenController).Assembly);
         builder.Services.AddDbContext<DeeplynxContext>(options =>
-            options.UseNpgsql(Context.Database.GetDbConnection().ConnectionString, npgsqlOptions => npgsqlOptions.UseVector()));
+            options.UseNpgsql(_fixture.PostgresDataSource, npgsqlOptions => npgsqlOptions.UseVector()));
         builder.Services.AddAuthentication("Test")
             .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>("Test", _ => { });
         builder.Services.AddAuthorization();

@@ -115,6 +115,15 @@ public class FileBusiness : IFileControllerBusiness
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
         var guid = Guid.NewGuid();
 
+        var project = await _context.Projects.FindAsync(projectId) ?? throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+        if (objectStorage.Config.AzureObjectConfig == null)
+            objectStorage.Config.AzureObjectConfig = new AzureObjectConfigDto();
+
+        objectStorage.Config.AzureObjectConfig.AzureFilePath = project.FilePath ?? string.Empty;
+
+        var fileContentHash = await fileBusiness.CalculateFileContentHash(file);
+
         var uri = await fileBusiness.UploadFile(organizationId, projectId, realDataSourceId, objectStorage.Config, file, guid);
 
         var recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
@@ -167,7 +176,8 @@ public class FileBusiness : IFileControllerBusiness
             ClassName = resolvedClass.Name,
             FileType = fileType,
             Uri = uri,
-            FileSize = fileSize
+            FileSize = fileSize,
+            FileContentHash = fileContentHash
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
@@ -219,6 +229,7 @@ public class FileBusiness : IFileControllerBusiness
         var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
         var guid = Guid.NewGuid();
 
+        var fileContentHash = await fileBusiness.CalculateFileContentHash(file);
         var uri = await fileBusiness.UpdateFile(record, objectStorage.Config, file, guid);
 
         var fileSize = file.Length;
@@ -232,7 +243,9 @@ public class FileBusiness : IFileControllerBusiness
             Name = file.FileName,
             Uri = uri,
             FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
-            FileSize = fileSize
+            FileSize = fileSize,
+            FileContentHash = fileContentHash,
+            ReplaceFileContentHash = true
         };
 
         var updatedRecord = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
@@ -252,6 +265,21 @@ public class FileBusiness : IFileControllerBusiness
         await InvalidateProjectStorageSizeCache(projectId);
 
         return updatedRecord;
+    }
+
+    public Task<RecordResponseDto> UpdateFileContentHash(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        UpdateFileContentHashRequestDto dto)
+    {
+        return _recordBusiness.UpdateFileContentHash(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId,
+            dto);
     }
 
     /// <summary>
@@ -401,6 +429,20 @@ public class FileBusiness : IFileControllerBusiness
         };
     }
 
+    public async Task<FileUploadSessionResponseDto> StartUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadInitRequestDto request)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        return await StartUpload(organizationId, projectId, record.DataSourceId, record.ObjectStorageId, request);
+    }
+
     /// <summary>
     ///     Upload File Chunk
     /// </summary>
@@ -476,6 +518,7 @@ public class FileBusiness : IFileControllerBusiness
 
         var uri = await fileBusiness.CompleteUpload(organizationId, projectId, realDataSourceId,
             objectStorage.Config, request, guid);
+        var fileContentHash = await fileBusiness.CalculateStoredFileContentHash(uri, objectStorage.Config);
 
         var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
@@ -512,7 +555,8 @@ public class FileBusiness : IFileControllerBusiness
             ClassId = resolvedClass.Id,
             ClassName = resolvedClass.Name,
             FileType = fileExtension,
-            FileSize = fileSize
+            FileSize = fileSize,
+            FileContentHash = fileContentHash
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
@@ -530,6 +574,93 @@ public class FileBusiness : IFileControllerBusiness
         await InvalidateProjectStorageSizeCache(projectId);
 
         return createdRecord;
+    }
+
+    /// <summary>
+    ///     Complete Chunked File Upload and replace an existing file record
+    /// </summary>
+    /// <param name="currentUserId">The ID of the requesting user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="request">File upload completion request DTO</param>
+    /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if the record is embedded</param>
+    /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if the record is embedded</param>
+    /// <param name="userJwt">User JWT for Insight embedding calls</param>
+    /// <returns>Record response DTO containing updated file information</returns>
+    public async Task<RecordResponseDto> CompleteUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadCompleteRequestDto request,
+        long? vlmConfigId = null,
+        long? embeddingModelConfigId = null,
+        string? userJwt = null)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        request.FileName = SanitizedFormFile.SanitizeFileName(request.FileName);
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(record.ObjectStorageId.Value);
+        var fileBusiness = _factory.CreateFileBusiness(objectStorage.Type);
+        var guid = Guid.NewGuid();
+
+        var uri = await fileBusiness.CompleteUpload(organizationId, projectId, record.DataSourceId,
+            objectStorage.Config, request, guid);
+        var fileContentHash = await fileBusiness.CalculateStoredFileContentHash(uri, objectStorage.Config);
+        var fileSize = await fileBusiness.GetFileSize(uri, objectStorage.Config);
+        var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
+
+        await fileBusiness.DeleteFile(record, objectStorage.Config);
+
+        var updateRecordRequest = new UpdateRecordRequestDto
+        {
+            Properties = new JsonObject
+            {
+                ["fileType"] = fileExtension
+            },
+            Name = request.FileName,
+            Uri = uri,
+            FileType = fileExtension,
+            FileSize = fileSize,
+            FileContentHash = fileContentHash,
+            ReplaceFileContentHash = true
+        };
+
+        var updatedRecord = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
+            updateRecordRequest);
+
+        if (record.Embedded)
+        {
+            var vlmConfig =
+                await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, vlmConfigId, "vlm");
+            var embeddingModelConfig =
+                await _insightBusiness.ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
+
+            _insightBusiness.TriggerEmbedding(projectId, updatedRecord.Id, updatedRecord.Uri!, currentUserId,
+                                                    vlmConfig, embeddingModelConfig, userJwt, overwrite: true);
+        }
+
+        await InvalidateProjectStorageSizeCache(projectId);
+
+        return updatedRecord;
+    }
+
+    public async Task CancelUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string uploadId)
+    {
+        var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
+
+        if (record.ObjectStorageId == null) throw new KeyNotFoundException("Record needs an object storage id");
+
+        await CancelUpload(currentUserId, organizationId, projectId, record.DataSourceId, record.ObjectStorageId, uploadId);
     }
 
     /// <summary>
@@ -836,6 +967,7 @@ public class FileBusiness : IFileControllerBusiness
             var fileName = await fileBusiness.GetFileNameTus(organizationId, projectId, realDataSourceId, uploadId, objectStorage.Config);
             var uri = await fileBusiness.CompleteUploadTus(organizationId, projectId, realDataSourceId,
                 objectStorage.Config, uploadId, guid, fileName);
+            var fileContentHash = await fileBusiness.CalculateStoredFileContentHash(uri, objectStorage.Config);
 
             var fileExtension = Path.GetExtension(fileName).TrimStart('.').ToLower();
             var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
@@ -872,7 +1004,8 @@ public class FileBusiness : IFileControllerBusiness
                 ClassId = resolvedClass.Id,
                 ClassName = resolvedClass.Name,
                 FileType = fileExtension,
-                FileSize = fileSize
+                FileSize = fileSize,
+                FileContentHash = fileContentHash
             };
 
             var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,

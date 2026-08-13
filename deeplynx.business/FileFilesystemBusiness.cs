@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using System.IO.Pipelines;
+using System.Text.Json.Nodes;
 using System.Threading.Channels;
 
 namespace deeplynx.business;
@@ -30,6 +31,23 @@ public class FileFilesystemBusiness : IFileBusiness
         _objectStorageBusiness = objectStorageBusiness;
         _classBusiness = classBusiness;
         _recordBusiness = recordBusiness;
+    }
+
+    public async Task<string?> CalculateFileContentHash(
+        IFormFile file,
+        CancellationToken cancellationToken = default)
+    {
+        await using var stream = file.OpenReadStream();
+        return await Sha256HashHelper.ComputeHexAsync(stream, cancellationToken);
+    }
+
+    public async Task<string?> CalculateStoredFileContentHash(
+        string fileUri,
+        ObjectStorageConfigDto objectStorageConfig,
+        CancellationToken cancellationToken = default)
+    {
+        await using var stream = File.OpenRead(fileUri);
+        return await Sha256HashHelper.ComputeHexAsync(stream, cancellationToken);
     }
 
     /// <summary>
@@ -212,18 +230,13 @@ public class FileFilesystemBusiness : IFileBusiness
 
         if (record.Uri == null)
             throw new ArgumentException("Record Uri is null");
-        if (string.IsNullOrWhiteSpace(objectStorageConfig?.MountPath))
-            throw new ArgumentException("Mounted path configuration is missing");
 
-        var fullPath = record.Uri.StartsWith("/")
-            ? record.Uri
-            : "/" + record.Uri;
+        var fullPath = record.Uri.TrimEnd('/', '\\');
 
         if (!Directory.Exists(fullPath))
             throw new DirectoryNotFoundException($"Directory '{fullPath}' not found.");
 
-        string lastFolderName = Path.GetFileName(record.Uri.TrimEnd('/', '\\'));
-
+        string lastFolderName = Path.GetFileName(fullPath);
         int underscoreIndex = lastFolderName.LastIndexOf('_');
         string suffix = underscoreIndex >= 0 && underscoreIndex < lastFolderName.Length - 1
             ? lastFolderName.Substring(underscoreIndex + 1)
@@ -241,10 +254,6 @@ public class FileFilesystemBusiness : IFileBusiness
                 await using var pipeStream = pipe.Writer.AsStream(leaveOpen: true);
                 using var archive = new ZipArchive(pipeStream, ZipArchiveMode.Create, leaveOpen: true);
 
-                // Bounded channel for producer-consumer coordination.
-                // Items carry EITHER buffered content (small files) OR just a
-                // file path (large files, streamed by the consumer at write time).
-                // Worst-case buffered memory ~= capacity * MaxBufferedFileSize.
                 var channel = Channel.CreateBounded<(string EntryName, byte[]? Content, string? FilePath)>(
                     new BoundedChannelOptions(128)
                     {
@@ -253,8 +262,6 @@ public class FileFilesystemBusiness : IFileBusiness
                         SingleWriter = false
                     });
 
-                // Producer: concurrently read small files into memory; enqueue
-                // large files as path-only items so they are never fully buffered.
                 var producer = Task.Run(async () =>
                 {
                     try
@@ -268,21 +275,16 @@ public class FileFilesystemBusiness : IFileBusiness
                             },
                             async (filePath, ct) =>
                             {
-                                var entryName = Path.GetRelativePath(fullPath, filePath).Replace('\\', '/');
+                                var entryName = Path.GetRelativePath(fullPath, filePath).Replace(Path.DirectorySeparatorChar, '/');
                                 var length = new FileInfo(filePath).Length;
 
                                 if (length <= MaxBufferedFileSize)
                                 {
-                                    // Small file: buffer raw bytes. Note: no
-                                    // pre-deflating here — the ZipArchive entry
-                                    // stream handles compression on write, so
-                                    // pre-compressing would double-deflate.
                                     var bytes = await File.ReadAllBytesAsync(filePath, ct);
                                     await channel.Writer.WriteAsync((entryName, bytes, null), ct);
                                 }
                                 else
                                 {
-                                    // Large file: defer the read to the consumer.
                                     await channel.Writer.WriteAsync((entryName, null, filePath), ct);
                                 }
                             });
@@ -296,7 +298,6 @@ public class FileFilesystemBusiness : IFileBusiness
                     }
                 }, cancellationToken);
 
-                // Consumer: single sequential writer to the ZipArchive.
                 var consumer = Task.Run(async () =>
                 {
                     await foreach (var (entryName, content, filePath) in channel.Reader.ReadAllAsync(cancellationToken))
@@ -310,8 +311,6 @@ public class FileFilesystemBusiness : IFileBusiness
                         }
                         else
                         {
-                            // Stream the large file straight from disk into the
-                            // zip entry — never fully materialized in memory.
                             await using var fileStream = new FileStream(
                                 filePath!,
                                 FileMode.Open,
@@ -325,7 +324,6 @@ public class FileFilesystemBusiness : IFileBusiness
                     }
                 }, cancellationToken);
 
-                // Await both producer and consumer
                 await Task.WhenAll(producer, consumer);
             }
             catch (Exception ex)
@@ -826,4 +824,95 @@ public class FileFilesystemBusiness : IFileBusiness
         return (string)meta.FileName;
     }
 
+    /// <summary>
+    /// Scrapes at most (batchSize * maxBatches) files from a file system storage, startingafter the given cursor.
+    /// </summary>
+    /// <param name="mountPath">Root path to scan</param>
+    /// <param name="objectStorageId">The ID of the object storage being scraped</param>
+    /// <param name="cursor">Relative path to resume after, from a previous call, or null to start from the beginning</param>
+    /// <param name="batchSize">Number of records per batch</param>
+    /// <param name="maxBatches">Maximum number of batches to process before returning</param>
+    /// <param name="cancellationToken">Token checked periodically during the directory walk</param>
+    /// <exception cref="DirectoryNotFoundException"></exception>
+    public static Task<ScrapeResult> ScrapeFileSystem(
+        string mountPath,
+        long objectStorageId,
+        string? cursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Directory.Exists(mountPath))
+            throw new DirectoryNotFoundException($"Mount path '{mountPath}' does not exist.");
+
+        var result = new ScrapeResult();
+        var recordsWanted = (long)batchSize * maxBatches;
+
+        var allRelativePaths = Directory.EnumerateFiles(mountPath, "*", SearchOption.AllDirectories)
+            .Select(p => Path.GetRelativePath(mountPath, p))
+            .OrderBy(p => p, StringComparer.Ordinal)
+            .ToList();
+
+        var startIndex = 0;
+        if (!string.IsNullOrEmpty(cursor))
+        {
+            // Resume just after the last path we returned previously.
+            var cursorIndex = allRelativePaths.BinarySearch(cursor, StringComparer.Ordinal);
+            startIndex = cursorIndex >= 0 ? cursorIndex + 1 : ~cursorIndex;
+        }
+
+        var slice = allRelativePaths.Skip(startIndex).Take((int)Math.Min(recordsWanted, int.MaxValue)).ToList();
+
+        foreach (var relativePath in slice)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var fullPath = Path.Combine(mountPath, relativePath);
+            var fileInfo = new FileInfo(fullPath);
+
+            var properties = new JsonObject
+            {
+                ["lastModified"] = fileInfo.LastWriteTimeUtc.ToString("o")
+            };
+
+            result.Records.Add(new CreateRecordRequestDto
+            {
+                Name = fileInfo.Name,
+                Description = "File scraped from filesystem",
+                ObjectStorageId = objectStorageId,
+                Uri = fullPath,
+                Properties = properties,
+                OriginalId = fullPath,
+                FileType = string.IsNullOrEmpty(fileInfo.Extension) ? null : fileInfo.Extension.TrimStart('.'),
+                FileSize = fileInfo.Length
+            });
+        }
+
+        var reachedEnd = startIndex + slice.Count >= allRelativePaths.Count;
+        result.NextCursor = reachedEnd ? null : slice.LastOrDefault();
+
+        return Task.FromResult(result);
+    }
+
+    public async Task<ScrapeResult> ScrapeAsync(
+        ObjectStorageDecryptedDto objectStorage,
+        string? afterCursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        return await ScrapeFileSystem(
+            objectStorage.Config.MountPath
+                ?? throw new InvalidOperationException("Filesystem storage is missing a mount path."),
+            objectStorage.Id,
+            afterCursor,
+            batchSize,
+            maxBatches,
+            cancellationToken);
+    }
+
+    public Task<CreateObjectStorageRequestDto> CreateContainer(long organizationId, string? containerName, string? connectionString, bool isDefault = false, bool existingContainer = false)
+    {
+        throw new NotImplementedException();
+    }
 }

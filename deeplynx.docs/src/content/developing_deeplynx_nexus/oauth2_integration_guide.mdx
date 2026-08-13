@@ -152,10 +152,10 @@ After validating the callback, exchange the authorization code for an access tok
 
 ** Token Exchange Endpoint **
 
-**NOTE: The `/exchange` endpoint uses `v1` in the route due to being a backend route. `/authorize` does not use `v1` because it is a frontend proxy endpoint. Lack of attention to this difference will likely result in errors.**
+**NOTE:** The backend `/exchange` endpoint requires an explicit API version segment. The examples use v2, the forward-development API. The frozen and deprecated v1 contract remains accessible at `/api/v1/oauth/exchange`. The frontend `/authorize` proxy is not a versioned backend controller route and remains `/api/oauth/authorize`.
 
 ```
-POST {backendUrl}/api/v1/oauth/exchange
+POST {backendUrl}/api/v2/oauth/exchange
 ```
 
 ** Required Parameters **
@@ -173,7 +173,7 @@ POST {backendUrl}/api/v1/oauth/exchange
 
 ```python
 def exchange_code_for_token(code, state):
-    token_url = 'https://nexus.example.com/api/v1/oauth/exchange'
+    token_url = 'https://nexus.example.com/api/v2/oauth/exchange'
 
     params = {
         'code': code,
@@ -370,7 +370,7 @@ CLIENT_ID = 'your_client_id_123'
 CLIENT_SECRET = 'your_client_secret_456'
 REDIRECT_URI = 'http://localhost:8080/callback'
 AUTHORIZATION_URL = 'https://nexus.example.com/api/oauth/authorize'
-TOKEN_URL = 'https://nexus.example.com/api/v1/oauth/exchange'
+TOKEN_URL = 'https://nexus.example.com/api/v2/oauth/exchange'
 
 @app.route('/login')
 def login():
@@ -422,7 +422,7 @@ def get_data():
         return redirect('/login')
 
     response = requests.get(
-        'https://nexus.example.com/api/v1/projects/GetAllProjects',
+        'https://nexus.example.com/api/v2/organizations',
         headers={'Authorization': f'Bearer {token}'}
     )
 

@@ -84,6 +84,7 @@ export default function UploadCenterClient() {
   const organizationId = organization?.organizationId;
   const numericOrganizationId =
     organizationId !== undefined ? Number(organizationId) : undefined;
+  const fileTransferDisabled = !!organization?.disableFileTransfer;
 
   const fileUploadState = useUploadState();
   const bulkUploadState = useBulkUploadState();
@@ -152,7 +153,7 @@ export default function UploadCenterClient() {
 
     (async () => {
       try {
-        const classes = await getAllClasses(Number(projectId), true);
+        const { items: classes } = await getAllClasses(Number(projectId), true);
         if (cancelled) return;
         setAvailableClasses(classes);
       } catch (error) {
@@ -228,6 +229,7 @@ export default function UploadCenterClient() {
   );
 
   const canUpload =
+    !fileTransferDisabled &&
     selectedFiles.length > 0 &&
     !!projectId &&
     !!dataSourceId &&
@@ -241,6 +243,7 @@ export default function UploadCenterClient() {
   }, [needsTarget, setTargetFileId]);
 
   const handleFileUpload = async () => {
+    if (fileTransferDisabled) return;
     if (!organizationId || !projectId || selectedFiles.length === 0) {
       toast.error(t.translations.SELECT_A_PROJECT_AND_AT_LEAST_ONE_FILE);
       return;
@@ -318,13 +321,14 @@ export default function UploadCenterClient() {
     const showProgressToast = (progress: UploadProgressEvent) => {
       uploadToastManager.show({
         title: t.translations.UPLOADING_FILE,
-        message: `${progress.chunksCompleted} / ${progress.totalChunks} ${t.translations.CHUNKS
-          }`,
+        message: t.translations.PREPARING_UPLOAD,
         percent: progress.percentComplete,
-        chunksCompleted: progress.chunksCompleted,
-        totalChunks: progress.totalChunks,
+        bytesUploaded: progress.bytesUploaded,
+        totalBytes: progress.totalBytes,
+        speedBytesPerSec: progress.speedBytesPerSec,
+        isFinalizing: progress.isFinalizing,
         isCancelling: cancelling,
-        onCancel: progress.uploadId ? cancelFromToast : undefined,
+        onCancel: progress.uploadId && !progress.isFinalizing ? cancelFromToast : undefined,
         cancelDisabled: cancelling,
       });
     };
@@ -375,7 +379,6 @@ export default function UploadCenterClient() {
             const file = selectedFiles[currentIndex];
             const metadata = fileUploadState.filesMetadata[currentIndex] ?? {};
             fileUploadState.cleanUploadError(currentIndex);
-
             try {
               if ((metadata.recordMode ?? "new") === "update") {
                 if (!metadata.targetRecordId) {
@@ -521,6 +524,7 @@ export default function UploadCenterClient() {
   };
 
   const handleBulkUpload = async () => {
+    if (fileTransferDisabled) return;
     if (
       !bulkUploadState.validationResult ||
       !bulkUploadState.validationResult.isValid
@@ -619,6 +623,40 @@ export default function UploadCenterClient() {
       bulkUploadState.setIsUploading(false);
     }
   };
+
+  if (fileTransferDisabled) {
+    return (
+      <main className="min-h-screen bg-base-200/30">
+        <section className="border-b border-base-300/50 bg-base-100">
+          <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+                {t.translations.UPLOAD_MODE}
+              </p>
+              <h1 className="text-2xl font-bold text-base-content sm:text-3xl">
+                {t.translations.UPLOAD_CENTER}
+              </h1>
+            </div>
+          </div>
+        </section>
+        <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-3 py-5 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-5xl">
+            <div className="card border border-base-300/50 bg-base-100 shadow-sm">
+              <div className="card-body items-center text-center gap-2 py-12">
+                <DocumentIcon className="size-10 text-base-content/40" />
+                <h2 className="text-lg font-semibold text-base-content">
+                  {t.translations.UPLOAD_CENTER_DISABLED}
+                </h2>
+                <p className="max-w-md text-sm text-base-content/70">
+                  {t.translations.UPLOAD_CENTER_DISABLED_DETAIL}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   useEffect(() => {
     let cancelling = false;

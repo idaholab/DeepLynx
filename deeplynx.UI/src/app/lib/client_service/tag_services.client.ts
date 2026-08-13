@@ -185,10 +185,10 @@ export const getAllTagsOrg = async (
   hideArchived: boolean = true
 ): Promise<TagResponseDto[]> => {
   try {
-    const projectIdsQuery = projectIds?.map(id => `projectIds=${id}`).join('&') ?? '';
+    const projectIdsQuery = projectIds?.map(id => `projects=${id}`).join('&') ?? '';
     const separator = projectIdsQuery ? '&' : '';
     const res = await api.get(
-        `/organizations/${organizationId}/tags?${projectIdsQuery}${separator}hideArchived=${hideArchived}`
+      `/organizations/${organizationId}/tags?${projectIdsQuery}${separator}hideArchived=${hideArchived}`
     );
     return res.data;
   } catch (error) {

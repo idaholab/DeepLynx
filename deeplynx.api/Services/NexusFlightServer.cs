@@ -37,20 +37,18 @@ public class NexusFlightServer : FlightServer
             long rowsReceived = 0;
             int batchesReceived = 0;
 
-            var expectedColumnCount = schema.FieldsList.Count;
-
             while (await requestStream.MoveNext(context.CancellationToken))
             {
                 var batch = requestStream.Current;
 
+                ValidateBatch(batch, schema);
 
-                if (batch is null || batch.ColumnCount != expectedColumnCount)
+                if (batchesReceived == 0 && batch.Length > 0)
                 {
-                    throw new RpcException(new Status(
-                        StatusCode.InvalidArgument,
-                        $"Expected batch with {expectedColumnCount} columns, got {batch?.ColumnCount.ToString() ?? "null batch"}."));
+                    var preview = BuildBatchPreview(schema, batch);
+                    Console.WriteLine(
+                        $"DoPut received first batch - schema: {preview.SchemaDisplay}; firstRow: {preview.FirstRowDisplay}");
                 }
-
 
                 rowsReceived += batch.Length;
                 batchesReceived++;
@@ -260,6 +258,41 @@ public class NexusFlightServer : FlightServer
                         $"Field '{fieldName}' is missing a data type"));
             }
         }
+    }
+
+    private static void ValidateBatch(RecordBatch? batch, Schema expectedSchema)
+    {
+        var expectedColumnCount = expectedSchema.FieldsList.Count;
+
+        if (batch is null || batch.ColumnCount != expectedColumnCount)
+        {
+            throw new RpcException(new Status(
+                StatusCode.InvalidArgument,
+                $"Expected batch with {expectedColumnCount} columns, got {batch?.ColumnCount.ToString() ?? "null batch"}."));
+        }
+    }
+
+    private static (string SchemaDisplay, string FirstRowDisplay) BuildBatchPreview(Schema schema, RecordBatch batch)
+    {
+        var schemaDisplay = string.Join(", ",
+            schema.FieldsList.Select(field => $"{field.Name}: {field.DataType.Name}"));
+
+        var firstRowDisplay = string.Join(", ",
+            schema.FieldsList.Select((field, index) => $"{field.Name}={FormatArrayValue(batch.Column(index), 0)}"));
+
+        return (schemaDisplay, firstRowDisplay);
+    }
+
+    private static string FormatArrayValue(IArrowArray array, int index)
+    {
+        return array switch
+        {
+            StringArray stringArray => stringArray.GetString(index) ?? string.Empty,
+            Int64Array int64Array => int64Array.GetValue(index)?.ToString() ?? string.Empty,
+            BooleanArray booleanArray => booleanArray.GetValue(index)?.ToString() ?? string.Empty,
+            TimestampArray timestampArray => timestampArray.GetTimestamp(index)?.ToString("o") ?? string.Empty,
+            _ => array.ToString() ?? string.Empty
+        };
     }
 
     private FlightPutResult BuildPutAck(

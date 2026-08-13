@@ -7,8 +7,8 @@
 
 ## Prerequisites
 
-1. Postgres download:
-   - Download [PostgreSQL](https://www.postgresql.org/) natively, OR
+1. Postgres with the pgvector extension available:
+   - Install [PostgreSQL](https://www.postgresql.org/) and [pgvector](https://github.com/pgvector/pgvector) natively, OR
    - Download [Docker](https://docs.docker.com/engine/install/)
 
 2. .NET SDK: Ensure .NET SDK version 10.0 is installed on your system. Download [.NET 10.0](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). You can verify you are using the correct version by running `dotnet --version` in the command line.
@@ -26,6 +26,31 @@ Built containers must always be rebuilt after code changes, including pulled cod
 ```
 docker compose up --build
 ```
+
+### Selecting the UI API Version
+
+Docker Compose reads `NEXT_PUBLIC_API_VERSION` from the shell or the root
+`.env` file and uses `v2` when it is not set. For example:
+
+```dotenv
+NEXT_PUBLIC_API_VERSION=v2
+```
+
+To reuse the UI's `deeplynx.UI/.env.local` file instead, pass it explicitly:
+
+```bash
+docker compose --env-file deeplynx.UI/.env.local up --build
+```
+
+`NEXT_PUBLIC_*` values are compiled into the Next.js browser bundle, so the UI
+image must be rebuilt after changing the version. Developer `.env.*` files are
+excluded from the Docker build context to prevent local URLs and secrets from
+being copied into an image; Compose passes the selected version as a build
+argument instead.
+
+The deployed Dev UI does not use local env files. Its API URL and version come
+from the GitHub Development environment variables used by the image-build
+workflow.
 
 ### Running with DeepLynx Insight
 
@@ -49,7 +74,7 @@ The Insight services connect to the same `nx-postgres` container as the rest of 
 
 The values need to point at the same database. If you change the credentials, make sure both sets match in `docker-compose.yaml`:
 
-| Setting  | Nexus (`server`, `nx-postgres`, `db-version-check`) | Insight (`insight-fastapi`, `insight-rabbitmq-runner`) |
+| Setting  | Nexus (`server`, `nx-postgres`) | Insight (`insight-fastapi`, `insight-rabbitmq-runner`) |
 | -------- | --------------------------------------------------- | ------------------------------------------------------ |
 | Host     | `POSTGRES_DB_HOST`                                  | `PG_HOST`                                              |
 | Port     | `POSTGRES_PORT`                                     | `PG_PORT`                                              |
@@ -85,7 +110,8 @@ Once you have a `.env` file, be sure to periodically check `.env_sample` for upd
 1. PostgreSQL Setup:
    - Native Install:
      - Install and launch PostgreSQL.
-     - Create a PostgreSQL server.
+     - Install pgvector on the PostgreSQL server. Nexus enables the `vector` extension in the configured database during startup.
+     - Create the configured database (`deeplynx` by default).
    - Postgres on Docker:
      - Run the following commands:
 

@@ -15,6 +15,9 @@ import { getAllDataSources } from "@/app/lib/client_service/data_source_services
 import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
+  fetchInsightEndpointHealth,
+  type InsightEndpointHealthByRole,
+  type InsightModelHealthState,  
 } from "@/app/lib/client_service/insight_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
 import {
@@ -49,6 +52,18 @@ import PaginationControls from "../components/PaginationControls";
 
 const STATUS_POLL_INTERVAL_MS = 5000;
 
+const EMPTY_HEALTH_STATE: InsightModelHealthState = {
+  isChecking: false,
+  response: null,
+  error: null,
+};
+
+const EMPTY_ENDPOINT_HEALTH: InsightEndpointHealthByRole = {
+  query: { ...EMPTY_HEALTH_STATE },
+  upload: { ...EMPTY_HEALTH_STATE },
+  embedding: { ...EMPTY_HEALTH_STATE },
+};
+
 export default function ProjectInsightClientView() {
   // Session context
   const { t } = useLanguage();
@@ -69,9 +84,23 @@ export default function ProjectInsightClientView() {
   const [statusMap, setStatusMap] = useState<
     Record<number, ProjectInsightStatus>
   >({});
-  const [isQueryModelUnavailable, setIsQueryModelUnavailable] = useState(false);
-  const [isUploadModelUnavailable, setIsUploadModelUnavailable] = useState(false);
-  const [isEmbeddingModelUnavailable, setIsEmbeddingModelUnavailable] = useState(false);
+  const [endpointHealth, setEndpointHealth] =
+      useState<InsightEndpointHealthByRole>(EMPTY_ENDPOINT_HEALTH);
+  const isQueryModelUnavailable =
+      endpointHealth.query.response !== null
+          ? !endpointHealth.query.response.reachable ||
+          !endpointHealth.query.response.model_available
+          : Boolean(endpointHealth.query.error);
+  const isUploadModelUnavailable =
+      endpointHealth.upload.response !== null
+          ? !endpointHealth.upload.response.reachable ||
+          !endpointHealth.upload.response.model_available
+          : Boolean(endpointHealth.upload.error);
+  const isEmbeddingModelUnavailable =
+      endpointHealth.embedding.response !== null
+          ? !endpointHealth.embedding.response.reachable ||
+          !endpointHealth.embedding.response.model_available
+          : Boolean(endpointHealth.embedding.error);
   const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
   const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;  
   const pollingKey = useMemo(
@@ -97,12 +126,123 @@ export default function ProjectInsightClientView() {
   const { selectedInsightModels, setSelectedInsightModels } =
     useInsightModelSelection(organizationId, projectId);
 
+  useEffect(() => {
+    if (
+        !hasProjectLoaded ||
+        !hasOrganizationLoaded ||
+        !organizationId ||
+        !projectId
+    ) {
+      setEndpointHealth(EMPTY_ENDPOINT_HEALTH);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function checkEndpointHealth() {
+      setEndpointHealth({
+        query: { ...EMPTY_HEALTH_STATE, isChecking: true },
+        upload: { ...EMPTY_HEALTH_STATE, isChecking: true },
+        embedding: { ...EMPTY_HEALTH_STATE, isChecking: true },
+      });
+
+      const [queryHealth, uploadHealth, embeddingHealth] =
+          await Promise.allSettled([
+            fetchInsightEndpointHealth({
+              organizationId: organizationId!,
+              projectId: projectId!,
+              modelConfigId: selectedInsightModels.queryModelConfigId,
+              modelType: "llm",
+            }),
+            fetchInsightEndpointHealth({
+              organizationId: organizationId!,
+              projectId: projectId!,
+              modelConfigId: selectedInsightModels.uploadModelConfigId,
+              modelType: "vlm",
+            }),
+            fetchInsightEndpointHealth({
+              organizationId: organizationId!,
+              projectId: projectId!,
+              modelConfigId: selectedInsightModels.embeddingModelConfigId,
+              modelType: "embedding",
+            }),
+          ]);
+
+      if (cancelled) return;
+
+      setEndpointHealth({
+        query:
+            queryHealth.status === "fulfilled"
+                ? {
+                  isChecking: false,
+                  response: queryHealth.value,
+                  error: null,
+                }
+                : {
+                  isChecking: false,
+                  response: null,
+                  error:
+                      queryHealth.reason instanceof Error
+                          ? queryHealth.reason.message
+                          : "Query model health check failed",
+                },
+
+        upload:
+            uploadHealth.status === "fulfilled"
+                ? {
+                  isChecking: false,
+                  response: uploadHealth.value,
+                  error: null,
+                }
+                : {
+                  isChecking: false,
+                  response: null,
+                  error:
+                      uploadHealth.reason instanceof Error
+                          ? uploadHealth.reason.message
+                          : "Upload/OCR model health check failed",
+                },
+
+        embedding:
+            embeddingHealth.status === "fulfilled"
+                ? {
+                  isChecking: false,
+                  response: embeddingHealth.value,
+                  error: null,
+                }
+                : {
+                  isChecking: false,
+                  response: null,
+                  error:
+                      embeddingHealth.reason instanceof Error
+                          ? embeddingHealth.reason.message
+                          : "Embedding model health check failed",
+                },
+      });
+    }
+
+    void checkEndpointHealth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hasOrganizationLoaded,
+    hasProjectLoaded,
+    organizationId,
+    projectId,
+    selectedInsightModels.queryModelConfigId,
+    selectedInsightModels.uploadModelConfigId,
+    selectedInsightModels.embeddingModelConfigId,
+  ]);
+  
   const selectedPendingIdsLength = selectedPendingIds.size;
 
   // Effects
   useEffect(() => {
     setSelectedPendingIds(new Map());
     setActiveTabKey("library");
+    setEndpointHealth(EMPTY_ENDPOINT_HEALTH);
   }, [projectId]);
 
   const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
@@ -111,13 +251,14 @@ export default function ProjectInsightClientView() {
   const loadRecordMeta = useCallback(async () => {
     if (!projectId) return;
 
-    const [classDtos, dataSourceDtos, tagDtos] =
+    const [classesResponse, dataSourceDtos, tagDtos] =
       await Promise.all([
         getAllClasses(projectId, true),
         getAllDataSources(projectId, true),
         getAllTags(projectId, true),
       ]);
 
+    const classDtos = classesResponse.items;
     setClasses(classDtos);
     setSources(dataSourceDtos);
 
@@ -568,6 +709,7 @@ export default function ProjectInsightClientView() {
                 (record) => record.id,
               )}
               isChatUnavailable={isChatUnavailable}
+              endpointHealth={endpointHealth}
             />
           </section>
 

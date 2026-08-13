@@ -24,7 +24,7 @@ import {
   SensitivityLabelsDto,
   TagResponseDto,
 } from "../types/responseDTOs";
-import PropertyTable from "./components/PropertyTable";
+import PropertyTable, { uriPermission } from "./components/PropertyTable";
 import RecordLoading from "./loading";
 
 // Components
@@ -78,6 +78,8 @@ import {
   fetchInsightEndpointHealth,
   fetchInsightIngestionStatus,
   queueInsightUpload,
+  type InsightEndpointHealthByRole,
+  type InsightModelHealthState,
 } from "@/app/lib/client_service/insight_services.client";
 import { isInsightHidden } from "@/app/lib/feature_flags";
 import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
@@ -138,6 +140,18 @@ function parseNestedProperties(obj: JSON): PropertyRow[] {
   });
 }
 
+const EMPTY_HEALTH_STATE: InsightModelHealthState = {
+  isChecking: false,
+  response: null,
+  error: null,
+};
+
+const EMPTY_ENDPOINT_HEALTH: InsightEndpointHealthByRole = {
+  query: EMPTY_HEALTH_STATE,
+  upload: EMPTY_HEALTH_STATE,
+  embedding: EMPTY_HEALTH_STATE,
+};
+
 // ============= TYPE DEFINITIONS =============
 interface Props {
   projectId: number;
@@ -192,9 +206,22 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
-  const [isQueryModelUnavailable, setIsQueryModelUnavailable] = useState(false);
-  const [isUploadModelUnavailable, setIsUploadModelUnavailable] = useState(false);
-  const [isEmbeddingModelUnavailable, setIsEmbeddingModelUnavailable] = useState(false);
+  const [endpointHealth, setEndpointHealth] = useState<InsightEndpointHealthByRole>(EMPTY_ENDPOINT_HEALTH);
+  const isQueryModelUnavailable =
+      endpointHealth.query.response !== null
+          ? !endpointHealth.query.response.reachable ||
+          !endpointHealth.query.response.model_available
+          : Boolean(endpointHealth.query.error);
+  const isUploadModelUnavailable =
+      endpointHealth.upload.response !== null
+          ? !endpointHealth.upload.response.reachable ||
+          !endpointHealth.upload.response.model_available
+          : Boolean(endpointHealth.upload.error);
+  const isEmbeddingModelUnavailable =
+      endpointHealth.embedding.response !== null
+          ? !endpointHealth.embedding.response.reachable ||
+          !endpointHealth.embedding.response.model_available
+          : Boolean(endpointHealth.embedding.error);
   const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
   const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;
   const [hasCheckedInsightHealth, setHasCheckedInsightHealth] = useState(false);
@@ -287,9 +314,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const resetAllState = useCallback(() => {
     setRecord(null);
     setRecordFileType(null);
-    setIsQueryModelUnavailable(false);
-    setIsUploadModelUnavailable(false);
-    setIsEmbeddingModelUnavailable(false);
+    setEndpointHealth(EMPTY_ENDPOINT_HEALTH);
     setHasCheckedInsightHealth(false);
     setSelectedTags([]);
     setSelectedIds([]);
@@ -553,7 +578,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
       try {
         setIsLoadingClasses(true);
-        const data = await getAllClasses(projectId, true);
+        const { items: data } = await getAllClasses(projectId, true);
         setAvailableClasses(data);
       } catch (error) {
         console.error("Error fetching classes: ", error);
@@ -584,10 +609,9 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const systemPropertiesRows = useMemo(() => {
     if (!record) return [];
 
-    const isDownloadable =
-      !!record.uri &&
-      record.uri.trim().length > 0 &&
-      record.uri.toLowerCase() !== "null";
+    const uriType = uriPermission(record.uri, !organization?.disableFileTransfer);
+    const isDownloadable = (uriType === "download");
+    const isRedirectable = (uriType === "redirect");
 
     return [
       { label: t.translations.RECORD_ID, value: record.id },
@@ -619,6 +643,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         copyAriaLabel: t.translations.COPY_RECORD_URI,
         idleIconClassName: "size-6 text-base-content/70",
         copiedIconClassName: "size-6 text-success",
+        isLink: isRedirectable,
       },
       {
         label: t.translations.ORIGINAL_ID,
@@ -670,7 +695,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         value: record.objectStorageId,
       },
     ];
-  }, [record, recordFileType, handleUpdateRecord, t.translations]);
+  }, [
+    record, 
+    recordFileType,
+    handleUpdateRecord,
+    t.translations,
+    organization?.disableFileTransfer,
+  ]);
 
   const additionalPropertiesRows = useMemo(() => {
     if (!record?.properties) return [];
@@ -864,6 +895,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       try {
         if (isInitial) setIsCheckingLatticeReadiness(true);
 
+        setEndpointHealth({
+          query: { ...EMPTY_HEALTH_STATE, isChecking: true },
+          upload: { ...EMPTY_HEALTH_STATE, isChecking: true },
+          embedding: { ...EMPTY_HEALTH_STATE, isChecking: true },
+        });
+        
         const [queryHealth, uploadHealth, embeddingHealth] =
             await Promise.allSettled([
               fetchInsightEndpointHealth({
@@ -887,26 +924,59 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             ]);
 
         const queryUnavailable =
-            queryHealth.status === "rejected" ||
-            !queryHealth.value.reachable ||
-            !queryHealth.value.model_available;
+            queryHealth.status === "fulfilled"
+                ? !queryHealth.value.reachable || !queryHealth.value.model_available
+                : true;
 
         const uploadUnavailable =
-            uploadHealth.status === "rejected" ||
-            !uploadHealth.value.reachable ||
-            !uploadHealth.value.model_available;
+            uploadHealth.status === "fulfilled"
+                ? !uploadHealth.value.reachable || !uploadHealth.value.model_available
+                : true;
 
         const embeddingUnavailable =
-            embeddingHealth.status === "rejected" ||
-            !embeddingHealth.value.reachable ||
-            !embeddingHealth.value.model_available;
+            embeddingHealth.status === "fulfilled"
+                ? !embeddingHealth.value.reachable ||
+                !embeddingHealth.value.model_available
+                : true;
 
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
-        setIsQueryModelUnavailable(queryUnavailable);
-        setIsUploadModelUnavailable(uploadUnavailable);
-        setIsEmbeddingModelUnavailable(embeddingUnavailable);
+        setEndpointHealth({
+          query:
+              queryHealth.status === "fulfilled"
+                  ? { isChecking: false, response: queryHealth.value, error: null }
+                  : {
+                    isChecking: false,
+                    response: null,
+                    error:
+                        queryHealth.reason instanceof Error
+                            ? queryHealth.reason.message
+                            : "Query model health check failed",
+                  },
+          upload:
+              uploadHealth.status === "fulfilled"
+                  ? { isChecking: false, response: uploadHealth.value, error: null }
+                  : {
+                    isChecking: false,
+                    response: null,
+                    error:
+                        uploadHealth.reason instanceof Error
+                            ? uploadHealth.reason.message
+                            : "Upload/OCR model health check failed",
+                  },
+          embedding:
+              embeddingHealth.status === "fulfilled"
+                  ? { isChecking: false, response: embeddingHealth.value, error: null }
+                  : {
+                    isChecking: false,
+                    response: null,
+                    error:
+                        embeddingHealth.reason instanceof Error
+                            ? embeddingHealth.reason.message
+                            : "Embedding model health check failed",
+                  },
+        });
 
         if (embeddingUnavailable) {
           setIsRecordInsightEmbedded(false);
@@ -947,9 +1017,23 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
-        setIsQueryModelUnavailable(true);
-        setIsUploadModelUnavailable(true);
-        setIsEmbeddingModelUnavailable(true);
+        setEndpointHealth({
+          query: {
+            isChecking: false,
+            response: null,
+            error: "Query model health check failed",
+          },
+          upload: {
+            isChecking: false,
+            response: null,
+            error: "Upload/OCR model health check failed",
+          },
+          embedding: {
+            isChecking: false,
+            response: null,
+            error: "Embedding model health check failed",
+          },
+        });
         setIsRecordInsightEmbedded(false);
 
         if (recordEmbedPollRef.current) {
@@ -1031,11 +1115,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     return <RecordLoading />;
   }
 
-  const isDownloadable =
-    !!record.uri &&
-    record.uri.trim().length > 0 &&
-    record.uri.toLowerCase() !== "null";
-
   const isInsightSupported = isInsightSupportedFileType(
     recordFileType,
     record?.uri,
@@ -1083,7 +1162,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             <PropertyTable
               title={t.translations.SYSTEM_PROPERTIES}
               rows={systemPropertiesRows}
-              download={isDownloadable}
+              uri={record.uri ?? ""}
               recordName={record.name}
             />
             <PropertyTable
@@ -1128,6 +1207,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                 isIngestionUnavailable={!hasCheckedInsightHealth || isIngestionUnavailable}
                 selectedInsightModels={selectedInsightModels}
                 onSelectedInsightModelsChange={setSelectedInsightModels}
+                endpointHealth={endpointHealth}
               />
             ) : null}
 

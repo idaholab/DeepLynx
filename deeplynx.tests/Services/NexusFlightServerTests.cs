@@ -34,11 +34,13 @@ public class NexusFlightServerTests : IntegrationTestBase
     {
         _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, Mock.Of<IProjectRolePermissionService>(),
+            Mock.Of<IAdminService>());
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness,
-            _sensitivityLabelBusiness, _sensitivityLabelService);
+            _sensitivityLabelBusiness, _sensitivityLabelService, Mock.Of<IProvenanceBusiness>(),
+            Mock.Of<ILogger<RecordBusiness>>(), Mock.Of<IObjectStorageBusiness>(), Mock.Of<IFileBusinessFactory>());
     }
 
     [Fact]
