@@ -153,7 +153,7 @@ export default function UploadCenterClient() {
 
     (async () => {
       try {
-        const classes = await getAllClasses(Number(projectId), true);
+        const { items: classes } = await getAllClasses(Number(projectId), true);
         if (cancelled) return;
         setAvailableClasses(classes);
       } catch (error) {
@@ -321,13 +321,14 @@ export default function UploadCenterClient() {
     const showProgressToast = (progress: UploadProgressEvent) => {
       uploadToastManager.show({
         title: t.translations.UPLOADING_FILE,
-        message: `${progress.chunksCompleted} / ${progress.totalChunks} ${t.translations.CHUNKS
-          }`,
+        message: t.translations.PREPARING_UPLOAD,
         percent: progress.percentComplete,
-        chunksCompleted: progress.chunksCompleted,
-        totalChunks: progress.totalChunks,
+        bytesUploaded: progress.bytesUploaded,
+        totalBytes: progress.totalBytes,
+        speedBytesPerSec: progress.speedBytesPerSec,
+        isFinalizing: progress.isFinalizing,
         isCancelling: cancelling,
-        onCancel: progress.uploadId ? cancelFromToast : undefined,
+        onCancel: progress.uploadId && !progress.isFinalizing ? cancelFromToast : undefined,
         cancelDisabled: cancelling,
       });
     };

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import {
   CheckIcon,
   PencilIcon,
@@ -30,9 +31,9 @@ interface SplitViewLayoutProps {
   onEditClick: (role: RoleResponseDto) => void;
   onDeleteClick: (role: RoleResponseDto) => void;
   onCreateRole: () => void;
-  onStartEditingPermissions: () => void;
+  onStartEditingPermissions: (activePermissionTab: string) => void;
   onCancelEditingPermissions: () => void;
-  onSavePermissions: () => void;
+  onSavePermissions: (activePermissionTab: string) => void;
   onTogglePermission: (permissionId: number) => void;
 
   roleHasPermission: (roleId: number, permissionId: number) => boolean;
@@ -60,9 +61,16 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   isSeededUserRole,
 }) => {
   const { t } = useLanguage();
-  const [activePermissionTab, setActivePermissionTab] = useState(
+  const [activePermissionTab, setActivePermissionTab] = useState<string>(
     t.translations.RESOURCE_PERMISSIONS,
   );
+  const handleTabChange = (tab: string) => {
+    if (isEditingPermissions) {
+      toast.error("Please save or cancel your changes before switching tabs");
+      return;
+    }
+    setActivePermissionTab(tab);
+  };
 
   const splitPermissionCategories = useMemo(() => {
     const withoutLabelId: PermissionCategory[] = [];
@@ -131,14 +139,18 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
           <h3 className="text-sm font-semibold">{t.translations.PERMISSIONS}</h3>
           {!isEditingPermissions ? (
             <button
-              disabled={rolesLocked || isLoadingPermissions || isSeededUser}
-              onClick={onStartEditingPermissions}
+              disabled={
+                rolesLocked ||
+                isLoadingPermissions ||
+                (isSeededUser && activePermissionTab !== t.translations.SENSITIVITY_LABELS)
+              }
+              onClick={() => onStartEditingPermissions(activePermissionTab)}
               className="btn btn-primary btn-sm gap-2"
               title={
-                isSeededUser
-                    ? t.translations
-                        .SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
-                    : rolesLocked
+                (isSeededUser && activePermissionTab !== t.translations.SENSITIVITY_LABELS)
+                  ? t.translations
+                    .SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
+                  : rolesLocked
                     ? "Roles are locked"
                     : "Edit Permissions"
               }
@@ -155,7 +167,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                 {t.translations.CANCEL}
               </button>
               <button
-                onClick={onSavePermissions}
+                onClick={() => onSavePermissions(activePermissionTab)}
                 className="btn btn-primary btn-sm gap-2"
               >
                 <CheckIcon className="w-4 h-4" />
@@ -188,11 +200,10 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                       return (
                         <label
                           key={perm.id}
-                          className={`label justify-start gap-2 ${
-                            isEditingPermissions
-                              ? "cursor-pointer"
-                              : "cursor-default"
-                          }`}
+                          className={`label justify-start gap-2 ${isEditingPermissions
+                            ? "cursor-pointer"
+                            : "cursor-default"
+                            }`}
                           title={
                             displayMode === "permission-action"
                               ? perm.description || perm.action || perm.name
@@ -269,24 +280,21 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                   key={role.id}
                   onClick={() => onRoleSelection(role.id)}
                   disabled={isEditingPermissions}
-                  className={`w-full px-4 py-3 text-left border-b border-base-300 transition-colors ${
-                    selectedRoleId === role.id
-                      ? "bg-primary/10 border-l-4 border-l-primary"
-                      : ""
-                  } ${
-                    isEditingPermissions
+                  className={`w-full px-4 py-3 text-left border-b border-base-300 transition-colors ${selectedRoleId === role.id
+                    ? "bg-primary/10 border-l-4 border-l-primary"
+                    : ""
+                    } ${isEditingPermissions
                       ? "opacity-50 cursor-not-allowed"
                       : "hover:bg-base-200 cursor-pointer"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <ShieldCheckIcon
-                        className={`w-4 h-4 ${
-                          selectedRoleId === role.id
-                            ? "text-primary"
-                            : "text-base-content/40"
-                        }`}
+                        className={`w-4 h-4 ${selectedRoleId === role.id
+                          ? "text-primary"
+                          : "text-base-content/40"
+                          }`}
                       />
                       <span className="font-medium text-sm">{role.name}</span>
                     </div>
@@ -360,7 +368,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
               <Tabs
                 tabs={permissionTabs}
                 activeTab={activePermissionTab}
-                onTabChange={setActivePermissionTab}
+                onTabChange={handleTabChange}
               />
             </div>
           </>

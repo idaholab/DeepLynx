@@ -166,6 +166,8 @@ spec:
               value: ${SUPERUSER_EMAIL}
             - name: INSIGHT_FASTAPI_URL
               value: ${INSIGHT_FASTAPI_URL}
+            - name: NEXT_PUBLIC_API_VERSION
+              value: ${NEXT_PUBLIC_API_VERSION}
             - name: LATTICE_MODEL
               value: ${LATTICE_MODEL}
             - name: TENANT_MODE

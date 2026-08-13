@@ -129,6 +129,113 @@ public class FileController : ControllerBase
 
 
     /// <summary>
+    ///     Start Chunked File Update
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="request">File upload initialization request DTO</param>
+    /// <returns>A file upload session response DTO</returns>
+    [HttpPost("{recordId:long}/upload/start", Name = "api_start_file_update_upload")]
+    [Auth("update", "file")]
+    [Auth("update", "record")]
+    [Sensitivity("update file")]
+    public async Task<ActionResult<FileUploadSessionResponseDto>> StartUpdateUpload(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromBody] FileUploadInitRequestDto request)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var uploadSession = await _fileBusiness.StartUpdateUpload(
+                currentUserId, organizationId, projectId, recordId, request);
+            return Ok(uploadSession);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while starting update upload for file {request.FileName}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+
+    /// <summary>
+    ///     Complete Chunked File Update
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="request">File upload completion request DTO</param>
+    /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if the record is embedded</param>
+    /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if the record is embedded</param>
+    /// <returns>Record response DTO containing updated file information</returns>
+    [HttpPost("{recordId:long}/upload/complete", Name = "api_complete_file_update_upload")]
+    [Auth("update", "file")]
+    [Auth("update", "record")]
+    [Sensitivity("update file")]
+    public async Task<ActionResult<RecordResponseDto>> CompleteUpdateUpload(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromBody] FileUploadCompleteRequestDto request,
+        [FromQuery] long? vlmConfigId = null,
+        [FromQuery] long? embeddingModelConfigId = null)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var userJwt = UserContextStorage.Token;
+            var updatedFileInfo = await _fileBusiness.CompleteUpdateUpload(
+                currentUserId, organizationId, projectId, recordId, request, vlmConfigId, embeddingModelConfigId,
+                userJwt);
+            return Ok(updatedFileInfo);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while completing file update upload {request.UploadId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+
+    /// <summary>
+    ///     Cancel Chunked File Update
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the file belongs</param>
+    /// <param name="recordId">The ID of the record that contains file information</param>
+    /// <param name="uploadId">ID of upload session to cancel</param>
+    /// <returns>A message stating the upload was successfully cancelled</returns>
+    [HttpDelete("{recordId:long}/upload/{uploadId}", Name = "api_cancel_file_update_upload")]
+    [Auth("update", "file")]
+    [Auth("update", "record")]
+    [Sensitivity("update file")]
+    public async Task<IActionResult> CancelUpdateUpload(
+        long organizationId,
+        long projectId,
+        long recordId,
+        string uploadId)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            await _fileBusiness.CancelUpdateUpload(currentUserId, organizationId, projectId, recordId, uploadId);
+            return Ok(new { message = $"Upload {uploadId} cancelled successfully" });
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while cancelling update upload {uploadId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
+
+
+    /// <summary>
     ///     Updates the SHA-256 content hash stored for a file record.
     /// </summary>
     [HttpPut("{recordId:long}/hash", Name = "api_update_hash")]

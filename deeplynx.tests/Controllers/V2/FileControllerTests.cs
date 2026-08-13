@@ -260,8 +260,232 @@ public class FileControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // StartUpdateUpload Tests
+    // =========================================================================
+
+    #region StartUpdateUpload Tests
+
+    [Fact]
+    public async Task StartUpdateUpload_Returns200_WithUploadSession()
+    {
+        // Arrange
+        var request = new FileUploadInitRequestDto { FileName = "updated.zip", FileSize = 600_000_000 };
+        var expected = new FileUploadSessionResponseDto { UploadId = UploadId, ChunkSize = 5_000_000, TotalChunks = 120 };
+
+        _mockFileBusiness
+            .Setup(b => b.StartUpdateUpload(UserId, OrgId, ProjectId, RecordId, request))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _fileController.StartUpdateUpload(OrgId, ProjectId, RecordId, request);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task StartUpdateUpload_ThrowsException_WhenBusinessThrows()
+    {
+        // Arrange
+        var request = new FileUploadInitRequestDto { FileName = "updated.zip", FileSize = 600_000_000 };
+
+        _mockFileBusiness
+            .Setup(b => b.StartUpdateUpload(
+                It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                It.IsAny<FileUploadInitRequestDto>()))
+            .ThrowsAsync(new Exception("start update error"));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<Exception>(() =>
+            _fileController.StartUpdateUpload(OrgId, ProjectId, RecordId, request));
+    }
+
+    [Fact]
+    public async Task StartUpdateUpload_PassesArgumentsToBusinessLayer()
+    {
+        // Arrange
+        var request = new FileUploadInitRequestDto { FileName = "updated.zip", FileSize = 600_000_000 };
+        var expected = new FileUploadSessionResponseDto { UploadId = UploadId, ChunkSize = 5_000_000, TotalChunks = 120 };
+
+        _mockFileBusiness
+            .Setup(b => b.StartUpdateUpload(UserId, OrgId, ProjectId, RecordId, request))
+            .ReturnsAsync(expected);
+
+        // Act
+        await _fileController.StartUpdateUpload(OrgId, ProjectId, RecordId, request);
+
+        // Assert
+        _mockFileBusiness.Verify(
+            b => b.StartUpdateUpload(UserId, OrgId, ProjectId, RecordId, request),
+            Times.Once);
+    }
+
+    [Fact]
+    public void StartUpdateUpload_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(FileController.StartUpdateUpload),
+            "organizationId", "projectId", "recordId", "request");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+    // =========================================================================
+    // CompleteUpdateUpload Tests
+
+    // =========================================================================
+
+    #region CompleteUpdateUpload Tests
+
+    [Fact]
+    public async Task CompleteUpdateUpload_Returns200_WithRecord()
+    {
+        // Arrange
+        var request = new FileUploadCompleteRequestDto { UploadId = UploadId, FileName = "updated.zip" };
+        var expected = new RecordResponseDto();
+
+        _mockFileBusiness
+            .Setup(b => b.CompleteUpdateUpload(
+                UserId, OrgId, ProjectId, RecordId, request, null, null, UserJwt))
+            .ReturnsAsync(expected);
+
+        // Act
+        var actionResult = await _fileController.CompleteUpdateUpload(OrgId, ProjectId, RecordId, request);
+
+        // Assert
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task CompleteUpdateUpload_ThrowsException_WhenBusinessThrows()
+    {
+        // Arrange
+        var request = new FileUploadCompleteRequestDto { UploadId = UploadId, FileName = "updated.zip" };
+
+        _mockFileBusiness
+            .Setup(b => b.CompleteUpdateUpload(
+                It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                It.IsAny<FileUploadCompleteRequestDto>(), It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<string?>()))
+            .ThrowsAsync(new Exception("complete update error"));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<Exception>(() =>
+            _fileController.CompleteUpdateUpload(OrgId, ProjectId, RecordId, request));
+    }
+
+    [Fact]
+    public async Task CompleteUpdateUpload_PassesArgumentsToBusinessLayer()
+    {
+        // Arrange
+        var request = new FileUploadCompleteRequestDto { UploadId = UploadId, FileName = "updated.zip" };
+        const long vlmConfigId = 100L;
+        const long embeddingModelConfigId = 200L;
+
+        var expected = new RecordResponseDto();
+
+        _mockFileBusiness
+            .Setup(b => b.CompleteUpdateUpload(
+                UserId, OrgId, ProjectId, RecordId, request, vlmConfigId, embeddingModelConfigId, UserJwt))
+            .ReturnsAsync(expected);
+
+        // Act
+        await _fileController.CompleteUpdateUpload(
+            OrgId, ProjectId, RecordId, request, vlmConfigId, embeddingModelConfigId);
+
+        // Assert
+        _mockFileBusiness.Verify(
+            b => b.CompleteUpdateUpload(
+                UserId, OrgId, ProjectId, RecordId, request, vlmConfigId, embeddingModelConfigId, UserJwt),
+            Times.Once);
+    }
+
+    [Fact]
+    public void CompleteUpdateUpload_HasHttpPost()
+    {
+        var method = GetControllerMethod(
+            nameof(FileController.CompleteUpdateUpload),
+            "organizationId", "projectId", "recordId", "request");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // CancelUpdateUpload Tests
+    // =========================================================================
+
+    #region CancelUpdateUpload Tests
+
+    [Fact]
+    public async Task CancelUpdateUpload_Returns200()
+    {
+        // Arrange
+        _mockFileBusiness
+            .Setup(b => b.CancelUpdateUpload(UserId, OrgId, ProjectId, RecordId, UploadId))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var actionResult = await _fileController.CancelUpdateUpload(OrgId, ProjectId, RecordId, UploadId);
+
+        // Assert
+        var result = Assert.IsType<OkResult>(actionResult);
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task CancelUpdateUpload_ThrowsException_WhenBusinessThrows()
+    {
+        // Arrange
+        _mockFileBusiness
+            .Setup(b => b.CancelUpdateUpload(
+                It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<string>()))
+            .ThrowsAsync(new Exception("cancel update error"));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<Exception>(() =>
+            _fileController.CancelUpdateUpload(OrgId, ProjectId, RecordId, UploadId));
+    }
+
+    [Fact]
+    public async Task CancelUpdateUpload_PassesArgumentsToBusinessLayer()
+    {
+        // Arrange
+        _mockFileBusiness
+            .Setup(b => b.CancelUpdateUpload(UserId, OrgId, ProjectId, RecordId, UploadId))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _fileController.CancelUpdateUpload(OrgId, ProjectId, RecordId, UploadId);
+
+        // Assert
+        _mockFileBusiness.Verify(
+            b => b.CancelUpdateUpload(UserId, OrgId, ProjectId, RecordId, UploadId),
+            Times.Once);
+    }
+
+    [Fact]
+    public void CancelUpdateUpload_HasHttpDelete()
+    {
+        var method = GetControllerMethod(
+            nameof(FileController.CancelUpdateUpload),
+            "organizationId", "projectId", "recordId", "uploadId");
+
+        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
+    }
+
+    #endregion
+    // =========================================================================
     // DownloadAppendedFile Tests
     // =========================================================================
+
 
     #region DownloadAppendedFile Tests
 

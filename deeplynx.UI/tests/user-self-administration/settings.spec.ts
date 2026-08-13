@@ -1,6 +1,8 @@
 import { test, expect } from "../fixtures";
 import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
+const BASE_URL = 'http://localhost:5095/api/v1/';
+
 test.describe("Settings Page", () => {
   test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX });
   test.beforeEach(async ({ page }) => {
@@ -27,8 +29,8 @@ test.describe("Settings Page", () => {
   });
 
   test("Name and Email labels are displayed", async ({ page }) => {
-    await expect(page.getByText("Name")).toBeVisible();
-    await expect(page.getByText("Email")).toBeVisible();
+    await expect(page.getByText("Name", { exact: true })).toBeVisible();
+    await expect(page.getByText("Email", { exact: true })).toBeVisible();
   });
 
   test("Preferences section is visible", async ({ page }) => {
@@ -102,5 +104,60 @@ test.describe("Settings Page", () => {
     const lang = await page.evaluate(() => localStorage.getItem('lang'));
     expect(lang).toBe('en');
     await expect(page.getByRole('heading', { name: 'User Settings' })).toBeVisible();
+  });
+
+  test.describe("Generate API key", () => {
+    let key: string | undefined;
+    test.afterEach(async ({ page }) => {
+      if (!key) return;
+      const row = page.locator('.flex.items-center.gap-3').filter({ has: page.locator('code', { hasText: key }) });
+      await row.getByRole('button', { name: 'Delete API key' }).click();
+    });
+
+    test("create an API key", async ({ page }) => {
+      const keyElement = page.getByText('Key:');
+      const rows = page.locator('.space-y-3 > div');
+      await expect(rows.getByText('1', { exact: true })).toBeVisible();
+      const previousCount = await rows.count();
+      
+      await page.getByRole('button', { name: 'Generate New' }).click();
+      await expect(page.getByText('API Keypair created')).toBeVisible();
+      await expect(keyElement).toBeVisible();
+      await expect(page.getByText('Secret:')).toBeVisible();
+      const fullText = await keyElement.textContent();
+      key = fullText?.replace('Key: ', '')
+      await page.getByRole('button', { name: 'Dismiss' }).click();
+
+      await expect(rows).toHaveCount(previousCount + 1);
+      await expect(page.getByRole('main').getByText(`1${key}`, { exact: true })).toBeVisible();
+    });
+  });
+
+  test.describe("Delete API key", () => {
+    let key: string;
+    test.beforeAll(async ({ page, request }) => {
+      // create an API key for deleting
+      const newKeyUrl = `${BASE_URL}oauth/keys`;
+      const res = await request.post(newKeyUrl);
+      if (!res.ok() && res.status() !== 409) {
+        throw new Error(`Failed to create new API Key: ${res.status()}`);
+      };
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      const resJson = await res.json();
+      key = resJson.apiKey;
+    });
+
+    test("delete an API key", async ({ page }) => {
+      const rows = page.locator('.space-y-3 > div');
+      await expect(rows.getByText('1', { exact: true })).toBeVisible();
+      const previousCount = await rows.count();
+
+      const row = page.locator('.flex.items-center.gap-3').filter({ has: page.locator('code', { hasText: key }) });
+      await row.getByRole('button', { name: 'Delete API key' }).click();
+      await expect(page.getByText('API Keypair deleted')).toBeVisible();
+      await expect(page.getByText(key)).not.toBeVisible();
+      await expect(rows).toHaveCount(previousCount - 1);    
+      await expect(rows.getByText(String(previousCount))).not.toBeVisible();
+    });
   });
 });
