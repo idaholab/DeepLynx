@@ -11,6 +11,8 @@ import api from "./api";
  * @param projectId - The ID of the project
  * @param dataSourceId - Optional data source ID to filter edges
  * @param hideArchived - Flag to hide archived edges (default: true)
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
  * @returns Promise with array of EdgeResponseDto
  */
 export const getAllEdges = async (
