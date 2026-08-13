@@ -5,6 +5,7 @@ import {
   OrganizationResponseDto,
   UserResponseDto,
   ProjectResponseDto,
+  PaginatedResponse,
 } from "../types/responseDTOs";
 import { getAllOrganizationsServer } from "@/app/lib/server_service/organization_services.server";
 import { getAllOauthApplicationsServer } from "@/app/lib/server_service/oauth_services.server";
@@ -42,8 +43,8 @@ const SysAdminPage = async () => {
   await requireSystemAdminServer(organizationId);
 
   // Fetch all data
-  const OrganizationResponseDtos =
-    (await getAllOrganizationsServer()) as OrganizationResponseDto[];
+  const { items: OrganizationResponseDtos } =
+    (await getAllOrganizationsServer()) as PaginatedResponse<OrganizationResponseDto>;
   const oAuthApplications =
     (await getAllOauthApplicationsServer()) as OauthApplicationResponseDto[];
   const members = (await getAllUsersServer()) as UserResponseDto[];

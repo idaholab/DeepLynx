@@ -49,6 +49,105 @@ public class OrganizationBusiness : IOrganizationBusiness
     ///     Retrieves all organizations
     /// </summary>
     /// <param name="userId">The ID of the requesting user</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all matching organizations</param>
+    /// <param name="isSysAdmin">Boolean determining if the requesting user is a system admin</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
+    /// <returns>A list of organizations</returns>
+    public async Task<PaginatedResponse<OrganizationResponseDto>> GetAllOrganizationsPaginated(long userId, PaginatedRequestDto? paginatedRequestDto = null, bool hideArchived = true, bool isSysAdmin = false)
+    {
+        return await GetAllOrganizationsForUserPaginated(userId, paginatedRequestDto, hideArchived, isSysAdmin);
+    }
+
+    /// <summary>
+    ///     Retrieves organizations for current user with pagination
+    /// </summary>
+    /// <param name="userId">ID of the User executing this method.</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all matching organizations</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
+    /// <param name="isSysAdmin">Boolean value determining if the requesting user is a system admin</param>
+    /// <returns>A paginated list of organizations</returns>
+    public async Task<PaginatedResponse<OrganizationResponseDto>> GetAllOrganizationsForUserPaginated(
+        long userId,
+        PaginatedRequestDto? paginatedRequestDto = null,
+        bool hideArchived = true,
+        bool isSysAdmin = false)
+    {
+        paginatedRequestDto ??= new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        bool returnAll = paginatedRequestDto.PageSize == -1;
+
+        var query = _context.Organizations.AsQueryable();
+
+        if (!isSysAdmin)
+        {
+            query = query.Where(o => o.OrganizationUsers.Any(ou => ou.UserId == userId));
+        }
+
+        if (hideArchived)
+        {
+            query = query.Where(o => !o.IsArchived);
+        }
+
+        var orderedQuery = query.OrderBy(o => o.Id);
+
+        if (returnAll)
+        {
+            var allOrgs = await orderedQuery
+                .Select(o => new OrganizationResponseDto
+                {
+                    Id = o.Id,
+                    Name = o.Name,
+                    Description = o.Description,
+                    LastUpdatedAt = o.LastUpdatedAt,
+                    LastUpdatedBy = o.LastUpdatedBy,
+                    IsArchived = o.IsArchived,
+                    DefaultOrg = o.DefaultOrg,
+                    Banner = o.Banner,
+                    Theme = o.Theme
+                })
+                .ToListAsync();
+
+            return new PaginatedResponse<OrganizationResponseDto>
+            {
+                Items = allOrgs,
+                PageNumber = 1,
+                PageSize = allOrgs.Count,
+                TotalCount = allOrgs.Count
+            };
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var orgs = await orderedQuery
+            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
+            .Take(paginatedRequestDto.PageSize)
+            .Select(o => new OrganizationResponseDto
+            {
+                Id = o.Id,
+                Name = o.Name,
+                Description = o.Description,
+                LastUpdatedAt = o.LastUpdatedAt,
+                LastUpdatedBy = o.LastUpdatedBy,
+                IsArchived = o.IsArchived,
+                DefaultOrg = o.DefaultOrg,
+                Banner = o.Banner,
+                Theme = o.Theme
+            })
+            .ToListAsync();
+
+        return new PaginatedResponse<OrganizationResponseDto>
+        {
+            Items = orgs,
+            PageNumber = paginatedRequestDto.PageNumber,
+            PageSize = paginatedRequestDto.PageSize,
+            TotalCount = totalCount
+        };
+    }
+
+    /// <summary>
+    ///     Retrieves all organizations
+    /// </summary>
+    /// <param name="userId">The ID of the requesting user</param>
     /// <param name="isSysAdmin">Boolean determining if the requesting user is a system admin</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
     /// <returns>A list of organizations</returns>

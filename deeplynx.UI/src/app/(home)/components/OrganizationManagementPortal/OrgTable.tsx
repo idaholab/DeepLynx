@@ -44,7 +44,7 @@ const OrganizationManagement = ({
 
     const refreshOrganizations = async () => {
         try {
-            const updatedData = await getAllOrganizations();
+            const { items: updatedData } = await getAllOrganizations();
             setData(updatedData);
         } catch (err) {
             console.error("Failed to refresh organizations:", err);
