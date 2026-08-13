@@ -160,4 +160,83 @@ test.describe("Settings Page", () => {
       await expect(rows.getByText(String(previousCount))).not.toBeVisible();
     });
   });
+
+  test.describe("Verify functionality of personal API key", () => {
+    let key: string | undefined;
+    let secret: string | undefined;
+    test.beforeEach(async ({ page, request }) => {
+      // create an API key for testing
+      const newKeyUrl = `${BASE_URL}oauth/keys`;
+      const res = await request.post(newKeyUrl);
+      if (!res.ok() && res.status() !== 409) {
+        throw new Error(`Failed to create new API Key: ${res.status()}`);
+      };
+      const resJson = await res.json();
+      page.reload({ waitUntil: 'domcontentloaded' });
+      key = resJson.apiKey;
+      secret = resJson.apiSecret;
+    });
+    
+    test.afterEach(async ({ page }) => {
+      if (!key) return;
+      await expect(page.getByText(key).first()).toBeVisible();
+      const row = page.locator('.flex.items-center.gap-3').filter({ has: page.locator('code', { hasText: key }) });
+      await row.getByRole('button', { name: 'Delete API key' }).click();
+    });
+
+    test("verify API key works", async ({ request }) => {
+      // Create a JWT with the API key
+      const newTokenUrl = `${BASE_URL}oauth/tokens`;
+      const tokenRes = await request.post(newTokenUrl, { data: { ApiKey: key, ApiSecret: secret } });
+      expect(tokenRes.ok()).toBeTruthy();
+      const token = (await tokenRes.text()).trim();
+      expect(token).toBeTruthy();
+      expect(token.split('.')).toHaveLength(3);
+
+      // Use the JWT and verify it works
+      const orgsRes = await request.fetch(`${BASE_URL}organizations?hideArchived=true`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(orgsRes.ok()).toBeTruthy();
+      const orgs = await orgsRes.json();
+      expect(Array.isArray(orgs)).toBeTruthy();
+      expect(orgs.length).toBeGreaterThan(0);
+
+      for (const org of orgs) {
+        expect(org).toMatchObject({
+          id: expect.any(Number),
+          name: expect.any(String),
+          isArchived: expect.any(Boolean),
+          defaultOrg: expect.any(Boolean)
+        });
+      };
+      expect(orgs.some((org: any) => org.defaultOrg === true)).toBeTruthy();
+    });
+    
+    test("Invalid secret is rejected", async ({ request }) => {
+      const res = await request.post(`${BASE_URL}oauth/tokens`, {
+        data: { ApiKey: key, ApiSecret: "wrong secret..." },
+      });
+      expect(res.ok()).toBeFalsy();
+      expect(res.status()).toBe(401);
+    });
+
+    test("verify deleted API key no longer works", async ({ page, request }) => {
+      // Delete the new api key, keep the values stored for reference
+      if (!key) return;
+      await expect(page.getByText(key).first()).toBeVisible();
+      const row = page.locator('.flex.items-center.gap-3').filter({ has: page.locator('code', { hasText: key }) });
+      await row.getByRole('button', { name: 'Delete API key' }).click();
+      await expect(page.getByText(key)).not.toBeVisible();
+      
+      const res = await request.post(`${BASE_URL}oauth/tokens`, {
+        data: {ApiKey: key, ApiSecret: secret},
+      });
+      expect(res.ok()).toBeFalsy();
+      expect(res.status()).toBe(404);
+
+      key = undefined;
+      secret = undefined;
+    });
+  });
 });
