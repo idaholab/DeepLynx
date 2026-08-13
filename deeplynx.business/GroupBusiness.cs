@@ -24,11 +24,89 @@ public class GroupBusiness : IGroupBusiness
     }
 
     /// <summary>
-    ///     Get all groups within an organization
+    ///     Get all groups within an organization with optional pagination
+    /// </summary>
+    /// <param name="organizationId">ID of the organization from which to list groups</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all matching groups</param>
+    /// <param name="hideArchived">Boolean indicating whether to hide archived groups from results</param>
+    /// <returns>A paginated response of groups within the given organization</returns>
+    public async Task<PaginatedResponse<GroupResponseDto>> GetAllGroupsPaginated(
+        long organizationId,
+        PaginatedRequestDto? paginatedRequestDto = null,
+        bool hideArchived = true)
+    {
+        var returnAll = paginatedRequestDto.PageSize == -1;
+
+        var query = _context.Groups.Where(g => g.OrganizationId == organizationId);
+
+        if (hideArchived)
+            query = query.Where(g => !g.IsArchived);
+
+        var orderedQuery = query.OrderBy(g => g.Id);
+
+        if (returnAll)
+        {
+            var allGroups = await orderedQuery
+                .Select(g => new GroupResponseDto
+                {
+                    Id = g.Id,
+                    Name = g.Name,
+                    Description = g.Description,
+                    LastUpdatedAt = g.LastUpdatedAt,
+                    LastUpdatedBy = g.LastUpdatedBy,
+                    IsArchived = g.IsArchived,
+                    OrganizationId = g.OrganizationId,
+                    MemberCount = g.Users.Count(u => !u.IsArchived)
+                })
+                .ToListAsync();
+
+            return new PaginatedResponse<GroupResponseDto>
+            {
+                Items = allGroups,
+                PageNumber = 1,
+                PageSize = allGroups.Count,
+                TotalCount = allGroups.Count
+            };
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var groups = await orderedQuery
+            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
+            .Take(paginatedRequestDto.PageSize)
+            .Select(g => new GroupResponseDto
+            {
+                Id = g.Id,
+                Name = g.Name,
+                Description = g.Description,
+                LastUpdatedAt = g.LastUpdatedAt,
+                LastUpdatedBy = g.LastUpdatedBy,
+                IsArchived = g.IsArchived,
+                OrganizationId = g.OrganizationId,
+                MemberCount = g.Users.Count(u => !u.IsArchived)
+            })
+            .ToListAsync();
+
+        return new PaginatedResponse<GroupResponseDto>
+        {
+            Items = groups,
+            PageNumber = paginatedRequestDto.PageNumber,
+            PageSize = paginatedRequestDto.PageSize,
+            TotalCount = totalCount
+        };
+    }
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all groups without pagination.
+    ///     Superseded by <see cref="GetAllGroupsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 group controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
     /// </summary>
     /// <param name="organizationId">ID of the organization from which to list groups</param>
     /// <param name="hideArchived">Boolean indicating whether to hide archived groups from results</param>
     /// <returns>An array of groups within the given organization</returns>
+    [Obsolete("V1-only. Used by deprecated v1 group endpoints. Superseded by GetAllGroupsPaginated. " +
+              "Remove once v1 group endpoints are sunset.", error: false)]
     public async Task<IEnumerable<GroupResponseDto>> GetAllGroups(long organizationId, bool hideArchived = true)
     {
         var groupQuery = _context.Groups.Where(g => g.OrganizationId == organizationId);
