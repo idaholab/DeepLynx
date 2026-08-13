@@ -109,19 +109,26 @@ test.describe("Settings Page", () => {
   test.describe("Generate API key", () => {
     let key: string | undefined;
     test.afterEach(async ({ page }) => {
+      if (!key) return;
       const row = page.locator('.flex.items-center.gap-3').filter({ has: page.locator('code', { hasText: key }) });
       await row.getByRole('button', { name: 'Delete API key' }).click();
     });
 
     test("create an API key", async ({ page }) => {
       const keyElement = page.getByText('Key:');
+      const rows = page.locator('.space-y-3 > div');
+      await expect(rows.getByText('1', { exact: true })).toBeVisible();
+      const previousCount = await rows.count();
       
       await page.getByRole('button', { name: 'Generate New' }).click();
       await expect(page.getByText('API Keypair created')).toBeVisible();
+      await expect(keyElement).toBeVisible();
+      await expect(page.getByText('Secret:')).toBeVisible();
       const fullText = await keyElement.textContent();
       key = fullText?.replace('Key: ', '')
       await page.getByRole('button', { name: 'Dismiss' }).click();
 
+      await expect(rows).toHaveCount(previousCount + 1);
       await expect(page.getByRole('main').getByText(`1${key}`, { exact: true })).toBeVisible();
     });
   });
