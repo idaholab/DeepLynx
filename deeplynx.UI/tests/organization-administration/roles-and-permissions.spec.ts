@@ -1,9 +1,8 @@
 import { test, expect, Page, APIRequestContext } from "../fixtures";
 import { ORGS, PROJECTS, orgAdminA } from "../deeplynx-config";
 import { getOrgIdByName } from "../helpers/api";
-
+import { TEST_API_BASE_URL } from "../api-url";
 // Adjust this base URL to match whichever environment the test config points at.
-const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:5095";
 
 async function navigateToOrgLevelSensitivityLabelPermissions(page: Page) {
     await page.getByRole('link', { name: 'Organization Settings' }).click();
@@ -19,33 +18,23 @@ test.describe("Roles & Permissions", () => {
         actingProject: PROJECTS.projectX,
     });
 
-    // Unique per test run so parallel runs / reruns never collide on name.
     let uniqueLabelName: string;
     let createdLabelId: number;
-    let apiContext: APIRequestContext;
     let orgId: string;
 
     test.beforeAll(async ({ request }, testInfo) => {
-        // NOTE: adjust auth header/token retrieval to match how your test
-        // fixtures normally authenticate API calls (e.g. a helper that logs
-        // in orgAdminA and returns a bearer token). Swap ACCESS_TOKEN below.
-        apiContext = request;
         orgId = await getOrgIdByName(request, ORGS.orgA.name);
         uniqueLabelName = `Test SL-${testInfo.testId}`;
 
-        const createResponse = await apiContext.post(
-            `${API_BASE_URL}/api/v1/organizations/${orgId}/labels`,
-            {
-                headers: {
-                    Authorization: `Bearer ${process.env.TEST_ACCESS_TOKEN}`,
-                    "Content-Type": "application/json",
-                },
-                data: {
-                    name: uniqueLabelName,
-                    description: "Created by Playwright test - safe to delete",
-                },
+        const createResponse = await request.post(
+        `${TEST_API_BASE_URL}/organizations/${orgId}/labels`,
+        {
+            data: {
+                name: uniqueLabelName,
+                description: "Created by Playwright test - safe to delete",
             },
-        );
+        },
+    );
 
         expect(createResponse.ok()).toBeTruthy();
         const created = await createResponse.json();
@@ -54,15 +43,9 @@ test.describe("Roles & Permissions", () => {
 
     test.afterAll(async ({ request }) => {
         if (!createdLabelId) return;
-        apiContext = request;
 
-        const deleteResponse = await apiContext.delete(
-            `${API_BASE_URL}/api/v1/organizations/${orgId}/labels/${createdLabelId}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${process.env.TEST_ACCESS_TOKEN}`,
-                },
-            },
+        const deleteResponse = await request.delete(
+            `${TEST_API_BASE_URL}/organizations/${orgId}/labels/${createdLabelId}`,
         );
 
         expect(deleteResponse.ok()).toBeTruthy();
