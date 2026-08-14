@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,7 +6,7 @@ namespace deeplynx.helpers;
 /// <summary>
 /// Paginating utilities. Paginating may be used to improve load times by reducing network traffic.
 /// </summary>
-public class Paginator
+public static class Paginator
 {
     /// <summary>
     /// Paginates a query.
@@ -15,20 +14,53 @@ public class Paginator
     /// <typeparam name="T">The query type</typeparam>
     /// <param name="paginated">The paginated request</param>
     /// <param name="values">The query</param>
-    /// <param name="map">The mapping to the final paginated value</param>
     /// <returns>The query paginated</returns>
-    static public async Task<PaginatedResponse<U>> Paginate<T, U>(PaginatedRequestDto paginated, IQueryable<T> values, Expression<Func<T, U>> map)
+    static public Task<PaginatedResponse<T>> ToPaginatedAsync<T>(this IQueryable<T> values, PaginatedRequestDto paginated)
     {
-        return new PaginatedResponse<U>
+        if (paginated.PageSize == -1)
+        {
+            return PaginateAll(values);
+        }
+
+        return Paginate(values, paginated);
+    }
+
+    /// <summary>
+    /// Paginates a query.
+    /// </summary>
+    /// <typeparam name="T">The query type</typeparam>
+    /// <param name="paginated">The paginated request</param>
+    /// <param name="values">The query</param>
+    /// <returns>The query paginated</returns>
+    static private async Task<PaginatedResponse<T>> Paginate<T>(IQueryable<T> values, PaginatedRequestDto paginated)
+    {
+        return new PaginatedResponse<T>
         {
             Items = await values
                     .Skip((paginated.PageNumber - 1) * paginated.PageSize)
                     .Take(paginated.PageSize)
-                    .Select(map)
                     .ToListAsync(),
             PageNumber = paginated.PageNumber,
             PageSize = paginated.PageSize,
             TotalCount = await values.CountAsync(),
+        };
+    }
+
+    /// <summary>
+    /// Paginates a query by including all entities.
+    /// </summary>
+    /// <typeparam name="T">The query type</typeparam>
+    /// <param name="values">The query</param>
+    /// <returns>The query paginated</returns>
+    static private async Task<PaginatedResponse<T>> PaginateAll<T>(IQueryable<T> values)
+    {
+        var items = await values.ToListAsync();
+        return new PaginatedResponse<T>
+        {
+            Items = items,
+            PageNumber = 1,
+            PageSize = items.Count,
+            TotalCount = items.Count,
         };
     }
 }

@@ -127,9 +127,10 @@ public class ProjectBusinessTests : IntegrationTestBase
         _classBusiness = new ClassBusiness(
             Context, _recordBusiness,
             _mockRelationshipBusiness.Object, _eventBusiness, _permissionService, _adminService);
-        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper, protectProvider);
 
-        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
 
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _fileBusinessFactory
@@ -175,7 +176,8 @@ public class ProjectBusinessTests : IntegrationTestBase
             _olapBusiness,
             _objectStorageBusiness,
             NullLogger<FileBusiness>.Instance,
-            _eventBusiness
+            _eventBusiness,
+            protectProvider
         );
     }
 
