@@ -1,35 +1,66 @@
-# DeepLynx UI — E2E Testing Guide
-
-This project uses [Playwright](https://playwright.dev) with a custom fixture layer that handles authentication, org/project scoping, and role/permission provisioning for you. Instead of logging in manually or hand-rolling test data, you declare **who** a test runs as, and the framework takes care of the rest.
-
+# DeepLynx UI — Playwright E2E Testing Guide
 ## Table of Contents
 
 - DeepLynx UI — E2E Testing Guide
-  - [Getting Started](#getting-started)
-  - [How it fits together](#how-it-fits-together)
-  - [Test directory structure \& the UAT list](#test-directory-structure--the-uat-list)
-  - [Configuring orgs \& projects](#configuring-orgs--projects)
-  - [Configuring roles \& permissions](#configuring-roles--permissions)
-    - [Built-in roles](#built-in-roles)
-    - [Custom roles](#custom-roles)
-    - [Defining a test-local custom role](#defining-a-test-local-custom-role)
-  - [Configuring test accounts](#configuring-test-accounts)
-  - [The setup project](#the-setup-project)
-  - [Using the fixtures in a test](#using-the-fixtures-in-a-test)
-  - [Testing workflows against multiple accounts](#testing-workflows-against-multiple-accounts)
+  - **Part 1: [Setting up your environment for Playwright](#setting-up-your-environment-for-playwright)**
+  - **Part 2: [Running the tests](#running-the-test-suite)**
+  - **Part 3: Configuring Users, Roles, Orgs, and Projects**
+    - [How it fits together](#how-it-fits-together)
+    - [Configuring orgs \& projects](#configuring-orgs--projects)
+    - [Configuring roles \& permissions](#configuring-roles--permissions)
+      - [Built-in roles](#built-in-roles)
+      - [Custom roles](#custom-roles)
+      - [Defining a test-local custom role](#defining-a-test-local-custom-role)
+    - [Configuring test accounts](#configuring-test-accounts)
+    - [The setup project](#the-setup-project)
+  - **Part 4: Writing Tests**
+    - [Test directory structure \& the UAT list](#test-directory-structure--the-uat-list)
+    - [Using the fixtures in a test](#using-the-fixtures-in-a-test)
+    - [Idea: testing workflows against multiple accounts](#idea-testing-workflows-against-multiple-accounts)
 
 ---
 
-## Getting Started
+# Part 1: Configuration
 
-Before running any tests, ensure authentication is enabled.</br>
-```dotenv
-  NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=false
-  DISABLE_BACKEND_AUTHENTICATION=false
+## Setting up your environment for Playwright
+
+Before you can run any tests, get your local environment ready:
+
+### 1. Install dependencies
+
+From the `deeplynx.UI` folder:
+
+```bash
+npm install
 ```
-*Do this in the root .env and the deeplynx.UI/.env*
 
-Next, ensure that a test account with system admin priviges has it's api key and secret in the deeplynx.UI/.env </br>
+### 2. Get sysAdmin access
+
+Before you can create and provision the test account, you need access to a backend identity with system admin rights. You have two options:
+
+- **Turn off authentication** — with auth disabled, you're automatically logged in as a local dev user that is sysAdmin by default. This is the easiest path and is what most people should do for local testing.
+- **Use your own account** — if authentication is enabled, just make sure your own account already has sysAdmin privileges.
+
+#### Disabling authentication
+
+Authentication has two separate switches, controlled in two separate `.env` files — one for the backend, one for the frontend.
+
+**Backend** (project root `.env`):
+```dotenv
+DISABLE_BACKEND_AUTHENTICATION=false
+```
+
+**Frontend** (`deeplynx.UI/.env`):
+```dotenv
+NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=false
+```
+
+Set both to fully disable authentication locally.
+
+### 3. Test account creation
+
+With sysAdmin access sorted (either via a disabled-auth local dev user or your own sysAdmin account), create the dedicated test account Playwright will use.
+
 The framework needs a bootstrap system-admin identity it can use to provision everything else (orgs, projects, roles, and every other test account). This identity is supplied via two env vars in the `deeplynx.UI` env file:
 
 ```dotenv
@@ -39,44 +70,61 @@ TEST_SYSADMIN_SECRET=
 
 `setup.ts` uses these to authenticate as `sysAdmin` and provision everything else declared in `deeplynx-config.ts` — so tests won't run without them.
 
-### 1. Create a test account
+1. **Create a test account**
 
-Hit the create test account endpoint, found in the Scalar docs under:
+    Hit the create test account endpoint, found in the Scalar docs under:
 
-**Administration → Test Accounts → Create Test Account**
+    **Administration → Test Accounts → Create Test Account**
 
-This creates a backend user you'll promote to sysAdmin in the next step.
+    This creates a backend user you'll promote to sysAdmin in the next step.
 
-### 2. Grant it SysAdmin rights
+2. **Grant it SysAdmin rights**
 
-Using the user ID from step 1, hit:
+    Using the user ID from step 1, hit:
 
-**Administration → User → Grant or Remove System Admin Rights**
+    **Administration → User → Grant or Remove System Admin Rights**
 
-This elevates the test account so it has unrestricted access — required since it will be provisioning orgs, projects, roles, and other accounts on behalf of every test.
+    This elevates the test account so it has unrestricted access — required since it will be provisioning orgs, projects, roles, and other accounts on behalf of every test.
 
-### 3. Generate an API key and secret
+3. **Generate an API key and secret**
 
-Still under Test Accounts, hit:
+    Still under Test Accounts, hit:
 
-**Administration → Test Accounts → Generate API Key and Secret**
+    **Administration → Test Accounts → Generate API Key and Secret**
 
-for the account you just promoted. Take the returned key/secret pair and add them to your `deeplynx.UI` env file as `TEST_SYSADMIN_API_KEY` and `TEST_SYSADMIN_SECRET`.
+    for the account you just promoted. Take the returned key/secret pair and add them to your `deeplynx.UI` env file as `TEST_SYSADMIN_API_KEY` and `TEST_SYSADMIN_SECRET`.
 
-### 4. Run the tests
+### 4. Run the tests for the first time
+
+Now that your environment is configured the tests are ready to run.
+If you disabled authentication to create the test account, re-enable authentication.
+
+Make sure you're in the `deeplynx.UI` directory and have a backend running in a separate terminal via `dotnet run dev`, then run:
+
+```bash
+npx playwright test --ui
+```
+
+This steps through the tests visually and is a good way to confirm your setup is working before running the full suite headlessly.
+
+---
+
+# Part 2: Running the Tests
+
+## Running the test suite
 
 Tests live in `deeplynx.UI/tests`, organized by page. Before running anything, make sure you're in the `deeplynx.UI` directory and have a backend running in a separate terminal via `dotnet run dev`.
 
-**Run all tests**
+**To have a better visual of the tests Run in UI mode**
+```bash
+npx playwright test --ui
+```
+
+**Run all tests (headless)**
 ```bash
 npx playwright test
 # or
 npm run test
-```
-
-**Run in UI mode** (step through tests visually)
-```bash
-npx playwright test --ui
 ```
 
 **Run in headed mode**
@@ -105,6 +153,9 @@ npx playwright show-report
 
 ---
 
+# Part 3: Configuring Users, Roles, Orgs, and Projects
+
+This part covers the test framework's provisioning system — how orgs, projects, roles, and accounts are declared, and how the setup project turns those declarations into real backend records before any test runs.
 
 ## How it fits together
 
@@ -115,12 +166,6 @@ npx playwright show-report
 | `deeplynx-fixtures.ts` | Exposes the `test`/`expect` you import in spec files, along with the `actAs`, `actingUser`, `actingOrg`, `actingProject`, `page`, and `request` fixtures. |
 
 You should almost never need to touch the backend by hand — declare what you need in `deeplynx-config.ts`, and the setup project provisions it.
-
----
-
-## Test directory structure & the UAT list
-
-  Test directories are intentionally structured to mirror the sections of the **UAT (User Acceptance Testing) list**. If the UAT list has a "Site Administration" section, the corresponding specs live under `tests/site-administration/`, and so on. When adding a new spec, find (or create) the folder that matches its UAT section rather than grouping by feature/component name.
 
 ---
 
@@ -289,6 +334,14 @@ npx playwright test --project=setup
 
 ---
 
+# Part 4: Writing Tests
+
+## Test directory structure & the UAT list
+
+Test directories are intentionally structured to mirror the sections of the **UAT (User Acceptance Testing) list**. If the UAT list has a "Site Administration" section, the corresponding specs live under `tests/site-administration/`, and so on. When adding a new spec, find (or create) the folder that matches its UAT section rather than grouping by feature/component name.
+
+---
+
 ## Using the fixtures in a test
 
 Import `test`/`expect` from the fixtures file (not directly from `@playwright/test`), and declare `actingUser` before using `page` or `request`:
@@ -326,9 +379,9 @@ test('org admin can revoke access mid-session', async ({ actAs }) => {
 
 ---
 
-## Testing workflows against multiple accounts
+## Idea: testing workflows against multiple accounts
 
-A common need: check that the same page/action behaves differently (or the same) across several roles. Pair up the accounts you want to test with their expected outcome, and loop over that list using `test.describe` + `test.use` per account — this keeps each account's run as its own reported test, with its own pass/fail:
+A common need is checking that the same page/action behaves differently (or the same) across several roles. There's no single "correct" way to do this, but here's one pattern that tends to work well: pair up the accounts you want to test with their expected outcome, and loop over that list using `test.describe` + `test.use` per account. This keeps each account's run as its own reported test, with its own pass/fail:
 
 ```ts
 // tests/site-administration/admin-setting-options.spec.ts
@@ -365,7 +418,7 @@ for (const { account, canEditSettings } of cases) {
 
 This produces one reported test per account (e.g. `as sysAdmin > admin settings edit access matches expectation`), so a failure for one account doesn't hide failures for the others.
 
-**Alternative — single test, sequential accounts:** if you'd rather keep it as one test (e.g. the check is cheap and you don't need per-account reporting), drive multiple accounts with `actAs` directly instead of `test.use`, since `test.use` can't be called mid-test:
+**A possible alternative — single test, sequential accounts:** if you'd rather keep it as one test (e.g. the check is cheap and you don't need per-account reporting), you could instead drive multiple accounts with `actAs` directly instead of `test.use`, since `test.use` can't be called mid-test:
 
 ```ts
 import { test, expect, gotoScope } from '../../deeplynx-fixtures';
@@ -392,4 +445,4 @@ test('admin settings edit access across roles', async ({ actAs }) => {
 });
 ```
 
-Prefer the `test.describe` loop for anything you'd want isolated pass/fail results on in CI; reach for the `actAs` loop when the accounts genuinely belong to one continuous scenario.
+Prefer the `test.describe` loop for anything you'd want isolated pass/fail results on in CI; reach for the `actAs` loop when the accounts genuinely belong to one continuous scenario. Either way, treat these as starting points rather than rules — adapt the pattern to whatever fits the workflow you're testing.
