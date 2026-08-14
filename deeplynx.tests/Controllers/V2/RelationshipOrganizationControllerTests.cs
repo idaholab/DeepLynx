@@ -60,10 +60,16 @@ public class RelationshipOrganizationControllerTests : IDisposable
     [Fact]
     public async Task GetAllRelationships_Returns200_WithRelationships()
     {
-        var expected = new List<RelationshipResponseDto>();
+        var expected = new PaginatedResponse<RelationshipResponseDto>
+        {
+            Items = new List<RelationshipResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
         _mockRelationshipBusiness
-            .Setup(b => b.GetAllRelationships(OrgId, ProjectList, true))
+            .Setup(b => b.GetAllRelationshipsPaginated(OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true))
             .ReturnsAsync(expected);
 
         var result = (await _relationshipOrganizationController.GetAllRelationships(
@@ -78,22 +84,30 @@ public class RelationshipOrganizationControllerTests : IDisposable
     public async Task GetAllRelationships_Returns200_WithEmptyList()
     {
         _mockRelationshipBusiness
-            .Setup(b => b.GetAllRelationships(It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>()))
-            .ReturnsAsync([]);
+            .Setup(b => b.GetAllRelationshipsPaginated(
+                It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>()))
+            .ReturnsAsync(new PaginatedResponse<RelationshipResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
 
         var result = (await _relationshipOrganizationController.GetAllRelationships(
             OrgId, ProjectList, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<RelationshipResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<RelationshipResponseDto>>(result.Value);
     }
 
     [Fact]
     public async Task GetAllRelationships_ThrowsException_WhenBusinessThrows()
     {
         _mockRelationshipBusiness
-            .Setup(b => b.GetAllRelationships(It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>()))
+            .Setup(b => b.GetAllRelationshipsPaginated(
+                It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>()))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _relationshipOrganizationController.GetAllRelationships(
@@ -103,17 +117,73 @@ public class RelationshipOrganizationControllerTests : IDisposable
     [Fact]
     public async Task GetAllRelationships_PassesProjectIdsAndHideArchivedToBusinessLayer()
     {
-        var expected = new List<RelationshipResponseDto>();
+        var expected = new PaginatedResponse<RelationshipResponseDto>
+        {
+            Items = [],
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 0
+        };
 
         _mockRelationshipBusiness
-            .Setup(b => b.GetAllRelationships(OrgId, ProjectList, true))
+            .Setup(b => b.GetAllRelationshipsPaginated(OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true))
             .ReturnsAsync(expected);
 
         await _relationshipOrganizationController.GetAllRelationships(OrgId, ProjectList, true);
 
         _mockRelationshipBusiness.Verify(
-            b => b.GetAllRelationships(OrgId, ProjectList, true),
+            b => b.GetAllRelationshipsPaginated(OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllRelationships_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        _mockRelationshipBusiness
+            .Setup(b => b.GetAllRelationshipsPaginated(
+                OrgId, ProjectList,
+                It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+                true))
+            .ReturnsAsync(new PaginatedResponse<RelationshipResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
+
+        await _relationshipOrganizationController.GetAllRelationships(OrgId, ProjectList, true);
+
+        _mockRelationshipBusiness.Verify(b => b.GetAllRelationshipsPaginated(
+            OrgId, ProjectList,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+            true), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllRelationships_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var pagination = new PaginatedRequestDto { PageNumber = 4, PageSize = 50 };
+
+        _mockRelationshipBusiness
+            .Setup(b => b.GetAllRelationshipsPaginated(
+                OrgId, ProjectList,
+                It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+                true))
+            .ReturnsAsync(new PaginatedResponse<RelationshipResponseDto>
+            {
+                Items = [],
+                PageNumber = 4,
+                PageSize = 50,
+                TotalCount = 0
+            });
+
+        await _relationshipOrganizationController.GetAllRelationships(OrgId, ProjectList, true, pagination);
+
+        _mockRelationshipBusiness.Verify(b => b.GetAllRelationshipsPaginated(
+            OrgId, ProjectList,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+            true), Times.Once);
     }
 
     [Fact]
@@ -121,7 +191,7 @@ public class RelationshipOrganizationControllerTests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(RelationshipOrganizationController.GetAllRelationships),
-            "organizationId", "projectIds", "hideArchived");
+            "organizationId", "projectIds", "hideArchived", "paginatedRequestDto");
 
         AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
         AssertHasAuthAttribute(method, "read", "relationship");
