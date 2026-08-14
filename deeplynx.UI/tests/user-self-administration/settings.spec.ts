@@ -159,7 +159,7 @@ test.describe("Settings Page", () => {
       await expect(page.getByText('API Keypair deleted')).toBeVisible();
       await expect(page.getByText(key)).not.toBeVisible();
       await expect(rows).toHaveCount(previousCount - 1);    
-      await expect(rows.getByText(String(previousCount))).not.toBeVisible();
+      await expect(page.getByRole('main').getByText(String(previousCount), { exact: true })).not.toBeVisible();
     });
   });
 
