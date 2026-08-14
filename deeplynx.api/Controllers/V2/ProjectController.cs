@@ -43,18 +43,21 @@ public class ProjectController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization to list projects from</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived projects from the result (Default true)</param>
-    /// <returns>A list of projects</returns>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of projects</returns>
     [HttpGet(Name = "api_get_all_projects")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "project")]
-    public async Task<ActionResult<IEnumerable<ProjectResponseDto>>> GetAllProjects(
+    public async Task<ActionResult<PaginatedResponse<ProjectResponseDto>>> GetAllProjects(
         long organizationId,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+        paginatedRequestDto ??= new PaginatedRequestDto();
         // get user ID from the middleware context
         var currentUserId = UserContextStorage.UserId;
         var projects = await _projectBusiness
-            .GetAllProjects(currentUserId, organizationId, hideArchived);
+            .GetAllProjectsPaginated(currentUserId, organizationId, paginatedRequestDto, hideArchived);
         return Ok(projects);
     }
 
@@ -66,17 +69,20 @@ public class ProjectController : ControllerBase
     /// <param name="organizationId">ID of the organization to list projects from</param>
     /// <param name="userId">ID of the user whose projects to retrieve</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived projects from the result (Default true)</param>
-    /// <returns>A list of projects</returns>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of projects</returns>
     [HttpGet("GetProjectsByUser", Name = "api_get_all_projects_by_user")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "project")]
-    public async Task<ActionResult<IEnumerable<ProjectResponseDto>>> GetAllProjectsByUser(
+    public async Task<ActionResult<PaginatedResponse<ProjectResponseDto>>> GetAllProjectsByUser(
         long organizationId,
         [FromQuery] long userId,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+        paginatedRequestDto ??= new PaginatedRequestDto();
         var projects = await _projectBusiness
-            .GetAllProjects(userId, organizationId, hideArchived);
+            .GetAllProjectsPaginated(userId, organizationId, paginatedRequestDto, hideArchived);
         return Ok(projects);
     }
 

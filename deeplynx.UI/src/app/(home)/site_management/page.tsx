@@ -4,7 +4,6 @@ import {
   OauthApplicationResponseDto,
   OrganizationResponseDto,
   UserResponseDto,
-  ProjectResponseDto,
 } from "../types/responseDTOs";
 import { getAllOrganizationsServer } from "@/app/lib/server_service/organization_services.server";
 import { getAllOauthApplicationsServer } from "@/app/lib/server_service/oauth_services.server";
@@ -49,9 +48,9 @@ const SysAdminPage = async () => {
   const members = (await getAllUsersServer()) as UserResponseDto[];
 
   // Fetch projects filtered by organization
-  const projects = (await getAllProjectsServer(
+  const { items: projects } = (await getAllProjectsServer(
     organizationId as number,
-  )) as ProjectResponseDto[];
+  ));
   const initialProjects = projects.map((p) => ({
     id: String(p.id),
     name: p.name,
