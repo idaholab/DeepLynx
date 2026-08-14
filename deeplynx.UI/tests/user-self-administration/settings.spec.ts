@@ -1,5 +1,5 @@
-import { test, expect, gotoScope } from "../fixtures";
-import { sysAdmin, ORGS, PROJECTS, authFile } from "../deeplynx-config";
+import { test, expect } from "../fixtures";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
 const BASE_URL = 'http://localhost:5095/api/v1/';
 
