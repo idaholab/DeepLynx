@@ -398,7 +398,10 @@ public class GroupBusiness : IGroupBusiness
     /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all members</param>
     /// <returns>Paginated list of users who are members of the group</returns>
     /// <exception cref="KeyNotFoundException">Thrown if group not found or archived</exception>
-    public async Task<PaginatedResponse<UserResponseDto>> GetGroupMembersPaginated(long organizationId, long groupId, PaginatedRequestDto? paginatedRequestDto = null)
+    public async Task<PaginatedResponse<UserResponseDto>> GetGroupMembersPaginated(
+        long organizationId,
+        long groupId,
+        PaginatedRequestDto paginatedRequestDto)
     {
         paginatedRequestDto ??= new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
         bool returnAll = paginatedRequestDto.PageSize == -1;
@@ -414,56 +417,20 @@ public class GroupBusiness : IGroupBusiness
             .Where(u => !u.IsArchived)
             .AsQueryable();
 
-        var totalCount = usersQuery.Count();
+        return await usersQuery.Select(g => GroupToResponse(g)).ToPaginatedAsync(paginatedRequestDto);
+    }
 
-        if (returnAll)
+    private static UserResponseDto GroupToResponse(User u)
+    {
+        return new UserResponseDto
         {
-            var allUsers = usersQuery
-                .Select(u => new UserResponseDto
-                {
-                    Id = u.Id,
-                    Name = u.Name,
-                    Email = u.Email,
-                    AccountType = u.AccountType,
-                    IsSysAdmin = u.IsSysAdmin,
-                    IsArchived = u.IsArchived,
-                    IsActive = u.IsActive
-                })
-                .ToList();
-
-            return new PaginatedResponse<UserResponseDto>
-            {
-                Items = allUsers,
-                PageNumber = 1,
-                PageSize = allUsers.Count,
-                TotalCount = allUsers.Count
-            };
-        }
-        else
-        {
-            var pagedUsers = usersQuery
-                .OrderBy(u => u.Id)
-                .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
-                .Take(paginatedRequestDto.PageSize)
-                .Select(u => new UserResponseDto
-                {
-                    Id = u.Id,
-                    Name = u.Name,
-                    Email = u.Email,
-                    AccountType = u.AccountType,
-                    IsSysAdmin = u.IsSysAdmin,
-                    IsArchived = u.IsArchived,
-                    IsActive = u.IsActive
-                })
-                .ToList();
-
-            return new PaginatedResponse<UserResponseDto>
-            {
-                Items = pagedUsers,
-                PageNumber = paginatedRequestDto.PageNumber,
-                PageSize = paginatedRequestDto.PageSize,
-                TotalCount = totalCount
-            };
-        }
+            Id = u.Id,
+            Name = u.Name,
+            Email = u.Email,
+            AccountType = u.AccountType,
+            IsSysAdmin = u.IsSysAdmin,
+            IsArchived = u.IsArchived,
+            IsActive = u.IsActive
+        };
     }
 }

@@ -8,7 +8,7 @@ public interface IGroupBusiness
               "Remove once v1 group endpoints are sunset.", error: false)]
     Task<IEnumerable<UserResponseDto>> GetGroupMembers(long organizationId, long groupId);
     Task<IEnumerable<GroupResponseDto>> GetAllGroups(long organizationId, bool hideArchived = true);
-    Task<PaginatedResponse<UserResponseDto>> GetGroupMembersPaginated(long organizationId, long groupId, PaginatedRequestDto? paginatedRequestDto = null);
+    Task<PaginatedResponse<UserResponseDto>> GetGroupMembersPaginated(long organizationId, long groupId, PaginatedRequestDto paginatedRequestDto);
     Task<GroupResponseDto> GetGroup(long organizationId, long groupId, bool hideArchived = true);
     Task<GroupResponseDto> CreateGroup(long currentUserId, long organizationId, CreateGroupRequestDto dto);
 
