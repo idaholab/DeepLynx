@@ -6,8 +6,6 @@ public interface IGroupBusiness
 {
     [Obsolete("V1-only. Used by deprecated v1 group endpoints. Superseded by GetAllGroupsPaginated. " +
               "Remove once v1 group endpoints are sunset.", error: false)]
-    [Obsolete("V1-only. Used by deprecated v1 group endpoints. Superseded by GetGroupMembersPaginated. " +
-              "Remove once v1 group endpoints are sunset.", error: false)]
     Task<IEnumerable<UserResponseDto>> GetGroupMembers(long organizationId, long groupId);
     Task<IEnumerable<GroupResponseDto>> GetAllGroups(long organizationId, bool hideArchived = true);
     Task<PaginatedResponse<GroupResponseDto>> GetAllGroupsPaginated(
