@@ -1,4 +1,5 @@
 import { CreateTokenDto } from "@/app/(home)/types/requestDTOs";
+import { PaginatedResponse } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 
@@ -67,14 +68,14 @@ export async function deleteApiKey(key: string): Promise<{ message: string }> {
  */
 export async function getAllKeysByUser(): Promise<string[]> {
   try {
-    const res = await api.get(
-      `/oauth/keys`,
-      { headers: { "Content-Type": "application/json" } }
-    );
-    return res.data;
-  } catch (error) {
-    console.error("Error getting API keys for user:", error);
-    throw error;
+    const res = await api.get<PaginatedResponse<string>>("/oauth/keys", {
+      params: { pageSize: -1 },
+    });
+
+    return res.data.items;
+  } catch (err) {
+    console.error("Error fetching API keys:", err);
+    throw err;
   }
 }
 
