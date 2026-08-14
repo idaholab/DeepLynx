@@ -17,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace deeplynx.tests;
 
@@ -52,6 +53,8 @@ public class FileBusinessTests : IntegrationTestBase
     private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private EncryptionHelper _encryptionHelper = null!;
+    private ObjectStorageConfigDto _osConfig = null!;
+    private ITimeLimitedDataProtector _downloadProtector = null!;
 
     public long did; // datasource ID
     public long oid; // organization ID
@@ -122,8 +125,12 @@ public class FileBusinessTests : IntegrationTestBase
         _mockPermissionService.Object,
         _mockAdminService.Object);
 
+        var protectProvider = new EphemeralDataProtectionProvider();
+        _downloadProtector = protectProvider
+            .CreateProtector(RecordUrlHelper.DownloadProtector)
+            .ToTimeLimitedDataProtector();
         var realFileFilesystemBusiness =
-            new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+            new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
 
         _fileBusinessFactory
             .Setup(x => x.CreateFileBusiness("filesystem"))
@@ -139,7 +146,8 @@ public class FileBusinessTests : IntegrationTestBase
             _olapBusiness,
             _objectStorageBusiness,
             NullLogger<FileBusiness>.Instance,
-            _eventBusiness
+            _eventBusiness,
+            protectProvider
         );
     }
 
@@ -182,7 +190,7 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         did = dataSource.Id;
 
-        var osConfig = new ObjectStorageConfigDto
+        _osConfig = new ObjectStorageConfigDto
         {
             MountPath = _testDirectory
         };
@@ -193,7 +201,7 @@ public class FileBusinessTests : IntegrationTestBase
             ProjectId = pid,
             OrganizationId = oid,
             Type = "filesystem",
-            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(osConfig),
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(_osConfig),
             Default = true
         };
 
@@ -237,6 +245,25 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     #region Helpers
+
+
+    private static FormFile CreateMockFile(string fileName, string content)
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
+
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
+    }
 
     private IFormFile CreateFormFile(string content)
     {
@@ -290,6 +317,100 @@ public class FileBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         return record;
+    }
+
+    #endregion
+
+    #region GenerateDownloadUrl Tests
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_ReturnsValidSasUri()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.StartsWith("https://example.com?token=", result);
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_ValidatesToken()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        var token = result.Split("https://example.com?token=")[1];
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(RecordUrlHelper.IsValidToken(_downloadProtector, token, recordDto.Id));
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Failure_ValidatesTokenModified()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        var token = "MODIFIED" + result.Split("https://example.com?token=")[1];
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(RecordUrlHelper.IsValidToken(_downloadProtector, token, recordDto.Id));
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Failure_ValidatesTokenRecordDifferent()
+    {
+        // Arrange
+        var mockFile = CreateMockFile("mock_valid_sas.txt", "MOCK CONTENT");
+
+        // Upload file first
+        var recordDto = await _fileBusiness.UploadFile(
+            uid, oid, pid, did, osid, mockFile);
+
+        var filesystem = _fileBusinessFactory.Object.CreateFileBusiness("filesystem");
+
+        // Act
+        var result = await filesystem.GenerateDownloadUrl(
+            recordDto, _osConfig, expirationHours: 1, directUrl: "https://example.com");
+
+        var token = result.Split("https://example.com?token=")[1];
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(RecordUrlHelper.IsValidToken(_downloadProtector, token, recordDto.Id + 1));
     }
 
     #endregion
@@ -2443,7 +2564,105 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CompleteUpdateUpload_ReplacesChunkUploadedFileContent()
+    {
+        var initialContent = "original content";
+        var initialSession = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            new FileUploadInitRequestDto { FileName = "original.txt", FileSize = Encoding.UTF8.GetByteCount(initialContent) });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("original "), initialSession.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), initialSession.UploadId, 1);
+
+        var initialCompleteRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = initialSession.UploadId,
+            FileName = "original.txt",
+            TotalChunks = 2
+        };
+
+        var initialRecord = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, initialCompleteRequest);
+        var originalUri = initialRecord.Uri;
+
+        var updatedContent = "updated content";
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid,
+            oid,
+            pid,
+            initialRecord.Id,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = Encoding.UTF8.GetByteCount(updatedContent) });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("updated "), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "updated.txt",
+            TotalChunks = 2
+        };
+
+        var updatedRecord = await _fileBusiness.CompleteUpdateUpload(uid, oid, pid, initialRecord.Id, completeRequest);
+        var downloadedFile = await _fileBusiness.DownloadFile(uid, oid, pid, updatedRecord.Id);
+
+        using var reader = new StreamReader(downloadedFile.FileStream);
+        var downloadedContent = await reader.ReadToEndAsync();
+
+        Assert.Equal(initialRecord.Id, updatedRecord.Id);
+        Assert.Equal("updated.txt", updatedRecord.Name);
+        Assert.Equal(osid, updatedRecord.ObjectStorageId);
+        Assert.Equal(did, updatedRecord.DataSourceId);
+        Assert.Equal(Encoding.UTF8.GetByteCount(updatedContent), updatedRecord.FileSize);
+        Assert.True(File.Exists(updatedRecord.Uri));
+        Assert.Equal(updatedContent, await File.ReadAllTextAsync(updatedRecord.Uri));
+        Assert.Equal(updatedContent, downloadedContent);
+        Assert.False(File.Exists(originalUri));
+    }
+
+    [Fact]
+    public async Task CancelUpdateUpload_CleansUpUploadSession()
+    {
+        var initialContent = "original content";
+        var initialStream = new MemoryStream(Encoding.UTF8.GetBytes(initialContent));
+        var initialFile = new FormFile(initialStream, 0, initialStream.Length, "file", "original.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+        var initialRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, initialFile);
+
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid,
+            oid,
+            pid,
+            initialRecord.Id,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = 2048 });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("chunk0"), session.UploadId, 0);
+
+        var uploadPath = Path.Combine(
+            _testDirectory,
+            $"org_{oid}",
+            $"project_{pid}",
+            $"datasource_{did}",
+            "uploads",
+            session.UploadId
+        );
+
+        Assert.True(Directory.Exists(uploadPath));
+        Assert.True(File.Exists(Path.Combine(uploadPath, "0.part")));
+
+        await _fileBusiness.CancelUpdateUpload(uid, oid, pid, initialRecord.Id, session.UploadId);
+
+        Assert.False(Directory.Exists(uploadPath));
+    }
+
+    [Fact]
     public async Task CompleteUpload_CsvFile_AssignsTimeseriesClassAndExtractsColumns()
+
     {
         // Arrange
         var csvContent = "timestamp,temperature,humidity\n2024-01-01,22.5,60.1\n2024-01-02,23.0,58.3";

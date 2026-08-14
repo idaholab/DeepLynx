@@ -514,6 +514,8 @@ export const translations = {
       FILE_TYPE: "File Type",
       FILE_UPLOAD: "File Upload",
       FILE_UPLOADED_SUCCESSFULLY: "File uploaded successfully!",
+      FINALIZING_UPLOAD: "Finalizing upload...",
+      FINALIZING_UPLOAD_MESSAGE: "Your file has finished uploading. Please wait while it is finalized.",
       FILES_LABEL: "files",
       FILESYSTEM: "Filesystem",
       FILESYSTEM_PATH: "Filesystem Path",
@@ -1945,7 +1947,7 @@ export const translations = {
       THIS_ORG_SPACE_MAY_CONTAIN_SENSITIVE_DATA:
         "This organization space may contain sensitive data that must be protected accordingly.",
       THIS_ROLE_IS_INHERITED:
-        "This role is inherited from the organization and cannot be modified at the project level. You can view its permissions or create a custom project role.",
+        "This role is inherited from the organization and can only be modified by an Organization Admin. You can view its permissions or create a custom project role.",
       THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT:
         "This storage is already set as default",
       TIMESERIES: "Timeseries",
@@ -2686,6 +2688,8 @@ export const translations = {
       FILE_TYPE: "Tipo de archivo",
       FILE_UPLOAD: "Carga de archivos",
       FILE_UPLOADED_SUCCESSFULLY: "¡Archivo cargado correctamente!",
+      FINALIZING_UPLOAD: "Finalizando la carga...",
+      FINALIZING_UPLOAD_MESSAGE: "Tu archivo ha terminado de subirse. Por favor, espera mientras se finaliza.",
       FILES_LABEL: "archivos",
       FILESYSTEM: "Sistema de archivos",
       FILESYSTEM_PATH: "Ruta del sistema de archivos",
@@ -4192,7 +4196,7 @@ export const translations = {
       THIS_ORG_SPACE_MAY_CONTAIN_SENSITIVE_DATA:
         "Este espacio de la organización puede contener datos sensibles que deben protegerse adecuadamente.",
       THIS_ROLE_IS_INHERITED:
-        "Este rol se hereda de la organización y no se puede modificar a nivel de proyecto. Puede consultar sus permisos o crear un rol de proyecto personalizado.",
+        "Este rol se hereda de la organización y solo puede ser modificado por un Administrador de la Organización. Puede consultar sus permisos o crear un rol de proyecto personalizado.",
       THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT:
         "Este almacenamiento ya está configurado como predeterminado",
       TIMESERIES: "Series de tiempo",

@@ -11,6 +11,8 @@ using Newtonsoft.Json;
 using System.IO.Pipelines;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
+using Microsoft.AspNetCore.DataProtection;
+using System.Security.Cryptography;
 
 namespace deeplynx.business;
 
@@ -20,17 +22,22 @@ public class FileFilesystemBusiness : IFileBusiness
     private readonly DeeplynxContext _context;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly IRecordBusiness _recordBusiness;
+    private readonly ITimeLimitedDataProtector _downloadProtector;
 
     public FileFilesystemBusiness(
         DeeplynxContext context,
         IObjectStorageBusiness objectStorageBusiness,
         IClassBusiness classBusiness,
-        IRecordBusiness recordBusiness)
+        IRecordBusiness recordBusiness,
+        IDataProtectionProvider dataProtectionProvider)
     {
         _context = context;
         _objectStorageBusiness = objectStorageBusiness;
         _classBusiness = classBusiness;
         _recordBusiness = recordBusiness;
+        _downloadProtector = dataProtectionProvider
+            .CreateProtector(RecordUrlHelper.DownloadProtector)
+            .ToTimeLimitedDataProtector();
     }
 
     public async Task<string?> CalculateFileContentHash(
@@ -345,9 +352,12 @@ public class FileFilesystemBusiness : IFileBusiness
 
 
     public async Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,
-        int expirationHours = 1)
+        int expirationHours = 1, string? directUrl = null)
     {
-        throw new NotImplementedException("Generate download urls is not implemented for filesystem");
+        if (!File.Exists(record.Uri))
+            throw new FileNotFoundException("The requested file does not exist.", record.Uri);
+
+        return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, directUrl, record.Id, record.Uri, expirationHours);
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import {
   BuildingOfficeIcon,
   CheckIcon,
@@ -31,7 +32,7 @@ interface SplitViewLayoutProps {
   onCreateRole: () => void;
   onEditClick: (role: RoleResponseDto) => void;
   onDeleteClick: (role: RoleResponseDto) => void;
-  onStartEditingPermissions: () => void;
+  onStartEditingPermissions: (activePermissionTab: string) => void;
   onCancelEditingPermissions: () => void;
   onSavePermissions: () => void;
   onTogglePermission: (permissionId: number) => void;
@@ -64,15 +65,25 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   onTogglePermission,
   isAdmin,
 }) => {
-  // Determine if current role can be edited
-  const canEditRole =
-    currentRole &&
-    !isOrganizationRole(currentRole);
-  const canEditPermissions = canEditRole && !rolesLocked;
   const { t } = useLanguage();
-  const [activePermissionTab, setActivePermissionTab] = useState(
+  const [activePermissionTab, setActivePermissionTab] = useState<string>(
     t.translations.RESOURCE_PERMISSIONS,
   );
+
+  // Determine if current role can be edited
+  const isSensitivityTab = activePermissionTab === t.translations.SENSITIVITY_LABELS;
+  const canEditRole =
+    currentRole &&
+    (!isOrganizationRole(currentRole) || (isSensitivityTab && isAdmin));
+
+  const canEditPermissions = canEditRole && !rolesLocked;
+  const handleTabChange = (tab: string) => {
+    if (isEditingPermissions) {
+      toast.error("Please save or cancel your changes before switching tabs");
+      return;
+    }
+    setActivePermissionTab(tab);
+  };
   const splitPermissionCategories = useMemo(() => {
     const withoutLabelId: PermissionCategory[] = [];
     const withLabelId: PermissionCategory[] = [];
@@ -141,7 +152,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
           {!isEditingPermissions ? (
             <button
               disabled={!canEditPermissions || isLoadingPermissions}
-              onClick={onStartEditingPermissions}
+              onClick={() => onStartEditingPermissions(activePermissionTab)}
               className="btn btn-primary btn-sm gap-2"
               title={
                 isOrganizationRole(currentRole)
@@ -419,7 +430,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
               <Tabs
                 tabs={permissionTabs}
                 activeTab={activePermissionTab}
-                onTabChange={setActivePermissionTab}
+                onTabChange={handleTabChange}
               />
             </div>
           </>

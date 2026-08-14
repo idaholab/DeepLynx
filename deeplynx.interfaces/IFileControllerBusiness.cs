@@ -53,6 +53,12 @@ public interface IFileControllerBusiness
         bool isOrgAdmin,
         bool isProjectAdmin);
 
+    Task<FileStreamResult> DownloadFileDirect(
+        long organizationId,
+        long projectId,
+        long recordId,
+        string token);
+
     // Download appended file
     Task<FileStreamResult> DownloadAppendedFile(
         long currentUserId,
@@ -69,7 +75,8 @@ public interface IFileControllerBusiness
         long currentUserId,
         long organizationId,
         long projectId,
-        long recordId);
+        long recordId,
+        string? directUrl = null);
 
     // Delete file
     Task<bool> DeleteFile(
@@ -86,6 +93,13 @@ public interface IFileControllerBusiness
         long? objectStorageId,
         FileUploadInitRequestDto request,
         CreateRecordFileUploadRequestDto? metadata);
+
+    Task<FileUploadSessionResponseDto> StartUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadInitRequestDto request);
 
     // Upload chunk
     Task<string> UploadChunk(
@@ -110,6 +124,23 @@ public interface IFileControllerBusiness
         bool embed,
         long? vlmConfigId,
         long? embeddingModelConfigId);
+
+    Task<RecordResponseDto> CompleteUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        FileUploadCompleteRequestDto request,
+        long? vlmConfigId,
+        long? embeddingModelConfigId,
+        string? userJwt);
+
+    Task CancelUpdateUpload(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId,
+        string uploadId);
 
     // Cancel upload
     Task CancelUpload(
