@@ -38,15 +38,18 @@ public class GroupController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the groups belong</param>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived groups</param>
+    /// <param name="paginatedRequestDto"> Pagination parameters</param>
     /// <returns>A list of groups in the organization.</returns>
     [HttpGet(Name = "api_get_all_groups")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "group")]
-    public async Task<ActionResult<IEnumerable<GroupResponseDto>>> GetAllGroups(
+    public async Task<ActionResult<PaginatedResponse<GroupResponseDto>>> GetAllGroups(
         long organizationId,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
-        var groups = await _groupBusiness.GetAllGroups(organizationId, hideArchived);
+        paginatedRequestDto ??= new PaginatedRequestDto();
+        var groups = await _groupBusiness.GetAllGroupsPaginated(organizationId, paginatedRequestDto, hideArchived);
         return Ok(groups);
     }
 

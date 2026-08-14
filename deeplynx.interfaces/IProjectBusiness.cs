@@ -5,7 +5,10 @@ namespace deeplynx.interfaces;
 
 public interface IProjectBusiness
 {
+    [Obsolete("V1-only. Used by deprecated v1 project endpoints. Superseded by GetAllProjectsPaginated. " +
+              "Remove once v1 project endpoints are sunset.", error: false)]
     Task<IEnumerable<ProjectResponseDto>> GetAllProjects(long userId, long organizationId, bool hideArchived = true);
+    Task<PaginatedResponse<ProjectResponseDto>> GetAllProjectsPaginated(long userId, long organizationId, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true);
     Task<ProjectResponseDto> GetProject(long organizationId, long projectId, bool hideArchived = true);
     Task<ProjectResponseDto> CreateProject(long currentUserId, long organizationId, CreateProjectRequestDto dto);
 

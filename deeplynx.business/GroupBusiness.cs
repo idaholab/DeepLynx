@@ -24,11 +24,38 @@ public class GroupBusiness : IGroupBusiness
     }
 
     /// <summary>
-    ///     Get all groups within an organization
+    ///     Get all groups within an organization with optional pagination
+    /// </summary>
+    /// <param name="organizationId">ID of the organization from which to list groups</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all matching groups</param>
+    /// <param name="hideArchived">Boolean indicating whether to hide archived groups from results</param>
+    /// <returns>A paginated response of groups within the given organization</returns>
+    public async Task<PaginatedResponse<GroupResponseDto>> GetAllGroupsPaginated(
+        long organizationId,
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true)
+    {
+        var query = _context.Groups.Where(g => g.OrganizationId == organizationId);
+
+        if (hideArchived)
+            query = query.Where(g => !g.IsArchived);
+
+        var orderedQuery = query.OrderBy(g => g.Id);
+
+        return await orderedQuery.Select(g => GroupToResponse(g)).ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all groups without pagination.
+    ///     Superseded by <see cref="GetAllGroupsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 group controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
     /// </summary>
     /// <param name="organizationId">ID of the organization from which to list groups</param>
     /// <param name="hideArchived">Boolean indicating whether to hide archived groups from results</param>
     /// <returns>An array of groups within the given organization</returns>
+    [Obsolete("V1-only. Used by deprecated v1 group endpoints. Superseded by GetAllGroupsPaginated. " +
+              "Remove once v1 group endpoints are sunset.", error: false)]
     public async Task<IEnumerable<GroupResponseDto>> GetAllGroups(long organizationId, bool hideArchived = true)
     {
         var groupQuery = _context.Groups.Where(g => g.OrganizationId == organizationId);
@@ -388,6 +415,20 @@ public class GroupBusiness : IGroupBusiness
                 IsActive = u.IsActive
             })
             .ToList();
+    }
+
+    private static GroupResponseDto GroupToResponse(Group group)
+    {
+        return new GroupResponseDto
+        {
+            Id = group.Id,
+            Name = group.Name,
+            Description = group.Description,
+            LastUpdatedAt = group.LastUpdatedAt,
+            LastUpdatedBy = group.LastUpdatedBy,
+            IsArchived = group.IsArchived,
+            OrganizationId = group.OrganizationId
+        };
     }
 
     /// <summary>

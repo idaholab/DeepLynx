@@ -259,8 +259,8 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     setGroupModalLoading(true);
 
     try {
-      const groups = await getAllGroups(organizationId);
-      setAvailableGroups(groups);
+      const { items: paginatedGroups } = await getAllGroups(organizationId);
+      setAvailableGroups(paginatedGroups);
     } catch (error) {
       console.error("Failed to load groups:", error);
       toast.error(t.translations.UNABLE_TO_LOAD_USERS_OR_GROUPS);
