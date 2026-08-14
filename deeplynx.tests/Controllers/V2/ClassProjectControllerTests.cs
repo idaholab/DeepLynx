@@ -61,10 +61,17 @@ public class ClassProjectControllerTests : IDisposable
     [Fact]
     public async Task GetAllClasses_Returns200_WithList()
     {
-        var expected = new List<ClassResponseDto> { new(), new() };
+        var expected = new PaginatedResponse<ClassResponseDto>
+        {
+            Items = new List<ClassResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
-        _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })), true))
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })),
+                         It.IsAny<PaginatedRequestDto>(), true, false, false))
                      .ReturnsAsync(expected);
 
         var result = (await _classProjectController.GetAllClasses(ProjectId, true)).Result as OkObjectResult;
@@ -77,22 +84,30 @@ public class ClassProjectControllerTests : IDisposable
     [Fact]
     public async Task GetAllClasses_Returns200_WithEmptyList()
     {
-        _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
-                     .ReturnsAsync([]);
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(),
+                         It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                     .ReturnsAsync(new PaginatedResponse<ClassResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
         var result = (await _classProjectController.GetAllClasses(ProjectId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<ClassResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<ClassResponseDto>>(result.Value);
     }
 
     [Fact]
     public async Task GetAllClasses_ThrowsException_WhenBusinessThrows()
     {
-        _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(), It.IsAny<bool>()))
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]?>(),
+                         It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _classProjectController.GetAllClasses(ProjectId, true));
@@ -101,14 +116,70 @@ public class ClassProjectControllerTests : IDisposable
     [Fact]
     public async Task GetAllClasses_PassesProjectIdAndHideArchivedToBusinessLayer()
     {
-        _mockClassBusiness.Setup(b => b.GetAllClasses(
-                         UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })), false))
-                     .ReturnsAsync([]);
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })),
+                         It.IsAny<PaginatedRequestDto>(), false, false, false))
+                     .ReturnsAsync(new PaginatedResponse<ClassResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
         await _classProjectController.GetAllClasses(ProjectId, hideArchived: false);
 
-        _mockClassBusiness.Verify(b => b.GetAllClasses(
-            UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })), false), Times.Once);
+        _mockClassBusiness.Verify(b => b.GetAllClassesPaginated(
+            UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })),
+            It.IsAny<PaginatedRequestDto>(), false, false, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllClasses_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })),
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+                         true, false, false))
+                     .ReturnsAsync(new PaginatedResponse<ClassResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        await _classProjectController.GetAllClasses(ProjectId, true);
+
+        _mockClassBusiness.Verify(b => b.GetAllClassesPaginated(
+            UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })),
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+            true, false, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllClasses_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var pagination = new PaginatedRequestDto { PageNumber = 3, PageSize = 10 };
+
+        _mockClassBusiness.Setup(b => b.GetAllClassesPaginated(
+                         UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })),
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 3 && p.PageSize == 10),
+                         true, false, false))
+                     .ReturnsAsync(new PaginatedResponse<ClassResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 3,
+                         PageSize = 10,
+                         TotalCount = 0
+                     });
+
+        await _classProjectController.GetAllClasses(ProjectId, true, pagination);
+
+        _mockClassBusiness.Verify(b => b.GetAllClassesPaginated(
+            UserId, OrgId, It.Is<long[]>(ids => ids.SequenceEqual(new[] { ProjectId })),
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 3 && p.PageSize == 10),
+            true, false, false), Times.Once);
     }
 
     #endregion
@@ -448,7 +519,7 @@ public class ClassProjectControllerTests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(ClassProjectController.GetAllClasses),
-            "projectId", "hideArchived");
+            "projectId", "hideArchived", "paginatedRequestDto");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
         AssertHasAuthAttribute(method, "read", "class");

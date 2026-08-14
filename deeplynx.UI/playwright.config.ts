@@ -5,6 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./tests",
+  testIgnore: "**/unit/**",
   /* Run tests serially to avoid overwhelming the dev server. */
   fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

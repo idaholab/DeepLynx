@@ -251,13 +251,14 @@ export default function ProjectInsightClientView() {
   const loadRecordMeta = useCallback(async () => {
     if (!projectId) return;
 
-    const [classDtos, dataSourceDtos, tagDtos] =
+    const [classesResponse, dataSourceDtos, tagDtos] =
       await Promise.all([
         getAllClasses(projectId, true),
         getAllDataSources(projectId, true),
         getAllTags(projectId, true),
       ]);
 
+    const classDtos = classesResponse.items;
     setClasses(classDtos);
     setSources(dataSourceDtos);
 

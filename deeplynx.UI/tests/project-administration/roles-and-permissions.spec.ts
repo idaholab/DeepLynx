@@ -3,6 +3,7 @@ import { sysAdmin, ORGS, PROJECTS, orgAdminA, projectAdminX } from "../deeplynx-
 import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
 import { getOrgIdByName } from "../helpers/api";
 import { getProjectIdByName } from "../helpers/upload-helpers";
+import { testApiUrl } from "../api-url";
 
 let orgId: string;
 
@@ -131,8 +132,9 @@ test.describe("Roles & Permissions", () => {
     request: APIRequestContext, projectId: string | undefined, page: Page, orgId: string,
   ) {
     if (!projectId) return;
-    const BASE_URL = 'http://localhost:5095/api/v1';
-    const getAllUrl = `${BASE_URL}/organizations/${orgId}/projects/${projectId}/roles?hideArchived=true`;
+    const getAllUrl = testApiUrl(
+      `/organizations/${orgId}/projects/${projectId}/roles?hideArchived=true`,
+    );
     try {
       let res = await request.fetch(getAllUrl);
       if (!res.ok()) throw new Error(`Failed to fetch roles: ${res.status()}`);

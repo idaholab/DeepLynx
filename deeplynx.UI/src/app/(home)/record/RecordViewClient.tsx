@@ -578,7 +578,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
       try {
         setIsLoadingClasses(true);
-        const data = await getAllClasses(projectId, true);
+        const { items: data } = await getAllClasses(projectId, true);
         setAvailableClasses(data);
       } catch (error) {
         console.error("Error fetching classes: ", error);

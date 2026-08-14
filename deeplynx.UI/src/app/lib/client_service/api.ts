@@ -1,10 +1,10 @@
 // lib/client_service/api.ts
 
-import axios from 'axios';
-import { getSession } from 'next-auth/react';
-import type { Session } from 'next-auth';
-import { getApiErrorMessage } from '../api-error';
-import { withNexusApiVersion } from '../api-version';
+import axios from "axios";
+import { getSession } from "next-auth/react";
+import type { Session } from "next-auth";
+import { getApiErrorMessage } from "../api-error";
+import { withNexusApiVersion } from "../api-version";
 
 const api = axios.create({
   baseURL: withNexusApiVersion(process.env.NEXT_PUBLIC_API_URL ?? ""),

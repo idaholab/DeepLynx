@@ -160,7 +160,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       }
 
       try {
-        const classData = await getAllClasses(projectId, false);
+        const { items: classData } = await getAllClasses(projectId, false);
 
         if (cancelled) return;
 

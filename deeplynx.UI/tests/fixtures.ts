@@ -5,10 +5,10 @@ import {
   authFile, TestAccount, TestOrg, TestProject, selectOrganization, selectProject,
   scopeCacheFile, testUserCacheFile, readJsonCache,
 } from './deeplynx-config';
+import { TEST_API_BASE_URL } from './api-url';
+const API_URL = TEST_API_BASE_URL;
 
 loadEnvConfig(process.cwd());
-
-const API_URL = process.env.BACKEND_BASE_URL ?? '';
 
 type Fixtures = {
   actAs: (account: TestAccount) => Promise<Page>; // returns a logged in page for the provided test account.

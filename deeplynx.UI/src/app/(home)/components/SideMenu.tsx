@@ -232,6 +232,9 @@ const SideMenu: React.FC<SideMenuProps> = ({
     if (targetPath === "/upload_center" && organization?.disableFileTransfer)
       return true;
 
+    // No project selected and in data catalog side bar should be disabled
+    if (pathname === "/data_catalog/all_records" && !activeProject) return true;
+
     return false;
   };
 
