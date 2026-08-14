@@ -51,7 +51,7 @@ export default function HomeDashboardClient({ initialProjects }: Props) {
 
     isRefreshing.current = true;
     try {
-      const data = await getAllProjects(
+      const { items: data } = await getAllProjects(
         organization.organizationId as number,
         true,
       );
