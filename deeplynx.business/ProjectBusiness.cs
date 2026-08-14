@@ -88,8 +88,6 @@ public class ProjectBusiness : IProjectBusiness
         PaginatedRequestDto paginatedRequestDto,
         bool hideArchived = true)
     {
-        var returnAll = paginatedRequestDto.PageSize == -1;
-
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null) throw new ArgumentException($"User with id {userId} not found.");
 
@@ -110,41 +108,8 @@ public class ProjectBusiness : IProjectBusiness
                 )
             );
 
-        var orderedQuery = projectQuery.OrderBy(p => p.Id);
-
-        if (returnAll)
-        {
-            var allProjects = await orderedQuery
-                .Select(p => new ProjectResponseDto
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Description = p.Description,
-                    Abbreviation = p.Abbreviation,
-                    LastUpdatedAt = p.LastUpdatedAt,
-                    LastUpdatedBy = p.LastUpdatedBy,
-                    IsArchived = p.IsArchived,
-                    OrganizationId = p.OrganizationId,
-                    Banner = p.Banner,
-                    RequireSensitivityLabel = p.RequireSensitivityLabel,
-                    DefaultObjectStorageId = p.DefaultObjectStorageId
-                })
-                .ToListAsync();
-
-            return new PaginatedResponse<ProjectResponseDto>
-            {
-                Items = allProjects,
-                PageNumber = 1,
-                PageSize = allProjects.Count,
-                TotalCount = allProjects.Count
-            };
-        }
-
-        var totalCount = await projectQuery.CountAsync();
-
-        var projects = await orderedQuery
-            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
-            .Take(paginatedRequestDto.PageSize)
+        return await projectQuery
+            .OrderBy(p => p.Id)
             .Select(p => new ProjectResponseDto
             {
                 Id = p.Id,
@@ -159,15 +124,7 @@ public class ProjectBusiness : IProjectBusiness
                 RequireSensitivityLabel = p.RequireSensitivityLabel,
                 DefaultObjectStorageId = p.DefaultObjectStorageId
             })
-            .ToListAsync();
-
-        return new PaginatedResponse<ProjectResponseDto>
-        {
-            Items = projects,
-            PageNumber = paginatedRequestDto.PageNumber,
-            PageSize = paginatedRequestDto.PageSize,
-            TotalCount = totalCount
-        };
+            .ToPaginatedAsync(paginatedRequestDto);
     }
 
     #region Deprecated
