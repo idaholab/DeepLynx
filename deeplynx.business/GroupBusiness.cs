@@ -404,7 +404,6 @@ public class GroupBusiness : IGroupBusiness
         PaginatedRequestDto paginatedRequestDto)
     {
         paginatedRequestDto ??= new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
-        bool returnAll = paginatedRequestDto.PageSize == -1;
 
         var group = await _context.Groups
             .Include(g => g.Users)

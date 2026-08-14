@@ -160,7 +160,11 @@ public class GroupBusinessTests : IntegrationTestBase
     public async Task GetAllGroupMembersPaginated_ExcludesArchived()
     {
         // Arrange
-        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+        var paginatedRequest = new PaginatedRequestDto
+        {
+            PageNumber = 1,
+            PageSize = -1
+        };
 
         // Act
         var result = await _groupBusiness.GetGroupMembersPaginated(oid, gid, paginatedRequest);
@@ -176,7 +180,7 @@ public class GroupBusinessTests : IntegrationTestBase
     public async Task GetAllGroupMembersPaginated_ReturnsAll_WhenPageSizeIsMinusOne()
     {
         // Arrange
-        var paginatedRequest = new PaginatedRequestDto { PageNumber = 5, PageSize = -1 };
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
 
         // Act
         var result = await _groupBusiness.GetGroupMembersPaginated(oid, gid, paginatedRequest);
@@ -220,10 +224,11 @@ public class GroupBusinessTests : IntegrationTestBase
     {
         // Arrange
         long nonExistentGroupId = 999999;
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 1 };
 
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(async () =>
-            await _groupBusiness.GetGroupMembersPaginated(oid, nonExistentGroupId));
+            await _groupBusiness.GetGroupMembersPaginated(oid, nonExistentGroupId, paginatedRequest));
     }
 
     [Fact]
@@ -231,10 +236,11 @@ public class GroupBusinessTests : IntegrationTestBase
     {
         // Arrange
         long archivedGroupId = gid2;
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 1 };
 
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(async () =>
-            await _groupBusiness.GetGroupMembersPaginated(oid, archivedGroupId));
+            await _groupBusiness.GetGroupMembersPaginated(oid, archivedGroupId, paginatedRequest));
     }
 
     #endregion
