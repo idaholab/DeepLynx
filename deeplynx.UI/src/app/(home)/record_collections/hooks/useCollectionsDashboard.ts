@@ -104,7 +104,7 @@ export function useCollectionsDashboard({
 
         if (cancelled) return;
         setAvailableLabels(labels);
-        setAvailableTags(tags);
+        setAvailableTags(tags.items);
       } catch (error) {
         console.error("Failed to load record collection dashboard filters:", error);
         toast.error(t.translations.RECORD_COLLECTIONS_FAILED_LOAD_PROJECT_TAGS);

@@ -553,7 +553,7 @@ export default function DataCatalogClient({
         const tags = await getAllTagsOrg(organizationId, projectIds, true);
 
         setAvailableTags(
-          tags.map((tag) => ({
+          tags.items.map((tag) => ({
             id: tag.id,
             name: tag.name,
             projectId: tag.projectId ?? null,

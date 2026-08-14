@@ -163,17 +163,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const { t } = useLanguage();
   const { organization, hasLoaded } = useOrganizationSession();
   const router = useRouter();
-  
+
   const organizationId =
-      organization?.organizationId !== undefined
-        ? Number(organization.organizationId)
-        : null;
-  
+    organization?.organizationId !== undefined
+      ? Number(organization.organizationId)
+      : null;
+
   const { selectedInsightModels, setSelectedInsightModels } = useInsightModelSelection(
-      organizationId,
-      projectId,
+    organizationId,
+    projectId,
   );
-          
+
   // ============= STATE MANAGEMENT =============
   // Record & Tags State
   const [record, setRecord] = useState<HistoricalRecordResponseDto | null>(
@@ -208,20 +208,20 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
   const [endpointHealth, setEndpointHealth] = useState<InsightEndpointHealthByRole>(EMPTY_ENDPOINT_HEALTH);
   const isQueryModelUnavailable =
-      endpointHealth.query.response !== null
-          ? !endpointHealth.query.response.reachable ||
-          !endpointHealth.query.response.model_available
-          : Boolean(endpointHealth.query.error);
+    endpointHealth.query.response !== null
+      ? !endpointHealth.query.response.reachable ||
+      !endpointHealth.query.response.model_available
+      : Boolean(endpointHealth.query.error);
   const isUploadModelUnavailable =
-      endpointHealth.upload.response !== null
-          ? !endpointHealth.upload.response.reachable ||
-          !endpointHealth.upload.response.model_available
-          : Boolean(endpointHealth.upload.error);
+    endpointHealth.upload.response !== null
+      ? !endpointHealth.upload.response.reachable ||
+      !endpointHealth.upload.response.model_available
+      : Boolean(endpointHealth.upload.error);
   const isEmbeddingModelUnavailable =
-      endpointHealth.embedding.response !== null
-          ? !endpointHealth.embedding.response.reachable ||
-          !endpointHealth.embedding.response.model_available
-          : Boolean(endpointHealth.embedding.error);
+    endpointHealth.embedding.response !== null
+      ? !endpointHealth.embedding.response.reachable ||
+      !endpointHealth.embedding.response.model_available
+      : Boolean(endpointHealth.embedding.error);
   const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
   const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;
   const [hasCheckedInsightHealth, setHasCheckedInsightHealth] = useState(false);
@@ -535,7 +535,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
       try {
         const data = await getAllTags(projectId);
-        setTags(data);
+        setTags(data.items);
       } catch (error) {
         console.error("Error fetching tags:", error);
       }
@@ -696,7 +696,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
       },
     ];
   }, [
-    record, 
+    record,
     recordFileType,
     handleUpdateRecord,
     t.translations,
@@ -835,7 +835,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   const handleQueueInsightUpload = useCallback(async () => {
     if (isIngestionUnavailable) return;
-    
+
     const uri = record?.uri?.trim();
     if (!uri || !organization?.organizationId) return;
     setIsQueuingInsightUpload(true);
@@ -857,7 +857,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   const handleQueueOntologyEmbeddings = useCallback(async () => {
     if (isEmbeddingModelUnavailable) return;
-    
+
     if (!organization?.organizationId) return;
     setIsQueuingOntologyEmbeddings(true);
     try {
@@ -900,82 +900,82 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           upload: { ...EMPTY_HEALTH_STATE, isChecking: true },
           embedding: { ...EMPTY_HEALTH_STATE, isChecking: true },
         });
-        
+
         const [queryHealth, uploadHealth, embeddingHealth] =
-            await Promise.allSettled([
-              fetchInsightEndpointHealth({
-                organizationId: organization.organizationId as number,
-                projectId,
-                modelConfigId: selectedInsightModels.queryModelConfigId,
-                modelType: "llm",
-              }),
-              fetchInsightEndpointHealth({
-                organizationId: organization.organizationId as number,
-                projectId,
-                modelConfigId: selectedInsightModels.uploadModelConfigId,
-                modelType: "vlm",
-              }),
-              fetchInsightEndpointHealth({
-                organizationId: organization.organizationId as number,
-                projectId,
-                modelConfigId: selectedInsightModels.embeddingModelConfigId,
-                modelType: "embedding",
-              }),
-            ]);
+          await Promise.allSettled([
+            fetchInsightEndpointHealth({
+              organizationId: organization.organizationId as number,
+              projectId,
+              modelConfigId: selectedInsightModels.queryModelConfigId,
+              modelType: "llm",
+            }),
+            fetchInsightEndpointHealth({
+              organizationId: organization.organizationId as number,
+              projectId,
+              modelConfigId: selectedInsightModels.uploadModelConfigId,
+              modelType: "vlm",
+            }),
+            fetchInsightEndpointHealth({
+              organizationId: organization.organizationId as number,
+              projectId,
+              modelConfigId: selectedInsightModels.embeddingModelConfigId,
+              modelType: "embedding",
+            }),
+          ]);
 
         const queryUnavailable =
-            queryHealth.status === "fulfilled"
-                ? !queryHealth.value.reachable || !queryHealth.value.model_available
-                : true;
+          queryHealth.status === "fulfilled"
+            ? !queryHealth.value.reachable || !queryHealth.value.model_available
+            : true;
 
         const uploadUnavailable =
-            uploadHealth.status === "fulfilled"
-                ? !uploadHealth.value.reachable || !uploadHealth.value.model_available
-                : true;
+          uploadHealth.status === "fulfilled"
+            ? !uploadHealth.value.reachable || !uploadHealth.value.model_available
+            : true;
 
         const embeddingUnavailable =
-            embeddingHealth.status === "fulfilled"
-                ? !embeddingHealth.value.reachable ||
-                !embeddingHealth.value.model_available
-                : true;
+          embeddingHealth.status === "fulfilled"
+            ? !embeddingHealth.value.reachable ||
+            !embeddingHealth.value.model_available
+            : true;
 
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
         setEndpointHealth({
           query:
-              queryHealth.status === "fulfilled"
-                  ? { isChecking: false, response: queryHealth.value, error: null }
-                  : {
-                    isChecking: false,
-                    response: null,
-                    error:
-                        queryHealth.reason instanceof Error
-                            ? queryHealth.reason.message
-                            : "Query model health check failed",
-                  },
+            queryHealth.status === "fulfilled"
+              ? { isChecking: false, response: queryHealth.value, error: null }
+              : {
+                isChecking: false,
+                response: null,
+                error:
+                  queryHealth.reason instanceof Error
+                    ? queryHealth.reason.message
+                    : "Query model health check failed",
+              },
           upload:
-              uploadHealth.status === "fulfilled"
-                  ? { isChecking: false, response: uploadHealth.value, error: null }
-                  : {
-                    isChecking: false,
-                    response: null,
-                    error:
-                        uploadHealth.reason instanceof Error
-                            ? uploadHealth.reason.message
-                            : "Upload/OCR model health check failed",
-                  },
+            uploadHealth.status === "fulfilled"
+              ? { isChecking: false, response: uploadHealth.value, error: null }
+              : {
+                isChecking: false,
+                response: null,
+                error:
+                  uploadHealth.reason instanceof Error
+                    ? uploadHealth.reason.message
+                    : "Upload/OCR model health check failed",
+              },
           embedding:
-              embeddingHealth.status === "fulfilled"
-                  ? { isChecking: false, response: embeddingHealth.value, error: null }
-                  : {
-                    isChecking: false,
-                    response: null,
-                    error:
-                        embeddingHealth.reason instanceof Error
-                            ? embeddingHealth.reason.message
-                            : "Embedding model health check failed",
-                  },
+            embeddingHealth.status === "fulfilled"
+              ? { isChecking: false, response: embeddingHealth.value, error: null }
+              : {
+                isChecking: false,
+                response: null,
+                error:
+                  embeddingHealth.reason instanceof Error
+                    ? embeddingHealth.reason.message
+                    : "Embedding model health check failed",
+              },
         });
 
         if (embeddingUnavailable) {
@@ -988,13 +988,13 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
           return;
         }
-        
+
         const status = await fetchInsightIngestionStatus({
           organizationId: organization.organizationId as number,
           projectId,
           fileId: recordId,
         });
-        
+
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
@@ -1007,7 +1007,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           }
           return;
         }
-        
+
         if (!recordEmbedPollRef.current) {
           recordEmbedPollRef.current = setInterval(() => {
             void checkLatticeReadiness();
@@ -1040,7 +1040,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           clearInterval(recordEmbedPollRef.current);
           recordEmbedPollRef.current = null;
         }
-        
+
         console.error("Failed to check Insight status:", error);
       } finally {
         if (!cancelled && isInitial) {
@@ -1587,19 +1587,19 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   {record.name}
                 </h1>
                 {isQueryModelUnavailable && (
-                    <span className="badge badge-warning badge-sm">
-                      Query model unavailable
-                    </span>
+                  <span className="badge badge-warning badge-sm">
+                    Query model unavailable
+                  </span>
                 )}
                 {isUploadModelUnavailable && (
-                    <span className="badge badge-warning badge-sm">
-                      Upload/OCR model unavailable
-                    </span>
+                  <span className="badge badge-warning badge-sm">
+                    Upload/OCR model unavailable
+                  </span>
                 )}
                 {isEmbeddingModelUnavailable && (
-                    <span className="badge badge-warning badge-sm">
-                      Embedding model unavailable
-                    </span>
+                  <span className="badge badge-warning badge-sm">
+                    Embedding model unavailable
+                  </span>
                 )}
               </div>
               {record.classId ? (
