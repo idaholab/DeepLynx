@@ -155,16 +155,99 @@ public class TokenControllerTests : IDisposable
     [Fact]
     public async Task GetAllUserKeys_ReturnsKeysAndUsesCurrentUser()
     {
-        var expected = new List<string> { "key-one", "key-two" };
+        var expected = new PaginatedResponse<string>
+        {
+            Items = new List<string> { "key-one", "key-two" },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
+
         _mockTokenBusiness
-            .Setup(business => business.GetAllUserKeys(UserId))
+            .Setup(business => business.GetAllUserKeysPaginated(UserId, It.IsAny<PaginatedRequestDto>()))
             .ReturnsAsync(expected);
 
         var result = (await _controller.GetAllUserKeys()).Result;
 
         AssertOkObject(result, expected);
         _mockTokenBusiness.Verify(
-            business => business.GetAllUserKeys(UserId),
+            business => business.GetAllUserKeysPaginated(UserId, It.IsAny<PaginatedRequestDto>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllUserKeys_Returns200_WithEmptyList()
+    {
+        _mockTokenBusiness
+            .Setup(business => business.GetAllUserKeysPaginated(It.IsAny<long>(), It.IsAny<PaginatedRequestDto>()))
+            .ReturnsAsync(new PaginatedResponse<string>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
+
+        var result = (await _controller.GetAllUserKeys()).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.IsAssignableFrom<PaginatedResponse<string>>(result.Value);
+    }
+
+    [Fact]
+    public async Task GetAllUserKeys_ThrowsException_WhenBusinessThrows()
+    {
+        _mockTokenBusiness
+            .Setup(business => business.GetAllUserKeysPaginated(It.IsAny<long>(), It.IsAny<PaginatedRequestDto>()))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() => _controller.GetAllUserKeys());
+    }
+
+    [Fact]
+    public async Task GetAllUserKeys_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        _mockTokenBusiness
+            .Setup(business => business.GetAllUserKeysPaginated(
+                UserId, It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25)))
+            .ReturnsAsync(new PaginatedResponse<string>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
+
+        await _controller.GetAllUserKeys();
+
+        _mockTokenBusiness.Verify(
+            business => business.GetAllUserKeysPaginated(
+                UserId, It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllUserKeys_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var pagination = new PaginatedRequestDto { PageNumber = 4, PageSize = 50 };
+
+        _mockTokenBusiness
+            .Setup(business => business.GetAllUserKeysPaginated(
+                UserId, It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50)))
+            .ReturnsAsync(new PaginatedResponse<string>
+            {
+                Items = [],
+                PageNumber = 4,
+                PageSize = 50,
+                TotalCount = 0
+            });
+
+        await _controller.GetAllUserKeys(pagination);
+
+        _mockTokenBusiness.Verify(
+            business => business.GetAllUserKeysPaginated(
+                UserId, It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50)),
             Times.Once);
     }
 

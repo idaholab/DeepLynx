@@ -50,9 +50,9 @@ const SysAdminPage = async () => {
   const members = (await getAllUsersServer()) as UserResponseDto[];
 
   // Fetch projects filtered by organization
-  const projects = (await getAllProjectsServer(
+  const { items: projects } = (await getAllProjectsServer(
     organizationId as number,
-  )) as ProjectResponseDto[];
+  ));
   const initialProjects = projects.map((p) => ({
     id: String(p.id),
     name: p.name,

@@ -54,7 +54,7 @@ const OrganizationManagementPage = async ({
   // Fetch projects filtered by organization
   let projects: ProjectResponseDto[] = [];
   try {
-    const apiProjects = await getAllProjectsServer(
+    const { items: apiProjects } = await getAllProjectsServer(
       organizationId as number,
       true,
     );

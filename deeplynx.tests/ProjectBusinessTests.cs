@@ -699,7 +699,7 @@ public class ProjectBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetAllProjects Tests
+    #region GetAllProjects (V1 / Legacy) Tests
 
     [Fact]
     public async Task GetAllProjects_ReturnsProjectsForUser()
@@ -837,6 +837,334 @@ public class ProjectBusinessTests : IntegrationTestBase
         Assert.NotEmpty(projectsForOrganization);
         Assert.Equal(4, projectsForOrganization.Count);
         Assert.All(projectsForOrganization, p => Assert.Equal(oid, p.OrganizationId));
+    }
+
+    #endregion
+
+    #region GetAllProjectsPaginated Tests
+
+    private static PaginatedRequestDto DefaultPagination(int pageNumber = 1, int pageSize = 100)
+    {
+        return new PaginatedRequestDto
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_ReturnsProjectsForUser()
+    {
+        // Act
+        var forTestUser = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), true);
+        var forLonely = await _projectBusiness.GetAllProjectsPaginated(uid3, oid, DefaultPagination(), true);
+
+        // Assert
+        Assert.Equal(2, forTestUser.TotalCount);
+        Assert.Equal(2, forTestUser.Items.Count);
+        Assert.Contains(forTestUser.Items, p => p.Id == pid);
+        Assert.Contains(forTestUser.Items, p => p.Id == pid2);
+
+        Assert.Equal(1, forLonely.TotalCount);
+        Assert.Single(forLonely.Items);
+        Assert.Contains(forLonely.Items, p => p.Id == pid3);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_ExcludesArchived_ByDefault()
+    {
+        // Act - uid is a member of pid4 (archived), but hideArchived defaults to true
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination());
+
+        // Assert
+        Assert.DoesNotContain(result.Items, p => p.Id == pid4);
+        Assert.All(result.Items, p => Assert.False(p.IsArchived));
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_HideArchivedFalse_IncludesArchivedProjects()
+    {
+        // Act - uid is a direct member of pid4 (archived)
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), false);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid4 && p.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_SysAdmin_ReturnsAllNonArchivedProjects()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), true);
+
+        // Assert - sees all non-archived org projects, membership no longer matters
+        Assert.Equal(4, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid);
+        Assert.Contains(result.Items, p => p.Id == pid2);
+        Assert.Contains(result.Items, p => p.Id == pid3);
+        Assert.Contains(result.Items, p => p.Id == pid5);
+        Assert.DoesNotContain(result.Items, p => p.Id == pid4);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_SysAdmin_HideArchivedFalse_ReturnsAllProjects()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), false);
+
+        // Assert - all 5 projects in the org, including archived
+        Assert.Equal(5, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid4 && p.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_OrgAdmin_ReturnsAllOrganizationProjects()
+    {
+        // Arrange - lonelyUser is only a direct member of pid3, but org admin should see the whole org
+        Context.OrganizationUsers.Add(new OrganizationUser
+        {
+            OrganizationId = oid,
+            UserId = uid3,
+            IsOrgAdmin = true
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid3, oid, DefaultPagination(), true);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid);
+        Assert.Contains(result.Items, p => p.Id == pid2);
+        Assert.Contains(result.Items, p => p.Id == pid3);
+        Assert.Contains(result.Items, p => p.Id == pid5);
+        Assert.DoesNotContain(result.Items, p => p.Id == pid4);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_GroupMembership_GrantsAccess()
+    {
+        // Arrange - pid5's ProjectMember row grants access via GroupId = gid; add lonelyUser to that group
+        var group = await Context.Groups.FindAsync(gid);
+        var lonelyUser = await Context.Users.FindAsync(uid3);
+        group!.Users.Add(lonelyUser!);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid3, oid, DefaultPagination(), true);
+
+        // Assert - lonelyUser now sees pid3 (direct), plus pid2 and pid5 (via group gid)
+        Assert.Equal(3, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid3);
+        Assert.Contains(result.Items, p => p.Id == pid5);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_NonMemberNonAdmin_ReturnsEmptyPaginatedResponse()
+    {
+        // Arrange - a user with no project memberships and no admin rights
+        var outsider = new User { Email = "outsider@example.com", Name = "Outsider", IsSysAdmin = false };
+        Context.Users.Add(outsider);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(outsider.Id, oid, DefaultPagination(), true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(100, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_Fails_IfUserDoesNotExist()
+    {
+        // Arrange
+        const long nonExistentUserId = 999999;
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _projectBusiness.GetAllProjectsPaginated(nonExistentUserId, oid, DefaultPagination(), true));
+
+        Assert.Contains($"User with id {nonExistentUserId} not found.", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_Fails_IfUserWasDeleted()
+    {
+        // Act & Assert - uid2 (missingUser) was added then removed in SeedTestDataAsync
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _projectBusiness.GetAllProjectsPaginated(uid2, oid, DefaultPagination(), true));
+
+        Assert.Contains($"User with id {uid2} not found.", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_FiltersByOrganizationId()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), true);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.All(result.Items, p => Assert.Equal(oid, p.OrganizationId));
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_ReturnsAllProperties_Correctly()
+    {
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), true);
+        var dto = result.Items.First(p => p.Id == pid);
+
+        // Assert
+        Assert.Equal(pid, dto.Id);
+        Assert.Equal("Test Project", dto.Name);
+        Assert.Equal("Test project for unit tests", dto.Description);
+        Assert.Equal("TST", dto.Abbreviation);
+        Assert.Equal(oid, dto.OrganizationId);
+        Assert.False(dto.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_Paginates_Correctly()
+    {
+        // Arrange - sys admin sees 4 non-archived projects total (pid, pid2, pid3, pid5)
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        var pageOne = DefaultPagination(pageNumber: 1, pageSize: 3);
+        var pageTwo = DefaultPagination(pageNumber: 2, pageSize: 3);
+
+        // Act
+        var firstPage = await _projectBusiness.GetAllProjectsPaginated(uid, oid, pageOne, true);
+        var secondPage = await _projectBusiness.GetAllProjectsPaginated(uid, oid, pageTwo, true);
+
+        // Assert
+        Assert.Equal(4, firstPage.TotalCount);
+        Assert.Equal(3, firstPage.Items.Count);
+        Assert.Equal(4, secondPage.TotalCount);
+        Assert.Single(secondPage.Items);
+
+        var firstPageIds = firstPage.Items.Select(p => p.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(p => p.Id).ToHashSet();
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_PageSizeNegativeOne_ReturnsAllProjects_IgnoringPageNumber()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, sentinel, true);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(4, result.PageSize);
+        Assert.DoesNotContain(result.Items, p => p.Id == pid4);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_PageSizeNegativeOne_RespectsHideArchivedFilter()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        // Act - request everything with hideArchived = false
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(pageSize: -1), false);
+
+        // Assert
+        Assert.Equal(5, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid4 && p.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_PageSizeNegativeOne_NonMemberNonAdmin_ReturnsEmptyPaginatedResponse()
+    {
+        // Arrange
+        var outsider = new User { Email = "outsider2@example.com", Name = "Outsider Two", IsSysAdmin = false };
+        Context.Users.Add(outsider);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(
+            outsider.Id, oid, DefaultPagination(pageSize: -1), true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+    {
+        // Arrange - sys admin sees 4 non-archived projects total
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        var zeroSize = DefaultPagination(pageNumber: 1, pageSize: 0);
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, zeroSize, true);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_PageSizeZero_OnAnyPageNumber_StillReturnsEmptyItems()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        var zeroSizePageThree = DefaultPagination(pageNumber: 3, pageSize: 0);
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, zeroSizePageThree, true);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(3, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
     }
 
     #endregion

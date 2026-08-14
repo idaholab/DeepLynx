@@ -43,19 +43,24 @@ public class EdgeController : ControllerBase
     /// <param name="projectId">The ID of the project whose edges are to be retrieved</param>
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter edges</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived edges from the result (Default true)</param>
+    /// <param name="paginatedRequestDto"> Pagination parameters</param>
     /// <returns>A list of edges based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_edges")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "edge")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<EdgeResponseDto>>> GetAllEdges(
+    public async Task<ActionResult<PaginatedResponse<EdgeResponseDto>>> GetAllEdges(
         long organizationId,
         long projectId,
         [FromQuery] long? dataSourceId = null,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+        paginatedRequestDto ??= new PaginatedRequestDto();
         var currentUserId = UserContextStorage.UserId;
-        var edges = await _edgeBusiness.GetAllEdges(currentUserId, organizationId, projectId, dataSourceId, hideArchived);
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var edges = await _edgeBusiness.GetAllEdgesPaginated(currentUserId, organizationId, projectId, paginatedRequestDto, dataSourceId, hideArchived, isSysAdmin, isOrgAdmin);
         return Ok(edges);
     }
 
@@ -145,7 +150,7 @@ public class EdgeController : ControllerBase
     public async Task<ActionResult<List<EdgeResponseDto>>> BulkCreateEdges(
         long organizationId,
         long projectId,
-        [FromQuery] [Required] long dataSourceId,
+        [FromQuery][Required] long dataSourceId,
         [FromBody] List<CreateEdgeRequestDto> edges)
     {
         var currentUserId = UserContextStorage.UserId;
