@@ -405,21 +405,20 @@ public class GroupBusiness : IGroupBusiness
     {
         paginatedRequestDto ??= new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
 
-        var group = await _context.Groups
-            .Include(g => g.Users)
-            .FirstOrDefaultAsync(g => g.Id == groupId && g.OrganizationId == organizationId);
+        var groupExists = await _context.Groups
+            .AnyAsync(g => g.Id == groupId && g.OrganizationId == organizationId && !g.IsArchived);
 
-        if (group == null || group.IsArchived)
-            throw new KeyNotFoundException($"Group with id {groupId} not found");
+        if (!groupExists)
+            throw new KeyNotFoundException($"Group with id {groupId} not found or is archived");
 
-        var usersQuery = group.Users
-            .Where(u => !u.IsArchived)
-            .AsQueryable();
+        var usersQuery = _context.Users
+            .Where(u => u.Groups.Any(g => g.Id == groupId && g.OrganizationId == organizationId) && !u.IsArchived)
+            .Select(u => GroupMemberToResponse(u));
 
-        return await usersQuery.Select(g => GroupToResponse(g)).ToPaginatedAsync(paginatedRequestDto);
+        return await usersQuery.ToPaginatedAsync(paginatedRequestDto);
     }
 
-    private static UserResponseDto GroupToResponse(User u)
+    private static UserResponseDto GroupMemberToResponse(User u)
     {
         return new UserResponseDto
         {

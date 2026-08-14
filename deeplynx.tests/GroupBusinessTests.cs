@@ -180,7 +180,7 @@ public class GroupBusinessTests : IntegrationTestBase
     public async Task GetAllGroupMembersPaginated_ReturnsAll_WhenPageSizeIsMinusOne()
     {
         // Arrange
-        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 1 };
 
         // Act
         var result = await _groupBusiness.GetGroupMembersPaginated(oid, gid, paginatedRequest);
