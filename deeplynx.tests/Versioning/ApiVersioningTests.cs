@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
+using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -231,10 +232,11 @@ public class ApiVersioningTests : IntegrationTestBase
     {
         var mockBusiness = new Mock<ITagBusiness>();
         mockBusiness
-            .Setup(b => b.GetAllTags(
+            .Setup(b => b.GetAllTagsPaginated(
                 It.IsAny<long>(),
                 It.IsAny<long>(),
                 It.IsAny<long[]?>(),
+                It.IsAny<PaginatedRequestDto>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>()))
@@ -260,10 +262,11 @@ public class ApiVersioningTests : IntegrationTestBase
     {
         var mockBusiness = new Mock<ITagBusiness>();
         mockBusiness
-            .Setup(b => b.GetAllTags(
+            .Setup(b => b.GetAllTagsPaginated(
                 It.IsAny<long>(),
                 It.IsAny<long>(),
                 It.IsAny<long[]?>(),
+                It.IsAny<PaginatedRequestDto>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>()))
