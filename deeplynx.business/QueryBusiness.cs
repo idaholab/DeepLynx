@@ -524,11 +524,9 @@ public class QueryBusiness : IQueryBusiness
                 authorizedProjectIds.ToArray(),
                 isSysAdmin || isOrgAdmin || userProjectAdminStatus.Values.Any(x => x));
 
-            return await Paginator.Paginate(
-                paginated,
-                queryRecordResults,
-                record => QueryRecordToResponse(record, isUriAuthorized(record))
-            );
+            var records = queryRecordResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
+
+            return await records.ToPaginatedAsync(paginated);
         }
         catch (PostgresException ex) when (ex.SqlState == "42703")
         {
@@ -776,7 +774,9 @@ public class QueryBusiness : IQueryBusiness
             projectId,
             isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-        return await Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r, isUriAuthorized(r)));
+        var records = query.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
+
+        return await records.ToPaginatedAsync(paginated);
     }
 
     static private QueryRecordViewResponseDto QueryRecordToResponse(

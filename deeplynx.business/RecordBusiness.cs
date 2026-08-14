@@ -322,7 +322,9 @@ public class RecordBusiness : IRecordBusiness
             [projectId],
             isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-        return await Paginator.Paginate(paginated, records, r => RecordToResponse(r, isUriAuthorized(r)));
+        return await records
+            .Select(r => RecordToResponse(r, isUriAuthorized(r)))
+            .ToPaginatedAsync(paginated);
     }
 
     /// <summary>
