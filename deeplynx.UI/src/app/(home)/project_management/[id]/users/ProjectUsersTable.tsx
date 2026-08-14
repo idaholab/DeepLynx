@@ -20,6 +20,7 @@ import toast from "react-hot-toast";
 import { InviteUserToOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
 import {
   GroupResponseDto,
+  PaginatedResponse,
   ProjectMemberResponseDto,
   ProjectResponseDto,
   RoleResponseDto,
@@ -278,7 +279,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     // Fetch asynchronously and cache
     getGroupMembers(organizationId, groupId)
-      .then((groupMembers) => {
+      .then(({ items: groupMembers }) => {
         setGroupMembersCache((prev) =>
           new Map(prev).set(groupId, groupMembers),
         );
@@ -305,16 +306,20 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     try {
       // Use members from cache if it exists, if not fetch API
-      const members = groupMembersCache.has(row.memberId)
+      const paginatedOrArray = groupMembersCache.has(row.memberId)
         ? groupMembersCache.get(row.memberId)!
         : await getGroupMembers(organizationId, row.memberId);
 
-      setGroupMembersCache((prev) => new Map(prev).set(row.memberId, members));
+      const membersArray: UserResponseDto[] = Array.isArray(paginatedOrArray)
+        ? paginatedOrArray
+        : paginatedOrArray.items;
+
+      setGroupMembersCache((prev) => new Map(prev).set(row.memberId, membersArray));
 
       setViewGroupMembersModal({
         isOpen: true,
         groupName: row.name,
-        members,
+        members: membersArray,
         loading: false,
       });
     } catch (error) {

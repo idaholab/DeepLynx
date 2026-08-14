@@ -382,12 +382,17 @@ public class GroupBusiness : IGroupBusiness
     }
 
     /// <summary>
-    ///     Get all members of a group
+    ///     [DEPRECATED - V1 ONLY] Retrieves all groups without pagination.
+    ///     Superseded by <see cref="GetGroupMembersPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 group controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
     /// </summary>
     /// <param name="organizationId">The organization ID to which the group belongs</param>
     /// <param name="groupId">ID of the group</param>
     /// <returns>List of users who are members of the group</returns>
     /// <exception cref="KeyNotFoundException">Returned if group not found</exception>
+    [Obsolete("V1-only. Used by deprecated v1 group endpoints. Superseded by GetGroupMembersPaginated. " +
+              "Remove once v1 group endpoints are sunset.", error: false)]
     public async Task<IEnumerable<UserResponseDto>> GetGroupMembers(long organizationId, long groupId)
     {
         var group = await _context.Groups
@@ -423,6 +428,48 @@ public class GroupBusiness : IGroupBusiness
             LastUpdatedBy = group.LastUpdatedBy,
             IsArchived = group.IsArchived,
             OrganizationId = group.OrganizationId
+        };
+    }
+
+    /// <summary>
+    ///     Get all members of a group with pagination
+    /// </summary>
+    /// <param name="organizationId">The organization ID to which the group belongs</param>
+    /// <param name="groupId">ID of the group</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all members</param>
+    /// <returns>Paginated list of users who are members of the group</returns>
+    /// <exception cref="KeyNotFoundException">Thrown if group not found or archived</exception>
+    public async Task<PaginatedResponse<UserResponseDto>> GetGroupMembersPaginated(
+        long organizationId,
+        long groupId,
+        PaginatedRequestDto paginatedRequestDto)
+    {
+        paginatedRequestDto ??= new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        var groupExists = await _context.Groups
+            .AnyAsync(g => g.Id == groupId && g.OrganizationId == organizationId && !g.IsArchived);
+
+        if (!groupExists)
+            throw new KeyNotFoundException($"Group with id {groupId} not found or is archived");
+
+        var usersQuery = _context.Users
+            .Where(u => u.Groups.Any(g => g.Id == groupId && g.OrganizationId == organizationId) && !u.IsArchived)
+            .Select(u => GroupMemberToResponse(u));
+
+        return await usersQuery.ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    private static UserResponseDto GroupMemberToResponse(User u)
+    {
+        return new UserResponseDto
+        {
+            Id = u.Id,
+            Name = u.Name,
+            Email = u.Email,
+            AccountType = u.AccountType,
+            IsSysAdmin = u.IsSysAdmin,
+            IsArchived = u.IsArchived,
+            IsActive = u.IsActive
         };
     }
 }
