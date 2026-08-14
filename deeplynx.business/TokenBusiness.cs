@@ -355,7 +355,8 @@ public class TokenBusiness : ITokenBusiness
     /// List all API keys for a user
     /// </summary>
     /// <param name="currentUserId">The ID of the user for which to list API keys</param>
-    /// <returns></returns>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching projects are returned unpaginated</param>
+    /// <returns>A paginated list of API keys, or all API keys if no pagination is specified</returns>
     async Task<PaginatedResponse<string>> ITokenBusiness.GetAllUserKeysPaginated(long currentUserId, PaginatedRequestDto paginatedRequestDto)
     {
         var returnAll = paginatedRequestDto.PageSize == -1;
