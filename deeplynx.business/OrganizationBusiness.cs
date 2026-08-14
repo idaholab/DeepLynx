@@ -53,7 +53,7 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <param name="isSysAdmin">Boolean determining if the requesting user is a system admin</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
     /// <returns>A list of organizations</returns>
-    public async Task<PaginatedResponse<OrganizationResponseDto>> GetAllOrganizationsPaginated(long userId, PaginatedRequestDto? paginatedRequestDto = null, bool hideArchived = true, bool isSysAdmin = false)
+    public async Task<PaginatedResponse<OrganizationResponseDto>> GetAllOrganizationsPaginated(long userId, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true, bool isSysAdmin = false)
     {
         return await GetAllOrganizationsForUserPaginated(userId, paginatedRequestDto, hideArchived, isSysAdmin);
     }
@@ -68,14 +68,10 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <returns>A paginated list of organizations</returns>
     public async Task<PaginatedResponse<OrganizationResponseDto>> GetAllOrganizationsForUserPaginated(
         long userId,
-        PaginatedRequestDto? paginatedRequestDto = null,
+        PaginatedRequestDto paginatedRequestDto,
         bool hideArchived = true,
         bool isSysAdmin = false)
     {
-        paginatedRequestDto ??= new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
-
-        bool returnAll = paginatedRequestDto.PageSize == -1;
-
         var query = _context.Organizations.AsQueryable();
 
         if (!isSysAdmin)
@@ -90,58 +86,7 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         var orderedQuery = query.OrderBy(o => o.Id);
 
-        if (returnAll)
-        {
-            var allOrgs = await orderedQuery
-                .Select(o => new OrganizationResponseDto
-                {
-                    Id = o.Id,
-                    Name = o.Name,
-                    Description = o.Description,
-                    LastUpdatedAt = o.LastUpdatedAt,
-                    LastUpdatedBy = o.LastUpdatedBy,
-                    IsArchived = o.IsArchived,
-                    DefaultOrg = o.DefaultOrg,
-                    Banner = o.Banner,
-                    Theme = o.Theme
-                })
-                .ToListAsync();
-
-            return new PaginatedResponse<OrganizationResponseDto>
-            {
-                Items = allOrgs,
-                PageNumber = 1,
-                PageSize = allOrgs.Count,
-                TotalCount = allOrgs.Count
-            };
-        }
-
-        var totalCount = await query.CountAsync();
-
-        var orgs = await orderedQuery
-            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
-            .Take(paginatedRequestDto.PageSize)
-            .Select(o => new OrganizationResponseDto
-            {
-                Id = o.Id,
-                Name = o.Name,
-                Description = o.Description,
-                LastUpdatedAt = o.LastUpdatedAt,
-                LastUpdatedBy = o.LastUpdatedBy,
-                IsArchived = o.IsArchived,
-                DefaultOrg = o.DefaultOrg,
-                Banner = o.Banner,
-                Theme = o.Theme
-            })
-            .ToListAsync();
-
-        return new PaginatedResponse<OrganizationResponseDto>
-        {
-            Items = orgs,
-            PageNumber = paginatedRequestDto.PageNumber,
-            PageSize = paginatedRequestDto.PageSize,
-            TotalCount = totalCount
-        };
+        return await orderedQuery.Select(o => OrganizationToResponse(o)).ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -1036,16 +981,23 @@ public class OrganizationBusiness : IOrganizationBusiness
             organizationId, null);
     }
 
-    private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
+    private static OrganizationResponseDto OrganizationToResponse(Organization organization)
     {
-        if (objectStorageId.HasValue)
+        return new OrganizationResponseDto
         {
-            // object storage could be org-level so just return object storage, don't check for project existence
-            return objectStorageId.Value;
-        }
-
-        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
-            ?? throw new KeyNotFoundException("Default object storage not found");
-        return defaultObjectStorage.Id;
+            Id = organization.Id,
+            Name = organization.Name,
+            Description = organization.Description,
+            LastUpdatedAt = organization.LastUpdatedAt,
+            LastUpdatedBy = organization.LastUpdatedBy,
+            IsArchived = organization.IsArchived,
+            DefaultOrg = organization.DefaultOrg,
+            Banner = organization.Banner,
+            RequireSensitivityLabel = organization.RequireSensitivityLabel,
+            Theme = organization.Theme,
+            CreateContainerPerProject = organization.CreateContainerPerProject,
+            DisableFileTransfer = organization.DisableFileTransfer,
+            DefaultObjectStorageId = organization.DefaultObjectStorageId
+        };
     }
 }
