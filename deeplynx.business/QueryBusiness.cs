@@ -30,279 +30,306 @@ public class QueryBusiness : IQueryBusiness
         _projectRolePermissionService = projectRolePermissionService;
     }
 
-    /// <summary>
-    ///     Build a query
-    /// </summary>
-    /// <param name="currentUserId">The ID of current user</param>
-    /// <param name="request">Array of query component dtos, initial connector string will be null</param>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="textSearch">Full text search phrase</param>
-    /// <param name="projectIds">Project ids that a user has access to</param>
-    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
-    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
-    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-    /// <returns>A list of record response dtos from the query view that match provided filters</returns>
-    public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
-        long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request, long organizationId, long[] projectIds,
-        string? textSearch = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+   // Add this as a field on the QueryBusiness class (near other private fields),
+// so it's shared by QueryBuilder, QueryBuilderPaginated, and any other method
+// that needs to validate a query_records filter column.
+private static readonly HashSet<string> AllowedQueryRecordFilterColumns = new(StringComparer.OrdinalIgnoreCase)
+{
+    "id", "name", "description", "uri", "original_id", "class_id", "class_name",
+    "data_source_id", "data_source_name", "project_id", "project_name",
+    "object_storage_id", "object_storage_name", "last_updated_at", "last_updated_by",
+    "is_archived", "properties", "tags"
+};
+
+/// <summary>
+///     Build a query
+/// </summary>
+/// <param name="currentUserId">The ID of current user</param>
+/// <param name="request">Array of query component dtos, initial connector string will be null</param>
+/// <param name="organizationId">The ID of the organization to which the project belongs</param>
+/// <param name="textSearch">Full text search phrase</param>
+/// <param name="projectIds">Project ids that a user has access to</param>
+/// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+/// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+/// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+/// <returns>A list of record response dtos from the query view that match provided filters</returns>
+public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
+    long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request, long organizationId, long[] projectIds,
+    string? textSearch = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+{
+    if (request == null) throw new ArgumentException("Custom query request dto cannot be null");
+    try
     {
-        if (request == null) throw new ArgumentException("Custom query request dto cannot be null");
-        try
+        var authorizedLabelIds = new List<long>();
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
-            var authorizedLabelIds = new List<long>();
-            if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+            authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectIds, "read record");
+        }
+
+        var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
+            AND (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM deeplynx.record_labels rl
+                    WHERE rl.record_id = qr.id
+                )
+                OR
+                NOT EXISTS (
+                    SELECT 1
+                    FROM deeplynx.record_labels rl2
+                    WHERE rl2.record_id = qr.id
+                    AND rl2.label_id != ALL(@authorizedLabelIds)
+                )
+            )" : "";
+
+        var sql = $@"
+            SELECT
+                qr.*,
+                qr.class_id as ClassId,
+                qr.class_name as ClassName,
+                qr.original_id as OriginalId,
+                qr.data_source_name as DataSourceName,
+                qr.data_source_id as DataSourceId,
+                qr.project_name as ProjectName,
+                qr.project_id as ProjectId,
+                qr.last_updated_at as LastUpdatedAt,
+                qr.last_updated_by as LastUpdatedBy,
+                qr.object_storage_name as ObjectStorageName,
+                qr.object_storage_id as ObjectStorageId,
+                qr.id as RecordId,
+                qr.is_archived as IsArchived
+            FROM deeplynx.query_records qr
+            WHERE qr.is_archived = false
+            AND qr.project_id = ANY(@projectIds)
+            AND qr.organization_id = @organizationId
+            {authorizationFilter}";
+
+        var parameters = new List<NpgsqlParameter>
+        {
+            new NpgsqlParameter("projectIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = projectIds },
+            new NpgsqlParameter("organizationId", organizationId)
+        };
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            parameters.Add(new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
             {
-                authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                    currentUserId, organizationId, projectIds, "read record");
-            }
+                Value = authorizedLabelIds.ToArray()
+            });
+        }
 
-            var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
-                AND (
-                    NOT EXISTS (
-                        SELECT 1
-                        FROM deeplynx.record_labels rl
-                        WHERE rl.record_id = qr.id
-                    )
-                    OR
-                    NOT EXISTS (
-                        SELECT 1
-                        FROM deeplynx.record_labels rl2
-                        WHERE rl2.record_id = qr.id
-                        AND rl2.label_id != ALL(@authorizedLabelIds)
-                    )
-                )" : "";
-
-            var sql = $@"
-                SELECT
-                    qr.*,
-                    qr.class_id as ClassId,
-                    qr.class_name as ClassName,
-                    qr.original_id as OriginalId,
-                    qr.data_source_name as DataSourceName,
-                    qr.data_source_id as DataSourceId,
-                    qr.project_name as ProjectName,
-                    qr.project_id as ProjectId,
-                    qr.last_updated_at as LastUpdatedAt,
-                    qr.last_updated_by as LastUpdatedBy,
-                    qr.object_storage_name as ObjectStorageName,
-                    qr.object_storage_id as ObjectStorageId,
-                    qr.id as RecordId,
-                    qr.is_archived as IsArchived
-                FROM deeplynx.query_records qr
-                WHERE qr.is_archived = false
-                AND qr.project_id = ANY(@projectIds)
-                AND qr.organization_id = @organizationId
-                {authorizationFilter}";
-
-            var parameters = new List<NpgsqlParameter>
+        // Build individual conditions
+        var conditions = new List<string>();
+        if (request?.Length > 0)
+            for (var i = 0; i < request.Length; i++)
             {
-                new NpgsqlParameter("projectIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = projectIds },
-                new NpgsqlParameter("organizationId", organizationId)
-            };
+                var query = request[i];
 
-            if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-            {
-                parameters.Add(new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+                // -----------------------------------------------------------
+                // SECURITY: query.Filter is later interpolated directly into
+                // raw SQL as a column reference (e.g. $"qr.{query.Filter} = ...").
+                // Without this check, a caller can pass arbitrary SQL instead
+                // of a column name (e.g. "id = 1 OR 1=1 OR qr.id"), resulting
+                // in SQL injection. Only allow exact matches against a known,
+                // fixed set of real query_records columns - reject anything
+                // else before it ever reaches string interpolation.
+                // -----------------------------------------------------------
+                if (string.IsNullOrWhiteSpace(query.Filter) || !AllowedQueryRecordFilterColumns.Contains(query.Filter))
                 {
-                    Value = authorizedLabelIds.ToArray()
-                });
-            }
+                    throw new ArgumentException(
+                        $"Invalid filter field: '{query.Filter}'. Filter must be one of the allowed query_records columns.");
+                }
 
-            // Build individual conditions
-            var conditions = new List<string>();
-            if (request?.Length > 0)
-                for (var i = 0; i < request.Length; i++)
+                if (string.IsNullOrWhiteSpace(query.Value) && query.Operator != "KEY_VALUE")
+                    throw new ArgumentException("Value cannot be null or empty.");
+                var condition = "";
+                var paramName = $"param{i}";
+
+                // Build the individual condition
+                if (query.Operator == "KEY_VALUE")
                 {
-                    var query = request[i];
-                    if (string.IsNullOrWhiteSpace(query.Value) && query.Operator != "KEY_VALUE")
-                        throw new ArgumentException("Value cannot be null or empty.");
-                    var condition = "";
-                    var paramName = $"param{i}";
+                    condition = $"({query.Filter}::jsonb @> @{paramName}::jsonb)";
+                    parameters.Add(new NpgsqlParameter(paramName, query.Json));
+                }
+                else if (query.Operator == "LIKE")
+                {
+                    // Check if this is a JSONB column that needs special handling
+                    var jsonbColumns = new[] { "properties", "tags" };
 
-                    // Build the individual condition
-                    if (query.Operator == "KEY_VALUE")
+                    if (jsonbColumns.Contains(query.Filter.ToLower()))
                     {
-                        condition = $"({query.Filter}::jsonb @> @{paramName}::jsonb)";
-                        parameters.Add(new NpgsqlParameter(paramName, query.Json));
-                    }
-                    else if (query.Operator == "LIKE")
-                    {
-                        // Check if this is a JSONB column that needs special handling
-                        var jsonbColumns = new[] { "properties", "tags" };
-
-                        if (jsonbColumns.Contains(query.Filter.ToLower()))
-                        {
-                            if (query.Filter.ToLower() == "tags")
-                                // Tags are an array of objects - flatten and search only the name values
-                                condition =
-                                    $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' ILIKE @{paramName})";
-                            else
-                                // Properties is a flat object already - we can just search the values
-                                condition =
-                                    $"EXISTS (SELECT 1 FROM jsonb_each_text(qr.{query.Filter}) WHERE value ILIKE @{paramName})";
-                        }
+                        if (query.Filter.ToLower() == "tags")
+                            // Tags are an array of objects - flatten and search only the name values
+                            condition =
+                                $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' ILIKE @{paramName})";
                         else
-                        {
-                            condition = $"qr.{query.Filter} ILIKE @{paramName}";
-                        }
-
-                        parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
-                    }
-                    else if (query.Operator == "=")
-                    {
-                        // Check if this is a JSONB column that needs special handling
-                        var jsonbColumns = new[] { "properties", "tags" };
-
-                        if (jsonbColumns.Contains(query.Filter.ToLower()))
-                        {
-                            if (query.Filter.ToLower() == "tags")
-                            {
-                                condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' = @{paramName})";
-                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
-                            }
-                            else
-                            {
-                                condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
-                                parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
-                            }
-                        }
-                        else
-                        {
-                            condition = $"qr.{query.Filter} = @{paramName}";
-                            if (int.TryParse(query.Value, out var intVal))
-                                parameters.Add(new NpgsqlParameter(paramName, intVal));
-                            else if (DateTime.TryParse(query.Value, out var dateVal))
-                            {
-                                var startOfDay = dateVal.Date;
-                                var startOfNextDay = dateVal.Date.AddDays(1);
-                                var paramName2 = $"p{parameters.Count + 1}";
-                                condition = $"qr.{query.Filter} >= @{paramName} AND qr.{query.Filter} < @{paramName2}";
-                                parameters.Add(new NpgsqlParameter(paramName, startOfDay));
-                                parameters.Add(new NpgsqlParameter(paramName2, startOfNextDay));
-                            }
-                            else
-                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
-                        }
-                    }
-                    else if (query.Operator == ">")
-                    {
-
-                        condition = $"qr.{query.Filter} > @{paramName}";
-
-                        if (DateTime.TryParse(query.Value, out var dateVal))
-                            parameters.Add(new NpgsqlParameter(paramName, dateVal));
-                        else
-                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
-                    }
-                    else if (query.Operator == "<")
-                    {
-                        condition = $"qr.{query.Filter} < @{paramName}";
-
-                        if (DateTime.TryParse(query.Value, out var dateVal))
-                            parameters.Add(new NpgsqlParameter(paramName, dateVal));
-                        else
-                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                            // Properties is a flat object already - we can just search the values
+                            condition =
+                                $"EXISTS (SELECT 1 FROM jsonb_each_text(qr.{query.Filter}) WHERE value ILIKE @{paramName})";
                     }
                     else
                     {
-                        throw new ArgumentException("Invalid operator in query.");
+                        condition = $"qr.{query.Filter} ILIKE @{paramName}";
                     }
 
-                    if (!string.IsNullOrEmpty(condition)) conditions.Add(condition);
+                    parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
                 }
-
-            if (conditions.Any())
-            {
-                sql += " AND (";
-
-                for (var i = 0; i < conditions.Count; i++)
+                else if (query.Operator == "=")
                 {
-                    if (i > 0)
-                    {
-                        var connector = request[i].Connector?.ToUpper() == "OR" ? " OR " : " AND ";
-                        sql += connector;
-                    }
+                    // Check if this is a JSONB column that needs special handling
+                    var jsonbColumns = new[] { "properties", "tags" };
 
-                    sql += conditions[i];
+                    if (jsonbColumns.Contains(query.Filter.ToLower()))
+                    {
+                        if (query.Filter.ToLower() == "tags")
+                        {
+                            condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' = @{paramName})";
+                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                        }
+                        else
+                        {
+                            condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
+                            parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
+                        }
+                    }
+                    else
+                    {
+                        condition = $"qr.{query.Filter} = @{paramName}";
+                        if (int.TryParse(query.Value, out var intVal))
+                            parameters.Add(new NpgsqlParameter(paramName, intVal));
+                        else if (DateTime.TryParse(query.Value, out var dateVal))
+                        {
+                            var startOfDay = dateVal.Date;
+                            var startOfNextDay = dateVal.Date.AddDays(1);
+                            var paramName2 = $"p{parameters.Count + 1}";
+                            condition = $"qr.{query.Filter} >= @{paramName} AND qr.{query.Filter} < @{paramName2}";
+                            parameters.Add(new NpgsqlParameter(paramName, startOfDay));
+                            parameters.Add(new NpgsqlParameter(paramName2, startOfNextDay));
+                        }
+                        else
+                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                    }
+                }
+                else if (query.Operator == ">")
+                {
+
+                    condition = $"qr.{query.Filter} > @{paramName}";
+
+                    if (DateTime.TryParse(query.Value, out var dateVal))
+                        parameters.Add(new NpgsqlParameter(paramName, dateVal));
+                    else
+                        parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                }
+                else if (query.Operator == "<")
+                {
+                    condition = $"qr.{query.Filter} < @{paramName}";
+
+                    if (DateTime.TryParse(query.Value, out var dateVal))
+                        parameters.Add(new NpgsqlParameter(paramName, dateVal));
+                    else
+                        parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                }
+                else
+                {
+                    throw new ArgumentException("Invalid operator in query.");
                 }
 
-                sql += ")";
+                if (!string.IsNullOrEmpty(condition)) conditions.Add(condition);
             }
 
-            if (!string.IsNullOrWhiteSpace(textSearch))
+        if (conditions.Any())
+        {
+            sql += " AND (";
+
+            for (var i = 0; i < conditions.Count; i++)
             {
-                // Split query into words and add :* to each for prefix matching
-                var processedQuery = string.Join(" & ",
-                    textSearch.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(word => word.Trim() + ":*"));
-                var processedQueryParam = new NpgsqlParameter("processedQuery", processedQuery);
-                var originalQueryParam = new NpgsqlParameter("originalQuery", textSearch);
-                parameters.Add(processedQueryParam);
-                parameters.Add(originalQueryParam);
+                if (i > 0)
+                {
+                    var connector = request[i].Connector?.ToUpper() == "OR" ? " OR " : " AND ";
+                    sql += connector;
+                }
 
-                var textSearchCondition = @"
-                    AND (
-                        to_tsvector('english',
-                                coalesce(name, '') || ' ' ||
-                                coalesce(description, '') || ' ' ||
-                                coalesce(class_name, '') || ' ' ||
-                                coalesce(uri, '') || ' ' ||
-                                coalesce(original_id, '') || ' ' ||
-                                coalesce(data_source_name, '') || ' ' ||
-                                coalesce(project_name, '') || ' ' ||
-                                coalesce(properties::text, '') || ' ' ||
-                                coalesce(tags::text, '')
-                            )@@ to_tsquery('english', @processedQuery)
-                        OR qr.name ILIKE '%' || @originalQuery || '%'
-                        OR qr.description ILIKE '%' || @originalQuery || '%'
-                        OR qr.original_id ILIKE '%' || @originalQuery || '%'
-                        OR qr.data_source_name ILIKE '%' || @originalQuery || '%'
-                        OR qr.project_name ILIKE '%' || @originalQuery || '%'
-                        OR qr.class_name ILIKE '%' || @originalQuery || '%'
-                    )";
-
-                sql += textSearchCondition;
+                sql += conditions[i];
             }
 
-            // Add ORDER BY
-            sql += " ORDER BY qr.id, qr.last_updated_at DESC";
+            sql += ")";
+        }
 
-            // Execute the query with parameters
-            var queryRecordResults = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
+        if (!string.IsNullOrWhiteSpace(textSearch))
+        {
+            // Split query into words and add :* to each for prefix matching
+            var processedQuery = string.Join(" & ",
+                textSearch.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(word => word.Trim() + ":*"));
+            var processedQueryParam = new NpgsqlParameter("processedQuery", processedQuery);
+            var originalQueryParam = new NpgsqlParameter("originalQuery", textSearch);
+            parameters.Add(processedQueryParam);
+            parameters.Add(originalQueryParam);
 
-            var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
-                _sensitivityLabelService,
-                currentUserId,
-                organizationId,
-                projectIds,
-                isSysAdmin || isOrgAdmin || isProjectAdmin);
+            var textSearchCondition = @"
+                AND (
+                    to_tsvector('english',
+                            coalesce(name, '') || ' ' ||
+                            coalesce(description, '') || ' ' ||
+                            coalesce(class_name, '') || ' ' ||
+                            coalesce(uri, '') || ' ' ||
+                            coalesce(original_id, '') || ' ' ||
+                            coalesce(data_source_name, '') || ' ' ||
+                            coalesce(project_name, '') || ' ' ||
+                            coalesce(properties::text, '') || ' ' ||
+                            coalesce(tags::text, '')
+                        )@@ to_tsquery('english', @processedQuery)
+                    OR qr.name ILIKE '%' || @originalQuery || '%'
+                    OR qr.description ILIKE '%' || @originalQuery || '%'
+                    OR qr.original_id ILIKE '%' || @originalQuery || '%'
+                    OR qr.data_source_name ILIKE '%' || @originalQuery || '%'
+                    OR qr.project_name ILIKE '%' || @originalQuery || '%'
+                    OR qr.class_name ILIKE '%' || @originalQuery || '%'
+                )";
 
-            return await queryRecordResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToListAsync();
+            sql += textSearchCondition;
         }
-        catch (PostgresException ex) when (ex.SqlState == "42703") // undefined_column
-        {
-            throw new ArgumentException(
-                "Invalid column name in query. Please check your filter fields against the query_records view structure.",
-                ex);
-        }
-        catch (PostgresException ex) when (ex.SqlState == "42601") // syntax_error
-        {
-            throw new ArgumentException("Invalid query syntax. Please check your operators and values.", ex);
-        }
-        catch (PostgresException ex) when (ex.SqlState == "22P02")
-        {
-            throw new ArgumentException(
-                "Invalid data type in query. Please check that your values match the expected column data types.", ex);
-        }
-        catch (JsonException ex)
-        {
-            throw new ArgumentException($"Invalid JSON format in KEY_VALUE operation: {ex.Message}", ex);
-        }
-        catch (Exception ex)
-        {
-            throw new ArgumentException($"Error executing query: {ex.Message}", ex);
-        }
+
+        // Add ORDER BY
+        sql += " ORDER BY qr.id, qr.last_updated_at DESC";
+
+        // Execute the query with parameters
+        var queryRecordResults = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
+
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projectIds,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return await queryRecordResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToListAsync();
     }
+    catch (PostgresException ex) when (ex.SqlState == "42703") // undefined_column
+    {
+        throw new ArgumentException(
+            "Invalid column name in query. Please check your filter fields against the query_records view structure.",
+            ex);
+    }
+    catch (PostgresException ex) when (ex.SqlState == "42601") // syntax_error
+    {
+        throw new ArgumentException("Invalid query syntax. Please check your operators and values.", ex);
+    }
+    catch (PostgresException ex) when (ex.SqlState == "22P02")
+    {
+        throw new ArgumentException(
+            "Invalid data type in query. Please check that your values match the expected column data types.", ex);
+    }
+    catch (JsonException ex)
+    {
+        throw new ArgumentException($"Invalid JSON format in KEY_VALUE operation: {ex.Message}", ex);
+    }
+    catch (Exception ex)
+    {
+        throw new ArgumentException($"Error executing query: {ex.Message}", ex);
+    }
+}
 
     /// <summary>
     ///     Build a paginated query
