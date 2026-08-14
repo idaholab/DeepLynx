@@ -9,14 +9,12 @@ type MetadataSchemaTranslations = {
   CLASS_ID_MUST_BE_GREATER_THAN_ZERO: string;
 };
 
-export const createMetadataUploadSchema = (
-  t: MetadataSchemaTranslations,
-) =>
+export const createMetadataUploadSchema = (t: MetadataSchemaTranslations) =>
   z.object({
     Name: z.string().trim().min(1, t.NAME_REQUIRED),
     Description: z.string().trim().min(1, t.DESCRIPTION_REQUIRED),
-    OriginalId: z.string().trim().min(1, t.ORIGINAL_ID_REQUIRED),
-    ClassName: z.string().trim().min(1).optional(),
+    OriginalId: z.string().trim().optional(),
+    ClassName: z.string().trim().optional(),
     ClassId: z
       .number({
         error: t.CLASS_ID_MUST_BE_NUMBER_NOT_STRING,
