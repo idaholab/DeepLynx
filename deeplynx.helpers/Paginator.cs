@@ -15,12 +15,15 @@ public static class Paginator
     /// <param name="paginated">The paginated request</param>
     /// <param name="values">The query</param>
     /// <returns>The query paginated</returns>
-    static public Task<PaginatedResponse<T>> ToPaginatedAsync<T>(this IQueryable<T> values, PaginatedRequestDto paginated) =>
-        IsPaginated(paginated) ? Paginate(values, paginated) : Paginate(values);
+    static public Task<PaginatedResponse<T>> ToPaginatedAsync<T>(this IQueryable<T> values, PaginatedRequestDto paginated)
+    {
+        if (paginated.PageSize == -1)
+        {
+            return PaginateAll(values);
+        }
 
-    /// <returns>`true` if pagination is enabled and `false` if all entities should be included.</returns>
-    static private bool IsPaginated(PaginatedRequestDto paginated) =>
-        paginated.PageSize != -1;
+        return Paginate(values, paginated);
+    }
 
     /// <summary>
     /// Paginates a query.
@@ -36,7 +39,7 @@ public static class Paginator
             Items = await values
                     .Skip((paginated.PageNumber - 1) * paginated.PageSize)
                     .Take(paginated.PageSize)
-                    .ToListAsync(),
+                    .ToListAsync() ?? [],
             PageNumber = paginated.PageNumber,
             PageSize = paginated.PageSize,
             TotalCount = await values.CountAsync(),
@@ -49,9 +52,9 @@ public static class Paginator
     /// <typeparam name="T">The query type</typeparam>
     /// <param name="values">The query</param>
     /// <returns>The query paginated</returns>
-    static private async Task<PaginatedResponse<T>> Paginate<T>(IQueryable<T> values)
+    static private async Task<PaginatedResponse<T>> PaginateAll<T>(IQueryable<T> values)
     {
-        var items = await values.ToListAsync();
+        var items = await values.ToListAsync() ?? [];
         return new PaginatedResponse<T>
         {
             Items = items,

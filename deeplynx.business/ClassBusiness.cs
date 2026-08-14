@@ -46,7 +46,7 @@ public class ClassBusiness : IClassBusiness
         _projectRolePermissionService = projectRolePermissionService;
         _adminService = adminService;
     }
-    
+
     /// <summary>
     ///     Retrieves all classes
     /// </summary>
@@ -136,19 +136,7 @@ public class ClassBusiness : IClassBusiness
 
         var orderedQuery = query.OrderBy(c => c.Id);
 
-        return await orderedQuery.Select(c => new ClassResponseDto
-        {
-            Id = c.Id,
-            Name = c.Name,
-            Description = c.Description,
-            Properties = c.Properties,
-            Uuid = c.Uuid,
-            ProjectId = c.ProjectId,
-            OrganizationId = c.OrganizationId,
-            LastUpdatedAt = c.LastUpdatedAt,
-            LastUpdatedBy = c.LastUpdatedBy,
-            IsArchived = c.IsArchived
-        }).ToPaginatedAsync(paginatedRequestDto);
+        return await orderedQuery.Select(c => ClassToResponse(c)).ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -769,4 +757,21 @@ public class ClassBusiness : IClassBusiness
     }
 
     #endregion
+
+    private static ClassResponseDto ClassToResponse(Class c)
+    {
+        return new ClassResponseDto
+        {
+            Id = c.Id,
+            Name = c.Name,
+            Description = c.Description,
+            Uuid = c.Uuid,
+            Properties = c.Properties,
+            ProjectId = c.ProjectId,
+            OrganizationId = c.OrganizationId,
+            LastUpdatedAt = c.LastUpdatedAt,
+            LastUpdatedBy = c.LastUpdatedBy,
+            IsArchived = c.IsArchived
+        };
+    }
 }
