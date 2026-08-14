@@ -32,11 +32,9 @@ public class GroupBusiness : IGroupBusiness
     /// <returns>A paginated response of groups within the given organization</returns>
     public async Task<PaginatedResponse<GroupResponseDto>> GetAllGroupsPaginated(
         long organizationId,
-        PaginatedRequestDto? paginatedRequestDto = null,
+        PaginatedRequestDto paginatedRequestDto,
         bool hideArchived = true)
     {
-        var returnAll = paginatedRequestDto.PageSize == -1;
-
         var query = _context.Groups.Where(g => g.OrganizationId == organizationId);
 
         if (hideArchived)
@@ -44,56 +42,7 @@ public class GroupBusiness : IGroupBusiness
 
         var orderedQuery = query.OrderBy(g => g.Id);
 
-        if (returnAll)
-        {
-            var allGroups = await orderedQuery
-                .Select(g => new GroupResponseDto
-                {
-                    Id = g.Id,
-                    Name = g.Name,
-                    Description = g.Description,
-                    LastUpdatedAt = g.LastUpdatedAt,
-                    LastUpdatedBy = g.LastUpdatedBy,
-                    IsArchived = g.IsArchived,
-                    OrganizationId = g.OrganizationId,
-                    MemberCount = g.Users.Count(u => !u.IsArchived)
-                })
-                .ToListAsync();
-
-            return new PaginatedResponse<GroupResponseDto>
-            {
-                Items = allGroups,
-                PageNumber = 1,
-                PageSize = allGroups.Count,
-                TotalCount = allGroups.Count
-            };
-        }
-
-        var totalCount = await query.CountAsync();
-
-        var groups = await orderedQuery
-            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
-            .Take(paginatedRequestDto.PageSize)
-            .Select(g => new GroupResponseDto
-            {
-                Id = g.Id,
-                Name = g.Name,
-                Description = g.Description,
-                LastUpdatedAt = g.LastUpdatedAt,
-                LastUpdatedBy = g.LastUpdatedBy,
-                IsArchived = g.IsArchived,
-                OrganizationId = g.OrganizationId,
-                MemberCount = g.Users.Count(u => !u.IsArchived)
-            })
-            .ToListAsync();
-
-        return new PaginatedResponse<GroupResponseDto>
-        {
-            Items = groups,
-            PageNumber = paginatedRequestDto.PageNumber,
-            PageSize = paginatedRequestDto.PageSize,
-            TotalCount = totalCount
-        };
+        return await orderedQuery.Select(g => GroupToResponse(g)).ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -461,5 +410,19 @@ public class GroupBusiness : IGroupBusiness
                 IsActive = u.IsActive
             })
             .ToList();
+    }
+
+    private static GroupResponseDto GroupToResponse(Group group)
+    {
+        return new GroupResponseDto
+        {
+            Id = group.Id,
+            Name = group.Name,
+            Description = group.Description,
+            LastUpdatedAt = group.LastUpdatedAt,
+            LastUpdatedBy = group.LastUpdatedBy,
+            IsArchived = group.IsArchived,
+            OrganizationId = group.OrganizationId
+        };
     }
 }

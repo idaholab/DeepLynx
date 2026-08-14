@@ -9,7 +9,7 @@ public interface IGroupBusiness
     Task<IEnumerable<GroupResponseDto>> GetAllGroups(long organizationId, bool hideArchived = true);
     Task<PaginatedResponse<GroupResponseDto>> GetAllGroupsPaginated(
         long organizationId,
-        PaginatedRequestDto? paginatedRequestDto = null,
+        PaginatedRequestDto paginatedRequestDto,
         bool hideArchived = true);
     Task<GroupResponseDto> GetGroup(long organizationId, long groupId, bool hideArchived = true);
     Task<GroupResponseDto> CreateGroup(long currentUserId, long organizationId, CreateGroupRequestDto dto);
