@@ -359,45 +359,11 @@ public class TokenBusiness : ITokenBusiness
     /// <returns>A paginated list of API keys, or all API keys if no pagination is specified</returns>
     async Task<PaginatedResponse<string>> ITokenBusiness.GetAllUserKeysPaginated(long currentUserId, PaginatedRequestDto paginatedRequestDto)
     {
-        var returnAll = paginatedRequestDto.PageSize == -1;
-
-        var keyQuery = _context.ApiKeys
-            .Where(r => r.UserId == currentUserId);
-
-        var orderedQuery = keyQuery.OrderBy(k => k.Id);
-
-        if (returnAll)
-        {
-            // Send just the key, not the secret
-            var allKeys = await orderedQuery
-                .Select(k => k.Key)
-                .ToListAsync();
-
-            return new PaginatedResponse<string>
-            {
-                Items = allKeys,
-                PageNumber = 1,
-                PageSize = allKeys.Count,
-                TotalCount = allKeys.Count
-            };
-        }
-
-        var totalCount = await keyQuery.CountAsync();
-
-        // Send just the key, not the secret
-        var keys = await orderedQuery
-            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
-            .Take(paginatedRequestDto.PageSize)
+        return await _context.ApiKeys
+            .Where(r => r.UserId == currentUserId)
+            .OrderBy(k => k.Id)
             .Select(k => k.Key)
-            .ToListAsync();
-
-        return new PaginatedResponse<string>
-        {
-            Items = keys,
-            PageNumber = paginatedRequestDto.PageNumber,
-            PageSize = paginatedRequestDto.PageSize,
-            TotalCount = totalCount
-        };
+            .ToPaginatedAsync(paginatedRequestDto);
     }
 
     #region Deprecated
