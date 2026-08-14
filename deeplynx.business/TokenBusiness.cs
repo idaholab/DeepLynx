@@ -356,6 +356,59 @@ public class TokenBusiness : ITokenBusiness
     /// </summary>
     /// <param name="currentUserId">The ID of the user for which to list API keys</param>
     /// <returns></returns>
+    async Task<PaginatedResponse<string>> ITokenBusiness.GetAllUserKeysPaginated(long currentUserId, PaginatedRequestDto paginatedRequestDto)
+    {
+        var returnAll = paginatedRequestDto.PageSize == -1;
+
+        var keyQuery = _context.ApiKeys
+            .Where(r => r.UserId == currentUserId);
+
+        var orderedQuery = keyQuery.OrderBy(k => k.Id);
+
+        if (returnAll)
+        {
+            // Send just the key, not the secret
+            var allKeys = await orderedQuery
+                .Select(k => k.Key)
+                .ToListAsync();
+
+            return new PaginatedResponse<string>
+            {
+                Items = allKeys,
+                PageNumber = 1,
+                PageSize = allKeys.Count,
+                TotalCount = allKeys.Count
+            };
+        }
+
+        var totalCount = await keyQuery.CountAsync();
+
+        // Send just the key, not the secret
+        var keys = await orderedQuery
+            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
+            .Take(paginatedRequestDto.PageSize)
+            .Select(k => k.Key)
+            .ToListAsync();
+
+        return new PaginatedResponse<string>
+        {
+            Items = keys,
+            PageNumber = paginatedRequestDto.PageNumber,
+            PageSize = paginatedRequestDto.PageSize,
+            TotalCount = totalCount
+        };
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    /// [DEPRECATED - V1 ONLY] List all API keys for a user without pagination
+    /// Superseded by <see cref="GetAllUserKeysPaginated"/>. Do not call this from new controller versions;
+    /// it exists solely to back the deprecated v1 token controllers and should be deleted once
+    /// those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user for which to list API keys</param>
+    /// <returns></returns>
     async Task<List<string>> ITokenBusiness.GetAllUserKeys(long currentUserId)
     {
         // Query for existing records (excluding archived)
@@ -366,4 +419,6 @@ public class TokenBusiness : ITokenBusiness
         var keys = userApiKeys.Select(c => c.Key).ToList();
         return keys;
     }
+
+    #endregion
 }

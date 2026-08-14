@@ -136,13 +136,17 @@ public class TokenController : ControllerBase
     /// <summary>
     ///     Get All API Keys Associated with the Current User
     /// </summary>
-    /// <returns>A list of API keys; secrets are never returned.</returns>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of API keys; secrets are never returned.</returns>
     [HttpGet("keys", Name = "api_get_all_user_keys")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<ActionResult<List<string>>> GetAllUserKeys()
+    public async Task<ActionResult<PaginatedResponse<string>>> GetAllUserKeys(
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null
+    )
     {
+        paginatedRequestDto ??= new PaginatedRequestDto();
         var currentUserId = UserContextStorage.UserId;
-        var keys = await _tokenBusiness.GetAllUserKeys(currentUserId);
+        var keys = await _tokenBusiness.GetAllUserKeysPaginated(currentUserId, paginatedRequestDto);
         return Ok(keys);
     }
 
