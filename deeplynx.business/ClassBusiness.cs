@@ -20,22 +20,6 @@ public class ClassBusiness : IClassBusiness
 
     private readonly IRelationshipBusiness _relationshipBusiness;
 
-    // Converts a class to a response DTO. Used an expression for IQuerable.
-    static private readonly Expression<Func<Class, ClassResponseDto>> ClassToResponse = c =>
-    new()
-    {
-        Id = c.Id,
-        Name = c.Name,
-        Description = c.Description,
-        Properties = c.Properties,
-        Uuid = c.Uuid,
-        ProjectId = c.ProjectId,
-        OrganizationId = c.OrganizationId,
-        LastUpdatedAt = c.LastUpdatedAt,
-        LastUpdatedBy = c.LastUpdatedBy,
-        IsArchived = c.IsArchived
-    };
-
     /// <summary>
     ///     Initializes a new instance of the <see cref="ClassBusiness" /> class.
     /// </summary>
@@ -152,7 +136,19 @@ public class ClassBusiness : IClassBusiness
 
         var orderedQuery = query.OrderBy(c => c.Id);
 
-        return await orderedQuery.Select(ClassToResponse).ToPaginatedAsync(paginatedRequestDto);
+        return await orderedQuery.Select(c => new ClassResponseDto
+        {
+            Id = c.Id,
+            Name = c.Name,
+            Description = c.Description,
+            Properties = c.Properties,
+            Uuid = c.Uuid,
+            ProjectId = c.ProjectId,
+            OrganizationId = c.OrganizationId,
+            LastUpdatedAt = c.LastUpdatedAt,
+            LastUpdatedBy = c.LastUpdatedBy,
+            IsArchived = c.IsArchived
+        }).ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
