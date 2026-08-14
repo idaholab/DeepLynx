@@ -13,7 +13,7 @@ public interface IEdgeBusiness
         long currentUserId,
         long organizationId,
         long projectId,
-        PaginatedRequestDto? paginatedRequestDto,
+        PaginatedRequestDto paginatedRequestDto,
         long? dataSourceId = null,
         bool hideArchived = true,
         bool isSysAdmin = false,
