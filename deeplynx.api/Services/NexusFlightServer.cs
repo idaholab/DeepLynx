@@ -53,7 +53,8 @@ public class NexusFlightServer : FlightServer
                 rowsReceived += batch.Length;
                 batchesReceived++;
 
-                //temporary status hardcode for now
+                // TODO: temporary status hardcode for now
+                //       Resolve in https://nstinl.atlassian-us-gov-mod.net/browse/DL-2060
                 string status = "not_persisted";
 
                 var result = BuildPutAck(
@@ -63,12 +64,14 @@ public class NexusFlightServer : FlightServer
                 //per-batch acks are temporary until the storage/checkpointing ticket defines final ack semantics
                 await responseStream.WriteAsync(result);
 
-                //TODO: Add a durable sink for the recieved. Persistance is per batch/checkpoint. 
+                // TODO: Add a durable sink for the received. Persistence is per batch/checkpoint
+                //       Resolve in https://nstinl.atlassian-us-gov-mod.net/browse/DL-2060
             }
         }
         catch (Exception ex)
         {
-            //add abort and storage cleanup here if needed once storage gets hooked up.
+            // TODO: add abort and storage cleanup here if needed once storage gets hooked up
+            //       Resolve in https://nstinl.atlassian-us-gov-mod.net/browse/DL-2060
             throw ToRpcException(ex);
         }
     }
@@ -79,7 +82,9 @@ public class NexusFlightServer : FlightServer
         var ticketBytes = ticket.Ticket.ToByteArray();
         var requestPayload = DeserializeFromBytes(ticketBytes);
 
-        if (requestPayload.TicketName != "dev-ticket123")
+        // TODO: Placeholder ticket name pending real ticket-based lookup/validation
+        //       Resolve in https://nstinl.atlassian-us-gov-mod.net/browse/DL-2035
+        if (requestPayload.TicketName != "todo-placeholder-ticket")
         {
             throw new RpcException(new Status(StatusCode.NotFound, "Unknown ticket"));
         }
@@ -116,6 +121,24 @@ public class NexusFlightServer : FlightServer
 
         Console.WriteLine("DoGet completed successfully.");
 
+    }
+
+    public class TicketPayload
+    {
+        public long OrganizationId { get; set; }
+        [Required]
+        public required string TicketName { get; set; }
+
+        public long ProjectId { get; set; }
+        [Required]
+        public long CurrentUserId { get; set; }
+    }
+
+    public TicketPayload DeserializeFromBytes(byte[] bytes)
+    {
+        var jsonString = System.Text.Encoding.UTF8.GetString(bytes);
+        var payload = JsonSerializer.Deserialize<TicketPayload>(jsonString) ?? throw new InvalidOperationException("Failed to deserialize ticket payload");
+        return payload;
     }
 
     private static RecordBatch ConvertRecordsToRecordBatch(List<RecordResponseDto> records)
@@ -329,23 +352,5 @@ public class NexusFlightServer : FlightServer
             new Status(
                 StatusCode.Internal,
                 $"DoPut failed: {exception.Message}"));
-    }
-
-    public class TicketPayload
-    {
-        public long OrganizationId { get; set; }
-        [Required]
-        public required string TicketName { get; set; }
-
-        public long ProjectId { get; set; }
-        [Required]
-        public long CurrentUserId { get; set; }
-    }
-
-    public TicketPayload DeserializeFromBytes(byte[] bytes)
-    {
-        var jsonString = System.Text.Encoding.UTF8.GetString(bytes);
-        var payload = JsonSerializer.Deserialize<TicketPayload>(jsonString) ?? throw new InvalidOperationException("Failed to deserialize ticket payload");
-        return payload;
     }
 }

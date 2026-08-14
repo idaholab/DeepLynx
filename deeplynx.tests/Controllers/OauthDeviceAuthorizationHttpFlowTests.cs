@@ -4,11 +4,12 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using deeplynx.api.Controllers.V1;
+using deeplynx.api.Controllers.V2;
 using deeplynx.business;
 using deeplynx.datalayer;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
+using deeplynx.helpers.ExceptionHandlers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authentication;
@@ -227,7 +228,7 @@ public class OauthDeviceAuthorizationHttpFlowTests : IntegrationTestBase
 
         builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
         builder.Services.AddControllers()
-            .AddApplicationPart(typeof(TokenController).Assembly);
+            .AddApplicationPart(typeof(OauthDeviceAuthorizationController).Assembly);
         builder.Services.AddDbContext<DeeplynxContext>(options =>
             options.UseNpgsql(_fixture.PostgresDataSource, npgsqlOptions => npgsqlOptions.UseVector()));
         builder.Services.AddAuthentication("Test")
@@ -237,10 +238,13 @@ public class OauthDeviceAuthorizationHttpFlowTests : IntegrationTestBase
         builder.Services.AddScoped<ITokenBusiness, TokenBusiness>();
         builder.Services.AddScoped<IOauthDeviceAuthorizationBusiness, OauthDeviceAuthorizationBusiness>();
         builder.Services.AddSingleton(new Mock<IEventBusiness>().Object);
+        builder.Services.AddProblemDetails();
+        builder.Services.AddExceptionHandler<OauthExceptionHandler>();
 
         _app = builder.Build();
-        _app.UsePathBase("/api/v1");
+        _app.UsePathBase("/api/v2");
         _app.UseRouting();
+        _app.UseExceptionHandler();
         _app.UseAuthentication();
         _app.Use(async (context, next) =>
         {
@@ -255,7 +259,7 @@ public class OauthDeviceAuthorizationHttpFlowTests : IntegrationTestBase
 
         _httpClient = new HttpClient
         {
-            BaseAddress = new Uri($"http://127.0.0.1:{port}/api/v1/")
+            BaseAddress = new Uri($"http://127.0.0.1:{port}/api/v2/")
         };
     }
 

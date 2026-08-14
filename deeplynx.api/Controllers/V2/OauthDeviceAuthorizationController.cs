@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using deeplynx.helpers.Context;
+using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
@@ -13,15 +14,15 @@ namespace deeplynx.api.Controllers.V2;
 [Tags("OauthDeviceAuthorization")]
 public class OauthDeviceAuthorizationController : ControllerBase
 {
+    private const string DeviceCodeGrantType = "urn:ietf:params:oauth:grant-type:device_code";
+    private const string RefreshTokenGrantType = "refresh_token";
+
     private readonly IOauthDeviceAuthorizationBusiness _oauthDeviceAuthorizationBusiness;
-    private readonly ILogger<OauthDeviceAuthorizationController> _logger;
 
     public OauthDeviceAuthorizationController(
-        IOauthDeviceAuthorizationBusiness oauthDeviceAuthorizationBusiness,
-        ILogger<OauthDeviceAuthorizationController> logger)
+        IOauthDeviceAuthorizationBusiness oauthDeviceAuthorizationBusiness)
     {
         _oauthDeviceAuthorizationBusiness = oauthDeviceAuthorizationBusiness;
-        _logger = logger;
     }
 
     /// <summary>
@@ -34,45 +35,52 @@ public class OauthDeviceAuthorizationController : ControllerBase
         [FromForm(Name = "client_id")] string? clientId,
         [FromForm] string? scope)
     {
-        try
-        {
-            var verificationUri = BuildVerificationUri();
-            var response = await _oauthDeviceAuthorizationBusiness.CreateDeviceAuthorizationRequest(
-                clientId,
-                scope,
-                verificationUri);
+        var verificationUri = BuildVerificationUri();
+        var response = await _oauthDeviceAuthorizationBusiness.CreateDeviceAuthorizationRequest(
+            clientId,
+            scope,
+            verificationUri);
 
-            return Ok(response);
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogWarning(ex, "Invalid OAuth device authorization request");
-            return BadRequest(new OauthErrorResponseDto
-            {
-                Error = "invalid_request",
-                ErrorDescription = ex.Message
-            });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            _logger.LogWarning(ex, "OAuth application not found for device authorization request");
-            return NotFound(new OauthErrorResponseDto
-            {
-                Error = "invalid_client",
-                ErrorDescription = ex.Message
-            });
-        }
-        catch (Exception ex)
-        {
-            const string message = "An unexpected error occurred in the OAuth device authorization flow";
-            _logger.LogError(ex, message);
+        return Ok(response);
+    }
 
-            return StatusCode(StatusCodes.Status500InternalServerError, new OauthErrorResponseDto
-            {
-                Error = "server_error",
-                ErrorDescription = message
-            });
+    /// <summary>
+    ///     OAuth 2.0 Token Endpoint
+    /// </summary>
+    /// <param name="grantType">The OAuth grant type</param>
+    /// <param name="deviceCode">The device code returned by the device authorization endpoint</param>
+    /// <param name="refreshToken">The refresh token returned by a previous OAuth token response</param>
+    /// <param name="clientId">The OAuth application's client ID</param>
+    /// <returns>OAuth token response or polling error</returns>
+    [AllowAnonymous]
+    [HttpPost("/oauth/token", Name = "api_oauth_token")]
+    public async Task<IActionResult> ExchangeOauthToken(
+        [FromForm(Name = "grant_type")] string? grantType,
+        [FromForm(Name = "device_code")] string? deviceCode,
+        [FromForm(Name = "refresh_token")] string? refreshToken,
+        [FromForm(Name = "client_id")] string? clientId)
+    {
+        if (string.IsNullOrWhiteSpace(grantType))
+        {
+            throw new OauthException("invalid_request", "grant_type is required", StatusCodes.Status400BadRequest);
         }
+
+        OauthTokenGrantResponseDto response;
+
+        if (grantType == DeviceCodeGrantType)
+        {
+            response = await _oauthDeviceAuthorizationBusiness.ExchangeDeviceCodeForToken(deviceCode, clientId);
+        }
+        else if (grantType == RefreshTokenGrantType)
+        {
+            response = await _oauthDeviceAuthorizationBusiness.ExchangeRefreshTokenForToken(refreshToken, clientId);
+        }
+        else
+        {
+            throw new OauthException("unsupported_grant_type", "Unsupported grant_type", StatusCodes.Status400BadRequest);
+        }
+
+        return Ok(response);
     }
 
     /// <summary>
@@ -84,41 +92,9 @@ public class OauthDeviceAuthorizationController : ControllerBase
     [HttpGet("verify", Name = "api_oauth_device_verify_lookup")]
     public async Task<IActionResult> GetDeviceAuthorizationRequest([FromQuery(Name = "user_code")] string? userCode)
     {
-        try
-        {
-            var response = await _oauthDeviceAuthorizationBusiness.GetDeviceAuthorizationRequest(userCode);
+        var response = await _oauthDeviceAuthorizationBusiness.GetDeviceAuthorizationRequest(userCode);
 
-            return Ok(response);
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogWarning(ex, "Invalid OAuth device verification lookup request");
-            return BadRequest(new OauthErrorResponseDto
-            {
-                Error = "invalid_request",
-                ErrorDescription = ex.Message
-            });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            _logger.LogWarning(ex, "OAuth device authorization request not found");
-            return NotFound(new OauthErrorResponseDto
-            {
-                Error = "invalid_request",
-                ErrorDescription = ex.Message
-            });
-        }
-        catch (Exception ex)
-        {
-            const string message = "An unexpected error occurred while looking up the OAuth device authorization request";
-            _logger.LogError(ex, message);
-
-            return StatusCode(StatusCodes.Status500InternalServerError, new OauthErrorResponseDto
-            {
-                Error = "server_error",
-                ErrorDescription = message
-            });
-        }
+        return Ok(response);
     }
 
     /// <summary>
@@ -131,54 +107,13 @@ public class OauthDeviceAuthorizationController : ControllerBase
     public async Task<IActionResult> SetDeviceAuthorizationDecision(
         [FromBody] DeviceAuthorizationDecisionRequestDto requestDto)
     {
-        try
-        {
-            var userId = UserContextStorage.UserId;
-            var response = await _oauthDeviceAuthorizationBusiness.SetDeviceAuthorizationDecision(
-                requestDto.UserCode,
-                requestDto.Approve,
-                userId);
+        var userId = UserContextStorage.UserId;
+        var response = await _oauthDeviceAuthorizationBusiness.SetDeviceAuthorizationDecision(
+            requestDto.UserCode,
+            requestDto.Approve,
+            userId);
 
-            return Ok(response);
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogWarning(ex, "Invalid OAuth device verification decision request");
-            return BadRequest(new OauthErrorResponseDto
-            {
-                Error = "invalid_request",
-                ErrorDescription = ex.Message
-            });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            _logger.LogWarning(ex, "OAuth device authorization request not found");
-            return NotFound(new OauthErrorResponseDto
-            {
-                Error = "invalid_request",
-                ErrorDescription = ex.Message
-            });
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Invalid OAuth device verification decision");
-            return BadRequest(new OauthErrorResponseDto
-            {
-                Error = "invalid_request",
-                ErrorDescription = ex.Message
-            });
-        }
-        catch (Exception ex)
-        {
-            const string message = "An unexpected error occurred while updating the OAuth device authorization request";
-            _logger.LogError(ex, message);
-
-            return StatusCode(StatusCodes.Status500InternalServerError, new OauthErrorResponseDto
-            {
-                Error = "server_error",
-                ErrorDescription = message
-            });
-        }
+        return Ok(response);
     }
 
     private string BuildVerificationUri()

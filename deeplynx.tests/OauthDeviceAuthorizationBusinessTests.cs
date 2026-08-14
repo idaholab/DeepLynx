@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers.exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -52,13 +53,13 @@ public class OauthDeviceAuthorizationBusinessTests : IntegrationTestBase
         Assert.Contains(deviceResponse.UserCode, deviceResponse.VerificationUriComplete);
 
         // Headless client polls while user approval is pending
-        var pending = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var pending = await Assert.ThrowsAsync<OauthException>(() =>
             _oauthDeviceAuthorizationBusiness.ExchangeDeviceCodeForToken(deviceResponse.DeviceCode, clientId));
-        Assert.Equal("authorization_pending", pending.Message);
+        Assert.Equal("authorization_pending", pending.ErrorCode);
 
-        var slowDown = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var slowDown = await Assert.ThrowsAsync<OauthException>(() =>
             _oauthDeviceAuthorizationBusiness.ExchangeDeviceCodeForToken(deviceResponse.DeviceCode, clientId));
-        Assert.Equal("slow_down", slowDown.Message);
+        Assert.Equal("slow_down", slowDown.ErrorCode);
 
         var storedRequest = await Context.OauthDeviceAuthorizationRequests.SingleAsync();
         Assert.Equal(10, storedRequest.PollingIntervalSeconds);

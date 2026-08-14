@@ -1,7 +1,7 @@
 'use client';
 
 import { CreateOauthApplicationRequestDto, UpdateOauthApplicationRequestDto } from "@/app/(home)/types/requestDTOs";
-import { OauthApplicationResponseDto, OauthApplicationSecureResponseDto } from "@/app/(home)/types/responseDTOs";
+import { DeviceVerificationLookupResponseDto, OauthApplicationResponseDto, OauthApplicationSecureResponseDto } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 /**
@@ -130,15 +130,6 @@ export const archiveOauthApplication = async (
         throw error;
     }
 };
-export interface DeviceVerificationLookupResponseDto {
-    user_code: string;
-    client_id: string;
-    application_name: string;
-    scope?: string | null;
-    expires_at: string;
-    status: string;
-}
-
 export const getDeviceAuthorizationRequest = async (
     userCode: string
 ): Promise<DeviceVerificationLookupResponseDto> => {

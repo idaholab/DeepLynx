@@ -75,6 +75,10 @@ export async function proxy(request: NextRequest) {
   if (!session) {
     const signInUrl = new URL("/login/signin", request.url);
 
+    // NOTE: this redirect path (and the device-verify bypass below) has been fragile
+    // historically. Regular hosted login and the hosted OAuth redirect login from
+    // visualize/other ecosystem apps still need manual browser verification before
+    // relying on this — not something this change can confirm on its own.
     if (pathname.startsWith("/oauth/device/verify")) {
       signInUrl.searchParams.set("returnUrl", `${pathname}${request.nextUrl.search}`);
     }

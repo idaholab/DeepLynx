@@ -279,6 +279,7 @@ try
     builder.Services.AddExceptionHandler<BadRequestExceptionHandler>();
     builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
     builder.Services.AddExceptionHandler<ConflictExceptionHandler>();
+    builder.Services.AddExceptionHandler<OauthExceptionHandler>();
     builder.Services.AddExceptionHandler<InternalServerErrorExceptionHandler>();
 
     //OpenApi Documentation

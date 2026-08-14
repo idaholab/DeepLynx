@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -42,12 +43,12 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
     {
         if (string.IsNullOrWhiteSpace(clientId))
         {
-            throw new ArgumentException("client_id is required");
+            throw new OauthException("invalid_request", "client_id is required", 400);
         }
 
         if (string.IsNullOrWhiteSpace(verificationUri))
         {
-            throw new ArgumentException("verification_uri is required");
+            throw new OauthException("invalid_request", "verification_uri is required", 400);
         }
 
         var application = await _context.OauthApplications
@@ -57,7 +58,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         if (application == null)
         {
-            throw new KeyNotFoundException($"OAuth application with ClientId '{clientId}' not found or has been archived.");
+            throw new OauthException("invalid_client", $"OAuth application with ClientId '{clientId}' not found or has been archived.", 404);
         }
 
         var nowWithoutTz = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -101,12 +102,12 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
     {
         if (string.IsNullOrWhiteSpace(deviceCode))
         {
-            throw new ArgumentException("device_code is required");
+            throw new OauthException("invalid_request", "device_code is required", 400);
         }
 
         if (string.IsNullOrWhiteSpace(clientId))
         {
-            throw new ArgumentException("client_id is required");
+            throw new OauthException("invalid_request", "client_id is required", 400);
         }
 
         var application = await _context.OauthApplications
@@ -116,7 +117,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         if (application == null)
         {
-            throw new KeyNotFoundException($"OAuth application with ClientId '{clientId}' not found or has been archived.");
+            throw new OauthException("invalid_client", $"OAuth application with ClientId '{clientId}' not found or has been archived.", 404);
         }
 
         var deviceCodeHash = HashCode(deviceCode);
@@ -126,7 +127,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         if (request == null)
         {
-            throw new InvalidOperationException("invalid_grant");
+            throw new OauthException("invalid_grant", "invalid_grant", 400);
         }
 
         var nowWithoutTz = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -141,32 +142,32 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
             request.Status = OauthDeviceAuthorizationStatus.Expired;
             await _context.SaveChangesAsync();
             await CleanupExpiredOrConsumedRequests();
-            throw new InvalidOperationException("expired_token");
+            throw new OauthException("expired_token", "expired_token", 400);
         }
 
         if (request.Status == OauthDeviceAuthorizationStatus.Pending && polledTooSoon)
         {
             request.PollingIntervalSeconds += SlowDownIntervalSeconds;
             await _context.SaveChangesAsync();
-            throw new InvalidOperationException("slow_down");
+            throw new OauthException("slow_down", "slow_down", 400);
         }
 
         if (request.Status == OauthDeviceAuthorizationStatus.Pending)
         {
             await _context.SaveChangesAsync();
-            throw new InvalidOperationException("authorization_pending");
+            throw new OauthException("authorization_pending", "authorization_pending", 400);
         }
 
         if (request.Status == OauthDeviceAuthorizationStatus.Denied)
         {
             await _context.SaveChangesAsync();
-            throw new InvalidOperationException("access_denied");
+            throw new OauthException("access_denied", "access_denied", 400);
         }
 
         if (request.Status != OauthDeviceAuthorizationStatus.Approved || !request.UserId.HasValue)
         {
             await _context.SaveChangesAsync();
-            throw new InvalidOperationException("invalid_grant");
+            throw new OauthException("invalid_grant", "invalid_grant", 400);
         }
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
@@ -180,7 +181,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         if (consumedRequestCount != 1)
         {
-            throw new InvalidOperationException("invalid_grant");
+            throw new OauthException("invalid_grant", "invalid_grant", 400);
         }
 
         var tokenKeys = await _tokenBusiness.CreateApiKey(request.UserId.Value, clientId);
@@ -218,12 +219,12 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
     {
         if (string.IsNullOrWhiteSpace(refreshToken))
         {
-            throw new ArgumentException("refresh_token is required");
+            throw new OauthException("invalid_request", "refresh_token is required", 400);
         }
 
         if (string.IsNullOrWhiteSpace(clientId))
         {
-            throw new ArgumentException("client_id is required");
+            throw new OauthException("invalid_request", "client_id is required", 400);
         }
 
         var application = await _context.OauthApplications
@@ -233,7 +234,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         if (application == null)
         {
-            throw new KeyNotFoundException($"OAuth application with ClientId '{clientId}' not found or has been archived.");
+            throw new OauthException("invalid_client", $"OAuth application with ClientId '{clientId}' not found or has been archived.", 404);
         }
 
         var nowWithoutTz = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
@@ -244,7 +245,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         if (storedRefreshToken == null || storedRefreshToken.Revoked)
         {
-            throw new InvalidOperationException("invalid_grant");
+            throw new OauthException("invalid_grant", "invalid_grant", 400);
         }
 
         if (storedRefreshToken.ExpiresAt <= nowWithoutTz)
@@ -253,7 +254,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
             storedRefreshToken.RevokedAt = nowWithoutTz;
             await _context.SaveChangesAsync();
             await CleanupExpiredOrConsumedRequests();
-            throw new InvalidOperationException("invalid_grant");
+            throw new OauthException("invalid_grant", "invalid_grant", 400);
         }
 
         var tokenKeys = await _tokenBusiness.CreateApiKey(storedRefreshToken.UserId, clientId);
@@ -296,12 +297,12 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         if (isExpired)
         {
-            throw new InvalidOperationException("Device authorization request has expired");
+            throw new OauthException("invalid_request", "Device authorization request has expired", 400);
         }
 
         if (request.Status != OauthDeviceAuthorizationStatus.Pending)
         {
-            throw new InvalidOperationException($"Device authorization request is {request.Status}");
+            throw new OauthException("invalid_request", $"Device authorization request is {request.Status}", 400);
         }
 
         request.UserId = userId;
@@ -361,7 +362,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
     {
         if (string.IsNullOrWhiteSpace(userCode))
         {
-            throw new ArgumentException("user_code is required");
+            throw new OauthException("invalid_request", "user_code is required", 400);
         }
 
         var userCodeHash = HashCode(NormalizeUserCode(userCode));
@@ -372,7 +373,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
 
         if (request == null)
         {
-            throw new KeyNotFoundException("Device authorization request not found");
+            throw new OauthException("invalid_request", "Device authorization request not found", 404);
         }
 
         return request;
@@ -427,7 +428,7 @@ public class OauthDeviceAuthorizationBusiness : IOauthDeviceAuthorizationBusines
             }
         }
 
-        throw new InvalidOperationException("Unable to generate a unique user code");
+        throw new OauthException("server_error", "Unable to generate a unique user code", 500);
     }
 
     private string GenerateDeviceCode()

@@ -204,7 +204,6 @@ public class TokenControllerTests : IDisposable
         var v1Controller = new V1TokenController(
             Mock.Of<IEventBusiness>(),
             _mockTokenBusiness.Object,
-            Mock.Of<IOauthDeviceAuthorizationBusiness>(),
             Mock.Of<ILogger<V1TokenController>>());
 
         var result = await v1Controller.CreateToken(request);

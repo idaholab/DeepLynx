@@ -7,7 +7,7 @@ import {
     getDeviceAuthorizationRequest,
     setDeviceAuthorizationDecision,
 } from "@/app/lib/client_service/oauth_services.client";
-import type { DeviceVerificationLookupResponseDto } from "@/app/lib/client_service/oauth_services.client";
+import type { DeviceVerificationLookupResponseDto } from "@/app/(home)/types/responseDTOs";
 
 type ApiError = {
     response?: {

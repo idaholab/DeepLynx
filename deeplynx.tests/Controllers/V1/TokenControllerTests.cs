@@ -15,7 +15,6 @@ public class TokenControllerTests : IDisposable
 {
     private readonly Mock<IEventBusiness> _mockEventBusiness;
     private readonly Mock<ILogger<TokenController>> _mockLogger;
-    private readonly Mock<IOauthDeviceAuthorizationBusiness> _mockOauthDeviceAuthorizationBusiness;
     private readonly Mock<ITokenBusiness> _mockTokenBusiness;
     private readonly TokenController _tokenController;
 
@@ -33,13 +32,11 @@ public class TokenControllerTests : IDisposable
     {
         _mockEventBusiness = new Mock<IEventBusiness>();
         _mockLogger = new Mock<ILogger<TokenController>>();
-        _mockOauthDeviceAuthorizationBusiness = new Mock<IOauthDeviceAuthorizationBusiness>();
         _mockTokenBusiness = new Mock<ITokenBusiness>();
 
         _tokenController = new TokenController(
             _mockEventBusiness.Object,
             _mockTokenBusiness.Object,
-            _mockOauthDeviceAuthorizationBusiness.Object,
             _mockLogger.Object
         );
 
