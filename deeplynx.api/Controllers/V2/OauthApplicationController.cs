@@ -39,13 +39,16 @@ public class OauthApplicationController : ControllerBase
     ///     Get All OAuth Applications
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived applications</param>
-    /// <returns>A list of OAuth applications.</returns>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of OAuth applications.</returns>
     [HttpGet(Name = "api_get_all_oauth_applications")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     public async Task<ActionResult<IEnumerable<OauthApplicationResponseDto>>> GetAllOauthApplications(
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
-        var applications = await _oauthApplicationBusiness.GetAllOauthApplications(hideArchived);
+        paginatedRequestDto ??= new PaginatedRequestDto();
+        var applications = await _oauthApplicationBusiness.GetAllOauthApplicationsPaginated(paginatedRequestDto, hideArchived);
         return Ok(applications);
     }
 
