@@ -1,5 +1,6 @@
-import { test, expect } from "../fixtures";
-import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
+import { test, expect, gotoScope } from "../fixtures";
+import { sysAdmin, ORGS, PROJECTS, authFile } from "../deeplynx-config";
+import fs from 'fs';
 
 const BASE_URL = 'http://localhost:5095/api/v1/';
 
@@ -238,5 +239,31 @@ test.describe("Settings Page", () => {
       key = undefined;
       secret = undefined;
     });
+  });
+
+  test("Verify changes remain after logging out", async ({ page, reAuthenticate }) => {
+    // setup changes in the settings page
+    const darkModeSelector = page.locator('div').filter({ hasText: /^Dark ModeToggle between light and dark themes$/ }).first();
+    await darkModeSelector.locator('label').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'default-dark');
+
+    const languageSelector = page.getByText('LanguageChoose your preferred languageEnglishEspañol');
+    await languageSelector.getByRole('combobox').selectOption('es');
+    const lang = await page.evaluate(() => localStorage.getItem('lang'));
+    expect(lang).toBe('es');
+
+    // log out and back in
+    await page.getByRole('list').filter({ hasText: 'Usa estos identificadores al' }).getByRole('button').click();
+    await page.getByRole('button', { name: 'Cerrar sesión' }).click();
+    await page.waitForURL('**/login/signin');
+    await expect(page.getByRole('img', { name: 'DeepLynx logo' })).toBeVisible();
+
+    await reAuthenticate();
+
+    // verify changes are still there
+    await expect(page.getByRole('heading', { name: 'Resumen del catálogo de datos' })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'default-dark');
+    const langSecondCheck = await page.evaluate(() => localStorage.getItem('lang'));
+    expect(langSecondCheck).toBe('es');
   });
 });
