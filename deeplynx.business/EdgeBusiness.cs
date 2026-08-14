@@ -62,8 +62,6 @@ public class EdgeBusiness : IEdgeBusiness
         bool isSysAdmin = false,
         bool isOrgAdmin = false)
     {
-        var returnAll = paginatedRequestDto?.PageSize == -1;
-
         bool isUserProjectAdmin = false;
 
         isUserProjectAdmin = await _context.ProjectMembers
@@ -108,67 +106,7 @@ public class EdgeBusiness : IEdgeBusiness
 
         var orderedQuery = query.OrderBy(e => e.Id);
 
-        if (returnAll)
-        {
-            var allEdges = await orderedQuery
-                .Select(e => new EdgeResponseDto
-                {
-                    Id = e.Id,
-                    OriginOriginalId = e.Origin.OriginalId,
-                    DestinationOriginalId = e.Destination.OriginalId,
-                    Properties = e.Properties,
-                    OriginId = e.OriginId,
-                    DestinationId = e.DestinationId,
-                    RelationshipId = e.RelationshipId,
-                    DataSourceId = e.DataSourceId,
-                    ProjectId = e.ProjectId,
-                    OrganizationId = e.OrganizationId,
-                    LastUpdatedAt = e.LastUpdatedAt,
-                    LastUpdatedBy = e.LastUpdatedBy,
-                    IsArchived = e.IsArchived
-                })
-                .ToListAsync();
-
-            return new PaginatedResponse<EdgeResponseDto>
-            {
-                Items = allEdges,
-                PageNumber = 1,
-                PageSize = allEdges.Count,
-                TotalCount = allEdges.Count
-            };
-        }
-
-        var totalCount = await query.CountAsync();
-
-        var edges = await orderedQuery
-            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
-            .Take(paginatedRequestDto.PageSize)
-            .Select(e => new EdgeResponseDto
-            {
-                Id = e.Id,
-                OriginOriginalId = e.Origin.OriginalId,
-                DestinationOriginalId = e.Destination.OriginalId,
-                Properties = e.Properties,
-                OriginId = e.OriginId,
-                DestinationId = e.DestinationId,
-                RelationshipId = e.RelationshipId,
-                DataSourceId = e.DataSourceId,
-                ProjectId = e.ProjectId,
-                OrganizationId = e.OrganizationId,
-                LastUpdatedAt = e.LastUpdatedAt,
-                LastUpdatedBy = e.LastUpdatedBy,
-                IsArchived = e.IsArchived
-            })
-            .ToListAsync();
-
-
-        return new PaginatedResponse<EdgeResponseDto>
-        {
-            Items = edges,
-            PageNumber = paginatedRequestDto.PageNumber,
-            PageSize = paginatedRequestDto.PageSize,
-            TotalCount = totalCount
-        };
+        return await orderedQuery.Select(e => EdgeToResponse(e)).ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -738,6 +676,26 @@ public class EdgeBusiness : IEdgeBusiness
             ).ToListAsync();
 
         return classes;
+    }
+
+    private static EdgeResponseDto EdgeToResponse(Edge edge)
+    {
+        return new EdgeResponseDto
+        {
+            Id = edge.Id,
+            OriginOriginalId = edge.Origin.OriginalId,
+            DestinationOriginalId = edge.Destination.OriginalId,
+            Properties = edge.Properties,
+            OriginId = edge.OriginId,
+            DestinationId = edge.DestinationId,
+            RelationshipId = edge.RelationshipId,
+            DataSourceId = edge.DataSourceId,
+            ProjectId = edge.ProjectId,
+            OrganizationId = edge.OrganizationId,
+            LastUpdatedAt = edge.LastUpdatedAt,
+            LastUpdatedBy = edge.LastUpdatedBy,
+            IsArchived = edge.IsArchived
+        };
     }
 
     /// <summary>
