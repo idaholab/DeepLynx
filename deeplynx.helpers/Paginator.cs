@@ -39,7 +39,7 @@ public static class Paginator
             Items = await values
                     .Skip((paginated.PageNumber - 1) * paginated.PageSize)
                     .Take(paginated.PageSize)
-                    .ToListAsync() ?? [],
+                    .ToListAsync(),
             PageNumber = paginated.PageNumber,
             PageSize = paginated.PageSize,
             TotalCount = await values.CountAsync(),
@@ -54,7 +54,7 @@ public static class Paginator
     /// <returns>The query paginated</returns>
     static private async Task<PaginatedResponse<T>> PaginateAll<T>(IQueryable<T> values)
     {
-        var items = await values.ToListAsync() ?? [];
+        var items = await values.ToListAsync();
         return new PaginatedResponse<T>
         {
             Items = items,
