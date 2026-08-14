@@ -58,7 +58,7 @@ export default async function Page() {
   // Fetch projects filtered by organization
   let projects: ProjectResponseDto[] = [];
   try {
-    const apiProjects = await getAllProjectsServer(
+    const { items: apiProjects } = await getAllProjectsServer(
       organizationId as number,
       true,
     );
