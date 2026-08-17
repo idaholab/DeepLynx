@@ -726,6 +726,353 @@ const OrganizationSettings = () => {
     setIsEditStorageModalOpen(true);
   };
 
+  useEffect(() => {
+    async function loadOrgSettings() {
+      if (!organization?.organizationId) return;
+
+      try {
+        const orgData = await getOrganization(organization.organizationId as number);
+        const objectStorage = await getDefaultOrganizationObjectStorage(organization.organizationId as number);
+        setDefaultStorage(objectStorage);
+        setCreateContainerPerProject(orgData.createContainerPerProject ?? false);
+      } catch (error) {
+        console.error("Failed to load organization settings", error);
+      }
+    }
+
+    loadOrgSettings();
+  }, [organization?.organizationId]);
+
+  // Load available storages and default storage for the organization
+  const loadStorages = useCallback(async () => {
+    if (!organization?.organizationId) {
+      setIsLoadingStorages(false);
+      return;
+    }
+
+    try {
+      setIsLoadingStorages(true);
+
+      // Fetch all available storages for the organization
+      const storages = await getAllOrganizationObjectStorages(
+        organization.organizationId as number,
+        false, // Don't hide archived storages
+      );
+
+      // Fetch the current default storage
+      try {
+        const defaultStorageData = await getDefaultOrganizationObjectStorage(
+          organization.organizationId as number,
+        );
+        const orgDefaultStorage =
+          storages.find((storage) => storage.default) ?? null;
+        const effectiveDefaultStorage =
+          orgDefaultStorage ?? defaultStorageData;
+
+        setDefaultStorage(effectiveDefaultStorage);
+        setSelectedStorageId(effectiveDefaultStorage.id as number);
+        setAvailableStorages(
+          storages.map((storage) => ({
+            ...storage,
+            default:
+              String(storage.id) === String(effectiveDefaultStorage.id),
+          })),
+        );
+      } catch (error) {
+        setDefaultStorage(null);
+        setSelectedStorageId(null);
+        setAvailableStorages(storages);
+      }
+    } catch (error) {
+      console.error("Error loading organization storages:", error);
+      toast.error(t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS);
+    } finally {
+      setIsLoadingStorages(false);
+    }
+  }, [
+    organization?.organizationId,
+    t.translations.FAILED_TO_LOAD_STORAGE_CONFIGURATIONS,
+  ]);
+
+  useEffect(() => {
+    loadStorages();
+  }, [loadStorages]);
+
+  const handleSaveDefaultStorage = async () => {
+    if (!organization?.organizationId || !selectedStorageId) {
+      toast.error(t.translations.PLEASE_SELECT_A_STORAGE_LOCATION);
+      return;
+    }
+
+    if (defaultStorage?.id === selectedStorageId) {
+      toast.error(t.translations.THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT);
+      return;
+    }
+
+    try {
+      setIsSavingStorage(true);
+
+      await setDefaultOrganizationObjectStorage(
+        organization.organizationId as number,
+        selectedStorageId,
+      );
+
+      const updatedDefault = availableStorages.find(
+        (s) => s.id === selectedStorageId,
+      );
+      if (updatedDefault) {
+        setDefaultStorage({ ...updatedDefault, default: true });
+        setAvailableStorages((currentStorages) =>
+          currentStorages.map((storage) => ({
+            ...storage,
+            default: String(storage.id) === String(selectedStorageId),
+          })),
+        );
+      }
+
+      toast.success(
+        t.translations.DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY,
+      );
+    } catch (error) {
+      console.error("Failed to set default organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_DEFAULT_STORAGE,
+      );
+    } finally {
+      setIsSavingStorage(false);
+    }
+  };
+
+  const resetStorageForm = () => {
+    setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
+    setStorageType("filesystem");
+    setFilesystemPath("");
+    setAzureEndpoint("");
+    setAzureBucketName("");
+  };
+
+  const handleCreateStorage = async () => {
+    if (!organization?.organizationId) return;
+
+    if (!storageFormData.name.trim()) {
+      toast.error(t.translations.STORAGE_NAME_IS_REQUIRED);
+      return;
+    }
+
+    // Build config based on storage type
+    let config: Record<string, unknown> = {};
+
+    if (storageType === "filesystem") {
+      if (!filesystemPath.trim()) {
+        toast.error(t.translations.FILESYSTEM_PATH_IS_REQUIRED);
+        return;
+      }
+      config = {
+        mountPath: filesystemPath,
+      };
+    } else if (storageType === "azure_blob") {
+      if (!azureEndpoint.trim() || !azureBucketName.trim()) {
+        toast.error(t.translations.ALL_AZURE_BLOB_FIELDS_ARE_REQUIRED);
+        return;
+      }
+      config = {
+        azureObjectConfig: {
+          azureConnectionString: azureEndpoint,
+          azureContainerName: azureBucketName,
+          existingContainer: storageFormData.existingContainer || false
+        },
+      };
+    } else if (storageType === "aws_s3") {
+      // TODO: Waiting for backend to finalize AWS S3 config structure
+      toast.error("AWS S3 storage configuration is not yet implemented");
+      return;
+    }
+
+    try {
+      const dto: CreateObjectStorageRequestDto = {
+        name: storageFormData.name,
+        config: config,
+        default: storageFormData.default,
+      };
+
+      const updateOrganizationDto: UpdateOrganizationRequestDto = {
+        createContainerPerProject: storageFormData.createContainerPerProject,
+      };
+
+      const createdStorage = await createOrganizationObjectStorage(
+        organization.organizationId as number,
+        dto,
+        storageFormData.default,
+      );
+
+      await updateOrganization(
+        organization.organizationId as number,
+        updateOrganizationDto
+      );
+
+      setCreateContainerPerProject(storageFormData.createContainerPerProject);
+      setExistingContainer(storageFormData.existingContainer as boolean);
+
+      const storageForList = {
+        ...createdStorage,
+        default: storageFormData.default || createdStorage.default,
+      };
+
+      setAvailableStorages((currentStorages) => {
+        const existingStorage = currentStorages.some(
+          (storage) => String(storage.id) === String(storageForList.id),
+        );
+        const nextStorages = existingStorage
+          ? currentStorages.map((storage) =>
+            String(storage.id) === String(storageForList.id)
+              ? storageForList
+              : storage,
+          )
+          : [...currentStorages, storageForList];
+
+        if (!storageForList.default) {
+          return nextStorages;
+        }
+
+        return nextStorages.map((storage) => ({
+          ...storage,
+          default: String(storage.id) === String(storageForList.id),
+        }));
+      });
+
+      if (storageForList.default) {
+        setDefaultStorage(storageForList);
+        setSelectedStorageId(storageForList.id as number);
+      }
+
+      toast.success(t.translations.STORAGE_CREATED_SUCCESSFULLY);
+      setIsCreateStorageModalOpen(false);
+      resetStorageForm();
+    } catch (error) {
+      console.error("Failed to create organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_CREATE_STORAGE,
+      );
+    }
+  };
+
+  const handleEditStorage = async () => {
+    if (!organization?.organizationId || !editingStorage) return;
+    if (editingStorage.isArchived) {
+      toast.error(t.translations.ARCHIVED_STORAGE_CANNOT_BE_EDITED);
+      return;
+    }
+
+    if (!storageFormData.name.trim()) {
+      toast.error(t.translations.STORAGE_NAME_IS_REQUIRED);
+      return;
+    }
+
+    try {
+      const updateObjectStorageDto: UpdateObjectStorageRequestDto = {
+        name: storageFormData.name,
+        default: storageFormData.default,
+        existingContainer: storageFormData.existingContainer,
+      };
+
+      const updateOrganizationDto: UpdateOrganizationRequestDto = {
+        createContainerPerProject: storageFormData.createContainerPerProject,
+      };
+
+      await updateOrganizationObjectStorage(
+        organization.organizationId as number,
+        editingStorage.id as number,
+        updateObjectStorageDto,
+      );
+
+      await updateOrganization(
+        organization.organizationId as number,
+        updateOrganizationDto
+      );
+      setCreateContainerPerProject(storageFormData.createContainerPerProject);
+      setExistingContainer(storageFormData.existingContainer as boolean);
+
+      toast.success(t.translations.STORAGE_UPDATED_SUCCESSFULLY);
+      setIsEditStorageModalOpen(false);
+      setEditingStorage(null);
+      setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false, existingContainer: false });
+      loadStorages();
+    } catch (error) {
+      console.error("Failed to update organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_UPDATE_STORAGE,
+      );
+    }
+  };
+
+  const handleDeleteStorage = async () => {
+    if (!organization?.organizationId || !deleteStorageId) return;
+
+    try {
+      await deleteOrganizationObjectStorage(
+        organization.organizationId as number,
+        deleteStorageId,
+      );
+
+      toast.success(t.translations.STORAGE_DELETE_SUCCESSFULLY);
+      setDeleteStorageId(null);
+      loadStorages();
+    } catch (error) {
+      console.error("Failed to delete organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_DELETE_STORAGE,
+      );
+    }
+  };
+
+  const handleArchiveStorage = async () => {
+    if (!organization?.organizationId || !archiveStorageId) return;
+
+    try {
+      await archiveOrganizationObjectStorage(
+        organization.organizationId as number,
+        archiveStorageId,
+        archiveAction,
+      );
+
+      toast.success(
+        `${t.translations.STORAGE} ${archiveAction ? t.translations.ARCHIVE : t.translations.UNARCHIVE} ${t.translations.SUCCESSFULLY}`,
+      );
+      setArchiveStorageId(null);
+      loadStorages();
+    } catch (error) {
+      console.error("Failed to archive/unarchive organization storage:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t.translations.FAILED_TO_ARCHIVE_STORAGE,
+      );
+    }
+  };
+
+  const openEditStorageModal = (storage: ObjectStorageResponseDto) => {
+    if (storage.isArchived) {
+      return;
+    }
+    setEditingStorage(storage);
+    setStorageFormData({
+      name: storage.name,
+      config: {},
+      default: storage.default,
+      createContainerPerProject: createContainerPerProject,
+      existingContainer: existingContainer,
+    });
+    setIsEditStorageModalOpen(true);
+  };
+
   // Syncs Theme from session
   useEffect(() => {
     const themeName = resolveOrganizationTheme(organization?.themeName);

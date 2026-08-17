@@ -44,7 +44,7 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [orgsWithCounts, setOrgsWithCounts] = useState<OrgWithCounts[]>([]);
-
+    
   useEffect(() => {
     async function fetchProjectCounts() {
       try {
@@ -97,6 +97,7 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
     try {
       await createOrganization(formData);
 
+      // Reset form and close modal
       setFormData({ name: "", description: "", disableFileTransfer: false });
       setIsModalOpen(false);
 

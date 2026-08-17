@@ -353,27 +353,30 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Upload a Organization Logo
+    ///     Remove a Organization Logo
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="file">The file to upload</param>
-    /// <returns>File path for the logo</returns>
-    [HttpPost("{organizationId}/logo", Name = "api_upload_organization_logo")]
+    /// <returns>True if file was sucessfully deleted</returns>
+    [HttpDelete("{organizationId}/logo/delete", Name = "api_delete_organization_logo")]
     [OrgAdmin]
-    [Sensitivity("upload file")]
-    public async Task<IActionResult> UploadOrganizationLogo(
-        long organizationId,
-        IFormFile file)
+    [Sensitivity("delete file")]
+    public async Task<IActionResult> RemoveOrganizationLogo(
+        long organizationId)
     {
         try
         {
-            var logoUri = await _organizationBusiness.UploadOrganizationLogo(organizationId, file);
+            var success = await _organizationBusiness.RemoveLogoFileAsync(organizationId);
 
-            return Ok(new { message = "Logo uploaded successfully", logoUri });
+            if (!success)
+            {
+                return NotFound(new { message = "Active logo file not found or already deleted." });
+            }
+
+            return Ok(new { message = "Active logo file successfully removed." });
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Failed to upload organization logo for organization {organizationId}: {ex.Message}");
+            _logger.LogError($"Failed to remove active logo file for organization {organizationId}: {ex.Message}");
             return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
         }
     }
@@ -412,33 +415,29 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Delete a Organization Logo
+    ///     Upload a Organization Logo
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <returns>True if file was sucessfully deleted</returns>
-    [HttpDelete("{organizationId}/logo/delete", Name = "api_delete_organization_logo")]
+    /// <param name="file">The file to upload</param>
+    /// <returns>File path for the logo</returns>
+    [HttpPost("{organizationId}/logo", Name = "api_upload_organization_logo")]
     [OrgAdmin]
-    [Sensitivity("delete file")]
-    public async Task<IActionResult> RemoveOrganizationLogo(
-        long organizationId)
+    [Sensitivity("upload file")]
+    public async Task<IActionResult> UploadOrganizationLogoV1(
+        long organizationId,
+        IFormFile file)
     {
         try
         {
-            var success = await _organizationBusiness.RemoveLogoFileAsync(organizationId);
+            var logoUri = await _organizationBusiness.UploadOrganizationLogo(organizationId, file);
 
-            if (!success)
-            {
-                return NotFound(new { message = "Active logo file not found or already deleted." });
-            }
-
-            return Ok(new { message = "Active logo file successfully removed." });
+            return Ok(new { message = "Logo uploaded successfully", logoUri });
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Failed to remove active logo file for organization {organizationId}: {ex.Message}");
+            _logger.LogError($"Failed to upload Organization logo for organization {organizationId}: {ex.Message}");
             return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
         }
     }
-
 
 }
