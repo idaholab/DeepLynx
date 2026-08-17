@@ -49,7 +49,7 @@ const SiteOrganizationManagement = ({
 
   const refreshOrganizations = async () => {
     try {
-      const updatedData = await getAllOrganizations();
+      const { items: updatedData } = await getAllOrganizations();
       setData(updatedData);
       // Notify parent component to update its state too
       if (onOrganizationsChange) {

@@ -3,7 +3,7 @@ import {
     InviteUserToOrganizationRequestDto,
     UpdateOrganizationRequestDto
 } from "@/app/(home)/types/requestDTOs";
-import { OrganizationResponseDto } from "@/app/(home)/types/responseDTOs";
+import { OrganizationResponseDto, PaginatedResponse } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 import { UploadLogoRequest, UploadLogoResponse, RemoveLogoRequest, RemoveLogoResponse, FetchOrganizationLogoResponse } from "@/app/(home)/types/org_setting_types";
 
@@ -14,15 +14,19 @@ import { UploadLogoRequest, UploadLogoResponse, RemoveLogoRequest, RemoveLogoRes
 /**
  * Get all organizations
  * @param hideArchived - Flag to hide archived organizations (default: true)
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
  * @returns Promise with array of OrganizationResponseDto
  */
 export const getAllOrganizations = async (
-    hideArchived: boolean = true
-): Promise<OrganizationResponseDto[]> => {
+    hideArchived: boolean = true,
+    pageNumber: number = 1,
+    pageSize: number = -1
+): Promise<PaginatedResponse<OrganizationResponseDto>> => {
     try {
-        const res = await api.get<OrganizationResponseDto[]>(
+        const res = await api.get<PaginatedResponse<OrganizationResponseDto>>(
             `/organizations`,
-            { params: { hideArchived } }
+            { params: { hideArchived, pageNumber, pageSize } }
         );
         return res.data;
     } catch (error) {
@@ -34,15 +38,19 @@ export const getAllOrganizations = async (
 /**
  * Get all organizations for the current user
  * @param hideArchived - Flag to hide archived organizations (default: true)
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
  * @returns Promise with array of OrganizationResponseDto
  */
 export const getAllOrganizationsForUser = async (
-    hideArchived: boolean = true
-): Promise<OrganizationResponseDto[]> => {
+    hideArchived: boolean = true,
+    pageNumber: number = 1,
+    pageSize: number = -1
+): Promise<PaginatedResponse<OrganizationResponseDto>> => {
     try {
-        const res = await api.get<OrganizationResponseDto[]>(
+        const res = await api.get<PaginatedResponse<OrganizationResponseDto>>(
             `/organizations/user`,
-            { params: { hideArchived } }
+            { params: { hideArchived, pageNumber, pageSize } }
         );
         return res.data;
     } catch (error) {

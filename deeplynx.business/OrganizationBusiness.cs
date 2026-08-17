@@ -49,6 +49,50 @@ public class OrganizationBusiness : IOrganizationBusiness
     ///     Retrieves all organizations
     /// </summary>
     /// <param name="userId">The ID of the requesting user</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all matching organizations</param>
+    /// <param name="isSysAdmin">Boolean determining if the requesting user is a system admin</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
+    /// <returns>A list of organizations</returns>
+    public async Task<PaginatedResponse<OrganizationResponseDto>> GetAllOrganizationsPaginated(long userId, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true, bool isSysAdmin = false)
+    {
+        return await GetAllOrganizationsForUserPaginated(userId, paginatedRequestDto, hideArchived, isSysAdmin);
+    }
+
+    /// <summary>
+    ///     Retrieves organizations for current user with pagination
+    /// </summary>
+    /// <param name="userId">ID of the User executing this method.</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all matching organizations</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
+    /// <param name="isSysAdmin">Boolean value determining if the requesting user is a system admin</param>
+    /// <returns>A paginated list of organizations</returns>
+    public async Task<PaginatedResponse<OrganizationResponseDto>> GetAllOrganizationsForUserPaginated(
+        long userId,
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true,
+        bool isSysAdmin = false)
+    {
+        var query = _context.Organizations.AsQueryable();
+
+        if (!isSysAdmin)
+        {
+            query = query.Where(o => o.OrganizationUsers.Any(ou => ou.UserId == userId));
+        }
+
+        if (hideArchived)
+        {
+            query = query.Where(o => !o.IsArchived);
+        }
+
+        var orderedQuery = query.OrderBy(o => o.Id);
+
+        return await orderedQuery.Select(o => OrganizationToResponse(o)).ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    /// <summary>
+    ///     Retrieves all organizations
+    /// </summary>
+    /// <param name="userId">The ID of the requesting user</param>
     /// <param name="isSysAdmin">Boolean determining if the requesting user is a system admin</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
     /// <returns>A list of organizations</returns>
@@ -937,16 +981,23 @@ public class OrganizationBusiness : IOrganizationBusiness
             organizationId, null);
     }
 
-    private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
+    private static OrganizationResponseDto OrganizationToResponse(Organization organization)
     {
-        if (objectStorageId.HasValue)
+        return new OrganizationResponseDto
         {
-            // object storage could be org-level so just return object storage, don't check for project existence
-            return objectStorageId.Value;
-        }
-
-        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
-            ?? throw new KeyNotFoundException("Default object storage not found");
-        return defaultObjectStorage.Id;
+            Id = organization.Id,
+            Name = organization.Name,
+            Description = organization.Description,
+            LastUpdatedAt = organization.LastUpdatedAt,
+            LastUpdatedBy = organization.LastUpdatedBy,
+            IsArchived = organization.IsArchived,
+            DefaultOrg = organization.DefaultOrg,
+            Banner = organization.Banner,
+            RequireSensitivityLabel = organization.RequireSensitivityLabel,
+            Theme = organization.Theme,
+            CreateContainerPerProject = organization.CreateContainerPerProject,
+            DisableFileTransfer = organization.DisableFileTransfer,
+            DefaultObjectStorageId = organization.DefaultObjectStorageId
+        };
     }
 }

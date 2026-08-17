@@ -49,19 +49,25 @@ public class OrganizationControllerTests : IDisposable
     [Fact]
     public async Task GetAllOrganizations_ReturnsOrganizationsAndPassesContext()
     {
-        var expected = new List<OrganizationResponseDto> { new() { Id = OrgId } };
+        var expected = new PaginatedResponse<OrganizationResponseDto>
+        {
+            Items = new List<OrganizationResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
         UserContextStorage.IsSysAdmin = true;
         _mockOrganizationBusiness
-            .Setup(b => b.GetAllOrganizations(UserId, false, true))
+            .Setup(b => b.GetAllOrganizationsPaginated(UserId, It.IsAny<PaginatedRequestDto>(), false, true))
             .ReturnsAsync(expected);
 
-        var actionResult = await _controller.GetAllOrganizations(false);
+        var actionResult = await _controller.GetAllOrganizations(false, It.IsAny<PaginatedRequestDto>());
 
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         Assert.Same(expected, result.Value);
         _mockOrganizationBusiness.Verify(
-            b => b.GetAllOrganizations(UserId, false, true),
+            b => b.GetAllOrganizationsPaginated(UserId, It.IsAny<PaginatedRequestDto>(), false, true),
             Times.Once);
     }
 
@@ -69,7 +75,7 @@ public class OrganizationControllerTests : IDisposable
     public async Task GetAllOrganizations_PropagatesUnexpectedException()
     {
         _mockOrganizationBusiness
-            .Setup(b => b.GetAllOrganizations(It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .Setup(b => b.GetAllOrganizationsPaginated(It.IsAny<long>(), It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _controller.GetAllOrganizations(true));
@@ -78,10 +84,16 @@ public class OrganizationControllerTests : IDisposable
     [Fact]
     public async Task GetAllOrganizationsForUser_ReturnsOrganizationsAndPassesContext()
     {
-        var expected = new List<OrganizationResponseDto> { new() { Id = OrgId } };
+        var expected = new PaginatedResponse<OrganizationResponseDto>
+        {
+            Items = new List<OrganizationResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
         UserContextStorage.IsSysAdmin = true;
         _mockOrganizationBusiness
-            .Setup(b => b.GetAllOrganizationsForUser(UserId, false, true))
+            .Setup(b => b.GetAllOrganizationsForUserPaginated(UserId, It.IsAny<PaginatedRequestDto>(), false, true))
             .ReturnsAsync(expected);
 
         var actionResult = await _controller.GetAllOrganizationsForUser(false);
@@ -90,7 +102,7 @@ public class OrganizationControllerTests : IDisposable
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
         Assert.Same(expected, result.Value);
         _mockOrganizationBusiness.Verify(
-            b => b.GetAllOrganizationsForUser(UserId, false, true),
+            b => b.GetAllOrganizationsForUserPaginated(UserId, It.IsAny<PaginatedRequestDto>(), false, true),
             Times.Once);
     }
 
@@ -98,7 +110,7 @@ public class OrganizationControllerTests : IDisposable
     public async Task GetAllOrganizationsForUser_PropagatesUnexpectedException()
     {
         _mockOrganizationBusiness
-            .Setup(b => b.GetAllOrganizationsForUser(It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .Setup(b => b.GetAllOrganizationsForUserPaginated(It.IsAny<long>(), It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _controller.GetAllOrganizationsForUser(true));
