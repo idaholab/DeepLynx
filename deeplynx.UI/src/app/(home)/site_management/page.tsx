@@ -4,6 +4,7 @@ import {
   OauthApplicationResponseDto,
   OrganizationResponseDto,
   UserResponseDto,
+  PaginatedResponse
 } from "../types/responseDTOs";
 import { getAllOrganizationsServer } from "@/app/lib/server_service/organization_services.server";
 import { getAllOauthApplicationsServer } from "@/app/lib/server_service/oauth_services.server";
@@ -44,7 +45,7 @@ const SysAdminPage = async () => {
   const OrganizationResponseDtos =
     (await getAllOrganizationsServer()) as OrganizationResponseDto[];
   const oAuthApplications =
-    (await getAllOauthApplicationsServer()) as OauthApplicationResponseDto[];
+    (await getAllOauthApplicationsServer()) as PaginatedResponse<OauthApplicationResponseDto>;
   const members = (await getAllUsersServer()) as UserResponseDto[];
 
   // Fetch projects filtered by organization

@@ -1,21 +1,25 @@
 'use client';
 
 import { CreateOauthApplicationRequestDto, UpdateOauthApplicationRequestDto } from "@/app/(home)/types/requestDTOs";
-import { OauthApplicationResponseDto, OauthApplicationSecureResponseDto } from "@/app/(home)/types/responseDTOs";
+import { OauthApplicationResponseDto, OauthApplicationSecureResponseDto, PaginatedResponse } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 /**
  * Get all OAuth applications
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all projects (default: -1)
  * @param hideArchived - Flag to hide archived applications (default: true)
  * @returns Promise with array of OauthApplicationResponseDto
  */
 export const getAllOauthApplications = async (
+    pageNumber: number = 1,
+    pageSize: number = -1,
     hideArchived: boolean = true
-): Promise<OauthApplicationResponseDto[]> => {
+): Promise<PaginatedResponse<OauthApplicationResponseDto>> => {
     try {
-        const res = await api.get<OauthApplicationResponseDto[]>(
+        const res = await api.get<PaginatedResponse<OauthApplicationResponseDto>>(
             `/oauth/applications`,
-            { params: { hideArchived } }
+            { params: { pageNumber, pageSize, hideArchived } }
         );
         return res.data;
     } catch (error) {
