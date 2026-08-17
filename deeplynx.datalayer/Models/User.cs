@@ -119,6 +119,12 @@ public partial class User
     [InverseProperty("User")]
     public virtual ICollection<OauthToken> OauthTokens { get; set; } = new List<OauthToken>();
 
+    [InverseProperty("User")]
+    public virtual ICollection<OauthDeviceAuthorizationRequest> OauthDeviceAuthorizationRequests { get; set; } = new List<OauthDeviceAuthorizationRequest>();
+
+    [InverseProperty("User")]
+    public virtual ICollection<OauthRefreshToken> OauthRefreshTokens { get; set; } = new List<OauthRefreshToken>();
+
     [InverseProperty("LastUpdatedByUser")]
     public virtual ICollection<OauthApplication> UpdatedOauthApplications { get; set; } = new List<OauthApplication>();
 
