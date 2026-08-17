@@ -4,7 +4,10 @@ namespace deeplynx.interfaces;
 
 public interface IRoleBusiness
 {
+    [Obsolete("V1-only. Used by deprecated v1 role endpoints. Superseded by GetAllRolesPaginated. " +
+          "Remove once v1 role endpoints are sunset.", error: false)]
     Task<IEnumerable<RoleResponseDto>> GetAllRoles(long organizationId, long? projectId, bool hideArchived = true);
+    Task<PaginatedResponse<RoleResponseDto>> GetAllRolesPaginated(long organizationId, long? projectId, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true);
     Task<RoleResponseDto> GetRole(long roleId, long organizationId, long? projectId, bool hideArchived = true);
     Task<RoleResponseDto> CreateRole(long currentUserId, CreateRoleRequestDto role, long organizationId, long? projectId);
     Task<List<RoleResponseDto>> BulkCreateRoles(long currentUserId, long organizationId, long? projectId, List<CreateRoleRequestDto> dtos);
