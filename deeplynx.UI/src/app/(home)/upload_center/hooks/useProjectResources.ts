@@ -38,7 +38,7 @@ export function useProjectResources(organizationId?: number) {
     setIsLoadingProjects(true);
 
     try {
-      const data = await getAllProjects(organizationId, true);
+      const { items: data } = await getAllProjects(organizationId, true);
       setProjects(data);
       if (data.length === 1) {
         setProjectId(String(data[0].id));

@@ -47,16 +47,22 @@ public class GroupControllerTests : IDisposable
     [Fact]
     public async Task GetAllGroups_ReturnsGroupsAndForwardsFilters()
     {
-        var expected = new List<GroupResponseDto> { new() { Id = GroupId, Name = "Group" } };
+        var expected = new PaginatedResponse<GroupResponseDto>
+        {
+            Items = new List<GroupResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
         _mockGroupBusiness
-            .Setup(business => business.GetAllGroups(OrganizationId, false))
+            .Setup(business => business.GetAllGroupsPaginated(OrganizationId, It.IsAny<PaginatedRequestDto>(), false))
             .ReturnsAsync(expected);
 
         var result = (await _controller.GetAllGroups(OrganizationId, hideArchived: false)).Result;
 
         AssertOkObject(result, expected);
         _mockGroupBusiness.Verify(
-            business => business.GetAllGroups(OrganizationId, false),
+            business => business.GetAllGroupsPaginated(OrganizationId, It.IsAny<PaginatedRequestDto>(), false),
             Times.Once);
     }
 
@@ -82,12 +88,18 @@ public class GroupControllerTests : IDisposable
     [Fact]
     public async Task GetGroupMembers_ReturnsMembers()
     {
-        var expected = new List<UserResponseDto> { new() { Id = MemberId } };
+        var expected = new PaginatedResponse<UserResponseDto>
+        {
+            Items = new List<UserResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
         _mockGroupBusiness
-            .Setup(business => business.GetGroupMembers(OrganizationId, GroupId))
+            .Setup(business => business.GetGroupMembersPaginated(OrganizationId, GroupId, It.IsAny<PaginatedRequestDto>()))
             .ReturnsAsync(expected);
 
-        var result = (await _controller.GetGroupMembers(OrganizationId, GroupId)).Result;
+        var result = (await _controller.GetGroupMembers(OrganizationId, GroupId, It.IsAny<PaginatedRequestDto>())).Result;
 
         AssertOkObject(result, expected);
     }

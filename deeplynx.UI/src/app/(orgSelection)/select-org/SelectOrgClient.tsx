@@ -54,7 +54,7 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
         const orgsWithProjectCounts = await Promise.all(
           organizations.map(async (org) => {
             try {
-              const projects = await getAllProjects(org.id as number, true);
+              const { items: projects } = await getAllProjects(org.id as number, true);
               return {
                 ...org,
                 projectCount: projects.length,

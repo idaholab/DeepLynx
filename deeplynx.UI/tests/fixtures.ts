@@ -5,13 +5,14 @@ import {
   authFile, TestAccount, TestOrg, TestProject, selectOrganization, selectProject,
   scopeCacheFile, testUserCacheFile, readJsonCache,
 } from './deeplynx-config';
+import { TEST_API_BASE_URL } from './api-url';
+const API_URL = TEST_API_BASE_URL;
 
 loadEnvConfig(process.cwd());
 
-const API_URL = process.env.BACKEND_BASE_URL ?? '';
-
 type Fixtures = {
   actAs: (account: TestAccount) => Promise<Page>; // returns a logged in page for the provided test account.
+  reAuthenticate: () => Promise<void>; // re-establishes a session for an already open page/context (if you need to log out mid-test)
   actingUser: TestAccount; // the account a given test should run as.
   actingOrg: TestOrg; // an optional override to force a specific organization context (needed for accounts like SysAdmin that aren't tied to one org).
   actingProject: TestProject; // an optional override to force a specific project context (needed for accounts like SysAdmin/orgAdmin that aren't tied to one project).
@@ -138,6 +139,26 @@ export const test = base.extend<Fixtures>({
       return context.newPage();
     });
     await Promise.all(contexts.map((c) => c.close()));
+  },
+
+  // reAuthenticates the actuing user within the existing browser context.
+  // Unlike actAs, this does not create a new context, so browser state such as localStorage
+  // can be preserved across logout/login tests. 
+  // Use this when you want to simulate logging out and logging back in like the user would.
+  reAuthenticate: async ({ page, actingUser, actingOrg, actingProject }, use) => {
+    await use(async () => {
+      const file = authFile(actingUser.name);
+      const storageState = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      
+      // restore authentication in existing context to preserve localStorage
+      await page.context().addCookies(storageState.cookies);
+
+      // return to the acting org/project
+      const org = actingOrg ?? actingUser.provision?.org;
+      const project = actingProject ?? actingUser.provision?.project;
+      if (!org) throw new Error(`"${actingUser.name}" has no organization to return to.`);
+      await gotoScope(page, org, project);
+    });
   },
 
   // forces every test file to explicitly declare actingUser

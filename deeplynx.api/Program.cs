@@ -181,6 +181,12 @@ try
             options.SubstituteApiVersionInUrl = true;
         });
 
+    builder.Services.AddDataProtection();
+        // // If running multiple server instances behind a load balancer, state must be shared
+        // .PersistKeysToFileSystem(new DirectoryInfo(@"/shared/keys"))
+        // // or .PersistKeysToAzureBlobStorage(...), .PersistKeysToStackExchangeRedis(...), etc.
+        // .SetApplicationName("Nexus");
+
     /*
     ╔════════════════════════════╗
     ║  Dependency Injection      ║

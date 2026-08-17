@@ -124,7 +124,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
 
-        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
 
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
@@ -160,7 +161,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
 
         _fileBusiness = new FileFilesystemBusiness(Context, _mockObjectStorageBusiness.Object, _mockClassBusiness.Object,
-            _mockRecordBusiness.Object);
+            _mockRecordBusiness.Object, protectProvider);
 
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
 
@@ -174,7 +175,8 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             _olapBusiness,
             _objectStorageBusiness,
             NullLogger<FileBusiness>.Instance,
-            _eventBusiness
+            _eventBusiness,
+            protectProvider
         );
 
     }
@@ -2182,6 +2184,4 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             }).ToList() ?? new List<RecordLabelDto>()
         };
     }
-
-
 }

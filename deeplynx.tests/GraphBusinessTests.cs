@@ -77,7 +77,7 @@ public class GraphBusinessTests : IntegrationTestBase
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
         _graphBusiness = new GraphBusiness(Context, _eventBusiness, _sensitivityLabelService);
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _sensitivityLabelService);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _bulkCopyUpsertExecutor, _sensitivityLabelService, _mockPermissionService.Object);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness, _mockRecordBusiness.Object,
             _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(

@@ -42,7 +42,7 @@ const SysAdminClient = ({
   const { t } = useLanguage();
   const refreshOrganizations = async () => {
     try {
-      const updatedData = await getAllOrganizations();
+      const { items: updatedData } = await getAllOrganizations();
       setOrganizations(updatedData);
     } catch (err) {
       console.error("Failed to refresh organizations:", err);

@@ -100,8 +100,9 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
 
         var fileBusinessFactory = new Mock<IFileBusinessFactory>();
-        var filesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, null!, null!);
-        var azureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        var filesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, null!, null!, protectProvider);
+        var azureBusiness = new FileAzureBusiness(Context, _encryptionHelper, protectProvider);
 
         fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(filesystemBusiness);
         fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(azureBusiness);
