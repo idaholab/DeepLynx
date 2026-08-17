@@ -60,10 +60,16 @@ public class TagOrganizationControllerTests : IDisposable
     [Fact]
     public async Task GetAllTags_Returns200_WithTags()
     {
-        var expected = new List<TagResponseDto>();
+        var expected = new PaginatedResponse<TagResponseDto>
+        {
+            Items = new List<TagResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(UserId, OrgId, null, true, false, false))
+            .Setup(b => b.GetAllTagsPaginated(UserId, OrgId, null, It.IsAny<PaginatedRequestDto>(), true, false, false))
             .ReturnsAsync(expected);
 
         var result = (await _tagOrganizationController.GetAllTags(OrgId, null, true)).Result as OkObjectResult;
@@ -77,21 +83,27 @@ public class TagOrganizationControllerTests : IDisposable
     public async Task GetAllTags_Returns200_WithEmptyList()
     {
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
-            .ReturnsAsync([]);
+            .Setup(b => b.GetAllTagsPaginated(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ReturnsAsync(new PaginatedResponse<TagResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
 
         var result = (await _tagOrganizationController.GetAllTags(OrgId, null, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<TagResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<TagResponseDto>>(result.Value);
     }
 
     [Fact]
     public async Task GetAllTags_ThrowsException_WhenBusinessThrows()
     {
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(UserId, OrgId, null, true, false, false))
+            .Setup(b => b.GetAllTagsPaginated(UserId, OrgId, null, It.IsAny<PaginatedRequestDto>(), true, false, false))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _tagOrganizationController.GetAllTags(OrgId, null, true));
@@ -100,16 +112,22 @@ public class TagOrganizationControllerTests : IDisposable
     [Fact]
     public async Task GetAllTags_PassesOrganizationIdAndHideArchivedToBusinessLayer()
     {
-        var expected = new List<TagResponseDto>();
+        var expected = new PaginatedResponse<TagResponseDto>
+        {
+            Items = new List<TagResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(UserId, OrgId, null, true, false, false))
+            .Setup(b => b.GetAllTagsPaginated(UserId, OrgId, null, It.IsAny<PaginatedRequestDto>(), true, false, false))
             .ReturnsAsync(expected);
 
         await _tagOrganizationController.GetAllTags(OrgId, null, true);
 
         _mockTagBusiness.Verify(
-            b => b.GetAllTags(UserId, OrgId, null, true, false, false),
+            b => b.GetAllTagsPaginated(UserId, OrgId, null, It.IsAny<PaginatedRequestDto>(), true, false, false),
             Times.Once);
     }
 
