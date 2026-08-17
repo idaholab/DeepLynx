@@ -192,7 +192,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       }
 
       try {
-        const relationshipData = await getAllRelationships(projectId, false);
+        const { items: relationshipData } = await getAllRelationships(projectId, false);
 
         if (cancelled) return;
 
