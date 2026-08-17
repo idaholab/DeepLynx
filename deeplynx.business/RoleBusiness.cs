@@ -30,17 +30,28 @@ public class RoleBusiness : IRoleBusiness
     /// </summary>
     /// <param name="organizationId">(Required) ID of the organization</param>
     /// <param name="projectId">(Optional) ID of the project to filter by</param>
-    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching applications are returned unpaginated</param>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching roles are returned unpaginated</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived roles</param>
-    /// <returns>A list of roles</returns>
+    /// <returns>A paginated list of roles, or all roles if no pagination is specified</returns>
     public async Task<PaginatedResponse<RoleResponseDto>> GetAllRolesPaginated(
         long organizationId, long? projectId, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true)
     {
-        var roleQuery = _context.Roles.AsQueryable();
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId);
 
         if (hideArchived)
         {
-            roleQuery = roleQuery.Where(x => !x.IsArchived);
+            roleQuery = roleQuery.Where(r => !r.IsArchived);
+        }
+
+        // If project id supplied, inherit org level roles
+        if (projectId.HasValue)
+        {
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId || r.ProjectId == null);
+        }
+        else
+        {
+            // Only return org-level roles when no project specified
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
 
         return await roleQuery
@@ -71,6 +82,8 @@ public class RoleBusiness : IRoleBusiness
     /// <param name="projectId">(Optional) ID of the project to filter by</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived roles</param>
     /// <returns>A list of roles</returns>
+    [Obsolete("V1-only. Used by deprecated v1 role endpoints. Superseded by GetAllRolesPaginated. " +
+              "Remove once v1 role endpoints are sunset.", error: false)]
     public async Task<IEnumerable<RoleResponseDto>> GetAllRoles(
         long organizationId, long? projectId, bool hideArchived = true)
     {
