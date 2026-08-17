@@ -574,8 +574,6 @@ public class FileBusiness : IFileControllerBusiness
             ["originalUploadId"] = request.UploadId
         };
 
-        // Does this need fixed???
-
         fileClass = await ExtractTabularRecordMetadata(
             currentUserId,
             organizationId,
