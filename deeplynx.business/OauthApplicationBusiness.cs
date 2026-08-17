@@ -70,7 +70,7 @@ public class OauthApplicationBusiness : IOauthApplicationBusiness
 
     /// <summary>
     /// [DEPRECATED - V1 ONLY] List all OAuth applications without pagination
-    /// Superseded by <see cref="GetAllOAuthApplicationsPaginated"/>. Do not call this from new controller versions;
+    /// Superseded by <see cref="GetAllOauthApplicationsPaginated"/>. Do not call this from new controller versions;
     /// it exists solely to back the deprecated v1 OAuth application controllers and should be deleted once
     /// those v1 endpoints are sunset.
     /// </summary>
