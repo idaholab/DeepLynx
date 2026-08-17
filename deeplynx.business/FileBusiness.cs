@@ -238,13 +238,16 @@ public class FileBusiness : IFileControllerBusiness
         var uri = await fileBusiness.UpdateFile(record, objectStorage.Config, file, guid);
 
         var fileSize = file.Length;
+        
+        var properties = record.Properties;
+        var updatedProperties = !string.IsNullOrWhiteSpace(properties)
+            ? JsonNode.Parse(properties)!.AsObject()
+            : new JsonObject();
+        updatedProperties["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower();
 
         var updateRecordRequest = new UpdateRecordRequestDto
         {
-            Properties = new JsonObject
-            {
-                ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
-            },
+            Properties = updatedProperties,
             Name = file.FileName,
             Uri = uri,
             FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
