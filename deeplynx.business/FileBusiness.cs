@@ -574,6 +574,8 @@ public class FileBusiness : IFileControllerBusiness
             ["originalUploadId"] = request.UploadId
         };
 
+        // Does this need fixed???
+
         fileClass = await ExtractTabularRecordMetadata(
             currentUserId,
             organizationId,
@@ -658,14 +660,17 @@ public class FileBusiness : IFileControllerBusiness
         var fileSize = await fileBusiness.GetFileSize(uri, objectStorage.Config);
         var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
 
+        var properties = record.Properties;
+        var updatedProperties = !string.IsNullOrWhiteSpace(properties)
+            ? JsonNode.Parse(properties)!.AsObject()
+            : new JsonObject();
+        updatedProperties["fileType"] = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
+
         await fileBusiness.DeleteFile(record, objectStorage.Config);
 
         var updateRecordRequest = new UpdateRecordRequestDto
         {
-            Properties = new JsonObject
-            {
-                ["fileType"] = fileExtension
-            },
+            Properties = updatedProperties,
             Name = request.FileName,
             Uri = uri,
             FileType = fileExtension,
