@@ -353,9 +353,9 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Remove a Organization Logo
+    ///     Remove an Organization Logo
     /// </summary>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="organizationId">The ID of the organization to which the logo belongs</param>
     /// <returns>True if file was sucessfully deleted</returns>
     [HttpDelete("{organizationId}/logo/delete", Name = "api_delete_organization_logo")]
     [OrgAdmin]
@@ -384,7 +384,7 @@ public class OrganizationController : ControllerBase
     /// <summary>
     ///     Get an Organization Logo
     /// </summary>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="organizationId">The ID of the organization to which the logo belongs</param>
     /// <returns>File stream of the logo bytes</returns>
     [HttpGet("{organizationId}/logo/image", Name = "api_get_organization_image")]
     public async Task<IActionResult> GetOrganizationLogoImage(
@@ -415,9 +415,9 @@ public class OrganizationController : ControllerBase
     }
 
     /// <summary>
-    ///     Upload a Organization Logo
+    ///     Upload an Organization Logo
     /// </summary>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="organizationId">The ID of the organization to which the logo belongs</param>
     /// <param name="file">The file to upload</param>
     /// <returns>File path for the logo</returns>
     [HttpPost("{organizationId}/logo", Name = "api_upload_organization_logo")]
