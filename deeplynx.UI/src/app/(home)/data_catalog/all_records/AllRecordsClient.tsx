@@ -960,7 +960,7 @@ export default function DataCatalogClient({
         />
 
         {/* Two-column layout: sidebar on left, record list on right */}
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
           <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
             <FilterSidebar
               statusFilter={statusFilter}
