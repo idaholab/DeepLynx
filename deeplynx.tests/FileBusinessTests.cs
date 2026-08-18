@@ -1650,6 +1650,7 @@ public class FileBusinessTests : IntegrationTestBase
             Description = "Awesome Description",
             Properties = new JsonObject { ["Test"] = "Property" },
             OriginalId = "OriginalId",
+            Tags = new List<string> { "Tag1", "Tag2" }
         };
         var metadataJson = JsonSerializer.Serialize(metadata);
         var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
@@ -1671,6 +1672,7 @@ public class FileBusinessTests : IntegrationTestBase
         var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
         Assert.Equal("Property", properties["Test"]?.GetValue<string>());
         Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+        Assert.Equal(new[] { "Tag1", "Tag2" }, updatedRecord.Tags.Select(tag => tag.Name).OrderBy(name => name));
     }
 
     #endregion
