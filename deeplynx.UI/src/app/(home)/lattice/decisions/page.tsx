@@ -858,7 +858,13 @@ export default function LatticeDecisionsPage() {
   const refreshList = useCallback(() => {
     if (!orgId || !projId) return;
     listExtractions(orgId, projId)
-      .then(setItems)
+      .then((response) => {
+        if (response?.items) {
+          setItems(response.items);
+        } else {
+          setItems([]);
+        }
+      })
       .catch(() =>
         setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS),
       );
@@ -873,11 +879,23 @@ export default function LatticeDecisionsPage() {
   useEffect(() => {
     if (insightHidden) return;
     if (!orgId || !projId) return;
+
     setIsListLoading(true);
+
     listExtractions(orgId, projId)
-      .then(setItems)
-      .catch(() => setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS))
-      .finally(() => setIsListLoading(false));
+      .then((response) => {
+        if (response?.items) {
+          setItems(response.items);
+        } else {
+          setItems([]);
+        }
+      })
+      .catch(() => {
+        setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS);
+      })
+      .finally(() => {
+        setIsListLoading(false);
+      });
   }, [
     insightHidden,
     orgId,

@@ -1,7 +1,7 @@
 "use client";
 
 import { TriggerLatticeExtractionRequestDTO } from "@/app/(home)/types/requestDTOs";
-import { TriggerLatticeExtractionResponseDTO } from "@/app/(home)/types/responseDTOs";
+import { PaginatedResponse, TriggerLatticeExtractionResponseDTO } from "@/app/(home)/types/responseDTOs";
 import { EmbeddingStatusResponseDTO, ExtractionListItemDTO, ExtractionStagingResponseDTO, PromoteExtractionRequestDto, ExtractionResponseDto, RejectExtractionRequestDto } from "@/app/(home)/types/latticeDTOs";
 import api from "./api";
 
@@ -28,9 +28,12 @@ export async function triggerLatticeExtraction(
 export async function listExtractions(
   organizationId: number,
   projectId: number,
-): Promise<ExtractionListItemDTO[]> {
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<ExtractionListItemDTO>> {
   const res = await api.get(
     `/organizations/${organizationId}/projects/${projectId}/extractions`,
+    { params: {pageNumber, pageSize}}
   );
   return res.data;
 }

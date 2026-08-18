@@ -336,11 +336,109 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region ListExtractionsByProjectPaginated Tests
+
+    [Fact]
+    public async Task ListExtractionsByProjectPaginated_ReturnsPaginatedExtractionsForCorrectProject()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+        var result = await _business.ListExtractionsByProjectPaginated(pid, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+        Assert.All(result.Items, e => Assert.Equal(pid, e.ProjectId));
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(10, result.PageSize);
+    }
+
+    [Fact]
+    public async Task ListExtractionsByProjectPaginated_ReturnsEmpty_WhenNoExtractionsExistForProject()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+        var result = await _business.ListExtractionsByProjectPaginated(NotFoundId, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task ListExtractionsByProjectPaginated_DoesNotReturnOtherProjectExtractions()
+    {
+        var otherProj = new Project { Name = "Other Project", IsArchived = false, OrganizationId = oid };
+        Context.Projects.Add(otherProj);
+
+        var other = new User { Name = "Other User", Email = "other@test.com", Password = "pw", IsArchived = false };
+        Context.Users.Add(other);
+        await Context.SaveChangesAsync();
+
+        var extraction = new Extraction { CreatedBy = other.Id, ProjectId = pid };
+        Context.Extractions.Add(extraction);
+        await Context.SaveChangesAsync();
+
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+        var result = await _business.ListExtractionsByProjectPaginated(otherProj.Id, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task ListExtractionsByProjectPaginated_ReturnsCorrectFields()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+        var result = await _business.ListExtractionsByProjectPaginated(pid, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.Contains(result.Items, e => e.Id == extractionId && e.Status == ExtractionStatus.Running && e.Mode == ExtractionMode.Strict);
+        Assert.Contains(result.Items, e => e.Id == completeExtractionId && e.Status == ExtractionStatus.Complete && e.Mode == ExtractionMode.Discovery);
+    }
+
+    [Fact]
+    public async Task ListExtractionsByProjectPaginated_ReturnsFailureMessage()
+    {
+        const string failureMessage = "LLM model endpoint rejected the request.";
+        await _business.MarkExtractionFailed(extractionId, oid, pid, failureMessage);
+
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+        var result = await _business.ListExtractionsByProjectPaginated(pid, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.Contains(result.Items, e => e.Id == extractionId && e.FailureMessage == failureMessage);
+    }
+
+    [Fact]
+    public async Task ListExtractionsByProjectPaginated_RespectsPagination()
+    {
+        for (int i = 1; i <= 15; i++)
+        {
+            Context.Extractions.Add(new Extraction
+            {
+                CreatedBy = uid,
+                ProjectId = pid,
+                Status = ExtractionStatus.Complete,
+                Mode = ExtractionMode.Strict
+            });
+        }
+
+        await Context.SaveChangesAsync();
+
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = 10 };
+        var result = await _business.ListExtractionsByProjectPaginated(pid, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(10, result.PageSize);
+        Assert.Equal(17, result.TotalCount);
+        Assert.Equal(7, result.Items.Count);
+    }
+    #endregion
+
     // =========================================================================
     // ListExtractionsByProject Tests
     // =========================================================================
 
-    #region ListExtractionsByProject Tests
+    #region ListExtractionsByProject (V1 / Legacy) Tests
 
     [Fact]
     public async Task ListExtractionsByProject_ReturnsExtractionsForCorrectProject()

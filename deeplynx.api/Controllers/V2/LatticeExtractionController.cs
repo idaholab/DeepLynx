@@ -121,13 +121,18 @@ public class LatticeExtractionController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
+    /// <param name="paginatedRequestDto"> Pagination parameters</param>
     /// <returns>200 OK with a list of extractions belonging to the project.</returns>
     [HttpGet(Name = "api_list_extractions")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [InsightEnabled]
-    public async Task<IActionResult> ListExtractions(long organizationId, long projectId)
+    public async Task<IActionResult> ListExtractions(
+        long organizationId, 
+        long projectId,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
-        var result = await _latticeExtractionBusiness.ListExtractionsByProject(projectId);
+        paginatedRequestDto ??= new PaginatedRequestDto();
+        var result = await _latticeExtractionBusiness.ListExtractionsByProjectPaginated(projectId, paginatedRequestDto);
         return Ok(result);
     }
 
