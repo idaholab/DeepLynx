@@ -274,12 +274,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   // ============= Loaded Project ==============
   useEffect(() => {
     if (project?.projectId === projectId) return;
+    let cancelled = false;
     const loadProject = async () => {
       const recordProject = await getProject(Number(organizationId), projectId);
+      if (cancelled) return;
       setProject({projectId, projectName: recordProject.name})
     };
     loadProject();
-  }, [organizationId, project]);
+    return () => {
+      cancelled = true;
+    }
+  }, [organizationId, setProject, projectId]);
 
   // ============= RECORD UPDATE HANDLERS =============
   const handleUpdateRecord = useCallback(
