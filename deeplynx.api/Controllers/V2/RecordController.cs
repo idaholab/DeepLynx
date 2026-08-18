@@ -710,8 +710,9 @@ public class RecordController : ControllerBase
         long recordId,
         [FromQuery] int depth)
     {
-            var edges = await _graphBusiness.GetGraphDataForRecord(
-                organizationId, projectId, recordId, UserContextStorage.UserId, depth);
-            return Ok(edges);
+        bool isAdmin = UserContextStorage.IsSysAdmin || UserContextStorage.IsOrgAdmin || UserContextStorage.IsProjectAdmin;
+        var edges = await _graphBusiness.GetGraphDataForRecord(
+            organizationId, projectId, recordId, UserContextStorage.UserId, depth, isAdmin);
+        return Ok(edges);
     }
 }
