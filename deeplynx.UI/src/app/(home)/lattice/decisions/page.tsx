@@ -30,6 +30,8 @@ import toast from "react-hot-toast";
 import { useLanguage } from "@/app/contexts/Language";
 import { BetaBadge } from "@/app/(home)/components/BetaBadge";
 import { isInsightHidden } from "@/app/lib/feature_flags";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "../../components/PaginationControls";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
@@ -923,6 +925,23 @@ export default function LatticeDecisionsPage() {
     return null;
   }
 
+    const {
+      currentPage: extractionPage,
+      pageSize: extractionPageSize,
+      paginatedItems: paginatedExtractions,
+      resetPagination: resetExtractionPagination,
+      setCurrentPage: setExtractionPage,
+      setPageSize: setExtractionPageSize,
+      totalPages: extractionTotalPages,
+    } = useLocalPagination({
+      items: items,
+      initialPageSize: 5,
+    });
+
+    useEffect(() => {
+      resetExtractionPagination();
+    }, [resetExtractionPagination]);
+
   return (
     <main className="min-h-screen bg-base-200/30">
       {/* Page header */}
@@ -980,7 +999,7 @@ export default function LatticeDecisionsPage() {
               </p>
             ) : (
               <ul className="divide-y divide-base-200 max-h-[60vh] overflow-y-auto">
-                {items.map((item) => (
+                {paginatedExtractions.map((item) => (
                   <li key={item.id}>
                     <button
                       type="button"
@@ -1037,6 +1056,14 @@ export default function LatticeDecisionsPage() {
                     </button>
                   </li>
                 ))}
+
+                <PaginationControls
+                  currentPage={extractionPage}
+                  pageSize={extractionPageSize}
+                  totalPages={extractionTotalPages}
+                  onPageChange={setExtractionPage}
+                  onPageSizeChange={setExtractionPageSize}
+                />
               </ul>
             )}
           </aside>
