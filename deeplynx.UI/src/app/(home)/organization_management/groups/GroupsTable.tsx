@@ -1,7 +1,7 @@
 // src/app/(home)/organization_management/groups/GroupsTable.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -16,6 +16,8 @@ import {
 import AvatarCell from "../../components/Avatar";
 import { GroupResponseDto, UserResponseDto } from "../../types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "../../components/PaginationControls";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -116,6 +118,24 @@ const GroupsTable: React.FC<GroupsTableProps> = ({
   onArchiveGroup,
 }) => {
   const { t } = useLanguage();
+
+  const {
+    currentPage: groupPage,
+    pageSize: groupPageSize,
+    paginatedItems: paginatedGroup,
+    resetPagination: resetGroupPagination,
+    setCurrentPage: setGroupPage,
+    setPageSize: setGroupPageSize,
+    totalPages: groupTotalPages,
+  } = useLocalPagination({
+    items: groups,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetGroupPagination();
+  }, [resetGroupPagination]);
+
   return (
     <div className="rounded-lg shadow-xl overflow-hidden border-2 border-primary">
       <table className="table w-full">
@@ -157,7 +177,7 @@ const GroupsTable: React.FC<GroupsTableProps> = ({
               </td>
             </tr>
           ) : (
-            groups.map((group) => {
+            paginatedGroup.map((group) => {
               const currentMembers = groupMembers.get(group.id) || [];
               const availableUsersForGroup = getAvailableUsers(group.id);
               const filteredAvailable = filterUsersBySearch(
@@ -198,6 +218,18 @@ const GroupsTable: React.FC<GroupsTableProps> = ({
           )}
         </tbody>
       </table>
+      {/* Add PaginationControls below the table */}
+      {groups.length > 0 && (
+        <div className="mt-4 flex justify-end">
+          <PaginationControls
+            currentPage={groupPage}
+            pageSize={groupPageSize}
+            totalPages={groupTotalPages}
+            onPageChange={setGroupPage}
+            onPageSizeChange={setGroupPageSize}
+          />
+        </div>
+      )}
     </div>
   );
 };

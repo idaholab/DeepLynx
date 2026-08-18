@@ -238,13 +238,16 @@ public class FileBusiness : IFileControllerBusiness
         var uri = await fileBusiness.UpdateFile(record, objectStorage.Config, file, guid);
 
         var fileSize = file.Length;
+        
+        var properties = record.Properties;
+        var updatedProperties = !string.IsNullOrWhiteSpace(properties)
+            ? JsonNode.Parse(properties)!.AsObject()
+            : new JsonObject();
+        updatedProperties["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower();
 
         var updateRecordRequest = new UpdateRecordRequestDto
         {
-            Properties = new JsonObject
-            {
-                ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
-            },
+            Properties = updatedProperties,
             Name = file.FileName,
             Uri = uri,
             FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
@@ -655,14 +658,17 @@ public class FileBusiness : IFileControllerBusiness
         var fileSize = await fileBusiness.GetFileSize(uri, objectStorage.Config);
         var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
 
+        var properties = record.Properties;
+        var updatedProperties = !string.IsNullOrWhiteSpace(properties)
+            ? JsonNode.Parse(properties)!.AsObject()
+            : new JsonObject();
+        updatedProperties["fileType"] = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
+
         await fileBusiness.DeleteFile(record, objectStorage.Config);
 
         var updateRecordRequest = new UpdateRecordRequestDto
         {
-            Properties = new JsonObject
-            {
-                ["fileType"] = fileExtension
-            },
+            Properties = updatedProperties,
             Name = request.FileName,
             Uri = uri,
             FileType = fileExtension,
