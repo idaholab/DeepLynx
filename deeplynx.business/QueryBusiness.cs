@@ -30,9 +30,8 @@ public class QueryBusiness : IQueryBusiness
         _projectRolePermissionService = projectRolePermissionService;
     }
 
-   // Add this as a field on the QueryBusiness class (near other private fields),
-// so it's shared by QueryBuilder, QueryBuilderPaginated, and any other method
-// that needs to validate a query_records filter column.
+   
+// validate a query_records filter column
 private static readonly HashSet<string> AllowedQueryRecordFilterColumns = new(StringComparer.OrdinalIgnoreCase)
 {
     "id", "uri", "properties", "original_id", "name", "description",
@@ -127,15 +126,7 @@ public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
             {
                 var query = request[i];
 
-                // -----------------------------------------------------------
-                // SECURITY: query.Filter is later interpolated directly into
-                // raw SQL as a column reference (e.g. $"qr.{query.Filter} = ...").
-                // Without this check, a caller can pass arbitrary SQL instead
-                // of a column name (e.g. "id = 1 OR 1=1 OR qr.id"), resulting
-                // in SQL injection. Only allow exact matches against a known,
-                // fixed set of real query_records columns - reject anything
-                // else before it ever reaches string interpolation.
-                // -----------------------------------------------------------
+                //  verify filter belongs to one of valid filter columns
                 if (string.IsNullOrWhiteSpace(query.Filter) || !AllowedQueryRecordFilterColumns.Contains(query.Filter))
                 {
                     throw new ArgumentException(
@@ -466,8 +457,7 @@ public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
                 {
                     var query = request[i];
 
-                    // SECURITY: query.Filter is interpolated directly into raw SQL as a
-                    // column reference below. Validate it against the allowed columns
+                    // Validate filter against the allowed columns
                     // before it's ever used, to prevent SQL injection.
                     if (string.IsNullOrWhiteSpace(query.Filter) || !AllowedQueryRecordFilterColumns.Contains(query.Filter))
                     {
