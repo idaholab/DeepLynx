@@ -211,9 +211,9 @@ public class FileBusiness : IFileControllerBusiness
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
     /// <param name="file">The file to replace the old one</param>
-    /// <param name="metadataFile">Optional metadata that will be appended to the updated record</param>
     /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
     /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
+    /// <param name="metadataFile">Optional metadata that will be appended to the updated record</param>
     /// <returns>Record response DTO containing updated file information</returns>
     public async Task<RecordResponseDto> UpdateFile(
         long currentUserId,
@@ -221,10 +221,10 @@ public class FileBusiness : IFileControllerBusiness
         long projectId,
         long recordId,
         IFormFile file,
-        IFormFile? metadataFile = null,
         long? vlmConfigId = null,
         long? embeddingModelConfigId = null,
-        string? userJwt = null)
+        string? userJwt = null,
+        IFormFile? metadataFile = null)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 

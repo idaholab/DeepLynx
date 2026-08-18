@@ -32,10 +32,10 @@ public interface IFileControllerBusiness
         long projectId,
         long recordId,
         IFormFile file,
-        IFormFile? metadataFile,
         long? vlmConfigId,
         long? embeddingModelConfigId,
-        string? userJwt);
+        string? userJwt,
+        IFormFile? metadataFile = null);
 
     Task<RecordResponseDto> UpdateFileContentHash(
         long currentUserId,
