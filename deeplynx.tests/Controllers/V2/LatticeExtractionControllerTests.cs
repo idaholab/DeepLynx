@@ -57,9 +57,15 @@ public class LatticeExtractionControllerTests : IDisposable
     [Fact]
     public async Task ListExtractions_ReturnsProjectExtractions()
     {
-        var expected = new List<ExtractionListItemDto> { new() { Id = ExtractionId } };
+        var expected = new PaginatedResponse<ExtractionListItemDto>
+        {
+            Items = [new(), new()],
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
         _mockBusiness
-            .Setup(b => b.ListExtractionsByProject(ProjectId))
+            .Setup(b => b.ListExtractionsByProjectPaginated(ProjectId, It.IsAny<PaginatedRequestDto>()))
             .ReturnsAsync(expected);
 
         var actionResult = await _controller.ListExtractions(OrgId, ProjectId);
@@ -202,7 +208,7 @@ public class LatticeExtractionControllerTests : IDisposable
     public async Task ListExtractions_PropagatesUnexpectedException()
     {
         _mockBusiness
-            .Setup(b => b.ListExtractionsByProject(ProjectId))
+            .Setup(b => b.ListExtractionsByProjectPaginated(ProjectId, It.IsAny<PaginatedRequestDto>()))
             .ThrowsAsync(new Exception("database unavailable"));
 
         await Assert.ThrowsAsync<Exception>(
