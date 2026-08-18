@@ -89,7 +89,7 @@ public class FileController : ControllerBase
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
     /// <param name="file">The file to replace the old one</param>
-    /// <param name="metadata">Optional metadata that will be appended to the updated record</param>
+    /// <param name="metadataFile">Optional metadata that will be appended to the updated record</param>
     /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
     /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
     /// <returns>Record response DTO containing updated file information</returns>
@@ -103,14 +103,14 @@ public class FileController : ControllerBase
         long projectId,
         long recordId,
         IFormFile file,
-        IFormFile? metadata,
+        IFormFile? metadataFile,
         [FromQuery] long? vlmConfigId = null,
         [FromQuery] long? embeddingModelConfigId = null)
     {
         var currentUserId = UserContextStorage.UserId;
         var userJwt = UserContextStorage.Token;
         var updatedFileInfo =
-            await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file, metadata, vlmConfigId, embeddingModelConfigId, userJwt);
+            await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file, metadataFile, vlmConfigId, embeddingModelConfigId, userJwt);
         return Ok(updatedFileInfo);
     }
 
