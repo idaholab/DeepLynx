@@ -164,9 +164,6 @@ const CreateStorageModal = ({
               <option value="aws_s3">
                 {t.translations.AWS_S3} ({t.translations.COMING_SOON})
               </option>
-              <option value="azure_object">
-                {t.translations.AZURE_BLOB_STORAGE}
-              </option>
             </select>
           </div>
 
