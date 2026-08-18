@@ -277,6 +277,14 @@ public class FileBusiness : IFileControllerBusiness
             objectStorage.Type, objectStorage.Config, uri, updatedProperties, recordClass, () => file.OpenReadStream());
         var resolvedClass = await GetResolvedClass(organizationId, projectId, currentUserId, metadata, recordClass);
 
+        // resolve tags
+        var recordTags = record.Tags?.Select(t => t.Name) ?? Enumerable.Empty<string>();
+        var metadataTags = metadata?.Tags ?? new List<string>();
+        var updatedTags = recordTags
+            .Concat(metadataTags)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         var updateRecordRequest = new UpdateRecordRequestDto
         {
             Properties = updatedProperties,
@@ -289,7 +297,8 @@ public class FileBusiness : IFileControllerBusiness
             FileType = fileExtension,
             FileSize = fileSize,
             FileContentHash = fileContentHash,
-            ReplaceFileContentHash = true
+            ReplaceFileContentHash = true,
+            Tags = updatedTags
         };
 
         var updatedRecord = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
