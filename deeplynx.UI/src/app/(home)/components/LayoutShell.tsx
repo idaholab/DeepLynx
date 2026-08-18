@@ -73,7 +73,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
     const fetchOrganizations = async () => {
       try {
         setLoadingOrgs(true);
-        const orgs = await getAllOrganizationsForUser(true);
+        const { items: orgs } = await getAllOrganizationsForUser(true);
         setOrganizations(orgs);
       } catch (error) {
         console.error("Failed to fetch organizations:", error);
@@ -337,10 +337,10 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
             <ul className="mt-auto">
               <li className="mt-5">
                 <SysAdminRoute>
-                <Link href={"/site_management"} prefetch={false} aria-label="Admin Settings">
-                  <Cog6ToothIcon className="size-10" />
-                </Link>
-              </SysAdminRoute>
+                  <Link href={"/site_management"} prefetch={false} aria-label="Admin Settings">
+                    <Cog6ToothIcon className="size-10" />
+                  </Link>
+                </SysAdminRoute>
               </li>
               <li className="mt-5 id-tooltip group relative">
                 <Link

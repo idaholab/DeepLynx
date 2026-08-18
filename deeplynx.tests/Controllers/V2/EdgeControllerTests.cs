@@ -63,9 +63,15 @@ public class EdgeControllerTests : IDisposable
     [Fact]
     public async Task GetAllEdges_Returns200_WithList()
     {
-        var expected = new List<EdgeResponseDto> { new(), new() };
+        var expected = new PaginatedResponse<EdgeResponseDto>
+        {
+            Items = new List<EdgeResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
-        _mockEdgeBusiness.Setup(b => b.GetAllEdges(UserId, OrgId, ProjectId, DataSourceId, true))
+        _mockEdgeBusiness.Setup(b => b.GetAllEdgesPaginated(UserId, OrgId, ProjectId, It.IsAny<PaginatedRequestDto>(), DataSourceId, true))
                      .ReturnsAsync(expected);
 
         var result = (await _edgeController.GetAllEdges(OrgId, ProjectId, DataSourceId, true)).Result as OkObjectResult;
@@ -78,24 +84,30 @@ public class EdgeControllerTests : IDisposable
     [Fact]
     public async Task GetAllEdges_Returns200_WithEmptyList()
     {
-        _mockEdgeBusiness.Setup(b => b.GetAllEdges(
+        _mockEdgeBusiness.Setup(b => b.GetAllEdgesPaginated(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<long?>(), It.IsAny<bool>()))
-                     .ReturnsAsync([]);
+                         It.IsAny<PaginatedRequestDto?>(), It.IsAny<long?>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                     .ReturnsAsync(new PaginatedResponse<EdgeResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
-        var result = (await _edgeController.GetAllEdges(OrgId, ProjectId, null, true)).Result as OkObjectResult;
+        var result = (await _edgeController.GetAllEdges(OrgId, ProjectId, null, true, null)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<EdgeResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<EdgeResponseDto>>(result.Value);
     }
 
     [Fact]
     public async Task GetAllEdges_ThrowsException_WhenEdgeBusinessThrows()
     {
-        _mockEdgeBusiness.Setup(b => b.GetAllEdges(
+        _mockEdgeBusiness.Setup(b => b.GetAllEdgesPaginated(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
-                         It.IsAny<long?>(), It.IsAny<bool>()))
+                         It.IsAny<PaginatedRequestDto?>(), It.IsAny<long?>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _edgeController.GetAllEdges(OrgId, ProjectId, null, true));
@@ -104,12 +116,18 @@ public class EdgeControllerTests : IDisposable
     [Fact]
     public async Task GetAllEdges_PassesIdsDataSourceIdAndHideArchivedToBusinessLayer()
     {
-        _mockEdgeBusiness.Setup(b => b.GetAllEdges(UserId, OrgId, ProjectId, DataSourceId, false))
-                     .ReturnsAsync([]);
+        _mockEdgeBusiness.Setup(b => b.GetAllEdgesPaginated(UserId, OrgId, ProjectId, It.IsAny<PaginatedRequestDto>(), DataSourceId, false, false, false))
+                     .ReturnsAsync(new PaginatedResponse<EdgeResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
-        await _edgeController.GetAllEdges(OrgId, ProjectId, DataSourceId, hideArchived: false);
+        await _edgeController.GetAllEdges(OrgId, ProjectId, DataSourceId, hideArchived: false, null);
 
-        _mockEdgeBusiness.Verify(b => b.GetAllEdges(UserId, OrgId, ProjectId, DataSourceId, false), Times.Once);
+        _mockEdgeBusiness.Verify(b => b.GetAllEdgesPaginated(UserId, OrgId, ProjectId, It.IsAny<PaginatedRequestDto>(), DataSourceId, false, false, false), Times.Once);
     }
 
     #endregion
@@ -647,7 +665,7 @@ public class EdgeControllerTests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(EdgeController.GetAllEdges),
-            "organizationId", "projectId", "dataSourceId", "hideArchived");
+            "organizationId", "projectId", "dataSourceId", "hideArchived", "paginatedRequestDto");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
         AssertHasAuthAttribute(method, "read", "edge");

@@ -88,7 +88,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
     try {
       setLoadingProjects(true);
-      const data = await getAllProjects(
+      const { items: data } = await getAllProjects(
         organization.organizationId as number,
         true,
       );

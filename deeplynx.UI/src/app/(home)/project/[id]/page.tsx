@@ -44,10 +44,10 @@ export default async function ProjectPage({ params }: Props) {
   }
 
   // Fetch projects filtered by organization
-  const ProjectResponseDtos = (await getAllProjectsServer(
+  const { items: ProjectResponseDtos } = (await getAllProjectsServer(
     organizationId as number,
     true
-  )) as ProjectResponseDto[];
+  ));
   const initialProjects = ProjectResponseDtos.map((p) =>
     toProjectResponseDtos(p)
   );

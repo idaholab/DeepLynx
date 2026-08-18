@@ -34,6 +34,8 @@ import { useLanguage } from "@/app/contexts/Language";
 
 import ArchiveClassModal from "./ArchiveClassModal";
 import { queryBuilder } from "@/app/lib/client_service/query_services.client";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 
 type LayoutMode = "tabs";
 
@@ -190,7 +192,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       }
 
       try {
-        const relationshipData = await getAllRelationships(projectId, false);
+        const { items: relationshipData } = await getAllRelationships(projectId, false);
 
         if (cancelled) return;
 
@@ -326,6 +328,23 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       );
     });
   }, [classLookup, relationshipSearch, relationships]);
+
+  const {
+    currentPage: classPage,
+    pageSize: classPageSize,
+    paginatedItems: paginatedClasses,
+    resetPagination: resetClassPagination,
+    setCurrentPage: setClassPage,
+    setPageSize: setClassPageSize,
+    totalPages: classTotalPages,
+  } = useLocalPagination({
+    items: filteredClasses,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetClassPagination();
+  }, [classSearch, resetClassPagination]);
 
   const relationshipCountForClass = (classId: number) =>
     relationships.filter(
@@ -631,47 +650,54 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               : t.translations.NO_CLASSES_FOUND_IN_DATABASE,
           )
         ) : (
-          <div
-            className={`overflow-x-auto rounded-lg border border-base-300/50 ${filteredClasses.length > 5 ? "max-h-[22rem] overflow-y-auto" : ""
-              }`}
-          >
-            <table className="table">
-              <thead className="bg-base-200">
-                <tr>
-                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.NAME}</th>
-                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.STATUS}</th>
-                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.UPDATED}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredClasses.map((item) => {
-                  const isSelected =
-                    selection?.kind === "class" && selection.id === item.id;
+          <>
+            <div className="overflow-x-auto rounded-lg border border-base-300/50">
+              <table className="table">
+                <thead className="bg-base-200">
+                  <tr>
+                    <th className="sticky top-0 z-10 bg-base-200">{t.translations.NAME}</th>
+                    <th className="sticky top-0 z-10 bg-base-200">{t.translations.STATUS}</th>
+                    <th className="sticky top-0 z-10 bg-base-200">{t.translations.UPDATED}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedClasses.map((item) => {
+                    const isSelected =
+                      selection?.kind === "class" && selection.id === item.id;
 
-                  return (
-                    <tr
-                      key={item.id}
-                      className={`cursor-pointer transition-colors ${isSelected ? "bg-primary/10" : "hover"
-                        }`}
-                      onClick={() => focusClass(item.id)}
-                    >
-                      <td>
-                        <div className="font-medium">{item.name}</div>
-                      </td>
-                      <td>
-                        <span className={statusClass(item.isArchived)}>
-                          {item.isArchived ? t.translations.ARCHIVED : t.translations.ACTIVE}
-                        </span>
-                      </td>
-                      <td className="text-sm text-base-content/70">
-                        {formatLocalDateTime(item.lastUpdatedAt ?? item.createdat)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    return (
+                      <tr
+                        key={item.id}
+                        className={`cursor-pointer transition-colors ${isSelected ? "bg-primary/10" : "hover"
+                          }`}
+                        onClick={() => focusClass(item.id)}
+                      >
+                        <td>
+                          <div className="font-medium">{item.name}</div>
+                        </td>
+                        <td>
+                          <span className={statusClass(item.isArchived)}>
+                            {item.isArchived ? t.translations.ARCHIVED : t.translations.ACTIVE}
+                          </span>
+                        </td>
+                        <td className="text-sm text-base-content/70">
+                          {formatLocalDateTime(item.lastUpdatedAt ?? item.createdat)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <PaginationControls
+              currentPage={classPage}
+              pageSize={classPageSize}
+              totalPages={classTotalPages}
+              onPageChange={setClassPage}
+              onPageSizeChange={setClassPageSize}
+            />
+          </>
         )}
       </div>
     </div>

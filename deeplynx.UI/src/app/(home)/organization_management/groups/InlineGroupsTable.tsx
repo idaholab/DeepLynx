@@ -140,11 +140,11 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
               Number(group.id)
             );
 
-            preloadedGroupMembers.set(group.id, members);
+            preloadedGroupMembers.set(group.id, members.items);
 
             return {
               ...group,
-              memberCount: members.length,
+              memberCount: members.totalCount,
             };
           } catch (err) {
             console.error(
@@ -177,13 +177,13 @@ const InlineGroupsTable: React.FC<InlineGroupsTableProps> = ({
 
       setGroupMembers((prev) => {
         const copy = new Map(prev);
-        copy.set(groupId, members);
+        copy.set(groupId, members.items);
         return copy;
       });
 
       setGroups((prev) =>
         prev.map((g) =>
-          g.id === groupId ? { ...g, memberCount: members.length } : g
+          g.id === groupId ? { ...g, memberCount: members.totalCount } : g
         )
       );
     } catch (err) {

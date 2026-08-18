@@ -2,7 +2,7 @@
 "use client";
 
 import { CreateGroupRequestDto, UpdateGroupRequestDto } from "@/app/(home)/types/requestDTOs";
-import { GroupResponseDto, UserResponseDto } from "@/app/(home)/types/responseDTOs";
+import { GroupResponseDto, PaginatedResponse, UserResponseDto } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 
@@ -11,16 +11,20 @@ import api from "./api";
  * Get all groups within an organization
  * @param organizationId - The ID of the organization
  * @param hideArchived - Flag to hide archived groups (default: true)
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
  * @returns Promise with array of GroupResponseDto
  */
 export async function getAllGroups(
   organizationId: number,
-  hideArchived: boolean = true
-): Promise<GroupResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<GroupResponseDto>> {
   try {
     const res = await api.get(
       `/organizations/${organizationId}/groups`,
-      { params: { hideArchived } }
+      { params: { hideArchived, pageNumber, pageSize } }
     );
     return res.data;
   } catch (error) {
@@ -57,15 +61,20 @@ export async function getGroup(
  * Get all members of a group
  * @param organizationId - The ID of the organization
  * @param groupId - The ID of the group
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
  * @returns Promise with array of UserResponseDto
  */
 export async function getGroupMembers(
   organizationId: number,
-  groupId: number
-): Promise<UserResponseDto[]> {
+  groupId: number,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<UserResponseDto>> {
   try {
     const res = await api.get(
-      `/organizations/${organizationId}/groups/${groupId}/users`
+      `/organizations/${organizationId}/groups/${groupId}/users`,
+      { params: { pageNumber, pageSize } }
     );
     return res.data;
   } catch (error) {

@@ -36,8 +36,7 @@ builder.WebHost.ConfigureKestrel(options => { options.Limits.MaxRequestBodySize 
 
 builder.Services.Configure<FormOptions>(options => { options.MultipartBodyLengthLimit = 2L * 1024 * 1024 * 1024; });
 
-builder.Services.AddGrpc().AddFlightServer<NexusFlightServer>();
-builder.Services.AddGrpcReflection();
+
 
 var connectionString = ConnectionStringsProvider.GetPostgresConnectionString(builder.Configuration);
 
@@ -181,6 +180,12 @@ try
             options.SubstituteApiVersionInUrl = true;
         });
 
+    builder.Services.AddDataProtection();
+        // // If running multiple server instances behind a load balancer, state must be shared
+        // .PersistKeysToFileSystem(new DirectoryInfo(@"/shared/keys"))
+        // // or .PersistKeysToAzureBlobStorage(...), .PersistKeysToStackExchangeRedis(...), etc.
+        // .SetApplicationName("Nexus");
+
     /*
     ╔════════════════════════════╗
     ║  Dependency Injection      ║
@@ -224,6 +229,7 @@ try
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
     builder.Services.AddTransient<ITokenBusiness, TokenBusiness>();
     builder.Services.AddTransient<IOauthApplicationBusiness, OauthApplicationBusiness>();
+    builder.Services.AddTransient<IOauthDeviceAuthorizationBusiness, OauthDeviceAuthorizationBusiness>();
     builder.Services.AddTransient<IProvenanceBusiness, ProvenanceBusiness>();
     builder.Services.AddTransient<IQueryBusiness, QueryBusiness>();
     builder.Services.AddTransient<IMetadataBusiness, MetadataBusiness>();
@@ -264,6 +270,9 @@ try
     builder.Services.AddHttpClient<AirflowServiceClient>();
     builder.Services.AddSingleton<EncryptionHelper>();
 
+    builder.Services.AddGrpc().AddFlightServer<NexusFlightServer>();
+    builder.Services.AddGrpcReflection();
+
     /*
     ╔════════════════════════════╗
     ║  Global Exception Handling ║
@@ -276,6 +285,7 @@ try
     builder.Services.AddExceptionHandler<BadRequestExceptionHandler>();
     builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
     builder.Services.AddExceptionHandler<ConflictExceptionHandler>();
+    builder.Services.AddExceptionHandler<OauthExceptionHandler>();
     builder.Services.AddExceptionHandler<InternalServerErrorExceptionHandler>();
 
     //OpenApi Documentation

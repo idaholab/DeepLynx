@@ -104,10 +104,10 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
     () =>
       normalizedLabelSearch
         ? labels.filter(
-            (l) =>
-              l.name.toLowerCase().includes(normalizedLabelSearch) ||
-              l.description?.toLowerCase().includes(normalizedLabelSearch),
-          )
+          (l) =>
+            l.name.toLowerCase().includes(normalizedLabelSearch) ||
+            l.description?.toLowerCase().includes(normalizedLabelSearch),
+        )
         : labels,
     [labels, normalizedLabelSearch],
   );
@@ -214,13 +214,11 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
       setTagsLoading(true);
       setTagsError(null);
 
-      const dtoList: TagResponseDto[] = await getAllTagsOrg(
-        orgId,
-        undefined,
-        true, // hide archived by default
+      const dtoList = await getAllTagsOrg(
+        orgId
       );
 
-      setTags(dtoList.filter((t) => !t.isArchived));
+      setTags(dtoList.items.filter((t) => !t.isArchived));
     } catch (error) {
       console.error("Failed to load organization tags:", error);
       setTagsError(t.translations.FAILED_TO_LOAD_ORGANIZATION_TAGS);

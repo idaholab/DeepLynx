@@ -38,15 +38,18 @@ public class GroupController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the groups belong</param>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived groups</param>
+    /// <param name="paginatedRequestDto"> Pagination parameters</param>
     /// <returns>A list of groups in the organization.</returns>
     [HttpGet(Name = "api_get_all_groups")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "group")]
-    public async Task<ActionResult<IEnumerable<GroupResponseDto>>> GetAllGroups(
+    public async Task<ActionResult<PaginatedResponse<GroupResponseDto>>> GetAllGroups(
         long organizationId,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
-        var groups = await _groupBusiness.GetAllGroups(organizationId, hideArchived);
+        paginatedRequestDto ??= new PaginatedRequestDto();
+        var groups = await _groupBusiness.GetAllGroupsPaginated(organizationId, paginatedRequestDto, hideArchived);
         return Ok(groups);
     }
 
@@ -78,15 +81,18 @@ public class GroupController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the group belongs</param>
     /// <param name="groupId">ID of the group</param>
+    /// <param name="paginatedRequestDto"> Pagination parameters</param>
     /// <returns>A list of users in the group.</returns>
     [HttpGet("{groupId:long}/users", Name = "api_get_group_members")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "group")]
-    public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetGroupMembers(
+    public async Task<ActionResult<PaginatedResponse<UserResponseDto>>> GetGroupMembers(
         long organizationId,
-        long groupId)
+        long groupId,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
-        var members = await _groupBusiness.GetGroupMembers(organizationId, groupId);
+        paginatedRequestDto ??= new PaginatedRequestDto();
+        var members = await _groupBusiness.GetGroupMembersPaginated(organizationId, groupId, paginatedRequestDto);
         return Ok(members);
     }
 

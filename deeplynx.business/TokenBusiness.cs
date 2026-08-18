@@ -355,6 +355,26 @@ public class TokenBusiness : ITokenBusiness
     /// List all API keys for a user
     /// </summary>
     /// <param name="currentUserId">The ID of the user for which to list API keys</param>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching projects are returned unpaginated</param>
+    /// <returns>A paginated list of API keys, or all API keys if no pagination is specified</returns>
+    async Task<PaginatedResponse<string>> ITokenBusiness.GetAllUserKeysPaginated(long currentUserId, PaginatedRequestDto paginatedRequestDto)
+    {
+        return await _context.ApiKeys
+            .Where(r => r.UserId == currentUserId)
+            .OrderBy(k => k.Id)
+            .Select(k => k.Key)
+            .ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    /// [DEPRECATED - V1 ONLY] List all API keys for a user without pagination
+    /// Superseded by <see cref="GetAllUserKeysPaginated"/>. Do not call this from new controller versions;
+    /// it exists solely to back the deprecated v1 token controllers and should be deleted once
+    /// those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="currentUserId">The ID of the user for which to list API keys</param>
     /// <returns></returns>
     async Task<List<string>> ITokenBusiness.GetAllUserKeys(long currentUserId)
     {
@@ -366,4 +386,6 @@ public class TokenBusiness : ITokenBusiness
         var keys = userApiKeys.Select(c => c.Key).ToList();
         return keys;
     }
+
+    #endregion
 }

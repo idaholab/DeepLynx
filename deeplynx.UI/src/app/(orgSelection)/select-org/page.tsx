@@ -21,7 +21,7 @@ const page = async () => {
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
 
-    const organizations = await getAllOrganizationsForUserServer(true);
+    const { items: organizations } = await getAllOrganizationsForUserServer(true);
 
     const usersByOrg: Record<number, UserResponseDto[]> = {};
     for (const org of organizations) {
@@ -38,7 +38,7 @@ const page = async () => {
     redirect("/login/signin");
   }
 
-  const organizations = await getAllOrganizationsForUserServer(true);
+  const { items: organizations } = await getAllOrganizationsForUserServer(true);
 
   const usersByOrg: Record<number, UserResponseDto[]> = {};
   for (const org of organizations) {

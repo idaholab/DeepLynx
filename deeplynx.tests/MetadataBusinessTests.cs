@@ -76,7 +76,7 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService, _mockPermissionService.Object);
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _mockFileAzureBusiness = new Mock<IFileBusiness>();

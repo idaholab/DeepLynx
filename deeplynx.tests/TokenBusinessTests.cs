@@ -19,7 +19,7 @@ namespace deeplynx.tests
     public class TokenBusinessTests : IntegrationTestBase
     {
         private TokenBusiness _tokenBusiness;
-        
+
         private long uid1;
         private long uid2;
         private string userEmail;
@@ -31,7 +31,7 @@ namespace deeplynx.tests
         private long serviceAccountId;
         private long orgId;
         private long projectId;
-        
+
         public TokenBusinessTests(TestSuiteFixture fixture) : base(fixture)
         {
         }
@@ -56,7 +56,7 @@ namespace deeplynx.tests
             var parsed = handler.ReadJwtToken(jwt);
             Assert.Equal(apiKey1, parsed.Claims.First(c => c.Type == "apiKey").Value);
             Assert.True(parsed.ValidTo > DateTime.UtcNow);
-            
+
             // Verify token was saved to database
             var jti = parsed.Claims.First(c => c.Type == JwtRegisteredClaimNames.Jti).Value;
             var tokenHash = HashToken(jti);
@@ -106,11 +106,11 @@ namespace deeplynx.tests
             var app = Context.OauthApplications.Find(applicationId);
             app!.IsArchived = true;
             await Context.SaveChangesAsync();
-            
-            Context.ApiKeys.Add(new ApiKey 
-            { 
-                Key = "archived-key", 
-                Secret = hashedSecret1, 
+
+            Context.ApiKeys.Add(new ApiKey
+            {
+                Key = "archived-key",
+                Secret = hashedSecret1,
                 UserId = uid1,
                 ApplicationId = applicationId
             });
@@ -133,11 +133,11 @@ namespace deeplynx.tests
             var apiKey = "revoke-test-key";
             var plaintextSecret = "revoke-secret";
             var hashedSecret = _tokenBusiness.HashApiSecret(plaintextSecret);
-            
-            Context.ApiKeys.Add(new ApiKey 
-            { 
-                Key = apiKey, 
-                Secret = hashedSecret, 
+
+            Context.ApiKeys.Add(new ApiKey
+            {
+                Key = apiKey,
+                Secret = hashedSecret,
                 UserId = uid1,
                 ApplicationId = applicationId
             });
@@ -164,11 +164,11 @@ namespace deeplynx.tests
             var apiKey = "already-revoked-key";
             var plaintextSecret = "already-revoked-secret";
             var hashedSecret = _tokenBusiness.HashApiSecret(plaintextSecret);
-            
-            Context.ApiKeys.Add(new ApiKey 
-            { 
-                Key = apiKey, 
-                Secret = hashedSecret, 
+
+            Context.ApiKeys.Add(new ApiKey
+            {
+                Key = apiKey,
+                Secret = hashedSecret,
                 UserId = uid1,
                 ApplicationId = applicationId
             });
@@ -195,7 +195,7 @@ namespace deeplynx.tests
             var nonExistentJti = Guid.NewGuid().ToString();
 
             // Act & Assert
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => 
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _tokenBusiness.RevokeToken(nonExistentJti));
         }
 
@@ -210,11 +210,11 @@ namespace deeplynx.tests
             var apiKey = "check-revoked-key";
             var plaintextSecret = "check-revoked-secret";
             var hashedSecret = _tokenBusiness.HashApiSecret(plaintextSecret);
-            
-            Context.ApiKeys.Add(new ApiKey 
-            { 
-                Key = apiKey, 
-                Secret = hashedSecret, 
+
+            Context.ApiKeys.Add(new ApiKey
+            {
+                Key = apiKey,
+                Secret = hashedSecret,
                 UserId = uid1,
                 ApplicationId = applicationId
             });
@@ -239,11 +239,11 @@ namespace deeplynx.tests
             var apiKey = "revoked-check-key";
             var plaintextSecret = "revoked-check-secret";
             var hashedSecret = _tokenBusiness.HashApiSecret(plaintextSecret);
-            
-            Context.ApiKeys.Add(new ApiKey 
-            { 
-                Key = apiKey, 
-                Secret = hashedSecret, 
+
+            Context.ApiKeys.Add(new ApiKey
+            {
+                Key = apiKey,
+                Secret = hashedSecret,
                 UserId = uid1,
                 ApplicationId = applicationId
             });
@@ -269,18 +269,18 @@ namespace deeplynx.tests
         [Fact]
         public async Task RevokeAllUserTokens_RevokesAllTokensForUser()
         {
-           // Create multiple tokens for the user
+            // Create multiple tokens for the user
             var tokens = new List<string>();
             for (int i = 0; i < 3; i++)
             {
                 var apiKey = $"bulk-revoke-key-{i}";
                 var plaintextSecret = $"bulk-revoke-secret-{i}";
                 var hashedSecret = _tokenBusiness.HashApiSecret(plaintextSecret);
-                
-                Context.ApiKeys.Add(new ApiKey 
-                { 
-                    Key = apiKey, 
-                    Secret = hashedSecret, 
+
+                Context.ApiKeys.Add(new ApiKey
+                {
+                    Key = apiKey,
+                    Secret = hashedSecret,
                     UserId = uid1,
                     ApplicationId = applicationId
                 });
@@ -313,10 +313,10 @@ namespace deeplynx.tests
             var apiKey = "user1-key";
             var secret1 = "user1-secret";
             var hashedSecret1 = _tokenBusiness.HashApiSecret(secret1);
-            Context.ApiKeys.Add(new ApiKey 
-            { 
-                Key = apiKey, 
-                Secret = hashedSecret1, 
+            Context.ApiKeys.Add(new ApiKey
+            {
+                Key = apiKey,
+                Secret = hashedSecret1,
                 UserId = uid1,
                 ApplicationId = applicationId
             });
@@ -327,10 +327,10 @@ namespace deeplynx.tests
             var apiKey2 = "user2-key";
             var secret2 = "user2-secret";
             var hashedSecret2 = _tokenBusiness.HashApiSecret(secret2);
-            Context.ApiKeys.Add(new ApiKey 
-            { 
-                Key = apiKey2, 
-                Secret = hashedSecret2, 
+            Context.ApiKeys.Add(new ApiKey
+            {
+                Key = apiKey2,
+                Secret = hashedSecret2,
                 UserId = uid2,
                 ApplicationId = applicationId
             });
@@ -342,7 +342,7 @@ namespace deeplynx.tests
 
             // Assert
             var handler = new JwtSecurityTokenHandler();
-            
+
             var parsed1 = handler.ReadJwtToken(jwt1);
             var jti1 = parsed1.Claims.First(c => c.Type == JwtRegisteredClaimNames.Jti).Value;
             Assert.True(await _tokenBusiness.IsTokenRevoked(jti1));
@@ -360,10 +360,10 @@ namespace deeplynx.tests
         public async Task GetApiKey_ReturnsKey_WhenExists()
         {
             var apiKey = "findMe";
-            Context.ApiKeys.Add(new ApiKey 
-            { 
-                Key = apiKey, 
-                Secret = "hashMe", 
+            Context.ApiKeys.Add(new ApiKey
+            {
+                Key = apiKey,
+                Secret = "hashMe",
                 UserId = uid1,
                 ApplicationId = applicationId
             });
@@ -377,13 +377,13 @@ namespace deeplynx.tests
             Assert.Equal(apiKey, found!.Key);
             Assert.Equal(uid1, found.UserId);
         }
-        
+
         public async Task GetApiKey_Fails_WhenNotExists()
         {
             var apiKey = "cantFindMe";
 
             // Act & Assert
-            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() => 
+            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _tokenBusiness.GetApiKey(apiKey));
             Assert.Contains("Api Keypair with key", ex.Message);
         }
@@ -407,9 +407,9 @@ namespace deeplynx.tests
             Assert.NotNull(saved);
             Assert.False(string.IsNullOrWhiteSpace(saved!.Secret));
             Assert.Equal(applicationId, saved.ApplicationId);
-            
+
             Assert.True(_tokenBusiness.VerifyApiSecret(dto.apiSecret, saved.Secret));
-    
+
             // Verify they are NOT the same (one is plaintext, one is hash)
             Assert.NotEqual(dto.apiSecret, saved.Secret);
         }
@@ -421,7 +421,7 @@ namespace deeplynx.tests
             UserContextStorage.Email = "nouser@example.com";
 
             // Act & Assert
-            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() => 
+            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _tokenBusiness.CreateApiKey(99999, clientId));
             Assert.Contains("User with id", ex.Message);
         }
@@ -430,7 +430,7 @@ namespace deeplynx.tests
         public async Task CreateApiKey_Throws_WhenApplicationNotFound()
         {
             // Act & Assert
-            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() => 
+            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _tokenBusiness.CreateApiKey(uid1, "nonexistent-client-id"));
             Assert.Contains("OAuth application", ex.Message);
         }
@@ -443,13 +443,13 @@ namespace deeplynx.tests
             await Context.SaveChangesAsync();
 
             // Act & Assert
-            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() => 
+            var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _tokenBusiness.CreateApiKey(uid1, clientId));
             Assert.Contains("archived", ex.Message);
         }
 
         #endregion
-        
+
         #region GenerateServiceAccountApiKey Tests
 
         [Fact]
@@ -514,11 +514,13 @@ namespace deeplynx.tests
 
             Context.OrganizationUsers.Add(new OrganizationUser
             {
-                OrganizationId = orgId, UserId = regularUser.Id
+                OrganizationId = orgId,
+                UserId = regularUser.Id
             });
             Context.ProjectMembers.Add(new ProjectMember
             {
-                ProjectId = projectId, UserId = regularUser.Id
+                ProjectId = projectId,
+                UserId = regularUser.Id
             });
             await Context.SaveChangesAsync();
 
@@ -545,10 +547,10 @@ namespace deeplynx.tests
         public async Task DeleteApiKey_RemovesRow_And_ReturnsTrue()
         {
             var key = "delete-me";
-            Context.ApiKeys.Add(new ApiKey 
-            { 
-                Key = key, 
-                Secret = "sec", 
+            Context.ApiKeys.Add(new ApiKey
+            {
+                Key = key,
+                Secret = "sec",
                 UserId = uid1,
                 ApplicationId = applicationId
             });
@@ -592,30 +594,30 @@ namespace deeplynx.tests
 
         #endregion
 
-        #region GetAllUserKeys Tests
+        #region GetAllUserKeys (V1 / Legacy) Tests
 
         [Fact]
         public async Task GetAllUserKeys_ReturnsOnlyKeys_ForUser()
         {
             Context.ApiKeys.AddRange(
-                new ApiKey 
-                { 
-                    Key = "K1", 
-                    Secret = "s1", 
+                new ApiKey
+                {
+                    Key = "K1",
+                    Secret = "s1",
                     UserId = uid1,
                     ApplicationId = applicationId
                 },
-                new ApiKey 
-                { 
-                    Key = "K2", 
-                    Secret = "s2", 
+                new ApiKey
+                {
+                    Key = "K2",
+                    Secret = "s2",
                     UserId = uid1,
                     ApplicationId = applicationId
                 },
-                new ApiKey 
-                { 
-                    Key = "Z9", 
-                    Secret = "s9", 
+                new ApiKey
+                {
+                    Key = "Z9",
+                    Secret = "s9",
                     UserId = uid2,
                     ApplicationId = applicationId
                 }
@@ -631,6 +633,154 @@ namespace deeplynx.tests
             Assert.Contains("K2", keys);
             Assert.Contains("api-key-123", keys); // application key
             Assert.DoesNotContain("Z9", keys);
+        }
+
+        #endregion
+
+        #region GetAllUserKeysPaginated Tests
+
+        private static PaginatedRequestDto DefaultPagination(int pageNumber = 1, int pageSize = 100)
+        {
+            return new PaginatedRequestDto
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+        }
+
+        [Fact]
+        public async Task GetAllUserKeysPaginated_ReturnsOnlyKeys_ForUser()
+        {
+            // Arrange
+            Context.ApiKeys.AddRange(
+                new ApiKey { Key = "K1", Secret = "s1", UserId = uid1, ApplicationId = applicationId },
+                new ApiKey { Key = "K2", Secret = "s2", UserId = uid1, ApplicationId = applicationId },
+                new ApiKey { Key = "Z9", Secret = "s9", UserId = uid2, ApplicationId = applicationId }
+            );
+            await Context.SaveChangesAsync();
+
+            // Act
+            var result = await ((interfaces.ITokenBusiness)_tokenBusiness)
+                .GetAllUserKeysPaginated(uid1, DefaultPagination());
+
+            // Assert - baseline "api-key-123" + K1 + K2 = 3, Z9 belongs to uid2
+            Assert.Equal(3, result.TotalCount);
+            Assert.Equal(3, result.Items.Count);
+            Assert.Contains("K1", result.Items);
+            Assert.Contains("K2", result.Items);
+            Assert.Contains("api-key-123", result.Items);
+            Assert.DoesNotContain("Z9", result.Items);
+        }
+
+        [Fact]
+        public async Task GetAllUserKeysPaginated_NeverReturnsSecret()
+        {
+            // Arrange
+            Context.ApiKeys.Add(
+                new ApiKey { Key = "K1", Secret = "super-secret-value", UserId = uid1, ApplicationId = applicationId });
+            await Context.SaveChangesAsync();
+
+            // Act
+            var result = await ((interfaces.ITokenBusiness)_tokenBusiness)
+                .GetAllUserKeysPaginated(uid1, DefaultPagination());
+
+            // Assert - Items is List<string> of keys only; secret values must never surface
+            Assert.All(result.Items, key => Assert.DoesNotContain("secret", key, StringComparison.OrdinalIgnoreCase));
+        }
+
+        [Fact]
+        public async Task GetAllUserKeysPaginated_NoKeysForUser_ReturnsEmptyPaginatedResponse()
+        {
+            // Act - uid2 has no keys in this test's arrange
+            var result = await ((interfaces.ITokenBusiness)_tokenBusiness)
+                .GetAllUserKeysPaginated(uid2, DefaultPagination());
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Empty(result.Items);
+            Assert.Equal(0, result.TotalCount);
+            Assert.Equal(1, result.PageNumber);
+            Assert.Equal(100, result.PageSize);
+        }
+
+        [Fact]
+        public async Task GetAllUserKeysPaginated_Paginates_Correctly()
+        {
+            // Arrange - baseline "api-key-123" + K1..K3 = 4 total for uid1
+            Context.ApiKeys.AddRange(
+                new ApiKey { Key = "K1", Secret = "s1", UserId = uid1, ApplicationId = applicationId },
+                new ApiKey { Key = "K2", Secret = "s2", UserId = uid1, ApplicationId = applicationId },
+                new ApiKey { Key = "K3", Secret = "s3", UserId = uid1, ApplicationId = applicationId }
+            );
+            await Context.SaveChangesAsync();
+
+            var pageOne = DefaultPagination(pageNumber: 1, pageSize: 3);
+            var pageTwo = DefaultPagination(pageNumber: 2, pageSize: 3);
+
+            // Act
+            var firstPage = await ((interfaces.ITokenBusiness)_tokenBusiness)
+                .GetAllUserKeysPaginated(uid1, pageOne);
+            var secondPage = await ((interfaces.ITokenBusiness)_tokenBusiness)
+                .GetAllUserKeysPaginated(uid1, pageTwo);
+
+            // Assert
+            Assert.Equal(4, firstPage.TotalCount);
+            Assert.Equal(3, firstPage.Items.Count);
+            Assert.Equal(4, secondPage.TotalCount);
+            Assert.Single(secondPage.Items);
+
+            // No overlap between pages
+            var firstPageSet = firstPage.Items.ToHashSet();
+            var secondPageSet = secondPage.Items.ToHashSet();
+            Assert.Empty(firstPageSet.Intersect(secondPageSet));
+        }
+
+        [Fact]
+        public async Task GetAllUserKeysPaginated_PageSizeNegativeOne_ReturnsAllKeys_IgnoringPageNumber()
+        {
+            // Arrange - baseline "api-key-123" + K1, K2 = 3 total for uid1
+            Context.ApiKeys.AddRange(
+                new ApiKey { Key = "K1", Secret = "s1", UserId = uid1, ApplicationId = applicationId },
+                new ApiKey { Key = "K2", Secret = "s2", UserId = uid1, ApplicationId = applicationId }
+            );
+            await Context.SaveChangesAsync();
+
+            var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+            // Act
+            var result = await ((interfaces.ITokenBusiness)_tokenBusiness)
+                .GetAllUserKeysPaginated(uid1, sentinel);
+
+            // Assert - PageNumber is ignored entirely, every matching key comes back on "page 1"
+            Assert.Equal(3, result.TotalCount);
+            Assert.Equal(3, result.Items.Count);
+            Assert.Equal(1, result.PageNumber);
+            Assert.Equal(3, result.PageSize);
+            Assert.Contains("K1", result.Items);
+            Assert.Contains("K2", result.Items);
+        }
+
+        [Fact]
+        public async Task GetAllUserKeysPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+        {
+            // Arrange - baseline "api-key-123" + K1, K2 = 3 total for uid1
+            Context.ApiKeys.AddRange(
+                new ApiKey { Key = "K1", Secret = "s1", UserId = uid1, ApplicationId = applicationId },
+                new ApiKey { Key = "K2", Secret = "s2", UserId = uid1, ApplicationId = applicationId }
+            );
+            await Context.SaveChangesAsync();
+
+            var zeroSize = DefaultPagination(pageNumber: 1, pageSize: 0);
+
+            // Act
+            var result = await ((interfaces.ITokenBusiness)_tokenBusiness)
+                .GetAllUserKeysPaginated(uid1, zeroSize);
+
+            // Assert
+            Assert.Empty(result.Items);
+            Assert.Equal(3, result.TotalCount);
+            Assert.Equal(1, result.PageNumber);
+            Assert.Equal(0, result.PageSize);
         }
 
         #endregion
@@ -680,7 +830,7 @@ namespace deeplynx.tests
                 }
             }
         }
-        
+
         // Helpers copied from TokenBusiness
         private string HashToken(string jti)
         {
@@ -688,34 +838,34 @@ namespace deeplynx.tests
             var hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(jti));
             return Convert.ToBase64String(hashBytes);
         }
-        
+
         public string HashApiSecret(string apiKey)
         {
             return BCrypt.Net.BCrypt.HashPassword(apiKey, workFactor: 12);
         }
-        
-        # endregion
-        
+
+        #endregion
+
         protected override async Task SeedTestDataAsync()
         {
             await base.SeedTestDataAsync();
-            
+
             // Create test users
-            var user = new User 
-            { 
-                Email = "tester@example.com", 
-                Name = "Test User" 
+            var user = new User
+            {
+                Email = "tester@example.com",
+                Name = "Test User"
             };
             Context.Users.Add(user);
-            
-            var otherUser = new User 
-            { 
-                Email = "other@example.com", 
-                Name = "Other User" 
+
+            var otherUser = new User
+            {
+                Email = "other@example.com",
+                Name = "Other User"
             };
             Context.Users.Add(otherUser);
             await Context.SaveChangesAsync();
-            
+
             uid1 = user.Id;
             uid2 = otherUser.Id;
             userEmail = user.Email;
@@ -725,7 +875,7 @@ namespace deeplynx.tests
             clientId = GenerateClientId();
             var clientSecret = GenerateClientSecret();
             var clientSecretHash = HashSecret(clientSecret);
-            
+
             var oauthApp = new OauthApplication
             {
                 Name = "Test OAuth Application",
@@ -739,26 +889,26 @@ namespace deeplynx.tests
                 LastUpdatedBy = uid1,
                 IsArchived = false
             };
-            
+
             Context.OauthApplications.Add(oauthApp);
             await Context.SaveChangesAsync();
             applicationId = oauthApp.Id;
-            
+
             // Create API Key and Secret
             apiKey1 = "api-key-123";
             plaintextSecret1 = "my-plaintext-secret";
 
             // Store the HASHED secret in the database
             hashedSecret1 = HashApiSecret(plaintextSecret1);
-            Context.ApiKeys.Add(new ApiKey 
-            { 
-                Key = apiKey1, 
-                Secret = hashedSecret1, 
+            Context.ApiKeys.Add(new ApiKey
+            {
+                Key = apiKey1,
+                Secret = hashedSecret1,
                 UserId = uid1,
                 ApplicationId = applicationId
             });
             await Context.SaveChangesAsync();
-            
+
             // --- Service account test data ---
 
             // Create org and project
@@ -795,7 +945,7 @@ namespace deeplynx.tests
                 UserId = serviceAccountId
             });
             await Context.SaveChangesAsync();
-            
+
             // Set the JWT signing secret environment variable
             Environment.SetEnvironmentVariable("JWT_SECRET_KEY", "test-jwt-secret-key-min-32-chars");
         }

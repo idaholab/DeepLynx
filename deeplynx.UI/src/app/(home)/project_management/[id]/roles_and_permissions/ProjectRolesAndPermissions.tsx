@@ -155,6 +155,7 @@ const ProjectRolesAndPermissions = ({
           project?.projectId as number,
           newRole.id,
           userPermissionIds,
+          false,
         );
 
         setRolePermissions((prev) => ({
@@ -272,13 +273,17 @@ const ProjectRolesAndPermissions = ({
     new Set(),
   );
 
-  const handleStartEditingPermissions = () => {
+  const handleStartEditingPermissions = (activePermissionTab: string) => {
     if (!currentRole) return;
 
     // Only allow editing for project-specific roles.
     if (isOrganizationRole(currentRole)) {
-      toast.error("Cannot edit permissions for inherited roles");
-      return;
+      const isSensitivityTab = activePermissionTab === t.translations.SENSITIVITY_LABELS;
+      const isOrgAdmin = currentUserInfo?.isOrgAdmin === true || currentUserInfo?.isSysAdmin === true;
+      if (!isSensitivityTab || !isOrgAdmin) {
+        toast.error("Cannot edit permissions for inherited roles");
+        return;
+      }
     }
 
     const currentPermissionIds =
@@ -309,6 +314,7 @@ const ProjectRolesAndPermissions = ({
         project?.projectId as number,
         currentRole.id,
         Array.from(tempPermissions),
+        isOrganizationRole(currentRole),
       );
 
       const updatedPerms = permissions.filter((p) =>
@@ -416,6 +422,7 @@ const ProjectRolesAndPermissions = ({
           project?.projectId as number,
           role.id,
           newPermissions,
+          false,
         );
       });
 

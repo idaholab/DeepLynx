@@ -523,45 +523,37 @@ async function setOrgAdminStatus(
 }
 
 async function setProjectAdminStatus(
-  sysApi: APIRequestContext,
-  orgId: string,
-  projectId: string,
-  userId: string,
-  isAdmin: boolean,
+  sysApi: APIRequestContext, 
+  orgId: string, 
+  projectId: string, 
+  userId: string, 
+  isAdmin: boolean, 
+  roleId: string,
 ): Promise<void> {
-  const res = await sysApi.put(
-    `${API_URL}/organizations/${orgId}/projects/${projectId}/members`,
-    { params: { userId, isProjectAdmin: String(isAdmin) } },
-  );
-  if (!res.ok())
-    throw new Error(
-      `Set project admin status failed for user ${userId} project ${projectId} (${res.status()}): ${await res.text()}`,
-    );
+  const res = await sysApi.put(`${API_URL}/organizations/${orgId}/projects/${projectId}/members`, { params: { userId, isProjectAdmin: String(isAdmin), roleId } });
+  if (!res.ok()) throw new Error(`Set project admin status failed for user ${userId} project ${projectId} (${res.status()}): ${await res.text()}`);
 }
 
 // --------------------------------
 // assignRole
 // --------------------------------
 async function assignRole(
-  sysApi: APIRequestContext,
-  userId: string,
-  provision: NonNullable<TestAccount["provision"]>,
-  orgId: string,
-  projectId?: string,
+  sysApi: APIRequestContext, userId: string, provision: NonNullable<TestAccount['provision']>, orgId: string, projectId?: string,
 ): Promise<void> {
+
   if (provision.role && !provision.project) {
     throw new Error(
       `assignRole: provision has a "role" set but no "project" — roles are only assignable ` +
-        `via project membership. Add a "project" to this account's provision, or remove "role" ` +
-        `if this account only needs org-level access.`,
+      `via project membership. Add a "project" to this account's provision, or remove "role" ` +
+      `if this account only needs org-level access.`,
     );
   }
 
   if (provision.role && provision.isProjectAdmin) {
     throw new Error(
       `assignRole: provision has both "role" and "isProjectAdmin" set for user ${userId} — ` +
-        `project admins are granted access via admin status, not a permission-bearing role. ` +
-        `Remove "role" from this account's provision.`,
+      `project admins are granted access via admin status, not a permission-bearing role. ` +
+      `Remove "role" from this account's provision.`,
     );
   }
 
@@ -571,29 +563,23 @@ async function assignRole(
   }
 
   if (provision.project) {
-    if (!projectId)
-      throw new Error(
-        `assignRole: provision.project "${provision.project.name}" set but no projectId resolved for user ${userId}`,
-      );
+    if (!projectId) throw new Error(`assignRole: provision.project "${provision.project.name}" set but no projectId resolved for user ${userId}`);
 
     if (!provision.isProjectAdmin && !provision.role) {
       throw new Error(
         `assignRole: project membership requested for "${provision.project.name}" but neither ` +
-          `isProjectAdmin nor role was set — nothing to assign for user ${userId}.`,
+        `isProjectAdmin nor role was set — nothing to assign for user ${userId}.`,
       );
     }
 
     if (provision.isProjectAdmin) {
-      await addUserToProject(sysApi, orgId, projectId, userId, true);
-      await setProjectAdminStatus(sysApi, orgId, projectId, userId, true);
-    } else {
-      const roleId = await resolveProjectUserRoleId(
-        sysApi,
-        orgId,
-        provision.role!,
-      );
+      const roleId = await resolveProjectUserRoleId(sysApi, orgId, Roles.user);
+      await addUserToProject(sysApi, orgId, projectId, userId, true, roleId);
+      await setProjectAdminStatus(sysApi, orgId, projectId, userId, true, roleId);
+  } else {
+      const roleId = await resolveProjectUserRoleId(sysApi, orgId, provision.role!);
       await addUserToProject(sysApi, orgId, projectId, userId, false, roleId);
-    }
+  }
   }
 }
 
