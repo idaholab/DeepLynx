@@ -134,7 +134,8 @@ public interface IFileControllerBusiness
         FileUploadCompleteRequestDto request,
         long? vlmConfigId,
         long? embeddingModelConfigId,
-        string? userJwt);
+        string? userJwt,
+        CreateRecordFileUploadRequestDto? metadata = null);
 
     Task CancelUpdateUpload(
         long currentUserId,

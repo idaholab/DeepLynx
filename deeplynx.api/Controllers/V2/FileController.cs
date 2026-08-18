@@ -169,7 +169,7 @@ public class FileController : ControllerBase
         var userJwt = UserContextStorage.Token;
         var updatedFileInfo = await _fileBusiness.CompleteUpdateUpload(
             currentUserId, organizationId, projectId, recordId, request, vlmConfigId, embeddingModelConfigId,
-            userJwt);
+            userJwt, request.Metadata);
         return Ok(updatedFileInfo);
     }
 

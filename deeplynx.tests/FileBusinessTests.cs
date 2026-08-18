@@ -2862,6 +2862,71 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CompleteUpdateUpload_WithMetadata_UpdatesCorrectly()
+    {
+        // Arrange
+        var initialContent = "original content";
+        var initialSession = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            new FileUploadInitRequestDto { FileName = "original.txt", FileSize = Encoding.UTF8.GetByteCount(initialContent) });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("original "), initialSession.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), initialSession.UploadId, 1);
+
+        var initialCompleteRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = initialSession.UploadId,
+            FileName = "original.txt",
+            TotalChunks = 2
+        };
+
+        var initialRecord = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, initialCompleteRequest, null);
+
+        var updatedContent = "updated content";
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid,
+            oid,
+            pid,
+            initialRecord.Id,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = Encoding.UTF8.GetByteCount(updatedContent) });
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata File",
+            Description = "Awesome Description",
+            Properties = new JsonObject { ["Test"] = "Property" },
+            OriginalId = "OriginalId",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+
+        // Act
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("updated "), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "updated.txt",
+            TotalChunks = 2
+        };
+
+        var updatedRecord = await _fileBusiness.CompleteUpdateUpload(uid, oid, pid, initialRecord.Id, completeRequest, null, null, null, metadata);
+
+        // Assert
+        Assert.NotNull(updatedRecord);
+        Assert.Equal("Metadata File", updatedRecord.Name);
+        Assert.Equal("Awesome Description", updatedRecord.Description);
+        Assert.Equal("OriginalId", updatedRecord.OriginalId);
+        var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
+        Assert.Equal("Property", properties["Test"]?.GetValue<string>());
+        Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+        Assert.Equal(new[] { "Tag1", "Tag2" }, updatedRecord.Tags.Select(tag => tag.Name).OrderBy(name => name));
+    }
+
+    [Fact]
     public async Task CancelUpdateUpload_CleansUpUploadSession()
     {
         var initialContent = "original content";
