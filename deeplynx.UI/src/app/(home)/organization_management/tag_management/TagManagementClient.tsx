@@ -215,9 +215,7 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
       setTagsError(null);
 
       const dtoList = await getAllTagsOrg(
-        orgId,
-        undefined,
-        true, // hide archived by default
+        orgId
       );
 
       setTags(dtoList.items.filter((t) => !t.isArchived));
