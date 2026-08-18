@@ -275,10 +275,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   useEffect(() => {
     if (project?.projectId === projectId) return;
     const loadProject = async () => {
-      if (!project) {
-        const recordProject = await getProject(Number(organizationId), projectId);
-        setProject({projectId, projectName: recordProject.name})
-      }
+      const recordProject = await getProject(Number(organizationId), projectId);
+      setProject({projectId, projectName: recordProject.name})
     };
     loadProject();
   }, [organizationId, project]);
