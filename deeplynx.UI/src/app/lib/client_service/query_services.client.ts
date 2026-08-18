@@ -187,19 +187,24 @@ export async function getRecordsPaginated(
  * @param organizationId - The ID of the organization
  * @param projectIds - Array of project IDs whose records are to be retrieved
  * @param hideArchived - Flag to hide archived records (default: true)
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
  * @returns Promise with array of QueryRecordViewResponseDto
  */
 export async function getMultiProjectRecords(
     organizationId: number,
     projectIds: number[],
     hideArchived: boolean = true,
-): Promise<QueryRecordViewResponseDto[]> {
+    pageNumber: number = 1,
+    pageSize: number = -1
+): Promise<PaginatedResponse<QueryRecordViewResponseDto>> {
     try {
         const projectIdsQuery = projectIds
             .map((id) => `projects=${id}`)
             .join("&");
         const res = await api.get(
             `/organizations/${organizationId}/query/multiproject?${projectIdsQuery}&hideArchived=${hideArchived}`,
+            { params: { pageNumber, pageSize}}
         );
         return res.data;
     } catch (error) {

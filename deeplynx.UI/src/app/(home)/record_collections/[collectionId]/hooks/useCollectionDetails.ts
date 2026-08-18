@@ -384,7 +384,9 @@ export function useCollectionDetails({
       const results = query
         ? await fullTextSearch(organizationId, query, [projectId])
         : await getMultiProjectRecords(organizationId, [projectId]);
-      setRecordSearchResults(results);
+
+      const items = Array.isArray(results) ? results : results.items;
+      setRecordSearchResults(items);
       setSelectedRecordIds([]);
     } catch (error) {
       console.error("Failed to search records:", error);
@@ -402,7 +404,7 @@ export function useCollectionDetails({
     setRecordSearchLoading(true);
     try {
       const results = await getMultiProjectRecords(organizationId, [projectId]);
-      setRecordSearchResults(results);
+      setRecordSearchResults(results.items);
       setSelectedRecordIds([]);
     } catch (error) {
       console.error("Failed to browse records:", error);
