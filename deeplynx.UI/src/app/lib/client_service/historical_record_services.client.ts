@@ -1,12 +1,14 @@
 "use client";
 
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import { HistoricalRecordResponseDto, PaginatedResponse } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 /**
  * Get all historical records for a project
  * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all projects (default: -1)
  * @param dataSourceId - Optional data source ID to filter records
  * @param pointInTime - Optional point in time to get most current records before
  * @param hideArchived - Flag to hide archived records (default: true)
@@ -15,14 +17,16 @@ import api from "./api";
 export async function getAllHistoricalRecords(
   organizationId: number,
   projectId: number,
+  pageNumber: number = 1,
+  pageSize: number = -1,
   dataSourceId?: number | string,
   pointInTime?: string,
   hideArchived: boolean = true
-): Promise<HistoricalRecordResponseDto[]> {
+): Promise<PaginatedResponse<HistoricalRecordResponseDto>> {
   try {
     const res = await api.get(
       `/organizations/${organizationId}/projects/${projectId}/records/historical`,
-      { params: { dataSourceId, pointInTime, hideArchived } }
+      { params: { pageNumber, pageSize, dataSourceId, pointInTime, hideArchived } }
     );
     return res.data;
   } catch (error) {
