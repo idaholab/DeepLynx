@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { v4 as uuidv4 } from 'uuid';
 import toast from "react-hot-toast";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
