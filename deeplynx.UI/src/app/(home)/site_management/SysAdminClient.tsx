@@ -61,7 +61,7 @@ const SysAdminClient = ({
   const refreshUsers = async () => {
     try {
       const updatedData = await getAllUsers();
-      setMembers(updatedData);
+      setMembers(updatedData.items);
     } catch (err) {
       console.error("Failed to refresh users:", err);
     }
