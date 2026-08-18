@@ -44,6 +44,8 @@ public partial class Organization
     public bool DisableFileTransfer { get; set; } = false;
     [Column("default_object_storage_id")]
     public int? DefaultObjectStorageId { get; set; } = null;
+    [Column("logo_object_storage_id")]
+    public int? LogoObjectStorageId { get; set; } = null;
 
     [InverseProperty("Organization")]
     public virtual ICollection<Group> Groups { get; set; } = new List<Group>();

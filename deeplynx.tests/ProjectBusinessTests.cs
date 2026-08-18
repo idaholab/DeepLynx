@@ -2215,7 +2215,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     {
         // Arrange
         long organizationId = 1;
-        long projectId = 1;
 
         var testFileName = "test-logo.png";
         var testFileContent = "Fake image content for testing";
@@ -2223,8 +2222,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
 
         // Act
-        await _projectBusiness.UploadProjectLogo(organizationId, projectId, os1, testFormFile);
-        var result = await _projectBusiness.RemoveLogoFileAsync(organizationId, projectId, os1);
+        await _projectBusiness.UploadProjectLogo(organizationId, pid, os1, testFormFile);
+        var result = await _projectBusiness.RemoveLogoFileAsync(organizationId, pid, os1);
 
         // Assert
         Assert.True(result);
@@ -2241,7 +2240,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     {
         // Arrange
         long organizationId = 1;
-        long projectId = 1;
 
         var testFileName = "test-logo.png";
         var testFileContent = "Fake image content for testing"; // This can be any string or real binary data
@@ -2249,7 +2247,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
 
         // Act
-        string uploadedFilePath = await _projectBusiness.UploadProjectLogo(organizationId, projectId, os1, testFormFile);
+        string uploadedFilePath = await _projectBusiness.UploadProjectLogo(organizationId, pid, os1, testFormFile);
 
         // Assert
         Assert.False(string.IsNullOrEmpty(uploadedFilePath));
@@ -2267,7 +2265,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     {
         // Arrange
         long organizationId = 1;
-        long projectId = 1;
 
         var testFileName = "test-logo.png";
         var testFileContent = "Fake image content for testing";
@@ -2275,10 +2272,10 @@ public class ProjectBusinessTests : IntegrationTestBase
         var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
 
         // Upload a logo so there is an active logo file
-        string uploadedFilePath = await _projectBusiness.UploadProjectLogo(organizationId, projectId, os1, testFormFile);
+        string uploadedFilePath = await _projectBusiness.UploadProjectLogo(organizationId, pid, os1, testFormFile);
 
         // Act
-        var result = await _projectBusiness.GetProjectLogoStreamAsync(organizationId, projectId, os1);
+        var result = await _projectBusiness.GetProjectLogoStreamAsync(organizationId, pid, os1);
 
         // Assert
         Assert.NotNull(result);
