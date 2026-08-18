@@ -100,10 +100,10 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     () =>
       normalizedLabelSearch
         ? labels.filter(
-            (l) =>
-              l.name.toLowerCase().includes(normalizedLabelSearch) ||
-              l.description?.toLowerCase().includes(normalizedLabelSearch),
-          )
+          (l) =>
+            l.name.toLowerCase().includes(normalizedLabelSearch) ||
+            l.description?.toLowerCase().includes(normalizedLabelSearch),
+        )
         : labels,
     [labels, normalizedLabelSearch],
   );
@@ -211,9 +211,9 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
       setTagsLoading(true);
       setTagsError(null);
 
-      const dtoList: TagResponseDto[] = await getAllTags(projectId);
+      const dtoList = await getAllTags(projectId);
 
-      setTags(dtoList.filter((t) => !t.isArchived));
+      setTags(dtoList.items.filter((t) => !t.isArchived));
     } catch (error) {
       console.error("Failed to load project tags:", error);
       setTagsError(t.translations.FAILED_TO_LOAD_PROJECT_TAGS);

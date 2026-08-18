@@ -168,6 +168,14 @@ public class IntegrationTestBase : IAsyncLifetime
         Context.OauthTokens.RemoveRange(tokens);
         await Context.SaveChangesAsync();
 
+        var deviceAuthorizationRequests = await Context.OauthDeviceAuthorizationRequests.ToListAsync();
+        Context.OauthDeviceAuthorizationRequests.RemoveRange(deviceAuthorizationRequests);
+        await Context.SaveChangesAsync();
+
+        var refreshTokens = await Context.OauthRefreshTokens.ToListAsync();
+        Context.OauthRefreshTokens.RemoveRange(refreshTokens);
+        await Context.SaveChangesAsync();
+
         var apiKeys = await Context.ApiKeys.ToListAsync();
         Context.ApiKeys.RemoveRange(apiKeys);
         await Context.SaveChangesAsync();
