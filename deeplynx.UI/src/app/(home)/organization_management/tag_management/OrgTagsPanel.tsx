@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   TagIcon,
   LockClosedIcon,
@@ -8,6 +8,8 @@ import {
 } from "@heroicons/react/24/outline";
 import type { TagResponseDto } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "../../components/PaginationControls";
 
 interface Props {
   tags: TagResponseDto[];
@@ -44,6 +46,24 @@ const OrgTagsPanel: React.FC<Props> = ({
   onArchiveClick,
 }) => {
   const { t } = useLanguage();
+
+  const {
+    currentPage: tagPage,
+    pageSize: tagPageSize,
+    paginatedItems: paginatedTags,
+    resetPagination: resetTagPagination,
+    setCurrentPage: setTagPage,
+    setPageSize: setTagPageSize,
+    totalPages: tagTotalPages,
+  } = useLocalPagination({
+    items: filteredTags,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetTagPagination();
+  }, [filteredTags, resetTagPagination]);
+
   return (
     <div className="card bg-base-100 shadow-lg">
       <div className="card-body">
@@ -129,7 +149,7 @@ const OrgTagsPanel: React.FC<Props> = ({
                 : t.translations.NO_TAGS_DEFINED_HELP}
             </div>
           ) : (
-            filteredTags.map((tag) => (
+            paginatedTags.map((tag) => (
               <div
                 key={tag.id}
                 className="flex items-center justify-between bg-base-200/70 hover:bg-base-300/80 transition rounded-lg px-3 py-2"
@@ -172,6 +192,17 @@ const OrgTagsPanel: React.FC<Props> = ({
               </div>
             ))
           )}
+
+          {/* Pagination Controls */}
+          <div className="mt-2 flex justify-end">
+            <PaginationControls
+              currentPage={tagPage}
+              pageSize={tagPageSize}
+              totalPages={tagTotalPages}
+              onPageChange={setTagPage}
+              onPageSizeChange={setTagPageSize}
+            />
+          </div>
         </div>
       </div>
     </div>

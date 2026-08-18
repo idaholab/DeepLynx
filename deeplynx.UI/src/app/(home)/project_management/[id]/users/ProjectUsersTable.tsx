@@ -42,6 +42,8 @@ import {
   ProjectMemberTableRow,
   buildTableData,
 } from "../../types/projectUsersTypes";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
 
 /* -------------------------------------------------------------------------- */
 /*                         ProjectUsersTable Component                        */
@@ -99,6 +101,23 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     members: [],
     loading: false,
   });
+
+  const {
+    currentPage,
+    pageSize,
+    paginatedItems,
+    resetPagination,
+    setCurrentPage,
+    setPageSize,
+    totalPages,
+  } = useLocalPagination({
+    items: viewGroupMembersModal.members,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetPagination();
+  }, [viewGroupMembersModal.members, resetPagination]);
 
   /* ------------------------------------------------------------------------ */
   /*                        Confirm Remove / Future Use                       */
@@ -651,7 +670,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
                   </p>
                 ) : (
                   <div className="py-4 space-y-2 max-h-80 overflow-y-auto">
-                    {viewGroupMembersModal.members.map((user) => (
+                    {paginatedItems.map((user) => (
                       <div key={user.id} className="p-3 rounded-lg bg-base-200">
                         <p className="font-semibold">{user.name || user.email}</p>
                         <p className="text-sm text-base-content/70">{user.email}</p>
@@ -659,6 +678,17 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
                     ))}
                   </div>
                 )}
+
+                {/* Pagination Controls */}
+                <div className="mt-2 flex justify-end">
+                  <PaginationControls
+                    currentPage={currentPage}
+                    pageSize={pageSize}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                </div>
 
                 <div className="modal-action">
                   <button

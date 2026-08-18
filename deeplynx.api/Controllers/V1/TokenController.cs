@@ -25,12 +25,16 @@ public class TokenController : ControllerBase
     private readonly ILogger<TokenController> _logger;
     private readonly ITokenBusiness _tokenBusiness;
 
-    public TokenController(IEventBusiness eventBusiness, ITokenBusiness tokenBusiness, ILogger<TokenController> logger)
+    public TokenController(
+        IEventBusiness eventBusiness,
+        ITokenBusiness tokenBusiness,
+        ILogger<TokenController> logger)
     {
         _eventBusiness = eventBusiness;
         _tokenBusiness = tokenBusiness;
         _logger = logger;
     }
+
 
     /// <summary>
     ///     Create JWT Token
@@ -66,8 +70,6 @@ public class TokenController : ControllerBase
                 new { message = "An error occurred while creating the token" });
         }
     }
-
-
 
     /// <summary>
     ///     Create API Key and Secret
