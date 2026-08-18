@@ -197,15 +197,14 @@ export default function FilterSidebar({
                     )}
                   </label>
                 ))}
-
-                <PaginationControls
+              </div>
+              <PaginationControls
                   currentPage={classPage}
                   pageSize={classPageSize}
                   totalPages={classTotalPages}
                   onPageChange={setClassPage}
                   onPageSizeChange={setClassPageSize}
                 />
-              </div>
             </div>
           </div>
 
@@ -256,8 +255,9 @@ export default function FilterSidebar({
                     </label>
                   ))
                 )}
+              </div>
 
-                {/* Pagination Controls */}
+              {/* Pagination Controls */}
                 <div className="mt-2 flex justify-end">
                   <PaginationControls
                     currentPage={tagPage}
@@ -267,7 +267,6 @@ export default function FilterSidebar({
                     onPageSizeChange={setTagPageSize}
                   />
                 </div>
-              </div>
             </div>
           </div>
         </div>

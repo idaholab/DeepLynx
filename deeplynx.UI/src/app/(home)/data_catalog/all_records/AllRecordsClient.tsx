@@ -127,12 +127,6 @@ type AvailableTag = {
   projectId: number | null;
 };
 
-/** Number of records shown per page in the paginated list. */
-const RECORDS_PER_PAGE = 12;
-
-/** Maximum number of class or tag facet options shown in the sidebar before truncation. */
-const FACET_LIMIT = 8;
-
 /* ─── Component ──────────────────────────────────────────────────────────── */
 
 export default function DataCatalogClient({
@@ -177,7 +171,7 @@ export default function DataCatalogClient({
   const [nextFilterId, setNextFilterId] = useState(1);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(RECORDS_PER_PAGE);
+  const [pageSize] = useState(5);
   const [totalCount, setTotalCount] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(1);
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
@@ -599,8 +593,7 @@ export default function DataCatalogClient({
       classFacetOptions
         .filter((option) =>
           option.label.toLowerCase().includes(classFacetQuery.toLowerCase()),
-        )
-        .slice(0, FACET_LIMIT),
+        ),
     [classFacetOptions, classFacetQuery],
   );
 
@@ -609,8 +602,7 @@ export default function DataCatalogClient({
       tagFacetOptions
         .filter((option) =>
           option.label.toLowerCase().includes(tagFacetQuery.toLowerCase()),
-        )
-        .slice(0, FACET_LIMIT),
+        ),
     [tagFacetOptions, tagFacetQuery],
   );
 
