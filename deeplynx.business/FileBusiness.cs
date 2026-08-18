@@ -182,7 +182,8 @@ public class FileBusiness : IFileControllerBusiness
             FileType = fileType,
             Uri = uri,
             FileSize = fileSize,
-            FileContentHash = fileContentHash
+            FileContentHash = fileContentHash,
+            Tags = metadata?.Tags
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
@@ -600,7 +601,8 @@ public class FileBusiness : IFileControllerBusiness
             ClassName = resolvedClass.Name,
             FileType = fileExtension,
             FileSize = fileSize,
-            FileContentHash = fileContentHash
+            FileContentHash = fileContentHash,
+            Tags = metadata?.Tags
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,

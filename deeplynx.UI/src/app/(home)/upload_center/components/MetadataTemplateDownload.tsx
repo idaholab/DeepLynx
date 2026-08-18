@@ -14,6 +14,7 @@ export default function MetadataTemplateDownload() {
     Properties: {
       exampleKey: "exampleValue",
     },
+    Tags: ["Tag1", "Tag2"],
   };
 
   const downloadTemplate = () => {

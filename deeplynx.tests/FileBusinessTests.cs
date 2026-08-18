@@ -958,6 +958,43 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task UploadFile_MetadataFileWithTags_AttachesTagsToRecord()
+    {
+        // Arrange
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes("hello world"));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Tagged File",
+            Description = "File with tags supplied via metadata file",
+            Properties = new JsonObject(),
+            OriginalId = "tagged-file-original-id",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert: Tags from the metadata file are attached to the created record
+        Assert.NotNull(result);
+        Assert.Equal(new[] { "Tag1", "Tag2" }, result.Tags.Select(tag => tag.Name).OrderBy(name => name));
+    }
+
+    [Fact]
     public async Task UploadFile_CsvFile_ColumnsAreMergedWithExistingMetadataProperties()
     {
         // Arrange: Metadata carries pre-existing properties; columns should be added alongside them
@@ -3195,6 +3232,49 @@ public class FileBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Equal(fileClass.Id, result.ClassId);
+    }
+
+    [Fact]
+    public async Task CompleteUpload_MetadataWithTags_AttachesTagsToRecord()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Tagged Chunked File",
+            Description = "File with tags supplied via chunked upload metadata",
+            Properties = new JsonObject(),
+            OriginalId = "tagged-chunked-file-original-id",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata);
+
+        // Assert: Tags from the completion request's metadata are attached to the created record
+        Assert.NotNull(result);
+        Assert.Equal(new[] { "Tag1", "Tag2" }, result.Tags.Select(tag => tag.Name).OrderBy(name => name));
     }
 
     [Fact]

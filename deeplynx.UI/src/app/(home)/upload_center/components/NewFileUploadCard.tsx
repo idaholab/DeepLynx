@@ -112,6 +112,12 @@ export default function NewFileUploadCard({
     if (value === undefined || value === null) return undefined;
     if (typeof value === "string") return value.trim() || undefined;
     if (typeof value === "number") return String(value);
+    if (Array.isArray(value)) {
+      const joined = value
+        .filter((item): item is string => typeof item === "string")
+        .join(", ");
+      return joined || undefined;
+    }
     return undefined;
   };
 
@@ -494,6 +500,18 @@ export default function NewFileUploadCard({
                             metadataPreview,
                             "ClassId",
                             "classId",
+                          ) ?? t.translations.NOT_AVAILABLE}
+                        </span>
+                      </p>
+                      <p className="break-words">
+                        <span className="font-semibold">
+                          {t.translations.METADATA_PREVIEW_TAGS}:
+                        </span>{" "}
+                        <span className="break-all">
+                          {getPreviewString(
+                            metadataPreview,
+                            "Tags",
+                            "tags",
                           ) ?? t.translations.NOT_AVAILABLE}
                         </span>
                       </p>
