@@ -83,6 +83,8 @@ import {
 } from "@/app/lib/client_service/insight_services.client";
 import { isInsightHidden } from "@/app/lib/feature_flags";
 import { useInsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
+import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
+import { getProject } from "@/app/lib/client_service/projects_services.client";
 
 // ============= HELPER FUNCTIONS =============
 interface PropertyRow {
@@ -191,6 +193,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
 
   // UI State
+  const { project, setProject } = useProjectSession();
   const [activeTab, setActiveTab] = useState(0);
 
   const [isPropertiesEditorOpen, setIsPropertiesEditorOpen] = useState(false);
@@ -267,6 +270,18 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     recordDataSourceId: record?.dataSourceId,
     translations: t.translations,
   });
+
+  // ============= Loaded Project ==============
+  useEffect(() => {
+    if (project?.projectId === projectId) return;
+    const loadProject = async () => {
+      if (!project) {
+        const recordProject = await getProject(Number(organizationId), projectId);
+        setProject({projectId, projectName: recordProject.name})
+      }
+    };
+    loadProject();
+  }, [organizationId, project]);
 
   // ============= RECORD UPDATE HANDLERS =============
   const handleUpdateRecord = useCallback(
