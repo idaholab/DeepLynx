@@ -670,6 +670,47 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task UploadFile_MetadataWithoutOriginalId_UsesGeneratedGuid()
+    {
+        // Arrange
+        var content = "File without explicit OriginalId";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "no-original-id.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Metadata deliberately omits OriginalId, which is now optional
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "No OriginalId",
+            Description = "Should fall back to generated guid",
+            Properties = new JsonObject { ["Name"] = "Name" }
+            // OriginalId intentionally not set
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(metadata.Name, result.Name);
+        Assert.Equal(metadata.Description, result.Description);
+        Assert.False(string.IsNullOrWhiteSpace(result.OriginalId));
+        Assert.True(Guid.TryParse(result.OriginalId, out _), "OriginalId should be a generated GUID when not provided");
+    }
+
+    [Fact]
     public async Task UploadFile_MetadataFileMissingRequiredFields_ThrowsValidationException()
     {
         // Arrange
