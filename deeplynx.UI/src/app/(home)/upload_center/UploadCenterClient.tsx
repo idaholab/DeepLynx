@@ -488,6 +488,7 @@ export default function UploadCenterClient() {
           Number(projectId),
           Number(metadata.targetRecordId),
           file,
+          metadata.metadataFile
         );
         uploadToastManager.success(
           t.translations.RECORD_FILE_UPDATED_SUCCESSFULLY,
