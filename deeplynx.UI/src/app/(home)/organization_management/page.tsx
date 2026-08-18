@@ -79,7 +79,8 @@ const OrganizationManagementPage = async ({
 
   try {
     // First, fetch roles for the organization
-    roles = await getAllOrgRolesServer(Number(organizationId));
+    const { items } = await getAllOrgRolesServer(Number(organizationId));
+    roles = items;
     permissions = await getAllOrgPermissionsServer(Number(organizationId), true);
     labels = await getAllSensitivityLabelsOrg(Number(organizationId));
   } catch (error) {

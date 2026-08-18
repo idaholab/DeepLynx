@@ -163,15 +163,19 @@ export async function setPermissionsForRoleServer(
 
 export async function getAllOrgRolesServer(
   organizationId: number,
-  hideArchived: boolean = true
-): Promise<RoleResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<RoleResponseDto>> {
   const searchParams = new URLSearchParams();
   searchParams.append("hideArchived", hideArchived.toString());
+  searchParams.append("pageNumber", String(pageNumber));
+  searchParams.append("pageSize", String(pageSize));
 
   const path = `/organizations/${organizationId}/roles?${searchParams.toString()}`;
 
   const res = await apiFetch(path);
-  return asJson<RoleResponseDto[]>(res);
+  return asJson<PaginatedResponse<RoleResponseDto>>(res);
 }
 
 /**
