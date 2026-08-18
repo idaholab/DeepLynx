@@ -1009,6 +1009,7 @@ export const translations = {
       MIRROR_ADD_EDGE_WORKFLOW: "Mirror the add-edge workflow by defining which classes the edge can span.",
       METADATA_PREVIEW_ORIGINAL_ID: "Original ID",
       METADATA_PREVIEW_PROPERTIES: "Properties",
+      METADATA_PREVIEW_TAGS: "Tags",
       METADATA_PREVIEW_SELECT_FILE:
         "Upload a metadata JSON file to preview key values.",
       METADATA_PREVIEW_TITLE: "Metadata Preview",
@@ -3216,6 +3217,7 @@ export const translations = {
       METADATA_PREVIEW_NAME: "Nombre",
       METADATA_PREVIEW_ORIGINAL_ID: "ID original",
       METADATA_PREVIEW_PROPERTIES: "Propiedades",
+      METADATA_PREVIEW_TAGS: "Etiquetas",
       METADATA_PREVIEW_SELECT_FILE:
         "Sube un archivo JSON de metadatos para previsualizar valores clave.",
       METADATA_PREVIEW_TITLE: "Vista previa de metadatos",

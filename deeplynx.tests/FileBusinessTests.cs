@@ -958,6 +958,43 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task UploadFile_MetadataFileWithTags_AttachesTagsToRecord()
+    {
+        // Arrange
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes("hello world"));
+        var file = new FormFile(ms, 0, ms.Length, "file", "notes.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Tagged File",
+            Description = "File with tags supplied via metadata file",
+            Properties = new JsonObject(),
+            OriginalId = "tagged-file-original-id",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert: Tags from the metadata file are attached to the created record
+        Assert.NotNull(result);
+        Assert.Equal(new[] { "Tag1", "Tag2" }, result.Tags.Select(tag => tag.Name).OrderBy(name => name));
+    }
+
+    [Fact]
     public async Task UploadFile_CsvFile_ColumnsAreMergedWithExistingMetadataProperties()
     {
         // Arrange: Metadata carries pre-existing properties; columns should be added alongside them

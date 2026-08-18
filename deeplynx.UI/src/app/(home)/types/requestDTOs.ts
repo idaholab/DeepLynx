@@ -380,4 +380,5 @@ export type CreateRecordFileUploadRequestDto = {
   originalId: string;
   classId?: number | null;
   className?: string | null;
+  Tags?: string[];
 }
