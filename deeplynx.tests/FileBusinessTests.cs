@@ -3128,6 +3128,49 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CompleteUpload_MetadataWithTags_AttachesTagsToRecord()
+    {
+        // Arrange
+        var fileName = "final.txt";
+        var initRequest = new FileUploadInitRequestDto
+        {
+            FileName = fileName,
+            FileSize = 2048
+        };
+
+        var session = await _fileBusiness.StartUpload(oid, pid, did, osid, initRequest);
+
+        var chunk0 = CreateFormFile("first-");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk0, session.UploadId, 0);
+
+        var chunk1 = CreateFormFile("second");
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, chunk1, session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 2
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Tagged Chunked File",
+            Description = "File with tags supplied via chunked upload metadata",
+            Properties = new JsonObject(),
+            OriginalId = "tagged-chunked-file-original-id",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest, metadata: metadata);
+
+        // Assert: Tags from the completion request's metadata are attached to the created record
+        Assert.NotNull(result);
+        Assert.Equal(new[] { "Tag1", "Tag2" }, result.Tags.Select(tag => tag.Name).OrderBy(name => name));
+    }
+
+    [Fact]
     public async Task CompleteUpload_MetadataOnlyClassId_ReturnsCorrectClass()
     {
         // Arrange
