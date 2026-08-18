@@ -40,17 +40,21 @@ public class UserController : ControllerBase
     /// <param name="includeArchived">(Optional) Boolean determining if archived accounts will be included (default: false)</param>
     /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
     /// <param name="includeTestAccounts">(Optional) Boolean determining if test accounts will be included (default: false)</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
     /// <returns>A list of users matching the requested filters.</returns>
     [HttpGet(Name = "api_get_all_users")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetAllUsers(
+    public async Task<ActionResult<PaginatedResponse<UserResponseDto>>> GetAllUsers(
         [FromQuery] long? projectId,
         [FromQuery] long? organizationId,
         [FromQuery] bool includeArchived = false,
         [FromQuery] bool includeServiceAccounts = false,
-        [FromQuery] bool includeTestAccounts = false)
+        [FromQuery] bool includeTestAccounts = false,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
-        var users = await _userBusiness.GetAllUsers(
+        paginatedRequestDto ??= new PaginatedRequestDto();
+        var users = await _userBusiness.GetAllUsersPaginated(
+            paginatedRequestDto,
             projectId,
             organizationId,
             includeArchived,
