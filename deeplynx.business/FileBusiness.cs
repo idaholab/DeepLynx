@@ -211,6 +211,7 @@ public class FileBusiness : IFileControllerBusiness
     /// <param name="projectId">The ID of the project to which the file belongs</param>
     /// <param name="recordId">The ID of the record that contains file information</param>
     /// <param name="file">The file to replace the old one</param>
+    /// <param name="metadataFile">Optional metadata that will be appended to the updated record</param>
     /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
     /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
     /// <returns>Record response DTO containing updated file information</returns>
@@ -220,6 +221,7 @@ public class FileBusiness : IFileControllerBusiness
         long projectId,
         long recordId,
         IFormFile file,
+        IFormFile? metadataFile = null,
         long? vlmConfigId = null,
         long? embeddingModelConfigId = null,
         string? userJwt = null)
@@ -239,19 +241,52 @@ public class FileBusiness : IFileControllerBusiness
         var uri = await fileBusiness.UpdateFile(record, objectStorage.Config, file, guid);
 
         var fileSize = file.Length;
-        
+
+        CreateRecordFileUploadRequestDto? metadata = null;
+        if (metadataFile != null)
+        {
+            using var reader = new StreamReader(metadataFile.OpenReadStream());
+            var metadataJson = await reader.ReadToEndAsync();
+
+            if (string.IsNullOrWhiteSpace(metadataJson))
+                throw new ArgumentException("Metadata file is empty or contains no content.");
+
+            metadata = JsonSerializer.Deserialize<CreateRecordFileUploadRequestDto>(metadataJson)
+                       ?? throw new InvalidOperationException("Failed to deserialize metadata file.");
+
+            ValidationHelper.ValidateModel(metadata);
+        }
+
+        // resolve and combine properties
         var properties = record.Properties;
         var updatedProperties = !string.IsNullOrWhiteSpace(properties)
             ? JsonNode.Parse(properties)!.AsObject()
             : new JsonObject();
         updatedProperties["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower();
+        
+        var metadataProperties = metadata?.Properties ?? new JsonObject();
+        foreach (var kvp in metadataProperties.ToList())
+        {
+            updatedProperties[kvp.Key] = kvp.Value?.DeepClone();
+        }
+
+        // resolve class
+        var recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+        var fileExtension = Path.GetExtension(file.FileName).TrimStart('.').ToLower();
+        recordClass = await ExtractTabularRecordMetadata(currentUserId, organizationId, projectId, fileExtension,
+            objectStorage.Type, objectStorage.Config, uri, updatedProperties, recordClass, () => file.OpenReadStream());
+        var resolvedClass = await GetResolvedClass(organizationId, projectId, currentUserId, metadata, recordClass);
 
         var updateRecordRequest = new UpdateRecordRequestDto
         {
             Properties = updatedProperties,
-            Name = file.FileName,
+            Name = metadata?.Name ?? file.FileName,
+            Description = metadata?.Description ?? record.Description,
+            OriginalId = metadata?.OriginalId ?? record.OriginalId,
+            ClassId = resolvedClass.Id,
+            ClassName = resolvedClass.Name,
             Uri = uri,
-            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
+            FileType = fileExtension,
             FileSize = fileSize,
             FileContentHash = fileContentHash,
             ReplaceFileContentHash = true

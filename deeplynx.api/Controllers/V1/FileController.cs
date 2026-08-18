@@ -115,7 +115,7 @@ public class FileController : ControllerBase
             var currentUserId = UserContextStorage.UserId;
             var userJwt = UserContextStorage.Token;
             var updatedFileInfo =
-                await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file, vlmConfigId, embeddingModelConfigId, userJwt);
+                await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file, null, vlmConfigId, embeddingModelConfigId, userJwt);
             return Ok(updatedFileInfo);
         }
         catch (Exception exc)

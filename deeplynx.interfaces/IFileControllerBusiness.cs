@@ -32,6 +32,7 @@ public interface IFileControllerBusiness
         long projectId,
         long recordId,
         IFormFile file,
+        IFormFile? metadataFile,
         long? vlmConfigId,
         long? embeddingModelConfigId,
         string? userJwt);
