@@ -1621,6 +1621,58 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
     }
 
+    [Fact]
+    public async Task UpdateFile_WithMetadata_WorksCorrectly()
+    {
+        // Arrange: set up the file
+        var content = "Original content";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "update-default.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var originalRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, null, file, null);
+
+        // Update the file
+        var newContent = "Updated with default";
+        var newMs = new MemoryStream(Encoding.UTF8.GetBytes(newContent));
+        var newFile = new FormFile(newMs, 0, newMs.Length, "file", "updated-default.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata File",
+            Description = "Awesome Description",
+            Properties = new JsonObject { ["Test"] = "Property" },
+            OriginalId = "OriginalId",
+        };
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var updatedRecord = await _fileBusiness.UpdateFile(uid, oid, pid, originalRecord.Id, newFile, null, null, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(updatedRecord);
+        Assert.Equal("Metadata File", updatedRecord.Name);
+        Assert.Equal("Awesome Description", updatedRecord.Description);
+        Assert.Equal("OriginalId", updatedRecord.OriginalId);
+        var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
+        Assert.Equal("Property", properties["Test"]?.GetValue<string>());
+        Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+    }
+
     #endregion
 
     #region DownloadAppendedFile Tests
