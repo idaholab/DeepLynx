@@ -17,7 +17,7 @@ import {
 } from "@/app/lib/client_service/record_collection_services.client";
 import { createSensitivityLabelProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import {
-  fullTextSearch,
+  fullTextSearchPaginated,
   getMultiProjectRecords,
 } from "@/app/lib/client_service/query_services.client";
 import { createTag } from "@/app/lib/client_service/tag_services.client";
@@ -377,13 +377,22 @@ export function useCollectionDetails({
   }, [loadCollectionRecords]);
 
   const handleSearchRecords = async () => {
-    const query = recordSearchTerm.trim();
+  const query = recordSearchTerm.trim();
 
-    setRecordSearchLoading(true);
+  setRecordSearchLoading(true);
     try {
       const results = query
-        ? await fullTextSearch(organizationId, query, [projectId])
+        ? (
+            await fullTextSearchPaginated(
+              organizationId,
+              query,
+              [projectId],
+              1,
+              -1,
+            )
+          ).items
         : await getMultiProjectRecords(organizationId, [projectId]);
+
       setRecordSearchResults(results);
       setSelectedRecordIds([]);
     } catch (error) {

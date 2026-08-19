@@ -12,7 +12,7 @@ import {
 import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 import { updateFile } from "@/app/lib/client_service/file_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
-import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
+import { fullTextSearchPaginated } from "@/app/lib/client_service/query_services.client";
 import { getAllRecords } from "@/app/lib/client_service/record_services.client";
 import { parseBackendErrors } from "@/app/lib/error_parser";
 import { createUploadToastManager } from "@/app/lib/uploadToastManager";
@@ -198,14 +198,16 @@ export default function UploadCenterClient() {
       if (!organizationId || !projectId) return [];
 
       try {
-        const results = await fullTextSearch(
+        const response = await fullTextSearchPaginated(
           Number(organizationId),
           trimmedQuery,
           [Number(projectId)],
+          1,
+          -1,
         );
 
         return dedupeExistingFiles(
-          results
+          response.items
             .map((record) => mapRecordToExistingFile(record))
             .filter((record): record is ExistingFile => record !== null),
         );
