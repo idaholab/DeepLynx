@@ -293,6 +293,139 @@ public class RecordCollectionControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // GetRecordCollectionsForARecord Tests
+    // =========================================================================
+
+    #region GetRecordCollectionsForARecord Tests
+
+    [Fact]
+    public async Task GetRecordCollectionsForARecord_Returns200_WithList()
+    {
+        var expected = new PaginatedResponse<RecordCollectionResponseDto>
+        {
+            Items = new List<RecordCollectionResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
+
+        _mockRecordCollectionBusiness.Setup(b => b.GetRecordCollectionsForRecordPaginated(
+                         UserId, OrgId, ProjectId, RecordIdConst, true, It.IsAny<PaginatedRequestDto>(), false, false, false))
+                     .ReturnsAsync(expected);
+
+        var result = (await _recordCollectionController.GetRecordCollectionsForARecord(
+            OrgId, ProjectId, RecordIdConst, true)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForARecord_Returns200_WithEmptyList()
+    {
+        _mockRecordCollectionBusiness.Setup(b => b.GetRecordCollectionsForRecordPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<bool>(), It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                     .ReturnsAsync(new PaginatedResponse<RecordCollectionResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        var result = (await _recordCollectionController.GetRecordCollectionsForARecord(
+            OrgId, ProjectId, RecordIdConst, true)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.IsAssignableFrom<PaginatedResponse<RecordCollectionResponseDto>>(result.Value);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForARecord_ThrowsException_WhenBusinessThrows()
+    {
+        _mockRecordCollectionBusiness.Setup(b => b.GetRecordCollectionsForRecordPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
+                         It.IsAny<bool>(), It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                     .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() => _recordCollectionController.GetRecordCollectionsForARecord(
+            OrgId, ProjectId, RecordIdConst, true));
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForARecord_PassesIdsAndHideArchivedToBusinessLayer()
+    {
+        _mockRecordCollectionBusiness.Setup(b => b.GetRecordCollectionsForRecordPaginated(
+                         UserId, OrgId, ProjectId, RecordIdConst, false, It.IsAny<PaginatedRequestDto>(), false, false, false))
+                     .ReturnsAsync(new PaginatedResponse<RecordCollectionResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        await _recordCollectionController.GetRecordCollectionsForARecord(
+            OrgId, ProjectId, RecordIdConst, hideArchived: false);
+
+        _mockRecordCollectionBusiness.Verify(b => b.GetRecordCollectionsForRecordPaginated(
+            UserId, OrgId, ProjectId, RecordIdConst, false, It.IsAny<PaginatedRequestDto>(), false, false, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForARecord_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        _mockRecordCollectionBusiness.Setup(b => b.GetRecordCollectionsForRecordPaginated(
+                         UserId, OrgId, ProjectId, RecordIdConst, true,
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+                         false, false, false))
+                     .ReturnsAsync(new PaginatedResponse<RecordCollectionResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        await _recordCollectionController.GetRecordCollectionsForARecord(OrgId, ProjectId, RecordIdConst, true);
+
+        _mockRecordCollectionBusiness.Verify(b => b.GetRecordCollectionsForRecordPaginated(
+            UserId, OrgId, ProjectId, RecordIdConst, true,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+            false, false, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForARecord_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var pagination = new PaginatedRequestDto { PageNumber = 4, PageSize = 50 };
+
+        _mockRecordCollectionBusiness.Setup(b => b.GetRecordCollectionsForRecordPaginated(
+                         UserId, OrgId, ProjectId, RecordIdConst, true,
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+                         false, false, false))
+                     .ReturnsAsync(new PaginatedResponse<RecordCollectionResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 4,
+                         PageSize = 50,
+                         TotalCount = 0
+                     });
+
+        await _recordCollectionController.GetRecordCollectionsForARecord(OrgId, ProjectId, RecordIdConst, true, pagination);
+
+        _mockRecordCollectionBusiness.Verify(b => b.GetRecordCollectionsForRecordPaginated(
+            UserId, OrgId, ProjectId, RecordIdConst, true,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+            false, false, false), Times.Once);
+    }
+
+    #endregion
+
+    // =========================================================================
     // AddRecordsToRecordCollection Tests
     // =========================================================================
 
