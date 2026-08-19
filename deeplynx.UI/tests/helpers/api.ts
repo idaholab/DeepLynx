@@ -15,7 +15,11 @@ type Organization = { id: number; name: string };
 export async function getOrgIdByName(request: APIRequestContext, orgName: string): Promise<string> {
   const res = await request.fetch(`${BASE_URL}/organizations`);
   if (!res.ok()) throw new Error(`Failed to fetch organizations: ${res.status()}`);
-  const orgs: Organization[] = await res.json();
+  const body = await res.json();
+  const orgs: Organization[] = Array.isArray(body) ? body : body.items;
+  if (!Array.isArray(orgs)) {
+    throw new Error(`Expected array of organizations, got: ${JSON.stringify(body).slice(0, 300)}`);
+  }
   const match = orgs.find((org) => org.name === orgName);
   if (!match) throw new Error(`Could not find organization named "${orgName}" in ${JSON.stringify(orgs)}`);
   return String(match.id);
