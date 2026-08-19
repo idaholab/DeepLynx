@@ -1,4 +1,5 @@
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -128,13 +129,14 @@ public class GraphBusiness : IGraphBusiness
     }
 
     /// <summary>
-    ///     Gets related records up to 3 levels deep
+    ///     Gets related records up to 3 levels deep within a project scope
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the record belongs</param>
     /// <param name="projectId">The ID of the project to which the record belongs</param>
     /// <param name="recordId">The record Id to start</param>
     /// <param name="userId">The user accessing this info</param>
     /// <param name="depth">How many relationships away the user wants</param>
+    /// <param name="isAdmin">Whether the requesting user is an admin (sys, org, or project level — resolved upstream by middleware). Admins skip label filtering; project membership/scoping still applies.</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     public async Task<GraphResponse> GetGraphDataForRecord(
@@ -142,46 +144,32 @@ public class GraphBusiness : IGraphBusiness
         long projectId,
         long recordId,
         long userId,
-        int depth)
+        int depth,
+        bool isAdmin = false)
     {
         if (depth > 3) throw new ArgumentException("Depth must be no more than 3");
 
         var rootRecord = await _context.Records
             .Include(r => r.Class)
             .Include(r => r.Labels)
-            .FirstOrDefaultAsync(r => r.Id == recordId);
+            .Where(r => r.OrganizationId == organizationId && r.ProjectId == projectId)
+            .FirstOrDefaultAsync(r => r.Id == recordId && !r.IsArchived);
 
         if (rootRecord == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
 
-        var isSysAdmin = await AdminHelper.IsSysAdmin(_context, userId);
-        var isAdmin = isSysAdmin || await AdminHelper.IsAnyAdmin(_context, userId, organizationId, projectId);
+        List<long> userAuthorizedLabels = new();
 
-        List<long> userProjectIds;
-        List<long>? userAuthorizedLabels = null;
-
-        if (isSysAdmin)
+        if (!isAdmin)
         {
-            userProjectIds = await _context.Projects
-                .Select(p => p.Id)
-                .ToListAsync();
-        }
-        else
-        {
-            userProjectIds = await _context.Projects
-                .Where(p => p.ProjectMembers.Any(pm =>
-                    pm.UserId == userId ||
-                    (pm.GroupId.HasValue && pm.Group != null && pm.Group.Users.Any(u => u.Id == userId))))
-                .Select(p => p.Id)
-                .ToListAsync();
-
-            if (userProjectIds.Count == 0 || !userProjectIds.Contains(rootRecord.ProjectId))
-                throw new AccessViolationException($"You do not have access to view record with id {recordId}");
-
             userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                userId, organizationId, userProjectIds.ToArray(), "read record");
+                userId, organizationId, projectId, "read record");
 
-            if (rootRecord.Labels.Any() && !rootRecord.Labels.All(l => userAuthorizedLabels.Contains(l.Id)))
-                throw new UnauthorizedAccessException($"Access Denied: You do not have access to all the sensitivity labels on record: {recordId}");
+            if (rootRecord.Labels.Any() &&
+                !rootRecord.Labels.All(l => userAuthorizedLabels.Contains(l.Id)))
+            {
+                throw new UnauthorizedAccessException(
+                    $"Access Denied: You do not have access to all the sensitivity labels on record: {recordId}");
+            }
         }
 
         var nodes = new Dictionary<long, GraphNode>();
@@ -210,8 +198,8 @@ public class GraphBusiness : IGraphBusiness
 
                 visitedRecords.Add(currentLevelRecordId);
 
-                var outgoingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isSysAdmin, isAdmin, true);
-                var incomingEdges = await GetGraphEdges(currentLevelRecordId, userProjectIds, userAuthorizedLabels, isSysAdmin, isAdmin, false);
+                var outgoingEdges = await GetGraphEdges(currentLevelRecordId, projectId, userAuthorizedLabels, isAdmin, isOutgoing: true);
+                var incomingEdges = await GetGraphEdges(currentLevelRecordId, projectId, userAuthorizedLabels, isAdmin, isOutgoing: false);
 
                 ProcessEdges(outgoingEdges, nodes, links, visitedEdges, nextLevelRecordIds, true);
                 ProcessEdges(incomingEdges, nodes, links, visitedEdges, nextLevelRecordIds, false);
@@ -227,21 +215,19 @@ public class GraphBusiness : IGraphBusiness
         };
     }
 
+
     /// <summary>
-    ///     Gets all edges connected to a specific record from the database
+    ///     Gets all edges connected to a specific record from the database. Project Scoped
     /// </summary>
     /// <param name="recordId">The ID of the record to get edges for</param>
-    /// <param name="userProjectIds">The ID of the projects the user has access to</param>
-    /// <param name="userAuthorizedLabels">list of Sensitivity Label IDs that the requesting user has access to</param>
-    /// <param name="isSysAdmin">If true, skips project membership filtering.</param>
-    /// <param name="isAdmin">if admin then skip sensitivity label checks</param>
-    /// <param name="isOutgoing">True for edges going OUT from this record, False for edges coming IN to this record</param>
-    /// <returns>A list of edges with their related data (origin, destination, relationship) loaded</returns>
+    /// <param name="projectId">The single project this traversal is scoped to (the root record's project)</param>
+    /// <param name="userAuthorizedLabels">Sensitivity label IDs the user may read (ignored for admins)</param>
+    /// <param name="isAdmin">Admins skip label filtering (project scoping still applies)</param>
+    /// <param name="isOutgoing">True for edges going OUT from this record, false for edges coming IN</param>
     private async Task<List<Edge>> GetGraphEdges(
         long recordId,
-        List<long> userProjectIds,
-        List<long>? userAuthorizedLabels,
-        bool isSysAdmin,
+        long projectId,
+        List<long> userAuthorizedLabels,
         bool isAdmin,
         bool isOutgoing)
     {
@@ -251,21 +237,20 @@ public class GraphBusiness : IGraphBusiness
             .Include(e => e.Destination).ThenInclude(r => r.Labels)
             .Include(e => e.Destination).ThenInclude(r => r.Class)
             .Include(e => e.Relationship)
-            .Where(e => !e.IsArchived);
+            .Where(e => !e.IsArchived && !e.Origin.IsArchived && !e.Destination.IsArchived);
 
-        if (!isSysAdmin)
-        {
-            query = query.Where(e =>
-                userProjectIds.Contains(e.ProjectId) &&
-                userProjectIds.Contains(e.Origin.ProjectId) &&
-                userProjectIds.Contains(e.Destination.ProjectId));
-        }
+        query = query.Where(e =>
+            e.ProjectId == projectId &&
+            e.Origin.ProjectId == projectId &&
+            e.Destination.ProjectId == projectId);
 
         if (!isAdmin)
         {
             query = query.Where(e =>
-                (!e.Origin.Labels.Any() || e.Origin.Labels.All(l => userAuthorizedLabels!.Contains(l.Id))) &&
-                (!e.Destination.Labels.Any() || e.Destination.Labels.All(l => userAuthorizedLabels!.Contains(l.Id))));
+                (!e.Origin.Labels.Any() ||
+                e.Origin.Labels.All(l => userAuthorizedLabels.Contains(l.Id))) &&
+                (!e.Destination.Labels.Any() ||
+                e.Destination.Labels.All(l => userAuthorizedLabels.Contains(l.Id))));
         }
 
         query = isOutgoing

@@ -5,7 +5,6 @@ using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
-using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
@@ -202,8 +201,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         await base.SeedTestDataAsync();
 
         // Add org
-        var testOrg = new Organization { Name = "Test Org" };
-        var deletedOrg = new Organization { Name = "Delete Me" };
+        var testOrg = new Organization { Name = "Test Org", CreateContainerPerProject = false };
+        var deletedOrg = new Organization { Name = "Delete Me", CreateContainerPerProject = false };
         Context.Organizations.AddRange(testOrg, deletedOrg);
         await Context.SaveChangesAsync();
         oid = testOrg.Id;
