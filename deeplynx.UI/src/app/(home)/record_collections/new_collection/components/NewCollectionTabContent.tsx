@@ -526,7 +526,7 @@ export default function NewCollectionTabContent({
                       />
                     </label>
                       
-                    <div className="form-control w-full">
+                    {/* <div className="form-control w-full">
                       <button
                         type="button"
                         className="btn btn-outline btn-sm w-fit"
@@ -535,7 +535,45 @@ export default function NewCollectionTabContent({
                         {t.translations.EDIT_ADDITIONAL_PROPERTIES ?? "Add Properties"}
                       </button>
                     </div>
-                    <AdditionalPropertiesEditor {...propertiesEditorProps} />
+                    <AdditionalPropertiesEditor {...propertiesEditorProps} /> */}
+                    <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="font-semibold text-base-content">
+                          {t.translations.RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES}
+                        </h3>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          disabled={saving}
+                          onClick={() =>
+                            setSelectedCollectionPropertiesEditorOpen(true)
+                          }
+                        >
+                          {t.translations.EDIT}
+                        </button>
+                      </div>
+                      <div className="mt-4 max-h-[17.5rem] overflow-auto pr-1">
+                        <table className="table table-pin-rows">
+                          <thead className="bg-base-100">
+                            <tr>
+                              <th>{t.translations.RECORD_COLLECTIONS_FIELD}</th>
+                              <th>{t.translations.RECORD_COLLECTIONS_VALUE}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td colSpan={2}>
+                                {
+                                  t.translations
+                                    .RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET
+                                }
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  
 
                     {selectedRecordsPreview}
                   </div>
