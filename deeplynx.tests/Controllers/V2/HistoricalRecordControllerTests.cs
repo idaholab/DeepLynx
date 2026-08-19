@@ -54,22 +54,28 @@ public class HistoricalRecordControllerTests : IDisposable
     }
 
     // =========================================================================
-    // GetAllHistoricalRecords Tests
+    // GetAllHistoricalRecordsPaginated Tests
     // =========================================================================
 
-    #region GetAllHistoricalRecords Tests
+    #region GetAllHistoricalRecordsPaginated Tests
 
     [Fact]
-    public async Task GetAllHistoricalRecords_Returns200_WithList()
+    public async Task GetAllHistoricalRecordsPaginated_Returns200_WithList()
     {
-        var expected = new List<HistoricalRecordResponseDto> { new(), new() };
+        var expected = new PaginatedResponse<HistoricalRecordResponseDto>
+        {
+            Items = [new(), new()],
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
-        _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecords(
-                         UserId, ProjectId, OrgId, DataSourceId, PointInTimeConst, true, false, false, false))
+        _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecordsPaginated(
+                         UserId, ProjectId, OrgId, It.IsAny<PaginatedRequestDto>(), DataSourceId, PointInTimeConst, true, false, false, false))
                      .ReturnsAsync(expected);
 
         var result = (await _historicalRecordController.GetAllHistoricalRecords(
-            OrgId, ProjectId, DataSourceId, PointInTimeConst, true)).Result as OkObjectResult;
+            OrgId, ProjectId, null, DataSourceId, PointInTimeConst, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -77,49 +83,112 @@ public class HistoricalRecordControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllHistoricalRecords_Returns200_WithEmptyList()
+    public async Task GetAllHistoricalRecordsPaginated_Returns200_WithEmptyList()
     {
-        _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecords(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(),
-                         It.IsAny<DateTime?>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
-                     .ReturnsAsync([]);
+        _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecordsPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<PaginatedRequestDto>(),
+                         It.IsAny<long?>(), It.IsAny<DateTime?>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                     .ReturnsAsync(new PaginatedResponse<HistoricalRecordResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
         var result = (await _historicalRecordController.GetAllHistoricalRecords(
-            OrgId, ProjectId, null, null, true)).Result as OkObjectResult;
+            OrgId, ProjectId, null, null, null, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<HistoricalRecordResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<HistoricalRecordResponseDto>>(result.Value);
     }
 
     [Fact]
-    public async Task GetAllHistoricalRecords_ThrowsException_WhenBusinessThrows()
+    public async Task GetAllHistoricalRecordsPaginated_ThrowsException_WhenBusinessThrows()
     {
-        _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecords(
-                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(),
-                         It.IsAny<DateTime?>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+        _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecordsPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<PaginatedRequestDto>(),
+                         It.IsAny<long?>(), It.IsAny<DateTime?>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _historicalRecordController.GetAllHistoricalRecords(
-            OrgId, ProjectId, null, null, true));
+            OrgId, ProjectId, null, null, null, true));
     }
 
     [Fact]
-    public async Task GetAllHistoricalRecords_PassesIdsFiltersAndAdminFlagsToBusinessLayer()
+    public async Task GetAllHistoricalRecordsPaginated_PassesIdsFiltersAndAdminFlagsToBusinessLayer()
     {
         UserContextStorage.IsSysAdmin = true;
         UserContextStorage.IsOrgAdmin = true;
         UserContextStorage.IsProjectAdmin = true;
 
-        _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecords(
-                         UserId, ProjectId, OrgId, DataSourceId, PointInTimeConst, false, true, true, true))
-                     .ReturnsAsync([]);
+        _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecordsPaginated(
+                         UserId, ProjectId, OrgId, It.IsAny<PaginatedRequestDto>(), DataSourceId, PointInTimeConst, false, true, true, true))
+                     .ReturnsAsync(new PaginatedResponse<HistoricalRecordResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
 
         await _historicalRecordController.GetAllHistoricalRecords(
-            OrgId, ProjectId, DataSourceId, PointInTimeConst, hideArchived: false);
+            OrgId, ProjectId, null, DataSourceId, PointInTimeConst, hideArchived: false);
 
-        _mockHistoricalRecordBusiness.Verify(b => b.GetAllHistoricalRecords(
-            UserId, ProjectId, OrgId, DataSourceId, PointInTimeConst, false, true, true, true), Times.Once);
+        _mockHistoricalRecordBusiness.Verify(b => b.GetAllHistoricalRecordsPaginated(
+            UserId, ProjectId, OrgId, It.IsAny<PaginatedRequestDto>(), DataSourceId, PointInTimeConst, false, true, true, true), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        PaginatedRequestDto? capturedDto = null;
+
+        _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecordsPaginated(
+                         UserId, ProjectId, OrgId, It.IsAny<PaginatedRequestDto>(), DataSourceId, PointInTimeConst, true, false, false, false))
+                     .Callback<long, long, long, PaginatedRequestDto, long?, DateTime?, bool, bool, bool, bool>(
+                         (_, _, _, dto, _, _, _, _, _, _) => capturedDto = dto)
+                     .ReturnsAsync(new PaginatedResponse<HistoricalRecordResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        await _historicalRecordController.GetAllHistoricalRecords(
+            OrgId, ProjectId, null, DataSourceId, PointInTimeConst, true);
+
+        Assert.NotNull(capturedDto);
+        Assert.Equal(1, capturedDto.PageNumber);
+        Assert.Equal(25, capturedDto.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var providedDto = new PaginatedRequestDto { PageNumber = 3, PageSize = 10 };
+        PaginatedRequestDto? capturedDto = null;
+
+        _mockHistoricalRecordBusiness.Setup(b => b.GetAllHistoricalRecordsPaginated(
+                         UserId, ProjectId, OrgId, It.IsAny<PaginatedRequestDto>(), DataSourceId, PointInTimeConst, true, false, false, false))
+                     .Callback<long, long, long, PaginatedRequestDto, long?, DateTime?, bool, bool, bool, bool>(
+                         (_, _, _, dto, _, _, _, _, _, _) => capturedDto = dto)
+                     .ReturnsAsync(new PaginatedResponse<HistoricalRecordResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 3,
+                         PageSize = 10,
+                         TotalCount = 0
+                     });
+
+        await _historicalRecordController.GetAllHistoricalRecords(
+            OrgId, ProjectId, providedDto, DataSourceId, PointInTimeConst, true);
+
+        Assert.NotNull(capturedDto);
+        Assert.Equal(3, capturedDto.PageNumber);
+        Assert.Equal(10, capturedDto.PageSize);
     }
 
     #endregion
@@ -269,7 +338,7 @@ public class HistoricalRecordControllerTests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(HistoricalRecordController.GetAllHistoricalRecords),
-            "organizationId", "projectId", "dataSourceId", "pointInTime", "hideArchived");
+            "organizationId", "projectId", "paginatedRequestDto", "dataSourceId", "pointInTime", "hideArchived");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
         AssertHasAuthAttribute(method, "read", "record");
