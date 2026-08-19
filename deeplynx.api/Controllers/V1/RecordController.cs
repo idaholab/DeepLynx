@@ -225,27 +225,24 @@ public class RecordController : ControllerBase
     /// <param name="projectId">The ID of the project to which the records belong</param>
     /// <param name="tagIds">The list of tag IDs to filter records by - records must contain all IDs in the list</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
-    /// <param name="paginatedRequestDto">Pagination parameters</param>
-    /// <returns>A paginated list of records that have all the specified tags.</returns>
+    /// <returns>A list of records that have all the specified tags.</returns>
     [HttpGet("by-tags", Name = "api_get_records_by_tags")]
     [Auth("read", "record")]
     [Auth("read", "tag")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetRecordsByTags(
+    public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetRecordsByTags(
         long organizationId,
         long projectId,
         [FromQuery] long[] tagIds,
-        [FromQuery] bool hideArchived = true,
-        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
+        [FromQuery] bool hideArchived = true)
     {
         try
         {
-            paginatedRequestDto ??= new PaginatedRequestDto();
             var currentUserId = UserContextStorage.UserId;
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _recordBusiness.GetRecordsByTagsPaginated(currentUserId, organizationId, projectId, tagIds, hideArchived, paginatedRequestDto, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            var records = await _recordBusiness.GetRecordsByTags(currentUserId, organizationId, projectId, tagIds, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
         }
         catch (Exception exc)
