@@ -319,6 +319,7 @@ public class ProjectBusiness : IProjectBusiness
         if (logoFile.Length > maxFileSize)
             throw new ArgumentException("File size exceeds the 5MB limit.");
 
+        var project = await _context.Projects.FirstOrDefaultAsync(o => o.Id == projectId) ?? throw new ArgumentException("Project not found.");
         var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId) ?? throw new Exception("Object storage not found or failed to decrypt.");
         if (objectStorage.Config == null)
@@ -338,6 +339,9 @@ public class ProjectBusiness : IProjectBusiness
 
             if (!SanitizeFilePath.IsValidFilePath(baseFilePath))
                 throw new ArgumentException("Invalid Azure file path. Allowed characters are letters (a-z, A-Z), numbers (0-9), and '/'.");
+
+            project.LogoObjectStorageId = (int?)realObjectStorageId;
+            await _context.SaveChangesAsync();
 
             var newLogoFileId = $"logo_{Guid.NewGuid()}";
             var fileName = $"{newLogoFileId}.{fileExtension}";
@@ -371,6 +375,9 @@ public class ProjectBusiness : IProjectBusiness
 
         if (string.IsNullOrEmpty(objectStorage.Config.MountPath))
             throw new Exception("File system mount path not set in object storage.");
+
+        project.LogoObjectStorageId = (int?)realObjectStorageId;
+        await _context.SaveChangesAsync();
 
         var logosFolderPathFs = Path.Combine(
             objectStorage.Config.MountPath,
@@ -435,8 +442,19 @@ public class ProjectBusiness : IProjectBusiness
         long projectId,
         long? objectStorageId)
     {
-        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+        var project = await _context.Projects.FirstOrDefaultAsync(o => o.Id == projectId) ?? throw new ArgumentException("Project not found.");
+
+        if (project.LogoObjectStorageId.HasValue)
+        {
+            objectStorageId = project.LogoObjectStorageId.Value;
+        }
+        else
+        {
+            var defaultStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
+            objectStorageId = defaultStorage.Id;
+        }
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage((long)objectStorageId);
 
         if (objectStorage.Config == null)
             throw new Exception("Object storage config is null.");
@@ -548,8 +566,19 @@ public class ProjectBusiness : IProjectBusiness
         long projectId,
         long? objectStorageId)
     {
-        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+        var project = await _context.Projects.FirstOrDefaultAsync(o => o.Id == projectId) ?? throw new ArgumentException("Project not found.");
+
+        if (project.LogoObjectStorageId.HasValue)
+        {
+            objectStorageId = project.LogoObjectStorageId.Value;
+        }
+        else
+        {
+            var defaultStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
+            objectStorageId = defaultStorage.Id;
+        }
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage((long)objectStorageId);
 
         if (objectStorage.Config == null)
             throw new Exception("Object storage config is null.");

@@ -1,6 +1,8 @@
 import { test, expect } from "../fixtures";
 import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 
+const SETTINGS_URL = "http://localhost:3000/settings";
+
 const BASE_URL = 'http://localhost:5095/api/v1/';
 
 test.describe("Settings Page", () => {
@@ -157,7 +159,7 @@ test.describe("Settings Page", () => {
       await expect(page.getByText('API Keypair deleted')).toBeVisible();
       await expect(page.getByText(key)).not.toBeVisible();
       await expect(rows).toHaveCount(previousCount - 1);    
-      await expect(rows.getByText(String(previousCount))).not.toBeVisible();
+      await expect(page.getByRole('main').getByText(String(previousCount), { exact: true })).not.toBeVisible();
     });
   });
 
@@ -264,5 +266,32 @@ test.describe("Settings Page", () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'default-dark');
     const langSecondCheck = await page.evaluate(() => localStorage.getItem('lang'));
     expect(langSecondCheck).toBe('es');
+  });
+});
+
+// these tests hit the URL directly to confirm the page is fully reachable
+// and renders correctly without going through in-app navigation first.
+
+test.describe("Settings Page - direct link navigation", () => {
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX });
+
+  test("loads the settings page directly via URL", async ({ page }) => {
+    try {
+      await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    } catch {
+      await page.goto(SETTINGS_URL, {
+        waitUntil: "domcontentloaded",
+        timeout: 10_000,
+      });
+    }
+
+    await expect(page.getByRole("heading", { name: "User Settings" })).toBeVisible({ timeout: 15000 });
+    await expect(page).toHaveURL(SETTINGS_URL);
+    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByText("Name")).toBeVisible();
+    await expect(page.getByText("Email")).toBeVisible();
+    await expect(page.getByText("User Settings")).toBeVisible();
+    await expect(page.getByText("Preferences")).toBeVisible();
+    await expect(page.getByText("API Keys")).toBeVisible();
   });
 });

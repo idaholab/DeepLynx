@@ -61,11 +61,17 @@ public class TagProjectControllerTests : IDisposable
     [Fact]
     public async Task GetAllTags_Returns200_WithTags()
     {
-        var expected = new List<TagResponseDto>();
+        var expected = new PaginatedResponse<TagResponseDto>
+        {
+            Items = new List<TagResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(
-                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true, false, false))
+            .Setup(b => b.GetAllTagsPaginated(
+                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), It.IsAny<PaginatedRequestDto>(), true, false, false))
             .ReturnsAsync(expected);
 
         var result = (await _tagProjectController.GetAllTags(ProjectId, true)).Result as OkObjectResult;
@@ -79,22 +85,28 @@ public class TagProjectControllerTests : IDisposable
     public async Task GetAllTags_Returns200_WithEmptyList()
     {
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
-            .ReturnsAsync([]);
+            .Setup(b => b.GetAllTagsPaginated(It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]>(), It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ReturnsAsync(new PaginatedResponse<TagResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
 
         var result = (await _tagProjectController.GetAllTags(ProjectId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<TagResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<TagResponseDto>>(result.Value);
     }
 
     [Fact]
     public async Task GetAllTags_ThrowsException_WhenBusinessThrows()
     {
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(
-                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true, false, false))
+            .Setup(b => b.GetAllTagsPaginated(
+                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), It.IsAny<PaginatedRequestDto>(), true, false, false))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _tagProjectController.GetAllTags(ProjectId, true));
@@ -103,18 +115,24 @@ public class TagProjectControllerTests : IDisposable
     [Fact]
     public async Task GetAllTags_RebuildsProjectIdArray_AndPassesOrganizationIdFromContext()
     {
-        var expected = new List<TagResponseDto>();
+        var expected = new PaginatedResponse<TagResponseDto>
+        {
+            Items = new List<TagResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
         _mockTagBusiness
-            .Setup(b => b.GetAllTags(
-                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true, false, false))
+            .Setup(b => b.GetAllTagsPaginated(
+                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), It.IsAny<PaginatedRequestDto>(), true, false, false))
             .ReturnsAsync(expected);
 
         await _tagProjectController.GetAllTags(ProjectId, true);
 
         _mockTagBusiness.Verify(
-            b => b.GetAllTags(
-                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), true, false, false),
+            b => b.GetAllTagsPaginated(
+                UserId, OrgId, It.Is<long[]>(x => x.SequenceEqual(new[] { ProjectId })), It.IsAny<PaginatedRequestDto>(), true, false, false),
             Times.Once);
     }
 

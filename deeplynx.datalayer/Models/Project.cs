@@ -44,6 +44,8 @@ public partial class Project
 
     [Column("default_object_storage_id")]
     public int? DefaultObjectStorageId { get; set; } = null;
+    [Column("logo_object_storage_id")]
+    public int? LogoObjectStorageId { get; set; } = null;
 
     [InverseProperty("Project")]
     public virtual ICollection<Action> Actions { get; set; } = new List<Action>();

@@ -3,8 +3,10 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import React, { useEffect, useRef } from "react";
+import PaginationControls from "../../components/PaginationControls";
 
 export interface CardColumn<T extends object> {
   key: keyof T;
@@ -34,6 +36,24 @@ function RelatedRecordsCard<T extends object>({
   const { t } = useLanguage();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const cardTitle = title ?? `${t.translations.RELATIONSHIPS}:`;
+
+    const {
+    currentPage: relatedRecordPage,
+    pageSize: relatedRecordPageSize,
+    paginatedItems: paginatedRelatedRecord,
+    resetPagination: resetRelatedRecordPagination,
+    setCurrentPage: setRelatedRecordPage,
+    setPageSize: setRelatedRecordPageSize,
+    totalPages: relatedRecordTotalPages,
+  } = useLocalPagination({
+    items: rows,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetRelatedRecordPagination();
+  }, [rows, resetRelatedRecordPagination]);
+
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -82,7 +102,7 @@ function RelatedRecordsCard<T extends object>({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => (
+              {paginatedRelatedRecord.map((row, i) => (
                 <tr key={i}>
                   {columns.map((col) => {
                     const raw = row[col.key];
@@ -121,6 +141,16 @@ function RelatedRecordsCard<T extends object>({
               {t.translations.NO_RECORDS_FOUND}
             </div>
           )}
+        </div>
+        {/* Pagination Controls */}
+        <div className="mt-2 flex justify-end">
+          <PaginationControls
+            currentPage={relatedRecordPage}
+            pageSize={relatedRecordPageSize}
+            totalPages={relatedRecordTotalPages}
+            onPageChange={setRelatedRecordPage}
+            onPageSizeChange={setRelatedRecordPageSize}
+          />
         </div>
       </div>
     </div>

@@ -492,8 +492,20 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <returns>True if the file is successfully removed, false otherwise.</returns>
     public async Task<bool> RemoveLogoFileAsync(long organizationId)
     {
-        var realObjectStorageId = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId.Id);
+        var organization = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId) ?? throw new ArgumentException("Organization not found.");
+
+        long objectStorageId;
+        if (organization.LogoObjectStorageId.HasValue)
+        {
+            objectStorageId = organization.LogoObjectStorageId.Value;
+        }
+        else
+        {
+            var defaultStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
+            objectStorageId = defaultStorage.Id;
+        }
+        
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
 
         if (objectStorage.Config.MountPath != null)
         {
@@ -626,6 +638,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         if (logoFile.Length > maxFileSize)
             throw new ArgumentException("File size exceeds the 5MB limit.");
 
+        var organization = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId) ?? throw new ArgumentException("Organization not found.");
         var realObjectStorageId = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId.Id);
 
@@ -643,6 +656,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 
             if (!SanitizeFilePath.IsValidFilePath(baseFilePath))
                 throw new ArgumentException("Invalid Azure file path. Allowed characters are letters (a-z, A-Z), numbers (0-9), and '/'.");
+
+            organization.LogoObjectStorageId = (int?)realObjectStorageId.Id;
+            await _context.SaveChangesAsync();
 
             var newLogoFileId2 = $"logo_{Guid.NewGuid()}";
             var fileName2 = $"{newLogoFileId2}.{fileExtension}";
@@ -673,13 +689,14 @@ public class OrganizationBusiness : IOrganizationBusiness
                 await metadataBlobClient.UploadAsync(ms, overwrite: true);
             }
 
-            Console.WriteLine("uri clint: " + blobClient.Uri.ToString());
-
             return blobClient.Uri.ToString();
         }
 
         if (objectStorage.Config.MountPath == null)
             throw new Exception("File system mount path not set in object storage.");
+
+        organization.LogoObjectStorageId = (int?)realObjectStorageId.Id;
+        await _context.SaveChangesAsync();
 
         var logosFolderPath = Path.Combine(
             objectStorage.Config.MountPath,
@@ -738,8 +755,20 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <returns>Record Id of Logo</returns>
     public async Task<(Stream Stream, string FullPath)?> GetOrganizationLogoStreamAsync(long organizationId)
     {
-        var realObjectStorageId = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId.Id);
+        var organization = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId) ?? throw new ArgumentException("Organization not found.");
+
+        long objectStorageId;
+        if (organization.LogoObjectStorageId.HasValue)
+        {
+            objectStorageId = organization.LogoObjectStorageId.Value;
+        }
+        else
+        {
+            var defaultStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
+            objectStorageId = defaultStorage.Id;
+        }
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
 
         if (objectStorage.Config.MountPath != null)
         {

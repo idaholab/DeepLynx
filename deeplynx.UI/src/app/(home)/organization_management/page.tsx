@@ -66,7 +66,7 @@ const OrganizationManagementPage = async ({
   // Fetch groups filtered by organization
   let groups: GroupResponseDto[] = [];
   try {
-    const apiGroups = await getAllGroupsServer(organizationId as number, true);
+    const { items: apiGroups } = await getAllGroupsServer(organizationId as number, true);
     groups = apiGroups.map(mapToGroupResponseDtos);
   } catch (error) {
     console.error("getAllGroups failed:", error);
