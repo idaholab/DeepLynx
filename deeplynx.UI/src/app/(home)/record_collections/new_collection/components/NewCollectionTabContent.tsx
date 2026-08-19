@@ -526,54 +526,53 @@ export default function NewCollectionTabContent({
                       />
                     </label>
                       
-                    {/* <div className="form-control w-full">
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm w-fit"
-                        onClick={onOpen}
-                      >
-                        {t.translations.EDIT_ADDITIONAL_PROPERTIES ?? "Add Properties"}
-                      </button>
-                    </div>
-                    <AdditionalPropertiesEditor {...propertiesEditorProps} /> */}
-                    <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="font-semibold text-base-content">
+                    <label className="form-control w-full">
+                      <div className="label">
+                        <span className="label-text font-medium">
                           {t.translations.RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES}
-                        </h3>
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          disabled={saving}
-                          onClick={() =>
-                            setSelectedCollectionPropertiesEditorOpen(true)
-                          }
-                        >
-                          {t.translations.EDIT}
-                        </button>
+                        </span>
                       </div>
-                      <div className="mt-4 max-h-[17.5rem] overflow-auto pr-1">
-                        <table className="table table-pin-rows">
-                          <thead className="bg-base-100">
-                            <tr>
-                              <th>{t.translations.RECORD_COLLECTIONS_FIELD}</th>
-                              <th>{t.translations.RECORD_COLLECTIONS_VALUE}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr>
-                              <td colSpan={2}>
-                                {
-                                  t.translations
-                                    .RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET
-                                }
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
+                      <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
+                        <div className="max-h-[17.5rem] overflow-auto pr-1">
+                          <table className="table table-pin-rows">
+                            <thead className="bg-base-100">
+                              <tr>
+                                <th>{t.translations.RECORD_COLLECTIONS_FIELD}</th>
+                                <th className="flex items-center justify-between">
+                                  <span>{t.translations.RECORD_COLLECTIONS_VALUE}</span>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-xs"
+                                    disabled={saving}
+                                    onClick={onOpen}
+                                  >
+                                    {t.translations.ADD}
+                                  </button>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Object.keys(propertiesEditorProps.properties ?? {}).length === 0 ? (
+                                <tr>
+                                  <td colSpan={2}>
+                                    {t.translations.RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET}
+                                  </td>
+                                </tr>
+                              ) : (
+                                Object.entries(propertiesEditorProps.properties).map(([key, value]) => (
+                                  <tr key={key}>
+                                    <td>{key}</td>
+                                    <td>{String(value)}</td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    </div>
-                  
+                    </label>
+                    <AdditionalPropertiesEditor {...propertiesEditorProps} />
+                                      
 
                     {selectedRecordsPreview}
                   </div>
