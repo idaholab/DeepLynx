@@ -207,7 +207,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     try {
       const users = await getAllUsers(organizationId);
-      setAvailableUsers(users);
+      setAvailableUsers(users.items);
     } catch (error) {
       console.error("Failed to load users:", error);
       toast.error(t.translations.UNABLE_TO_LOAD_USERS);
@@ -253,7 +253,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
         setTableData(buildTableData(updatedMembers));
       } else {
         const updatedMembers = await getAllUsers(organizationId);
-        setTableData(buildTableData(updatedMembers));
+        setTableData(buildTableData(updatedMembers.items));
       }
     } catch (refreshError) {
       console.error("Failed to refresh members list:", refreshError);
