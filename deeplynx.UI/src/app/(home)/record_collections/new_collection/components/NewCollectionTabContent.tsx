@@ -12,6 +12,7 @@ import NewCollectionStepIndicator from "./NewCollectionStepIndicator";
 import SelectedRecordsPreviewPanel from "../../components/SelectedRecordsPreviewPanel";
 import { interpolateTemplate } from "@/app/lib/record_helpers";
 import type { NewCollectionTabController } from "../hooks/useNewCollectionWorkflow";
+import AdditionalPropertiesEditor from "@/app/(home)/record/components/AdditionalPropertiesEditor";
 
 type Props = {
   controller: NewCollectionTabController;
@@ -38,6 +39,7 @@ export default function NewCollectionTabContent({
       newCollectionDescription,
       setNewCollectionDescription,
     },
+    propertiesEditor: { onOpen, ...propertiesEditorProps },
     recordSearch: {
       newCollectionRecordSearchTerm,
       setNewCollectionRecordSearchTerm,
@@ -523,6 +525,17 @@ export default function NewCollectionTabContent({
                         }
                       />
                     </label>
+                      
+                    <div className="form-control w-full">
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm w-fit"
+                        onClick={onOpen}
+                      >
+                        {t.translations.EDIT_ADDITIONAL_PROPERTIES ?? "Add Properties"}
+                      </button>
+                    </div>
+                    <AdditionalPropertiesEditor {...propertiesEditorProps} />
 
                     {selectedRecordsPreview}
                   </div>

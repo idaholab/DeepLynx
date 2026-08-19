@@ -58,6 +58,8 @@ export function useNewCollectionWorkflow({
   const [newCollectionDescription, setNewCollectionDescription] = useState("");
   const [newCollectionSelectedTagNames, setNewCollectionSelectedTagNames] =
     useState<string[]>([]);
+  const [newCollectionProperties, setNewCollectionProperties] = useState<Record<string, unknown>>({});
+  const [newCollectionPropertiesEditorOpen, setNewCollectionPropertiesEditorOpen] = useState(false);
   const [newCollectionLabelSearchTerm, setNewCollectionLabelSearchTerm] =
     useState("");
   const [newCollectionTagSearchTerm, setNewCollectionTagSearchTerm] =
@@ -254,21 +256,28 @@ export function useNewCollectionWorkflow({
   );
 
   const toggleNewCollectionRecord = async (
-    record: QueryRecordViewResponseDto,
+      record: QueryRecordViewResponseDto,
+    ) => {
+      if (typeof record.id !== "number") return;
+
+      if (newCollectionSelectedRecordIds.includes(record.id)) {
+        setNewCollectionSelectedRecordIds((prev) =>
+          prev.filter((id) => id !== record.id),
+        );
+        setNewCollectionSelectedRecords((prev) =>
+          prev.filter((selectedRecord) => selectedRecord.id !== record.id),
+        );
+        return;
+      }
+
+      await addNewCollectionRecords([record]);
+    };
+
+    const handleSaveNewCollectionProperties = async (
+    properties: Record<string, unknown>,
   ) => {
-    if (typeof record.id !== "number") return;
-
-    if (newCollectionSelectedRecordIds.includes(record.id)) {
-      setNewCollectionSelectedRecordIds((prev) =>
-        prev.filter((id) => id !== record.id),
-      );
-      setNewCollectionSelectedRecords((prev) =>
-        prev.filter((selectedRecord) => selectedRecord.id !== record.id),
-      );
-      return;
-    }
-
-    await addNewCollectionRecords([record]);
+    setNewCollectionProperties(properties ?? {});
+    setNewCollectionPropertiesEditorOpen(false);
   };
 
   const toggleSelectAllVisibleRecords = async () => {
@@ -467,7 +476,7 @@ export function useNewCollectionWorkflow({
         {
           name,
           description,
-          properties: {},
+          properties: newCollectionProperties,
           tags: newCollectionSelectedTagNames,
         },
         newCollectionSelectedLabelIds,
@@ -594,6 +603,14 @@ export function useNewCollectionWorkflow({
       onToggleSelectAllVisibleRecords: toggleSelectAllVisibleRecords,
       onToggleNewCollectionRecord: toggleNewCollectionRecord,
       onSelectAllSearchedRecords: handleSelectAllSearchedRecords,
+    },
+    propertiesEditor: {
+      isOpen: newCollectionPropertiesEditorOpen,
+      onOpen: () => setNewCollectionPropertiesEditorOpen(true),
+      onClose: () => setNewCollectionPropertiesEditorOpen(false),
+      properties: newCollectionProperties,
+      onSave: handleSaveNewCollectionProperties,
+      isSaving: false,
     },
     selection: {
       newCollectionSelectedRecordIds,
