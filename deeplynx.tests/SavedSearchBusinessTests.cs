@@ -869,7 +869,70 @@ public class SavedSearchBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region ExecuteSavedSearch Tests
+    #region ExecuteSavedSearchPaginated Tests
+
+    [Fact]
+    public async Task ExecuteSavedSearchPaginated_InvalidId_ThrowsKeyNotFoundException()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearchPaginated(
+                99999, uid1, pid, [pid], new PaginatedRequestDto(), isSysAdmin: false, isOrgAdmin: false));
+
+        Assert.Contains("Saved Search does not exist", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearchPaginated_WrongUser_ThrowsKeyNotFoundException()
+    {
+        // Arrange - Save a search under uid1
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "LIKE",
+                Value = "test"
+            }
+        };
+        await _savedSearchBusiness.SaveSearch(uid1, "User Search", "test", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "User Search");
+
+        // Act & Assert - anotherUserId attempts to execute uid1's saved search
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearchPaginated(
+                savedSearch.Id, uid2, pid, [pid], new PaginatedRequestDto(), isSysAdmin: false, isOrgAdmin: false));
+
+        Assert.Contains("Saved Search does not exist", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearchPaginated_CorruptedSearchJson_ThrowsArgumentException()
+    {
+        // Arrange - Manually insert a saved search with invalid/empty filter JSON
+        var badSearch = new SavedSearch
+        {
+            UserId = uid1,
+            Name = "Bad Search",
+            Search = JsonSerializer.Serialize(new { TextSearch = "test", Filter = (object)null })
+        };
+        Context.SavedSearches.Add(badSearch);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearchPaginated(
+                badSearch.Id, uid1, pid, [pid], new PaginatedRequestDto(), isSysAdmin: false, isOrgAdmin: false));
+
+        Assert.Contains("invalid or empty query", exception.Message);
+    }
+
+    #endregion
+
+    #region ExecuteSavedSearch (V1/Legacy) Tests
 
     [Fact]
     public async Task ExecuteSavedSearch_InvalidId_ThrowsKeyNotFoundException()
