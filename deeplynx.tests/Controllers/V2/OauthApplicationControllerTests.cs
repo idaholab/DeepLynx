@@ -45,19 +45,103 @@ public class OauthApplicationControllerTests : IDisposable
     [Fact]
     public async Task GetAllOauthApplications_ReturnsApplicationsAndForwardsFilter()
     {
-        var expected = new List<OauthApplicationResponseDto>
+        var expected = new PaginatedResponse<OauthApplicationResponseDto>
         {
-            CreateApplicationResponse()
+            Items = new List<OauthApplicationResponseDto> { CreateApplicationResponse() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 1
         };
+
         _mockBusiness
-            .Setup(business => business.GetAllOauthApplications(false))
+            .Setup(business => business.GetAllOauthApplicationsPaginated(
+                It.IsAny<PaginatedRequestDto>(), false))
             .ReturnsAsync(expected);
 
         var result = (await _controller.GetAllOauthApplications(hideArchived: false)).Result;
 
         AssertOkObject(result, expected);
         _mockBusiness.Verify(
-            business => business.GetAllOauthApplications(false),
+            business => business.GetAllOauthApplicationsPaginated(
+                It.IsAny<PaginatedRequestDto>(), false),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllOauthApplications_Returns200_WithEmptyList()
+    {
+        _mockBusiness
+            .Setup(business => business.GetAllOauthApplicationsPaginated(
+                It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>()))
+            .ReturnsAsync(new PaginatedResponse<OauthApplicationResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
+
+        var result = (await _controller.GetAllOauthApplications(hideArchived: true)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.IsAssignableFrom<PaginatedResponse<OauthApplicationResponseDto>>(result.Value);
+    }
+
+    [Fact]
+    public async Task GetAllOauthApplications_ThrowsException_WhenBusinessThrows()
+    {
+        _mockBusiness
+            .Setup(business => business.GetAllOauthApplicationsPaginated(
+                It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>()))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() => _controller.GetAllOauthApplications(hideArchived: true));
+    }
+
+    [Fact]
+    public async Task GetAllOauthApplications_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        _mockBusiness
+            .Setup(business => business.GetAllOauthApplicationsPaginated(
+                It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25), true))
+            .ReturnsAsync(new PaginatedResponse<OauthApplicationResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
+
+        await _controller.GetAllOauthApplications(hideArchived: true);
+
+        _mockBusiness.Verify(
+            business => business.GetAllOauthApplicationsPaginated(
+                It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25), true),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllOauthApplications_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var pagination = new PaginatedRequestDto { PageNumber = 4, PageSize = 50 };
+
+        _mockBusiness
+            .Setup(business => business.GetAllOauthApplicationsPaginated(
+                It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50), true))
+            .ReturnsAsync(new PaginatedResponse<OauthApplicationResponseDto>
+            {
+                Items = [],
+                PageNumber = 4,
+                PageSize = 50,
+                TotalCount = 0
+            });
+
+        await _controller.GetAllOauthApplications(true, pagination);
+
+        _mockBusiness.Verify(
+            business => business.GetAllOauthApplicationsPaginated(
+                It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50), true),
             Times.Once);
     }
 
