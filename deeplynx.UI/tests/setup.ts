@@ -32,6 +32,16 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function unwrapItems<T>(body: unknown, context: string): T[] {
+  if (Array.isArray(body)) return body;
+  if (body && typeof body === "object" && Array.isArray((body as any).items)) {
+    return (body as any).items;
+  }
+  throw new Error(
+    `${context}: expected an array or {items: [...]}, got: ${JSON.stringify(body).slice(0, 300)}`,
+  );
+}
+
 const API_URL = TEST_API_BASE_URL;
 const FRONTEND_URL = requireEnv("NEXTAUTH_URL");
 
@@ -177,7 +187,7 @@ async function findOrgId(
     throw new Error(
       `Fetch orgs failed for "${orgName}" (${res.status()}): ${await res.text()}`,
     );
-  const orgs = (await res.json()) as Scope[];
+  const orgs = unwrapItems<Scope>(await res.json(), "findOrgId");
   return orgs.find((o) => o.name === orgName)?.id.toString();
 }
 
@@ -227,7 +237,7 @@ async function findProjectId(
     throw new Error(
       `Fetch projects failed for "${projectName}" (${res.status()}): ${await res.text()}`,
     );
-  const projects = (await res.json()) as Scope[];
+  const projects = unwrapItems<Scope>(await res.json(), "findProjectId");
   return projects.find((p) => p.name === projectName)?.id.toString();
 }
 
@@ -296,7 +306,7 @@ async function findRoleIdByName(
     throw new Error(
       `Fetch roles failed for org ${orgId} (${res.status()}): ${await res.text()}`,
     );
-  const roles = (await res.json()) as Role[];
+  const roles = unwrapItems<Role>(await res.json(), "findRoleIdByName");
   return roles.find((r) => r.name === roleName)?.id.toString();
 }
 
@@ -311,7 +321,7 @@ async function getAllPermissions(
     throw new Error(
       `Fetch permissions failed for org ${orgId} (${res.status()}): ${await res.text()}`,
     );
-  return (await res.json()) as Permission[];
+  return unwrapItems<Permission>(await res.json(), "getAllPermissions");
 }
 
 function flattenRolePermissions(perms: RolePermissions): string[] {
@@ -425,9 +435,8 @@ async function isOrgMember(
     throw new Error(
       `Check org membership failed for user ${userId} org ${orgId} (${res.status()}): ${await res.text()}`,
     );
-  return ((await res.json()) as UserSummary[]).some(
-    (u) => String(u.id) === userId,
-  );
+  const users = unwrapItems<UserSummary>(await res.json(), "isOrgMember");
+  return users.some((u) => String(u.id) === userId);
 }
 
 async function isProjectMember(
@@ -447,9 +456,8 @@ async function isProjectMember(
     throw new Error(
       `Check project membership failed for user ${userId} project ${projectId} (${res.status()}): ${await res.text()}`,
     );
-  return ((await res.json()) as UserSummary[]).some(
-    (u) => String(u.id) === userId,
-  );
+  const users = unwrapItems<UserSummary>(await res.json(), "isProjectMember");
+  return users.some((u) => String(u.id) === userId);
 }
 
 async function addUserToOrg(
