@@ -18,6 +18,7 @@ namespace deeplynx.tests;
 public class EdgeBusinessTests : IntegrationTestBase
 {
     private ClassBusiness _classBusiness = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private DataSourceBusiness _dataSourceBusiness = null!;
     private EdgeBusiness _edgeBusiness = null!;
     private EventBusiness _eventBusiness = null!;
@@ -74,11 +75,13 @@ public class EdgeBusinessTests : IntegrationTestBase
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
             _mockRelationshipBusiness.Object, _eventBusiness);
-
+        _notificationBusiness =
+            new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -1306,7 +1309,7 @@ public class EdgeBusinessTests : IntegrationTestBase
         Assert.Equal("parsed-record-001", result.OriginOriginalId);
         Assert.Equal("parsed-record-002", result.DestinationOriginalId);
     }
-    
+
     private async Task SetRecordOriginalIds()
     {
         var origin = await Context.Records.FindAsync(originRecordId);

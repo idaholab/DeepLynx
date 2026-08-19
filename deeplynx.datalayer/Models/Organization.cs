@@ -38,6 +38,10 @@ public partial class Organization
     [Column("theme")]
     [MaxLength(50)]
     public string Theme { get; set; } = "default";
+    [Column("create_container_per_project")]
+    public bool CreateContainerPerProject { get; set; } = false;
+    [Column("disable_file_transfer")]
+    public bool DisableFileTransfer { get; set; } = false;
 
     [InverseProperty("Organization")]
     public virtual ICollection<Group> Groups { get; set; } = new List<Group>();

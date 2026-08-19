@@ -520,6 +520,8 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: rabbitmq-default-pass
+            - name: NEXUS_API_URL
+              value: ${NEXUS_API_URL}
           resources:
             requests:
               cpu: "250m"
@@ -776,6 +778,8 @@ spec:
               value: "false"
             - name: STORAGE_BASE_DIR
               value: "/data/insight"
+            - name: NEXUS_API_URL
+              value: ${NEXUS_API_URL}
           resources:
             requests:
               memory: "512Mi"

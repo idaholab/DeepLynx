@@ -3,6 +3,7 @@
 
 import {
   ArrowDownTrayIcon,
+  ArrowTopRightOnSquareIcon,
   CheckCircleIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -37,14 +38,37 @@ interface PropertyRow {
   copyAriaLabel?: string;
   idleIconClassName?: string;
   copiedIconClassName?: string;
+  isLink?: boolean;
+}
+
+function isUrl(s: string): boolean {
+  try {
+    const url = new URL(s);
+    // Only accept http/https (and optionally ftp) — excludes file:// and others
+    return ['http:', 'https:'].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function isValidUri(uri: string): boolean {
+  return uri.trim().length > 0 && uri.toLowerCase() !== "null";
+}
+
+/** @returns whether the record may be downloaded, redirected, or neither depending on detected URI type. */
+export function uriPermission(uri?: string | null, fileTransfers?: boolean): "download" | "redirect" | "none" | "downloadBlocked" {
+  if (!uri || !isValidUri(uri)) return "none";
+  if (isUrl(uri)) return "redirect";
+  if (fileTransfers) return "download";
+  return "downloadBlocked";
 }
 
 interface PropertyTableProps {
   title?: string;
   rows: PropertyRow[];
   className?: string;
-  download?: boolean;
   recordName?: string | null;
+  uri?: string;
   onEditProperties?: () => void;
 }
 
@@ -52,8 +76,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   title,
   rows,
   className,
-  download = false,
   recordName,
+  uri,
   onEditProperties,
 }) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -72,6 +96,14 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const [isPresignedUrl, setIsPresignedUrl] = useState<boolean>(false);
   const [preparingDownload, setPreparingDownload] = useState<boolean>(false);
 
+  const { organization, hasLoaded } = useOrganizationSession();
+
+  const uriType = uriPermission(uri, !organization?.disableFileTransfer);
+  const download = (uriType === "download");
+  const downloadBlocked = (uriType === "downloadBlocked");
+  const redirect = (uriType === "redirect");
+  const show = (uri !== undefined);
+
   const searchParams = useSearchParams();
   const [isFolder, setIsFolder] = useState(false);
   const isFolderRef = useRef(false);
@@ -80,9 +112,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const recordIdParam = searchParams.get("recordId");
   const projectId = projectIdParam ? Number(projectIdParam) : NaN;
   const recordId = recordIdParam ? Number(recordIdParam) : NaN;
-  const canDownload = Number.isFinite(projectId) && Number.isFinite(recordId);
+  const canDownload = !downloadBlocked && Number.isFinite(projectId) && Number.isFinite(recordId);
   const { t } = useLanguage();
-  const { organization, hasLoaded } = useOrganizationSession();
 
   useEffect(() => {
     isFolderRef.current = isFolder;
@@ -386,6 +417,17 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                         String(row.nestedRows?.length ?? 0),
                       )}
                   </span>
+                ) : row.isLink &&
+                  typeof row.value === "string" &&
+                  isUrl(row.value) ? (
+                  <a
+                    href={row.value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="link link-primary break-all"
+                  >
+                    {row.value}
+                  </a>
                 ) : (
                   row.value
                 )}
@@ -469,7 +511,13 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                 </button>
               )}
 
-              {download && (
+              {show && redirect && (
+                <a href={uri} target="_blank" rel="noopener noreferrer">
+                  <ArrowTopRightOnSquareIcon className="w-8 h-8" />
+                </a>
+              )}
+
+              {show && (download || downloadBlocked) && (
                 <div className="flex items-center gap-3">
                   {/* Status indicator - show during preparation or for presigned URL downloads */}
                   {downloading && (preparingDownload || isPresignedUrl) && !showProgressBar && !isFolder && (

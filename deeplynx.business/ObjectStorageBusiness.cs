@@ -11,12 +11,14 @@ namespace deeplynx.business;
 public class ObjectStorageBusiness : IObjectStorageBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly IFileBusiness _fileAzureBusiness;
     private readonly EncryptionHelper _encryptionHelper;
 
-    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper)
+    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper, IFileBusiness fileAzureBusiness)
     {
         _encryptionHelper = encryptionHelper;
         _context = context;
+        _fileAzureBusiness = fileAzureBusiness;
     }
 
     /// <summary>
@@ -108,11 +110,13 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     /// <param name="organizationId">The ID of the organization to which the object storage belongs</param>
     /// <param name="projectId">The ID of the project to which the object storage belongs</param>
     /// <param name="dto">A data transfer object with details on the new object storage to be created.</param>
+    /// <param name="createContainer">A bool to create a container</param>
     public async Task<ObjectStorageResponseDto> CreateObjectStorage(
         long currentUserId,
         long organizationId,
         long? projectId,
-        CreateObjectStorageRequestDto dto)
+        CreateObjectStorageRequestDto dto,
+        bool createContainer = true)
     {
         ValidationHelper.ValidateModel(dto);
 
@@ -165,52 +169,65 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         using var transaction = await _context.Database.BeginTransactionAsync();
 
-        try
+        if (hasAzure && createContainer && !dto.Config.AzureObjectConfig.ExistingContainer)
         {
-            var newObjectStorage = new ObjectStorage
+            string containerName;
+            if (projectId == null)
             {
-                Name = dto.Name,
-                Type = type,
-                Default = dto.Default,
-                ProjectId = projectId,
-                OrganizationId = organizationId,
-                ConfigEncrypted = SerializeAndEncryptConfig(dto.Config),
-                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-                LastUpdatedBy = currentUserId
-            };
-
-            _context.ObjectStorages.Add(newObjectStorage);
-            await _context.SaveChangesAsync();
-
-            // reset the defaults at the project or org level
-            if (dto.Default)
+                containerName = ContainerName.UniqueContainerNameFromString(dto.Config.AzureObjectConfig?.AzureContainerName ?? "container");
+            }
+            else
             {
-                if (projectId.HasValue)
-                    await ResetProjectDefaults(projectId.Value, newObjectStorage.Id);
-                else
-                    await ResetOrganizationDefaults(organizationId, newObjectStorage.Id);
+                containerName = dto.Config.AzureObjectConfig?.AzureContainerName ?? ContainerName.UniqueContainerNameFromString("container");
             }
 
-            await transaction.CommitAsync();
+            dto.Config.AzureObjectConfig?.AzureContainerName = containerName;
 
-            return new ObjectStorageResponseDto
-            {
-                Id = newObjectStorage.Id,
-                Name = newObjectStorage.Name,
-                Type = newObjectStorage.Type,
-                ProjectId = newObjectStorage.ProjectId,
-                OrganizationId = newObjectStorage.OrganizationId,
-                Default = newObjectStorage.Default,
-                LastUpdatedAt = newObjectStorage.LastUpdatedAt,
-                LastUpdatedBy = newObjectStorage.LastUpdatedBy,
-                IsArchived = newObjectStorage.IsArchived
-            };
+            await _fileAzureBusiness.CreateContainer(
+                organizationId: organizationId,
+                containerName: containerName,
+                connectionString: dto.Config.AzureObjectConfig?.AzureConnectionString,
+                existingContainer: dto.Config.AzureObjectConfig.ExistingContainer);
         }
-        catch
+        var newObjectStorage = new ObjectStorage
         {
-            await transaction.RollbackAsync();
-            throw new Exception("Unable to create object storage");
+            Name = dto.Name,
+            Type = type,
+            Default = dto.Default,
+            ProjectId = projectId,
+            OrganizationId = organizationId,
+            ConfigEncrypted = SerializeAndEncryptConfig(dto.Config),
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = currentUserId
+        };
+
+        _context.ObjectStorages.Add(newObjectStorage);
+        await _context.SaveChangesAsync();
+
+        // reset the defaults at the project or org level
+        if (dto.Default)
+        {
+            if (projectId.HasValue)
+                await ResetProjectDefaults(projectId.Value, newObjectStorage.Id);
+            else
+                await ResetOrganizationDefaults(organizationId, newObjectStorage.Id);
         }
+
+
+        await transaction.CommitAsync();
+
+        return new ObjectStorageResponseDto
+        {
+            Id = newObjectStorage.Id,
+            Name = newObjectStorage.Name,
+            Type = newObjectStorage.Type,
+            ProjectId = newObjectStorage.ProjectId,
+            OrganizationId = newObjectStorage.OrganizationId,
+            Default = newObjectStorage.Default,
+            LastUpdatedAt = newObjectStorage.LastUpdatedAt,
+            LastUpdatedBy = newObjectStorage.LastUpdatedBy,
+            IsArchived = newObjectStorage.IsArchived
+        };
     }
 
     /// <summary>
@@ -623,4 +640,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
     }
+
+
 }

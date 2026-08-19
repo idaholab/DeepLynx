@@ -30,7 +30,7 @@
     "graphology-types": "^0.24.8",
     "jsonwebtoken": "9.0.2",
     "motion": "^12.18.1",
-    "next": "16.2.10",
+    "next": "^16.2.11",
     "next-auth": "5.0.0-beta.30",
     "papaparse": "^5.5.3",
     "react": "19.2.7",
@@ -44,6 +44,7 @@
     "sigma": "^3.0.2",
     "slick-carousel": "^1.8.1",
     "usehooks-ts": "^3.1.1",
+    "uuid": "^14.0.1",
     "zod": "^4.3.5"
   },
   "devDependencies": {

@@ -4,6 +4,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 
 namespace deeplynx.api.Controllers;
 
@@ -303,7 +304,7 @@ public class OrganizationController : ControllerBase
     /// <param name="userName"></param>
     /// <returns></returns>
     [HttpPost("{organizationId:long}/invite", Name = "api_invite_user_to_organization")]
-    [ProjectAdmin(unscoped: true)] 
+    [ProjectAdmin(unscoped: true)]
     public async Task<ActionResult> InviteUserToOrganization(
         long organizationId,
         [FromQuery] string? userEmail,
@@ -325,4 +326,93 @@ public class OrganizationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Remove a Organization Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <returns>True if file was sucessfully deleted</returns>
+    [HttpDelete("{organizationId}/logo/delete", Name = "api_delete_organization_logo")]
+    [OrgAdmin]
+    [Sensitivity("delete file")]
+    public async Task<IActionResult> RemoveOrganizationLogo(
+        long organizationId)
+    {
+        try
+        {
+            var success = await _organizationBusiness.RemoveLogoFileAsync(organizationId);
+
+            if (!success)
+            {
+                return NotFound(new { message = "Active logo file not found or already deleted." });
+            }
+
+            return Ok(new { message = "Active logo file successfully removed." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to remove active logo file for organization {organizationId}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
+    }
+
+    /// <summary>
+    ///     Get an Organization Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <returns>File stream of the logo bytes</returns>
+    [HttpGet("{organizationId}/logo/image", Name = "api_get_organization_image")]
+    public async Task<IActionResult> GetOrganizationLogoImage(
+        long organizationId)
+    {
+        try
+        {
+            var result = await _organizationBusiness.GetOrganizationLogoStreamAsync(organizationId);
+            if (result == null)
+                return NotFound();
+
+            var (logoStream, fullPath) = result.Value;
+
+
+            var provider = new FileExtensionContentTypeProvider();
+            if (!provider.TryGetContentType(fullPath, out var contentType))
+            {
+                contentType = "application/octet-stream";
+            }
+
+            return File(logoStream, contentType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error retrieving logo image for organization {organizationId}");
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    /// <summary>
+    ///     Upload a Organization Logo
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="file">The file to upload</param>
+    /// <returns>File path for the logo</returns>
+    [HttpPost("{organizationId}/logo", Name = "api_upload_organization_logo")]
+    [OrgAdmin]
+    [Sensitivity("upload file")]
+    public async Task<IActionResult> UploadOrganizationLogoV1(
+        long organizationId,
+        IFormFile file)
+    {
+        try
+        {
+            var logoUri = await _organizationBusiness.UploadOrganizationLogo(organizationId, file);
+
+            return Ok(new { message = "Logo uploaded successfully", logoUri });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to upload Organization logo for organization {organizationId}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
+    }
+
 }
