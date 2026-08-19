@@ -192,7 +192,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       }
 
       try {
-        const relationshipData = await getAllRelationships(projectId, false);
+        const { items: relationshipData } = await getAllRelationships(projectId, false);
 
         if (cancelled) return;
 
@@ -345,6 +345,23 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
   useEffect(() => {
     resetClassPagination();
   }, [classSearch, resetClassPagination]);
+
+  const {
+    currentPage: relationshipPage,
+    pageSize: relationshipPageSize,
+    paginatedItems: paginatedRelationships,
+    resetPagination: resetRelationshipPagination,
+    setCurrentPage: setRelationshipPage,
+    setPageSize: setRelationshipPageSize,
+    totalPages: relationshipTotalPages,
+  } = useLocalPagination({
+    items: filteredRelationships,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetRelationshipPagination();
+  }, [relationshipSearch, resetRelationshipPagination]);
 
   const relationshipCountForClass = (classId: number) =>
     relationships.filter(
@@ -740,55 +757,60 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
               : t.translations.NO_RELATIONSHIPS_FOUND_IN_DATABASE,
           )
         ) : (
-          <div
-            className={`overflow-x-auto rounded-lg border border-base-300/50 ${filteredRelationships.length > 5
-              ? "max-h-[22rem] overflow-y-auto"
-              : ""
-              }`}
-          >
-            <table className="table">
-              <thead className="bg-base-200">
-                <tr>
-                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.NAME}</th>
-                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.DIRECTION}</th>
-                  <th className="sticky top-0 z-10 bg-base-200">{t.translations.STATUS}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRelationships.map((item) => {
-                  const isSelected =
-                    selection?.kind === "relationship" &&
-                    selection.id === item.id;
+          <>
+            <div className="overflow-x-auto rounded-lg border border-base-300/50">
+              <table className="table">
+                <thead className="bg-base-200">
+                  <tr>
+                    <th className="sticky top-0 z-10 bg-base-200">{t.translations.NAME}</th>
+                    <th className="sticky top-0 z-10 bg-base-200">{t.translations.DIRECTION}</th>
+                    <th className="sticky top-0 z-10 bg-base-200">{t.translations.STATUS}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedRelationships.map((item) => {
+                    const isSelected =
+                      selection?.kind === "relationship" &&
+                      selection.id === item.id;
 
-                  return (
-                    <tr
-                      key={item.id}
-                      className={`cursor-pointer transition-colors ${isSelected ? "bg-primary/10" : "hover"
-                        }`}
-                      onClick={() => focusRelationship(item.id)}
-                    >
-                      <td>
-                        <div className="font-medium">{item.name}</div>
-                      </td>
-                      <td className="text-sm text-base-content/70">
-                        {(item.originId && classLookup.get(item.originId)) ||
-                          t.translations.UNASSIGNED}
-                        {" -> "}
-                        {(item.destinationId &&
-                          classLookup.get(item.destinationId)) ||
-                          t.translations.UNASSIGNED}
-                      </td>
-                      <td>
-                        <span className={statusClass(item.isArchived)}>
-                          {item.isArchived ? t.translations.ARCHIVED_BADGE : t.translations.ACTIVE}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    return (
+                      <tr
+                        key={item.id}
+                        className={`cursor-pointer transition-colors ${isSelected ? "bg-primary/10" : "hover"
+                          }`}
+                        onClick={() => focusRelationship(item.id)}
+                      >
+                        <td>
+                          <div className="font-medium">{item.name}</div>
+                        </td>
+                        <td className="text-sm text-base-content/70">
+                          {(item.originId && classLookup.get(item.originId)) ||
+                            t.translations.UNASSIGNED}
+                          {" -> "}
+                          {(item.destinationId &&
+                            classLookup.get(item.destinationId)) ||
+                            t.translations.UNASSIGNED}
+                        </td>
+                        <td>
+                          <span className={statusClass(item.isArchived)}>
+                            {item.isArchived ? t.translations.ARCHIVED_BADGE : t.translations.ACTIVE}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <PaginationControls
+              currentPage={relationshipPage}
+              pageSize={relationshipPageSize}
+              totalPages={relationshipTotalPages}
+              onPageChange={setRelationshipPage}
+              onPageSizeChange={setRelationshipPageSize}
+            />
+          </>
         )}
       </div>
     </div>

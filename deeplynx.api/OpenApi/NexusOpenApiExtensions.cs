@@ -161,27 +161,64 @@ internal static class NexusOpenApiExtensions
                     }
                 };
 
+                if (documentName == "v2")
+                {
+                    document.Components.Schemas ??= new Dictionary<string, IOpenApiSchema>();
+
+                    document.Components.Schemas["ProblemDetails"] = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.Object,
+                        Properties = new Dictionary<string, IOpenApiSchema>
+                        {
+                            ["type"] = new OpenApiSchema { Type = JsonSchemaType.String, Description = "A URI reference identifying the problem type" },
+                            ["title"] = new OpenApiSchema { Type = JsonSchemaType.String, Description = "A short, human-readable summary of the problem" },
+                            ["status"] = new OpenApiSchema { Type = JsonSchemaType.Integer, Description = "The HTTP status code" },
+                            ["detail"] = new OpenApiSchema { Type = JsonSchemaType.String, Description = "A human-readable explanation specific to this occurrence" },
+                            ["instance"] = new OpenApiSchema { Type = JsonSchemaType.String, Description = "A URI reference identifying the specific occurrence" }
+                        }
+                    };
+                }
+
                 return Task.CompletedTask;
             });
 
-            options.AddOperationTransformer((operation, context, cancellationToken) =>
+            if (documentName == "v2")
             {
-                operation.Responses ??= new OpenApiResponses();
-                operation.Responses.TryAdd("401", new OpenApiResponse
+                options.AddOperationTransformer((operation, context, cancellationToken) =>
                 {
-                    Description = "Unauthorized - Invalid or missing authentication token"
-                });
-                operation.Responses.TryAdd("403", new OpenApiResponse
-                {
-                    Description = "Forbidden - Insufficient permissions"
-                });
-                operation.Responses.TryAdd("500", new OpenApiResponse
-                {
-                    Description = "Internal Server Error"
-                });
+                    operation.Responses ??= new OpenApiResponses();
 
-                return Task.CompletedTask;
-            });
+                    operation.Responses.TryAdd("401", CreateProblemDetailsResponse("Unauthorized - Invalid or missing authentication token"));
+                    operation.Responses.TryAdd("403", CreateProblemDetailsResponse("Forbidden - Insufficient permissions"));
+                    operation.Responses.TryAdd("404", CreateProblemDetailsResponse("Not Found - The requested resource does not exist"));
+                    operation.Responses.TryAdd("409", CreateProblemDetailsResponse("Conflict - The request could not be completed due to a conflict with current state"));
+                    operation.Responses.TryAdd("500", CreateProblemDetailsResponse("Internal Server Error"));
+
+                    return Task.CompletedTask;
+                });
+            }
+            else
+            {
+                options.AddOperationTransformer((operation, context, cancellationToken) =>
+                {
+                    operation.Responses ??= new OpenApiResponses();
+                    operation.Responses.TryAdd("401", new OpenApiResponse
+                    {
+                        Description = "Unauthorized - Invalid or missing authentication token"
+                    });
+                    operation.Responses.TryAdd("403", new OpenApiResponse
+                    {
+                        Description = "Forbidden - Insufficient permissions"
+                    });
+                    operation.Responses.TryAdd("500", new OpenApiResponse
+                    {
+                        Description = "Internal Server Error"
+                    });
+
+                    return Task.CompletedTask;
+                });
+            }
+
 
             options.AddOperationTransformer((operation, context, cancellationToken) =>
             {
@@ -354,5 +391,20 @@ internal static class NexusOpenApiExtensions
         content.Remove("application/*+json");
         if (removePlainText && jsonMediaType.Schema?.Type != JsonSchemaType.String)
             content.Remove("text/plain");
+    }
+
+    private static OpenApiResponse CreateProblemDetailsResponse(string description)
+    {
+        return new OpenApiResponse
+        {
+            Description = description,
+            Content = new Dictionary<string, OpenApiMediaType>
+            {
+                ["application/problem+json"] = new()
+                {
+                    Schema = new OpenApiSchemaReference("ProblemDetails")
+                }
+            }
+        };
     }
 }

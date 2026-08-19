@@ -41,9 +41,9 @@ export default async function Page({ params }: Props) {
     redirect("/select-org");
   }
 
-  const ProjectResponseDtos = (await getAllProjectsServer(
+  const { items: ProjectResponseDtos } = (await getAllProjectsServer(
     organizationId as number
-  )) as ProjectResponseDto[];
+  ));
   const initialProjects = ProjectResponseDtos.map((p) =>
     toProjectResponseDtos(p)
   );

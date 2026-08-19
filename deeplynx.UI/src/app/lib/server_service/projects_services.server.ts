@@ -2,6 +2,7 @@
 import "server-only";
 import {
   ProjectResponseDto,
+  PaginatedResponse,
   ProjectStatResponseDto,
   ProjectMemberResponseDto,
 } from "../../(home)/types/responseDTOs";
@@ -14,20 +15,32 @@ import { apiFetch, asJson } from "./api.server";
 
 export async function getAllProjectsServer(
   organizationId?: number,
-  hideArchived: boolean = true
-): Promise<ProjectResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<ProjectResponseDto>> {
   // If no organizationId provided, return empty array or fetch from a different endpoint
   if (!organizationId) {
-    return [];
+    return {
+      items: [],
+      pageNumber,
+      pageSize,
+      totalCount: 0,
+      totalPages: 0,
+      hasPrevious: false,
+      hasNext: false
+    };
   }
 
   const params = new URLSearchParams();
   params.append("hideArchived", String(hideArchived));
+  params.append("pageNumber", String(pageNumber));
+  params.append("pageSize", String(pageSize));
 
   const res = await apiFetch(
     `/organizations/${organizationId}/projects?${params.toString()}`
   );
-  return asJson<ProjectResponseDto[]>(res);
+  return asJson<PaginatedResponse<ProjectResponseDto>>(res);
 }
 
 export async function createProjectServer(

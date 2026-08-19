@@ -861,7 +861,7 @@ public class UserBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region CreateTestAccount Tests
 
     [Fact]
@@ -1305,6 +1305,314 @@ public class UserBusinessTests : IntegrationTestBase
         Context.Users.Add(serviceAccount);
         await Context.SaveChangesAsync();
         return serviceAccount.Id;
+    }
+
+    #endregion
+
+    #region GetAllUsersPaginated Tests
+
+    [Fact]
+    public async Task GetAllUsersPaginated_NoFilters_ReturnsAllNonArchivedUsers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null);
+
+        // Assert
+        Assert.Equal(9, result.TotalCount);
+        Assert.Equal(9, result.Items.Count);
+        Assert.All(result.Items, u => Assert.False(u.IsArchived));
+        Assert.Contains(result.Items, u => u.Id == uid5);
+        Assert.DoesNotContain(result.Items, u => u.Id == uid2); // archived
+        Assert.DoesNotContain(result.Items, u => u.Id == uid3); // archived
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_FilterByProjectId_ReturnsOnlyProjectMembers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, pid, null);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.All(result.Items, u => Assert.False(u.IsArchived));
+        Assert.Contains(result.Items, u => u.Id == uid1);
+        Assert.Contains(result.Items, u => u.Id == ouid2);
+        Assert.Contains(result.Items, u => u.Id == guid1); // group is project member
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_FilterByOrganizationId_ReturnsOnlyOrgMembers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, oid);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.All(result.Items, u => Assert.False(u.IsArchived));
+        Assert.Contains(result.Items, u => u.Id == ouid1);
+        Assert.Contains(result.Items, u => u.Id == ouid2);
+        Assert.Contains(result.Items, u => u.Id == guid2); // group is in organization
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_FilterByBothProjectAndOrg_ReturnsUsersInBoth()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, pid, oid);
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Contains(result.Items, u => u.Id == ouid2); // ou2 is in both org and proj
+        Assert.DoesNotContain(result.Items, u => u.Id == ouid1); // ou1 is not in proj
+        Assert.DoesNotContain(result.Items, u => u.Id == uid4); // u4 is not in org
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_FilterByNonExistentProject_ReturnsEmpty()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, pid4, null);
+
+        // Assert
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_FilterByNonExistentOrg_ReturnsEmpty()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, oid2);
+
+        // Assert
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_IncludeArchived_ReturnsAllUsers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null, includeArchived: true);
+
+        // Assert
+        Assert.Equal(10, result.TotalCount);
+        Assert.Equal(10, result.Items.Count);
+        Assert.Contains(result.Items, u => u.Id == uid2);
+        Assert.DoesNotContain(result.Items, u => u.Id == uid3); // hard-deleted, not just archived
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_ExcludeArchived_OmitsArchivedUsers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null, includeArchived: false);
+
+        // Assert
+        Assert.Equal(9, result.TotalCount);
+        Assert.All(result.Items, u => Assert.False(u.IsArchived));
+        Assert.DoesNotContain(result.Items, u => u.Id == uid2);
+        Assert.DoesNotContain(result.Items, u => u.Id == uid3);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_ExcludesServiceAccounts_ByDefault()
+    {
+        // Arrange
+        var serviceAccountId = await CreateServiceAccount();
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, u => u.Id == serviceAccountId);
+        Assert.All(result.Items, u => Assert.Equal(AccountType.Standard, u.AccountType));
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_IncludeServiceAccounts_ReturnsServiceAccounts()
+    {
+        // Arrange
+        var serviceAccountId = await CreateServiceAccount();
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null, includeServiceAccounts: true);
+
+        // Assert
+        Assert.Contains(result.Items, u => u.Id == serviceAccountId && u.AccountType == AccountType.Service);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_ExcludesTestAccounts_ByDefault()
+    {
+        // Arrange
+        var testAccount = await _userBusiness.CreateTestAccount("Test Account");
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, u => u.Id == testAccount.Id);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_IncludeTestAccounts_ReturnsTestAccounts()
+    {
+        // Arrange
+        var testAccount = await _userBusiness.CreateTestAccount("Test Account");
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null, includeTestAccounts: true);
+
+        // Assert
+        Assert.Contains(result.Items, u => u.Id == testAccount.Id && u.AccountType == AccountType.Test);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_ReturnsCorrectMetadata_ForRequestedPage()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 3 }, null, null);
+
+        // Assert
+        Assert.Equal(9, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(3, result.PageSize);
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(3, result.TotalPages);
+        Assert.False(result.HasPrevious);
+        Assert.True(result.HasNext);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_MiddlePage_HasPreviousAndNext()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 2, PageSize = 3 }, null, null);
+
+        // Assert
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(3, result.Items.Count);
+        Assert.True(result.HasPrevious);
+        Assert.True(result.HasNext);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_LastPage_HasPreviousOnly()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 3, PageSize = 3 }, null, null);
+
+        // Assert
+        Assert.Equal(3, result.PageNumber);
+        Assert.Equal(3, result.Items.Count);
+        Assert.True(result.HasPrevious);
+        Assert.False(result.HasNext);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_PagesCoverAllUsersWithoutDuplicates()
+    {
+        // Act
+        var page1 = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 3 }, null, null);
+        var page2 = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 2, PageSize = 3 }, null, null);
+        var page3 = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 3, PageSize = 3 }, null, null);
+
+        // Assert
+        var allIds = page1.Items.Select(u => u.Id)
+            .Concat(page2.Items.Select(u => u.Id))
+            .Concat(page3.Items.Select(u => u.Id))
+            .ToList();
+
+        Assert.Equal(9, allIds.Count);
+        Assert.Equal(allIds.Count, allIds.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_PageBeyondResults_ReturnsEmptyItems()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 99, PageSize = 3 }, null, null);
+
+        // Assert
+        Assert.Equal(9, result.TotalCount);
+        Assert.Empty(result.Items);
+        Assert.True(result.HasPrevious);
+        Assert.False(result.HasNext);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_NullDto_FallsBackToDefaultPagination()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(null, null, null);
+
+        // Assert
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(25, result.PageSize);
+        Assert.Equal(9, result.TotalCount);
+        Assert.Equal(9, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_IsOrgAdmin_ReflectsOrgAdminStatusWhenOrgSpecified()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, oid);
+
+        // Assert
+        Assert.All(result.Items, u => Assert.NotNull(u.IsOrgAdmin));
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_IsOrgAdmin_NullWhenNoOrgSpecified()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null);
+
+        // Assert
+        Assert.All(result.Items, u => Assert.Null(u.IsOrgAdmin));
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_PageSizeNegativeOne_ReturnsAllUsersInSinglePage()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }, null, null);
+
+        // Assert
+        Assert.Equal(9, result.TotalCount);
+        Assert.Equal(9, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(9, result.PageSize); // PageSize collapses to item count when returning all
+        Assert.Equal(1, result.TotalPages);
+        Assert.False(result.HasPrevious);
+        Assert.False(result.HasNext);
     }
 
     #endregion

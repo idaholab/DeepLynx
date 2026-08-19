@@ -239,6 +239,124 @@ public class TagBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetAllTagsPaginated Tests
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ValidProjectId_ReturnsActiveProjectAndOrgTags()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Items, t => Assert.Equal(oid, t.OrganizationId));
+        Assert.All(result.Items, t => Assert.False(t.IsArchived));
+        Assert.Equal(3, result.TotalCount);
+        Assert.Contains(result.Items, t => t.Id == tid);
+        Assert.Contains(result.Items, t => t.Id == tid2);
+        Assert.Contains(result.Items, t => t.Id == tid5);
+        Assert.DoesNotContain(result.Items, t => t.Id == tid3);
+        Assert.DoesNotContain(result.Items, t => t.Id == tid4);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ValidProjectId_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: false, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Items, t => Assert.Equal(oid, t.OrganizationId));
+        Assert.Equal(4, result.TotalCount);
+        Assert.Contains(result.Items, t => t.IsArchived);
+        Assert.Contains(result.Items, t => t.Id == tid);
+        Assert.Contains(result.Items, t => t.Id == tid2);
+        Assert.Contains(result.Items, t => t.Id == tid5);
+        Assert.DoesNotContain(result.Items, t => t.Id == tid4);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ProjectWithNoTags_ReturnsOrgInheritedTag()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid3], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_DifferentProject_ReturnsOrgInheritedTags()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(3, result.TotalCount);
+        Assert.All(result.Items, t => Assert.Equal(oid, t.OrganizationId));
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ReturnsAll_WhenPageSizeIsMinusOne()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 5, PageSize = -1 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
+        Assert.Equal(result.TotalCount, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_PaginatesCorrectly()
+    {
+        // Arrange
+        var pageSize = 2;
+        var firstPageRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = pageSize };
+        var secondPageRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = pageSize };
+
+        // Act
+        var firstPage = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], firstPageRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+        var secondPage = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], secondPageRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(firstPage);
+        Assert.NotNull(secondPage);
+
+        Assert.Equal(firstPage.TotalCount, secondPage.TotalCount);
+
+        Assert.Equal(pageSize, firstPage.Items.Count);
+        Assert.True(secondPage.Items.Count <= pageSize);
+
+        var firstPageIds = firstPage.Items.Select(t => t.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(t => t.Id).ToHashSet();
+
+        Assert.Empty(firstPageIds.Intersect(secondPageIds)); // no overlap
+    }
+
+    #endregion
+
+
     #region GetTag Tests
 
     [Fact]

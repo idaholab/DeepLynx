@@ -25,4 +25,5 @@ export const createMetadataUploadSchema = (t: MetadataSchemaTranslations) =>
     Properties: z
       .record(z.string(), z.unknown())
       .or(z.object({}).catchall(z.unknown())),
+    Tags: z.array(z.string()).optional(),
   });

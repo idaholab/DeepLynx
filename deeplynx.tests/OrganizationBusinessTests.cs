@@ -244,6 +244,85 @@ public class OrganizationBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetAllOrganizationsPaginated Tests
+
+    [Fact]
+    public async Task GetAllOrganizationsPaginated_ExcludesArchived_WhenHideArchivedTrue()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _organizationBusiness.GetAllOrganizationsForUserPaginated(uid, paginatedRequest, hideArchived: true);
+        var organizations = result.Items.ToList();
+
+        // Assert
+        Assert.All(organizations, o => Assert.False(o.IsArchived));
+        Assert.Contains(organizations, o => o.Id == oid);
+        Assert.DoesNotContain(organizations, o => o.Id == oid2);
+    }
+
+    [Fact]
+    public async Task GetAllOrganizationsPaginated_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _organizationBusiness.GetAllOrganizationsForUserPaginated(uid, paginatedRequest, hideArchived: false);
+        var organizations = result.Items.ToList();
+
+        // Assert
+        Assert.Contains(organizations, o => o.IsArchived);
+        Assert.Contains(organizations, o => o.Id == oid);
+        Assert.Contains(organizations, o => o.Id == oid2);
+    }
+
+    [Fact]
+    public async Task GetAllOrganizationsPaginated_ReturnsAll_WhenPageSizeIsMinusOne()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 5, PageSize = -1 };
+
+        // Act
+        var result = await _organizationBusiness.GetAllOrganizationsForUserPaginated(uid, paginatedRequest, hideArchived: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
+        Assert.Equal(result.TotalCount, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllOrganizationsPaginated_PaginatesCorrectly()
+    {
+        // Arrange
+        var pageSize = 1;
+        var firstPageRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = pageSize };
+        var secondPageRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = pageSize };
+
+        // Act
+        var firstPage = await _organizationBusiness.GetAllOrganizationsForUserPaginated(uid, firstPageRequest, hideArchived: true);
+        var secondPage = await _organizationBusiness.GetAllOrganizationsForUserPaginated(uid, secondPageRequest, hideArchived: true);
+
+        // Assert
+        Assert.NotNull(firstPage);
+        Assert.NotNull(secondPage);
+
+        Assert.Equal(firstPage.TotalCount, secondPage.TotalCount);
+
+        Assert.Equal(pageSize, firstPage.Items.Count);
+        Assert.True(secondPage.Items.Count <= pageSize);
+
+        var firstPageIds = firstPage.Items.Select(o => o.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(o => o.Id).ToHashSet();
+
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    #endregion
+
     #region GetOrganization Tests
 
     [Fact]

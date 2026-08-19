@@ -20,6 +20,7 @@ import toast from "react-hot-toast";
 import { InviteUserToOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
 import {
   GroupResponseDto,
+  PaginatedResponse,
   ProjectMemberResponseDto,
   ProjectResponseDto,
   RoleResponseDto,
@@ -41,6 +42,8 @@ import {
   ProjectMemberTableRow,
   buildTableData,
 } from "../../types/projectUsersTypes";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
 
 /* -------------------------------------------------------------------------- */
 /*                         ProjectUsersTable Component                        */
@@ -98,6 +101,23 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     members: [],
     loading: false,
   });
+
+  const {
+    currentPage,
+    pageSize,
+    paginatedItems,
+    resetPagination,
+    setCurrentPage,
+    setPageSize,
+    totalPages,
+  } = useLocalPagination({
+    items: viewGroupMembersModal.members,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetPagination();
+  }, [viewGroupMembersModal.members, resetPagination]);
 
   /* ------------------------------------------------------------------------ */
   /*                        Confirm Remove / Future Use                       */
@@ -187,7 +207,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     try {
       const users = await getAllUsers(organizationId);
-      setAvailableUsers(users);
+      setAvailableUsers(users.items);
     } catch (error) {
       console.error("Failed to load users:", error);
       toast.error(t.translations.UNABLE_TO_LOAD_USERS);
@@ -233,7 +253,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
         setTableData(buildTableData(updatedMembers));
       } else {
         const updatedMembers = await getAllUsers(organizationId);
-        setTableData(buildTableData(updatedMembers));
+        setTableData(buildTableData(updatedMembers.items));
       }
     } catch (refreshError) {
       console.error("Failed to refresh members list:", refreshError);
@@ -258,8 +278,8 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     setGroupModalLoading(true);
 
     try {
-      const groups = await getAllGroups(organizationId);
-      setAvailableGroups(groups);
+      const { items: paginatedGroups } = await getAllGroups(organizationId);
+      setAvailableGroups(paginatedGroups);
     } catch (error) {
       console.error("Failed to load groups:", error);
       toast.error(t.translations.UNABLE_TO_LOAD_USERS_OR_GROUPS);
@@ -278,7 +298,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     // Fetch asynchronously and cache
     getGroupMembers(organizationId, groupId)
-      .then((groupMembers) => {
+      .then(({ items: groupMembers }) => {
         setGroupMembersCache((prev) =>
           new Map(prev).set(groupId, groupMembers),
         );
@@ -305,16 +325,20 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     try {
       // Use members from cache if it exists, if not fetch API
-      const members = groupMembersCache.has(row.memberId)
+      const paginatedOrArray = groupMembersCache.has(row.memberId)
         ? groupMembersCache.get(row.memberId)!
         : await getGroupMembers(organizationId, row.memberId);
 
-      setGroupMembersCache((prev) => new Map(prev).set(row.memberId, members));
+      const membersArray: UserResponseDto[] = Array.isArray(paginatedOrArray)
+        ? paginatedOrArray
+        : paginatedOrArray.items;
+
+      setGroupMembersCache((prev) => new Map(prev).set(row.memberId, membersArray));
 
       setViewGroupMembersModal({
         isOpen: true,
         groupName: row.name,
-        members,
+        members: membersArray,
         loading: false,
       });
     } catch (error) {
@@ -646,7 +670,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
                   </p>
                 ) : (
                   <div className="py-4 space-y-2 max-h-80 overflow-y-auto">
-                    {viewGroupMembersModal.members.map((user) => (
+                    {paginatedItems.map((user) => (
                       <div key={user.id} className="p-3 rounded-lg bg-base-200">
                         <p className="font-semibold">{user.name || user.email}</p>
                         <p className="text-sm text-base-content/70">{user.email}</p>
@@ -654,6 +678,17 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
                     ))}
                   </div>
                 )}
+
+                {/* Pagination Controls */}
+                <div className="mt-2 flex justify-end">
+                  <PaginationControls
+                    currentPage={currentPage}
+                    pageSize={pageSize}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                </div>
 
                 <div className="modal-action">
                   <button

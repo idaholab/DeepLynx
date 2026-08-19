@@ -176,13 +176,14 @@ public class FileBusiness : IFileControllerBusiness
             Name = metadata?.Name ?? file.FileName,
             ObjectStorageId = objectStorage.Id,
             Description = metadata?.Description ?? file.FileName,
-            OriginalId = metadata?.OriginalId ?? guid.ToString(),
+            OriginalId = string.IsNullOrWhiteSpace(metadata?.OriginalId) ? guid.ToString() : metadata.OriginalId,
             ClassId = resolvedClass.Id,
             ClassName = resolvedClass.Name,
             FileType = fileType,
             Uri = uri,
             FileSize = fileSize,
-            FileContentHash = fileContentHash
+            FileContentHash = fileContentHash,
+            Tags = metadata?.Tags
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
@@ -212,6 +213,7 @@ public class FileBusiness : IFileControllerBusiness
     /// <param name="file">The file to replace the old one</param>
     /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
     /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
+    /// <param name="metadataFile">Optional metadata that will be appended to the updated record</param>
     /// <returns>Record response DTO containing updated file information</returns>
     public async Task<RecordResponseDto> UpdateFile(
         long currentUserId,
@@ -221,7 +223,8 @@ public class FileBusiness : IFileControllerBusiness
         IFormFile file,
         long? vlmConfigId = null,
         long? embeddingModelConfigId = null,
-        string? userJwt = null)
+        string? userJwt = null,
+        IFormFile? metadataFile = null)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
@@ -239,18 +242,63 @@ public class FileBusiness : IFileControllerBusiness
 
         var fileSize = file.Length;
 
+        CreateRecordFileUploadRequestDto? metadata = null;
+        if (metadataFile != null)
+        {
+            using var reader = new StreamReader(metadataFile.OpenReadStream());
+            var metadataJson = await reader.ReadToEndAsync();
+
+            if (string.IsNullOrWhiteSpace(metadataJson))
+                throw new ArgumentException("Metadata file is empty or contains no content.");
+
+            metadata = JsonSerializer.Deserialize<CreateRecordFileUploadRequestDto>(metadataJson)
+                       ?? throw new InvalidOperationException("Failed to deserialize metadata file.");
+
+            ValidationHelper.ValidateModel(metadata);
+        }
+
+        // resolve and combine properties
+        var properties = record.Properties;
+        var updatedProperties = !string.IsNullOrWhiteSpace(properties)
+            ? JsonNode.Parse(properties)!.AsObject()
+            : new JsonObject();
+        updatedProperties["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower();
+        
+        var metadataProperties = metadata?.Properties ?? new JsonObject();
+        foreach (var kvp in metadataProperties.ToList())
+        {
+            updatedProperties[kvp.Key] = kvp.Value?.DeepClone();
+        }
+
+        // resolve class
+        var recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+        var fileExtension = Path.GetExtension(file.FileName).TrimStart('.').ToLower();
+        recordClass = await ExtractTabularRecordMetadata(currentUserId, organizationId, projectId, fileExtension,
+            objectStorage.Type, objectStorage.Config, uri, updatedProperties, recordClass, () => file.OpenReadStream());
+        var resolvedClass = await GetResolvedClass(organizationId, projectId, currentUserId, metadata, recordClass);
+
+        // resolve tags
+        var recordTags = record.Tags?.Select(t => t.Name) ?? Enumerable.Empty<string>();
+        var metadataTags = metadata?.Tags ?? new List<string>();
+        var updatedTags = recordTags
+            .Concat(metadataTags)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         var updateRecordRequest = new UpdateRecordRequestDto
         {
-            Properties = new JsonObject
-            {
-                ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLower()
-            },
-            Name = file.FileName,
+            Properties = updatedProperties,
+            Name = metadata?.Name ?? file.FileName,
+            Description = metadata?.Description ?? record.Description,
+            OriginalId = metadata?.OriginalId ?? record.OriginalId,
+            ClassId = resolvedClass.Id,
+            ClassName = resolvedClass.Name,
             Uri = uri,
-            FileType = Path.GetExtension(file.FileName).TrimStart('.').ToLower(),
+            FileType = fileExtension,
             FileSize = fileSize,
             FileContentHash = fileContentHash,
-            ReplaceFileContentHash = true
+            ReplaceFileContentHash = true,
+            Tags = updatedTags
         };
 
         var updatedRecord = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
@@ -591,13 +639,14 @@ public class FileBusiness : IFileControllerBusiness
             Name = metadata?.Name ?? request.FileName,
             ObjectStorageId = objectStorage.Id,
             Description = metadata?.Description ?? $"File uploaded via chunked upload (session: {request.UploadId})",
-            OriginalId = metadata?.OriginalId ?? guid.ToString(),
+            OriginalId = string.IsNullOrWhiteSpace(metadata?.OriginalId) ? guid.ToString() : metadata.OriginalId,
             Uri = uri,
             ClassId = resolvedClass.Id,
             ClassName = resolvedClass.Name,
             FileType = fileExtension,
             FileSize = fileSize,
-            FileContentHash = fileContentHash
+            FileContentHash = fileContentHash,
+            Tags = metadata?.Tags
         };
 
         var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
@@ -628,6 +677,7 @@ public class FileBusiness : IFileControllerBusiness
     /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if the record is embedded</param>
     /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if the record is embedded</param>
     /// <param name="userJwt">User JWT for Insight embedding calls</param>
+    /// <param name="metadata">Additional metadata that will be appended to the record</param>
     /// <returns>Record response DTO containing updated file information</returns>
     public async Task<RecordResponseDto> CompleteUpdateUpload(
         long currentUserId,
@@ -637,7 +687,8 @@ public class FileBusiness : IFileControllerBusiness
         FileUploadCompleteRequestDto request,
         long? vlmConfigId = null,
         long? embeddingModelConfigId = null,
-        string? userJwt = null)
+        string? userJwt = null,
+        CreateRecordFileUploadRequestDto? metadata = null)
     {
         var record = await _recordBusiness.GetRecord(currentUserId, organizationId, projectId, recordId, true);
 
@@ -655,20 +706,50 @@ public class FileBusiness : IFileControllerBusiness
         var fileSize = await fileBusiness.GetFileSize(uri, objectStorage.Config);
         var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
 
+        // resolve properties
+        var properties = record.Properties;
+        var updatedProperties = !string.IsNullOrWhiteSpace(properties)
+            ? JsonNode.Parse(properties)!.AsObject()
+            : new JsonObject();
+        var metadataProperties = metadata?.Properties ?? new JsonObject();
+        foreach (var kvp in metadataProperties.ToList())
+        {
+            updatedProperties[kvp.Key] = kvp.Value?.DeepClone();
+        }
+        updatedProperties["fileType"] = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
+        updatedProperties["uploadedViaChunking"] = true;
+        updatedProperties["originalUploadId"] = request.UploadId;
+
+        // resolve class
+        var recordClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
+        recordClass = await ExtractTabularRecordMetadata(currentUserId, organizationId, projectId, fileExtension,
+            objectStorage.Type, objectStorage.Config, uri, updatedProperties, recordClass, objectStorage.Type == "filesystem" ? () => File.OpenRead(uri) : null);
+        var resolvedClass = await GetResolvedClass(organizationId, projectId, currentUserId, metadata, recordClass);
+
+        // resolve tags
+        var recordTags = record.Tags?.Select(t => t.Name) ?? Enumerable.Empty<string>();
+        var metadataTags = metadata?.Tags ?? new List<string>();
+        var updatedTags = recordTags
+            .Concat(metadataTags)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         await fileBusiness.DeleteFile(record, objectStorage.Config);
 
         var updateRecordRequest = new UpdateRecordRequestDto
         {
-            Properties = new JsonObject
-            {
-                ["fileType"] = fileExtension
-            },
-            Name = request.FileName,
+            Properties = updatedProperties,
+            Name = metadata?.Name ?? request.FileName,
+            Description = metadata?.Description ?? record.Description,
+            OriginalId = metadata?.OriginalId ?? record.OriginalId,
+            ClassId = resolvedClass.Id,
+            ClassName = resolvedClass.Name,
             Uri = uri,
             FileType = fileExtension,
             FileSize = fileSize,
             FileContentHash = fileContentHash,
-            ReplaceFileContentHash = true
+            ReplaceFileContentHash = true,
+            Tags = updatedTags
         };
 
         var updatedRecord = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId,
@@ -1040,7 +1121,7 @@ public class FileBusiness : IFileControllerBusiness
                 Name = recordName,
                 ObjectStorageId = objectStorage.Id,
                 Description = metadata?.Description ?? $"File uploaded via chunked upload (session: {uploadId})",
-                OriginalId = metadata?.OriginalId ?? guid.ToString(),
+                OriginalId = string.IsNullOrWhiteSpace(metadata?.OriginalId) ? guid.ToString() : metadata.OriginalId,
                 Uri = uri,
                 ClassId = resolvedClass.Id,
                 ClassName = resolvedClass.Name,

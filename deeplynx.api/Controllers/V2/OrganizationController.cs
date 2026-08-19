@@ -42,36 +42,39 @@ public class OrganizationController : ControllerBase
     ///     Get All Organizations
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
+    /// <param name="paginatedRequestDto"> Pagination parameters</param>
     /// <returns>A list of organizations visible to the current user.</returns>
     [HttpGet(Name = "api_get_all_organizations")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizations(
-        [FromQuery] bool hideArchived = true)
+    public async Task<ActionResult<PaginatedResponse<OrganizationResponseDto>>> GetAllOrganizations(
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+        paginatedRequestDto ??= new PaginatedRequestDto();
         var userId = UserContextStorage.UserId;
         var isSysAdmin = UserContextStorage.IsSysAdmin;
         var organizations = await _organizationBusiness
-            .GetAllOrganizations(userId, hideArchived, isSysAdmin);
+            .GetAllOrganizationsPaginated(userId, paginatedRequestDto, hideArchived, isSysAdmin);
         return Ok(organizations);
     }
-
-
 
 
     /// <summary>
     ///     Get Organizations for User
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide or show archived orgs</param>
+    /// <param name="paginatedRequestDto"> Pagination parameters</param>
     /// <returns>A list of organizations associated with the current user.</returns>
     [HttpGet("user", Name = "api_get_organizations_for_user")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<ActionResult<IEnumerable<OrganizationResponseDto>>> GetAllOrganizationsForUser(
-        [FromQuery] bool hideArchived = true)
+    public async Task<ActionResult<PaginatedResponse<OrganizationResponseDto>>> GetAllOrganizationsForUser(
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
         var currentUserId = UserContextStorage.UserId;
         var isSysAdmin = UserContextStorage.IsSysAdmin;
         var organizations = await _organizationBusiness
-            .GetAllOrganizationsForUser(currentUserId, hideArchived, isSysAdmin);
+            .GetAllOrganizationsForUserPaginated(currentUserId, paginatedRequestDto, hideArchived, isSysAdmin);
         return Ok(organizations);
     }
 

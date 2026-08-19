@@ -1,21 +1,25 @@
 'use client';
 
 import { CreateOauthApplicationRequestDto, UpdateOauthApplicationRequestDto } from "@/app/(home)/types/requestDTOs";
-import { OauthApplicationResponseDto, OauthApplicationSecureResponseDto } from "@/app/(home)/types/responseDTOs";
+import { DeviceVerificationLookupResponseDto, OauthApplicationResponseDto, OauthApplicationSecureResponseDto, PaginatedResponse } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 /**
  * Get all OAuth applications
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all projects (default: -1)
  * @param hideArchived - Flag to hide archived applications (default: true)
  * @returns Promise with array of OauthApplicationResponseDto
  */
 export const getAllOauthApplications = async (
+    pageNumber: number = 1,
+    pageSize: number = -1,
     hideArchived: boolean = true
-): Promise<OauthApplicationResponseDto[]> => {
+): Promise<PaginatedResponse<OauthApplicationResponseDto>> => {
     try {
-        const res = await api.get<OauthApplicationResponseDto[]>(
+        const res = await api.get<PaginatedResponse<OauthApplicationResponseDto>>(
             `/oauth/applications`,
-            { params: { hideArchived } }
+            { params: { pageNumber, pageSize, hideArchived } }
         );
         return res.data;
     } catch (error) {
@@ -127,6 +131,37 @@ export const archiveOauthApplication = async (
         return res.data;
     } catch (error) {
         console.error(`Error ${archive ? 'archiving' : 'unarchiving'} OAuth application ${applicationId}:`, error);
+        throw error;
+    }
+};
+export const getDeviceAuthorizationRequest = async (
+    userCode: string
+): Promise<DeviceVerificationLookupResponseDto> => {
+    try {
+        const res = await api.get<DeviceVerificationLookupResponseDto>(
+            `/oauth/device/verify`,
+            { params: { user_code: userCode } }
+        );
+        return res.data;
+    } catch (error) {
+        console.error("Error fetching device authorization request:", error);
+        throw error;
+    }
+};
+
+export const setDeviceAuthorizationDecision = async (
+    userCode: string,
+    approve: boolean
+): Promise<DeviceVerificationLookupResponseDto> => {
+    try {
+        const res = await api.post<DeviceVerificationLookupResponseDto>(
+            `/oauth/device/verify`,
+            { user_code: userCode, approve },
+            { headers: { "Content-Type": "application/json" } }
+        );
+        return res.data;
+    } catch (error) {
+        console.error("Error setting device authorization decision:", error);
         throw error;
     }
 };
