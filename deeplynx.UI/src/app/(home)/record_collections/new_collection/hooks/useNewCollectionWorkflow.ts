@@ -89,6 +89,9 @@ export function useNewCollectionWorkflow({
     setNewCollectionRecordSearchLoading,
   ] = useState(false);
   const [newCollectionRecordTotalCount, setNewCollectionRecordTotalCount] = useState(0);
+  const [submittedRecordSearchTerm, setSubmittedRecordSearchTerm] = useState("");
+  const [selectAllSearchedRecordsLoading, setSelectAllSearchedRecordsLoading] =
+    useState(false);
   const [enrichingSelectedRecordIds, setEnrichingSelectedRecordIds] = useState<
     number[]
   >([]);
@@ -284,21 +287,37 @@ export function useNewCollectionWorkflow({
   };
 
   const handleSelectAllSearchedRecords = async () => {
-    const query = newCollectionRecordSearchTerm.trim();
+    const query = submittedRecordSearchTerm;
 
-    if (!query) {
-      return;
+    setSelectAllSearchedRecordsLoading(true);
+    try {
+      const response = query
+        ? await fullTextSearchPaginated(
+            organizationId,
+            query,
+            [projectId],
+            1,
+            -1,
+          )
+        : await getMultiProjectRecords(
+            organizationId,
+            [projectId],
+            true,
+            1,
+            -1,
+          );
+
+      await addNewCollectionRecords(response.items);
+    } catch (error) {
+      console.error("Failed to select all searched records:", error);
+      showToast(
+        "error",
+        t.translations.RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS,
+        "toast-top toast-center",
+      );
+    } finally {
+      setSelectAllSearchedRecordsLoading(false);
     }
-
-    const response = await fullTextSearchPaginated(
-      organizationId,
-      query,
-      [projectId],
-      1,
-      -1,
-    );
-
-    await addNewCollectionRecords(response.items);
   };
 
   const deselectNewCollectionRecordsByLabel = (labelName: string) => {
@@ -409,14 +428,26 @@ export function useNewCollectionWorkflow({
       pageSize: number,
     ) => {
       setNewCollectionRecordSearchLoading(true);
-      try {
-        const results = query
-          ? await fullTextSearch(organizationId, query, [projectId])
-          : await getMultiProjectRecords(organizationId, [projectId]);
 
-        const items = Array.isArray(results) ? results : results.items;
-        setNewCollectionRecordSearchResults(items);
-        setNewCollectionRecordPage(1);
+      try {
+        const response = query
+          ? await fullTextSearchPaginated(
+              organizationId,
+              query,
+              [projectId],
+              pageNumber,
+              pageSize,
+            )
+          : await getMultiProjectRecords(
+              organizationId,
+              [projectId],
+              true,
+              pageNumber,
+              pageSize,
+            );
+
+        setNewCollectionRecordSearchResults(response.items);
+        setNewCollectionRecordTotalCount(response.totalCount);
       } catch (error) {
         console.error("Failed to search records:", error);
         showToast(
@@ -438,18 +469,21 @@ export function useNewCollectionWorkflow({
       setNewCollectionReviewPage(1);
 
       void loadNewCollectionRecordPage(
-        newCollectionRecordSearchTerm.trim(),
+        submittedRecordSearchTerm,
         1,
         pageSize,
       );
     },
-    [loadNewCollectionRecordPage, newCollectionRecordSearchTerm],
+    [loadNewCollectionRecordPage, submittedRecordSearchTerm],
   );
 
   const handleSearchNewCollectionRecords = useCallback(
     async (overrideTerm?: string) => {
-      const query = (overrideTerm ?? newCollectionRecordSearchTerm).trim();
+      const query = (
+        overrideTerm ?? newCollectionRecordSearchTerm
+      ).trim();
 
+      setSubmittedRecordSearchTerm(query);
       setNewCollectionRecordPage(1);
 
       await loadNewCollectionRecordPage(
@@ -470,14 +504,14 @@ export function useNewCollectionWorkflow({
       setNewCollectionRecordPage(pageNumber);
 
       void loadNewCollectionRecordPage(
-        newCollectionRecordSearchTerm.trim(),
+        submittedRecordSearchTerm,
         pageNumber,
         newCollectionRecordsPerPage,
       );
     },
     [
       loadNewCollectionRecordPage,
-      newCollectionRecordSearchTerm,
+      submittedRecordSearchTerm,
       newCollectionRecordsPerPage,
     ],
   );
@@ -642,6 +676,7 @@ export function useNewCollectionWorkflow({
       setNewCollectionRecordSearchTerm,
       newCollectionRecordSearchResults,
       newCollectionRecordSearchLoading,
+      selectAllSearchedRecordsLoading,
       visibleNewCollectionRecords,
       visibleSelectionState,
       retrievedSelectionState,
