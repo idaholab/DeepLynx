@@ -805,61 +805,6 @@ public class QueryBusiness : IQueryBusiness
     }
 
     /// <summary>
-    ///     [DEPRECATED - V1 ONLY] Retrieves all specified records without pagination.
-    ///     Superseded by <see cref="GetMultiProjectRecordsPaginated"/>. Do not call this from new controller versions;
-    ///     it exists solely to back the deprecated v1 query controllers and should be deleted once
-    ///     those v1 endpoints are sunset.
-    /// </summary>
-    /// <param name="currentUserId">The ID of current user</param>
-    /// <param name="organizationId"> Organization Id of projects</param>
-    /// <param name="projects">Array of project ids whose records are to be retrieved</param>
-    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
-    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
-    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
-    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-    /// <returns>A list of records based on the applied filters.</returns>
-    [Obsolete("V1-only. Used by deprecated v1 query endpoints. Superseded by GetMultiProjectRecordsPaginated. " +
-              "Remove once v1 query endpoints are sunset.", error: false)]
-    public async Task<IEnumerable<QueryRecordViewResponseDto>> GetMultiProjectRecords(
-        long currentUserId, long organizationId, long[] projects, bool hideArchived,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
-    {
-        if (projects.Length == 0)
-            return new List<QueryRecordViewResponseDto>();
-
-        var projectSet = new HashSet<long>(projects);
-
-        var recordQuery = _context.QueryRecords
-            .Where(r => projectSet.Contains(r.ProjectId) && r.OrganizationId == organizationId);
-
-        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
-
-        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-        {
-            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                currentUserId, organizationId, projects, "read record");
-
-            var authorizedRecordIds = _context.Records
-                .Where(rec => rec.OrganizationId == organizationId && projects.Contains(rec.ProjectId))
-                .WithAuthorizedLabels(authorizedLabelIds)
-                .Select(rec => rec.Id);
-
-            recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.Id));
-        }
-
-        var records = await recordQuery.ToListAsync();
-
-        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
-            _sensitivityLabelService,
-            currentUserId,
-            organizationId,
-            projects,
-            isSysAdmin || isOrgAdmin || isProjectAdmin);
-
-        return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
-    }
-
-    /// <summary>
     ///     Retrieves all records for multiple projects.
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
@@ -927,4 +872,63 @@ public class QueryBusiness : IQueryBusiness
             .Select(r => QueryRecordToResponse(r, isUriAuthorized(r)))
             .ToPaginatedAsync(paginatedRequestDto);
     }
+
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all specified records without pagination.
+    ///     Superseded by <see cref="GetMultiProjectRecordsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 query controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId"> Organization Id of projects</param>
+    /// <param name="projects">Array of project ids whose records are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>A list of records based on the applied filters.</returns>
+    [Obsolete("V1-only. Used by deprecated v1 query endpoints. Superseded by GetMultiProjectRecordsPaginated. " +
+              "Remove once v1 query endpoints are sunset.", error: false)]
+    public async Task<IEnumerable<QueryRecordViewResponseDto>> GetMultiProjectRecords(
+        long currentUserId, long organizationId, long[] projects, bool hideArchived,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        if (projects.Length == 0)
+            return new List<QueryRecordViewResponseDto>();
+
+        var projectSet = new HashSet<long>(projects);
+
+        var recordQuery = _context.QueryRecords
+            .Where(r => projectSet.Contains(r.ProjectId) && r.OrganizationId == organizationId);
+
+        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projects, "read record");
+
+            var authorizedRecordIds = _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projects.Contains(rec.ProjectId))
+                .WithAuthorizedLabels(authorizedLabelIds)
+                .Select(rec => rec.Id);
+
+            recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.Id));
+        }
+
+        var records = await recordQuery.ToListAsync();
+
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projects,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
+    }
+
+    #endregion
 }
