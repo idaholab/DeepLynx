@@ -510,6 +510,177 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetAllRecordCollectionsPaginated Tests
+
+    [Fact]
+    public async Task GetAllRecordCollectionsPaginated_HideArchived_ReturnsOnlyActiveCollections()
+    {
+        var result = await _recordCollectionBusiness.GetAllRecordCollectionsPaginated(
+            _userId, _organizationId, _projectId, null, null, null, null,
+            new PaginatedRequestDto(), true, isSysAdmin: true);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(25, result.PageSize);
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(_collectionId, collection.Id);
+        Assert.False(collection.IsArchived);
+        Assert.Single(collection.Tags);
+        Assert.Equal(_tagId1, collection.Tags.First().Id);
+        Assert.Single(collection.Labels);
+        Assert.Equal(_labelId, collection.Labels.First().Id);
+    }
+
+    [Fact]
+    public async Task GetAllRecordCollectionsPaginated_NonAdmin_FiltersOutUnauthorizedLabeledCollections()
+    {
+        var accessibleCollection = new RecordCollection
+        {
+            Name = "Accessible Collection",
+            Description = "user can see this",
+            Properties = JsonSerializer.Serialize(new { source = "accessible" }),
+            ProjectId = _projectId,
+            OrganizationId = _organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            IsArchived = false,
+            Labels = new List<SensitivityLabel>()
+        };
+        var restrictedCollection = new RecordCollection
+        {
+            Name = "Restricted Collection",
+            Description = "user cannot see this",
+            Properties = JsonSerializer.Serialize(new { source = "restricted" }),
+            ProjectId = _projectId,
+            OrganizationId = _organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            IsArchived = false,
+            Labels = new List<SensitivityLabel>
+            {
+                await Context.SensitivityLabels.FirstAsync(l => l.Id == _labelId2)
+            }
+        };
+        Context.RecordCollections.AddRange(accessibleCollection, restrictedCollection);
+        await Context.SaveChangesAsync();
+
+        var result = await _recordCollectionBusiness.GetAllRecordCollectionsPaginated(
+            _userId, _organizationId, _projectId, null, null, null, null,
+            new PaginatedRequestDto(), hideArchived: true);
+
+        Assert.NotEmpty(result.Items);
+        Assert.Contains(result.Items, c => c.Id == accessibleCollection.Id);
+        Assert.DoesNotContain(result.Items, c => c.Id == restrictedCollection.Id);
+    }
+
+    [Fact]
+    public async Task GetAllRecordCollectionsPaginated_Search_MatchesRelatedTagAndLabelNames()
+    {
+        var matchedCollection = await CreateRecordCollectionAsync(
+            "Tagged Collection",
+            "search target",
+            tagIds: new[] { _tagId2 },
+            labelIds: new[] { _labelId2 });
+        await CreateRecordCollectionAsync(
+            "Non Matching Collection",
+            "control group",
+            tagIds: new[] { _tagId1 },
+            labelIds: new[] { _labelId });
+
+        var tagResult = await _recordCollectionBusiness.GetAllRecordCollectionsPaginated(
+            _userId, _organizationId, _projectId, "tag-two", null, null, null,
+            new PaginatedRequestDto(), true, isSysAdmin: true);
+
+        Assert.Contains(tagResult.Items, c => c.Id == matchedCollection.Id);
+        Assert.DoesNotContain(tagResult.Items, c => c.Id == _collectionId);
+
+        var labelResult = await _recordCollectionBusiness.GetAllRecordCollectionsPaginated(
+            _userId, _organizationId, _projectId, "label-two", null, null, null,
+            new PaginatedRequestDto(), true, isSysAdmin: true);
+
+        Assert.Contains(labelResult.Items, c => c.Id == matchedCollection.Id);
+        Assert.DoesNotContain(labelResult.Items, c => c.Id == _collectionId);
+    }
+
+    [Fact]
+    public async Task GetAllRecordCollectionsPaginated_FilterBySensitivityLabelIds_ReturnsCollectionsWithAllSelectedLabels()
+    {
+        var bothLabelsCollection = await CreateRecordCollectionAsync(
+            "Both Labels",
+            "matches all labels",
+            labelIds: new[] { _labelId, _labelId2 });
+        await CreateRecordCollectionAsync(
+            "Only Second Label",
+            "missing first label",
+            labelIds: new[] { _labelId2 });
+
+        var result = await _recordCollectionBusiness.GetAllRecordCollectionsPaginated(
+            _userId, _organizationId, _projectId, null, new[] { _labelId, _labelId2 }, null, null,
+            new PaginatedRequestDto(), true, isSysAdmin: true);
+
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(bothLabelsCollection.Id, collection.Id);
+    }
+
+    [Fact]
+    public async Task GetAllRecordCollectionsPaginated_FilterByTagIds_ReturnsCollectionsWithAllSelectedTags()
+    {
+        var bothTagsCollection = await CreateRecordCollectionAsync(
+            "Both Tags",
+            "matches all tags",
+            tagIds: new[] { _tagId1, _tagId2 });
+        await CreateRecordCollectionAsync(
+            "Only Second Tag",
+            "missing first tag",
+            tagIds: new[] { _tagId2 });
+
+        var result = await _recordCollectionBusiness.GetAllRecordCollectionsPaginated(
+            _userId, _organizationId, _projectId, null, null, new[] { _tagId1, _tagId2 }, null,
+            new PaginatedRequestDto(), true, isSysAdmin: true);
+
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(bothTagsCollection.Id, collection.Id);
+    }
+
+    [Fact]
+    public async Task GetAllRecordCollectionsPaginated_SortAndPaginate_ReturnsRequestedSlice()
+    {
+        var timestamp = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        await CreateRecordCollectionAsync("alpha-page", "page-set", timestamp.AddMinutes(-3));
+        await CreateRecordCollectionAsync("bravo-page", "page-set", timestamp.AddMinutes(-2));
+        var charlieCollection = await CreateRecordCollectionAsync(
+            "charlie-page",
+            "page-set",
+            timestamp.AddMinutes(-1));
+
+        var result = await _recordCollectionBusiness.GetAllRecordCollectionsPaginated(
+            _userId, _organizationId, _projectId, "page-set", null, null, "alphabeticalAsc",
+            new PaginatedRequestDto { PageNumber = 2, PageSize = 2 }, true, isSysAdmin: true);
+
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(2, result.PageSize);
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(charlieCollection.Id, collection.Id);
+        Assert.Equal("charlie-page", collection.Name);
+    }
+
+    [Fact]
+    public async Task GetAllRecordCollectionsPaginated_PageSizeNegativeOne_ReturnsAllResults()
+    {
+        await CreateRecordCollectionAsync("alpha-all", "return-all-set");
+        await CreateRecordCollectionAsync("bravo-all", "return-all-set");
+
+        var result = await _recordCollectionBusiness.GetAllRecordCollectionsPaginated(
+            _userId, _organizationId, _projectId, "return-all-set", null, null, null,
+            new PaginatedRequestDto { PageSize = -1 }, true, isSysAdmin: true);
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+    }
+
+    #endregion
+
     #region Get Records In Collections Tests
     [Fact]
     public async Task GetRecordsInRecordCollection_HideArchived_ExcludesArchivedRecords()
