@@ -102,6 +102,8 @@ public class FileAzureBusiness : IFileBusiness
             ? $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/{guid}_{file.FileName}"
             : $"{baseFilePath.TrimEnd('/')}/{guid}_{file.FileName}";
 
+
+
         var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
         // TODO(DL-2856): fix SAS fallback download URL by removing blob "exists" checks
         await containerClient.CreateIfNotExistsAsync();
@@ -224,9 +226,11 @@ public class FileAzureBusiness : IFileBusiness
             await containerClient.CreateIfNotExistsAsync();
         }
 
+        var objectStorageName = ContainerName.UniqueContainerNameFromString(containerName);
+
         var newObjectStorageDto = new CreateObjectStorageRequestDto
         {
-            Name = ContainerName.UniqueContainerNameFromString(containerName),
+            Name = objectStorageName,
             Config = new ObjectStorageConfigDto
             {
                 AzureObjectConfig = new AzureObjectConfigDto
@@ -1201,6 +1205,11 @@ public class FileAzureBusiness : IFileBusiness
         return fileName;
     }
 
+    private ObjectStorageConfigDto DeserializeAndDecryptConfig(string encryptedConfig)
+    {
+        return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
+    }
+
     /// <summary>
     /// Scrapes at most (batchSize * maxBatches) blobs from an Azure Blob storage, starting from the given cursor.
     /// </summary>
@@ -1307,11 +1316,6 @@ public class FileAzureBusiness : IFileBusiness
             batchSize,
             maxBatches,
             cancellationToken);
-    }
-
-    private ObjectStorageConfigDto DeserializeAndDecryptConfig(string encryptedConfig)
-    {
-        return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
     }
 }
 

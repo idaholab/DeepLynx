@@ -750,4 +750,11 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
     }
 
+    private async Task ResetOrganizationDefaults(long organizationId, long newDefaultId)
+    {
+        // check for existing defaults at the org level and remove them from being default
+        await _context.ObjectStorages
+            .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
+            .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
+    }
 }

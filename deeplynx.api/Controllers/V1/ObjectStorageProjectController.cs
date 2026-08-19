@@ -306,8 +306,11 @@ public class ObjectStorageProjectController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the object storage will belong</param>
     /// <param name="containerName">The name of the container</param>
-    /// <param name="existingContainer">A bool indicating whether the container already exists</param>
-    /// <param name="storageType">The storage provider type. Currently only "azure_object" is supported.</param>
+    /// <param name="existingContainer">A bool if the container already exists</param>
+    /// <param name="storageType">
+    ///     The type of container to create. Currently only "azure_object" is supported;
+    ///     additional providers (e.g. "aws") may be added in the future without a new endpoint.
+    /// </param>
     /// <returns>The newly created object storage.</returns>
     [HttpPost("container", Name = "api_create_project_azure_container")]
     [Auth("write", "object_storage")]
@@ -318,13 +321,17 @@ public class ObjectStorageProjectController : ControllerBase
         bool existingContainer,
         [FromQuery] string storageType = "azure_object")
     {
-        if (!string.Equals(storageType, "azure_object", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(storageType, "azure_object", StringComparison.OrdinalIgnoreCase))
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var objectStorage = await _projectBusiness.CreateProjectAzureContainer(
+                currentUserId, organizationId, projectId, containerName, existingContainer);
+            return Ok(objectStorage);
+        }
+        else
+        {
             throw new ArgumentException(
                 $"Unsupported storage type '{storageType}'. Only 'azure_object' is currently supported.");
-
-        var currentUserId = UserContextStorage.UserId;
-        var objectStorage = await _projectBusiness.CreateProjectAzureContainer(
-            currentUserId, organizationId, projectId, containerName, existingContainer);
-        return Ok(objectStorage);
+        }
     }
 }

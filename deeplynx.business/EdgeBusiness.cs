@@ -47,7 +47,7 @@ public class EdgeBusiness : IEdgeBusiness
     /// <param name="currentUserId">The ID of the user</param>
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter edges</param>
     /// <param name="projectId">(optional) The ID of the project to filter edges by</param>
-    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching edges are returned unpaginated</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if null, all matching edges are returned unpaginated</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived edges from the result</param>
     /// <param name="isSysAdmin">Flag indicating whether you are a system admin</param>
     /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin</param>

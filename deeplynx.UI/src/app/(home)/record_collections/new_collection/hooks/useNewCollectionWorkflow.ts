@@ -409,29 +409,14 @@ export function useNewCollectionWorkflow({
       pageSize: number,
     ) => {
       setNewCollectionRecordSearchLoading(true);
-
       try {
-        if (query) {
-          const response = await fullTextSearchPaginated(
-            organizationId,
-            query,
-            [projectId],
-            pageNumber,
-            pageSize,
-          );
+        const results = query
+          ? await fullTextSearch(organizationId, query, [projectId])
+          : await getMultiProjectRecords(organizationId, [projectId]);
 
-          setNewCollectionRecordSearchResults(response.items);
-          setNewCollectionRecordTotalCount(response.totalCount);
-        } else {
-          const results = await getMultiProjectRecords(
-            organizationId,
-            [projectId],
-          );
-
-          setNewCollectionRecordSearchResults(results);
-          setNewCollectionRecordTotalCount(results.length);
-          setNewCollectionRecordPage(1);
-        }
+        const items = Array.isArray(results) ? results : results.items;
+        setNewCollectionRecordSearchResults(items);
+        setNewCollectionRecordPage(1);
       } catch (error) {
         console.error("Failed to search records:", error);
         showToast(
