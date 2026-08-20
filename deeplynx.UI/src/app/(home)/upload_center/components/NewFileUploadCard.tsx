@@ -275,10 +275,11 @@ export default function NewFileUploadCard({
                 type="button"
                 role="radio"
                 aria-checked={recordMode === "new"}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${recordMode === "new"
-                  ? "bg-base-100 text-base-content shadow-sm"
-                  : "text-base-content/70"
-                  }`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  recordMode === "new"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70"
+                }`}
                 onClick={() => setRecordMode("new")}
               >
                 {t.translations.NEW_RECORD}
@@ -287,10 +288,11 @@ export default function NewFileUploadCard({
                 type="button"
                 role="radio"
                 aria-checked={recordMode === "update"}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${recordMode === "update"
-                  ? "bg-base-100 text-base-content shadow-sm"
-                  : "text-base-content/70"
-                  }`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  recordMode === "update"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70"
+                }`}
                 onClick={() => setRecordMode("update")}
               >
                 {t.translations.UPDATE_EXISTING_RECORD}
@@ -347,8 +349,9 @@ export default function NewFileUploadCard({
                         key={f.id}
                         type="button"
                         onClick={() => setTargetRecordId(String(f.id))}
-                        className={`w-full border-b border-base-300/50 px-3 py-2 text-left last:border-b-0 transition ${selected ? "bg-base-200/70" : "hover:bg-base-200/30"
-                          }`}
+                        className={`w-full border-b border-base-300/50 px-3 py-2 text-left last:border-b-0 transition ${
+                          selected ? "bg-base-200/70" : "hover:bg-base-200/30"
+                        }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">

@@ -197,18 +197,24 @@ public class RecordControllerTests : IDisposable
     #endregion
 
     // =========================================================================
-    // GetRecordsByTags Tests
+    // GetRecordsByTagsPaginated Tests
     // =========================================================================
 
-    #region GetRecordsByTags Tests
+    #region GetRecordsByTagsPaginated Tests
 
     [Fact]
-    public async Task GetRecordsByTags_Returns200_WithList()
+    public async Task GetRecordsByTagsPaginated_Returns200_WithList()
     {
-        var expected = new List<RecordResponseDto> { new() { Id = 1, Name = "Tagged" } };
-        _mockBusiness.Setup(b => b.GetRecordsByTags(
+        var expected = new PaginatedResponse<RecordResponseDto>
+        {
+            Items = [new() { Id = 1, Name = "Tagged" }],
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 1
+        };
+        _mockBusiness.Setup(b => b.GetRecordsByTagsPaginated(
                          UserId, OrgId, ProjectId, It.Is<long[]>(t => t.SequenceEqual(new[] { TagId })),
-                         true, false, false, false))
+                         true, It.IsAny<PaginatedRequestDto>(), false, false, false))
                      .ReturnsAsync(expected);
 
         var result = (await _controller.GetRecordsByTags(OrgId, ProjectId, new[] { TagId }, true)).Result as OkObjectResult;
@@ -219,24 +225,51 @@ public class RecordControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetRecordsByTags_Returns500_OnUnexpectedException()
+    public async Task GetRecordsByTagsPaginated_ThrowsException_WhenBusinessThrows()
     {
-        _mockBusiness.Setup(b => b.GetRecordsByTags(
+        _mockBusiness.Setup(b => b.GetRecordsByTagsPaginated(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long[]>(),
-                         It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
+                         It.IsAny<bool>(), It.IsAny<PaginatedRequestDto>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _controller.GetRecordsByTags(OrgId, ProjectId, new[] { TagId }, true));
     }
 
     [Fact]
-    public void GetRecordsByTags_HasHttpGetAndReadRecordAndReadTagAuthorization()
+    public async Task GetRecordsByTagsPaginated_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        PaginatedRequestDto? capturedDto = null;
+
+        _mockBusiness.Setup(b => b.GetRecordsByTagsPaginated(
+                         UserId, OrgId, ProjectId, It.Is<long[]>(t => t.SequenceEqual(new[] { TagId })),
+                         true, It.IsAny<PaginatedRequestDto>(), false, false, false))
+                     .Callback<long, long, long, long[], bool, PaginatedRequestDto, bool, bool, bool>(
+                         (_, _, _, _, _, dto, _, _, _) => capturedDto = dto)
+                     .ReturnsAsync(new PaginatedResponse<RecordResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        await _controller.GetRecordsByTags(OrgId, ProjectId, new[] { TagId }, true);
+
+        Assert.NotNull(capturedDto);
+        Assert.Equal(1, capturedDto.PageNumber);
+        Assert.Equal(25, capturedDto.PageSize);
+    }
+
+    [Fact]
+    public void GetRecordsByTagsPaginated_HasHttpGetAndReadRecordAndReadTagAuthorization()
     {
         var method = GetControllerMethod(
             nameof(RecordController.GetRecordsByTags),
             "organizationId",
             "projectId",
-            "tagIds");
+            "tagIds",
+            "hideArchived",
+            "paginatedRequestDto");
 
         AssertHasHttpAttribute(method, "HttpGetAttribute");
         AssertHasAuthAttribute(method, "read", "record");

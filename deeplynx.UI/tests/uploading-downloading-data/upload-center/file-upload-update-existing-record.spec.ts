@@ -162,7 +162,6 @@ test.describe("File Upload -> Update Existing Record", () => {
             originalFileName = `update-record-original-${testInfo.testId}.txt`;
             replacementFileName = `update-record-replacement-${testInfo.testId}.txt`;
 
-
             originalFilePath = path.join(os.tmpdir(), originalFileName);
             replacementFilePath = path.join(os.tmpdir(), replacementFileName);
             metadataFilePath = path.join(
