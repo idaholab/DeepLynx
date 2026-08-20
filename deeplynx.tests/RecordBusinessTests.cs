@@ -755,7 +755,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetRecordsByTags Tests
+    #region GetRecordsByTags (V1 / Legacy) Tests
 
     [Fact]
     public async Task GetRecordsByTags_ValidProjectIdWithSingleTag_ReturnsMatchingRecords()
@@ -979,6 +979,300 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.NotNull(correctTagResult);
         Assert.Single(correctTagResult);
         Assert.Equal("Test Record", correctTagResult.First().Name);
+    }
+
+    #endregion
+
+    #region GetRecordsByTagsPaginated Tests
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_ValidProjectIdWithSingleTag_ReturnsMatchingRecords()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [tid], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("Test Record", result.Items.First().Name);
+        Assert.Single(result.Items.First().Tags);
+        Assert.Equal("Test Tag", result.Items.First().Tags.First().Name);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_WithMultipleTags_ReturnsOnlyRecordsWithAllTags()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        // Arrange - Add additional tag
+        var tag2 = new Tag
+        {
+            Name = "Tag2",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            OrganizationId = organizationId
+        };
+        Context.Tags.Add(tag2);
+        await Context.SaveChangesAsync();
+
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        var recordWithAllTags = new Record
+        {
+            Name = "Record With All Tags",
+            Description = "Has testTag and tag2",
+            OriginalId = "multi_tag_record",
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Tags = new List<Tag> { testTag, tag2 },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        var recordWithSomeTags = new Record
+        {
+            Name = "Record With Some Tags",
+            Description = "Has only testTag",
+            OriginalId = "partial_tag_record",
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.AddRange(recordWithAllTags, recordWithSomeTags);
+        await Context.SaveChangesAsync();
+
+        // Act - Query for records with both testTag AND tag2
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [tid, tag2.Id], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert - Should only get the record with ALL tags
+        Assert.NotNull(result);
+        Assert.Single(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("Record With All Tags", result.Items.First().Name);
+        Assert.Equal(2, result.Items.First().Tags.Count);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_WithMultipleTags_DifferentProject_ReturnsEmpty()
+    {
+        // Arrange - Add additional tag
+        var tag2 = new Tag
+        {
+            Name = "Tag2",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            OrganizationId = organizationId
+        };
+        Context.Tags.Add(tag2);
+        await Context.SaveChangesAsync();
+
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        var recordWithAllTags = new Record
+        {
+            Name = "Record With All Tags",
+            Description = "Has testTag and tag2",
+            OriginalId = "multi_tag_different_project",
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Tags = new List<Tag> { testTag, tag2 },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(recordWithAllTags);
+        await Context.SaveChangesAsync();
+
+        // Act - Query for records with both tags but in different valid project (pid2)
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid2, [tid, tag2.Id], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert - Should return empty because records exist in pid, not pid2
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_EmptyTagArray_ReturnsAllNonArchivedRecords()
+    {
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal("Test Record", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_HideArchivedTrue_ExcludesArchivedRecords()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        // Arrange - Add an archived record with the same tag
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        var archivedRecord = new Record
+        {
+            Name = "Archived Record",
+            Description = "Archived",
+            OriginalId = "archived_record",
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(archivedRecord);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [tid], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert - Should only get the non-archived seeded record
+        Assert.NotNull(result);
+        Assert.Single(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("Test Record", result.Items.First().Name);
+        Assert.False(result.Items.First().IsArchived);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_HideArchivedFalse_IncludesArchivedRecords()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        // Arrange - Add an archived record with the same tag
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        var archivedRecord = new Record
+        {
+            Name = "Archived Record",
+            Description = "Archived",
+            OriginalId = "archived_record_2",
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(archivedRecord);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [tid], false, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert - Should get both archived and non-archived records
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Contains(result.Items, r => r.Name == "Test Record" && !r.IsArchived);
+        Assert.Contains(result.Items, r => r.Name == "Archived Record" && r.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_NonExistentTag_ReturnsEmpty()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        // Arrange - Make sure non-existent tag results in no results
+        var nonExistentTagResult = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [99999], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+        Assert.Empty(nonExistentTagResult.Items);
+        Assert.Equal(0, nonExistentTagResult.TotalCount);
+
+        // Act - Verify correct tag returns results
+        var correctTagResult = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [tid], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(correctTagResult);
+        Assert.Single(correctTagResult.Items);
+        Assert.Equal("Test Record", correctTagResult.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_Paginates_Correctly()
+    {
+        // Act - two-page split, page size 1, over the 4 seeded/no-tag-filter records
+        var page1 = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [], true, new PaginatedRequestDto { PageNumber = 1, PageSize = 2 });
+        var page2 = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [], true, new PaginatedRequestDto { PageNumber = 2, PageSize = 2 });
+
+        // Assert
+        Assert.NotNull(page1);
+        Assert.NotNull(page2);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Equal(4, page1.TotalCount);
+        Assert.Equal(4, page2.TotalCount);
+
+        var page1Ids = page1.Items.Select(r => r.Id).ToHashSet();
+        var page2Ids = page2.Items.Select(r => r.Id).ToHashSet();
+        Assert.Empty(page1Ids.Intersect(page2Ids));
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_NoMatches_ReturnsEmptyPaginatedResponse()
+    {
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [99999], true, new PaginatedRequestDto { PageNumber = 1, PageSize = 25 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(25, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_PageSizeNegativeOne_ReturnsAll_IgnoringPageNumber()
+    {
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [], true, new PaginatedRequestDto { PageNumber = 5, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.Items.Count, result.PageSize);
     }
 
     #endregion

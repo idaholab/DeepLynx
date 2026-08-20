@@ -179,18 +179,24 @@ function sanitizeSearchQuery(query: string): string {
  * @param projectId - The ID of the project
  * @param tagIds - Array of tag IDs to filter by (records must contain all tags)
  * @param hideArchived - Flag to hide archived records (default: true)
- * @returns Promise with array of RecordResponseDto
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all projects (default: -1)
+ * @returns Promise with paginated RecordResponseDto
  */
 export async function getRecordsByTags(
   organizationId: number,
   projectId: number,
   tagIds: number[],
-  hideArchived: boolean = true
-): Promise<RecordResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<RecordResponseDto>> {
   try {
     const params = new URLSearchParams();
     tagIds.forEach((tagId) => params.append("tagIds", tagId.toString()));
     params.append("hideArchived", hideArchived.toString());
+    params.append("pageNumber", pageNumber.toString());
+    params.append("pageSize", pageSize.toString());
 
     const res = await api.get(
       `/organizations/${organizationId}/projects/${projectId}/records/by-tags?${params.toString()}`
