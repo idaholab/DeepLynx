@@ -278,29 +278,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         var orderedQuery = collectionQuery.OrderBy(c => c.Id);
 
         return await orderedQuery
-            .Select(c => new RecordCollectionResponseDto
-            {
-                Id = c.Id,
-                Description = c.Description,
-                Properties = c.Properties,
-                Name = c.Name,
-                ProjectId = c.ProjectId,
-                OrganizationId = c.OrganizationId,
-                LastUpdatedBy = c.LastUpdatedBy,
-                LastUpdatedAt = c.LastUpdatedAt,
-                IsArchived = c.IsArchived,
-                RecordCount = c.Records.Count(),
-                Tags = c.Tags.Select(t => new RecordCollectionTagDto
-                {
-                    Id = t.Id,
-                    Name = t.Name
-                }).ToList(),
-                Labels = c.Labels.Select(l => new RecordCollectionLabelDto
-                {
-                    Id = l.Id,
-                    Name = l.Name
-                }).ToList()
-            })
+            .Select(c => RecordCollectionToResponse(c))
             .ToPaginatedAsync(paginatedRequestDto);
     }
 
@@ -1360,6 +1338,33 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 Name = t.Name
             }).ToList(),
             Labels = record.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        };
+    }
+
+    private static RecordCollectionResponseDto RecordCollectionToResponse(RecordCollection c)
+    {
+        return new RecordCollectionResponseDto
+        {
+            Id = c.Id,
+            Description = c.Description,
+            Properties = c.Properties,
+            Name = c.Name,
+            ProjectId = c.ProjectId,
+            OrganizationId = c.OrganizationId,
+            LastUpdatedBy = c.LastUpdatedBy,
+            LastUpdatedAt = c.LastUpdatedAt,
+            IsArchived = c.IsArchived,
+            RecordCount = c.Records.Count(),
+            Tags = c.Tags.Select(t => new RecordCollectionTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
