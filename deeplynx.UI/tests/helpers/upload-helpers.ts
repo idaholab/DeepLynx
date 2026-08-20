@@ -889,8 +889,8 @@ export async function getClass(request: APIRequestContext, projectId: string) {
   if (!res.ok()) throw new Error(`Failed to fetch classes: ${res.status()}`);
   const classes = await res.json();
   return {
-    id: classes[0].id,
-    name: classes[0].name,
+    id: classes.items[0].id,
+    name: classes.items[0].name,
   };
 }
 
