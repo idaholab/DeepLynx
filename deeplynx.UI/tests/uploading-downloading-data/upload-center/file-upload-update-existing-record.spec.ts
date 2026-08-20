@@ -148,20 +148,22 @@ test.describe("File Upload -> Update Existing Record", () => {
         let originalFilePath: string;
         let replacementFilePath: string;
         let metadataFilePath: string;
+        let originalFileName: string;
+        let replacementFileName: string;
         let createdRecord: {
             recordId: string;
             projectId: string;
         } | null = null;
 
-        const originalFileName = "update-record-original.txt";
-        const replacementFileName = "update-record-replacement.txt";
+        test.beforeEach(async ({}, testInfo) => {
+            originalFileName = `update-record-original-${testInfo.testId}.txt`;
+            replacementFileName = `update-record-replacement-${testInfo.testId}.txt`;
 
-        test.beforeEach(async () => {
             originalFilePath = path.join(os.tmpdir(), originalFileName);
             replacementFilePath = path.join(os.tmpdir(), replacementFileName);
             metadataFilePath = path.join(
                 os.tmpdir(),
-                "update-record-metadata.json",
+                `update-record-metadata-${testInfo.testId}.json`,
             );
 
             await fs.promises.writeFile(
@@ -182,7 +184,7 @@ test.describe("File Upload -> Update Existing Record", () => {
                     {
                         Name: replacementFileName,
                         Description: "Updated record created by Playwright",
-                        OriginalId: `playwright-update-${Date.now()}`,
+                        OriginalId: `playwright-update-${testInfo.testId}`,
                         ClassId: 1,
                     },
                     null,
