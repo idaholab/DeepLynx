@@ -183,7 +183,7 @@ const UsersTable = ({
     try {
       const usersRequest =
         scope === "org"
-          ? getAllUsers(undefined, organizationId, false, false, false, 1, -1)
+          ? getAllUsers(organizationId, undefined, false, false, false, 1, -1)
           : getAllUsers(undefined, undefined, false, false, false, 1, -1);
       const countsRequest =
         scope === "org"
@@ -205,7 +205,7 @@ const UsersTable = ({
 
   try {
     const users = scope === "org"
-        ? await getAllUsers(undefined, organizationId, true, false, false, 1, -1)
+        ? await getAllUsers(organizationId, undefined, true, false, false, 1, -1)
         : await getAllUsers(undefined, undefined, true, false, false, 1, -1);
     setArchivedUsers(buildTableData(users.items).filter((u) => u.isArchived));
   } catch (error) {
