@@ -7,9 +7,6 @@ import { testApiUrl } from "../api-url";
 
 let orgId: string;
 
-// Adjust this base URL to match whichever environment the test config points at.
-const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:5095";
-
 async function navigateToProjLevelSensitivityLabelPermissions(page: Page) {
   await page.getByRole('link', { name: 'Project Settings' }).click();
   await page.getByText('Roles & Permissions').click();
@@ -40,7 +37,7 @@ test.describe("Org Admin editing Permissions of Proj level SLs", () => {
     uniqueLabelName = `Test SL-${testInfo.testId}`;
 
     const createResponse = await apiContext.post(
-      `${API_BASE_URL}/api/v1/projects/${projectId}/labels`,
+      testApiUrl(`/api/v1/projects/${projectId}/labels`),
       {
         headers: {
           Authorization: `Bearer ${process.env.TEST_ACCESS_TOKEN}`,
@@ -63,7 +60,7 @@ test.describe("Org Admin editing Permissions of Proj level SLs", () => {
     apiContext = request;
 
     const deleteResponse = await apiContext.delete(
-      `${API_BASE_URL}/api/v1/projects/${projectId}/labels/${createdLabelId}`,
+      testApiUrl(`/api/v1/projects/${projectId}/labels/${createdLabelId}`),
       {
         headers: {
           Authorization: `Bearer ${process.env.TEST_ACCESS_TOKEN}`,
