@@ -46,7 +46,7 @@ export default function ProjectSettingsClient({
 
   useEffect(() => {
     const fetchRoles = async () => {
-      const rolesData = await getAllRoles(
+      const { items: rolesData } = await getAllRoles(
         organization?.organizationId as number,
         Number(selectedProjectId)
       );
