@@ -946,15 +946,6 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
 
     #region GetRecordCollectionsByTagsPaginated Tests
 
-    private static PaginatedRequestDto DefaultPagination(int pageNumber = 1, int pageSize = 100)
-    {
-        return new PaginatedRequestDto
-        {
-            PageNumber = pageNumber,
-            PageSize = pageSize
-        };
-    }
-
     [Fact]
     public async Task GetRecordCollectionsByTagsPaginated_ReturnsCollectionsContainingAllTags()
     {
