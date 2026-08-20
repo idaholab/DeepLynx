@@ -229,6 +229,7 @@ test.describe("Roles & Permissions", () => {
 
     test("displays role details panel for selected role", async ({ page }) => {
       // The right panel should show the selected role name as a heading
+      await page.getByRole('button', { name: 'User ORG User role with' }).click();
       const roleHeading = page.locator(".card-title").filter({
         hasText: /^(Admin|User)$/,
       });
