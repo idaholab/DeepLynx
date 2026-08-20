@@ -332,29 +332,8 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         var orderedQuery = recordCollectionQuery.OrderBy(r => r.Id);
 
         return await orderedQuery
-            .Select(r => new RecordCollectionResponseDto
-            {
-                Id = r.Id,
-                Description = r.Description,
-                Properties = r.Properties,
-                Name = r.Name,
-                ProjectId = r.ProjectId,
-                OrganizationId = r.OrganizationId,
-                LastUpdatedBy = r.LastUpdatedBy,
-                LastUpdatedAt = r.LastUpdatedAt,
-                IsArchived = r.IsArchived,
-                RecordCount = r.Records.Count(),
-                Tags = r.Tags.Select(t => new RecordCollectionTagDto
-                {
-                    Id = t.Id,
-                    Name = t.Name
-                }).ToList(),
-                Labels = r.Labels.Select(l => new RecordCollectionLabelDto
-                {
-                    Id = l.Id,
-                    Name = l.Name
-                }).ToList()
-            }).ToPaginatedAsync(paginatedRequestDto);
+            .Select(r => RecordCollectionToResponse(r)
+            ).ToPaginatedAsync(paginatedRequestDto);
     }
 
 
