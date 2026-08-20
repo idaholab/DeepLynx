@@ -38,10 +38,13 @@ public partial class Organization
     [Column("theme")]
     [MaxLength(50)]
     public string Theme { get; set; } = "default";
+    
     [Column("create_container_per_project")]
     public bool CreateContainerPerProject { get; set; } = false;
+    
     [Column("disable_file_transfer")]
     public bool DisableFileTransfer { get; set; } = false;
+    
     [Column("default_object_storage_id")]
     public int? DefaultObjectStorageId { get; set; } = null;
     [Column("logo_object_storage_id")]

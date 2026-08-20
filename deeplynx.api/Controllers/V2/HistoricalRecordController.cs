@@ -47,24 +47,27 @@ public class HistoricalRecordController : ControllerBase
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
     /// <param name="pointInTime">(Optional) Find the most current records that existed before this point in time</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
-    /// <returns>A list of historical records based on the applied filters.</returns>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of historical records based on the applied filters</returns>
     [HttpGet(Name = "api_get_all_historical_records")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetAllHistoricalRecords(
         long organizationId,
         long projectId,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null,
         [FromQuery] long? dataSourceId = null,
         [FromQuery] DateTime? pointInTime = null,
         [FromQuery] bool hideArchived = true)
     {
+            paginatedRequestDto ??= new PaginatedRequestDto();
             var currentUserId = UserContextStorage.UserId;
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var records =
-                await _historicalRecordBusiness.GetAllHistoricalRecords(
-                    currentUserId, projectId, organizationId, dataSourceId, pointInTime, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+                await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+                    currentUserId, projectId, organizationId, paginatedRequestDto, dataSourceId, pointInTime, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
     }
 

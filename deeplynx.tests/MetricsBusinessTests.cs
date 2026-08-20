@@ -9,6 +9,10 @@ using DlRecord = deeplynx.datalayer.Models.Record;
 using Testcontainers.Azurite;
 using Record = deeplynx.datalayer.Models.Record;
 using deeplynx.helpers.Cache;
+using deeplynx.helpers.BigData;
+using deeplynx.helpers.Hubs;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
 
 namespace deeplynx.tests;
 
@@ -45,6 +49,20 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     private IFileBusinessFactory _fileBusinessFactory = null!;
     private Mock<IFileBusiness> _mockFileAzureBusiness;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
+    private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
+    private SensitivityLabelService _sensitivityLabelService = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private UserBusiness _userBusiness = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private INotificationBusiness _notificationBusiness = null!;
+    private EventBusiness _eventBusiness;
+    private TagBusiness _tagBusiness = null!;
+    private SensitivityLabelBusiness _labelBusiness;
+    private RecordBusiness _recordBusiness;
     private EncryptionHelper _encryptionHelper = null!;
 
     // Organization IDs
@@ -56,6 +74,10 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     private long _org1Proj2Id; // Org1, Project2
     private long _org2Proj1Id; // Org2, Project1
     private long _org2Proj2Id; // Org2, Project2
+
+    // Record IDs
+    private long _org1Proj1Record1Id; // Org1, Project1, Record1
+    private long _org2Proj1Record1Id;
 
     // Filesystem Object Storage IDs
     private long _fsOrg1Proj1StorageId;
@@ -110,6 +132,21 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         _fileBusinessFactory = fileBusinessFactory.Object;
 
         _metricsBusiness = new MetricsBusiness(Context);
+
+        _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
+        _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockAdminService = new Mock<IAdminService>();
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _userBusiness = new UserBusiness(Context);
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _notificationBusiness = new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+        _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+        _labelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+        _recordBusiness = new RecordBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _tagBusiness, _labelBusiness, _sensitivityLabelService, _provenanceBusiness.Object, _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory);
     }
 
     public override async Task DisposeAsync()
@@ -621,6 +658,8 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         };
         Context.Records.AddRange(records);
         await Context.SaveChangesAsync();
+        _org1Proj1Record1Id = records[0].Id;
+        _org2Proj1Record1Id = records[4].Id;
     }
 
     #region Helper Methods
@@ -726,6 +765,25 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Assert.Equal(100, result.Bytes);
     }
 
+    // Verifies that archived records are immediately excluded from project storage size.
+    [Fact]
+    public async Task GetProjectStorageSize_ExcludesArchivedRecords_WhenJustArchived()
+    {
+        var scope = await CreateMetricsStorageTestProject(_org1Id);
+
+        var record1 = CreateStorageMetricRecord(_org1Id, scope.ProjectId, scope.DataSourceId, _fsOrg1Proj1StorageId, 100);
+        var record2 = CreateStorageMetricRecord(_org1Id, scope.ProjectId, scope.DataSourceId, _fsOrg1Proj1StorageId, 200);
+        Context.Records.AddRange(record1, record2);
+        await Context.SaveChangesAsync();
+
+        var record1Id = record1.Id;
+        await _recordBusiness.ArchiveRecord(_userId, _org1Id, scope.ProjectId, record1Id);
+
+        var result = await _metricsBusiness.GetProjectStorageSize(_org1Id, scope.ProjectId);
+
+        Assert.Equal(200, result.Bytes);
+    }
+
     // Verifies that object storage size only sums records matching the requested ObjectStorageId.
     [Fact]
     public async Task GetObjectStorageSize_SumsOnlyMatchingObjectStorage()
@@ -765,6 +823,27 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Assert.Equal(300, result.Bytes);
     }
 
+    // Verifies that organization storage size sums FileSize values after one was just archived
+    [Fact]
+    public async Task GetOrganizationStorageSize_ExcludesArchivedRecords_WhenJustArchived()
+    {
+        var scope1 = await CreateMetricsStorageTestProject(_org1Id);
+        var scope2 = await CreateMetricsStorageTestProject(_org1Id);
+
+        var record1 = CreateStorageMetricRecord(_org1Id, scope1.ProjectId, scope1.DataSourceId, _fsOrg1Proj1StorageId, 100);
+        var record2 = CreateStorageMetricRecord(_org1Id, scope1.ProjectId, scope1.DataSourceId, _fsOrg1Proj1StorageId, 200);
+        var record3 = CreateStorageMetricRecord(_org1Id, scope2.ProjectId, scope2.DataSourceId, _fsOrg1Proj1StorageId, 100);
+        Context.Records.AddRange(record1, record2, record3);
+        await Context.SaveChangesAsync();
+
+        var record1Id = record1.Id;
+        await _recordBusiness.ArchiveRecord(_userId, _org1Id, scope1.ProjectId, record1Id);
+
+        var result = await _metricsBusiness.GetOrganizationStorageSize(_org1Id);
+
+        Assert.Equal(300, result.Bytes);
+    }
+
     // Verifies that system storage size sums FileSize values across all organizations.
     [Fact]
     public async Task GetSystemStorageSize_SumsAllProjects()
@@ -777,6 +856,27 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
             CreateStorageMetricRecord(_org2Id, org2Scope.ProjectId, org2Scope.DataSourceId, _fsOrg2Proj1StorageId, 200));
 
         await Context.SaveChangesAsync();
+
+        var result = await _metricsBusiness.GetSystemStorageSize();
+
+        Assert.Equal(300, result.Bytes);
+    }
+
+    // Verifies that system storage size sums FileSize values after one was just archived
+    [Fact]
+    public async Task GetSystemStorageSize_ExcludesArchivedRecords_WhenJustArchived()
+    {
+        var org1Scope = await CreateMetricsStorageTestProject(_org1Id);
+        var org2Scope = await CreateMetricsStorageTestProject(_org2Id);
+
+        var record1 = CreateStorageMetricRecord(_org1Id, org1Scope.ProjectId, org1Scope.DataSourceId, _fsOrg1Proj1StorageId, 100);
+        var record2 = CreateStorageMetricRecord(_org1Id, org1Scope.ProjectId, org1Scope.DataSourceId, _fsOrg1Proj1StorageId, 200);
+        var record3 = CreateStorageMetricRecord(_org1Id, org2Scope.ProjectId, org2Scope.DataSourceId, _fsOrg1Proj1StorageId, 100);
+        Context.Records.AddRange(record1, record2, record3);
+        await Context.SaveChangesAsync();
+
+        var record1Id = record1.Id;
+        await _recordBusiness.ArchiveRecord(_userId, _org1Id, org1Scope.ProjectId, record1Id);
 
         var result = await _metricsBusiness.GetSystemStorageSize();
 
@@ -1014,6 +1114,18 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         var count = await _metricsBusiness.GetRecordCount(_org2Id, (long?)_org2Proj2Id, hideArchived: true);
         Assert.Equal(0, count);
     }
+    [Fact]
+    public async Task GetRecordCount_SingleProject_ShowsCorrectCount_WhenRecordGetsArchived()
+    {
+        await _recordBusiness.ArchiveRecord(_userId, _org1Id, _org1Proj1Id, _org1Proj1Record1Id);
+
+        // Org1 Project1: 2 active + 2 archived = 4
+        var countActive = await _metricsBusiness.GetRecordCount(_org1Id, (long?)_org1Proj1Id, hideArchived: true);
+        var countAll = await _metricsBusiness.GetRecordCount(_org1Id, (long?)_org1Proj1Id, hideArchived: false);
+
+        Assert.Equal(2, countActive);
+        Assert.Equal(4, countAll);
+    }
     #endregion
     #region GetOrganizationDataModalityCount Tests
 
@@ -1226,6 +1338,19 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Assert.Equal(0, count);
     }
 
+    [Fact]
+    public async Task GetFileCount_SingleProject_ShowsCorrectCount_WhenRecordGetsArchived()
+    {
+        await _recordBusiness.ArchiveRecord(_userId, _org1Id, _org1Proj1Id, _org1Proj1Record1Id);
+
+        // Org1 Proj1: 1 now active file + 2 now archived files = 3
+        var countActive = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: true);
+        var countAll = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: false);
+
+        Assert.Equal(1, countActive);
+        Assert.Equal(3, countAll);
+    }
+
     // ── Multiple projects ─────────────────────────────────────────────────────
 
     [Fact]
@@ -1261,6 +1386,21 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Assert.Equal(5, count);
     }
 
+    [Fact]
+    public async Task GetFileCount_MultipleProjects_ShowsCorrectCount_WhenRecordGetsArchived()
+    {
+        await _recordBusiness.ArchiveRecord(_userId, _org2Id, _org2Proj1Id, _org2Proj1Record1Id);
+
+        // Org2 Proj1: 2 active + 2 archived; Org2 Proj2: 2 active + 0 archived = 6 total files
+        var countActive = await _metricsBusiness.GetFileCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: true);
+        var countAll = await _metricsBusiness.GetFileCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: false);
+
+        Assert.Equal(4, countActive);
+        Assert.Equal(6, countAll);
+    }
+
     // ── Null / system-wide scoping ────────────────────────────────────────────
 
     [Fact]
@@ -1294,6 +1434,19 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         var count = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
 
         Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task GetFileCount_NullOrgAndNullProjectIds_ShowsCorrectCount_WhenRecordGetsArchived()
+    {
+        await _recordBusiness.ArchiveRecord(_userId, _org1Id, _org1Proj1Id, _org1Proj1Record1Id);
+
+        // Active (6) + archived files (Org1 Proj1: 2, Org2 Proj1: 1) = 9
+        var countActive = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
+        var countAll = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: false);
+
+        Assert.Equal(6, countActive);
+        Assert.Equal(9, countAll);
     }
 
     // ── Cross-org isolation ───────────────────────────────────────────────────

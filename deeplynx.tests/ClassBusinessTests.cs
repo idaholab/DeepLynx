@@ -89,6 +89,7 @@ public class ClassBusinessTests : IntegrationTestBase
 
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,

@@ -29,6 +29,138 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
     /// <param name="organizationId">The ID of the organization under which project exists</param>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching records are returned unpaginated</param>
+    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
+    /// <param name="pointInTime">(Optional) Find the most current records that existed before this point in time</param>
+    /// <param name="hideArchived">(Optional) Flag indicating whether to hide archived records from the result.</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>A paginated list of historical records, or all records if no pagination is specified</returns>
+    public async Task<PaginatedResponse<HistoricalRecordResponseDto>> GetAllHistoricalRecordsPaginated(
+        long currentUserId, long projectId, long organizationId, PaginatedRequestDto paginatedRequestDto, long? dataSourceId = null, DateTime? pointInTime = null,
+        bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        var recordQuery = _context.HistoricalRecords
+            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
+
+        if (dataSourceId.HasValue) recordQuery = recordQuery.Where(r => r.DataSourceId == dataSourceId);
+
+        if (pointInTime.HasValue)
+        {
+            var unspecifiedPointInTime = DateTime.SpecifyKind(pointInTime.Value, DateTimeKind.Unspecified);
+            recordQuery = recordQuery.Where(r => r.LastUpdatedAt <= unspecifiedPointInTime);
+        }
+
+        var records = await recordQuery
+            .GroupBy(e => e.RecordId)
+            .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).First())
+            .ToListAsync();
+
+        if (hideArchived && records.Count > 0)
+            records = records.Where(r => !r.IsArchived).ToList();
+
+        var recordIds = records.Select(r => r.RecordId).ToList();
+
+        // if user is not admin, filter out unauthorized labels
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedIds = await _sensitivityLabelService
+                .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+            records = records.Where(r => authorizedIds.Contains(r.RecordId)).ToList();
+        }
+
+        if (records.Count == 0)
+        {
+            return new PaginatedResponse<HistoricalRecordResponseDto>
+            {
+                Items = [],
+                PageNumber = paginatedRequestDto.PageNumber,
+                PageSize = paginatedRequestDto.PageSize,
+                TotalCount = 0
+            };
+        }
+
+        var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+            currentUserId,
+            organizationId,
+            projectId,
+            "download file");
+
+        var currentRecords = await _context.Records
+            .Where(r => recordIds.Contains(r.Id))
+            .Include(r => r.Labels)
+            .ToDictionaryAsync(r => r.Id);
+
+        var orderedItems = records
+            .OrderBy(r => r.RecordId)
+            .Select(r => new HistoricalRecordResponseDto
+            {
+                Id = r.RecordId,
+                Uri = currentRecords.TryGetValue(r.RecordId, out var currentRecord) &&
+                    ExposeUriHelper.CanExposeUri(currentRecord, authorizedDownloadLabels, isSysAdmin, isOrgAdmin, isProjectAdmin)
+                    ? r.Uri
+                    : null,
+                Properties = r.Properties,
+                OriginalId = r.OriginalId,
+                Name = r.Name,
+                Description = r.Description,
+                ClassId = r.ClassId,
+                ClassName = r.ClassName,
+                DataSourceId = r.DataSourceId,
+                DataSourceName = r.DataSourceName,
+                ObjectStorageId = r.ObjectStorageId,
+                ObjectStorageName = r.ObjectStorageName,
+                ProjectId = r.ProjectId,
+                ProjectName = r.ProjectName,
+                Tags = r.Tags,
+                Labels = r.Labels,
+                LastUpdatedBy = r.LastUpdatedBy,
+                FileType = r.FileType,
+                FileSize = r.FileSize,
+                IsArchived = r.IsArchived,
+                LastUpdatedAt = r.LastUpdatedAt
+            })
+            .ToList();
+
+        var totalCount = orderedItems.Count;
+
+        if (paginatedRequestDto.PageSize == -1)
+        {
+            return new PaginatedResponse<HistoricalRecordResponseDto>
+            {
+                Items = orderedItems,
+                PageNumber = 1,
+                PageSize = orderedItems.Count,
+                TotalCount = totalCount
+            };
+        }
+
+        var pagedItems = orderedItems
+            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
+            .Take(paginatedRequestDto.PageSize)
+            .ToList();
+
+        return new PaginatedResponse<HistoricalRecordResponseDto>
+        {
+            Items = pagedItems,
+            PageNumber = paginatedRequestDto.PageNumber,
+            PageSize = paginatedRequestDto.PageSize,
+            TotalCount = totalCount
+        };
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    /// [DEPRECATED - V1 ONLY] List all historical records without pagination
+    /// Superseded by <see cref="GetAllHistoricalRecordsPaginated"/>. Do not call this from new controller versions;
+    /// it exists solely to back the deprecated v1 historical record controllers and should be deleted once
+    /// those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <param name="organizationId">The ID of the organization under which project exists</param>
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
     /// <param name="pointInTime">(Optional) Find the most current records that existed before this point in time</param>
     /// <param name="hideArchived">(Optional) Flag indicating whether to hide archived records from the result.</param>
@@ -113,6 +245,8 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 LastUpdatedAt = r.LastUpdatedAt
             });
     }
+
+    #endregion
 
     /// <summary>
     ///     Show the historical updates of a specific record

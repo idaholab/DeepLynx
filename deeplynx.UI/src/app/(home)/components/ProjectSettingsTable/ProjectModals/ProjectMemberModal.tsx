@@ -33,8 +33,8 @@ const AddProjectMember = ({
     if (isOpen && organization?.organizationId) {
       // Fetch users
       getAllUsers()
-        .then((response: UserResponseDto[]) => {
-          setUsers(response);
+        .then((response) => {
+          setUsers(response.items);
         })
         .catch((error) => {
           console.error("Error fetching users:", error);

@@ -46,7 +46,7 @@ const SysAdminPage = async () => {
   const { items: OrganizationResponseDtos } =
     (await getAllOrganizationsServer()) as PaginatedResponse<OrganizationResponseDto>;
   const oAuthApplications =
-    (await getAllOauthApplicationsServer()) as OauthApplicationResponseDto[];
+    (await getAllOauthApplicationsServer()) as PaginatedResponse<OauthApplicationResponseDto>;
   const members = (await getAllUsersServer()) as UserResponseDto[];
 
   // Fetch projects filtered by organization
