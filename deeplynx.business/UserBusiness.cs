@@ -1,5 +1,6 @@
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -9,14 +10,17 @@ namespace deeplynx.business;
 
 public class UserBusiness : IUserBusiness
 {
+    private readonly ICacheBusiness _cache;
     private readonly DeeplynxContext _context;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="UserBusiness" /> class.
     /// </summary>
+    /// <param name="cache">Used for caching operations.</param>
     /// <param name="context">The database context used for the user operations.</param>
-    public UserBusiness(DeeplynxContext context)
+    public UserBusiness(ICacheBusiness cache, DeeplynxContext context)
     {
+        _cache = cache;
         _context = context;
     }
 
@@ -340,6 +344,10 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
+
+        // invalidate the cached admin flag now that it's changed
+        await _cache.DeleteAsync(CacheKeys.SysAdmin(userId));
+
         return true;
     }
 
@@ -421,6 +429,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(candidate);
         await _context.SaveChangesAsync();
+
+        await _cache.DeleteAsync(CacheKeys.SysAdmin(candidateId));
+
         return true;
     }
 

@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Context;
 using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
@@ -19,6 +20,7 @@ namespace deeplynx.business;
 
 public class ProjectBusiness : IProjectBusiness
 {
+    private readonly ICacheBusiness _cache;
     private readonly IClassBusiness _classBusiness;
     private readonly DeeplynxContext _context;
     private readonly IDataSourceBusiness _dataSourceBusiness;
@@ -36,6 +38,7 @@ public class ProjectBusiness : IProjectBusiness
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly INotificationBusiness _notificationBusiness;
     private readonly IOrganizationBusiness _organizationBusiness;
+    private readonly IOrganizationService _organizationService;
     private readonly IRoleBusiness _roleBusiness;
     private readonly TimeSpan cacheTTL = TimeSpan.FromHours(1);
     private readonly string ProjectsCacheKey = "projects";
@@ -44,23 +47,26 @@ public class ProjectBusiness : IProjectBusiness
     ///     Initializes a new instance of the <see cref="ProjectBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the project operations.</param>
+    /// <param name="cache">Used for caching operations.</param>
     /// <param name="classBusiness">Used to create default classes automatically on project creation.</param>
     /// <param name="roleBusiness">Used to create default roles automatically on project creation.</param>
     /// <param name="dataSourceBusiness">Used to create a default datasource on project creation.</param>
     /// <param name="notificationBusiness">The business logic interface for handling notification operations.</param>
     /// <param name="organizationBusiness">The business logic interface for handling organization operations.</param>
+    /// <param name="organizationService">Used for handling organization services.</param>
     /// <param name="eventBusiness">Used for logging events during create and update Operations.</param>
     /// <param name="logger">Used for uniformity in logging</param>
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
     /// <param name="fileAzureBusiness">Used to manage Azure operations.</param>
     public ProjectBusiness(
-        DeeplynxContext context, ILogger<ProjectBusiness> logger,
+        ICacheBusiness cache, DeeplynxContext context, ILogger<ProjectBusiness> logger,
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
         IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness,
-        IFileBusiness fileAzureBusiness,
+        IOrganizationService organizationService, IFileBusiness fileAzureBusiness,
         IFileBusinessFactory fileBusinessFactory)
     {
+        _cache = cache;
         _context = context;
         _logger = logger;
         _classBusiness = classBusiness;
@@ -70,6 +76,7 @@ public class ProjectBusiness : IProjectBusiness
         _objectStorageBusiness = objectStorageBusiness;
         _eventBusiness = eventBusiness;
         _organizationBusiness = organizationBusiness;
+        _organizationService = organizationService;
         _fileAzureBusiness = fileAzureBusiness;
         _fileBusinessFactory = fileBusinessFactory;
     }
@@ -1176,6 +1183,13 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Add(projMember);
         await _context.SaveChangesAsync();
 
+        // invalidate the cached admin flag now that it's changed
+        if (makeProjectAdmin && !(userId == null))
+        {
+            long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
+            await _cache.DeleteAsync(CacheKeys.ProjectAdmin((long)userId, organizationId, [projectId]));
+        }
+
         if (userId.HasValue && userId != UserContextStorage.UserId)
         {
             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -1241,6 +1255,13 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Update(existingProjectMember);
         await _context.SaveChangesAsync();
 
+        // invalidate the cached admin flag now that it's changed
+        if (!(userId == null))
+        {
+            long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
+            await _cache.DeleteAsync(CacheKeys.ProjectAdmin((long)userId, organizationId, [projectId]));
+        }
+
         return true;
     }
 
@@ -1279,6 +1300,13 @@ public class ProjectBusiness : IProjectBusiness
         existingProjectMember.IsProjectAdmin = isAdmin;
         _context.ProjectMembers.Update(existingProjectMember);
         await _context.SaveChangesAsync();
+
+        // invalidate the cached admin flag now that it's changed
+        if (!(userId == null)) 
+        {
+            long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
+            await _cache.DeleteAsync(CacheKeys.ProjectAdmin((long)userId, organizationId, [projectId]));
+        }
 
         return true;
     }
@@ -1331,6 +1359,13 @@ public class ProjectBusiness : IProjectBusiness
         // remove project member
         _context.ProjectMembers.Remove(existingProjectMember);
         await _context.SaveChangesAsync();
+
+        // invalidate the cached admin flag now that it's changed
+        if (!(userId == null))
+        {
+            long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
+            await _cache.DeleteAsync(CacheKeys.ProjectAdmin((long)userId, organizationId, [projectId]));
+        }
 
         return true;
     }

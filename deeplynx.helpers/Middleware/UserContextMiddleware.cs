@@ -1,5 +1,7 @@
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
+using deeplynx.helpers.Cache;
+using deeplynx.interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -13,14 +15,19 @@ public class UserContextMiddleware
     private readonly ILogger<UserContextMiddleware> _logger;
     private readonly RequestDelegate _next;
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly ICacheBusiness _cache;
+
+    private static readonly TimeSpan AdminFlagCacheTtl = TimeSpan.FromMinutes(2);
 
     public UserContextMiddleware(
         RequestDelegate next,
         IServiceScopeFactory serviceScopeFactory,
+        ICacheBusiness cache,
         ILogger<UserContextMiddleware> logger)
     {
         _next = next;
         _serviceScopeFactory = serviceScopeFactory;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -64,7 +71,9 @@ public class UserContextMiddleware
                             var adminService = scope.ServiceProvider.GetRequiredService<IAdminService>();
                             var organizationService = scope.ServiceProvider.GetRequiredService<IOrganizationService>();
 
-                            UserContextStorage.IsSysAdmin = await adminService.SysAdminCheck(user.Id);
+                            UserContextStorage.IsSysAdmin = await GetOrSetBoolAsync(
+                                CacheKeys.SysAdmin(user.Id),
+                                () => adminService.SysAdminCheck(user.Id));
 
                             var projectIds = ExtractProjectIds(context);
 
@@ -101,10 +110,18 @@ public class UserContextMiddleware
 
                             UserContextStorage.OrganizationId = resolvedOrganizationId;
 
-                            UserContextStorage.IsOrgAdmin = await adminService.OrgAdminCheck(user.Id, resolvedOrganizationId);
-                            UserContextStorage.IsOrgMember = await adminService.OrgMemberCheck(user.Id, resolvedOrganizationId);
+                            UserContextStorage.IsOrgAdmin = await GetOrSetBoolAsync(
+                                CacheKeys.OrgAdmin(user.Id, resolvedOrganizationId),
+                                () => adminService.OrgAdminCheck(user.Id, resolvedOrganizationId));
+
+                            UserContextStorage.IsOrgMember = await GetOrSetBoolAsync(
+                                CacheKeys.OrgMember(user.Id, resolvedOrganizationId),
+                                () => adminService.OrgMemberCheck(user.Id, resolvedOrganizationId));
+
                             UserContextStorage.IsProjectAdmin = projectIds.Any() &&
-                                await adminService.ProjectAdminCheck(user.Id, resolvedOrganizationId, projectIds);
+                                await GetOrSetBoolAsync(
+                                    CacheKeys.ProjectAdmin(user.Id, resolvedOrganizationId, projectIds),
+                                    () => adminService.ProjectAdminCheck(user.Id, resolvedOrganizationId, projectIds));
                         }
 
                         else
@@ -141,6 +158,17 @@ public class UserContextMiddleware
             UserContextStorage.IsOrgMember = false;
             UserContextStorage.IsProjectAdmin = false;
         }
+    }
+
+    private async Task<bool> GetOrSetBoolAsync(string key, Func<Task<bool>> factory)
+    {
+        var cached = await _cache.GetAsync<bool?>(key);
+        if (cached.HasValue)
+            return cached.Value;
+
+        var result = await factory();
+        await _cache.SetAsync(key, result, AdminFlagCacheTtl);
+        return result;
     }
 
     private static long? ExtractOrganizationId(HttpContext context)
