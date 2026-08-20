@@ -169,8 +169,8 @@ test.describe("File Upload -> New Record", () => {
                 let filePath: string;
                 let createdRecord: { recordId: string; projectId: string } | null = null;
 
-                test.beforeEach(async () => {
-                    uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2)}-${fileType.fileName}`;
+                test.beforeEach(async ({}, testInfo) => {
+                    uniqueName = `${testInfo.testId}-${fileType.fileName}`;
                     filePath = await setUp(uniqueName, fileType.content);
                     createdRecord = null;
                 });
@@ -538,15 +538,15 @@ test.describe("File Upload -> New Record", () => {
                 let options: CreatedMetadata;
                 let createdRecord: { recordId: string; projectId: string } | null = null;
 
-                test.beforeEach(async ({}) => {
+                test.beforeEach(async ({}, testInfo) => {
                     const fileContent = "The cow jumped over the moon.";
-                    fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-metadata-${scenario.name}`;
+                    fileName = `${testInfo.testId}-metadata-${scenario.name}`;
                     filePath = await setUp(fileName, fileContent);
                     createdRecord = null;
 
                     options = scenario.options(usableClass);
                     metadata = await buildMetadata(options);
-                    const rawName = options.Name ?? `${Date.now()}-${Math.random().toString(36).slice(2)}-missing-name-${scenario.name}.json`;
+                    const rawName = options.Name ?? `${testInfo.testId}-missing-name-${scenario.name}.json`;
                     const metadataFileName = toSafeFileName(rawName);
                     metadataPath = await setUp(metadataFileName, JSON.stringify(metadata, null, 2));
                 });
