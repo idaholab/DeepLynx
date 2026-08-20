@@ -261,7 +261,7 @@ export function useCollectionDetails({
   const loadCollectionRecords = useCallback(async () => {
     setRecordsLoading(true);
     try {
-      const records = await getRecordsInRecordCollection(
+      const {items: records } = await getRecordsInRecordCollection(
         organizationId,
         projectId,
         selectedCollection.id,

@@ -532,6 +532,63 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetRecordsInRecordCollectionPaginated Tests
+
+    [Fact]
+    public async Task GetRecordsInRecordCollectionPaginated_HideArchived_ExcludesArchivedRecords()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var result = await _recordCollectionBusiness.GetRecordsInRecordCollectionPaginated(
+            _userId, _organizationId, _projectId, _collectionId, true, paginatedRequest, true, true, false);
+
+        Assert.NotNull(result);
+        Assert.All(result.Items, r => Assert.False(r.IsArchived));
+    }
+
+    [Fact]
+    public async Task GetRecordsInRecordCollectionPaginated_ArchivedCollection_ThrowsKeyNotFound()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordCollectionBusiness.GetRecordsInRecordCollectionPaginated(
+                _userId, _organizationId, _projectId, _archivedCollectionId, true, paginatedRequest, true, true, false));
+    }
+
+    [Fact]
+    public async Task GetRecordsInRecordCollectionPaginated_Pagination_ReturnsCorrectPage()
+    {
+        // Arrange: Assuming at least 3 records exist in the collection
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 1 };
+
+        // Act
+        var result = await _recordCollectionBusiness.GetRecordsInRecordCollectionPaginated(
+            _userId, _organizationId, _projectId, _collectionId, true, paginatedRequest, false, true, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(1, result.PageSize);
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task GetRecordsInRecordCollectionPaginated_PageSizeMinusOne_ReturnsAllRecords()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = -1 };
+
+        var result = await _recordCollectionBusiness.GetRecordsInRecordCollectionPaginated(
+            _userId, _organizationId, _projectId, _collectionId, true, paginatedRequest, false, true, false);
+
+        Assert.NotNull(result);
+        Assert.True(result.Items.Count >= 1);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
+    }
+
+    #endregion
+
     #region Get Collection By Tags
     [Fact]
     public async Task GetRecordCollectionsByTags_ReturnsCollectionsContainingAllTags()
