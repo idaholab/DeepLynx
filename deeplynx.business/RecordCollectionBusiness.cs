@@ -1211,6 +1211,67 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         var inserted = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, projectId, tags);
         return inserted.ToDictionary(t => t.Name, t => t);
     }
+    
+    private static RecordResponseDto RecordToResponse(Record record)
+    {
+        return new RecordResponseDto
+        {
+            Id = record.Id,
+            Description = record.Description,
+            Uri = record.Uri,
+            Properties = record.Properties,
+            OriginalId = record.OriginalId,
+            ObjectStorageId = record.ObjectStorageId,
+            Name = record.Name,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedBy = record.LastUpdatedBy,
+            LastUpdatedAt = record.LastUpdatedAt,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize,
+            FileContentHash = record.FileContentHash,
+            Tags = record.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = record.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        };
+    }
+
+    private static RecordCollectionResponseDto RecordCollectionToResponse(RecordCollection c)
+    {
+        return new RecordCollectionResponseDto
+        {
+            Id = c.Id,
+            Description = c.Description,
+            Properties = c.Properties,
+            Name = c.Name,
+            ProjectId = c.ProjectId,
+            OrganizationId = c.OrganizationId,
+            LastUpdatedBy = c.LastUpdatedBy,
+            LastUpdatedAt = c.LastUpdatedAt,
+            IsArchived = c.IsArchived,
+            RecordCount = c.Records.Count(),
+            Tags = c.Tags.Select(t => new RecordCollectionTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        };
+    }
 
     #region Deprecated
 
@@ -1308,68 +1369,5 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         };
 
     }
-
     #endregion
-
-    private static RecordResponseDto RecordToResponse(Record record)
-    {
-        return new RecordResponseDto
-        {
-            Id = record.Id,
-            Description = record.Description,
-            Uri = record.Uri,
-            Properties = record.Properties,
-            OriginalId = record.OriginalId,
-            ObjectStorageId = record.ObjectStorageId,
-            Name = record.Name,
-            ClassId = record.ClassId,
-            DataSourceId = record.DataSourceId,
-            ProjectId = record.ProjectId,
-            OrganizationId = record.OrganizationId,
-            LastUpdatedBy = record.LastUpdatedBy,
-            LastUpdatedAt = record.LastUpdatedAt,
-            IsArchived = record.IsArchived,
-            FileType = record.FileType,
-            FileSize = record.FileSize,
-            FileContentHash = record.FileContentHash,
-            Tags = record.Tags.Select(t => new RecordTagDto
-            {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList(),
-            Labels = record.Labels.Select(l => new RecordLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        };
-    }
-
-    private static RecordCollectionResponseDto RecordCollectionToResponse(RecordCollection c)
-    {
-        return new RecordCollectionResponseDto
-        {
-            Id = c.Id,
-            Description = c.Description,
-            Properties = c.Properties,
-            Name = c.Name,
-            ProjectId = c.ProjectId,
-            OrganizationId = c.OrganizationId,
-            LastUpdatedBy = c.LastUpdatedBy,
-            LastUpdatedAt = c.LastUpdatedAt,
-            IsArchived = c.IsArchived,
-            RecordCount = c.Records.Count(),
-            Tags = c.Tags.Select(t => new RecordCollectionTagDto
-            {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList(),
-            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        };
-    }
-
 }
