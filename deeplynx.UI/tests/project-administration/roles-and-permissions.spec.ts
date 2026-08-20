@@ -28,21 +28,14 @@ test.describe("Org Admin editing Permissions of Proj level SLs", () => {
   let projectId: string;
 
   test.beforeAll(async ({ request }, testInfo) => {
-    // NOTE: adjust auth header/token retrieval to match how your test
-    // fixtures normally authenticate API calls (e.g. a helper that logs
-    // in orgAdminA and returns a bearer token). Swap ACCESS_TOKEN below.
     apiContext = request;
     orgId = await getOrgIdByName(request, ORGS.orgA.name);
     projectId = await getProjectIdByName(request, orgId, PROJECTS.projectX.name);
     uniqueLabelName = `Test SL-${testInfo.testId}`;
 
     const createResponse = await apiContext.post(
-      testApiUrl(`/api/v1/projects/${projectId}/labels`),
+      testApiUrl(`/projects/${projectId}/labels`),
       {
-        headers: {
-          Authorization: `Bearer ${process.env.TEST_ACCESS_TOKEN}`,
-          "Content-Type": "application/json",
-        },
         data: {
           name: uniqueLabelName,
           description: "Created by Playwright test - safe to delete",
@@ -50,6 +43,10 @@ test.describe("Org Admin editing Permissions of Proj level SLs", () => {
       },
     );
 
+    if (!createResponse.ok()) {
+      console.log("Status:", createResponse.status());
+      console.log("Body:", await createResponse.text());
+    }
     expect(createResponse.ok()).toBeTruthy();
     const created = await createResponse.json();
     createdLabelId = created.id;
@@ -60,12 +57,7 @@ test.describe("Org Admin editing Permissions of Proj level SLs", () => {
     apiContext = request;
 
     const deleteResponse = await apiContext.delete(
-      testApiUrl(`/api/v1/projects/${projectId}/labels/${createdLabelId}`),
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.TEST_ACCESS_TOKEN}`,
-        },
-      },
+      testApiUrl(`/projects/${projectId}/labels/${createdLabelId}`),
     );
 
     expect(deleteResponse.ok()).toBeTruthy();
