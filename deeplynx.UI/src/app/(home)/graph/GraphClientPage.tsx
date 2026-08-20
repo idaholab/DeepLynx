@@ -38,6 +38,7 @@ const GraphClientPage = ({
   const { t } = useLanguage();
 
   const [error, setError] = useState<string | null>(null);
+  const [isPermissionDenied, setIsPermissionDenied] = useState(false);
   const [graphData, setGraphData] = useState<GraphExplorerData | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
   const [selectedRecord, setSelectedRecord] =
@@ -48,9 +49,8 @@ const GraphClientPage = ({
   const [showAllLabels, setShowAllLabels] = useState(false);
   const { filteredNodes, loading: classesLoading } = useFilteredNodes(
     graphData?.nodes ?? [],
-    projectId
+    projectId,
   );
-
 
   const controllerRef = useRef<GraphController | null>(null);
   const relationshipViewMode: GraphViewMode = "all";
@@ -109,6 +109,10 @@ const GraphClientPage = ({
       cancelled = true;
     };
   }, [organization?.organizationId, projectId, selectedNodeId]);
+
+  useEffect(() => {
+    setIsPermissionDenied(false);
+  }, [recordId]);
 
   // Derive lookup maps and view models once from the graph payload so the UI
   // panels stay simple and render from precomputed data.
@@ -213,7 +217,12 @@ const GraphClientPage = ({
     [],
   );
 
-  const handleGraphLoadingChange = useCallback((_loading: boolean) => { }, []);
+  const handleGraphLoadingChange = useCallback((_loading: boolean) => {}, []);
+
+  const handlePermissionDenied = useCallback(() => {
+    setIsPermissionDenied(true);
+    setError(null);
+  }, []);
 
   return (
     <div className="mt-4 p-4">
@@ -243,24 +252,37 @@ const GraphClientPage = ({
             )}
 
             <div className="min-h-[720px] overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(14,116,144,0.08),_transparent_45%),linear-gradient(180deg,_rgba(248,250,252,0.82),_rgba(226,232,240,0.45))]">
-              {/* Interactive Sigma canvas */}
-              <GraphCanvas
-                organizationId={organization?.organizationId as number | null}
-                projectId={projectId}
-                recordId={recordId}
-                depth={depth}
-                selectedNodeId={selectedNodeId}
-                showAllLabels={showAllLabels}
-                viewMode="path"
-                pathNodeIds={pathToSelected.nodeIds}
-                pathEdgeIds={pathToSelected.edgeIds}
-                onLoadingChange={handleGraphLoadingChange}
-                onError={setError}
-                onNodeSelect={handleSelectNode}
-                onNodeOpen={handleOpenRecord}
-                onDataLoaded={setGraphData}
-                onControlsReady={handleControlsReady}
-              />
+              {isPermissionDenied ? (
+                <div className="flex h-full min-h-[720px] flex-col items-center justify-center gap-2 px-6 text-center">
+                  <p className="text-base font-medium text-base-content/70">
+                    {t.translations.GRAPH_EDGE_PERMISSION_REQUIRED ||
+                      "Edge access is needed to view the graph."}
+                  </p>
+                  <p className="text-sm text-base-content/50">
+                    {t.translations.GRAPH_EDGE_PERMISSION_REQUIRED_SUBTEXT ||
+                      "Ask a project administrator to grant edge read access to see connections for this record."}
+                  </p>
+                </div>
+              ) : (
+                <GraphCanvas
+                  organizationId={organization?.organizationId as number | null}
+                  projectId={projectId}
+                  recordId={recordId}
+                  depth={depth}
+                  selectedNodeId={selectedNodeId}
+                  showAllLabels={showAllLabels}
+                  viewMode="path"
+                  pathNodeIds={pathToSelected.nodeIds}
+                  pathEdgeIds={pathToSelected.edgeIds}
+                  onLoadingChange={handleGraphLoadingChange}
+                  onError={setError}
+                  onPermissionDenied={handlePermissionDenied}
+                  onNodeSelect={handleSelectNode}
+                  onNodeOpen={handleOpenRecord}
+                  onDataLoaded={setGraphData}
+                  onControlsReady={handleControlsReady}
+                />
+              )}
             </div>
 
             <GraphLegend nodes={filteredNodes} />
