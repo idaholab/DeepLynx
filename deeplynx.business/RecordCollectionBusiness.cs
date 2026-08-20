@@ -166,22 +166,31 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
     }
 
+   
     /// <summary>
-    /// Retrieves all authorized records in a specific record collection.
+    /// Retrieves all authorized records in a specific record collection with pagination.
     /// </summary>
     /// <param name="currentUserId"></param>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="recordCollectionId"></param>
     /// <param name="hideArchived"></param>
+    /// <param name="paginatedRequestDto"></param>
     /// <param name="isSysAdmin"></param>
     /// <param name="isOrgAdmin"></param>
     /// <param name="isProjectAdmin"></param>
     /// <returns></returns>
     /// <exception cref="KeyNotFoundException"></exception>
-    public async Task<List<RecordResponseDto>> GetRecordsInRecordCollection(
-        long currentUserId, long organizationId, long projectId, long recordCollectionId, bool hideArchived,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    public async Task<PaginatedResponse<RecordResponseDto>> GetRecordsInRecordCollectionPaginated(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordCollectionId,
+        bool hideArchived,
+        PaginatedRequestDto paginatedRequestDto,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
     {
         var collectionExists = await _context.RecordCollections.AnyAsync(c =>
             c.Id == recordCollectionId &&
@@ -211,39 +220,13 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
 
-        var records = await recordQuery
-            .Include(r => r.Tags)
-            .Include(r => r.Labels)
-            .ToListAsync();
+        var orderedQuery = recordQuery.OrderBy(r => r.Id);
 
-        return records
-        .Select(r => new RecordResponseDto
-        {
-            Id = r.Id,
-            Description = r.Description,
-            Uri = r.Uri,
-            Properties = r.Properties,
-            OriginalId = r.OriginalId,
-            Name = r.Name,
-            ClassId = r.ClassId,
-            DataSourceId = r.DataSourceId,
-            ProjectId = r.ProjectId,
-            OrganizationId = r.OrganizationId,
-            LastUpdatedBy = r.LastUpdatedBy,
-            LastUpdatedAt = r.LastUpdatedAt,
-            IsArchived = r.IsArchived,
-            FileType = r.FileType,
-            Tags = r.Tags.Select(t => new RecordTagDto
-            {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList(),
-            Labels = r.Labels.Select(l => new RecordLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        }).ToList();
+        var paginatedRecords = await orderedQuery
+            .Select(r => RecordToResponse(r))
+            .ToPaginatedAsync(paginatedRequestDto);
+
+        return paginatedRecords;
     }
 
     /// <summary>
@@ -1080,6 +1063,95 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         return recordCollection.Labels.ToList();
     }
 
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all record collections without pagination.
+    ///     Superseded by <see cref="GetRecordsInRecordCollectionPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 record collection controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="currentUserId"></param>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="recordCollectionId"></param>
+    /// <param name="hideArchived"></param>
+    /// <param name="isSysAdmin"></param>
+    /// <param name="isOrgAdmin"></param>
+    /// <param name="isProjectAdmin"></param>
+    /// <returns></returns>
+    /// <exception cref="KeyNotFoundException"></exception>
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by GetRecordsInRecordCollectionPaginated. " +
+              "Remove once v1 record collection endpoints are sunset.", error: false)]
+    public async Task<List<RecordResponseDto>> GetRecordsInRecordCollection(
+        long currentUserId, long organizationId, long projectId, long recordCollectionId, bool hideArchived,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        var collectionExists = await _context.RecordCollections.AnyAsync(c =>
+            c.Id == recordCollectionId &&
+            c.OrganizationId == organizationId &&
+            c.ProjectId == projectId &&
+            (!hideArchived || !c.IsArchived));
+
+        if (!collectionExists)
+            throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found");
+
+        var recordQuery = _context.Records
+            .Where(r =>
+                r.OrganizationId == organizationId &&
+                r.ProjectId == projectId &&
+                r.RecordCollections.Any(c => c.Id == recordCollectionId));
+
+        if (hideArchived)
+            recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            recordQuery = recordQuery.Where(r =>
+                r.Labels.Count == 0 ||
+                r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
+        }
+
+        var records = await recordQuery
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .ToListAsync();
+
+        return records
+        .Select(r => new RecordResponseDto
+        {
+            Id = r.Id,
+            Description = r.Description,
+            Uri = r.Uri,
+            Properties = r.Properties,
+            OriginalId = r.OriginalId,
+            Name = r.Name,
+            ClassId = r.ClassId,
+            DataSourceId = r.DataSourceId,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            LastUpdatedBy = r.LastUpdatedBy,
+            LastUpdatedAt = r.LastUpdatedAt,
+            IsArchived = r.IsArchived,
+            FileType = r.FileType,
+            Tags = r.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = r.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        }).ToList();
+    }
+
+    #endregion
+
     /// <summary>
     ///     Private method used to calculate json depth of properties (should be less than three)
     /// </summary>
@@ -1260,5 +1332,39 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     }
 
     #endregion
+
+    private static RecordResponseDto RecordToResponse(Record record)
+    {
+        return new RecordResponseDto
+        {
+            Id = record.Id,
+            Description = record.Description,
+            Uri = record.Uri,
+            Properties = record.Properties,
+            OriginalId = record.OriginalId,
+            ObjectStorageId = record.ObjectStorageId,
+            Name = record.Name,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedBy = record.LastUpdatedBy,
+            LastUpdatedAt = record.LastUpdatedAt,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize,
+            FileContentHash = record.FileContentHash,
+            Tags = record.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = record.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        };
+    }
 
 }

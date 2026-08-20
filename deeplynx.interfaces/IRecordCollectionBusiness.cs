@@ -9,9 +9,21 @@ public interface IRecordCollectionBusiness
         long currentUserId, long organizationId, long projectId, RecordCollectionQueryRequestDto dto,
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by GetRecordsInRecordCollectionPaginated. " +
+              "Remove once v1 record collection endpoints are sunset.", error: false)]
     Task<List<RecordResponseDto>> GetRecordsInRecordCollection(
         long currentUserId, long organizationId, long projectId, long recordCollectionId, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+    Task<PaginatedResponse<RecordResponseDto>> GetRecordsInRecordCollectionPaginated(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordCollectionId,
+        bool hideArchived,
+        PaginatedRequestDto paginatedRequestDto,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false);
 
     [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by " +
               "GetRecordCollectionsForRecordPaginated. Remove once v1 record collection endpoints are sunset.", error: false)]

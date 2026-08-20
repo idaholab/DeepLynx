@@ -80,8 +80,9 @@ export function useSelectedCollectionDetailsView({
   );
 
   const visibleCollectionDetailRecords = useMemo(() => {
+    const records = Array.isArray(filteredCollectionDetailRecords) ? filteredCollectionDetailRecords : [];
     const startIndex = (collectionDetailRecordPage - 1) * recordsPerPage;
-    return filteredCollectionDetailRecords.slice(startIndex, startIndex + recordsPerPage);
+    return records.slice(startIndex, startIndex + recordsPerPage);
   }, [collectionDetailRecordPage, filteredCollectionDetailRecords, recordsPerPage]);
 
   useEffect(() => {

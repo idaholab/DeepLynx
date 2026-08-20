@@ -70,25 +70,27 @@ export function useSelectedCollectionEditDerived({
     );
 
   const addableRecordResults = useMemo(() => {
+    const recordsArray = Array.isArray(collectionRecords) ? collectionRecords : [];
     const existingIds = new Set(
-      collectionRecords
+      recordsArray
         .map((record) => record.id)
         .filter((id): id is number => typeof id === "number"),
     );
-    return recordSearchResults.filter(
+
+    const searchResultsArray = Array.isArray(recordSearchResults) ? recordSearchResults : [];
+    return searchResultsArray.filter(
       (record) => typeof record.id === "number" && !existingIds.has(record.id),
     );
   }, [collectionRecords, recordSearchResults]);
 
-  const collectionRecordIds = useMemo(
-    () =>
-      new Set(
-        collectionRecords
-          .map((record) => record.id)
-          .filter((id): id is number => typeof id === "number"),
-      ),
-    [collectionRecords],
-  );
+  const collectionRecordIds = useMemo(() => {
+    const recordsArray = Array.isArray(collectionRecords) ? collectionRecords : [];
+    return new Set(
+      recordsArray
+        .map(record => record.id)
+        .filter((id): id is number => typeof id === "number"),
+    );
+  }, [collectionRecords]);
 
   const isShowingRecordSearchResults =
     recordSearchTerm.trim().length > 0 || recordSearchResults.length > 0;
