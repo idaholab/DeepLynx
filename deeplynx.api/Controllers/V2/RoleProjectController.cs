@@ -43,18 +43,21 @@ public class RoleProjectController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose roles are to be retrieved</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived roles from the result (Default true)</param>
-    /// <returns>A list of roles for the given organization/project.</returns>
+    /// <returns>A paginated list of roles for the given organization/project.</returns>
     [HttpGet(Name = "api_get_all_roles_project")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "role")]
     public async Task<ActionResult<IEnumerable<RoleResponseDto>>> GetAllRoles(
         long organizationId,
         long projectId,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null,
         [FromQuery] bool hideArchived = true)
     {
-            var roles = await _roleBusiness.GetAllRoles(organizationId, projectId, hideArchived);
-            return Ok(roles);
+        paginatedRequestDto ??= new PaginatedRequestDto();
+        var roles = await _roleBusiness.GetAllRolesPaginated(organizationId, projectId, paginatedRequestDto, hideArchived);
+        return Ok(roles);
     }
 
 
@@ -76,8 +79,8 @@ public class RoleProjectController : ControllerBase
         long roleId,
         [FromQuery] bool hideArchived = true)
     {
-            var role = await _roleBusiness.GetRole(roleId, organizationId, projectId, hideArchived);
-            return Ok(role);
+        var role = await _roleBusiness.GetRole(roleId, organizationId, projectId, hideArchived);
+        return Ok(role);
     }
 
 
@@ -97,9 +100,9 @@ public class RoleProjectController : ControllerBase
         long projectId,
         [FromBody] CreateRoleRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var role = await _roleBusiness.CreateRole(currentUserId, dto, organizationId, projectId);
-            return Ok(role);
+        var currentUserId = UserContextStorage.UserId;
+        var role = await _roleBusiness.CreateRole(currentUserId, dto, organizationId, projectId);
+        return Ok(role);
     }
 
 
@@ -121,9 +124,9 @@ public class RoleProjectController : ControllerBase
         long roleId,
         [FromBody] UpdateRoleRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var role = await _roleBusiness.UpdateRole(currentUserId, roleId, organizationId, projectId, dto);
-            return Ok(role);
+        var currentUserId = UserContextStorage.UserId;
+        var role = await _roleBusiness.UpdateRole(currentUserId, roleId, organizationId, projectId, dto);
+        return Ok(role);
     }
 
 
@@ -143,9 +146,9 @@ public class RoleProjectController : ControllerBase
         long projectId,
         long roleId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _roleBusiness.DeleteRole(currentUserId, roleId, organizationId, projectId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _roleBusiness.DeleteRole(currentUserId, roleId, organizationId, projectId);
+        return Ok(response);
     }
 
 
@@ -167,15 +170,15 @@ public class RoleProjectController : ControllerBase
         long roleId,
         [FromQuery] bool archive)
     {
-            var userId = UserContextStorage.UserId;
-            if (archive)
-            {
-                var responseA = await _roleBusiness.ArchiveRole(userId, roleId, organizationId, projectId);
-                return Ok(responseA);
-            }
+        var userId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var responseA = await _roleBusiness.ArchiveRole(userId, roleId, organizationId, projectId);
+            return Ok(responseA);
+        }
 
-            var responseB = await _roleBusiness.UnarchiveRole(userId, roleId, organizationId, projectId);
-            return Ok(responseB);
+        var responseB = await _roleBusiness.UnarchiveRole(userId, roleId, organizationId, projectId);
+        return Ok(responseB);
     }
 
 
@@ -196,8 +199,8 @@ public class RoleProjectController : ControllerBase
         long projectId,
         long roleId)
     {
-            var permissions = await _roleBusiness.GetPermissionsByRole(roleId, organizationId, projectId);
-            return Ok(permissions);
+        var permissions = await _roleBusiness.GetPermissionsByRole(roleId, organizationId, projectId);
+        return Ok(permissions);
     }
 
 
@@ -220,8 +223,8 @@ public class RoleProjectController : ControllerBase
         long roleId,
         long permissionId)
     {
-            var response = await _roleBusiness.AddPermissionToRole(roleId, permissionId, organizationId, projectId);
-            return Ok(response);
+        var response = await _roleBusiness.AddPermissionToRole(roleId, permissionId, organizationId, projectId);
+        return Ok(response);
     }
 
 
@@ -244,8 +247,8 @@ public class RoleProjectController : ControllerBase
         long roleId,
         long permissionId)
     {
-            var response = await _roleBusiness.RemovePermissionFromRole(roleId, permissionId, organizationId, projectId);
-            return Ok(response);
+        var response = await _roleBusiness.RemovePermissionFromRole(roleId, permissionId, organizationId, projectId);
+        return Ok(response);
     }
 
 
@@ -268,7 +271,7 @@ public class RoleProjectController : ControllerBase
         long roleId,
         [FromBody] long[] permissionIds)
     {
-            var response = await _roleBusiness.SetPermissionsForRole(roleId, permissionIds, organizationId, projectId);
-            return Ok(response);
+        var response = await _roleBusiness.SetPermissionsForRole(roleId, permissionIds, organizationId, projectId);
+        return Ok(response);
     }
 }

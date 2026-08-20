@@ -681,6 +681,175 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetRecordCollectionsForRecordPaginated Tests
+
+    private static PaginatedRequestDto DefaultPagination(int pageNumber = 1, int pageSize = 100)
+    {
+        return new PaginatedRequestDto
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForRecordPaginated_RecordNotFound_ThrowsKeyNotFoundException()
+    {
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+                _userId, _organizationId, _projectId, 999999, true, DefaultPagination(), isSysAdmin: true));
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForRecordPaginated_ArchivedRecord_HideArchivedTrue_ThrowsKeyNotFoundException()
+    {
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+                _userId, _organizationId, _projectId, _archivedRecordId, true, DefaultPagination(), isSysAdmin: true));
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForRecordPaginated_ArchivedRecord_HideArchivedFalse_ReturnsCollections()
+    {
+        var result = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+            _userId, _organizationId, _projectId, _archivedRecordId, false, DefaultPagination(), isSysAdmin: true);
+
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(_collectionId, collection.Id);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForRecordPaginated_ReturnsOnlyCollectionsContainingRecord()
+    {
+        var result = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+            _userId, _organizationId, _projectId, _recordId1, true, DefaultPagination(), isSysAdmin: true);
+
+        Assert.Equal(1, result.TotalCount);
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(_collectionId, collection.Id);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForRecordPaginated_ReturnsAllProperties_Correctly()
+    {
+        var result = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+            _userId, _organizationId, _projectId, _recordId1, true, DefaultPagination(), isSysAdmin: true);
+
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(_collectionId, collection.Id);
+        Assert.Equal("Active Collection", collection.Name);
+        Assert.Equal("active collection", collection.Description);
+        Assert.Equal(_projectId, collection.ProjectId);
+        Assert.Equal(_organizationId, collection.OrganizationId);
+        Assert.Equal(_userId, collection.LastUpdatedBy);
+        Assert.False(collection.IsArchived);
+        Assert.Equal(2, collection.RecordCount); // record1 + archivedRecord
+        Assert.Single(collection.Tags);
+        Assert.Equal(_tagId1, collection.Tags.First().Id);
+        Assert.Single(collection.Labels);
+        Assert.Equal(_labelId, collection.Labels.First().Id);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForRecordPaginated_RecordInNoCollections_ReturnsEmptyPaginatedResponse()
+    {
+        var result = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+            _userId, _organizationId, _projectId, _recordId2, true, DefaultPagination(), isSysAdmin: true);
+
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(100, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForRecordPaginated_HideArchivedTrue_ExcludesArchivedCollectionsContainingRecord()
+    {
+        var archivedWithRecord = await CreateRecordCollectionAsync(
+            "Archived With Record",
+            "archived collection containing record1",
+            recordIds: new[] { _recordId1 },
+            isArchived: true);
+
+        var hideArchivedResult = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+            _userId, _organizationId, _projectId, _recordId1, true, DefaultPagination(), isSysAdmin: true);
+
+        Assert.DoesNotContain(hideArchivedResult.Items, c => c.Id == archivedWithRecord.Id);
+
+        var showArchivedResult = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+            _userId, _organizationId, _projectId, _recordId1, false, DefaultPagination(), isSysAdmin: true);
+
+        Assert.Contains(showArchivedResult.Items, c => c.Id == archivedWithRecord.Id);
+        Assert.Contains(showArchivedResult.Items, c => c.Id == _collectionId);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForRecordPaginated_NonAdmin_FiltersOutUnauthorizedLabeledCollections()
+    {
+        var accessibleCollection = await CreateRecordCollectionAsync(
+            "Accessible Collection",
+            "user can see this",
+            recordIds: new[] { _recordId1 });
+        var restrictedCollection = await CreateRecordCollectionAsync(
+            "Restricted Collection",
+            "user cannot see this",
+            recordIds: new[] { _recordId1 },
+            labelIds: new[] { _labelId2 });
+
+        var result = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+            _userId, _organizationId, _projectId, _recordId1, true, DefaultPagination());
+
+        Assert.Contains(result.Items, c => c.Id == accessibleCollection.Id);
+        Assert.DoesNotContain(result.Items, c => c.Id == restrictedCollection.Id);
+        // Seeded collection has label1, which this non-admin user has no permission for either.
+        Assert.DoesNotContain(result.Items, c => c.Id == _collectionId);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForRecordPaginated_Paginates_Correctly()
+    {
+        await CreateRecordCollectionAsync("Second", "page-set", recordIds: new[] { _recordId1 });
+        await CreateRecordCollectionAsync("Third", "page-set", recordIds: new[] { _recordId1 });
+        await CreateRecordCollectionAsync("Fourth", "page-set", recordIds: new[] { _recordId1 });
+
+        var pageOne = DefaultPagination(pageNumber: 1, pageSize: 2);
+        var pageTwo = DefaultPagination(pageNumber: 2, pageSize: 2);
+
+        var firstPage = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+            _userId, _organizationId, _projectId, _recordId1, true, pageOne, isSysAdmin: true);
+        var secondPage = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+            _userId, _organizationId, _projectId, _recordId1, true, pageTwo, isSysAdmin: true);
+
+        Assert.Equal(4, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.Equal(4, secondPage.TotalCount);
+        Assert.Equal(2, secondPage.Items.Count);
+
+        var firstPageIds = firstPage.Items.Select(c => c.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(c => c.Id).ToHashSet();
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsForRecordPaginated_PageSizeNegativeOne_ReturnsAllMatchingCollections()
+    {
+        await CreateRecordCollectionAsync("Second", "page-set", recordIds: new[] { _recordId1 });
+        await CreateRecordCollectionAsync("Third", "page-set", recordIds: new[] { _recordId1 });
+        await CreateRecordCollectionAsync("Fourth", "page-set", recordIds: new[] { _recordId1 });
+
+        var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+        var result = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
+            _userId, _organizationId, _projectId, _recordId1, true, sentinel, isSysAdmin: true);
+
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(4, result.PageSize);
+    }
+
+    #endregion
+
     #region Get Records In Collections Tests
     [Fact]
     public async Task GetRecordsInRecordCollection_HideArchived_ExcludesArchivedRecords()
@@ -699,6 +868,63 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _recordCollectionBusiness.GetRecordsInRecordCollection(
                 _userId, _organizationId, _projectId, _archivedCollectionId, true, isSysAdmin: true));
+    }
+
+    #endregion
+
+    #region GetRecordsInRecordCollectionPaginated Tests
+
+    [Fact]
+    public async Task GetRecordsInRecordCollectionPaginated_HideArchived_ExcludesArchivedRecords()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var result = await _recordCollectionBusiness.GetRecordsInRecordCollectionPaginated(
+            _userId, _organizationId, _projectId, _collectionId, true, paginatedRequest, true, true, false);
+
+        Assert.NotNull(result);
+        Assert.All(result.Items, r => Assert.False(r.IsArchived));
+    }
+
+    [Fact]
+    public async Task GetRecordsInRecordCollectionPaginated_ArchivedCollection_ThrowsKeyNotFound()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordCollectionBusiness.GetRecordsInRecordCollectionPaginated(
+                _userId, _organizationId, _projectId, _archivedCollectionId, true, paginatedRequest, true, true, false));
+    }
+
+    [Fact]
+    public async Task GetRecordsInRecordCollectionPaginated_Pagination_ReturnsCorrectPage()
+    {
+        // Arrange: Assuming at least 3 records exist in the collection
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 1 };
+
+        // Act
+        var result = await _recordCollectionBusiness.GetRecordsInRecordCollectionPaginated(
+            _userId, _organizationId, _projectId, _collectionId, true, paginatedRequest, false, true, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(1, result.PageSize);
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task GetRecordsInRecordCollectionPaginated_PageSizeMinusOne_ReturnsAllRecords()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = -1 };
+
+        var result = await _recordCollectionBusiness.GetRecordsInRecordCollectionPaginated(
+            _userId, _organizationId, _projectId, _collectionId, true, paginatedRequest, false, true, false);
+
+        Assert.NotNull(result);
+        Assert.True(result.Items.Count >= 1);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
     }
 
     #endregion

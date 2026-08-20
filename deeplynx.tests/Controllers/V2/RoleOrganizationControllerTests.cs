@@ -61,13 +61,19 @@ public class RoleOrganizationControllerTests : IDisposable
     [Fact]
     public async Task GetAllRoles_Returns200_WithRoles()
     {
-        var expected = new List<RoleResponseDto>();
+        var expected = new PaginatedResponse<RoleResponseDto>
+        {
+            Items = new List<RoleResponseDto>(),
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 0
+        };
 
         _mockRoleBusiness
-            .Setup(b => b.GetAllRoles(OrgId, null, true))
+            .Setup(b => b.GetAllRolesPaginated(OrgId, null, It.IsAny<PaginatedRequestDto>(), true))
             .ReturnsAsync(expected);
 
-        var result = (await _roleOrganizationController.GetAllRoles(OrgId, true)).Result as OkObjectResult;
+        var result = (await _roleOrganizationController.GetAllRoles(OrgId, hideArchived: true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -78,39 +84,105 @@ public class RoleOrganizationControllerTests : IDisposable
     public async Task GetAllRoles_Returns200_WithEmptyList()
     {
         _mockRoleBusiness
-            .Setup(b => b.GetAllRoles(OrgId, null, true))
-            .ReturnsAsync([]);
+            .Setup(b => b.GetAllRolesPaginated(OrgId, null, It.IsAny<PaginatedRequestDto>(), true))
+            .ReturnsAsync(new PaginatedResponse<RoleResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
 
-        var result = (await _roleOrganizationController.GetAllRoles(OrgId, true)).Result as OkObjectResult;
+        var result = (await _roleOrganizationController.GetAllRoles(OrgId, hideArchived: true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<RoleResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<RoleResponseDto>>(result.Value);
     }
 
     [Fact]
     public async Task GetAllRoles_ThrowsException_WhenBusinessThrows()
     {
         _mockRoleBusiness
-            .Setup(b => b.GetAllRoles(OrgId, null, true))
+            .Setup(b => b.GetAllRolesPaginated(OrgId, null, It.IsAny<PaginatedRequestDto>(), true))
             .ThrowsAsync(new Exception("db error"));
 
-        await Assert.ThrowsAsync<Exception>(() => _roleOrganizationController.GetAllRoles(OrgId, true));
+        await Assert.ThrowsAsync<Exception>(() => _roleOrganizationController.GetAllRoles(OrgId, hideArchived: true));
     }
 
     [Fact]
     public async Task GetAllRoles_PassesNullProjectIdToBusinessLayer()
     {
-        var expected = new List<RoleResponseDto>();
+        var expected = new PaginatedResponse<RoleResponseDto>
+        {
+            Items = new List<RoleResponseDto>(),
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 0
+        };
 
         _mockRoleBusiness
-            .Setup(b => b.GetAllRoles(OrgId, null, true))
+            .Setup(b => b.GetAllRolesPaginated(OrgId, null, It.IsAny<PaginatedRequestDto>(), true))
             .ReturnsAsync(expected);
 
-        await _roleOrganizationController.GetAllRoles(OrgId, true);
+        await _roleOrganizationController.GetAllRoles(OrgId, hideArchived: true);
 
         _mockRoleBusiness.Verify(
-            b => b.GetAllRoles(OrgId, null, true),
+            b => b.GetAllRolesPaginated(OrgId, null, It.IsAny<PaginatedRequestDto>(), true),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllRoles_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        _mockRoleBusiness
+            .Setup(b => b.GetAllRolesPaginated(
+                OrgId, null,
+                It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+                true))
+            .ReturnsAsync(new PaginatedResponse<RoleResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
+
+        await _roleOrganizationController.GetAllRoles(OrgId, hideArchived: true);
+
+        _mockRoleBusiness.Verify(
+            b => b.GetAllRolesPaginated(
+                OrgId, null,
+                It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+                true),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllRoles_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var pagination = new PaginatedRequestDto { PageNumber = 4, PageSize = 50 };
+
+        _mockRoleBusiness
+            .Setup(b => b.GetAllRolesPaginated(
+                OrgId, null,
+                It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+                true))
+            .ReturnsAsync(new PaginatedResponse<RoleResponseDto>
+            {
+                Items = [],
+                PageNumber = 4,
+                PageSize = 50,
+                TotalCount = 0
+            });
+
+        await _roleOrganizationController.GetAllRoles(OrgId, pagination, hideArchived: true);
+
+        _mockRoleBusiness.Verify(
+            b => b.GetAllRolesPaginated(
+                OrgId, null,
+                It.Is<PaginatedRequestDto>(p => p.PageNumber == 4 && p.PageSize == 50),
+                true),
             Times.Once);
     }
 
@@ -119,7 +191,7 @@ public class RoleOrganizationControllerTests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(RoleOrganizationController.GetAllRoles),
-            "organizationId", "hideArchived");
+            "organizationId", "hideArchived", "paginatedRequestDto");
 
         AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
         AssertHasAuthAttribute(method, "read", "role");

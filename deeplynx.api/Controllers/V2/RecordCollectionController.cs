@@ -85,6 +85,7 @@ public class RecordCollectionController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the collection belongs</param>
     /// <param name="recordCollectionId">The ID of the collection whose records are to be retrieved</param>
+    /// <param name="paginatedDto">Pagination details</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
     /// <returns>A list of records in the specified record collection.</returns>
     [HttpGet("{recordCollectionId:long}/records", Name = "api_get_records_in_record_collection")]
@@ -92,22 +93,25 @@ public class RecordCollectionController : ControllerBase
     [Auth("read", "record_collection")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetRecordsInRecordCollection(
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetRecordsInRecordCollection(
         long organizationId,
         long projectId,
         long recordCollectionId,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedDto = null)
     {
+            paginatedDto ??= new PaginatedRequestDto();
             var currentUserId = UserContextStorage.UserId;
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _recordCollectionBusiness.GetRecordsInRecordCollection(
+            var records = await _recordCollectionBusiness.GetRecordsInRecordCollectionPaginated(
                 currentUserId,
                 organizationId,
                 projectId,
                 recordCollectionId,
                 hideArchived,
+                paginatedDto,
                 isSysAdmin,
                 isOrgAdmin,
                 isProjectAdmin);
@@ -123,6 +127,7 @@ public class RecordCollectionController : ControllerBase
     /// <param name="projectId">The ID of the project to which the collection belongs</param>
     /// <param name="recordId">The ID of the record whose collections are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived collections from the result (Default true)</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
     /// <returns>A list of record collections for the specified record.</returns>
     [HttpGet("~/organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/record-collections", Name = "api_get_record_collections_for_a_record")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -133,20 +138,21 @@ public class RecordCollectionController : ControllerBase
         long organizationId,
         long projectId,
         long recordId,
-        [FromQuery] RecordCollectionQueryRequestDto dto,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+            paginatedRequestDto ??= new PaginatedRequestDto();
             var currentUserId = UserContextStorage.UserId;
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var collections = await _recordCollectionBusiness.GetRecordCollectionsForRecord(
+            var collections = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
                 currentUserId,
                 organizationId,
                 projectId,
                 recordId,
                 hideArchived,
-                dto,
+                paginatedRequestDto,
                 isSysAdmin,
                 isOrgAdmin,
                 isProjectAdmin);
