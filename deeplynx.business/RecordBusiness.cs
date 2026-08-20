@@ -1687,6 +1687,8 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
+        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "archive-record", currentUserId, null))
             _logger.LogWarning("Failed to create provenance record for archive on record {RecordId}", recordId);
@@ -1753,6 +1755,8 @@ public class RecordBusiness : IRecordBusiness
                     $"unable to unarchive record {recordId} or its downstream dependents: {exc}");
             }
         }
+
+        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "unarchive-record", currentUserId, null))
@@ -1881,6 +1885,19 @@ public class RecordBusiness : IRecordBusiness
                     "User is not authorized to update the URI for this record.");
         }
 
+        ICollection<RecordTagDto> tags = new List<RecordTagDto>();
+        if (dto.Tags != null)
+        {
+            var filteredTags = dto.Tags
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .ToList();
+
+            if (filteredTags.Count == 0)
+                filteredTags = null;
+            
+            tags = await ProcessTags(currentUserId, organizationId, projectId, returnedRecord.Id, filteredTags);
+        }
+
         returnedRecord.Uri = dto.Uri ?? returnedRecord.Uri;
         returnedRecord.Properties = dto.Properties != null ? dto.Properties.ToString() : returnedRecord.Properties;
         returnedRecord.OriginalId = dto.OriginalId ?? returnedRecord.OriginalId;
@@ -1941,7 +1958,7 @@ public class RecordBusiness : IRecordBusiness
             FileType = returnedRecord.FileType,
             FileSize = returnedRecord.FileSize,
             FileContentHash = returnedRecord.FileContentHash,
-            Tags = new List<RecordTagDto>(),
+            Tags = tags,
             Labels = returnedRecord.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,

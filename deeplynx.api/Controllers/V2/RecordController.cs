@@ -40,7 +40,7 @@ public class RecordController : ControllerBase
     }
 
 
-    
+
     /// <summary>
     ///     Get All Records
     /// </summary>
@@ -66,19 +66,19 @@ public class RecordController : ControllerBase
         [FromQuery] bool hideArchived = true,
         [FromQuery] bool isInsightEligible = false)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records =
-                await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType,
-                    isSysAdmin, isOrgAdmin, isProjectAdmin, isInsightEligible);
-            return Ok(records);
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var records =
+            await _recordBusiness.GetAllRecords(currentUserId, organizationId, projectId, dataSourceId, hideArchived, fileType,
+                isSysAdmin, isOrgAdmin, isProjectAdmin, isInsightEligible);
+        return Ok(records);
     }
-    
-    
 
-    
+
+
+
     /// <summary>
     ///     Get All Records Paginated
     /// </summary>
@@ -106,28 +106,28 @@ public class RecordController : ControllerBase
         [FromQuery] bool isInsightEligible = false,
         [FromQuery] PaginatedRequestDto? paginatedDto = null)
     {
-            paginatedDto ??= new PaginatedRequestDto();
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _recordBusiness.GetAllRecordsPaginated(
-                currentUserId,
-                organizationId,
-                projectId,
-                dataSourceId,
-                hideArchived,
-                fileType,
-                paginatedDto,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin,
-                isInsightEligible);
-            return Ok(records);
+        paginatedDto ??= new PaginatedRequestDto();
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var records = await _recordBusiness.GetAllRecordsPaginated(
+            currentUserId,
+            organizationId,
+            projectId,
+            dataSourceId,
+            hideArchived,
+            fileType,
+            paginatedDto,
+            isSysAdmin,
+            isOrgAdmin,
+            isProjectAdmin,
+            isInsightEligible);
+        return Ok(records);
     }
 
 
-    
+
     /// <summary>
     ///     Paginated full text records search
     /// </summary>
@@ -148,14 +148,14 @@ public class RecordController : ControllerBase
         [FromQuery] RecordSearchRequestDto search,
         [FromQuery] PaginatedRequestDto paginated)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records =
-                await _recordBusiness.SearchPaginated(currentUserId, organizationId, projectId, search, paginated,
-                    isSysAdmin, isOrgAdmin, isProjectAdmin);
-            return Ok(records);
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var records =
+            await _recordBusiness.SearchPaginated(currentUserId, organizationId, projectId, search, paginated,
+                isSysAdmin, isOrgAdmin, isProjectAdmin);
+        return Ok(records);
     }
 
     /// <summary>
@@ -195,7 +195,7 @@ public class RecordController : ControllerBase
     }
 
 
-    
+
     /// <summary>
     ///     Get Records by Tags
     /// </summary>
@@ -227,8 +227,8 @@ public class RecordController : ControllerBase
     }
 
 
-    
-     /// <summary>
+
+    /// <summary>
     ///     Get Records by Original IDs
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -248,17 +248,17 @@ public class RecordController : ControllerBase
         [FromBody] List<string> originalIds,
         [FromQuery] bool hideArchived = true)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _recordBusiness.GetRecordsByOriginalId(
-                currentUserId, organizationId, projectId, dataSourceId, originalIds, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
-            return Ok(records);
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var records = await _recordBusiness.GetRecordsByOriginalId(
+            currentUserId, organizationId, projectId, dataSourceId, originalIds, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+        return Ok(records);
     }
 
 
-    
+
     /// <summary>
     ///     Get a Record
     /// </summary>
@@ -277,26 +277,26 @@ public class RecordController : ControllerBase
         long recordId,
         [FromQuery] bool hideArchived = true)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
 
-            var record = await _recordBusiness.GetRecord(
-                currentUserId,
-                organizationId,
-                projectId,
-                recordId,
-                hideArchived,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin);
+        var record = await _recordBusiness.GetRecord(
+            currentUserId,
+            organizationId,
+            projectId,
+            recordId,
+            hideArchived,
+            isSysAdmin,
+            isOrgAdmin,
+            isProjectAdmin);
 
-            return Ok(record);
+        return Ok(record);
     }
 
 
-    
+
     /// <summary>
     ///     Get Record Count for a Data Source
     /// </summary>
@@ -315,14 +315,14 @@ public class RecordController : ControllerBase
         [FromQuery] long dataSourceId,
         [FromQuery] bool hideArchived = true)
     {
-       var count =
-                await _recordBusiness.GetRecordsCountByDataSource(organizationId, projectId, dataSourceId,
-                    hideArchived);
-            return Ok(count);
+        var count =
+                 await _recordBusiness.GetRecordsCountByDataSource(organizationId, projectId, dataSourceId,
+                     hideArchived);
+        return Ok(count);
     }
 
 
-    
+
     /// <summary>
     ///     Create a Record
     /// </summary>
@@ -343,26 +343,26 @@ public class RecordController : ControllerBase
         [FromQuery] List<long>? sensitivityLabelIds,
         [FromBody] CreateRecordRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var record = await _recordBusiness.CreateRecord(
-                currentUserId,
-                organizationId,
-                projectId,
-                dataSourceId,
-                dto,
-                sensitivityLabelIds,
-                embedded: false,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin);
-            return Ok(record);
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var record = await _recordBusiness.CreateRecord(
+            currentUserId,
+            organizationId,
+            projectId,
+            dataSourceId,
+            dto,
+            sensitivityLabelIds,
+            embedded: false,
+            isSysAdmin,
+            isOrgAdmin,
+            isProjectAdmin);
+        return Ok(record);
     }
 
 
-    
+
     /// <summary>
     ///     Bulk Create Records
     /// </summary>
@@ -383,26 +383,26 @@ public class RecordController : ControllerBase
         [FromBody] List<CreateRecordRequestDto> records,
         [FromQuery] List<long>? sensitivityLabelIds = null)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
 
-            var newRecords = await _recordBusiness.BulkCreateRecords(
-                currentUserId,
-                organizationId,
-                projectId,
-                dataSourceId,
-                records,
-                sensitivityLabelIds,
-                isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin);
-            return Ok(newRecords);
+        var newRecords = await _recordBusiness.BulkCreateRecords(
+            currentUserId,
+            organizationId,
+            projectId,
+            dataSourceId,
+            records,
+            sensitivityLabelIds,
+            isSysAdmin,
+            isOrgAdmin,
+            isProjectAdmin);
+        return Ok(newRecords);
     }
 
 
-    
+
     /// <summary>
     ///     Update a Record
     /// </summary>
@@ -421,18 +421,18 @@ public class RecordController : ControllerBase
         long recordId,
         [FromBody] UpdateRecordRequestDto dto)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var updated = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId, dto, isSysAdmin,
-                isOrgAdmin,
-                isProjectAdmin);
-            return Ok(updated);
+        var currentUserId = UserContextStorage.UserId;
+        var isSysAdmin = UserContextStorage.IsSysAdmin;
+        var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+        var updated = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId, dto, isSysAdmin,
+            isOrgAdmin,
+            isProjectAdmin);
+        return Ok(updated);
     }
 
 
-    
+
     /// <summary>
     ///     Delete a Record
     /// </summary>
@@ -449,13 +449,13 @@ public class RecordController : ControllerBase
         long projectId,
         long recordId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _recordBusiness.DeleteRecord(currentUserId, organizationId, projectId, recordId);
+        return Ok(response);
     }
 
 
-    
+
     /// <summary>
     ///     Archive or Unarchive a Record
     /// </summary>
@@ -474,19 +474,19 @@ public class RecordController : ControllerBase
         long recordId,
         [FromQuery] bool archive)
     {
-            var currentUserId = UserContextStorage.UserId;
-            if (archive)
-            {
-                var responseA = await _recordBusiness.ArchiveRecord(currentUserId, organizationId, projectId, recordId);
-                return Ok(responseA);
-            }
+        var currentUserId = UserContextStorage.UserId;
+        if (archive)
+        {
+            var responseA = await _recordBusiness.ArchiveRecord(currentUserId, organizationId, projectId, recordId);
+            return Ok(responseA);
+        }
 
-            var responseB = await _recordBusiness.UnarchiveRecord(currentUserId, organizationId, projectId, recordId);
-            return Ok(responseB);
+        var responseB = await _recordBusiness.UnarchiveRecord(currentUserId, organizationId, projectId, recordId);
+        return Ok(responseB);
     }
 
 
-    
+
     /// <summary>
     ///     Attach a Tag to a Record
     /// </summary>
@@ -506,13 +506,13 @@ public class RecordController : ControllerBase
         long recordId,
         [FromQuery] long tagId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _recordBusiness.AttachTag(currentUserId, organizationId, projectId, recordId, tagId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _recordBusiness.AttachTag(currentUserId, organizationId, projectId, recordId, tagId);
+        return Ok(response);
     }
 
 
-    
+
     /// <summary>
     ///     Unattach a Tag from a Record
     /// </summary>
@@ -532,13 +532,13 @@ public class RecordController : ControllerBase
         long recordId,
         [FromQuery] long tagId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _recordBusiness.UnattachTag(currentUserId, organizationId, projectId, recordId, tagId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _recordBusiness.UnattachTag(currentUserId, organizationId, projectId, recordId, tagId);
+        return Ok(response);
     }
 
 
-    
+
     /// <summary>
     ///     Bulk Attach Tags to Records
     /// </summary>
@@ -555,15 +555,15 @@ public class RecordController : ControllerBase
         long projectId,
         [FromBody] List<RecordTagLinkDto> dtos)
     {
-            var currentUserId = UserContextStorage.UserId;
+        var currentUserId = UserContextStorage.UserId;
 
-            var response = await _recordBusiness.BulkAttachTags(currentUserId, organizationId, projectId, dtos);
+        var response = await _recordBusiness.BulkAttachTags(currentUserId, organizationId, projectId, dtos);
 
-            return Ok(response);
+        return Ok(response);
     }
 
 
-    
+
     /// <summary>
     ///     Bulk Unattach Tags From Records
     /// </summary>
@@ -580,13 +580,13 @@ public class RecordController : ControllerBase
         long projectId,
         [FromBody] List<RecordTagLinkDto> dtos)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _recordBusiness.BulkUnattachTags(currentUserId, organizationId, projectId, dtos);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _recordBusiness.BulkUnattachTags(currentUserId, organizationId, projectId, dtos);
+        return Ok(response);
     }
 
 
-    
+
     /// <summary>
     ///     Attach a Sensitivity Label to a Record
     /// </summary>
@@ -606,13 +606,13 @@ public class RecordController : ControllerBase
         long recordId,
         [FromQuery] long sensitivityLabelId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _recordBusiness.AttachLabel(currentUserId, organizationId, projectId, recordId, sensitivityLabelId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _recordBusiness.AttachLabel(currentUserId, organizationId, projectId, recordId, sensitivityLabelId);
+        return Ok(response);
     }
 
 
-    
+
     /// <summary>
     ///     Bulk attach sensitivity label(s) to records
     /// </summary>
@@ -632,14 +632,14 @@ public class RecordController : ControllerBase
         [FromQuery] List<long> recordIds,
         [FromQuery] List<long> sensitivityLabelIds)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _recordBusiness.BulkAttachLabels(currentUserId, organizationId, projectId, recordIds,
-                sensitivityLabelIds);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _recordBusiness.BulkAttachLabels(currentUserId, organizationId, projectId, recordIds,
+            sensitivityLabelIds);
+        return Ok(response);
     }
 
 
-    
+
     /// <summary>
     ///     Unattach a sensitivity label from a Record
     /// </summary>
@@ -659,13 +659,13 @@ public class RecordController : ControllerBase
         long recordId,
         [FromQuery] long sensitivityLabelId)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var response = await _recordBusiness.UnattachLabel(currentUserId, organizationId, projectId, recordId, sensitivityLabelId);
-            return Ok(response);
+        var currentUserId = UserContextStorage.UserId;
+        var response = await _recordBusiness.UnattachLabel(currentUserId, organizationId, projectId, recordId, sensitivityLabelId);
+        return Ok(response);
     }
 
 
-    
+
     /// <summary>
     ///     Get Edges by Record
     /// </summary>
@@ -688,14 +688,14 @@ public class RecordController : ControllerBase
         [FromQuery] int page,
         [FromQuery] int pageSize = 20)
     {
-            var currentUserId = UserContextStorage.UserId;
-            var edges = await _graphBusiness.GetEdgesByRecord(
-                currentUserId, organizationId, projectId, recordId, isOrigin, page, pageSize);
-            return Ok(edges);
+        var currentUserId = UserContextStorage.UserId;
+        var edges = await _graphBusiness.GetEdgesByRecord(
+            currentUserId, organizationId, projectId, recordId, isOrigin, page, pageSize);
+        return Ok(edges);
     }
 
 
-    
+
     /// <summary>
     ///     Get Graph Data for Record
     /// </summary>
@@ -707,14 +707,16 @@ public class RecordController : ControllerBase
     [HttpGet("{recordId:long}/graph", Name = "api_get_graph_data_for_record")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
+    [Auth("read", "edge")]
     public async Task<ActionResult<GraphResponse>> GetGraphDataForRecord(
         long organizationId,
         long projectId,
         long recordId,
         [FromQuery] int depth)
     {
-            var edges = await _graphBusiness.GetGraphDataForRecord(
-                organizationId, projectId, recordId, UserContextStorage.UserId, depth);
-            return Ok(edges);
+        bool isAdmin = UserContextStorage.IsSysAdmin || UserContextStorage.IsOrgAdmin || UserContextStorage.IsProjectAdmin;
+        var edges = await _graphBusiness.GetGraphDataForRecord(
+            organizationId, projectId, recordId, UserContextStorage.UserId, depth, isAdmin);
+        return Ok(edges);
     }
 }

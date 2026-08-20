@@ -15,6 +15,7 @@ import {
 } from "./graphTypes";
 import { getGraphDataForRecord } from "@/app/lib/client_service/record_services.client";
 import { buildClassColorMap, getSizeForDepth } from "./graphStyle";
+import { parseBackendError } from "@/app/lib/error_parser";
 
 interface GraphCanvasProps {
   organizationId: number | null;
@@ -28,6 +29,7 @@ interface GraphCanvasProps {
   pathEdgeIds: number[];
   onLoadingChange: (loading: boolean) => void;
   onError: (error: string | null) => void;
+  onPermissionDenied: () => void;
   onNodeSelect: (nodeId: number | null) => void;
   onNodeOpen: (nodeId: number) => void;
   onDataLoaded: (data: GraphExplorerData) => void;
@@ -46,6 +48,7 @@ const GraphCanvas = ({
   pathEdgeIds,
   onLoadingChange,
   onError,
+  onPermissionDenied,
   onNodeSelect,
   onNodeOpen,
   onDataLoaded,
@@ -839,11 +842,19 @@ const GraphCanvas = ({
 
         refreshGraphAppearance();
       } catch (err) {
-        onError(
+        const rawMessage =
           err instanceof Error
             ? err.message
-            : t.translations.GRAPH_FAILED_TO_LOAD,
-        );
+            : t.translations.GRAPH_FAILED_TO_LOAD;
+
+        const parsed = parseBackendError(rawMessage);
+
+        if (parsed.type === "permission") {
+          onPermissionDenied();
+        } else {
+          onError(rawMessage);
+        }
+
         onLoadingChange(false);
       }
     };
@@ -867,6 +878,7 @@ const GraphCanvas = ({
     onControlsReady,
     onDataLoaded,
     onError,
+    onPermissionDenied,
     onLoadingChange,
     onNodeOpen,
     onNodeSelect,

@@ -791,6 +791,47 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task UploadFile_MetadataWithoutOriginalId_UsesGeneratedGuid()
+    {
+        // Arrange
+        var content = "File without explicit OriginalId";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "no-original-id.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        // Metadata deliberately omits OriginalId, which is now optional
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "No OriginalId",
+            Description = "Should fall back to generated guid",
+            Properties = new JsonObject { ["Name"] = "Name" }
+            // OriginalId intentionally not set
+        };
+
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var result = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(metadata.Name, result.Name);
+        Assert.Equal(metadata.Description, result.Description);
+        Assert.False(string.IsNullOrWhiteSpace(result.OriginalId));
+        Assert.True(Guid.TryParse(result.OriginalId, out _), "OriginalId should be a generated GUID when not provided");
+    }
+
+    [Fact]
     public async Task UploadFile_MetadataFileMissingRequiredFields_ThrowsValidationException()
     {
         // Arrange
@@ -1578,6 +1619,60 @@ public class FileBusinessTests : IntegrationTestBase
         var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
         Assert.Equal("Property", properties["Test"]?.GetValue<string>());
         Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task UpdateFile_WithMetadata_WorksCorrectly()
+    {
+        // Arrange: set up the file
+        var content = "Original content";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "update-default.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var originalRecord = await _fileBusiness.UploadFile(uid, oid, pid, did, null, file, null);
+
+        // Update the file
+        var newContent = "Updated with default";
+        var newMs = new MemoryStream(Encoding.UTF8.GetBytes(newContent));
+        var newFile = new FormFile(newMs, 0, newMs.Length, "file", "updated-default.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata File",
+            Description = "Awesome Description",
+            Properties = new JsonObject { ["Test"] = "Property" },
+            OriginalId = "OriginalId",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+        var metadataJson = JsonSerializer.Serialize(metadata);
+        var metadataBytes = Encoding.UTF8.GetBytes(metadataJson);
+        var metadataStream = new MemoryStream(metadataBytes);
+        var metadataFile = new FormFile(metadataStream, 0, metadataStream.Length, "metadataFile", "metadata.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        // Act
+        var updatedRecord = await _fileBusiness.UpdateFile(uid, oid, pid, originalRecord.Id, newFile, null, null, null, metadataFile);
+
+        // Assert
+        Assert.NotNull(updatedRecord);
+        Assert.Equal("Metadata File", updatedRecord.Name);
+        Assert.Equal("Awesome Description", updatedRecord.Description);
+        Assert.Equal("OriginalId", updatedRecord.OriginalId);
+        var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
+        Assert.Equal("Property", properties["Test"]?.GetValue<string>());
+        Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+        Assert.Equal(new[] { "Tag1", "Tag2" }, updatedRecord.Tags.Select(tag => tag.Name).OrderBy(name => name));
     }
 
     #endregion
@@ -2764,6 +2859,71 @@ public class FileBusinessTests : IntegrationTestBase
         var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
         Assert.Equal("Property", properties["Test"]?.GetValue<string>());
         Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task CompleteUpdateUpload_WithMetadata_UpdatesCorrectly()
+    {
+        // Arrange
+        var initialContent = "original content";
+        var initialSession = await _fileBusiness.StartUpload(
+            oid,
+            pid,
+            did,
+            osid,
+            new FileUploadInitRequestDto { FileName = "original.txt", FileSize = Encoding.UTF8.GetByteCount(initialContent) });
+
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("original "), initialSession.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), initialSession.UploadId, 1);
+
+        var initialCompleteRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = initialSession.UploadId,
+            FileName = "original.txt",
+            TotalChunks = 2
+        };
+
+        var initialRecord = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, initialCompleteRequest, null);
+
+        var updatedContent = "updated content";
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid,
+            oid,
+            pid,
+            initialRecord.Id,
+            new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = Encoding.UTF8.GetByteCount(updatedContent) });
+
+        var metadata = new CreateRecordFileUploadRequestDto
+        {
+            Name = "Metadata File",
+            Description = "Awesome Description",
+            Properties = new JsonObject { ["Test"] = "Property" },
+            OriginalId = "OriginalId",
+            Tags = new List<string> { "Tag1", "Tag2" }
+        };
+
+        // Act
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("updated "), session.UploadId, 0);
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("content"), session.UploadId, 1);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "updated.txt",
+            TotalChunks = 2
+        };
+
+        var updatedRecord = await _fileBusiness.CompleteUpdateUpload(uid, oid, pid, initialRecord.Id, completeRequest, null, null, null, metadata);
+
+        // Assert
+        Assert.NotNull(updatedRecord);
+        Assert.Equal("Metadata File", updatedRecord.Name);
+        Assert.Equal("Awesome Description", updatedRecord.Description);
+        Assert.Equal("OriginalId", updatedRecord.OriginalId);
+        var properties = JsonNode.Parse(updatedRecord.Properties)!.AsObject();
+        Assert.Equal("Property", properties["Test"]?.GetValue<string>());
+        Assert.Equal("txt", properties["fileType"]?.GetValue<string>());
+        Assert.Equal(new[] { "Tag1", "Tag2" }, updatedRecord.Tags.Select(tag => tag.Name).OrderBy(name => name));
     }
 
     [Fact]

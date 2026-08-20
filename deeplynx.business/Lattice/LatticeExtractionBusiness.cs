@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -336,6 +337,30 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     ///     List extractions for project
     /// </summary>
     /// <param name="projectId">The ID of the project</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if null, all matching classes are returned unpaginated</param>
+    public async Task<PaginatedResponse<ExtractionListItemDto>> ListExtractionsByProjectPaginated(
+        long projectId,
+        PaginatedRequestDto paginatedRequestDto)
+    {
+        var query = _context.Extractions
+            .Where(e => e.ProjectId == projectId)
+            .OrderByDescending(e => e.Id)
+            .Select(e => ExtractionToResponse(e));
+
+        var totalCount = await query.CountAsync();
+
+        return await query.ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all lattice extractions without pagination.
+    ///     Superseded by <see cref="ListExtractionsByProjectPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 lattice extraction controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="projectId">The ID of the project</param>
+    [Obsolete("V1-only. Used by deprecated v1 lattice extraction endpoints. Superseded by ListExtractionsByProjectPaginated. " +
+              "Remove once v1 lattice extraction endpoints are sunset.", error: false)]
     public async Task<List<ExtractionListItemDto>> ListExtractionsByProject(long projectId)
     {
         var extractions = await _context.Extractions
@@ -1109,5 +1134,18 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 extraction.Id,
                 stage,
                 message);
+    }
+
+    private static ExtractionListItemDto ExtractionToResponse(Extraction e)
+    {
+        return new ExtractionListItemDto
+        {
+            Id = e.Id,
+            Status = e.Status,
+            Mode = e.Mode,
+            CreatedBy = e.CreatedBy,
+            ProjectId = e.ProjectId,
+            FailureMessage = GetExtractionFailureMessage(e.Properties)
+        };
     }
 }

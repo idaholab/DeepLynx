@@ -45,11 +45,19 @@ public class UserControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllUsers_ReturnsUsersAndForwardsAllFilters()
+    public async Task GetAllUsers_ReturnsUsersAndForwardsAllFiltersAndPagination()
     {
-        var expected = new List<UserResponseDto> { new() { Id = UserId } };
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = 10 };
+        var expected = new PaginatedResponse<UserResponseDto>
+        {
+            Items = new List<UserResponseDto> { new() { Id = UserId } },
+            PageNumber = 2,
+            PageSize = 10,
+            TotalCount = 11
+        };
         _mockUserBusiness
-            .Setup(business => business.GetAllUsers(ProjectId, OrganizationId, true, true, true))
+            .Setup(business => business.GetAllUsersPaginated(
+                paginatedRequest, ProjectId, OrganizationId, true, true, true))
             .ReturnsAsync(expected);
 
         var result = (await _controller.GetAllUsers(
@@ -57,11 +65,50 @@ public class UserControllerTests : IDisposable
             OrganizationId,
             includeArchived: true,
             includeServiceAccounts: true,
-            includeTestAccounts: true)).Result;
+            includeTestAccounts: true,
+            paginatedRequestDto: paginatedRequest)).Result;
 
         AssertOkObject(result, expected);
         _mockUserBusiness.Verify(
-            business => business.GetAllUsers(ProjectId, OrganizationId, true, true, true),
+            business => business.GetAllUsersPaginated(
+                paginatedRequest, ProjectId, OrganizationId, true, true, true),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllUsers_WhenPaginationDtoIsNull_UsesDefaultPagination()
+    {
+        var expected = new PaginatedResponse<UserResponseDto>
+        {
+            Items = new List<UserResponseDto> { new() { Id = UserId } },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 1
+        };
+        _mockUserBusiness
+            .Setup(business => business.GetAllUsersPaginated(
+                It.Is<PaginatedRequestDto>(dto => dto.PageNumber == 1 && dto.PageSize == 25),
+                ProjectId,
+                OrganizationId,
+                false,
+                false,
+                false))
+            .ReturnsAsync(expected);
+
+        var result = (await _controller.GetAllUsers(
+            ProjectId,
+            OrganizationId,
+            paginatedRequestDto: null)).Result;
+
+        AssertOkObject(result, expected);
+        _mockUserBusiness.Verify(
+            business => business.GetAllUsersPaginated(
+                It.Is<PaginatedRequestDto>(dto => dto.PageNumber == 1 && dto.PageSize == 25),
+                ProjectId,
+                OrganizationId,
+                false,
+                false,
+                false),
             Times.Once);
     }
 

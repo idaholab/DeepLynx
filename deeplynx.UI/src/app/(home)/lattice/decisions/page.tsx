@@ -30,6 +30,8 @@ import toast from "react-hot-toast";
 import { useLanguage } from "@/app/contexts/Language";
 import { BetaBadge } from "@/app/(home)/components/BetaBadge";
 import { isInsightHidden } from "@/app/lib/feature_flags";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "../../components/PaginationControls";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
@@ -858,7 +860,13 @@ export default function LatticeDecisionsPage() {
   const refreshList = useCallback(() => {
     if (!orgId || !projId) return;
     listExtractions(orgId, projId)
-      .then(setItems)
+      .then((response) => {
+        if (response?.items) {
+          setItems(response.items);
+        } else {
+          setItems([]);
+        }
+      })
       .catch(() =>
         setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS),
       );
@@ -873,11 +881,23 @@ export default function LatticeDecisionsPage() {
   useEffect(() => {
     if (insightHidden) return;
     if (!orgId || !projId) return;
+
     setIsListLoading(true);
+
     listExtractions(orgId, projId)
-      .then(setItems)
-      .catch(() => setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS))
-      .finally(() => setIsListLoading(false));
+      .then((response) => {
+        if (response?.items) {
+          setItems(response.items);
+        } else {
+          setItems([]);
+        }
+      })
+      .catch(() => {
+        setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS);
+      })
+      .finally(() => {
+        setIsListLoading(false);
+      });
   }, [
     insightHidden,
     orgId,
@@ -904,6 +924,23 @@ export default function LatticeDecisionsPage() {
   if (insightHidden) {
     return null;
   }
+
+    const {
+      currentPage: extractionPage,
+      pageSize: extractionPageSize,
+      paginatedItems: paginatedExtractions,
+      resetPagination: resetExtractionPagination,
+      setCurrentPage: setExtractionPage,
+      setPageSize: setExtractionPageSize,
+      totalPages: extractionTotalPages,
+    } = useLocalPagination({
+      items: items,
+      initialPageSize: 5,
+    });
+
+    useEffect(() => {
+      resetExtractionPagination();
+    }, [resetExtractionPagination]);
 
   return (
     <main className="min-h-screen bg-base-200/30">
@@ -941,7 +978,7 @@ export default function LatticeDecisionsPage() {
       </section>
 
       <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
-        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
           {/* Left: extraction list */}
           <aside className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden self-start">
             <div className="border-b border-base-300 px-4 py-3">
@@ -962,7 +999,7 @@ export default function LatticeDecisionsPage() {
               </p>
             ) : (
               <ul className="divide-y divide-base-200 max-h-[60vh] overflow-y-auto">
-                {items.map((item) => (
+                {paginatedExtractions.map((item) => (
                   <li key={item.id}>
                     <button
                       type="button"
@@ -1019,6 +1056,14 @@ export default function LatticeDecisionsPage() {
                     </button>
                   </li>
                 ))}
+
+                <PaginationControls
+                  currentPage={extractionPage}
+                  pageSize={extractionPageSize}
+                  totalPages={extractionTotalPages}
+                  onPageChange={setExtractionPage}
+                  onPageSizeChange={setExtractionPageSize}
+                />
               </ul>
             )}
           </aside>

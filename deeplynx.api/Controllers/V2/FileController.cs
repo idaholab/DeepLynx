@@ -91,6 +91,7 @@ public class FileController : ControllerBase
     /// <param name="file">The file to replace the old one</param>
     /// <param name="vlmConfigId">Optional ID of the VLM model that will be used by Insight if embed is set to true</param>
     /// <param name="embeddingModelConfigId">Optional ID of the Embedding model that will be used by Insight if embed is set to true</param>
+    /// <param name="metadataFile">Optional metadata that will be appended to the updated record</param>
     /// <returns>Record response DTO containing updated file information</returns>
     [HttpPut("{recordId:long}", Name = "api_update_file")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -103,12 +104,13 @@ public class FileController : ControllerBase
         long recordId,
         IFormFile file,
         [FromQuery] long? vlmConfigId = null,
-        [FromQuery] long? embeddingModelConfigId = null)
+        [FromQuery] long? embeddingModelConfigId = null,
+        IFormFile? metadataFile = null)
     {
         var currentUserId = UserContextStorage.UserId;
         var userJwt = UserContextStorage.Token;
         var updatedFileInfo =
-            await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file, vlmConfigId, embeddingModelConfigId, userJwt);
+            await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file, vlmConfigId, embeddingModelConfigId, userJwt, metadataFile);
         return Ok(updatedFileInfo);
     }
 
@@ -167,7 +169,7 @@ public class FileController : ControllerBase
         var userJwt = UserContextStorage.Token;
         var updatedFileInfo = await _fileBusiness.CompleteUpdateUpload(
             currentUserId, organizationId, projectId, recordId, request, vlmConfigId, embeddingModelConfigId,
-            userJwt);
+            userJwt, request.Metadata);
         return Ok(updatedFileInfo);
     }
 

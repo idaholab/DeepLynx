@@ -9,7 +9,6 @@ using deeplynx.models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -624,7 +623,7 @@ public class QueryBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
     }
 
-    #region GetMultiProjectRecords Tests
+    #region GetMultiProjectRecords (V1/Legacy) Tests
 
     [Fact]
     public async Task GetMultiProjectRecords_Success_ReturnsRecordsFromMultipleProjects()
@@ -673,6 +672,121 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.Contains(records, r => r.Name == "Echo");
         Assert.Contains(records, r => r.Name == "Chewbacca");
     }
+
+    #endregion
+
+    #region GetMultiProjectRecordsPaginated Tests
+
+    [Fact]
+    public async Task GetMultiProjectRecordsPaginated_ReturnsRecordsFromMultipleProjects_WithPagination()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecordsPaginated(
+            uid, organizationId, projectIds, hideArchived: true, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+        Assert.Contains(result.Items, r => r.ProjectId == pid);
+        Assert.Contains(result.Items, r => r.ProjectId == pid2);
+        Assert.All(result.Items, r => Assert.False(r.IsArchived));
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(10, result.PageSize);
+        Assert.True(result.TotalCount >= result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecordsPaginated_ReturnsOnlyUnarchivedRecords_WithPagination()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecordsPaginated(
+            uid, organizationId, projectIds, hideArchived: true, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+        Assert.All(result.Items, r => Assert.False(r.IsArchived));
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecordsPaginated_ReturnsWithArchivedRecords_WhenNotFiltered()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecordsPaginated(
+            uid, organizationId, projectIds, hideArchived: false, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+        Assert.Contains(result.Items, r => r.Name == "Echo");
+        Assert.Contains(result.Items, r => r.Name == "Chewbacca");
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecordsPaginated_ReturnsEmpty_WhenNoProjects()
+    {
+        // Arrange
+        var projectIds = Array.Empty<long>();
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecordsPaginated(
+            uid, organizationId, projectIds, hideArchived: true, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetMultiProjectRecordsPaginated_RespectsPagination()
+    {
+        // Arrange
+        var projectIds = new[] { pid, pid2 };
+
+        for (int i = 0; i < 25; i++)
+        {
+            Context.Records.Add(new Record
+            {
+                ProjectId = pid,
+                OrganizationId = organizationId,
+                Name = $"TestRecord_{i}",
+                OriginalId = $"TestRecord_{i}",
+                Description = "test",
+                DataSourceId = did,
+                IsArchived = false,
+                Properties = JsonSerializer.Serialize(new { Armor = "Beskar", Title = "Mand'alor" }),
+            });
+        }
+        await Context.SaveChangesAsync();
+
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = 10 };
+
+        // Act
+        var result = await _queryBusiness.GetMultiProjectRecordsPaginated(
+            uid, organizationId, projectIds, hideArchived: true, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(10, result.PageSize);
+        Assert.True(result.TotalCount >= 25);
+        Assert.Equal(10, result.Items.Count);
+    }
+
 
     #endregion
 

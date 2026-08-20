@@ -407,7 +407,9 @@ export function useNewCollectionWorkflow({
         const results = query
           ? await fullTextSearch(organizationId, query, [projectId])
           : await getMultiProjectRecords(organizationId, [projectId]);
-        setNewCollectionRecordSearchResults(results);
+
+        const items = Array.isArray(results) ? results : results.items;
+        setNewCollectionRecordSearchResults(items);
         setNewCollectionRecordPage(1);
       } catch (error) {
         console.error("Failed to search records:", error);

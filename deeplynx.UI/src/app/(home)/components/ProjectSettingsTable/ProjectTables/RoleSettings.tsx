@@ -35,9 +35,9 @@ const RoleSettings = ({ id }: RoleSettingsProps) => {
         organization?.organizationId as number,
         project?.projectId as number
       )
-        .then((data) => {
+        .then(({ items }) => {
           setRole(
-            data.find((r: RoleResponseDto) => r.id === Number(roleId)) || null
+            items.find((r: RoleResponseDto) => r.id === Number(roleId)) || null
           );
           // Add API call to get permissions based on roleId
         })
@@ -65,7 +65,7 @@ const RoleSettings = ({ id }: RoleSettingsProps) => {
           role.id,
           dto
         );
-        const updatedRoles = await getAllRoles(
+        const { items: updatedRoles } = await getAllRoles(
           organization?.organizationId as number,
           project?.projectId as number
         );

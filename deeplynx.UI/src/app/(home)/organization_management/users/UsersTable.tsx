@@ -182,14 +182,16 @@ const UsersTable = ({
 
     try {
       const usersRequest =
-        scope === "org" ? getAllUsers(organizationId) : getAllUsers();
+        scope === "org"
+          ? getAllUsers(undefined, organizationId, false, false, false, 1, -1)
+          : getAllUsers(undefined, undefined, false, false, false, 1, -1);
       const countsRequest =
         scope === "org"
           ? getActiveUserCounts(organizationId)
           : getActiveUserCounts();
       const [users, counts] = await Promise.all([usersRequest, countsRequest]);
 
-      setTableData(buildTableData(users));
+      setTableData(buildTableData(users.items));
       setActivityCounts(counts);
     } catch (error) {
       console.error("Failed to load data:", error);
@@ -203,9 +205,9 @@ const UsersTable = ({
 
   try {
     const users = scope === "org"
-      ? await getAllUsers(organizationId, undefined, true)
-      : await getAllUsers(undefined, undefined, true);
-    setArchivedUsers(buildTableData(users).filter((u) => u.isArchived));
+        ? await getAllUsers(undefined, organizationId, true, false, false, 1, -1)
+        : await getAllUsers(undefined, undefined, true, false, false, 1, -1);
+    setArchivedUsers(buildTableData(users.items).filter((u) => u.isArchived));
   } catch (error) {
     console.error("Failed to load archived users:", error);
   }
