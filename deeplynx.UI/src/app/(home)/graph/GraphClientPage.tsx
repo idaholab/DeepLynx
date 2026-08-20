@@ -255,12 +255,10 @@ const GraphClientPage = ({
               {isPermissionDenied ? (
                 <div className="flex h-full min-h-[720px] flex-col items-center justify-center gap-2 px-6 text-center">
                   <p className="text-base font-medium text-base-content/70">
-                    {t.translations.GRAPH_EDGE_PERMISSION_REQUIRED ||
-                      "Edge access is needed to view the graph."}
+                    {t.translations.GRAPH_EDGE_PERMISSION_REQUIRED}
                   </p>
                   <p className="text-sm text-base-content/50">
-                    {t.translations.GRAPH_EDGE_PERMISSION_REQUIRED_SUBTEXT ||
-                      "Ask a project administrator to grant edge read access to see connections for this record."}
+                    {t.translations.GRAPH_EDGE_PERMISSION_REQUIRED_SUBTEXT}
                   </p>
                 </div>
               ) : (
