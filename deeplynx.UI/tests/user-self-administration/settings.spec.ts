@@ -12,7 +12,7 @@ test.describe("Settings Page", () => {
     try {
         await expect(page.getByRole('heading', { name: 'User Settings' })).toBeVisible({ timeout: 15000 });
     } catch {
-        await page.goto('localhost:3000/settings', {
+        await page.goto('/settings', {
             waitUntil: 'domcontentloaded',
             timeout: 10_000
         });
