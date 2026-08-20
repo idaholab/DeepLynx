@@ -63,7 +63,7 @@ export default function RecordCollectionsClient({
 
       <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
         <div className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+          <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
             <div className="lg:sticky lg:top-4">
               <FilterSidebar {...filterSidebar} />
             </div>

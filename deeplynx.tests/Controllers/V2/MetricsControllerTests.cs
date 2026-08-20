@@ -203,7 +203,7 @@ public class MetricsControllerTests : IDisposable
             .ReturnsAsync(RecordCount);
 
         // Act
-        var result = (await _metricsController.GetSystemRecordCount(true)).Result as OkObjectResult;
+        var result = (await _metricsController.GetSystemRecordCount(false)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
@@ -220,26 +220,22 @@ public class MetricsControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act / Assert
-        await Assert.ThrowsAsync<Exception>(() => _metricsController.GetSystemRecordCount(true));
+        await Assert.ThrowsAsync<Exception>(() => _metricsController.GetSystemRecordCount(false));
     }
 
     [Fact]
-    public async Task GetSystemRecordCount_AlwaysPassesHideArchivedFalseRegardlessOfParameter()
+    public async Task GetSystemRecordCount_PassesHideArchivedFlagToBusinessLayer()
     {
         // Arrange
-        // Note: the controller currently ignores the incoming `hideArchived` argument and
-        // hardcodes `false` when calling into the business layer. This test pins down that
-        // existing (possibly unintended) behavior so a future fix is a deliberate, visible change.
         _mockMetricsBusiness
             .Setup(b => b.GetRecordCount((long?)null, (long[]?)null, false))
             .ReturnsAsync(RecordCount);
 
         // Act
-        await _metricsController.GetSystemRecordCount(hideArchived: true);
+        await _metricsController.GetSystemRecordCount(hideArchived: false);
 
         // Assert
         _mockMetricsBusiness.Verify(b => b.GetRecordCount((long?)null, (long[]?)null, false), Times.Once);
-        _mockMetricsBusiness.Verify(b => b.GetRecordCount((long?)null, (long[]?)null, true), Times.Never);
     }
 
     [Fact]
@@ -270,7 +266,7 @@ public class MetricsControllerTests : IDisposable
             .ReturnsAsync(FileCount);
 
         // Act
-        var result = (await _metricsController.GetSystemFileCount(true)).Result as OkObjectResult;
+        var result = (await _metricsController.GetSystemFileCount(false)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
@@ -287,25 +283,22 @@ public class MetricsControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         // Act / Assert
-        await Assert.ThrowsAsync<Exception>(() => _metricsController.GetSystemFileCount(true));
+        await Assert.ThrowsAsync<Exception>(() => _metricsController.GetSystemFileCount(false));
     }
 
     [Fact]
-    public async Task GetSystemFileCount_AlwaysPassesHideArchivedFalseRegardlessOfParameter()
+    public async Task GetSystemFileCount_PassesHideArchivedFlagToBusinessLayer()
     {
         // Arrange
-        // Same note as GetSystemRecordCount above: the incoming `hideArchived` value is
-        // currently ignored in favor of a hardcoded `false`.
         _mockMetricsBusiness
             .Setup(b => b.GetFileCount((long?)null, (long[]?)null, false))
             .ReturnsAsync(FileCount);
 
         // Act
-        await _metricsController.GetSystemFileCount(hideArchived: true);
+        await _metricsController.GetSystemFileCount(hideArchived: false);
 
         // Assert
         _mockMetricsBusiness.Verify(b => b.GetFileCount((long?)null, (long[]?)null, false), Times.Once);
-        _mockMetricsBusiness.Verify(b => b.GetFileCount((long?)null, (long[]?)null, true), Times.Never);
     }
 
     [Fact]

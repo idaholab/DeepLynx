@@ -5,9 +5,17 @@ namespace deeplynx.interfaces;
 
 public interface IRecordCollectionBusiness
 {
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by " +
+              "GetAllRecordCollectionsPaginated. Remove once v1 record collection endpoints are sunset.", error: false)]
     Task<PaginatedResponse<RecordCollectionResponseDto>> GetAllRecordCollections(
         long currentUserId, long organizationId, long projectId, RecordCollectionQueryRequestDto dto,
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+
+    Task<PaginatedResponse<RecordCollectionResponseDto>> GetAllRecordCollectionsPaginated(
+        long currentUserId, long organizationId, long projectId,
+        string? search, long[]? sensitivityLabelIds, long[]? tagIds, string? sort,
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by GetRecordsInRecordCollectionPaginated. " +
               "Remove once v1 record collection endpoints are sunset.", error: false)]
@@ -25,9 +33,15 @@ public interface IRecordCollectionBusiness
         bool isOrgAdmin = false,
         bool isProjectAdmin = false);
 
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by " +
+              "GetRecordCollectionsForRecordPaginated. Remove once v1 record collection endpoints are sunset.", error: false)]
     Task<PaginatedResponse<RecordCollectionResponseDto>> GetRecordCollectionsForRecord(
         long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived,
         RecordCollectionQueryRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+
+    Task<PaginatedResponse<RecordCollectionResponseDto>> GetRecordCollectionsForRecordPaginated(
+        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived,
+        PaginatedRequestDto paginatedRequestDto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<List<RecordCollectionResponseDto>> GetRecordCollectionsByTags(
         long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,

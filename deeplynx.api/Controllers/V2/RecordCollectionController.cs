@@ -44,8 +44,12 @@ public class RecordCollectionController : ControllerBase
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose collections are to be retrieved</param>
-    /// <param name="dto">The collection data transfer object used to search and return collections</param>
+    /// <param name="search">(Optional) Search term matched against name, description, tags, and labels</param>
+    /// <param name="sensitivityLabelIds">(Optional) Sensitivity label IDs to filter by</param>
+    /// <param name="tagIds">(Optional) Tag IDs to filter by</param>
+    /// <param name="sort">(Optional) Sort key (alphabeticalAsc/alphabeticalDesc/recordCountAsc/recordCountDesc/updatedAsc/updatedDesc)</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived collections from the result (Default true)</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
     /// <returns>A paginated response of record collections based on the applied filters.</returns>
     [HttpGet(Name = "api_get_all_record_collections")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -54,15 +58,22 @@ public class RecordCollectionController : ControllerBase
     public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetAllRecordCollections(
         long organizationId,
         long projectId,
-        [FromQuery] RecordCollectionQueryRequestDto dto,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] string? search,
+        [FromQuery] long[]? sensitivityLabelIds,
+        [FromQuery] long[]? tagIds,
+        [FromQuery] string? sort,
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+            paginatedRequestDto ??= new PaginatedRequestDto();
             var currentUserId = UserContextStorage.UserId;
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var recordCollections =
-                await _recordCollectionBusiness.GetAllRecordCollections(currentUserId, organizationId, projectId, dto, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+                await _recordCollectionBusiness.GetAllRecordCollectionsPaginated(
+                    currentUserId, organizationId, projectId, search, sensitivityLabelIds, tagIds, sort,
+                    paginatedRequestDto, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(recordCollections);
     }
 
@@ -116,6 +127,7 @@ public class RecordCollectionController : ControllerBase
     /// <param name="projectId">The ID of the project to which the collection belongs</param>
     /// <param name="recordId">The ID of the record whose collections are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived collections from the result (Default true)</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
     /// <returns>A list of record collections for the specified record.</returns>
     [HttpGet("~/organizations/{organizationId:long}/projects/{projectId:long}/records/{recordId:long}/record-collections", Name = "api_get_record_collections_for_a_record")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
@@ -126,20 +138,21 @@ public class RecordCollectionController : ControllerBase
         long organizationId,
         long projectId,
         long recordId,
-        [FromQuery] RecordCollectionQueryRequestDto dto,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+            paginatedRequestDto ??= new PaginatedRequestDto();
             var currentUserId = UserContextStorage.UserId;
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var collections = await _recordCollectionBusiness.GetRecordCollectionsForRecord(
+            var collections = await _recordCollectionBusiness.GetRecordCollectionsForRecordPaginated(
                 currentUserId,
                 organizationId,
                 projectId,
                 recordId,
                 hideArchived,
-                dto,
+                paginatedRequestDto,
                 isSysAdmin,
                 isOrgAdmin,
                 isProjectAdmin);
