@@ -507,63 +507,63 @@ test.describe("File Upload -> New Record", () => {
         });
     });
     test.describe('Metadata file uploads', () => {
-    let usableClass: { id: number; name: string; };
-    test.beforeAll(async ({ request }) => {
-      usableClass = await getClass(request, projectId);
-    })
+        let usableClass: { id: number; name: string; };
+        test.beforeAll(async ({ request }) => {
+        usableClass = await getClass(request, projectId);
+        })
 
-    // Source of truth -- error type tells us if/where the error will show up, message is more information about the error or what should happen
-    const scenarios: {
-        name: string;
-        error: { type: string, message: string };
-        options: (cls: typeof usableClass) => CreatedMetadata;
-    }[] = [
-        { name: 'normal', error: {type: 'none', message: ''}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
-        { name: 'exclude-name', error: {type: 'preview', message: 'Name: Invalid input: expected string, received undefined'}, options: (cls: typeof usableClass) => ({Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
-        { name: 'exclude-description', error: {type: 'preview', message: 'Description: Invalid input: expected string, received undefined'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-excluding-description-${Date.now()}.json`, OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
-        { name: 'exclude-original-id', error: {type: 'preview', message: 'OriginalId: Invalid input: expected string, received undefined'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-excluding-original-id-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
-        { name: 'exclude-class-name', error: {type: 'none', message: 'class info missing'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, Properties: {"background color": "white"}}) },
-        { name: 'exclude-class-id', error: {type: 'none', message: 'class info missing'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassName: cls.name, Properties: {"background color": "white"}}) },
-        { name: 'exclude-properties', error: {type: 'preview', message: 'Properties: Invalid input'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name}) },
-        { name: '1000-character-name', error: {type: 'exception', message: "The field Name must be a string or array type with a maximum length of '500'."}, options: (cls: typeof usableClass) => ({Name: `${randomBytes(500).toString('hex')}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
-        { name: '1000-character-description', error: {type: 'exception', message: "The field Description must be a string or array type with a maximum length of '250'."}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: randomBytes(500).toString('hex'), OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
-        { name: '1000-character-id', error: {type: 'none', message: 'long id'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-long-id-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: randomBytes(500).toString('hex'), ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
-        { name: '1000-character-properties', error: {type: 'none', message: 'long properties'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {[randomBytes(500).toString('hex')] : randomBytes(500).toString('hex')}}) },
-    ]
-        for (const scenario of scenarios) {
-            let filePath: string;
-            let fileName: string;
-            let metadata: CreatedMetadata;
-            let metadataPath: string;
-            let options: CreatedMetadata;
-            let createdRecord: { recordId: string; projectId: string } | null = null;
+        // Source of truth -- error type tells us if/where the error will show up, message is more information about the error or what should happen
+        const scenarios: {
+            name: string;
+            error: { type: string, message: string };
+            options: (cls: typeof usableClass) => CreatedMetadata;
+        }[] = [
+            { name: 'normal', error: {type: 'none', message: ''}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
+            { name: 'exclude-name', error: {type: 'preview', message: 'Name: Invalid input: expected string, received undefined'}, options: (cls: typeof usableClass) => ({Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
+            { name: 'exclude-description', error: {type: 'preview', message: 'Description: Invalid input: expected string, received undefined'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-excluding-description-${Date.now()}.json`, OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
+            { name: 'exclude-original-id', error: {type: 'preview', message: 'OriginalId: Invalid input: expected string, received undefined'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-excluding-original-id-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
+            { name: 'exclude-class-name', error: {type: 'none', message: 'class info missing'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, Properties: {"background color": "white"}}) },
+            { name: 'exclude-class-id', error: {type: 'none', message: 'class info missing'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassName: cls.name, Properties: {"background color": "white"}}) },
+            { name: 'exclude-properties', error: {type: 'preview', message: 'Properties: Invalid input'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name}) },
+            { name: '1000-character-name', error: {type: 'exception', message: "The field Name must be a string or array type with a maximum length of '500'."}, options: (cls: typeof usableClass) => ({Name: `${randomBytes(500).toString('hex')}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
+            { name: '1000-character-description', error: {type: 'exception', message: "The field Description must be a string or array type with a maximum length of '250'."}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: randomBytes(500).toString('hex'), OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
+            { name: '1000-character-id', error: {type: 'none', message: 'long id'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-long-id-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: randomBytes(500).toString('hex'), ClassId: cls.id, ClassName: cls.name, Properties: {"background color": "white"}}) },
+            { name: '1000-character-properties', error: {type: 'none', message: 'long properties'}, options: (cls: typeof usableClass) => ({Name: `${Math.random().toString(36).slice(2)}-normal-metadata-${Date.now()}.json`, Description: "What is metadata? And what does it truly mean?", OriginalId: `A random number ${Math.random().toString(36).slice(2)}`, ClassId: cls.id, ClassName: cls.name, Properties: {[randomBytes(500).toString('hex')] : randomBytes(500).toString('hex')}}) },
+        ]
+            for (const scenario of scenarios) {
+                let filePath: string;
+                let fileName: string;
+                let metadata: CreatedMetadata;
+                let metadataPath: string;
+                let options: CreatedMetadata;
+                let createdRecord: { recordId: string; projectId: string } | null = null;
 
-            test.beforeEach(async ({}) => {
-                const fileContent = "The cow jumped over the moon.";
-                fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-metadata-${scenario.name}`;
-                filePath = await setUp(fileName, fileContent);
-                createdRecord = null;
+                test.beforeEach(async ({}) => {
+                    const fileContent = "The cow jumped over the moon.";
+                    fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-metadata-${scenario.name}`;
+                    filePath = await setUp(fileName, fileContent);
+                    createdRecord = null;
 
-                options = scenario.options(usableClass);
-                metadata = await buildMetadata(options);
-                const rawName = options.Name ?? `${Date.now()}-${Math.random().toString(36).slice(2)}-missing-name-${scenario.name}.json`;
-                const metadataFileName = toSafeFileName(rawName);
-                metadataPath = await setUp(metadataFileName, JSON.stringify(metadata, null, 2));
-            });
+                    options = scenario.options(usableClass);
+                    metadata = await buildMetadata(options);
+                    const rawName = options.Name ?? `${Date.now()}-${Math.random().toString(36).slice(2)}-missing-name-${scenario.name}.json`;
+                    const metadataFileName = toSafeFileName(rawName);
+                    metadataPath = await setUp(metadataFileName, JSON.stringify(metadata, null, 2));
+                });
 
-            test.afterEach(async ({ request }) => {
-                if (fs.existsSync(filePath)) { 
-                fs.unlinkSync(filePath);
-                }
-                if (fs.existsSync(metadataPath)) {
-                fs.unlinkSync(metadataPath);
-                }
-                await deleteRecordIfExists({ request }, createdRecord, orgId);
-            });
+                test.afterEach(async ({ request }) => {
+                    if (fs.existsSync(filePath)) { 
+                    fs.unlinkSync(filePath);
+                    }
+                    if (fs.existsSync(metadataPath)) {
+                    fs.unlinkSync(metadataPath);
+                    }
+                    await deleteRecordIfExists({ request }, createdRecord, orgId);
+                });
 
-            test(`metadata upload: ${scenario.name}`, async ({ page }) => {
-                createdRecord = await clickToBrowse({ page }, fileName, filePath, undefined, undefined, metadataPath, scenario.error, options, usableClass);
-            });
+                test(`metadata upload: ${scenario.name}`, async ({ page }) => {
+                    createdRecord = await clickToBrowse({ page }, fileName, filePath, undefined, undefined, metadataPath, scenario.error, options, usableClass);
+                });
         }
     });
 });
