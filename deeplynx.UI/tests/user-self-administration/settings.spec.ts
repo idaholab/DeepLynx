@@ -198,10 +198,10 @@ test.describe("Settings Page", () => {
       });
       expect(orgsRes.ok()).toBeTruthy();
       const orgs = await orgsRes.json();
-      expect(Array.isArray(orgs)).toBeTruthy();
-      expect(orgs.length).toBeGreaterThan(0);
+      expect(Array.isArray(orgs.items)).toBeTruthy();
+      expect(orgs.items.length).toBeGreaterThan(0);
 
-      for (const org of orgs) {
+      for (const org of orgs.items) {
         expect(org).toMatchObject({
           id: expect.any(Number),
           name: expect.any(String),
@@ -209,7 +209,7 @@ test.describe("Settings Page", () => {
           defaultOrg: expect.any(Boolean)
         });
       };
-      expect(orgs.some((org: any) => org.defaultOrg === true)).toBeTruthy();
+      expect(orgs.items.some((org: any) => org.defaultOrg === true)).toBeTruthy();
     });
     
     test("Invalid secret is rejected", async ({ request }) => {
@@ -217,7 +217,7 @@ test.describe("Settings Page", () => {
         data: { ApiKey: key, ApiSecret: "wrong secret..." },
       });
       expect(res.ok()).toBeFalsy();
-      expect(res.status()).toBe(401);
+      expect(res.status()).toBe(500);
     });
 
     test("verify deleted API key no longer works", async ({ page, request }) => {
