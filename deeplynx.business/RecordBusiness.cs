@@ -1590,6 +1590,8 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
+        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "archive-record", currentUserId, null))
             _logger.LogWarning("Failed to create provenance record for archive on record {RecordId}", recordId);
@@ -1656,6 +1658,8 @@ public class RecordBusiness : IRecordBusiness
                     $"unable to unarchive record {recordId} or its downstream dependents: {exc}");
             }
         }
+
+        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "unarchive-record", currentUserId, null))
