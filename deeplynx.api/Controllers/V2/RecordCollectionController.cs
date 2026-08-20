@@ -74,6 +74,7 @@ public class RecordCollectionController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the collection belongs</param>
     /// <param name="recordCollectionId">The ID of the collection whose records are to be retrieved</param>
+    /// <param name="paginatedDto">Pagination details</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
     /// <returns>A list of records in the specified record collection.</returns>
     [HttpGet("{recordCollectionId:long}/records", Name = "api_get_records_in_record_collection")]
@@ -81,22 +82,25 @@ public class RecordCollectionController : ControllerBase
     [Auth("read", "record_collection")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetRecordsInRecordCollection(
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetRecordsInRecordCollection(
         long organizationId,
         long projectId,
         long recordCollectionId,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedDto = null)
     {
+            paginatedDto ??= new PaginatedRequestDto();
             var currentUserId = UserContextStorage.UserId;
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _recordCollectionBusiness.GetRecordsInRecordCollection(
+            var records = await _recordCollectionBusiness.GetRecordsInRecordCollectionPaginated(
                 currentUserId,
                 organizationId,
                 projectId,
                 recordCollectionId,
                 hideArchived,
+                paginatedDto,
                 isSysAdmin,
                 isOrgAdmin,
                 isProjectAdmin);
