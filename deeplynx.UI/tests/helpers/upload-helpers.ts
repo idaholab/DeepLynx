@@ -230,9 +230,8 @@ export async function getProjectIdByName(
   orgId: string,
   projectName: string,
 ): Promise<string> {
-  const BASE_URL = "http://localhost:5095/api/v1";
   const res = await request.fetch(
-    `${BASE_URL}/organizations/${orgId}/projects`,
+    testApiUrl(`/organizations/${orgId}/projects`),
   );
   if (!res.ok()) throw new Error(`Failed to fetch projects: ${res.status()}`);
   const projects: { id: number | string; name: string }[] = await res.json();
@@ -252,8 +251,7 @@ export async function createClass(
   name: string,
   options?: { description?: string; properties?: Record<string, unknown> },
 ): Promise<string> {
-  const BASE_URL = "http://localhost:5095/api/v1";
-  const res = await request.post(`${BASE_URL}/projects/${projectId}/classes`, {
+  const res = await request.post(testApiUrl(`/projects/${projectId}/classes`), {
     data: {
       name,
       description: options?.description ?? null,
@@ -277,7 +275,7 @@ export async function deleteClassIfExists(
   classId: string | null,
 ) {
   if (!classId) return;
-  const url = `http://localhost:5095/api/v1/projects/${projectId}/classes/${classId}`;
+  const url = testApiUrl(`projects/${projectId}/classes/${classId}`);
   try {
     const response = await request.delete(url);
     if (!response.ok()) {
@@ -867,7 +865,7 @@ export function toSafeFileName(name: string): string {
 }
 
 export async function getClass(request: APIRequestContext, projectId: string) {
-  const fetchUrl = `http://localhost:5095/api/v1/projects/${projectId}/classes?hideArchived=true`;
+  const fetchUrl = testApiUrl(`/projects/${projectId}/classes?hideArchived=true`);
   const res = await request.fetch(fetchUrl);
   if (!res.ok()) throw new Error(`Failed to fetch classes: ${res.status()}`);
   const classes = await res.json();
