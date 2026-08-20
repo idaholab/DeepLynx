@@ -1050,7 +1050,7 @@ export const translations = {
       METADATA_FILE_JSON_ONLY: "Only .json metadata files are allowed.",
       METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES:
         "Metadata file is unavailable for large files.",
-      METADATA_PREVIEW_CLASS: "Class",
+      METADATA_PREVIEW_CLASS: "Class Name",
       METADATA_PREVIEW_DESCRIPTION: "Description",
       METADATA_PREVIEW_NAME: "Name",
       MIRROR_ADD_EDGE_WORKFLOW:
@@ -3367,7 +3367,7 @@ export const translations = {
       METADATA_FILE_JSON_ONLY: "Solo se permiten archivos de metadatos .json.",
       METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES:
         "El archivo de metadatos no está disponible para archivos grandes.",
-      METADATA_PREVIEW_CLASS: "Clase",
+      METADATA_PREVIEW_CLASS: "Nombre Clase",
       METADATA_PREVIEW_DESCRIPTION: "Descripción",
       METADATA_PREVIEW_NAME: "Nombre",
       METADATA_PREVIEW_ORIGINAL_ID: "ID original",
