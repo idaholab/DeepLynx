@@ -38,6 +38,15 @@ export type FileTypeConfig = {
   dragAndDropOnly?: boolean; // e.g. PDF-only quirks can go here if ever needed
 };
 
+
+function unwrapArray<T>(body: unknown, label: string): T[] {
+  const arr = Array.isArray(body) ? body : (body as any)?.items;
+  if (!Array.isArray(arr)) {
+    throw new Error(`Expected array of ${label}, got: ${JSON.stringify(body).slice(0, 300)}`);
+  }
+  return arr;
+}
+
 export async function checkDataSources(page: Page) {
   const dataSourceSelect = page.getByLabel("Data sourceData Sources");
   const selectedText = await dataSourceSelect
@@ -127,8 +136,10 @@ export async function getNonDefault(
   orgId: string,
   projectId: string,
   type: string,
-) {
-  if (!projectId) return;
+): Promise<string> {
+  if (!projectId) {
+    throw new Error("getNonDefault requires a non-empty projectId");
+  }
   const isDataSource = type === "data source";
   const getAllUrl = isDataSource
     ? testApiUrl(`/projects/${projectId}/datasources?hideArchived=true`)
@@ -143,70 +154,78 @@ export async function getNonDefault(
   const FIXED_NAME = isDataSource
     ? "Second data source for playwright tests"
     : "Second storage for playwright tests";
-  try {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      let res = await request.fetch(getAllUrl);
-      if (!res.ok())
-        throw new Error(`Failed to fetch ${type}s: ${res.status()}`);
-      const allOfType = await res.json();
-      const nonDefault = allOfType.find(
-        (singleType: DataSourceOrStorage) => singleType.default !== true,
-      );
-      if (nonDefault) return nonDefault.name;
 
-      const postRes = isDataSource
-        ? await request.post(createUrl, { data: { name: FIXED_NAME } })
-        : await request.post(createUrl, {
-            data: {
-              name: FIXED_NAME,
-              config: {
-                mountPath: `../data/duckdb/org_${orgId}/project_${projectId}`,
-              },
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await request.fetch(getAllUrl);
+    if (!res.ok())
+      throw new Error(`Failed to fetch ${type}s: ${res.status()}`);
+    const body = await res.json();
+    const allOfType = unwrapArray<DataSourceOrStorage>(body, `${type}s`);
+
+    const nonDefault = allOfType.find(
+      (singleType) => singleType.default !== true,
+    );
+    if (nonDefault) return nonDefault.name;
+
+    const postRes = isDataSource
+      ? await request.post(createUrl, { data: { name: FIXED_NAME } })
+      : await request.post(createUrl, {
+          data: {
+            name: FIXED_NAME,
+            config: {
+              mountPath: `../data/duckdb/org_${orgId}/project_${projectId}`,
             },
-          });
+          },
+        });
 
-      if (!postRes.ok() && postRes.status() !== 409) {
-        throw new Error(`Failed to create new ${type}: ${postRes.status()}`);
-      }
+    if (!postRes.ok() && postRes.status() !== 409) {
+      throw new Error(`Failed to create new ${type}: ${postRes.status()}`);
     }
-    throw new Error(`Could not establish a non-default ${type} after retries`);
-  } catch (err) {
-    console.warn(`Error getting different ${type}.`, err);
-    return undefined;
   }
+  throw new Error(`Could not establish a non-default ${type} after retries`);
 }
 
 export async function getNonDefaultProject(
   request: APIRequestContext,
   orgId: string,
   projectId: string,
-) {
-  if (!projectId) return;
+): Promise<string> {
+  if (!projectId) {
+    throw new Error("getNonDefaultProject requires a non-empty projectId");
+  }
   const getAllUrl = testApiUrl(`/organizations/${orgId}/projects`);
   const createNewUrl = testApiUrl(`/organizations/${orgId}/projects`);
 
-  try {
-    let res = await request.fetch(getAllUrl);
-    if (!res.ok()) throw new Error(`Failed to fetch projects: ${res.status()}`);
-    let projects = await res.json();
-    if (projects.length === 1) {
-      // create new of type
-      const postRes = await request.post(createNewUrl, {
-        data: { name: "New Project for playwright testing" },
-      });
-      if (!postRes.ok())
-        throw new Error(`Failed to create new project: ${postRes.status()}`);
-      res = await request.get(getAllUrl);
-      if (!res.ok())
-        throw new Error(`Failed to refecth project: ${res.status()}`);
-      projects = await res.json();
-    }
-    // return non default
-    return projects.find((project: Project) => project.id != projectId).name;
-  } catch (err) {
-    console.warn(`Error getting different project.`, err);
-    return undefined;
+  let res = await request.fetch(getAllUrl);
+  if (!res.ok()) throw new Error(`Failed to fetch projects: ${res.status()}`);
+  let body = await res.json();
+  let projects = unwrapArray<Project>(body, "projects");
+
+  if (projects.length <= 1) {
+    // create new of type
+    const postRes = await request.post(createNewUrl, {
+      data: { name: `New Project for playwright testing ${Date.now()}` },
+    });
+    if (!postRes.ok())
+      throw new Error(`Failed to create new project: ${postRes.status()}`);
+    res = await request.get(getAllUrl);
+    if (!res.ok())
+      throw new Error(`Failed to refetch project: ${res.status()}`);
+    body = await res.json();
+    projects = unwrapArray<Project>(body, "projects");
   }
+
+  const nonDefault = projects.find(
+    (project) => String(project.id) !== String(projectId),
+  );
+
+  if (!nonDefault) {
+    throw new Error(
+      `Could not find a non-default project distinct from projectId=${projectId} in ${JSON.stringify(projects).slice(0, 500)}`,
+    );
+  }
+
+  return nonDefault.name;
 }
 
 // Record page URLs look like: http://localhost:3000/record?recordId=955&projectId=213
@@ -235,7 +254,11 @@ export async function getProjectIdByName(
     `${BASE_URL}/organizations/${orgId}/projects`,
   );
   if (!res.ok()) throw new Error(`Failed to fetch projects: ${res.status()}`);
-  const projects: { id: number | string; name: string }[] = await res.json();
+  const body = await res.json();
+  const projects = unwrapArray<{ id: number | string; name: string }>(
+    body,
+    "projects",
+  );
   const match = projects.find((p) => p.name === projectName);
   if (!match) {
     throw new Error(
@@ -489,12 +512,8 @@ export async function clickToBrowse(
   );
 
   if (projectNav) {
-    try {
-      await page.getByRole("button", { name: projectNav }).first().click();
-    } catch {
-      await page.getByTestId("project-select").click();
-      await page.getByRole("button", { name: projectNav }).first().click();
-    }
+    await page.getByTestId("project-select").click();
+    await page.getByRole("button", { name: projectNav }).first().click();
   }
 
   // Verify in Project Dashboard
