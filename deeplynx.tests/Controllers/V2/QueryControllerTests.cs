@@ -58,7 +58,7 @@ public class QueryControllerTests : IDisposable
     }
 
     // =========================================================================
-    // SearchRecordsPaginates Tests
+    // SearchRecordsPaginated Tests
     // =========================================================================
 
     #region SearchRecordsPaginated Tests
