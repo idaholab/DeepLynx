@@ -48,30 +48,36 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     }
 
     /// <summary>
-    ///     Retrieves all record collections for a specific project and datasource.
+    ///     Retrieves all record collections for a specific project, paginated using the shared
+    ///     <see cref="Paginator" /> helper.
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
-    /// <param name="dto">The data transfer object of the search parameters and pagination</param>
+    /// <param name="search">Optional search term matched against name, description, tags, and labels</param>
+    /// <param name="sensitivityLabelIds">Optional sensitivity label IDs to filter by</param>
+    /// <param name="tagIds">Optional tag IDs to filter by</param>
+    /// <param name="sort">Optional sort key (alphabeticalAsc/alphabeticalDesc/recordCountAsc/recordCountDesc/updatedAsc/updatedDesc)</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-    /// <returns>A list of record collections based on the applied filters.</returns>
-    public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetAllRecordCollections(
-        long currentUserId, long organizationId, long projectId, RecordCollectionQueryRequestDto dto,
-        bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    /// <returns>A paginated list of record collections based on the applied filters.</returns>
+    public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetAllRecordCollectionsPaginated(
+        long currentUserId, long organizationId, long projectId,
+        string? search, long[]? sensitivityLabelIds, long[]? tagIds, string? sort,
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        var search = dto.Search?.Trim();
-
+        var trimmedSearch = search?.Trim();
 
         var recordCollectionQuery = _context.RecordCollections
             .Where(c => c.ProjectId == projectId && c.OrganizationId == organizationId);
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (!string.IsNullOrWhiteSpace(trimmedSearch))
         {
-            var searchPattern = $"%{search}%";
+            var searchPattern = $"%{trimmedSearch}%";
 
             recordCollectionQuery = recordCollectionQuery.Where(c =>
                             EF.Functions.ILike(c.Name, searchPattern) ||
@@ -92,24 +98,24 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 c.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
 
-        if (dto.SensitivityLabelIds?.Length > 0)
+        if (sensitivityLabelIds?.Length > 0)
         {
-            foreach (var labelId in dto.SensitivityLabelIds.Distinct())
+            foreach (var labelId in sensitivityLabelIds.Distinct())
             {
                 recordCollectionQuery = recordCollectionQuery.Where(c =>
                     c.Labels.Any(l => l.Id == labelId));
             }
         }
 
-        if (dto.TagIds?.Length > 0)
+        if (tagIds?.Length > 0)
         {
-            foreach (var tagId in dto.TagIds.Distinct())
+            foreach (var tagId in tagIds.Distinct())
             {
                 recordCollectionQuery = recordCollectionQuery.Where(c => c.Tags.Any(t => t.Id == tagId));
             }
         }
 
-        recordCollectionQuery = dto.Sort switch
+        recordCollectionQuery = sort switch
         {
             "alphabeticalAsc" => recordCollectionQuery.OrderBy(c => c.Name),
             "alphabeticalDesc" => recordCollectionQuery.OrderByDescending(c => c.Name),
@@ -120,50 +126,9 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             _ => recordCollectionQuery.OrderByDescending(c => c.LastUpdatedAt).ThenBy(c => c.Name),
         };
 
-        // Get total count before pagination
-        var totalCount = await recordCollectionQuery.CountAsync();
-
-        // Get pagination values
-        var pageNumber = Math.Max(1, dto.PageNumber);
-        var pageSize = dto.GetValidatedPageSize();
-
-        // Apply pagination and execute query
-        var items = await recordCollectionQuery
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .Select(c => new RecordCollectionResponseDto
-            {
-                Id = c.Id,
-                Description = c.Description,
-                Properties = c.Properties,
-                Name = c.Name,
-                ProjectId = c.ProjectId,
-                OrganizationId = c.OrganizationId,
-                LastUpdatedBy = c.LastUpdatedBy,
-                LastUpdatedAt = c.LastUpdatedAt,
-                IsArchived = c.IsArchived,
-                RecordCount = c.Records.Count(),
-                Tags = c.Tags.Select(t => new RecordCollectionTagDto
-                {
-                    Id = t.Id,
-                    Name = t.Name
-                }).ToList(),
-                Labels = c.Labels.Select(l => new RecordCollectionLabelDto
-                {
-                    Id = l.Id,
-                    Name = l.Name
-                }).ToList()
-            }).ToListAsync();
-
-        return new PaginatedResponse<RecordCollectionResponseDto>
-        {
-            Items = items,
-            PageNumber = pageNumber,
-            PageSize = pageSize,
-            TotalCount = totalCount
-        };
-
-
+        return await recordCollectionQuery
+            .Select(c => RecordCollectionToResponse(c))
+            .ToPaginatedAsync(paginatedRequestDto);
     }
 
    
@@ -1274,6 +1239,124 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     }
 
     #region Deprecated
+    
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by " +
+              "GetAllRecordCollectionsPaginated. Remove once v1 record collection endpoints are sunset.", error: false)]
+    /// <summary>
+    ///     Retrieves all record collections for a specific project and datasource.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <param name="dto">The data transfer object of the search parameters and pagination</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>A list of record collections based on the applied filters.</returns>
+    public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetAllRecordCollections(
+        long currentUserId, long organizationId, long projectId, RecordCollectionQueryRequestDto dto,
+        bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        var search = dto.Search?.Trim();
+        
+        var recordCollectionQuery = _context.RecordCollections
+            .Where(c => c.ProjectId == projectId && c.OrganizationId == organizationId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchPattern = $"%{search}%";
+
+            recordCollectionQuery = recordCollectionQuery.Where(c =>
+                            EF.Functions.ILike(c.Name, searchPattern) ||
+                            (c.Description != null && EF.Functions.ILike(c.Description, searchPattern)) ||
+                            c.Labels.Any(l => EF.Functions.ILike(l.Name, searchPattern)) ||
+                            c.Tags.Any(t => EF.Functions.ILike(t.Name, searchPattern)));
+        }
+
+        if (hideArchived) recordCollectionQuery = recordCollectionQuery.Where(c => !c.IsArchived);
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            recordCollectionQuery = recordCollectionQuery.Where(c =>
+                c.Labels.Count == 0 ||
+                c.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
+        }
+
+        if (dto.SensitivityLabelIds?.Length > 0)
+        {
+            foreach (var labelId in dto.SensitivityLabelIds.Distinct())
+            {
+                recordCollectionQuery = recordCollectionQuery.Where(c =>
+                    c.Labels.Any(l => l.Id == labelId));
+            }
+        }
+
+        if (dto.TagIds?.Length > 0)
+        {
+            foreach (var tagId in dto.TagIds.Distinct())
+            {
+                recordCollectionQuery = recordCollectionQuery.Where(c => c.Tags.Any(t => t.Id == tagId));
+            }
+        }
+
+        recordCollectionQuery = dto.Sort switch
+        {
+            "alphabeticalAsc" => recordCollectionQuery.OrderBy(c => c.Name),
+            "alphabeticalDesc" => recordCollectionQuery.OrderByDescending(c => c.Name),
+            "recordCountAsc" => recordCollectionQuery.OrderBy(c => c.Records.Count).ThenBy(c => c.Name),
+            "recordCountDesc" => recordCollectionQuery.OrderByDescending(c => c.Records.Count).ThenBy(c => c.Name),
+            "updatedAsc" => recordCollectionQuery.OrderBy(c => c.LastUpdatedAt).ThenBy(c => c.Name),
+            "updatedDesc" => recordCollectionQuery.OrderByDescending(c => c.LastUpdatedAt).ThenBy(c => c.Name),
+            _ => recordCollectionQuery.OrderByDescending(c => c.LastUpdatedAt).ThenBy(c => c.Name),
+        };
+
+        // Get total count before pagination
+        var totalCount = await recordCollectionQuery.CountAsync();
+
+        // Get pagination values
+        var pageNumber = Math.Max(1, dto.PageNumber);
+        var pageSize = dto.GetValidatedPageSize();
+
+        // Apply pagination and execute query
+        var items = await recordCollectionQuery
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new RecordCollectionResponseDto
+            {
+                Id = c.Id,
+                Description = c.Description,
+                Properties = c.Properties,
+                Name = c.Name,
+                ProjectId = c.ProjectId,
+                OrganizationId = c.OrganizationId,
+                LastUpdatedBy = c.LastUpdatedBy,
+                LastUpdatedAt = c.LastUpdatedAt,
+                IsArchived = c.IsArchived,
+                RecordCount = c.Records.Count(),
+                Tags = c.Tags.Select(t => new RecordCollectionTagDto
+                {
+                    Id = t.Id,
+                    Name = t.Name
+                }).ToList(),
+                Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+                {
+                    Id = l.Id,
+                    Name = l.Name
+                }).ToList()
+            }).ToListAsync();
+
+        return new PaginatedResponse<RecordCollectionResponseDto>
+        {
+            Items = items,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+    }
 
     /// <summary>
     ///     [DEPRECATED - V1 ONLY] Retrieves all authorized record collections for a specific record.
