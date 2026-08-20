@@ -15,7 +15,7 @@ let orgId: string;
 const fileType: FileTypeConfig =
 {
     label: 'JSON',
-    fileName: 'test-file.json',
+    fileName: `${Date.now()}-${Math.random().toString(36).slice(2)}-test-file.json`,
     mimeType: 'application/json',
     content: JSON.stringify({
 
@@ -100,6 +100,9 @@ test.describe("File Upload -> Update Existing Record", () => {
             await expect(page.getByRole('radio', { name: 'Update Existing Record' })).toBeVisible();
             await page.getByRole('radio', { name: 'Update Existing Record' }).click();
 
+            await page.getByRole('textbox', { name: 'Search files by name, alias,' }).click();
+            await page.getByRole('textbox', { name: 'Search files by name, alias,' }).fill(fileName);
+            await page.getByRole('textbox', { name: 'Search files by name, alias,' }).press('Enter');
             await expect(page.getByRole('button', { name: fileName })).toBeVisible();
             await page.getByRole('button', { name: fileName }).click();
 
@@ -255,6 +258,10 @@ test.describe("File Upload -> Update Existing Record", () => {
                     exact: true,
                 })
                 .click();
+
+            await page.getByRole('textbox', { name: 'Search files by name, alias,' }).click();
+            await page.getByRole('textbox', { name: 'Search files by name, alias,' }).fill(originalFileName);
+            await page.getByRole('textbox', { name: 'Search files by name, alias,' }).press('Enter');
 
             const existingRecordButton = page.getByRole("button", {
                 name: new RegExp(originalFileName, "i"),
