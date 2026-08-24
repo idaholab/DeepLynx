@@ -4,24 +4,25 @@ using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace deeplynx.business;
 
 public class UserBusiness : IUserBusiness
 {
-    private readonly ICacheBusiness _cache;
     private readonly DeeplynxContext _context;
+    private readonly ILogger<UserBusiness> _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="UserBusiness" /> class.
     /// </summary>
-    /// <param name="cache">Used for caching operations.</param>
     /// <param name="context">The database context used for the user operations.</param>
-    public UserBusiness(ICacheBusiness cache, DeeplynxContext context)
+    /// <param name="logger">Used for uniformity in logging</param>
+    public UserBusiness(DeeplynxContext context, ILogger<UserBusiness> logger)
     {
-        _cache = cache;
         _context = context;
+        _logger = logger;
     }
 
     /// <summary>
@@ -346,7 +347,14 @@ public class UserBusiness : IUserBusiness
         await _context.SaveChangesAsync();
 
         // invalidate the cached admin flag now that it's changed
-        await _cache.DeleteAsync(CacheKeys.SysAdmin(userId));
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.SysAdmin(userId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}", userId);
+        }
 
         return true;
     }
@@ -430,7 +438,15 @@ public class UserBusiness : IUserBusiness
         _context.Users.Update(candidate);
         await _context.SaveChangesAsync();
 
-        await _cache.DeleteAsync(CacheKeys.SysAdmin(candidateId));
+        // invalidate the cached admin flag now that it's changed
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.SysAdmin(candidateId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}", candidateId);
+        }
 
         return true;
     }

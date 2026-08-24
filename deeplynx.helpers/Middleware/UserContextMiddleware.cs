@@ -15,19 +15,16 @@ public class UserContextMiddleware
     private readonly ILogger<UserContextMiddleware> _logger;
     private readonly RequestDelegate _next;
     private readonly IServiceScopeFactory _serviceScopeFactory;
-    private readonly ICacheBusiness _cache;
 
     private static readonly TimeSpan AdminFlagCacheTtl = TimeSpan.FromMinutes(2);
 
     public UserContextMiddleware(
         RequestDelegate next,
         IServiceScopeFactory serviceScopeFactory,
-        ICacheBusiness cache,
         ILogger<UserContextMiddleware> logger)
     {
         _next = next;
         _serviceScopeFactory = serviceScopeFactory;
-        _cache = cache;
         _logger = logger;
     }
 
@@ -119,9 +116,7 @@ public class UserContextMiddleware
                                 () => adminService.OrgMemberCheck(user.Id, resolvedOrganizationId));
 
                             UserContextStorage.IsProjectAdmin = projectIds.Any() &&
-                                await GetOrSetBoolAsync(
-                                    CacheKeys.ProjectAdmin(user.Id, resolvedOrganizationId, projectIds),
-                                    () => adminService.ProjectAdminCheck(user.Id, resolvedOrganizationId, projectIds));
+                                await IsProjectAdminForAllAsync(user.Id, resolvedOrganizationId, projectIds, adminService);
                         }
 
                         else
@@ -162,13 +157,40 @@ public class UserContextMiddleware
 
     private async Task<bool> GetOrSetBoolAsync(string key, Func<Task<bool>> factory)
     {
-        var cached = await _cache.GetAsync<bool?>(key);
+        var cached = await CacheService.Instance.GetAsync<bool?>(key);
         if (cached.HasValue)
             return cached.Value;
 
         var result = await factory();
-        await _cache.SetAsync(key, result, AdminFlagCacheTtl);
+        await CacheService.Instance.SetAsync(key, result, AdminFlagCacheTtl);
         return result;
+    }
+
+    private async Task<bool> IsProjectAdminForAllAsync(
+        long userId, long organizationId, List<long> projectIds, IAdminService adminService)
+    {
+        var results = new List<bool>();
+
+        foreach (var projectId in projectIds)
+        {
+            var cacheKey = CacheKeys.ProjectAdmin(userId, organizationId, projectId);
+            var cached = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+
+            bool isAdmin;
+            if (cached.HasValue)
+            {
+                isAdmin = cached.Value;
+            }
+            else
+            {
+                isAdmin = await adminService.ProjectAdminCheck(userId, organizationId, new List<long> { projectId });
+                await CacheService.Instance.SetAsync(cacheKey, isAdmin, AdminFlagCacheTtl);
+            }
+
+            results.Add(isAdmin);
+        }
+
+        return results.All(isAdmin => isAdmin);
     }
 
     private static long? ExtractOrganizationId(HttpContext context)

@@ -21,9 +21,8 @@ public class CacheKeys
         return $"orgmember:{userId}:{organizationId}";
     }
     
-    public static string ProjectAdmin(long userId, long organizationId, List<long> projectIds)
+    public static string ProjectAdmin(long userId, long organizationId, long projectId)
     {
-        var idsPart = string.Join(",", projectIds.OrderBy(id => id));
-        return $"projectadmin:{userId}:{organizationId}:{idsPart}";
+        return $"projectadmin:{userId}:{organizationId}:{projectId}";
     }
 }

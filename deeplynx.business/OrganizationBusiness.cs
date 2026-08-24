@@ -18,7 +18,6 @@ namespace deeplynx.business;
 
 public class OrganizationBusiness : IOrganizationBusiness
 {
-    private readonly ICacheBusiness _cache;
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
     private readonly ILogger<OrganizationBusiness> _logger;
@@ -28,13 +27,11 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <summary>
     ///     Initializes a new instance of the <see cref="OrganizationBusiness" /> class.
     /// </summary>
-    /// <param name="cache">Used for caching operations.</param>
     /// <param name="context">The database context used for organization CRUD operations.</param>
     /// <param name="eventBusiness">Used for logging events during CRUD operations.</param>
     /// <param name="roleBusiness">Used to create default roles automatically on project creation.</param>
     /// <param name="logger"></param>
     public OrganizationBusiness(
-        ICacheBusiness cache,
         DeeplynxContext context,
         IEventBusiness eventBusiness,
         IRoleBusiness roleBusiness,
@@ -42,7 +39,6 @@ public class OrganizationBusiness : IOrganizationBusiness
         IObjectStorageBusiness objectStorageBusiness
     )
     {
-        _cache = cache;
         _context = context;
         _eventBusiness = eventBusiness;
         _roleBusiness = roleBusiness;
@@ -487,8 +483,16 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Add(orgUser);
         await _context.SaveChangesAsync();
 
-        await _cache.DeleteAsync(CacheKeys.OrgMember(userId, organizationId));
-        await _cache.DeleteAsync(CacheKeys.OrgAdmin(userId, organizationId));
+        // invalidate the cached admin flag now that it's changed
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrgMember(userId, organizationId));
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrgAdmin(userId, organizationId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+        }
 
         return true;
     }
@@ -904,7 +908,14 @@ public class OrganizationBusiness : IOrganizationBusiness
         await _context.SaveChangesAsync();
 
         // invalidate the cached admin flag now that it's changed
-        await _cache.DeleteAsync(CacheKeys.OrgAdmin(userId, organizationId));
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrgAdmin(userId, organizationId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+        }
 
         return true;
     }
@@ -928,8 +939,16 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Remove(existingOrgUser);
         await _context.SaveChangesAsync();
 
-        await _cache.DeleteAsync(CacheKeys.OrgMember(userId, organizationId));
-        await _cache.DeleteAsync(CacheKeys.OrgAdmin(userId, organizationId));
+        // invalidate the cached admin flag now that it's changed
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrgMember(userId, organizationId));
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrgAdmin(userId, organizationId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+        }
 
         return true;
     }

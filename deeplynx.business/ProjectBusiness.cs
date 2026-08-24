@@ -20,7 +20,6 @@ namespace deeplynx.business;
 
 public class ProjectBusiness : IProjectBusiness
 {
-    private readonly ICacheBusiness _cache;
     private readonly IClassBusiness _classBusiness;
     private readonly DeeplynxContext _context;
     private readonly IDataSourceBusiness _dataSourceBusiness;
@@ -47,7 +46,6 @@ public class ProjectBusiness : IProjectBusiness
     ///     Initializes a new instance of the <see cref="ProjectBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the project operations.</param>
-    /// <param name="cache">Used for caching operations.</param>
     /// <param name="classBusiness">Used to create default classes automatically on project creation.</param>
     /// <param name="roleBusiness">Used to create default roles automatically on project creation.</param>
     /// <param name="dataSourceBusiness">Used to create a default datasource on project creation.</param>
@@ -59,14 +57,13 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
     /// <param name="fileAzureBusiness">Used to manage Azure operations.</param>
     public ProjectBusiness(
-        ICacheBusiness cache, DeeplynxContext context, ILogger<ProjectBusiness> logger,
+        DeeplynxContext context, ILogger<ProjectBusiness> logger,
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
         IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness,
         IOrganizationService organizationService, IFileBusiness fileAzureBusiness,
         IFileBusinessFactory fileBusinessFactory)
     {
-        _cache = cache;
         _context = context;
         _logger = logger;
         _classBusiness = classBusiness;
@@ -1184,27 +1181,39 @@ public class ProjectBusiness : IProjectBusiness
         await _context.SaveChangesAsync();
 
         // invalidate the cached admin flag now that it's changed
-        if (makeProjectAdmin && !(userId == null))
+        if (makeProjectAdmin)
         {
             long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
-            await _cache.DeleteAsync(CacheKeys.ProjectAdmin((long)userId, organizationId, [projectId]));
-        }
 
-        if (userId.HasValue && userId != UserContextStorage.UserId)
-        {
-            user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
-            if (user != null)
+            if (userId.HasValue)
             {
                 try
                 {
-                    await _notificationBusiness!.SendEmail(user.Email, user.Name, false, null, projectId);
+                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, organizationId, projectId));
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Failed to send notification email to user {user.Email} after adding to project {projectId}");
+                    _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
                 }
+            }
+            else if (groupId.HasValue)
+            {
+                var memberUserIds = await _context.Groups
+                    .Where(g => g.Id == groupId.Value)
+                    .SelectMany(g => g.Users.Select(u => u.Id))
+                    .ToListAsync();
 
-                return true;
+                foreach (var memberId in memberUserIds)
+                {
+                    try
+                    {
+                        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, organizationId, projectId));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", memberId, projectId);
+                    }
+                }
             }
         }
 
@@ -1255,11 +1264,41 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Update(existingProjectMember);
         await _context.SaveChangesAsync();
 
-        // invalidate the cached admin flag now that it's changed
-        if (!(userId == null))
+        // invalidate the cached admin flag, but only if it was actually touched
+        if (isProjectAdmin.HasValue)
         {
             long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
-            await _cache.DeleteAsync(CacheKeys.ProjectAdmin((long)userId, organizationId, [projectId]));
+
+            if (userId.HasValue)
+            {
+                try
+                {
+                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, organizationId, projectId));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
+                }
+            }
+            else if (groupId.HasValue)
+            {
+                var memberUserIds = await _context.Groups
+                    .Where(g => g.Id == groupId.Value)
+                    .SelectMany(g => g.Users.Select(u => u.Id))
+                    .ToListAsync();
+
+                foreach (var memberId in memberUserIds)
+                {
+                    try
+                    {
+                        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, organizationId, projectId));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", memberId, projectId);
+                    }
+                }
+            }
         }
 
         return true;
@@ -1302,12 +1341,38 @@ public class ProjectBusiness : IProjectBusiness
         await _context.SaveChangesAsync();
 
         // invalidate the cached admin flag now that it's changed
-        if (!(userId == null)) 
-        {
-            long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
-            await _cache.DeleteAsync(CacheKeys.ProjectAdmin((long)userId, organizationId, [projectId]));
-        }
+        long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
 
+        if (userId.HasValue)
+        {
+            try
+            {
+                await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, organizationId, projectId));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
+            }
+        }
+        else if (groupId.HasValue)
+        {
+            var memberUserIds = await _context.Groups
+                .Where(g => g.Id == groupId.Value)
+                .SelectMany(g => g.Users.Select(u => u.Id))
+                .ToListAsync();
+
+            foreach (var memberId in memberUserIds)
+            {
+                try
+                {
+                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, organizationId, projectId));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", memberId, projectId);
+                }
+            }
+        }
         return true;
     }
 
@@ -1361,10 +1426,37 @@ public class ProjectBusiness : IProjectBusiness
         await _context.SaveChangesAsync();
 
         // invalidate the cached admin flag now that it's changed
-        if (!(userId == null))
+        long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
+
+        if (userId.HasValue)
         {
-            long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
-            await _cache.DeleteAsync(CacheKeys.ProjectAdmin((long)userId, organizationId, [projectId]));
+            try
+            {
+                await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, organizationId, projectId));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
+            }
+        }
+        else if (groupId.HasValue)
+        {
+            var memberUserIds = await _context.Groups
+                .Where(g => g.Id == groupId.Value)
+                .SelectMany(g => g.Users.Select(u => u.Id))
+                .ToListAsync();
+
+            foreach (var memberId in memberUserIds)
+            {
+                try
+                {
+                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, organizationId, projectId));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", memberId, projectId);
+                }
+            }
         }
 
         return true;
