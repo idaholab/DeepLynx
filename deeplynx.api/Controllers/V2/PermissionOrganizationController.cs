@@ -43,7 +43,6 @@ public class PermissionOrganizationController : ControllerBase
     ///     Get All Permissions 
     /// </summary>
     /// <param name="organizationId">(Optional)The ID of the organization to which the project belongs. If not supplied, will get all defaults.</param>
-    /// <param name="labelId">Optional sensitivity label ID to filter permissions</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived permissions from the result (Default true)</param>
     /// <returns>A list of permissions for the given organization/project.</returns>
     [HttpGet(Name = "api_get_all_organization_permissions")]
@@ -51,12 +50,11 @@ public class PermissionOrganizationController : ControllerBase
     [Auth("read", "permission")]
     public async Task<ActionResult<IEnumerable<PermissionResponseDto>>> GetAllPermissions(
         long organizationId,
-        [FromQuery] long? labelId = null,
         [FromQuery] bool hideArchived = true)
     {
             var permissions =
                 await _permissionBusiness.GetAllPermissions(
-                    labelId, null, organizationId, hideArchived);
+                    null, null, organizationId, hideArchived);
             return Ok(permissions);
     }
 

@@ -200,7 +200,6 @@ export type PermissionResponseDto = {
   action: string;
   resource?: string | null;
   isDefault: boolean;
-  labelId?: number | string;
   lastUpdatedAt?: Date;
   lastUpdatedBy?: string | null;
   isArchived: boolean;
