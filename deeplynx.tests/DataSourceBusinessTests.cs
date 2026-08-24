@@ -27,6 +27,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
     private readonly Mock<IRecordBusiness> _mockRecordBusiness;
     private readonly INotificationBusiness _notificationBusiness = null!;
     private DataSourceBusiness _dataSourceBusiness;
+    private MetricsBusiness _metricsBusiness = null!;
     public long did;
     public long did2;
     public long did3;
@@ -62,6 +63,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
             _eventBusiness,
             _permissionService,
             _adminService);
+        _metricsBusiness = new MetricsBusiness(Context);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -1914,6 +1916,99 @@ public class DataSourceBusinessTests : IntegrationTestBase
         Assert.NotNull(updatedDataSource.LastUpdatedByUser);
         Assert.Equal("John Smith", updatedDataSource.LastUpdatedByUser.Name);
         Assert.Equal("Updated Description", updatedDataSource.Description);
+    }
+
+    #endregion
+
+    #region DataSourceCount Cache Invalidation Tests
+
+    [Fact]
+    public async Task CreateDataSource_InvalidatesProjectOrganizationAndSystemDataSourceCountCache()
+    {
+        // Arrange - warm the caches (did = 1 active project-level source, did2 = 1 active org-level source)
+        var projectCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid);
+        var orgCountBefore = await _metricsBusiness.GetOrganizationDataSourceCount(oid, null);
+        var systemCountBefore = await _metricsBusiness.GetSystemDataSourceCount();
+
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Cache Invalidation Source",
+            Type = "PostgreSQL"
+        };
+
+        // Act
+        await _dataSourceBusiness.CreateDataSource(oid, pid, uid, dto);
+
+        // Assert - cached counts reflect the new data source, not the stale cached value
+        Assert.Equal(projectCountBefore + 1, await _metricsBusiness.GetProjectDataSourceCount(pid));
+        Assert.Equal(orgCountBefore + 1, await _metricsBusiness.GetOrganizationDataSourceCount(oid, null));
+        Assert.Equal(systemCountBefore + 1, await _metricsBusiness.GetSystemDataSourceCount());
+    }
+
+    [Fact]
+    public async Task CreateDataSource_OrgLevel_DoesNotAffectUnrelatedProjectDataSourceCountCache()
+    {
+        // Arrange - warm the cache for a project that does not own the new org-level source
+        var project2CountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid2);
+
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "New Org-Level Source",
+            Type = "PostgreSQL"
+        };
+
+        // Act - create an org-level data source (ProjectId == null)
+        await _dataSourceBusiness.CreateDataSource(oid, null, uid, dto);
+
+        // Assert - project-level count is untouched since GetProjectDataSourceCount never inherits org-level sources
+        Assert.Equal(project2CountBefore, await _metricsBusiness.GetProjectDataSourceCount(pid2));
+    }
+
+    [Fact]
+    public async Task DeleteDataSource_InvalidatesProjectOrganizationAndSystemDataSourceCountCache()
+    {
+        // Arrange - warm the caches
+        var projectCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid);
+        var orgCountBefore = await _metricsBusiness.GetOrganizationDataSourceCount(oid, null);
+        var systemCountBefore = await _metricsBusiness.GetSystemDataSourceCount();
+
+        // Act
+        await _dataSourceBusiness.DeleteDataSource(oid, pid, did);
+
+        // Assert
+        Assert.Equal(projectCountBefore - 1, await _metricsBusiness.GetProjectDataSourceCount(pid));
+        Assert.Equal(orgCountBefore - 1, await _metricsBusiness.GetOrganizationDataSourceCount(oid, null));
+        Assert.Equal(systemCountBefore - 1, await _metricsBusiness.GetSystemDataSourceCount());
+    }
+
+    [Fact]
+    public async Task ArchiveDataSource_InvalidatesDataSourceCountCache_ForHideArchivedTrueOnly()
+    {
+        // Arrange - warm both hideArchived variants for the project
+        var activeCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: true);
+        var allCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: false);
+
+        // Act
+        await _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, did);
+
+        // Assert - active count drops, total count (including archived) is unchanged
+        Assert.Equal(activeCountBefore - 1, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: true));
+        Assert.Equal(allCountBefore, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: false));
+    }
+
+    [Fact]
+    public async Task UnarchiveDataSource_InvalidatesDataSourceCountCache_ForHideArchivedTrueOnly()
+    {
+        // Arrange - warm both hideArchived variants for the project (did3 starts archived)
+        var activeCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: true);
+        var allCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: false);
+
+        // Act
+        await _dataSourceBusiness.UnarchiveDataSource(oid, pid, uid, did3);
+
+        // Assert - active count rises, total count (including archived) is unchanged
+        Assert.Equal(activeCountBefore + 1, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: true));
+        Assert.Equal(allCountBefore, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: false));
     }
 
     #endregion

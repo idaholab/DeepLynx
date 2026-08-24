@@ -12,6 +12,7 @@ public class MetricsBusiness : IMetricsBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly TimeSpan _storageSizeCacheTtl = TimeSpan.FromHours(1);
+    private readonly TimeSpan _dataSourceCountCacheTtl = TimeSpan.FromHours(1);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsBusiness" /> class.
@@ -152,6 +153,20 @@ public class MetricsBusiness : IMetricsBusiness
         return new StorageSizeDto{ Bytes = totalBytes };
     }
 
+    private async Task<int> BuildProjectDataSourceCountFromDb(long projectId, bool hideArchived)
+    {
+        var dsQuery = _context.DataSources
+            .AsQueryable();
+
+        dsQuery = dsQuery.Where(d => d.ProjectId == projectId);
+
+        // hide archived data sources
+        if (hideArchived)
+            dsQuery = dsQuery.Where(d => !d.IsArchived);
+
+        return await dsQuery.CountAsync();
+    }
+
     /// <summary>
     ///     Gets datasource count for project
     /// </summary>
@@ -160,10 +175,30 @@ public class MetricsBusiness : IMetricsBusiness
     /// <returns>Quantity of data sources system-wide</returns>
     public async Task<int> GetProjectDataSourceCount(long projectId, bool hideArchived = true)
     {
+        var cacheKey = CacheKeys.ProjectDataSourceCount(projectId, hideArchived);
+
+        var cachedCount = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        if (cachedCount.HasValue)
+            return cachedCount.Value;
+
+        var count = await BuildProjectDataSourceCountFromDb(projectId, hideArchived);
+
+        await CacheService.Instance.SetAsync(cacheKey, count, _dataSourceCountCacheTtl);
+
+        return count;
+    }
+
+    private async Task<int> BuildOrganizationDataSourceCountFromDb(long organizationId, long[]? projectIds, bool hideArchived)
+    {
         var dsQuery = _context.DataSources
             .AsQueryable();
 
-        dsQuery = dsQuery.Where(d => d.ProjectId == projectId);    
+        dsQuery = dsQuery.Where(d => d.OrganizationId == organizationId);
+
+        // If project ids supplied, inherit org level data sources too
+        if (projectIds is { Length: > 0 })
+            dsQuery = dsQuery.Where(d =>
+                (d.ProjectId.HasValue && projectIds.Contains(d.ProjectId.Value)) || d.ProjectId == null);
 
         // hide archived data sources
         if (hideArchived)
@@ -180,26 +215,28 @@ public class MetricsBusiness : IMetricsBusiness
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
     /// <returns>Quantity of data sources system-wide</returns>
     public async Task<int> GetOrganizationDataSourceCount(
-        long organizationId, 
-        long[]? projectIds, 
+        long organizationId,
+        long[]? projectIds,
         bool hideArchived = true
         )
     {
-        var dsQuery = _context.DataSources
-            .AsQueryable();
+        // Only cache the unfiltered (org-total) case; arbitrary projectIds filters go straight to the DB.
+        if (projectIds is not { Length: > 0 })
+        {
+            var cacheKey = CacheKeys.OrganizationDataSourceCount(organizationId, hideArchived);
 
-        dsQuery = dsQuery.Where(d => d.OrganizationId == organizationId);
+            var cachedCount = await CacheService.Instance.GetAsync<int?>(cacheKey);
+            if (cachedCount.HasValue)
+                return cachedCount.Value;
 
-        // If project ids supplied, inherit org level data sources too 
-        if (projectIds is { Length: > 0 })
-            dsQuery = dsQuery.Where(d =>
-                (d.ProjectId.HasValue && projectIds.Contains(d.ProjectId.Value)) || d.ProjectId == null);
+            var count = await BuildOrganizationDataSourceCountFromDb(organizationId, projectIds, hideArchived);
 
-        // hide archived data sources
-        if (hideArchived)
-            dsQuery = dsQuery.Where(d => !d.IsArchived);
+            await CacheService.Instance.SetAsync(cacheKey, count, _dataSourceCountCacheTtl);
 
-        return await dsQuery.CountAsync();
+            return count;
+        }
+
+        return await BuildOrganizationDataSourceCountFromDb(organizationId, projectIds, hideArchived);
     }
     
     /// <summary>
@@ -222,12 +259,7 @@ public class MetricsBusiness : IMetricsBusiness
     }
 
 
-    /// <summary>
-    ///     Gets datasource count system-wide
-    /// </summary>
-    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
-    /// <returns>Quantity of data sources system-wide</returns>
-    public async Task<int> GetSystemDataSourceCount(bool hideArchived = true)
+    private async Task<int> BuildSystemDataSourceCountFromDb(bool hideArchived)
     {
         var dsQuery = _context.DataSources
             .AsQueryable();
@@ -237,6 +269,26 @@ public class MetricsBusiness : IMetricsBusiness
             dsQuery = dsQuery.Where(d => !d.IsArchived);
 
         return await dsQuery.CountAsync();
+    }
+
+    /// <summary>
+    ///     Gets datasource count system-wide
+    /// </summary>
+    /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
+    /// <returns>Quantity of data sources system-wide</returns>
+    public async Task<int> GetSystemDataSourceCount(bool hideArchived = true)
+    {
+        var cacheKey = CacheKeys.SystemDataSourceCount(hideArchived);
+
+        var cachedCount = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        if (cachedCount.HasValue)
+            return cachedCount.Value;
+
+        var count = await BuildSystemDataSourceCountFromDb(hideArchived);
+
+        await CacheService.Instance.SetAsync(cacheKey, count, _dataSourceCountCacheTtl);
+
+        return count;
     }
     
     /// <summary>
