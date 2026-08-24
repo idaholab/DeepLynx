@@ -1042,6 +1042,16 @@ public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
             .ToPaginatedAsync(paginatedRequestDto);
     }
 
+     // validate a query_records filter column
+    private static readonly HashSet<string> AllowedQueryRecordFilterColumns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "id", "uri", "properties", "original_id", "name", "description",
+        "class_id", "class_name", "data_source_id", "data_source_name",
+        "object_storage_id", "object_storage_name", "project_id", "project_name",
+        "organization_id", "file_type", "file_size", "tags", "labels",
+        "last_updated_at", "last_updated_by", "is_archived"
+    };
+
     #region Deprecated
 
     /// <summary>
@@ -1099,18 +1109,5 @@ public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
         return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
     }
 
-<<<<<<< HEAD
-    // validate a query_records filter column
-    private static readonly HashSet<string> AllowedQueryRecordFilterColumns = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "id", "uri", "properties", "original_id", "name", "description",
-        "class_id", "class_name", "data_source_id", "data_source_name",
-        "object_storage_id", "object_storage_name", "project_id", "project_name",
-        "organization_id", "file_type", "file_size", "tags", "labels",
-        "last_updated_at", "last_updated_by", "is_archived"
-    };
-}
-=======
     #endregion
 }
->>>>>>> origin/develop
