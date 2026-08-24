@@ -663,19 +663,42 @@ public class QueryBusiness : IQueryBusiness
             });
         }
 
-        var queryRecordsResults =
-            _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
+        var entityQuery = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
 
         var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
-            _sensitivityLabelService,
-            currentUserId,
-            organizationId,
-            projectIds,
+            _sensitivityLabelService, currentUserId, organizationId, projectIds,
             isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-        var records = queryRecordsResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
+        if (paginatedRequestDto.PageSize == -1)
+        {
+            var all = await entityQuery.ToListAsync();
+            var allItems = all.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToList();
+            return new PaginatedResponse<QueryRecordViewResponseDto>
+            {
+                Items = allItems,
+                PageNumber = 1,
+                PageSize = allItems.Count,
+                TotalCount = allItems.Count,
+            };
+        }
 
-        return await records.ToPaginatedAsync(paginatedRequestDto);
+        var totalCount = await entityQuery.CountAsync();
+
+        var page = await entityQuery
+            .OrderBy(r => r.Id) 
+            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
+            .Take(paginatedRequestDto.PageSize)
+            .ToListAsync();
+
+        var items = page.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToList();
+
+        return new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = items,
+            PageNumber = paginatedRequestDto.PageNumber,
+            PageSize = paginatedRequestDto.PageSize,
+            TotalCount = totalCount,
+        };
     }
 
     #region Deprecated
