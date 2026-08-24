@@ -67,9 +67,19 @@ export async function saveSearch(
     if (textSearch) params.set("textSearch", textSearch);
     if (alias) params.set("alias", alias);
 
+    const normalizedFilterArray = filterArray.map((filter) => {
+      if (filter.jsonKey && filter.jsonValue) {
+        return {
+          ...filter,
+          json: JSON.stringify({ [filter.jsonKey]: filter.jsonValue }),
+        };
+      }
+      return filter;
+    });
+
     const res = await api.post<boolean>(
       `saved-searches?${params.toString()}`,
-      filterArray
+      normalizedFilterArray
     );
     return res.data;
   } catch (error) {
