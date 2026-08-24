@@ -346,16 +346,6 @@ public class UserBusiness : IUserBusiness
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
 
-        // invalidate the cached admin flag now that it's changed
-        try
-        {
-            await CacheService.Instance.DeleteAsync(CacheKeys.SysAdmin(userId));
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "Cache invalidation failed for user {UserId}", userId);
-        }
-
         return true;
     }
 
