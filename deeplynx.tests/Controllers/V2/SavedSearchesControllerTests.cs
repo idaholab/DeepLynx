@@ -345,18 +345,24 @@ public class SavedSearchesControllerTests : IDisposable
     public async Task ExecuteSavedSearch_Returns200_WithDtoList()
     {
         // Arrange
-        IEnumerable<QueryRecordViewResponseDto> expected =
-        new List<QueryRecordViewResponseDto>();
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = new List<QueryRecordViewResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
         _mockSavedSearchBusiness
-            .Setup(b => b.ExecuteSavedSearch(SavedSearchId, UserId, OrgId, ProjectList, false, false, false))
+            .Setup(b => b.ExecuteSavedSearchPaginated(SavedSearchId, UserId, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), false, false))
             .ReturnsAsync(expected);
 
         // Act
         var actionResult = await _savedSearchController.ExecuteSavedSearch(
             OrgId,
             ProjectList,
-            SavedSearchId);
+            SavedSearchId,
+            It.IsAny<PaginatedRequestDto>());
 
         // Assert
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -370,37 +376,44 @@ public class SavedSearchesControllerTests : IDisposable
     public async Task ExecuteSavedSearchPropagatesException_OnUnexpectedException()
     {
         _mockSavedSearchBusiness
-            .Setup(b => b.ExecuteSavedSearch(SavedSearchId, UserId, OrgId, ProjectList, false, false, false))
+            .Setup(b => b.ExecuteSavedSearchPaginated(SavedSearchId, UserId, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), false, false))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _savedSearchController.ExecuteSavedSearch(
             OrgId,
             ProjectList,
-            SavedSearchId));
+            SavedSearchId,
+            It.IsAny<PaginatedRequestDto>()));
     }
 
     [Fact]
     public async Task ExecuteSavedSearch_PassesToBusinessLayer()
     {
         // Arrange
-        IEnumerable<QueryRecordViewResponseDto> expected =
-        new List<QueryRecordViewResponseDto>();
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = new List<QueryRecordViewResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
         _mockSavedSearchBusiness
-            .Setup(b => b.ExecuteSavedSearch(SavedSearchId, UserId, OrgId, ProjectList, false, false, false))
+            .Setup(b => b.ExecuteSavedSearchPaginated(SavedSearchId, UserId, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), false, false))
             .ReturnsAsync(expected);
 
         // Act
         var actionResult = await _savedSearchController.ExecuteSavedSearch(
             OrgId,
             ProjectList,
-            SavedSearchId);
+            SavedSearchId,
+            It.IsAny<PaginatedRequestDto>());
 
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
 
         // Assert
         _mockSavedSearchBusiness.Verify(
-            b => b.ExecuteSavedSearch(SavedSearchId, UserId, OrgId, ProjectList, false, false, false),
+            b => b.ExecuteSavedSearchPaginated(SavedSearchId, UserId, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), false, false),
             Times.Once);
     }
 
@@ -408,26 +421,32 @@ public class SavedSearchesControllerTests : IDisposable
     public async Task ExecuteSavedSearch_PassesAdminFlagTrueToBusinessLayer()
     {
         // Arrange
-        IEnumerable<QueryRecordViewResponseDto> expected =
-        new List<QueryRecordViewResponseDto>();
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = new List<QueryRecordViewResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
         UserContextStorage.IsSysAdmin = true;
 
         _mockSavedSearchBusiness
-            .Setup(b => b.ExecuteSavedSearch(SavedSearchId, UserId, OrgId, ProjectList, true, false, false))
+            .Setup(b => b.ExecuteSavedSearchPaginated(SavedSearchId, UserId, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true, false))
             .ReturnsAsync(expected);
 
         // Act
         var actionResult = await _savedSearchController.ExecuteSavedSearch(
             OrgId,
             ProjectList,
-            SavedSearchId);
+            SavedSearchId,
+            It.IsAny<PaginatedRequestDto>());
 
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
 
         // Assert
         _mockSavedSearchBusiness.Verify(
-            b => b.ExecuteSavedSearch(SavedSearchId, UserId, OrgId, ProjectList, true, false, false),
+            b => b.ExecuteSavedSearchPaginated(SavedSearchId, UserId, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true, false),
             Times.Once);
     }
 
@@ -437,8 +456,9 @@ public class SavedSearchesControllerTests : IDisposable
         var method = GetControllerMethod(
             nameof(SavedSearchController.ExecuteSavedSearch),
             "organizationId",
-            "projectIds",
-            "savedSearchId");
+            "projects",
+            "savedSearchId",
+            "paginatedDto");
 
         AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
     }

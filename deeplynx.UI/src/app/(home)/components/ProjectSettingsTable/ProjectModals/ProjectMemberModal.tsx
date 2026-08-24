@@ -42,8 +42,8 @@ const AddProjectMember = ({
 
       // Fetch roles for the specific project
       getAllRoles(organization.organizationId as number, projectId)
-        .then((response: RoleResponseDto[]) => {
-          setRoles(response);
+        .then(({ items }) => {
+          setRoles(items);
         })
         .catch((error) => {
           console.error("Error fetching roles:", error);

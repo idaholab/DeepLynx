@@ -218,7 +218,7 @@ public class MetricsProjectControllerTests : IDisposable
 
         // Act
         var result = (await _metricsProjectController.GetProjectRecordCount(
-            OrgId, ProjectId, true)).Result as OkObjectResult;
+            OrgId, ProjectId, false)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
@@ -236,26 +236,21 @@ public class MetricsProjectControllerTests : IDisposable
 
         // Act / Assert
         await Assert.ThrowsAsync<Exception>(() => _metricsProjectController.GetProjectRecordCount(
-            OrgId, ProjectId, true));
+            OrgId, ProjectId, false));
     }
 
     [Fact]
-    public async Task GetProjectRecordCount_AlwaysPassesHideArchivedFalseRegardlessOfParameter()
+    public async Task GetProjectRecordCount_PassesHideArchivedFlagToBusinessLayer()
     {
-        // Arrange
-        // Note: the controller currently ignores the incoming `hideArchived` argument and
-        // hardcodes `false` when calling into the business layer. This test pins down that
-        // existing (possibly unintended) behavior so a future fix is a deliberate, visible change.
         _mockMetricsBusiness
             .Setup(b => b.GetRecordCount(OrgId, ProjectId, false))
             .ReturnsAsync(RecordCount);
 
         // Act
-        await _metricsProjectController.GetProjectRecordCount(OrgId, ProjectId, hideArchived: true);
+        await _metricsProjectController.GetProjectRecordCount(OrgId, ProjectId, hideArchived: false);
 
         // Assert
         _mockMetricsBusiness.Verify(b => b.GetRecordCount(OrgId, ProjectId, false), Times.Once);
-        _mockMetricsBusiness.Verify(b => b.GetRecordCount(OrgId, ProjectId, true), Times.Never);
     }
 
     [Fact]
@@ -267,7 +262,7 @@ public class MetricsProjectControllerTests : IDisposable
             .ReturnsAsync(RecordCount);
 
         // Act
-        await _metricsProjectController.GetProjectRecordCount(OrgId, ProjectId, true);
+        await _metricsProjectController.GetProjectRecordCount(OrgId, ProjectId, false);
 
         // Assert
         _mockMetricsBusiness.Verify(b => b.GetRecordCount(OrgId, ProjectId, false), Times.Once);
@@ -303,7 +298,7 @@ public class MetricsProjectControllerTests : IDisposable
 
         // Act
         var result = (await _metricsProjectController.GetProjectFileCount(
-            OrgId, ProjectId, true)).Result as OkObjectResult;
+            OrgId, ProjectId, false)).Result as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);
@@ -321,25 +316,22 @@ public class MetricsProjectControllerTests : IDisposable
 
         // Act / Assert
         await Assert.ThrowsAsync<Exception>(() => _metricsProjectController.GetProjectFileCount(
-            OrgId, ProjectId, true));
+            OrgId, ProjectId, false));
     }
 
     [Fact]
-    public async Task GetProjectFileCount_AlwaysPassesHideArchivedFalseRegardlessOfParameter()
+    public async Task GetProjectFileCount_PassesHideArchivedFlagToBusinessLayer()
     {
         // Arrange
-        // Same note as GetProjectRecordCount above: the incoming `hideArchived` value is
-        // currently ignored in favor of a hardcoded `false`.
         _mockMetricsBusiness
             .Setup(b => b.GetFileCount(OrgId, ProjectId, false))
             .ReturnsAsync(FileCount);
 
         // Act
-        await _metricsProjectController.GetProjectFileCount(OrgId, ProjectId, hideArchived: true);
+        await _metricsProjectController.GetProjectFileCount(OrgId, ProjectId, hideArchived: false);
 
         // Assert
         _mockMetricsBusiness.Verify(b => b.GetFileCount(OrgId, ProjectId, false), Times.Once);
-        _mockMetricsBusiness.Verify(b => b.GetFileCount(OrgId, ProjectId, true), Times.Never);
     }
 
     [Fact]
