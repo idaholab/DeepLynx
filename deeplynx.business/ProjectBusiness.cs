@@ -1180,6 +1180,24 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Add(projMember);
         await _context.SaveChangesAsync();
 
+        if (userId.HasValue && userId != UserContextStorage.UserId)
+        {
+            user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user != null)
+            {
+                try
+                {
+                    await _notificationBusiness!.SendEmail(user.Email, user.Name, false, null, projectId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to send notification email to user {user.Email} after adding to project {projectId}");
+                }
+
+                return true;
+            }
+        }
+
         // invalidate the cached admin flag now that it's changed
         if (makeProjectAdmin)
         {
