@@ -116,6 +116,7 @@ const SelectOrgClient = ({ session, organizations, initialUsersByOrg }: Props) =
     try {
       await createOrganization(formData);
 
+      // Reset form and close modal
       setFormData({ name: "", description: "", disableFileTransfer: false });
       setIsModalOpen(false);
 

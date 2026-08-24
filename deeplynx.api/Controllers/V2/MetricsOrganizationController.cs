@@ -90,7 +90,7 @@ public class MetricsOrganizationController : ControllerBase
         [FromQuery] long[]? projectIds,
         [FromQuery] bool hideArchived = true)
     {
-        var count = await _metricsBusiness.GetRecordCount(organizationId, projectIds, hideArchived: false);
+        var count = await _metricsBusiness.GetRecordCount(organizationId, projectIds, hideArchived);
         return Ok(count);
     }
 
@@ -110,7 +110,7 @@ public class MetricsOrganizationController : ControllerBase
         [FromQuery] long[]? projectIds,
         [FromQuery] bool hideArchived = true)
     {
-        var count = await _metricsBusiness.GetFileCount(organizationId, projectIds, hideArchived: false);
+        var count = await _metricsBusiness.GetFileCount(organizationId, projectIds, hideArchived);
         return Ok(count);
     }
 

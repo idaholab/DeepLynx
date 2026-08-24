@@ -112,6 +112,12 @@ export default function NewFileUploadCard({
     if (value === undefined || value === null) return undefined;
     if (typeof value === "string") return value.trim() || undefined;
     if (typeof value === "number") return String(value);
+    if (Array.isArray(value)) {
+      const joined = value
+        .filter((item): item is string => typeof item === "string")
+        .join(", ");
+      return joined || undefined;
+    }
     return undefined;
   };
 
@@ -269,10 +275,11 @@ export default function NewFileUploadCard({
                 type="button"
                 role="radio"
                 aria-checked={recordMode === "new"}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${recordMode === "new"
-                  ? "bg-base-100 text-base-content shadow-sm"
-                  : "text-base-content/70"
-                  }`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  recordMode === "new"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70"
+                }`}
                 onClick={() => setRecordMode("new")}
               >
                 {t.translations.NEW_RECORD}
@@ -281,10 +288,11 @@ export default function NewFileUploadCard({
                 type="button"
                 role="radio"
                 aria-checked={recordMode === "update"}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${recordMode === "update"
-                  ? "bg-base-100 text-base-content shadow-sm"
-                  : "text-base-content/70"
-                  }`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  recordMode === "update"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70"
+                }`}
                 onClick={() => setRecordMode("update")}
               >
                 {t.translations.UPDATE_EXISTING_RECORD}
@@ -341,8 +349,9 @@ export default function NewFileUploadCard({
                         key={f.id}
                         type="button"
                         onClick={() => setTargetRecordId(String(f.id))}
-                        className={`w-full border-b border-base-300/50 px-3 py-2 text-left last:border-b-0 transition ${selected ? "bg-base-200/70" : "hover:bg-base-200/30"
-                          }`}
+                        className={`w-full border-b border-base-300/50 px-3 py-2 text-left last:border-b-0 transition ${
+                          selected ? "bg-base-200/70" : "hover:bg-base-200/30"
+                        }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">
@@ -494,6 +503,18 @@ export default function NewFileUploadCard({
                             metadataPreview,
                             "ClassId",
                             "classId",
+                          ) ?? t.translations.NOT_AVAILABLE}
+                        </span>
+                      </p>
+                      <p className="break-words">
+                        <span className="font-semibold">
+                          {t.translations.METADATA_PREVIEW_TAGS}:
+                        </span>{" "}
+                        <span className="break-all">
+                          {getPreviewString(
+                            metadataPreview,
+                            "Tags",
+                            "tags",
                           ) ?? t.translations.NOT_AVAILABLE}
                         </span>
                       </p>

@@ -75,7 +75,8 @@ export default async function ProjectManagementPage({ params }: Props) {
     }
 
     try {
-      projectRoles = await getAllRolesServer(organizationId, projectId);
+      const { items } = await getAllRolesServer(organizationId, projectId);
+      projectRoles = items;
     } catch (e) {
       console.error("getAllRoles failed: ", e);
     }

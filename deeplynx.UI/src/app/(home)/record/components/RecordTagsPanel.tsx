@@ -3,7 +3,7 @@
 "use client";
 
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import LabelButton from "@/app/(home)/record/components/LabelButton";
 import Tabs from "@/app/(home)/components/Tabs";
@@ -13,6 +13,8 @@ import type {
 } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import TagButton from "./TagButton";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "../../components/PaginationControls";
 
 interface Props {
   // Data
@@ -69,6 +71,24 @@ const RecordTagsPanel: React.FC<Props> = ({
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState(t.translations.SENSITIVITY_LABELS);
 
+  const {
+    currentPage: tagPage,
+    pageSize: tagPageSize,
+    paginatedItems: paginatedTags,
+    resetPagination: resetTagPagination,
+    setCurrentPage: setTagPage,
+    setPageSize: setTagPageSize,
+    totalPages: tagTotalPages,
+  } = useLocalPagination({
+    items: selectedTags,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetTagPagination();
+  }, [selectedTags, resetTagPagination]);
+
+
   const tagContent = (
     <>
       <div className="flex justify-end mb-3 mt-3">
@@ -91,7 +111,7 @@ const RecordTagsPanel: React.FC<Props> = ({
             {t.translations.USE_SELECTOR_TO_ADD_TAGS}
           </div>
         ) : (
-          selectedTags.map((tag) => (
+          paginatedTags.map((tag) => (
             <div
               key={tag.id}
               className="flex items-center justify-between gap-3 bg-base-200/60 hover:bg-base-200 rounded-lg px-3 py-1.5"
@@ -116,6 +136,17 @@ const RecordTagsPanel: React.FC<Props> = ({
             </div>
           ))
         )}
+
+        {/* Pagination Controls */}
+        <div className="mt-2 flex justify-end">
+          <PaginationControls
+            currentPage={tagPage}
+            pageSize={tagPageSize}
+            totalPages={tagTotalPages}
+            onPageChange={setTagPage}
+            onPageSizeChange={setTagPageSize}
+          />
+        </div>
       </div>
     </>
   );

@@ -196,22 +196,22 @@ try
     var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
     dataSourceBuilder.UseVector();
     var dataSource = dataSourceBuilder.Build();
-
+    
     builder.Services.AddDbContext<DeeplynxContext>(options =>
          options.UseNpgsql(dataSource, npgsqlOptions =>
         {
-            npgsqlOptions.CommandTimeout(60);
+            npgsqlOptions.CommandTimeout(120);
         }),
         ServiceLifetime.Transient
     );
 
     builder.Services.AddDbContext<LatticeContext>(options =>
-         options.UseNpgsql(connectionString, npgsqlOptions =>
-        {
-            npgsqlOptions.CommandTimeout(60);
-        }),
-        ServiceLifetime.Transient
-    );
+          options.UseNpgsql(connectionString, npgsqlOptions =>
+         {
+             npgsqlOptions.CommandTimeout(120);
+         }),
+         ServiceLifetime.Transient
+     );
 
     builder.Services.AddSignalR(); // Used for event system pub/sub and notifications
 

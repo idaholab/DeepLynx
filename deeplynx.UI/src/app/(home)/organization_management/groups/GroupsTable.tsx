@@ -265,6 +265,24 @@ const GroupRow: React.FC<GroupRowProps> = ({
   onArchiveGroup,
 }) => {
   const { t } = useLanguage();
+
+  const {
+    currentPage: memberPage,
+    pageSize: memberPageSize,
+    paginatedItems: paginatedMembers,
+    resetPagination: resetMemberPagination,
+    setCurrentPage: setMemberPage,
+    setPageSize: setMemberPageSize,
+    totalPages: memberTotalPages,
+  } = useLocalPagination({
+    items: currentMembers,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetMemberPagination();
+  }, [currentMembers, resetMemberPagination]);
+
   return (
     <>
       {/* Main Row */}
@@ -439,7 +457,7 @@ const GroupRow: React.FC<GroupRowProps> = ({
                           {t.translations.NO_MEMBERS_IN_THIS_GROUP_YET}
                         </div>
                       ) : (
-                        currentMembers.map((user) => (
+                        paginatedMembers.map((user) => (
                           <div
                             key={user.id}
                             className="flex items-center justify-between p-3 bg-base-200 rounded-lg hover:bg-base-300 transition"
@@ -464,6 +482,19 @@ const GroupRow: React.FC<GroupRowProps> = ({
                         ))
                       )}
                     </div>
+
+                    {/* Pagination Controls for members */}
+                    {currentMembers.length > 0 && (
+                      <div className="mt-2 flex justify-end">
+                        <PaginationControls
+                          currentPage={memberPage}
+                          pageSize={memberPageSize}
+                          totalPages={memberTotalPages}
+                          onPageChange={setMemberPage}
+                          onPageSizeChange={setMemberPageSize}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Add Members */}

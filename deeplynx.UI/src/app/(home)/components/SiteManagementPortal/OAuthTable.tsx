@@ -1,5 +1,5 @@
 import { useLanguage } from "@/app/contexts/Language";
-import { OauthApplicationResponseDto } from "../../types/responseDTOs";
+import { OauthApplicationResponseDto, PaginatedResponse } from "../../types/responseDTOs";
 import { useEffect, useState } from "react";
 import { Column } from "../../types/types";
 import { PencilIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
@@ -13,13 +13,13 @@ import {
 import { SiteManagementTable } from "./SiteManagementTable";
 
 interface Props {
-  initialApplications: OauthApplicationResponseDto[];
+  initialApplications: PaginatedResponse<OauthApplicationResponseDto>;
   onApplicationsChange?: () => Promise<void>; // Add this prop
 }
 
 const OAuthManagement = ({ initialApplications, onApplicationsChange }: Props) => {
   const { t } = useLanguage();
-  const [data, setData] = useState<OauthApplicationResponseDto[]>(initialApplications);
+  const [data, setData] = useState<OauthApplicationResponseDto[]>(initialApplications.items);
   const [isOAuthApplicationModalOpen, setIsOAuthApplicationModalOpen] =
     useState(false);
   const [editOAuthApplicationModal, setEditOAuthApplicationModal] =
@@ -56,8 +56,8 @@ const OAuthManagement = ({ initialApplications, onApplicationsChange }: Props) =
 
   const refreshOAuthApplications = async () => {
     try {
-      const updatedData = await getAllOauthApplications();
-      setData(updatedData);
+      const { items } = await getAllOauthApplications();
+      setData(items);
       // Notify parent component to update its state too
       if (onApplicationsChange) {
         await onApplicationsChange();

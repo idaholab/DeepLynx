@@ -577,6 +577,156 @@ public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
     /// <param name="userQuery">String query</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectIds">Project ids that a user has access to</param>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching projects are returned unpaginated</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>A paginated list of record response dtos from the query view that match provided query parameters</returns>
+    public async Task<PaginatedResponse<QueryRecordViewResponseDto>> SearchPaginated(
+        long currentUserId, string userQuery, long organizationId, long[] projectIds, PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        if (string.IsNullOrWhiteSpace(userQuery))
+            throw new Exception("Search query is required.");
+
+        // if user is not admin, filter out unauthorized labels
+        var authorizedLabelIds = new List<long>();
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                    currentUserId, organizationId, projectIds, "read record");
+        }
+
+        var processedQuery = string.Join(" & ",
+            userQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(word => word.Trim() + ":*"));
+
+        var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
+            AND (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM deeplynx.record_labels rl
+                    WHERE rl.record_id = qr.id
+                )
+                OR
+                NOT EXISTS (
+                    SELECT 1
+                    FROM deeplynx.record_labels rl2
+                    WHERE rl2.record_id = qr.id
+                    AND rl2.label_id != ALL(@authorized_label_ids)
+                )
+            )" : "";
+
+        var hideArchivedFilter = hideArchived ? @"
+            AND qr.is_archived = false
+            " : "";
+
+        var sql = $@"
+            SELECT
+            qr.*,
+            qr.class_id as ClassId,
+            qr.class_name as ClassName,
+            qr.original_id as OriginalId,
+            qr.data_source_name as DataSourceName,
+            qr.data_source_id as DataSourceId,
+            qr.project_name as ProjectName,
+            qr.project_id as ProjectId,
+            qr.last_updated_at as LastUpdatedAt,
+            qr.last_updated_by as LastUpdatedBy,
+            qr.object_storage_name as ObjectStorageName,
+            qr.object_storage_id as ObjectStorageId,
+            qr.id as RecordId,
+            qr.is_archived as IsArchived
+        FROM deeplynx.query_records qr
+        WHERE qr.project_id = ANY(@project_ids)
+        AND qr.organization_id = @organization_id
+        {hideArchivedFilter}
+        {authorizationFilter}
+        AND (
+            to_tsvector('english',
+                    coalesce(name, '') || ' ' ||
+                    coalesce(description, '') || ' ' ||
+                    coalesce(class_name, '') || ' ' ||
+                    coalesce(uri, '') || ' ' ||
+                    coalesce(original_id, '') || ' ' ||
+                    coalesce(data_source_name, '') || ' ' ||
+                    coalesce(project_name, '') || ' ' ||
+                    coalesce(properties::text, '') || ' ' ||
+                    coalesce(tags::text, '')
+                ) @@ to_tsquery('english', @processed_query)
+            OR qr.name ILIKE '%' || @original_query || '%'
+            OR qr.description ILIKE '%' || @original_query || '%'
+            OR qr.original_id ILIKE '%' || @original_query || '%'
+            OR qr.data_source_name ILIKE '%' || @original_query || '%'
+            OR qr.project_name ILIKE '%' || @original_query || '%'
+            OR qr.class_name ILIKE '%' || @original_query || '%'
+        )
+        ORDER BY qr.id, qr.last_updated_at DESC";
+
+        var parameters = new List<NpgsqlParameter>
+        {
+            new NpgsqlParameter("processed_query", processedQuery),
+            new NpgsqlParameter("original_query", userQuery),
+            new NpgsqlParameter("project_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = projectIds },
+            new NpgsqlParameter("organization_id", organizationId)
+        };
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            parameters.Add(new NpgsqlParameter("authorized_label_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+            {
+                Value = authorizedLabelIds.ToArray()
+            });
+        }
+
+        var entityQuery = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
+
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService, currentUserId, organizationId, projectIds,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        if (paginatedRequestDto.PageSize == -1)
+        {
+            var all = await entityQuery.ToListAsync();
+            var allItems = all.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToList();
+            return new PaginatedResponse<QueryRecordViewResponseDto>
+            {
+                Items = allItems,
+                PageNumber = 1,
+                PageSize = allItems.Count,
+                TotalCount = allItems.Count,
+            };
+        }
+
+        var totalCount = await entityQuery.CountAsync();
+
+        var page = await entityQuery
+            .OrderBy(r => r.Id) 
+            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
+            .Take(paginatedRequestDto.PageSize)
+            .ToListAsync();
+
+        var items = page.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToList();
+
+        return new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = items,
+            PageNumber = paginatedRequestDto.PageNumber,
+            PageSize = paginatedRequestDto.PageSize,
+            TotalCount = totalCount,
+        };
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    ///     Full text records search
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="userQuery">String query</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectIds">Project ids that a user has access to</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
@@ -691,6 +841,8 @@ public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
 
         return await queryRecordsResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToListAsync();
     }
+
+    #endregion
 
     /// <summary>
     ///     Retrieves current records for projects, ordered by last_updated_at first
@@ -825,13 +977,89 @@ public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
     ///     Retrieves all records for multiple projects.
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
-    /// <param name="organizationId"> Orginization Id of projects</param>
+    /// <param name="organizationId"> Organization Id of projects</param>
+    /// <param name="projects">Array of project ids whose records are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if null, all matching edges are returned unpaginated</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>A list of records based on the applied filters.</returns>
+    public async Task<PaginatedResponse<QueryRecordViewResponseDto>> GetMultiProjectRecordsPaginated(
+        long currentUserId,
+        long organizationId,
+        long[] projects,
+        bool hideArchived,
+        PaginatedRequestDto paginatedRequestDto,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
+    {
+        if (projects.Length == 0)
+        {
+            return new PaginatedResponse<QueryRecordViewResponseDto>
+            {
+                Items = [],
+                PageNumber = paginatedRequestDto.PageNumber,
+                PageSize = paginatedRequestDto.PageSize,
+                TotalCount = 0
+            };
+        }
+
+        var projectSet = new HashSet<long>(projects);
+
+        var recordQuery = _context.QueryRecords
+            .Where(r => projectSet.Contains(r.ProjectId) && r.OrganizationId == organizationId)
+            .AsQueryable();
+
+        if (hideArchived)
+            recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projects, "read record");
+
+            var authorizedRecordIds = _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projects.Contains(rec.ProjectId))
+                .WithAuthorizedLabels(authorizedLabelIds)
+                .Select(rec => rec.Id);
+
+            recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.Id));
+        }
+
+        var orderedQuery = recordQuery.OrderBy(r => r.Id);
+
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projects,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return await orderedQuery
+            .Select(r => QueryRecordToResponse(r, isUriAuthorized(r)))
+            .ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all specified records without pagination.
+    ///     Superseded by <see cref="GetMultiProjectRecordsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 query controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId"> Organization Id of projects</param>
     /// <param name="projects">Array of project ids whose records are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of records based on the applied filters.</returns>
+    [Obsolete("V1-only. Used by deprecated v1 query endpoints. Superseded by GetMultiProjectRecordsPaginated. " +
+              "Remove once v1 query endpoints are sunset.", error: false)]
     public async Task<IEnumerable<QueryRecordViewResponseDto>> GetMultiProjectRecords(
         long currentUserId, long organizationId, long[] projects, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
@@ -871,6 +1099,7 @@ public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
         return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
     }
 
+<<<<<<< HEAD
     // validate a query_records filter column
     private static readonly HashSet<string> AllowedQueryRecordFilterColumns = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -881,3 +1110,7 @@ public async Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(
         "last_updated_at", "last_updated_by", "is_archived"
     };
 }
+=======
+    #endregion
+}
+>>>>>>> origin/develop

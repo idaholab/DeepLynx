@@ -42,6 +42,8 @@ import {
   ProjectMemberTableRow,
   buildTableData,
 } from "../../types/projectUsersTypes";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
 
 /* -------------------------------------------------------------------------- */
 /*                         ProjectUsersTable Component                        */
@@ -99,6 +101,23 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     members: [],
     loading: false,
   });
+
+  const {
+    currentPage,
+    pageSize,
+    paginatedItems,
+    resetPagination,
+    setCurrentPage,
+    setPageSize,
+    totalPages,
+  } = useLocalPagination({
+    items: viewGroupMembersModal.members,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetPagination();
+  }, [viewGroupMembersModal.members, resetPagination]);
 
   /* ------------------------------------------------------------------------ */
   /*                        Confirm Remove / Future Use                       */
@@ -188,7 +207,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     try {
       const users = await getAllUsers(organizationId);
-      setAvailableUsers(users);
+      setAvailableUsers(users.items);
     } catch (error) {
       console.error("Failed to load users:", error);
       toast.error(t.translations.UNABLE_TO_LOAD_USERS);
@@ -234,7 +253,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
         setTableData(buildTableData(updatedMembers));
       } else {
         const updatedMembers = await getAllUsers(organizationId);
-        setTableData(buildTableData(updatedMembers));
+        setTableData(buildTableData(updatedMembers.items));
       }
     } catch (refreshError) {
       console.error("Failed to refresh members list:", refreshError);
@@ -651,7 +670,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
                   </p>
                 ) : (
                   <div className="py-4 space-y-2 max-h-80 overflow-y-auto">
-                    {viewGroupMembersModal.members.map((user) => (
+                    {paginatedItems.map((user) => (
                       <div key={user.id} className="p-3 rounded-lg bg-base-200">
                         <p className="font-semibold">{user.name || user.email}</p>
                         <p className="text-sm text-base-content/70">{user.email}</p>
@@ -659,6 +678,17 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
                     ))}
                   </div>
                 )}
+
+                {/* Pagination Controls */}
+                <div className="mt-2 flex justify-end">
+                  <PaginationControls
+                    currentPage={currentPage}
+                    pageSize={pageSize}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                </div>
 
                 <div className="modal-action">
                   <button

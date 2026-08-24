@@ -81,7 +81,7 @@ public class MetricsController : ControllerBase
     [SysAdmin]
     public async Task<ActionResult<int>> GetSystemRecordCount(bool hideArchived = true)
     {
-       var count = await _metricsBusiness.GetRecordCount(organizationId: null, projectIds: null, hideArchived: false);
+       var count = await _metricsBusiness.GetRecordCount(organizationId: null, projectIds: null, hideArchived);
             return Ok(count);
     }
 
@@ -97,7 +97,7 @@ public class MetricsController : ControllerBase
     [SysAdmin]
     public async Task<ActionResult<int>> GetSystemFileCount(bool hideArchived = true)
     {
-       var count = await _metricsBusiness.GetFileCount(organizationId: null, projectIds: null, hideArchived: false);
+       var count = await _metricsBusiness.GetFileCount(organizationId: null, projectIds: null, hideArchived);
             return Ok(count);
     }
 }

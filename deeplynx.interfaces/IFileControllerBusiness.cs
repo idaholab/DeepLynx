@@ -34,7 +34,8 @@ public interface IFileControllerBusiness
         IFormFile file,
         long? vlmConfigId,
         long? embeddingModelConfigId,
-        string? userJwt);
+        string? userJwt,
+        IFormFile? metadataFile = null);
 
     Task<RecordResponseDto> UpdateFileContentHash(
         long currentUserId,
@@ -133,7 +134,8 @@ public interface IFileControllerBusiness
         FileUploadCompleteRequestDto request,
         long? vlmConfigId,
         long? embeddingModelConfigId,
-        string? userJwt);
+        string? userJwt,
+        CreateRecordFileUploadRequestDto? metadata = null);
 
     Task CancelUpdateUpload(
         long currentUserId,

@@ -3,8 +3,10 @@
 import SearchInput from "@/app/(home)/components/SearchInput";
 import { useLanguage } from "@/app/contexts/Language";
 import { XCircleIcon } from "@heroicons/react/24/outline";
-import React from "react";
+import React, { useEffect } from "react";
 import { interpolateTemplate } from "@/app/lib/record_helpers";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "../../components/PaginationControls";
 
 type NamedItem = {
   id: number | string;
@@ -48,6 +50,23 @@ export default function CollectionEntitySelector({
 }: Props) {
   const { t } = useLanguage();
 
+  const {
+    currentPage: optionPage,
+    pageSize: optionPageSize,
+    paginatedItems: paginatedOptions,
+    resetPagination: resetOptionPagination,
+    setCurrentPage: setOptionPage,
+    setPageSize: setOptionPageSize,
+    totalPages: optionTotalPages,
+  } = useLocalPagination({
+    items: selectedItems,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetOptionPagination();
+  }, [selectedItems, resetOptionPagination]);
+
   return (
     <div>
       <p className="text-sm font-medium text-base-content">{title}</p>
@@ -72,6 +91,8 @@ export default function CollectionEntitySelector({
           </span>
         ))}
       </div>
+
+      
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <div
           className="min-w-0 flex-1"
@@ -110,7 +131,7 @@ export default function CollectionEntitySelector({
             {loadingText}
           </div>
         ) : options.length ? (
-          options.map((item) => (
+          paginatedOptions.map((item) => (
             <button
               type="button"
               key={item.id}
@@ -126,6 +147,17 @@ export default function CollectionEntitySelector({
         ) : (
           <p className="text-sm text-base-content/60">{emptyOptionsText}</p>
         )}
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="mt-2 flex justify-end">
+        <PaginationControls
+          currentPage={optionPage}
+          pageSize={optionPageSize}
+          totalPages={optionTotalPages}
+          onPageChange={setOptionPage}
+          onPageSizeChange={setOptionPageSize}
+        />
       </div>
     </div>
   );

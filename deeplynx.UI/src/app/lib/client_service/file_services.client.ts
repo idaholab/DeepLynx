@@ -238,11 +238,13 @@ export const updateFile = async (
   organizationId: number,
   projectId: number,
   recordId: number,
-  file: File
+  file: File,
+  metadataFile?: File
 ): Promise<RecordResponseDto> => {
   try {
     const formData = new FormData();
     formData.append('file', file);
+    if (metadataFile) formData.append("metadataFile", metadataFile, metadataFile.name);
 
     const res = await api.put(
       `/organizations/${organizationId}/projects/${projectId}/files/${recordId}`,
