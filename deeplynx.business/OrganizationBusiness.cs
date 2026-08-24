@@ -20,9 +20,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
-    private readonly ILogger<OrganizationBusiness> _logger;
     private readonly IRoleBusiness _roleBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly ILogger<OrganizationBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="OrganizationBusiness" /> class.
@@ -35,15 +35,15 @@ public class OrganizationBusiness : IOrganizationBusiness
         DeeplynxContext context,
         IEventBusiness eventBusiness,
         IRoleBusiness roleBusiness,
-        ILogger<OrganizationBusiness> logger,
-        IObjectStorageBusiness objectStorageBusiness
+        IObjectStorageBusiness objectStorageBusiness,
+        ILogger<OrganizationBusiness>? logger = null
     )
     {
         _context = context;
         _eventBusiness = eventBusiness;
         _roleBusiness = roleBusiness;
-        _logger = logger;
         _objectStorageBusiness = objectStorageBusiness;
+        _logger = logger;
     }
 
     /// <summary>
@@ -491,7 +491,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+            _logger?.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
         }
 
         return true;
@@ -914,7 +914,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+            _logger?.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
         }
 
         return true;
@@ -947,7 +947,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+            _logger?.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
         }
 
         return true;

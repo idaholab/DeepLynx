@@ -12,14 +12,14 @@ namespace deeplynx.business;
 public class UserBusiness : IUserBusiness
 {
     private readonly DeeplynxContext _context;
-    private readonly ILogger<UserBusiness> _logger;
+    private readonly ILogger<UserBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="UserBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the user operations.</param>
     /// <param name="logger">Used for uniformity in logging</param>
-    public UserBusiness(DeeplynxContext context, ILogger<UserBusiness> logger)
+    public UserBusiness(DeeplynxContext context, ILogger<UserBusiness>? logger = null)
     {
         _context = context;
         _logger = logger;
@@ -353,7 +353,7 @@ public class UserBusiness : IUserBusiness
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}", userId);
+            _logger?.LogWarning(ex, "Cache invalidation failed for user {UserId}", userId);
         }
 
         return true;
@@ -445,7 +445,7 @@ public class UserBusiness : IUserBusiness
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}", candidateId);
+            _logger?.LogWarning(ex, "Cache invalidation failed for user {UserId}", candidateId);
         }
 
         return true;
