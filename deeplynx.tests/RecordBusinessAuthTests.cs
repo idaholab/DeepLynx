@@ -901,23 +901,6 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission with this label so that it can be attached to the record (workaround that does not invalidate the test)
-        var permission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && permission != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(permission);
-            await Context.SaveChangesAsync();
-        }
-
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid2, label.Id);
 
         // Act - Query by tag (user does NOT have access to the label)
@@ -947,43 +930,19 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission so label can be attached (workaround that doesn't invalidate test)
-        var writePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(writePermission);
-            await Context.SaveChangesAsync();
-        }
-
         await _recordBusiness.AttachLabel(uid, organizationId, pid, rid2, label.Id);
 
         Context.ChangeTracker.Clear();
 
-        // Give user read permission to access the label
-        var readPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-
-        role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && readPermission != null)
+        // Give user access to the label
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
         {
-            Context.Attach(role);
-            role.Permissions.Add(readPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label.Id,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         // Act - Query by tag (user DOES have access to the label)
         var records = await _recordBusiness.GetRecordsByTagsPaginated(
@@ -1075,64 +1034,23 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission for accessible label to attach it
-        var accessibleWritePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && accessibleWritePermission != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(accessibleWritePermission);
-            await Context.SaveChangesAsync();
-        }
-
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record2.Id, accessibleLabel.Id);
 
         Context.ChangeTracker.Clear();
-
-        // Give user write permission for restricted label to attach it
-        var restrictedWritePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write record");
-
-        role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && restrictedWritePermission != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(restrictedWritePermission);
-            await Context.SaveChangesAsync();
-        }
 
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record3.Id, restrictedLabel.Id);
 
         Context.ChangeTracker.Clear();
 
-        // Give user read permission to accessible label only
-        var accessibleReadPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read record");
-
-        role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && accessibleReadPermission != null)
+        // Give user access to accessible label only
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
         {
-            Context.Attach(role);
-            role.Permissions.Add(accessibleReadPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = accessibleLabel.Id,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         // Act
         var records = await _recordBusiness.GetRecordsByTagsPaginated(
@@ -1189,82 +1107,31 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission for label1
-        var writePermission1 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission1 != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(writePermission1);
-            await Context.SaveChangesAsync();
-        }
-
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label1.Id);
 
         Context.ChangeTracker.Clear();
-
-        // Give user write permission for label2
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-
-        role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission2 != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(writePermission2);
-            await Context.SaveChangesAsync();
-        }
 
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label2.Id);
 
         Context.ChangeTracker.Clear();
 
-        // Give user read permission to BOTH labels
-        var readPermission1 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
-
-        role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && readPermission1 != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(readPermission1);
-            await Context.SaveChangesAsync();
-        }
-
-        Context.ChangeTracker.Clear();
-
-        var readPermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "read record");
-
-        role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && readPermission2 != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(readPermission2);
-            await Context.SaveChangesAsync();
-        }
+        // Give user access to both labels
+        Context.UserSensitivityLabels.AddRange(
+            new UserSensitivityLabel
+            {
+                UserId = uid,
+                LabelId = label1.Id,
+                GrantedBy = uid,
+                GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            },
+            new UserSensitivityLabel
+            {
+                UserId = uid,
+                LabelId = label2.Id,
+                GrantedBy = uid,
+                GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            });
+        await Context.SaveChangesAsync();
 
         // Act
         var records = await _recordBusiness.GetRecordsByTagsPaginated(
@@ -1321,64 +1188,23 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission for label1
-        var writePermission1 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission1 != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(writePermission1);
-            await Context.SaveChangesAsync();
-        }
-
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label1.Id);
 
         Context.ChangeTracker.Clear();
-
-        // Give user write permission for label2
-        var writePermission2 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label2.Id && p.Action == "write record");
-
-        role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && writePermission2 != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(writePermission2);
-            await Context.SaveChangesAsync();
-        }
 
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, label2.Id);
 
         Context.ChangeTracker.Clear();
 
-        // Give user read permission to only ONE label (label1)
-        var readPermission1 = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == label1.Id && p.Action == "read record");
-
-        role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && readPermission1 != null)
+        // Give user access to only ONE label (label1)
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
         {
-            Context.Attach(role);
-            role.Permissions.Add(readPermission1);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = label1.Id,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         // Act
         var records = await _recordBusiness.GetRecordsByTagsPaginated(
@@ -1500,65 +1326,24 @@ public class RecordBusinessAuthTests : IntegrationTestBase
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission for accessible label
-        var accessibleWritePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "write record");
-
-        var role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && accessibleWritePermission != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(accessibleWritePermission);
-            await Context.SaveChangesAsync();
-        }
-
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record2.Id, accessibleLabel.Id);
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record3.Id, accessibleLabel.Id);
 
         Context.ChangeTracker.Clear();
 
-        // Give user write permission for restricted label
-        var restrictedWritePermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == restrictedLabel.Id && p.Action == "write record");
-
-        role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && restrictedWritePermission != null)
-        {
-            Context.Attach(role);
-            role.Permissions.Add(restrictedWritePermission);
-            await Context.SaveChangesAsync();
-        }
-
         await _recordBusiness.AttachLabel(uid, organizationId, pid, record4.Id, restrictedLabel.Id);
 
         Context.ChangeTracker.Clear();
 
-        // Give user read permission to accessible label only
-        var accessibleReadPermission = await Context.Permissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.LabelId == accessibleLabel.Id && p.Action == "read record");
-
-        role = await Context.Roles
-            .AsNoTracking()
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null && accessibleReadPermission != null)
+        // Give user access to accessible label only
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
         {
-            Context.Attach(role);
-            role.Permissions.Add(accessibleReadPermission);
-            await Context.SaveChangesAsync();
-        }
+            UserId = uid,
+            LabelId = accessibleLabel.Id,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
 
         // Act - Query by both tags
         var records = await _recordBusiness.GetRecordsByTagsPaginated(
