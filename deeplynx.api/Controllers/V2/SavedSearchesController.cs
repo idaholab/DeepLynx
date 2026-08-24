@@ -97,20 +97,24 @@ public class SavedSearchController : ControllerBase
     /// </summary>
     /// <param name="savedSearchId">The ID of the saved search that will be executed</param>
     /// <param name="organizationId">The ID of organization</param>
-    /// <param name="projectIds">List of project ID's that the query will take place in</param>
+    /// <param name="paginatedDto">Pagination details</param>
+    /// <param name="projects">List of project ID's that the query will take place in</param>
     /// <returns>List of records retrieved by the query</returns>
     [HttpGet("organizations/{organizationId:long}", Name = "api_query_execute_saved_search")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> ExecuteSavedSearch(
-        long organizationId, [FromQuery] long[] projectIds, [FromQuery] long savedSearchId)
+    public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> ExecuteSavedSearch(
+        long organizationId, 
+        [FromQuery] long[] projects, 
+        [FromQuery] long savedSearchId,
+        [FromQuery] PaginatedRequestDto? paginatedDto = null)
     {
+        paginatedDto ??= new PaginatedRequestDto();
         var currentUserId = UserContextStorage.UserId;
         var isSysAdmin = UserContextStorage.IsSysAdmin;
         var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-        var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-        var records = await _savedSearchBusiness.ExecuteSavedSearch(
-            savedSearchId, currentUserId, organizationId, projectIds, isSysAdmin, isOrgAdmin, isProjectAdmin);
+        var records = await _savedSearchBusiness.ExecuteSavedSearchPaginated(
+            savedSearchId, currentUserId, organizationId, projects, paginatedDto, isSysAdmin, isOrgAdmin);
         return Ok(records);
     }
 
