@@ -1,5 +1,7 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.models;
 using Record = deeplynx.datalayer.Models.Record;
 
@@ -2254,6 +2256,41 @@ public class UserBusinessTests : IntegrationTestBase
     #endregion
 
     #region SetSysAdmin Tests
+
+    [Fact]
+    public async Task SetSysAdmin_InvalidatesCandidateSysAdminCache()
+    {
+        // Arrange
+        var authorizer = new User
+        {
+            Name = "Cache Test Admin",
+            Email = "cache-admin@test.com",
+            Username = $"cache_admin_{Guid.NewGuid()}",
+            IsActive = true,
+            IsSysAdmin = true
+        };
+        var candidate = new User
+        {
+            Name = "Cache Test Candidate",
+            Email = "cache-candidate@test.com",
+            Username = $"cache_candidate_{Guid.NewGuid()}",
+            IsActive = true,
+            IsSysAdmin = false
+        };
+
+        Context.Users.AddRange(authorizer, candidate);
+        await Context.SaveChangesAsync();
+
+        var cacheKey = CacheKeys.SysAdmin(candidate.Id);
+        await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _userBusiness.SetSysAdmin(authorizer.Id, candidate.Id, true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
 
     [Fact]
     public async Task SetSysAdmin_Succeeds_WhenAuthorizerIsSysAdmin()
