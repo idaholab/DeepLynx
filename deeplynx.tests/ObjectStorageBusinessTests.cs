@@ -31,6 +31,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     private FileAzureBusiness _fileAzureBusiness;
     private ProjectBusiness _projectBusiness;
     private EncryptionHelper _encryptionHelper = null!;
+    private Mock<IOrganizationService> _mockOrganizationService = null!;
 
     public long archivedOs;
     private long organizationId;
@@ -80,6 +81,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _mockOrganizationService = new Mock<IOrganizationService>();
         _projectBusiness = new ProjectBusiness(
             Context,
             _mockLogger.Object,
@@ -87,7 +89,8 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             _mockRoleBusiness.Object,
             _mockDataSourceBusiness.Object,
             _objectStorageBusiness,
-            _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
+            _eventBusiness, _organizationBusiness.Object, _notificationBusiness, 
+            _mockOrganizationService.Object, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     #region ObjectStorageResponseDto Tests

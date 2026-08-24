@@ -64,6 +64,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
     private OlapBusiness _olapBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
+    private Mock<IOrganizationService> _mockOrganizationService = null!;
     private long cid; // class ID
     private long did; // datasource ID
     private long os1;
@@ -117,6 +118,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         _mockEdgeBusiness = new Mock<IEdgeBusiness>();
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
+        _mockOrganizationService = new Mock<IOrganizationService>();
 
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
         _userBusiness = new UserBusiness(Context);
@@ -139,7 +141,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
-            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _fileAzureBusiness, _fileBusinessFactory.Object);
+            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness,
+            _mockOrganizationService.Object, _fileAzureBusiness, _fileBusinessFactory.Object);
 
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
 

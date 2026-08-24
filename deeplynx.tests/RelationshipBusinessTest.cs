@@ -34,6 +34,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
     private ProjectBusiness _projectBusiness = null!;
     private RelationshipBusiness _relationshipBusiness = null!;
     private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
+    private Mock<IOrganizationService> _mockOrganizationService = null!;
     public long cid; // origin class ID
     public long cid2; // dest. class ID
     public long cid3; // origin 2 class ID
@@ -69,6 +70,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _mockOrganizationService = new Mock<IOrganizationService>();
 
         _relationshipBusiness = new RelationshipBusiness(
             Context, _mockEdgeBusiness.Object, _eventBusiness);
@@ -83,7 +85,8 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness,
+            _mockOrganizationService.Object, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()

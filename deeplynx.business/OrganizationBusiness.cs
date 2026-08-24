@@ -20,9 +20,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
+    private readonly ILogger<OrganizationBusiness> _logger;
     private readonly IRoleBusiness _roleBusiness;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
-    private readonly ILogger<OrganizationBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="OrganizationBusiness" /> class.
@@ -35,8 +35,8 @@ public class OrganizationBusiness : IOrganizationBusiness
         DeeplynxContext context,
         IEventBusiness eventBusiness,
         IRoleBusiness roleBusiness,
-        IObjectStorageBusiness objectStorageBusiness,
-        ILogger<OrganizationBusiness>? logger = null
+        ILogger<OrganizationBusiness> logger,
+        IObjectStorageBusiness objectStorageBusiness
     )
     {
         _context = context;
