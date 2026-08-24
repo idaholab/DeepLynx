@@ -24,6 +24,7 @@ export interface CreatedMetadata {
   ClassId?: number | null;
   ClassName?: string | null;
   Properties?: Record<string, string> | null;
+  Tags?: string[] | null;
 }
 
 // ---------------------------------------------------------------------
@@ -556,6 +557,15 @@ export async function clickToBrowse(
     await expect(page.getByText(propertyKey)).toBeVisible();
     await expect(page.getByText(propertyValue)).toBeVisible();
     await page.getByRole("link", { name: "Project Dashboard" }).click();
+  } else if (error && error.type === "none" && error.message === "includes tags") {
+    await page.getByText(resolvedName).first().click();
+    await expect(page.getByRole('heading', { name: resolvedName, exact: true })).toBeVisible();
+    await page.getByText('Tags', { exact: true }).click();
+
+    const tags = options?.Tags ?? [];
+    tags.forEach(async (tag) => {
+      await expect(page.getByText(tag)).toBeVisible();
+    })
   }
 
   const sideBar = page.getByRole("list").filter({ hasText: /^$/ });
@@ -904,6 +914,7 @@ export async function buildMetadata(
     ClassId: options.ClassId,
     ClassName: options.ClassName,
     Properties: options.Properties,
+    Tags: options.Tags,
   };
 
   for (const key of Object.keys(base) as (keyof CreatedMetadata)[]) {
