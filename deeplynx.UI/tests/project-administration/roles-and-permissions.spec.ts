@@ -128,7 +128,7 @@ test.describe("Roles & Permissions", () => {
       let res = await request.fetch(getAllUrl);
       if (!res.ok()) throw new Error(`Failed to fetch roles: ${res.status()}`);
       let roles = await res.json();
-      if (roles.length === 1) {
+      if (roles.items.length === 1) {
         // create new role
         await page.getByRole('button', { name: 'Create Role' }).click();
         await page.getByRole('textbox', { name: 'Enter role name' }).click();
@@ -137,7 +137,7 @@ test.describe("Roles & Permissions", () => {
         return "Playwright test role";
       }
       // return non user
-      return (roles.find((role: RoleResponseDto) => role.name !== "User")).name;
+      return (roles.items.find((role: RoleResponseDto) => role.name !== "User")).name;
     } catch (err) {
       console.warn(`Error getting different role.`, err);
       return undefined;
@@ -274,7 +274,7 @@ test.describe("Roles & Permissions", () => {
       // make sure a second role is set up
       const url = new URL(page.url());
       const projectId = url.pathname.split('/').pop();
-      orgId = await getOrgIdByName(request, "PW Org A");
+      orgId = await getOrgIdByName(request, ORGS.orgA.name);
 
       // Click a different role than "User" in the sidebar (role buttons contain Source: text)
       const nonUserRole = await getNonUserRole(request, projectId, page, orgId);
