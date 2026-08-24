@@ -210,11 +210,38 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         var orderedQuery = recordQuery.OrderBy(r => r.Id);
 
-        var paginatedRecords = await orderedQuery
-            .Select(r => RecordToResponse(r))
-            .ToPaginatedAsync(paginatedRequestDto);
+        var projectedQuery = orderedQuery.Select(record => new RecordResponseDto
+        {
+            Id = record.Id,
+            Description = record.Description,
+            Uri = record.Uri,
+            Properties = record.Properties,
+            OriginalId = record.OriginalId,
+            ObjectStorageId = record.ObjectStorageId,
+            Name = record.Name,
+            ClassId = record.ClassId,
+            DataSourceId = record.DataSourceId,
+            ProjectId = record.ProjectId,
+            OrganizationId = record.OrganizationId,
+            LastUpdatedBy = record.LastUpdatedBy,
+            LastUpdatedAt = record.LastUpdatedAt,
+            IsArchived = record.IsArchived,
+            FileType = record.FileType,
+            FileSize = record.FileSize,
+            FileContentHash = record.FileContentHash,
+            Tags = record.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = record.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        });
 
-        return paginatedRecords;
+        return await projectedQuery.ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -1203,40 +1230,6 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     {
         var inserted = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, projectId, tags);
         return inserted.ToDictionary(t => t.Name, t => t);
-    }
-    
-    private static RecordResponseDto RecordToResponse(Record record)
-    {
-        return new RecordResponseDto
-        {
-            Id = record.Id,
-            Description = record.Description,
-            Uri = record.Uri,
-            Properties = record.Properties,
-            OriginalId = record.OriginalId,
-            ObjectStorageId = record.ObjectStorageId,
-            Name = record.Name,
-            ClassId = record.ClassId,
-            DataSourceId = record.DataSourceId,
-            ProjectId = record.ProjectId,
-            OrganizationId = record.OrganizationId,
-            LastUpdatedBy = record.LastUpdatedBy,
-            LastUpdatedAt = record.LastUpdatedAt,
-            IsArchived = record.IsArchived,
-            FileType = record.FileType,
-            FileSize = record.FileSize,
-            FileContentHash = record.FileContentHash,
-            Tags = record.Tags.Select(t => new RecordTagDto
-            {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList(),
-            Labels = record.Labels.Select(l => new RecordLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        };
     }
 
     #region Deprecated
