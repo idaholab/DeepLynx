@@ -587,7 +587,7 @@ const ProjectRolesAndPermissions = ({
     if (!organization?.organizationId || !project?.projectId) return;
 
     try {
-      const updatedRoles = await getAllRoles(
+      const { items: updatedRoles } = await getAllRoles(
         organization.organizationId as number,
         project.projectId as number,
         true,

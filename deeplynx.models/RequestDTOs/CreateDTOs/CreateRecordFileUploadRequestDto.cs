@@ -12,9 +12,11 @@ public class CreateRecordFileUploadRequestDto
 
     [Required] public JsonObject Properties { get; set; }
 
-    [Required] public string OriginalId { get; set; }
+    public string? OriginalId { get; set; }
 
     public long? ClassId { get; set; }
 
     public string? ClassName { get; set; }
+
+    public List<string>? Tags { get; set; }
 }

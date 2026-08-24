@@ -7,9 +7,6 @@ import { testApiUrl } from "../api-url";
 
 let orgId: string;
 
-// Adjust this base URL to match whichever environment the test config points at.
-const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:5095";
-
 async function navigateToProjLevelSensitivityLabelPermissions(page: Page) {
   await page.getByRole('link', { name: 'Project Settings' }).click();
   await page.getByText('Roles & Permissions').click();
@@ -31,21 +28,14 @@ test.describe("Org Admin editing Permissions of Proj level SLs", () => {
   let projectId: string;
 
   test.beforeAll(async ({ request }, testInfo) => {
-    // NOTE: adjust auth header/token retrieval to match how your test
-    // fixtures normally authenticate API calls (e.g. a helper that logs
-    // in orgAdminA and returns a bearer token). Swap ACCESS_TOKEN below.
     apiContext = request;
     orgId = await getOrgIdByName(request, ORGS.orgA.name);
     projectId = await getProjectIdByName(request, orgId, PROJECTS.projectX.name);
     uniqueLabelName = `Test SL-${testInfo.testId}`;
 
     const createResponse = await apiContext.post(
-      `${API_BASE_URL}/api/v1/projects/${projectId}/labels`,
+      testApiUrl(`/projects/${projectId}/labels`),
       {
-        headers: {
-          Authorization: `Bearer ${process.env.TEST_ACCESS_TOKEN}`,
-          "Content-Type": "application/json",
-        },
         data: {
           name: uniqueLabelName,
           description: "Created by Playwright test - safe to delete",
@@ -53,6 +43,10 @@ test.describe("Org Admin editing Permissions of Proj level SLs", () => {
       },
     );
 
+    if (!createResponse.ok()) {
+      console.log("Status:", createResponse.status());
+      console.log("Body:", await createResponse.text());
+    }
     expect(createResponse.ok()).toBeTruthy();
     const created = await createResponse.json();
     createdLabelId = created.id;
@@ -63,12 +57,7 @@ test.describe("Org Admin editing Permissions of Proj level SLs", () => {
     apiContext = request;
 
     const deleteResponse = await apiContext.delete(
-      `${API_BASE_URL}/api/v1/projects/${projectId}/labels/${createdLabelId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.TEST_ACCESS_TOKEN}`,
-        },
-      },
+      testApiUrl(`/projects/${projectId}/labels/${createdLabelId}`),
     );
 
     expect(deleteResponse.ok()).toBeTruthy();
@@ -139,7 +128,7 @@ test.describe("Roles & Permissions", () => {
       let res = await request.fetch(getAllUrl);
       if (!res.ok()) throw new Error(`Failed to fetch roles: ${res.status()}`);
       let roles = await res.json();
-      if (roles.length === 1) {
+      if (roles.items.length === 1) {
         // create new role
         await page.getByRole('button', { name: 'Create Role' }).click();
         await page.getByRole('textbox', { name: 'Enter role name' }).click();
@@ -148,7 +137,7 @@ test.describe("Roles & Permissions", () => {
         return "Playwright test role";
       }
       // return non user
-      return (roles.find((role: RoleResponseDto) => role.name !== "User")).name;
+      return (roles.items.find((role: RoleResponseDto) => role.name !== "User")).name;
     } catch (err) {
       console.warn(`Error getting different role.`, err);
       return undefined;
@@ -229,6 +218,7 @@ test.describe("Roles & Permissions", () => {
 
     test("displays role details panel for selected role", async ({ page }) => {
       // The right panel should show the selected role name as a heading
+      await page.getByRole('button', { name: 'User ORG User role with' }).click();
       const roleHeading = page.locator(".card-title").filter({
         hasText: /^(Admin|User)$/,
       });
@@ -284,7 +274,7 @@ test.describe("Roles & Permissions", () => {
       // make sure a second role is set up
       const url = new URL(page.url());
       const projectId = url.pathname.split('/').pop();
-      orgId = await getOrgIdByName(request, "PW Org A");
+      orgId = await getOrgIdByName(request, ORGS.orgA.name);
 
       // Click a different role than "User" in the sidebar (role buttons contain Source: text)
       const nonUserRole = await getNonUserRole(request, projectId, page, orgId);

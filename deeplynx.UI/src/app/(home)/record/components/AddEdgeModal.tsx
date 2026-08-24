@@ -194,7 +194,7 @@ export default function AddEdgeModal({
 
       try {
         setIsLoadingRelationships(true);
-        const data = await getAllRelationships(projectId, true);
+        const { items: data } = await getAllRelationships(projectId, true);
 
         if (cancelled) return;
 

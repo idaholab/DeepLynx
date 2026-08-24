@@ -58,19 +58,24 @@ public class QueryControllerTests : IDisposable
     }
 
     // =========================================================================
-    // SearchRecords Tests
+    // SearchRecordsPaginated Tests
     // =========================================================================
 
-    #region SearchRecords Tests
+    #region SearchRecordsPaginated Tests
 
     [Fact]
-    public async Task SearchRecords_Returns200_WithRecordResponse()
+    public async Task SearchRecordsPaginated_Returns200_WithRecordResponse()
     {
-        IEnumerable<QueryRecordViewResponseDto> expected =
-            new List<QueryRecordViewResponseDto>();
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = [],
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 0
+        };
 
-        _mockQueryBusiness.Setup(b => b.Search(
-            UserId, Query, OrgId, ProjectList, false, false, false, false))
+        _mockQueryBusiness.Setup(b => b.SearchPaginated(
+            UserId, Query, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true, false, false, false))
             .ReturnsAsync(expected);
 
         var result = (await _QueryController.SearchRecords(
@@ -85,12 +90,17 @@ public class QueryControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchRecords_Returns200_WithEmptyList()
+    public async Task SearchRecordsPaginated_Returns200_WithEmptyList()
     {
-
-        _mockQueryBusiness.Setup(b => b.Search(
-            UserId, Query, OrgId, ProjectList, false, false, false, false))
-            .ReturnsAsync([]);
+        _mockQueryBusiness.Setup(b => b.SearchPaginated(
+            UserId, Query, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true, false, false, false))
+            .ReturnsAsync(new PaginatedResponse<QueryRecordViewResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
 
         var result = (await _QueryController.SearchRecords(
             OrgId,
@@ -100,15 +110,14 @@ public class QueryControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
+        Assert.IsAssignableFrom<PaginatedResponse<QueryRecordViewResponseDto>>(result.Value);
     }
 
     [Fact]
-    public async Task SearchRecords_Returns500_UnexpectedException()
+    public async Task SearchRecordsPaginated_ThrowsException_WhenBusinessThrows()
     {
-
-
-        _mockQueryBusiness.Setup(b => b.Search(
-            UserId, Query, OrgId, ProjectList, true, false, false, false))
+        _mockQueryBusiness.Setup(b => b.SearchPaginated(
+            UserId, Query, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true, false, false, false))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _QueryController.SearchRecords(
@@ -119,28 +128,33 @@ public class QueryControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchRecords_PassesToBusinessLayer()
+    public async Task SearchRecordsPaginated_PassesToBusinessLayer()
     {
-        IEnumerable<QueryRecordViewResponseDto> expected =
-            new List<QueryRecordViewResponseDto>();
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = [],
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 0
+        };
 
-        _mockQueryBusiness.Setup(b => b.Search(
-            UserId, Query, OrgId, ProjectList, true, false, false, false))
+        _mockQueryBusiness.Setup(b => b.SearchPaginated(
+            UserId, Query, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true, false, false, false))
             .ReturnsAsync(expected);
 
-        var result = (await _QueryController.SearchRecords(
+        await _QueryController.SearchRecords(
             OrgId,
             Query,
             ProjectList,
-            true)).Result as OkObjectResult;
-
+            true);
 
         _mockQueryBusiness.Verify(
-            b => b.Search(
+            b => b.SearchPaginated(
                 UserId,
                 Query,
                 OrgId,
                 ProjectList,
+                It.IsAny<PaginatedRequestDto>(),
                 true,
                 false,
                 false,
@@ -149,16 +163,70 @@ public class QueryControllerTests : IDisposable
     }
 
     [Fact]
-    public void SearchRecords_HasHttpGet()
+    public async Task SearchRecordsPaginated_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        PaginatedRequestDto? capturedDto = null;
+
+        _mockQueryBusiness.Setup(b => b.SearchPaginated(
+            UserId, Query, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true, false, false, false))
+            .Callback<long, string, long, long[], PaginatedRequestDto, bool, bool, bool, bool>(
+                (_, _, _, _, dto, _, _, _, _) => capturedDto = dto)
+            .ReturnsAsync(new PaginatedResponse<QueryRecordViewResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
+
+        await _QueryController.SearchRecords(OrgId, Query, ProjectList, true);
+
+        Assert.NotNull(capturedDto);
+        Assert.Equal(1, capturedDto.PageNumber);
+        Assert.Equal(25, capturedDto.PageSize);
+    }
+
+    [Fact]
+    public async Task SearchRecordsPaginated_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var providedDto = new PaginatedRequestDto { PageNumber = 2, PageSize = 10 };
+        PaginatedRequestDto? capturedDto = null;
+
+        _mockQueryBusiness.Setup(b => b.SearchPaginated(
+            UserId, Query, OrgId, ProjectList, It.IsAny<PaginatedRequestDto>(), true, false, false, false))
+            .Callback<long, string, long, long[], PaginatedRequestDto, bool, bool, bool, bool>(
+                (_, _, _, _, dto, _, _, _, _) => capturedDto = dto)
+            .ReturnsAsync(new PaginatedResponse<QueryRecordViewResponseDto>
+            {
+                Items = [],
+                PageNumber = 2,
+                PageSize = 10,
+                TotalCount = 0
+            });
+
+        await _QueryController.SearchRecords(OrgId, Query, ProjectList, true, providedDto);
+
+        Assert.NotNull(capturedDto);
+        Assert.Equal(2, capturedDto.PageNumber);
+        Assert.Equal(10, capturedDto.PageSize);
+    }
+
+    [Fact]
+    public void SearchRecordsPaginated_HasHttpGet()
     {
         var method = GetControllerMethod(
             nameof(QueryController.SearchRecords),
-            "userQuery");
+            "organizationId",
+            "userQuery",
+            "projectIds",
+            "hideArchived",
+            "paginatedRequestDto");
 
         AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
     }
 
     #endregion
+
 
     // =========================================================================
     // QueryBuilder Tests
@@ -414,18 +482,24 @@ public class QueryControllerTests : IDisposable
     [Fact]
     public async Task GetMultiProjectRecords_Returns200_WithRecordResponse()
     {
-        IEnumerable<QueryRecordViewResponseDto> expected =
-            new List<QueryRecordViewResponseDto>();
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = [],
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
         _mockQueryBusiness
-            .Setup(b => b.GetMultiProjectRecords(
-                UserId, OrgId, ProjectList, false, false, false, false))
+            .Setup(b => b.GetMultiProjectRecordsPaginated(
+                UserId, OrgId, ProjectList, true, It.IsAny<PaginatedRequestDto>(), false, false, false))
             .ReturnsAsync(expected);
 
         var actionResult = await _QueryController.GetMultiProjectRecords(
             OrgId,
             ProjectList,
-            true);
+            true,
+            null);
 
         var result = actionResult.Result as OkObjectResult;
 
@@ -439,9 +513,15 @@ public class QueryControllerTests : IDisposable
     {
 
         _mockQueryBusiness
-            .Setup(b => b.GetMultiProjectRecords(
-                UserId, OrgId, ProjectList, false, false, false, false))
-            .ReturnsAsync([]);
+            .Setup(b => b.GetMultiProjectRecordsPaginated(
+                UserId, OrgId, ProjectList, false, It.IsAny<PaginatedRequestDto>(), false, false, false))
+            .ReturnsAsync(new PaginatedResponse<QueryRecordViewResponseDto>
+            {
+                Items = [],
+                PageNumber = 1,
+                PageSize = 25,
+                TotalCount = 0
+            });
 
         var actionResult = await _QueryController.GetMultiProjectRecords(
             OrgId,
@@ -458,8 +538,8 @@ public class QueryControllerTests : IDisposable
     public async Task GetMultiProjectRecords_Returns500_UnexpectedException()
     {
         _mockQueryBusiness
-            .Setup(b => b.GetMultiProjectRecords(
-                UserId, OrgId, ProjectList, true, false, false, false))
+            .Setup(b => b.GetMultiProjectRecordsPaginated(
+                UserId, OrgId, ProjectList, true, It.IsAny<PaginatedRequestDto>(), false, false, false))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _QueryController.GetMultiProjectRecords(
@@ -471,12 +551,17 @@ public class QueryControllerTests : IDisposable
     [Fact]
     public async Task GetMultiProjectRecords_PassesToBusinessLayer()
     {
-        IEnumerable<QueryRecordViewResponseDto> expected =
-            new List<QueryRecordViewResponseDto>();
+        var expected = new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = new List<QueryRecordViewResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
 
         _mockQueryBusiness
-            .Setup(b => b.GetMultiProjectRecords(
-                UserId, OrgId, ProjectList, true, false, false, false))
+            .Setup(b => b.GetMultiProjectRecordsPaginated(
+                UserId, OrgId, ProjectList, true, It.IsAny<PaginatedRequestDto>(), false, false, false))
             .ReturnsAsync(expected);
 
         var actionResult = await _QueryController.GetMultiProjectRecords(
@@ -489,8 +574,8 @@ public class QueryControllerTests : IDisposable
         Assert.NotNull(result);
 
         _mockQueryBusiness.Verify(
-            b => b.GetMultiProjectRecords(
-                UserId, OrgId, ProjectList, true, false, false, false),
+            b => b.GetMultiProjectRecordsPaginated(
+                UserId, OrgId, ProjectList, true, It.IsAny<PaginatedRequestDto>(), false, false, false),
             Times.Once);
     }
 

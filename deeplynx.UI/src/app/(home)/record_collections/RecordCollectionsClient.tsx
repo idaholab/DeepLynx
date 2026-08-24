@@ -63,7 +63,7 @@ export default function RecordCollectionsClient({
 
       <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
         <div className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+          <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
             <div className="lg:sticky lg:top-4">
               <FilterSidebar {...filterSidebar} />
             </div>
@@ -142,7 +142,7 @@ export default function RecordCollectionsClient({
               </div>
 
               {pagination.totalItems > pagination.pageSize ? (
-                <div className="flex flex-col gap-3 border-t border-base-200 pt-4">
+                <div className="flex flex-col gap-3 border-t border-base-200 pt-4 sm:items-center sm:justify-between">
                   <span className="text-sm text-base-content/70">
                     {`${t.translations.SHOWING} ${pagination.startIndex + 1}-${Math.min(
                       pagination.startIndex + pagination.pageSize,

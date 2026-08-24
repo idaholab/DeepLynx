@@ -14,3 +14,15 @@ public class InvalidRequestException : Exception
 {
     public InvalidRequestException(string message) : base(message) { }
 }
+
+public class OauthException : Exception
+{
+    public string ErrorCode { get; }
+    public int StatusCode { get; }
+
+    public OauthException(string errorCode, string errorDescription, int statusCode) : base(errorDescription)
+    {
+        ErrorCode = errorCode;
+        StatusCode = statusCode;
+    }
+}

@@ -43,7 +43,8 @@ public class QueryController : ControllerBase
     /// <param name="userQuery">String phrase entered by user</param>
     /// <param name="projectIds">Project IDs in the organization to search across</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
-    /// <returns>List of record response DTOs from the query_record view</returns>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>Paginated list of record response DTOs from the query_record view</returns>
     [HttpGet("records", Name = "api_filter_records")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
@@ -51,15 +52,17 @@ public class QueryController : ControllerBase
         long organizationId,
         [FromQuery] string userQuery,
         [FromQuery] long[] projectIds,
-        [FromQuery] bool hideArchived)
+        [FromQuery] bool hideArchived,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+            paginatedRequestDto ??= new PaginatedRequestDto();
             var currentUserId = UserContextStorage.UserId;
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _queryBusiness.Search(
+            var records = await _queryBusiness.SearchPaginated(
                 currentUserId, userQuery, organizationId, projectIds,
-                hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+                paginatedRequestDto, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
     }
 
@@ -181,22 +184,25 @@ public class QueryController : ControllerBase
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the projects belong</param>
     /// <param name="projects">Array of project ids whose records are to be retrieved</param>
+    /// <param name="paginatedDto">Pagination details</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <returns>List of record response DTOs from the query_record view</returns>
     [HttpGet("multiproject", Name = "api_multiproject_records")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> GetMultiProjectRecords(
+    public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> GetMultiProjectRecords(
         long organizationId,
         [FromQuery] long[] projects,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedDto = null)
     {
+            paginatedDto ??= new PaginatedRequestDto();
             var currentUserId = UserContextStorage.UserId;
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _queryBusiness.GetMultiProjectRecords(currentUserId, organizationId, projects,
-                hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            var records = await _queryBusiness.GetMultiProjectRecordsPaginated(currentUserId, organizationId, projects,
+                hideArchived, paginatedDto, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
     }
 }

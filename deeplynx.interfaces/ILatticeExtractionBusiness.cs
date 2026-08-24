@@ -28,7 +28,12 @@ public interface ILatticeExtractionBusiness
 
     Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId);
 
+    [Obsolete("V1-only. Used by deprecated v1 lattice extraction endpoints. Superseded by ListExtractionsByProjectPaginated. " +
+              "Remove once v1 lattice extraction endpoints are sunset.", error: false)]
     Task<List<ExtractionListItemDto>> ListExtractionsByProject(long projectId);
+    Task<PaginatedResponse<ExtractionListItemDto>> ListExtractionsByProjectPaginated(
+        long projectId,
+        PaginatedRequestDto paginatedRequestDto);
 
     Task<List<OntologySimilarityResultDto>> SearchOntologySimilarity(
         long recordId,

@@ -346,6 +346,15 @@ export type OauthApplicationSecureResponseDto = {
   clientSecretRaw: string;
 };
 
+export type DeviceVerificationLookupResponseDto = {
+  user_code: string;
+  client_id: string;
+  application_name: string;
+  scope?: string | null;
+  expires_at: string;
+  status: string;
+};
+
 export type PaginatedEventsResponseDto = PaginatedResponse<EventResponseDto>;
 
 export type EventResponseDto = {

@@ -7,6 +7,7 @@ import {
   OauthApplicationResponseDto,
   OrganizationResponseDto,
   UserResponseDto,
+  PaginatedResponse
 } from "../types/responseDTOs";
 import OAuthManagement from "../components/SiteManagementPortal/OAuthTable";
 import SiteOrganizationManagement from "../components/SiteManagementPortal/SiteOrgTable";
@@ -20,7 +21,7 @@ import AdminOverviewCard from "./AdminOverviewCard";
 
 interface SysAdminProps {
   organizations: OrganizationResponseDto[];
-  applications: OauthApplicationResponseDto[];
+  applications: PaginatedResponse<OauthApplicationResponseDto>;
   members: UserResponseDto[];
   initialProjects: Project[];
   initialSelectedProjects: string[];
@@ -37,12 +38,12 @@ const SysAdminClient = ({
   const [organizations, setOrganizations] =
     useState<OrganizationResponseDto[]>(initialOrganizations);
   const [applications, setApplications] =
-    useState<OauthApplicationResponseDto[]>(initialApplications);
+    useState<PaginatedResponse<OauthApplicationResponseDto>>(initialApplications);
   const [members, setMembers] = useState<UserResponseDto[]>(initialMembers);
   const { t } = useLanguage();
   const refreshOrganizations = async () => {
     try {
-      const updatedData = await getAllOrganizations();
+      const { items: updatedData } = await getAllOrganizations();
       setOrganizations(updatedData);
     } catch (err) {
       console.error("Failed to refresh organizations:", err);
@@ -61,7 +62,7 @@ const SysAdminClient = ({
   const refreshUsers = async () => {
     try {
       const updatedData = await getAllUsers();
-      setMembers(updatedData);
+      setMembers(updatedData.items);
     } catch (err) {
       console.error("Failed to refresh users:", err);
     }

@@ -650,7 +650,7 @@ function useFilterData(
       try {
         setIsLoadingTags(true);
         const data = await getAllTagsOrg(organizationId, projects);
-        setTags(data);
+        setTags(data.items);
       } catch (error) {
         console.error("Failed to fetch tags:", error);
         setTags([]);
@@ -933,7 +933,8 @@ export default function QueryBuilderClient({
       }
     } else if (field === "tags") {
       try {
-        setTags(await getAllTagsOrg(organizationId, projectIds));
+        const tagsResponse = await getAllTagsOrg(organizationId, projectIds);
+        setTags(tagsResponse.items);
       } catch (err) {
         console.error("Failed to fetch tags:", err);
       }

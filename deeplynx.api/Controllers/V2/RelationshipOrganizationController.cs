@@ -46,17 +46,21 @@ public class RelationshipOrganizationController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the relationship's project belongs</param>
     /// <param name="projectIds">(Optional)An array of project IDs within the organization to filter by</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived relationships from the result (Default true)</param>
-    /// <returns>List of relationship response DTOs</returns>
+    /// <param name="paginatedRequestDto">(Optional) Pagination parameters</param>
+    /// <returns>A paginated list of relationship response DTOs</returns>
     [HttpGet(Name = "api_get_all_relationships_organization")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "relationship")]
-    public async Task<ActionResult<IEnumerable<RelationshipResponseDto>>> GetAllRelationships(
+    public async Task<ActionResult<PaginatedResponse<RelationshipResponseDto>>> GetAllRelationships(
         long organizationId,
         [FromQuery] long[]? projectIds,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+            paginatedRequestDto ??= new PaginatedRequestDto();
             var relationships =
-                await _relationshipBusiness.GetAllRelationships(organizationId, projectIds, hideArchived);
+                await _relationshipBusiness.GetAllRelationshipsPaginated(organizationId, projectIds,
+                    paginatedRequestDto, hideArchived);
             return Ok(relationships);
     }
 

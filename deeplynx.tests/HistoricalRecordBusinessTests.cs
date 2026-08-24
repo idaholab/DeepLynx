@@ -446,7 +446,228 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
     }
 
-    #region GetHistoricalRecords Tests
+    #region GetAllHistoricalRecordsPaginated Tests
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_ReturnsListOfCurrentHistoricalRecordsForProject()
+    {
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal("Test Record", result.Items.First().Name);
+        Assert.Equal("Test Record 2", result.Items.Last().Name);
+        Assert.DoesNotContain(result.Items, x => x.Name == "Test Record 3");
+        Assert.DoesNotContain(result.Items, x => x.Name == "Test Record 4");
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_ReturnsListOfUpdatedHistoricalRecords()
+    {
+        // Arrange
+        var dto = new UpdateRecordRequestDto
+        {
+            Name = "Updated Test Record",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { UpdatedProp = "UpdatedValue" }))!,
+            Uri = "updated://uri",
+            OriginalId = "updated-123",
+            Description = "Updated Description",
+            ClassId = cid
+        };
+
+        var dto2 = new UpdateRecordRequestDto
+        {
+            Name = "Updated Test Record 2",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { UpdatedProp = "UpdatedValue 2" }))!,
+            Uri = "updated2://uri",
+            OriginalId = "updated2-123",
+            Description = "Updated 2 Description",
+            ClassId = cid
+        };
+
+        await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
+        await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid2, dto2);
+
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal("Updated Test Record", result.Items.First().Name);
+        Assert.Equal("Updated Test Record 2", result.Items.Last().Name);
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Arrange
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 },
+            null, null, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, x => x.Name == "Test Record");
+        Assert.Contains(result.Items, x => x.Name == "Test Record 2");
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_ExcludesArchived()
+    {
+        // Arrange
+        var initial = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        Assert.NotNull(initial);
+        Assert.Equal(2, initial.TotalCount);
+
+        // Act
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.DoesNotContain(result.Items, x => x.Name == "Test Record");
+        Assert.Contains(result.Items, x => x.Name == "Test Record 2");
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_NoMatches_ReturnsEmptyPaginatedResponse()
+    {
+        // Arrange
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid);
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid2);
+
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = 25 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(25, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_FiltersByDataSource()
+    {
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid2, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }, did2);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Contains(result.Items, x => x.Name == "Test Record 3");
+        Assert.DoesNotContain(result.Items, x => x.Name == "Test Record 4");
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_FiltersByTime()
+    {
+        // Arrange
+        var pointInTime = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        var testRecordLate = new Record
+        {
+            Name = "Test Record Late",
+            Description = "Test record late for unit tests",
+            OriginalId = "og_idlate",
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue late" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Uri = "localhost:8090",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(testRecordLate);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 },
+            null, pointInTime, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, x => x.Name == "Test Record");
+        Assert.Contains(result.Items, x => x.Name == "Test Record 2");
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_Paginates_Correctly()
+    {
+        // Act - two-page split over the 2 seeded records
+        var page1 = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = 1 });
+        var page2 = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 2, PageSize = 1 });
+
+        // Assert
+        Assert.NotNull(page1);
+        Assert.NotNull(page2);
+        Assert.Single(page1.Items);
+        Assert.Single(page2.Items);
+        Assert.Equal(2, page1.TotalCount);
+        Assert.Equal(2, page2.TotalCount);
+
+        var page1Ids = page1.Items.Select(r => r.Id).ToHashSet();
+        var page2Ids = page2.Items.Select(r => r.Id).ToHashSet();
+        Assert.Empty(page1Ids.Intersect(page2Ids));
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_PageSizeNegativeOne_ReturnsAll_IgnoringPageNumber()
+    {
+        // Act - PageNumber deliberately set to something other than 1 to confirm it's ignored
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 5, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.Items.Count, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+    {
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = 0 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    #endregion
+
+    #region GetHistoricalRecords (V1 / Legacy) Tests
 
     [Fact]
     public async Task GetHistoricalRecords_ReturnsListOfCurrentHistoricalRecordsForProject()

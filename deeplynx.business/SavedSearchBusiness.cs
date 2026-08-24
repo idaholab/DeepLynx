@@ -153,10 +153,55 @@ public class SavedSearchBusiness : ISavedSearchBusiness
     /// <param name="currentUserId">The ID of the user</param>
     /// <param name="organizationId">The ID of organization</param>
     /// <param name="projectIds">List of project ID's that the query will take place in</param>
+    /// <param name="paginated">Pagination details</param>
+    /// <param name="isSysAdmin">Boolean value determining if the user is a System admin</param>
+    /// <param name="isOrgAdmin">Boolean value determining if the user is a organization admin</param>
+    /// <returns>List of records retrieved by the query</returns>
+    public async Task<PaginatedResponse<QueryRecordViewResponseDto>> ExecuteSavedSearchPaginated(
+        long savedSearchId, 
+        long currentUserId, 
+        long organizationId, 
+        long[] projectIds,
+        PaginatedRequestDto paginated,
+        bool isSysAdmin = false, 
+        bool isOrgAdmin = false)
+    {
+        var savedSearchResult = await _context.SavedSearches
+            .FirstOrDefaultAsync(s => s.Id == savedSearchId && s.UserId == currentUserId);
+
+        if (savedSearchResult == null)
+            throw new KeyNotFoundException("Saved Search does not exist");
+
+        var savedSearch = JsonSerializer.Deserialize<SavedSearchRequestDtos.SavedSearchRequestDto>(
+            savedSearchResult.Search,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        if (savedSearch?.Filter == null)
+            throw new ArgumentException("Saved search contains an invalid or empty query.");
+
+        var queryResult = await _queryBusiness.QueryBuilderPaginated(
+            currentUserId, savedSearch.Filter, organizationId, projectIds, paginated,
+            savedSearch.TextSearch, isSysAdmin, isOrgAdmin);
+
+        return queryResult;
+    }
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all specified saved searches without pagination.
+    ///     Superseded by <see cref="ExecuteSavedSearchPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 saved search controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="savedSearchId">The ID of the saved search that will be executed</param>
+    /// <param name="currentUserId">The ID of the user</param>
+    /// <param name="organizationId">The ID of organization</param>
+    /// <param name="projectIds">List of project ID's that the query will take place in</param>
     /// <param name="isSysAdmin">Boolean value determining if the user is a System admin</param>
     /// <param name="isOrgAdmin">Boolean value determining if the user is a organization admin</param>
     /// <param name="isProjectAdmin">Boolean value determining if the user is a admin for all the project ID's referenced</param>
     /// <returns>List of records retrieved by the query</returns>
+    [Obsolete("V1-only. Used by deprecated v1 saved search endpoints. Superseded by ExecuteSavedSearchPaginated. " +
+              "Remove once v1 saved search endpoints are sunset.", error: false)]
     public async Task<IEnumerable<QueryRecordViewResponseDto>> ExecuteSavedSearch(
         long savedSearchId, long currentUserId, long organizationId, long[] projectIds,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)

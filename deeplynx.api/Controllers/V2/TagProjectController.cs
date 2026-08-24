@@ -36,19 +36,21 @@ public class TagProjectController : ControllerBase
     ///     Get all Tags 
     /// </summary>
     /// <param name="projectId">The ID of the project whose tags are to be retrieved</param>
+    /// <param name="paginatedRequestDto"> Pagination parameters</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result (Default true)</param>
     /// <returns>A list of tags belonging to the project.</returns>
     [HttpGet(Name = "api_get_all_tags_project")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "tag")]
-    public async Task<ActionResult<IEnumerable<TagResponseDto>>> GetAllTags(
-        long projectId, [FromQuery] bool hideArchived = true)
+    public async Task<ActionResult<PaginatedResponse<TagResponseDto>>> GetAllTags(
+        long projectId, [FromQuery] bool hideArchived = true, [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+        paginatedRequestDto ??= new PaginatedRequestDto();
         var organizationId = UserContextStorage.OrganizationId;
         var currentUserId = UserContextStorage.UserId;
         var isSysAdmin = UserContextStorage.IsSysAdmin;
         var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-        var tags = await _tagBusiness.GetAllTags(currentUserId, organizationId, [projectId], hideArchived, isSysAdmin, isOrgAdmin);
+        var tags = await _tagBusiness.GetAllTagsPaginated(currentUserId, organizationId, [projectId], paginatedRequestDto, hideArchived, isSysAdmin, isOrgAdmin);
         return Ok(tags);
     }
 

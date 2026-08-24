@@ -29,64 +29,28 @@ public class RelationshipBusiness : IRelationshipBusiness
     }
 
     /// <summary>
-    ///     Retrieves all relationships
+    ///     Retrieves all relationships, paginated
     /// </summary>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectIds">(optional) The ID(s) of the project(s) to filter classes by</param>
+    /// <param name="projectIds">(optional) The ID(s) of the project(s) to filter relationships by</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived relationships from the result</param>
-    /// <returns>A list of relationships</returns>
-    public async Task<List<RelationshipResponseDto>> GetAllRelationships(long organizationId, long[]? projectIds,
-        bool hideArchived)
+    /// <returns>A paginated list of relationships</returns>
+    public async Task<PaginatedResponse<RelationshipResponseDto>> GetAllRelationshipsPaginated(long organizationId,
+        long[]? projectIds, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true)
     {
-        // Start with base query
         var query = _context.Relationships
             .Where(r => r.OrganizationId == organizationId)
             .AsQueryable();
 
-        // Filter by projectIds if provided and not empty
         if (projectIds is { Length: > 0 })
             query = query.Where(r => r.ProjectId.HasValue && projectIds.Contains(r.ProjectId.Value));
 
-        // Optionally hide archived relationships
         if (hideArchived) query = query.Where(r => !r.IsArchived);
 
-        var relationships = await query
-            .Include(r => r.Origin)
-            .Include(r => r.Destination)
-            .Select(r => new
-            {
-                r.Id,
-                r.Name,
-                r.Description,
-                r.Properties,
-                r.Uuid,
-                r.ProjectId,
-                r.OrganizationId,
-                r.LastUpdatedBy,
-                r.LastUpdatedAt,
-                r.IsArchived,
-                r.OriginId,
-                r.DestinationId
-            })
-            .ToListAsync();
+        var orderedQuery = query.OrderBy(r => r.Id);
 
-
-        // Manual mapping to Relationship objects to match return type without getting infinite loop on Origin or Destination
-        return relationships.Select(r => new RelationshipResponseDto
-        {
-            Id = r.Id,
-            Name = r.Name,
-            Description = r.Description,
-            Properties = r.Properties,
-            Uuid = r.Uuid,
-            ProjectId = r.ProjectId,
-            OrganizationId = r.OrganizationId,
-            OriginId = r.OriginId,
-            DestinationId = r.DestinationId,
-            LastUpdatedBy = r.LastUpdatedBy,
-            LastUpdatedAt = r.LastUpdatedAt,
-            IsArchived = r.IsArchived
-        }).ToList();
+        return await orderedQuery.Select(r => RelationshipToResponse(r)).ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -683,5 +647,94 @@ public class RelationshipBusiness : IRelationshipBusiness
             ).ToListAsync();
 
         return relationships;
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all relationships without pagination.
+    ///     Superseded by <see cref="GetAllRelationshipsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 relationship controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectIds">(optional) The ID(s) of the project(s) to filter classes by</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived relationships from the result</param>
+    /// <returns>A list of relationships</returns>
+    [Obsolete("V1-only. Used by deprecated v1 relationship endpoints. Superseded by GetAllRelationshipsPaginated. " +
+              "Remove once v1 relationship endpoints are sunset.", error: false)]
+    public async Task<List<RelationshipResponseDto>> GetAllRelationships(long organizationId, long[]? projectIds,
+        bool hideArchived)
+    {
+        // Start with base query
+        var query = _context.Relationships
+            .Where(r => r.OrganizationId == organizationId)
+            .AsQueryable();
+
+        // Filter by projectIds if provided and not empty
+        if (projectIds is { Length: > 0 })
+            query = query.Where(r => r.ProjectId.HasValue && projectIds.Contains(r.ProjectId.Value));
+
+        // Optionally hide archived relationships
+        if (hideArchived) query = query.Where(r => !r.IsArchived);
+
+        var relationships = await query
+            .Include(r => r.Origin)
+            .Include(r => r.Destination)
+            .Select(r => new
+            {
+                r.Id,
+                r.Name,
+                r.Description,
+                r.Properties,
+                r.Uuid,
+                r.ProjectId,
+                r.OrganizationId,
+                r.LastUpdatedBy,
+                r.LastUpdatedAt,
+                r.IsArchived,
+                r.OriginId,
+                r.DestinationId
+            })
+            .ToListAsync();
+
+
+        // Manual mapping to Relationship objects to match return type without getting infinite loop on Origin or Destination
+        return relationships.Select(r => new RelationshipResponseDto
+        {
+            Id = r.Id,
+            Name = r.Name,
+            Description = r.Description,
+            Properties = r.Properties,
+            Uuid = r.Uuid,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            OriginId = r.OriginId,
+            DestinationId = r.DestinationId,
+            LastUpdatedBy = r.LastUpdatedBy,
+            LastUpdatedAt = r.LastUpdatedAt,
+            IsArchived = r.IsArchived
+        }).ToList();
+    }
+
+    #endregion
+
+    private static RelationshipResponseDto RelationshipToResponse(Relationship r)
+    {
+        return new RelationshipResponseDto
+        {
+            Id = r.Id,
+            Name = r.Name,
+            Description = r.Description,
+            Properties = r.Properties,
+            Uuid = r.Uuid,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            OriginId = r.OriginId,
+            DestinationId = r.DestinationId,
+            LastUpdatedBy = r.LastUpdatedBy,
+            LastUpdatedAt = r.LastUpdatedAt,
+            IsArchived = r.IsArchived
+        };
     }
 }

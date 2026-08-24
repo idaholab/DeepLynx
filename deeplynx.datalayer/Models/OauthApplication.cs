@@ -44,6 +44,12 @@ public partial class OauthApplication
     
     [InverseProperty("OauthApplication")]
     public virtual ICollection<OauthToken> OauthTokens { get; set; }
+
+    [InverseProperty("OauthApplication")]
+    public virtual ICollection<OauthDeviceAuthorizationRequest> OauthDeviceAuthorizationRequests { get; set; } = new List<OauthDeviceAuthorizationRequest>();
+
+    [InverseProperty("OauthApplication")]
+    public virtual ICollection<OauthRefreshToken> OauthRefreshTokens { get; set; } = new List<OauthRefreshToken>();
     
     [InverseProperty("UpdatedOauthApplications")]
     public virtual User? LastUpdatedByUser { get; set; }

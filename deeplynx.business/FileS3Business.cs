@@ -3,6 +3,7 @@ using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Nodes;
 
 namespace deeplynx.business;
 
@@ -151,6 +152,11 @@ public class FileS3Business : IFileBusiness
         return "";
     }
 
+    public Task<CreateObjectStorageRequestDto> CreateContainer(long organizationId, string? containerName, string? connectionString, bool isDefault = false, bool existingContainer = false)
+    {
+        throw new NotImplementedException();
+    }
+
     /// <summary>
     /// Scrapes at most (batchSize * maxBatches) objects from an S3 storage, starting from the given cursor.
     /// </summary>
@@ -186,10 +192,5 @@ public class FileS3Business : IFileBusiness
             batchSize,
             maxBatches,
             cancellationToken);
-    }
-
-    public Task<CreateObjectStorageRequestDto> CreateContainer(long organizationId, string? containerName, string? connectionString, bool isDefault = false, bool existingContainer = false)
-    {
-        throw new NotImplementedException();
     }
 }
