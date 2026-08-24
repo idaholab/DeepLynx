@@ -193,7 +193,7 @@ export const getRecordsInRecordCollection = async (
   recordCollectionId: number,
   hideArchived: boolean = true,
   pageNumber: number = 1,
-    pageSize: number = -1
+  pageSize: number = -1
 ): Promise<PaginatedResponse<RecordResponseDto>> => {
   const res = await api.get(
     `${recordCollectionsPath(organizationId, projectId)}/${recordCollectionId}/records`,

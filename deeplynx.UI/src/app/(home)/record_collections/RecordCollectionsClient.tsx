@@ -142,7 +142,7 @@ export default function RecordCollectionsClient({
               </div>
 
               {pagination.totalItems > pagination.pageSize ? (
-                <div className="flex flex-col gap-3 border-t border-base-200 pt-4">
+                <div className="flex flex-col gap-3 border-t border-base-200 pt-4 sm:items-center sm:justify-between">
                   <span className="text-sm text-base-content/70">
                     {`${t.translations.SHOWING} ${pagination.startIndex + 1}-${Math.min(
                       pagination.startIndex + pagination.pageSize,

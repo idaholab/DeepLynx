@@ -340,7 +340,7 @@ export default function NewCollectionTabContent({
                         emptyMessage={
                           t.translations.RECORD_COLLECTIONS_NO_RECORDS_FOUND
                         }
-                        maxHeightClassName="max-h-fit"
+                        maxHeightClassName="max-h-80"
                         pinnedHeader={false}
                         leadingHeaderCell={
                           <input

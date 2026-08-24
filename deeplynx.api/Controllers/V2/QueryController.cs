@@ -187,7 +187,7 @@ public class QueryController : ControllerBase
     [HttpGet("multiproject", Name = "api_multiproject_records")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
-    public async Task<ActionResult<IEnumerable<QueryRecordViewResponseDto>>> GetMultiProjectRecords(
+    public async Task<ActionResult<PaginatedResponse<QueryRecordViewResponseDto>>> GetMultiProjectRecords(
         long organizationId,
         [FromQuery] long[] projects,
         [FromQuery] bool hideArchived = true,

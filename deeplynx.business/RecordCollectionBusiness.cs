@@ -126,9 +126,31 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             _ => recordCollectionQuery.OrderByDescending(c => c.LastUpdatedAt).ThenBy(c => c.Name),
         };
 
-        return await recordCollectionQuery
-            .Select(c => RecordCollectionToResponse(c))
-            .ToPaginatedAsync(paginatedRequestDto);
+        var projectedQuery = recordCollectionQuery.Select(c => new RecordCollectionResponseDto
+        {
+            Id = c.Id,
+            Description = c.Description,
+            Properties = c.Properties,
+            Name = c.Name,
+            ProjectId = c.ProjectId,
+            OrganizationId = c.OrganizationId,
+            LastUpdatedBy = c.LastUpdatedBy,
+            LastUpdatedAt = c.LastUpdatedAt,
+            IsArchived = c.IsArchived,
+            RecordCount = c.Records.Count(),
+            Tags = c.Tags.Select(t => new RecordCollectionTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        });
+
+        return await projectedQuery.ToPaginatedAsync(paginatedRequestDto);
     }
 
    
@@ -242,9 +264,31 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         var orderedQuery = collectionQuery.OrderBy(c => c.Id);
 
-        return await orderedQuery
-            .Select(c => RecordCollectionToResponse(c))
-            .ToPaginatedAsync(paginatedRequestDto);
+        var projectedQuery = orderedQuery.Select(c => new RecordCollectionResponseDto
+        {
+            Id = c.Id,
+            Description = c.Description,
+            Properties = c.Properties,
+            Name = c.Name,
+            ProjectId = c.ProjectId,
+            OrganizationId = c.OrganizationId,
+            LastUpdatedBy = c.LastUpdatedBy,
+            LastUpdatedAt = c.LastUpdatedAt,
+            IsArchived = c.IsArchived,
+            RecordCount = c.Records.Count(),
+            Tags = c.Tags.Select(t => new RecordCollectionTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        });
+
+        return await projectedQuery.ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -1006,95 +1050,6 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         return recordCollection.Labels.ToList();
     }
 
-    #region Deprecated
-
-    /// <summary>
-    ///     [DEPRECATED - V1 ONLY] Retrieves all record collections without pagination.
-    ///     Superseded by <see cref="GetRecordsInRecordCollectionPaginated"/>. Do not call this from new controller versions;
-    ///     it exists solely to back the deprecated v1 record collection controllers and should be deleted once
-    ///     those v1 endpoints are sunset.
-    /// </summary>
-    /// <param name="currentUserId"></param>
-    /// <param name="organizationId"></param>
-    /// <param name="projectId"></param>
-    /// <param name="recordCollectionId"></param>
-    /// <param name="hideArchived"></param>
-    /// <param name="isSysAdmin"></param>
-    /// <param name="isOrgAdmin"></param>
-    /// <param name="isProjectAdmin"></param>
-    /// <returns></returns>
-    /// <exception cref="KeyNotFoundException"></exception>
-    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by GetRecordsInRecordCollectionPaginated. " +
-              "Remove once v1 record collection endpoints are sunset.", error: false)]
-    public async Task<List<RecordResponseDto>> GetRecordsInRecordCollection(
-        long currentUserId, long organizationId, long projectId, long recordCollectionId, bool hideArchived,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
-    {
-        var collectionExists = await _context.RecordCollections.AnyAsync(c =>
-            c.Id == recordCollectionId &&
-            c.OrganizationId == organizationId &&
-            c.ProjectId == projectId &&
-            (!hideArchived || !c.IsArchived));
-
-        if (!collectionExists)
-            throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found");
-
-        var recordQuery = _context.Records
-            .Where(r =>
-                r.OrganizationId == organizationId &&
-                r.ProjectId == projectId &&
-                r.RecordCollections.Any(c => c.Id == recordCollectionId));
-
-        if (hideArchived)
-            recordQuery = recordQuery.Where(r => !r.IsArchived);
-
-        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-        {
-            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                currentUserId, organizationId, projectId, "read record");
-
-            recordQuery = recordQuery.Where(r =>
-                r.Labels.Count == 0 ||
-                r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
-        }
-
-        var records = await recordQuery
-            .Include(r => r.Tags)
-            .Include(r => r.Labels)
-            .ToListAsync();
-
-        return records
-        .Select(r => new RecordResponseDto
-        {
-            Id = r.Id,
-            Description = r.Description,
-            Uri = r.Uri,
-            Properties = r.Properties,
-            OriginalId = r.OriginalId,
-            Name = r.Name,
-            ClassId = r.ClassId,
-            DataSourceId = r.DataSourceId,
-            ProjectId = r.ProjectId,
-            OrganizationId = r.OrganizationId,
-            LastUpdatedBy = r.LastUpdatedBy,
-            LastUpdatedAt = r.LastUpdatedAt,
-            IsArchived = r.IsArchived,
-            FileType = r.FileType,
-            Tags = r.Tags.Select(t => new RecordTagDto
-            {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList(),
-            Labels = r.Labels.Select(l => new RecordLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        }).ToList();
-    }
-
-    #endregion
-
     /// <summary>
     ///     Private method used to calculate json depth of properties (should be less than three)
     /// </summary>
@@ -1211,39 +1166,99 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         };
     }
 
-    private static RecordCollectionResponseDto RecordCollectionToResponse(RecordCollection c)
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all records in a record collection without pagination.
+    ///     Superseded by <see cref="GetRecordsInRecordCollectionPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 record collection controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="currentUserId"></param>
+    /// <param name="organizationId"></param>
+    /// <param name="projectId"></param>
+    /// <param name="recordCollectionId"></param>
+    /// <param name="hideArchived"></param>
+    /// <param name="isSysAdmin"></param>
+    /// <param name="isOrgAdmin"></param>
+    /// <param name="isProjectAdmin"></param>
+    /// <returns></returns>
+    /// <exception cref="KeyNotFoundException"></exception>
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by GetRecordsInRecordCollectionPaginated. " +
+              "Remove once v1 record collection endpoints are sunset.", error: false)]
+    public async Task<List<RecordResponseDto>> GetRecordsInRecordCollection(
+        long currentUserId, long organizationId, long projectId, long recordCollectionId, bool hideArchived,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        return new RecordCollectionResponseDto
+        var collectionExists = await _context.RecordCollections.AnyAsync(c =>
+            c.Id == recordCollectionId &&
+            c.OrganizationId == organizationId &&
+            c.ProjectId == projectId &&
+            (!hideArchived || !c.IsArchived));
+
+        if (!collectionExists)
+            throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found");
+
+        var recordQuery = _context.Records
+            .Where(r =>
+                r.OrganizationId == organizationId &&
+                r.ProjectId == projectId &&
+                r.RecordCollections.Any(c => c.Id == recordCollectionId));
+
+        if (hideArchived)
+            recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
         {
-            Id = c.Id,
-            Description = c.Description,
-            Properties = c.Properties,
-            Name = c.Name,
-            ProjectId = c.ProjectId,
-            OrganizationId = c.OrganizationId,
-            LastUpdatedBy = c.LastUpdatedBy,
-            LastUpdatedAt = c.LastUpdatedAt,
-            IsArchived = c.IsArchived,
-            RecordCount = c.Records.Count(),
-            Tags = c.Tags.Select(t => new RecordCollectionTagDto
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            recordQuery = recordQuery.Where(r =>
+                r.Labels.Count == 0 ||
+                r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
+        }
+
+        var records = await recordQuery
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .ToListAsync();
+
+        return records
+        .Select(r => new RecordResponseDto
+        {
+            Id = r.Id,
+            Description = r.Description,
+            Uri = r.Uri,
+            Properties = r.Properties,
+            OriginalId = r.OriginalId,
+            Name = r.Name,
+            ClassId = r.ClassId,
+            DataSourceId = r.DataSourceId,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            LastUpdatedBy = r.LastUpdatedBy,
+            LastUpdatedAt = r.LastUpdatedAt,
+            IsArchived = r.IsArchived,
+            FileType = r.FileType,
+            Tags = r.Tags.Select(t => new RecordTagDto
             {
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+            Labels = r.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
             }).ToList()
-        };
+        }).ToList();
     }
 
-    #region Deprecated
     
-    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by " +
-              "GetAllRecordCollectionsPaginated. Remove once v1 record collection endpoints are sunset.", error: false)]
     /// <summary>
-    ///     Retrieves all record collections for a specific project and datasource.
+    ///     [DEPRECATED - V1 ONLY] Retrieves all record collections without pagination.
+    ///     Superseded by <see cref="GetAllRecordCollectionsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 record collection controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -1254,6 +1269,8 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of record collections based on the applied filters.</returns>
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by " +
+              "GetAllRecordCollectionsPaginated. Remove once v1 record collection endpoints are sunset.", error: false)]
     public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetAllRecordCollections(
         long currentUserId, long organizationId, long projectId, RecordCollectionQueryRequestDto dto,
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
