@@ -1180,6 +1180,12 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Add(projMember);
         await _context.SaveChangesAsync();
 
+        // invalidate the cached admin flag now that it's changed
+        if (makeProjectAdmin)
+        {
+            await InvalidateProjectAdminCache(projectId, userId, groupId);
+        }
+
         if (userId.HasValue && userId != UserContextStorage.UserId)
         {
             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -1196,12 +1202,6 @@ public class ProjectBusiness : IProjectBusiness
 
                 return true;
             }
-        }
-
-        // invalidate the cached admin flag now that it's changed
-        if (makeProjectAdmin)
-        {
-            await InvalidateProjectAdminCache(projectId, userId, groupId);
         }
 
         return true;
