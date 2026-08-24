@@ -1183,38 +1183,7 @@ public class ProjectBusiness : IProjectBusiness
         // invalidate the cached admin flag now that it's changed
         if (makeProjectAdmin)
         {
-            long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
-
-            if (userId.HasValue)
-            {
-                try
-                {
-                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, organizationId, projectId));
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
-                }
-            }
-            else if (groupId.HasValue)
-            {
-                var memberUserIds = await _context.Groups
-                    .Where(g => g.Id == groupId.Value)
-                    .SelectMany(g => g.Users.Select(u => u.Id))
-                    .ToListAsync();
-
-                foreach (var memberId in memberUserIds)
-                {
-                    try
-                    {
-                        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, organizationId, projectId));
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", memberId, projectId);
-                    }
-                }
-            }
+            await InvalidateProjectAdminCache(projectId, userId, groupId);
         }
 
         return true;
@@ -1267,38 +1236,7 @@ public class ProjectBusiness : IProjectBusiness
         // invalidate the cached admin flag, but only if it was actually touched
         if (isProjectAdmin.HasValue)
         {
-            long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
-
-            if (userId.HasValue)
-            {
-                try
-                {
-                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, organizationId, projectId));
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
-                }
-            }
-            else if (groupId.HasValue)
-            {
-                var memberUserIds = await _context.Groups
-                    .Where(g => g.Id == groupId.Value)
-                    .SelectMany(g => g.Users.Select(u => u.Id))
-                    .ToListAsync();
-
-                foreach (var memberId in memberUserIds)
-                {
-                    try
-                    {
-                        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, organizationId, projectId));
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", memberId, projectId);
-                    }
-                }
-            }
+            await InvalidateProjectAdminCache(projectId, userId, groupId);
         }
 
         return true;
@@ -1341,38 +1279,8 @@ public class ProjectBusiness : IProjectBusiness
         await _context.SaveChangesAsync();
 
         // invalidate the cached admin flag now that it's changed
-        long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
+        await InvalidateProjectAdminCache(projectId, userId, groupId);
 
-        if (userId.HasValue)
-        {
-            try
-            {
-                await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, organizationId, projectId));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
-            }
-        }
-        else if (groupId.HasValue)
-        {
-            var memberUserIds = await _context.Groups
-                .Where(g => g.Id == groupId.Value)
-                .SelectMany(g => g.Users.Select(u => u.Id))
-                .ToListAsync();
-
-            foreach (var memberId in memberUserIds)
-            {
-                try
-                {
-                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, organizationId, projectId));
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", memberId, projectId);
-                }
-            }
-        }
         return true;
     }
 
@@ -1426,38 +1334,7 @@ public class ProjectBusiness : IProjectBusiness
         await _context.SaveChangesAsync();
 
         // invalidate the cached admin flag now that it's changed
-        long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
-
-        if (userId.HasValue)
-        {
-            try
-            {
-                await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, organizationId, projectId));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
-            }
-        }
-        else if (groupId.HasValue)
-        {
-            var memberUserIds = await _context.Groups
-                .Where(g => g.Id == groupId.Value)
-                .SelectMany(g => g.Users.Select(u => u.Id))
-                .ToListAsync();
-
-            foreach (var memberId in memberUserIds)
-            {
-                try
-                {
-                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, organizationId, projectId));
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", memberId, projectId);
-                }
-            }
-        }
+        await InvalidateProjectAdminCache(projectId, userId, groupId);
 
         return true;
     }
@@ -1614,5 +1491,44 @@ public class ProjectBusiness : IProjectBusiness
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
             ?? throw new KeyNotFoundException("Default object storage not found");
         return defaultObjectStorage.Id;
+    }
+
+    /// <summary>
+    /// Invalidates the cached ProjectAdmin flag for whichever member(s) a project-admin-affecting mutation just touched.
+    /// </summary>
+    private async Task InvalidateProjectAdminCache(long projectId, long? userId, long? groupId)
+    {
+        long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
+
+        if (userId.HasValue)
+        {
+            try
+            {
+                await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, organizationId, projectId));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
+            }
+        }
+        else if (groupId.HasValue)
+        {
+            var memberUserIds = await _context.Groups
+                .Where(g => g.Id == groupId.Value)
+                .SelectMany(g => g.Users.Select(u => u.Id))
+                .ToListAsync();
+
+            foreach (var memberId in memberUserIds)
+            {
+                try
+                {
+                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, organizationId, projectId));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", memberId, projectId);
+                }
+            }
+        }
     }
 }
