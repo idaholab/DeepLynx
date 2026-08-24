@@ -159,7 +159,9 @@ public class UserContextMiddleware
     {
         var cached = await CacheService.Instance.GetAsync<bool?>(key);
         if (cached.HasValue)
+        {
             return cached.Value;
+        }
 
         var result = await factory();
         await CacheService.Instance.SetAsync(key, result, AdminFlagCacheTtl);
