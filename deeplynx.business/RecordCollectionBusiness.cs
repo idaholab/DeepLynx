@@ -127,31 +127,12 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             _ => recordCollectionQuery.OrderByDescending(c => c.LastUpdatedAt).ThenBy(c => c.Name),
         };
 
-        var projectedQuery = recordCollectionQuery.Select(c => new RecordCollectionResponseDto
-        {
-            Id = c.Id,
-            Description = c.Description,
-            Properties = c.Properties,
-            Name = c.Name,
-            ProjectId = c.ProjectId,
-            OrganizationId = c.OrganizationId,
-            LastUpdatedBy = c.LastUpdatedBy,
-            LastUpdatedAt = c.LastUpdatedAt,
-            IsArchived = c.IsArchived,
-            RecordCount = c.Records.Count(),
-            Tags = c.Tags.Select(t => new RecordCollectionTagDto
-            {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList(),
-            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        });
-
-        return await projectedQuery.ToPaginatedAsync(paginatedRequestDto);
+        return await recordCollectionQuery
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .Include(r => r.Records)
+            .Select(c => RecordCollectionToResponse(c))
+            .ToPaginatedAsync(paginatedRequestDto);
     }
 
    
@@ -289,34 +270,12 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 c.Labels.Count == 0 ||
                 c.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
+            
+        var orderedQuery = collectionQuery.Include(r => r.Tags).Include(r => r.Labels).Include(r => r.Records).OrderBy(c => c.Id);
 
-        var orderedQuery = collectionQuery.OrderBy(c => c.Id);
-
-        var projectedQuery = orderedQuery.Select(c => new RecordCollectionResponseDto
-        {
-            Id = c.Id,
-            Description = c.Description,
-            Properties = c.Properties,
-            Name = c.Name,
-            ProjectId = c.ProjectId,
-            OrganizationId = c.OrganizationId,
-            LastUpdatedBy = c.LastUpdatedBy,
-            LastUpdatedAt = c.LastUpdatedAt,
-            IsArchived = c.IsArchived,
-            RecordCount = c.Records.Count(),
-            Tags = c.Tags.Select(t => new RecordCollectionTagDto
-            {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList(),
-            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        });
-
-        return await projectedQuery.ToPaginatedAsync(paginatedRequestDto);
+        return await orderedQuery
+            .Select(c => RecordCollectionToResponse(c))
+            .ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -1230,6 +1189,33 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     {
         var inserted = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, projectId, tags);
         return inserted.ToDictionary(t => t.Name, t => t);
+    }
+
+    private static RecordCollectionResponseDto RecordCollectionToResponse(RecordCollection c)
+    {
+        return new RecordCollectionResponseDto
+        {
+            Id = c.Id,
+            Description = c.Description,
+            Properties = c.Properties,
+            Name = c.Name,
+            ProjectId = c.ProjectId,
+            OrganizationId = c.OrganizationId,
+            LastUpdatedBy = c.LastUpdatedBy,
+            LastUpdatedAt = c.LastUpdatedAt,
+            IsArchived = c.IsArchived,
+            RecordCount = c.Records.Count(),
+            Tags = c.Tags.Select(t => new RecordCollectionTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        };
     }
 
     #region Deprecated
