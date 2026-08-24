@@ -1,3 +1,4 @@
+using System;
 using System.Data;
 using System.Reflection.Emit;
 using System.Text.Json;
@@ -298,14 +299,15 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
     /// <param name="tagIds">List of tag IDs - returned records must contain every given ID</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-    /// <returns></returns>
-    public async Task<List<RecordCollectionResponseDto>> GetRecordCollectionsByTags(
-        long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
-        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    /// <returns>A paginated list of record collections that have all the specified tags.</returns>
+    public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetRecordCollectionsByTagsPaginated(
+        long currentUserId, long organizationId, long projectId, long[] tagIds, PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         var recordCollectionQuery = _context.RecordCollections
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
@@ -327,7 +329,9 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
         }
 
-        return await recordCollectionQuery
+        var orderedQuery = recordCollectionQuery.OrderBy(r => r.Id);
+
+        return await orderedQuery
             .Select(r => new RecordCollectionResponseDto
             {
                 Id = r.Id,
@@ -350,7 +354,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     Id = l.Id,
                     Name = l.Name
                 }).ToList()
-            }).ToListAsync();
+            }).ToPaginatedAsync(paginatedRequestDto);
     }
 
 
@@ -1049,6 +1053,75 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         return recordCollection.Labels.ToList();
     }
+
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Get all records that contain all given tags.
+    ///     Superseded by <see cref="GetRecordCollectionsByTagsPaginated"/>.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <param name="tagIds">List of tag IDs - returned records must contain every given ID</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns></returns>
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by " +
+              "GetRecordCollectionsByTagsPaginated. Remove once v1 record collection endpoints are sunset.", error: false)]
+    public async Task<List<RecordCollectionResponseDto>> GetRecordCollectionsByTags(
+        long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        var recordCollectionQuery = _context.RecordCollections
+            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
+
+        if (hideArchived) recordCollectionQuery = recordCollectionQuery.Where(r => !r.IsArchived);
+
+        // Only return records that contain ALL given IDs
+        recordCollectionQuery = recordCollectionQuery.Where(r =>
+            tagIds.All(tagId => r.Tags.Any(t => t.Id == tagId)));
+
+        // if user is not admin, filter out unauthorized labels
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            recordCollectionQuery = recordCollectionQuery.Where(r =>
+                r.Labels.Count == 0 ||
+                r.Labels.All(l => userAuthorizedLabels.Contains(l.Id)));
+        }
+
+        return await recordCollectionQuery
+            .Select(r => new RecordCollectionResponseDto
+            {
+                Id = r.Id,
+                Description = r.Description,
+                Properties = r.Properties,
+                Name = r.Name,
+                ProjectId = r.ProjectId,
+                OrganizationId = r.OrganizationId,
+                LastUpdatedBy = r.LastUpdatedBy,
+                LastUpdatedAt = r.LastUpdatedAt,
+                IsArchived = r.IsArchived,
+                RecordCount = r.Records.Count(),
+                Tags = r.Tags.Select(t => new RecordCollectionTagDto
+                {
+                    Id = t.Id,
+                    Name = t.Name
+                }).ToList(),
+                Labels = r.Labels.Select(l => new RecordCollectionLabelDto
+                {
+                    Id = l.Id,
+                    Name = l.Name
+                }).ToList()
+            }).ToListAsync();
+    }
+
+    #endregion
 
     /// <summary>
     ///     Private method used to calculate json depth of properties (should be less than three)

@@ -1,3 +1,4 @@
+using System;
 using deeplynx.datalayer.Models;
 using deeplynx.models;
 
@@ -43,9 +44,15 @@ public interface IRecordCollectionBusiness
         long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived,
         PaginatedRequestDto paginatedRequestDto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by " +
+              "GetRecordCollectionsByTagsPaginated. Remove once v1 record collection endpoints are sunset.", error: false)]
     Task<List<RecordCollectionResponseDto>> GetRecordCollectionsByTags(
         long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+
+    Task<PaginatedResponse<RecordCollectionResponseDto>> GetRecordCollectionsByTagsPaginated(
+        long currentUserId, long organizationId, long projectId, long[] tagIds, PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<bool> AddRecordsToRecordCollection(
         long currentUserID, long organizationId, long projectId, long recordCollectionId,

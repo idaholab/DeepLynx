@@ -944,6 +944,105 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetRecordCollectionsByTagsPaginated Tests
+
+    [Fact]
+    public async Task GetRecordCollectionsByTagsPaginated_ReturnsCollectionsContainingAllTags()
+    {
+        await _recordCollectionBusiness.AttachTag(_organizationId, _projectId, _collectionId, _tagId2);
+
+        var result = await _recordCollectionBusiness.GetRecordCollectionsByTagsPaginated(
+            _userId, _organizationId, _projectId, new[] { _tagId1, _tagId2 }, DefaultPagination(), true, isSysAdmin: true);
+
+        Assert.Equal(1, result.TotalCount);
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(_collectionId, collection.Id);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsByTagsPaginated_HideArchivedTrue_ExcludesArchivedCollections()
+    {
+        var result = await _recordCollectionBusiness.GetRecordCollectionsByTagsPaginated(
+            _userId, _organizationId, _projectId, new[] { _tagId2 }, DefaultPagination(), true, isSysAdmin: true);
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsByTagsPaginated_HideArchivedFalse_IncludesArchivedCollections()
+    {
+        var result = await _recordCollectionBusiness.GetRecordCollectionsByTagsPaginated(
+            _userId, _organizationId, _projectId, new[] { _tagId2 }, DefaultPagination(), false, isSysAdmin: true);
+
+        Assert.Equal(1, result.TotalCount);
+        var collection = Assert.Single(result.Items);
+        Assert.Equal(_archivedCollectionId, collection.Id);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsByTagsPaginated_NoMatchingCollections_ReturnsEmptyPaginatedResponse()
+    {
+        var result = await _recordCollectionBusiness.GetRecordCollectionsByTagsPaginated(
+            _userId, _organizationId, _projectId, new[] { _tagId1, _tagId2 }, DefaultPagination(), true, isSysAdmin: true);
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(100, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsByTagsPaginated_Paginates_Correctly()
+    {
+        // Arrange - _collectionId already has _tagId1; add two more matching collections (3 total)
+        await CreateRecordCollectionAsync("delta-tagged", "page-set", tagIds: new[] { _tagId1 });
+        await CreateRecordCollectionAsync("echo-tagged", "page-set", tagIds: new[] { _tagId1 });
+
+        var pageOne = DefaultPagination(pageNumber: 1, pageSize: 2);
+        var pageTwo = DefaultPagination(pageNumber: 2, pageSize: 2);
+
+        // Act
+        var firstPage = await _recordCollectionBusiness.GetRecordCollectionsByTagsPaginated(
+            _userId, _organizationId, _projectId, new[] { _tagId1 }, pageOne, true, isSysAdmin: true);
+        var secondPage = await _recordCollectionBusiness.GetRecordCollectionsByTagsPaginated(
+            _userId, _organizationId, _projectId, new[] { _tagId1 }, pageTwo, true, isSysAdmin: true);
+
+        // Assert
+        Assert.Equal(3, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.Equal(3, secondPage.TotalCount);
+        Assert.Single(secondPage.Items);
+
+        // No overlap between pages
+        var firstPageIds = firstPage.Items.Select(c => c.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(c => c.Id).ToHashSet();
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    [Fact]
+    public async Task GetRecordCollectionsByTagsPaginated_PageSizeNegativeOne_ReturnsAllMatchingCollections_IgnoringPageNumber()
+    {
+        // Arrange - two more collections matching _tagId1 (3 total with _collectionId)
+        await CreateRecordCollectionAsync("foxtrot-tagged", "page-set", tagIds: new[] { _tagId1 });
+        await CreateRecordCollectionAsync("golf-tagged", "page-set", tagIds: new[] { _tagId1 });
+        var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+        // Act
+        var result = await _recordCollectionBusiness.GetRecordCollectionsByTagsPaginated(
+            _userId, _organizationId, _projectId, new[] { _tagId1 }, sentinel, true, isSysAdmin: true);
+
+        // Assert - PageNumber is ignored entirely, every matching collection comes back on "page 1"
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(3, result.PageSize);
+        Assert.Contains(result.Items, c => c.Id == _collectionId);
+    }
+
+    #endregion
+
     #region Add Records to Collections
 
     [Fact]
