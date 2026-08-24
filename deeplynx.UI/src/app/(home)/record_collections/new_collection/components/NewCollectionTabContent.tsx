@@ -359,8 +359,7 @@ export default function NewCollectionTabContent({
                           />
                         }
                       />
-                      {newCollectionRecordSearchResults.length >
-                      recordsPerPage ? (
+                      {newCollectionRecordPageCount > 1 ? (
                         <div className="px-4 py-3 text-sm">
                           <PaginationControls
                             currentPage={newCollectionRecordPage}

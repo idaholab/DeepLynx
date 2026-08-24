@@ -8,7 +8,7 @@ import {
 } from "@/app/lib/client_service/record_collection_services.client";
 import { createSensitivityLabelProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import {
-  fullTextSearch,
+  fullTextSearchPaginated,
   getMultiProjectRecords,
 } from "@/app/lib/client_service/query_services.client";
 import { getRecord } from "@/app/lib/client_service/record_services.client";
@@ -90,6 +90,10 @@ export function useNewCollectionWorkflow({
     newCollectionRecordSearchLoading,
     setNewCollectionRecordSearchLoading,
   ] = useState(false);
+  const [newCollectionRecordTotalCount, setNewCollectionRecordTotalCount] = useState(0);
+  const [submittedRecordSearchTerm, setSubmittedRecordSearchTerm] = useState("");
+  const [selectAllSearchedRecordsLoading, setSelectAllSearchedRecordsLoading] =
+    useState(false);
   const [enrichingSelectedRecordIds, setEnrichingSelectedRecordIds] = useState<
     number[]
   >([]);
@@ -107,7 +111,6 @@ export function useNewCollectionWorkflow({
     filteredNewCollectionTagOptions,
     canAddTypedNewCollectionTag,
     canAddTypedNewCollectionLabel,
-    newCollectionRecordPageCount,
     visibleNewCollectionRecords,
     visibleSelectionState,
     retrievedSelectionState,
@@ -123,7 +126,6 @@ export function useNewCollectionWorkflow({
     newCollectionLabelSearchTerm,
     newCollectionTagSearchTerm,
     newCollectionRecordSearchResults,
-    newCollectionRecordPage,
     newCollectionSelectedRecordIds,
     newCollectionSelectedRecords,
     newCollectionReviewSearchTerm,
@@ -131,15 +133,6 @@ export function useNewCollectionWorkflow({
     recordsPerPage: newCollectionRecordsPerPage,
     setNewCollectionReviewPage,
   });
-
-  const handleSetNewCollectionRecordsPerPage = useCallback(
-    (pageSize: number) => {
-      setNewCollectionRecordsPerPage(pageSize);
-      setNewCollectionRecordPage(1);
-      setNewCollectionReviewPage(1);
-    },
-    [],
-  );
 
   useEffect(() => {
     const selectedIdSet = new Set(newCollectionSelectedRecordIds);
@@ -303,7 +296,37 @@ export function useNewCollectionWorkflow({
   };
 
   const handleSelectAllSearchedRecords = async () => {
-    await addNewCollectionRecords(newCollectionRecordSearchResults);
+    const query = submittedRecordSearchTerm;
+
+    setSelectAllSearchedRecordsLoading(true);
+    try {
+      const response = query
+        ? await fullTextSearchPaginated(
+            organizationId,
+            query,
+            [projectId],
+            1,
+            -1,
+          )
+        : await getMultiProjectRecords(
+            organizationId,
+            [projectId],
+            true,
+            1,
+            -1,
+          );
+
+      await addNewCollectionRecords(response.items);
+    } catch (error) {
+      console.error("Failed to select all searched records:", error);
+      showToast(
+        "error",
+        t.translations.RECORD_COLLECTIONS_FAILED_SEARCH_RECORDS,
+        "toast-top toast-center",
+      );
+    } finally {
+      setSelectAllSearchedRecordsLoading(false);
+    }
   };
 
   const deselectNewCollectionRecordsByLabel = (labelName: string) => {
@@ -407,19 +430,33 @@ export function useNewCollectionWorkflow({
     );
   };
 
-  const handleSearchNewCollectionRecords = useCallback(
-    async (overrideTerm?: string) => {
-      const query = (overrideTerm ?? newCollectionRecordSearchTerm).trim();
-
+  const loadNewCollectionRecordPage = useCallback(
+    async (
+      query: string,
+      pageNumber: number,
+      pageSize: number,
+    ) => {
       setNewCollectionRecordSearchLoading(true);
-      try {
-        const results = query
-          ? await fullTextSearch(organizationId, query, [projectId])
-          : await getMultiProjectRecords(organizationId, [projectId]);
 
-        const items = Array.isArray(results) ? results : results.items;
-        setNewCollectionRecordSearchResults(items);
-        setNewCollectionRecordPage(1);
+      try {
+        const response = query
+          ? await fullTextSearchPaginated(
+              organizationId,
+              query,
+              [projectId],
+              pageNumber,
+              pageSize,
+            )
+          : await getMultiProjectRecords(
+              organizationId,
+              [projectId],
+              true,
+              pageNumber,
+              pageSize,
+            );
+
+        setNewCollectionRecordSearchResults(response.items);
+        setNewCollectionRecordTotalCount(response.totalCount);
       } catch (error) {
         console.error("Failed to search records:", error);
         showToast(
@@ -431,7 +468,61 @@ export function useNewCollectionWorkflow({
         setNewCollectionRecordSearchLoading(false);
       }
     },
-    [newCollectionRecordSearchTerm, organizationId, projectId, t],
+    [organizationId, projectId, showToast, t],
+  );
+
+  const handleSetNewCollectionRecordsPerPage = useCallback(
+    (pageSize: number) => {
+      setNewCollectionRecordsPerPage(pageSize);
+      setNewCollectionRecordPage(1);
+      setNewCollectionReviewPage(1);
+
+      void loadNewCollectionRecordPage(
+        submittedRecordSearchTerm,
+        1,
+        pageSize,
+      );
+    },
+    [loadNewCollectionRecordPage, submittedRecordSearchTerm],
+  );
+
+  const handleSearchNewCollectionRecords = useCallback(
+    async (overrideTerm?: string) => {
+      const query = (
+        overrideTerm ?? newCollectionRecordSearchTerm
+      ).trim();
+
+      setSubmittedRecordSearchTerm(query);
+      setNewCollectionRecordPage(1);
+
+      await loadNewCollectionRecordPage(
+        query,
+        1,
+        newCollectionRecordsPerPage,
+      );
+    },
+    [
+      loadNewCollectionRecordPage,
+      newCollectionRecordSearchTerm,
+      newCollectionRecordsPerPage,
+    ],
+  );
+
+  const handleSetNewCollectionRecordPage = useCallback(
+    (pageNumber: number) => {
+      setNewCollectionRecordPage(pageNumber);
+
+      void loadNewCollectionRecordPage(
+        submittedRecordSearchTerm,
+        pageNumber,
+        newCollectionRecordsPerPage,
+      );
+    },
+    [
+      loadNewCollectionRecordPage,
+      submittedRecordSearchTerm,
+      newCollectionRecordsPerPage,
+    ],
   );
 
   const clearNewCollectionRecordSearch = () => {
@@ -594,12 +685,14 @@ export function useNewCollectionWorkflow({
       setNewCollectionRecordSearchTerm,
       newCollectionRecordSearchResults,
       newCollectionRecordSearchLoading,
+      selectAllSearchedRecordsLoading,
       visibleNewCollectionRecords,
       visibleSelectionState,
       retrievedSelectionState,
       newCollectionRecordPage,
-      setNewCollectionRecordPage,
-      newCollectionRecordPageCount,
+      setNewCollectionRecordPage: handleSetNewCollectionRecordPage,
+      newCollectionRecordPageCount: Math.max(1, Math.ceil(newCollectionRecordTotalCount / newCollectionRecordsPerPage)),
+      newCollectionRecordTotalCount,
       onSearchRecords: handleSearchNewCollectionRecords,
       onClearRecordSearch: clearNewCollectionRecordSearch,
       onToggleSelectAllVisibleRecords: toggleSelectAllVisibleRecords,
