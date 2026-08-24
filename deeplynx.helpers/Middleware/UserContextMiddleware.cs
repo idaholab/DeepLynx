@@ -58,7 +58,7 @@ public class UserContextMiddleware
                     {
                         var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
                         var user = await dbContext.Users
-                            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+                            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower() && !u.IsArchived);
 
                         if (user != null)
                         {
