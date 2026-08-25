@@ -16,7 +16,7 @@ public class UserContextMiddleware
     private readonly RequestDelegate _next;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    private static readonly TimeSpan AdminFlagCacheTtl = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan AdminFlagCacheTtl = TimeSpan.FromHours(1);
 
     public UserContextMiddleware(
         RequestDelegate next,
@@ -155,6 +155,13 @@ public class UserContextMiddleware
         }
     }
 
+    /// <summary>
+    ///     Retrieves a cached Boolean value for the specified key. If the value is not
+    ///     cached, invokes the factory, caches its result, and returns it.
+    /// </summary>
+    /// <param name="key">The cache key associated with the Boolean value.</param>
+    /// <param name="factory">The asynchronous function used to retrieve the value on a cache miss.</param>
+    /// <returns>The cached or newly retrieved Boolean value.</returns>
     private async Task<bool> GetOrSetBoolAsync(string key, Func<Task<bool>> factory)
     {
         var cached = await CacheService.Instance.GetAsync<bool?>(key);
@@ -168,6 +175,15 @@ public class UserContextMiddleware
         return result;
     }
 
+    /// <summary>
+    ///     Determines whether a user is an administrator for every specified project,
+    ///     using cached project-admin values when available.
+    /// </summary>
+    /// <param name="userId">The ID of the user whose administrator status is checked.</param>
+    /// <param name="organizationId">The ID of the organization containing the projects.</param>
+    /// <param name="projectIds">The IDs of the projects to check.</param>
+    /// <param name="adminService">The service used to check administrator status on a cache miss.</param>
+    /// <returns>True if the user is an administrator for every specified project, otherwise false</returns>
     private async Task<bool> IsProjectAdminForAllAsync(
         long userId, long organizationId, List<long> projectIds, IAdminService adminService)
     {
