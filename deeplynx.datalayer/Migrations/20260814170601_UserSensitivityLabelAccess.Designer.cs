@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using deeplynx.datalayer.Models;
@@ -11,9 +12,11 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    partial class DeeplynxContextModelSnapshot : ModelSnapshot
+    [Migration("20260814170601_UserSensitivityLabelAccess")]
+    partial class UserSensitivityLabelAccess
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -704,9 +707,10 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<string>("Error")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("error");
 
@@ -714,10 +718,6 @@ namespace deeplynx.datalayer.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("job_id");
-
-                    b.Property<string>("Metadata")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("metadata");
 
                     b.Property<float>("Progress")
                         .HasColumnType("real")
@@ -1229,183 +1229,6 @@ namespace deeplynx.datalayer.Migrations
                     b.ToTable("oauth_applications", "deeplynx");
                 });
 
-            modelBuilder.Entity("deeplynx.datalayer.Models.OauthDeviceAuthorizationRequest", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ApplicationId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("application_id");
-
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("approved_at");
-
-                    b.Property<DateTime?>("ConsumedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("consumed_at");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<DateTime?>("DeniedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("denied_at");
-
-                    b.Property<string>("DeviceCodeHash")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("device_code_hash");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<DateTime?>("LastPolledAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("last_polled_at");
-
-                    b.Property<int>("PollCount")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("poll_count");
-
-                    b.Property<int>("PollingIntervalSeconds")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(5)
-                        .HasColumnName("polling_interval_seconds");
-
-                    b.Property<string>("Scope")
-                        .HasColumnType("text")
-                        .HasColumnName("scope");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("pending")
-                        .HasColumnName("status");
-
-                    b.Property<string>("UserCodeHash")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("user_code_hash");
-
-                    b.Property<long?>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("oauth_device_auth_requests_pkey");
-
-                    b.HasIndex("ApplicationId")
-                        .HasDatabaseName("idx_oauth_device_auth_application_id");
-
-                    b.HasIndex("DeviceCodeHash")
-                        .IsUnique()
-                        .HasDatabaseName("idx_oauth_device_auth_device_code_hash");
-
-                    b.HasIndex("ExpiresAt")
-                        .HasDatabaseName("idx_oauth_device_auth_expires_at");
-
-                    b.HasIndex("Id")
-                        .HasDatabaseName("idx_oauth_device_auth_requests_id");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("idx_oauth_device_auth_status");
-
-                    b.HasIndex("UserCodeHash")
-                        .IsUnique()
-                        .HasDatabaseName("idx_oauth_device_auth_user_code_hash");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("idx_oauth_device_auth_user_id");
-
-                    b.ToTable("oauth_device_authorization_requests", "deeplynx");
-                });
-
-            modelBuilder.Entity("deeplynx.datalayer.Models.OauthRefreshToken", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ApplicationId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("application_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<DateTime?>("LastUsedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("last_used_at");
-
-                    b.Property<bool>("Revoked")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("revoked");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("revoked_at");
-
-                    b.Property<string>("Scope")
-                        .HasColumnType("text")
-                        .HasColumnName("scope");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("token_hash");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("oauth_refresh_tokens_pkey");
-
-                    b.HasIndex("ApplicationId")
-                        .HasDatabaseName("idx_oauth_refresh_tokens_application_id");
-
-                    b.HasIndex("ExpiresAt")
-                        .HasDatabaseName("idx_oauth_refresh_tokens_expires_at");
-
-                    b.HasIndex("Id")
-                        .HasDatabaseName("idx_oauth_refresh_tokens_id");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique()
-                        .HasDatabaseName("idx_oauth_refresh_tokens_token_hash");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("idx_oauth_refresh_tokens_user_id");
-
-                    b.ToTable("oauth_refresh_tokens", "deeplynx");
-                });
-
             modelBuilder.Entity("deeplynx.datalayer.Models.OauthToken", b =>
                 {
                     b.Property<long>("Id")
@@ -1476,12 +1299,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<bool>("Default")
                         .HasColumnType("boolean")
                         .HasColumnName("default");
-
-                    b.Property<bool>("FilesDeletable")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("files_deletable");
 
                     b.Property<bool>("IsArchived")
                         .ValueGeneratedOnAdd()
@@ -1600,10 +1417,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("create_container_per_project");
 
-                    b.Property<int?>("DefaultObjectStorageId")
-                        .HasColumnType("integer")
-                        .HasColumnName("default_object_storage_id");
-
                     b.Property<bool>("DefaultOrg")
                         .HasColumnType("boolean")
                         .HasColumnName("default_org");
@@ -1611,10 +1424,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
-
-                    b.Property<bool>("DisableFileTransfer")
-                        .HasColumnType("boolean")
-                        .HasColumnName("disable_file_transfer");
 
                     b.Property<bool>("IsArchived")
                         .ValueGeneratedOnAdd()
@@ -1631,10 +1440,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long?>("LastUpdatedBy")
                         .HasColumnType("bigint")
                         .HasColumnName("last_updated_by");
-
-                    b.Property<int?>("LogoObjectStorageId")
-                        .HasColumnType("integer")
-                        .HasColumnName("logo_object_storage_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1812,10 +1617,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("banner");
 
-                    b.Property<int?>("DefaultObjectStorageId")
-                        .HasColumnType("integer")
-                        .HasColumnName("default_object_storage_id");
-
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
@@ -1840,10 +1641,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long?>("LastUpdatedBy")
                         .HasColumnType("bigint")
                         .HasColumnName("last_updated_by");
-
-                    b.Property<int?>("LogoObjectStorageId")
-                        .HasColumnType("integer")
-                        .HasColumnName("logo_object_storage_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -3479,47 +3276,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("LastUpdatedByUser");
                 });
 
-            modelBuilder.Entity("deeplynx.datalayer.Models.OauthDeviceAuthorizationRequest", b =>
-                {
-                    b.HasOne("deeplynx.datalayer.Models.OauthApplication", "OauthApplication")
-                        .WithMany("OauthDeviceAuthorizationRequests")
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("oauth_device_auth_requests_application_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.User", "User")
-                        .WithMany("OauthDeviceAuthorizationRequests")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("oauth_device_auth_requests_user_id_fkey");
-
-                    b.Navigation("OauthApplication");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("deeplynx.datalayer.Models.OauthRefreshToken", b =>
-                {
-                    b.HasOne("deeplynx.datalayer.Models.OauthApplication", "OauthApplication")
-                        .WithMany("OauthRefreshTokens")
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("oauth_refresh_tokens_application_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.User", "User")
-                        .WithMany("OauthRefreshTokens")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("oauth_refresh_tokens_user_id_fkey");
-
-                    b.Navigation("OauthApplication");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("deeplynx.datalayer.Models.OauthToken", b =>
                 {
                     b.HasOne("deeplynx.datalayer.Models.OauthApplication", "OauthApplication")
@@ -4136,10 +3892,6 @@ namespace deeplynx.datalayer.Migrations
                 {
                     b.Navigation("ApiKeys");
 
-                    b.Navigation("OauthDeviceAuthorizationRequests");
-
-                    b.Navigation("OauthRefreshTokens");
-
                     b.Navigation("OauthTokens");
                 });
 
@@ -4313,10 +4065,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("LastUpdatedSubscriptions");
 
                     b.Navigation("LastUpdatedTags");
-
-                    b.Navigation("OauthDeviceAuthorizationRequests");
-
-                    b.Navigation("OauthRefreshTokens");
 
                     b.Navigation("OauthTokens");
 

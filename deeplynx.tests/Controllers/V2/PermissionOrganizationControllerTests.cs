@@ -26,7 +26,6 @@ public class PermissionOrganizationControllerTests : IDisposable
 
     private const long OrgId = 1L;
     private const long UserId = 10L;
-    private const long LabelId = 8L;
     private const long PermissionId = 9L;
 
     public PermissionOrganizationControllerTests()
@@ -63,11 +62,11 @@ public class PermissionOrganizationControllerTests : IDisposable
         IEnumerable<PermissionResponseDto> expected = new List<PermissionResponseDto>();
 
         _mockPermissionBusiness
-            .Setup(b => b.GetAllPermissions(LabelId, null, OrgId, true))
+            .Setup(b => b.GetAllPermissions(null, null, OrgId, true))
             .ReturnsAsync(expected);
 
         var result = (await _permissionOrganizationController.GetAllPermissions(
-            OrgId, LabelId, true)).Result as OkObjectResult;
+            OrgId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -78,11 +77,11 @@ public class PermissionOrganizationControllerTests : IDisposable
     public async Task GetAllPermissions_Returns200_WithEmptyList()
     {
         _mockPermissionBusiness
-            .Setup(b => b.GetAllPermissions(LabelId, null, OrgId, true))
+            .Setup(b => b.GetAllPermissions(null, null, OrgId, true))
             .ReturnsAsync([]);
 
         var result = (await _permissionOrganizationController.GetAllPermissions(
-            OrgId, LabelId, true)).Result as OkObjectResult;
+            OrgId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -93,11 +92,11 @@ public class PermissionOrganizationControllerTests : IDisposable
     public async Task GetAllPermissions_ThrowsException_WhenBusinessThrows()
     {
         _mockPermissionBusiness
-            .Setup(b => b.GetAllPermissions(LabelId, null, OrgId, true))
+            .Setup(b => b.GetAllPermissions(null, null, OrgId, true))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _permissionOrganizationController.GetAllPermissions(
-            OrgId, LabelId, true));
+            OrgId, true));
     }
 
     [Fact]
@@ -106,13 +105,13 @@ public class PermissionOrganizationControllerTests : IDisposable
         var expected = new List<PermissionResponseDto>();
 
         _mockPermissionBusiness
-            .Setup(b => b.GetAllPermissions(LabelId, null, OrgId, true))
+            .Setup(b => b.GetAllPermissions(null, null, OrgId, true))
             .ReturnsAsync(expected);
 
-        await _permissionOrganizationController.GetAllPermissions(OrgId, LabelId, true);
+        await _permissionOrganizationController.GetAllPermissions(OrgId, true);
 
         _mockPermissionBusiness.Verify(
-            b => b.GetAllPermissions(LabelId, null, OrgId, true),
+            b => b.GetAllPermissions(null, null, OrgId, true),
             Times.Once);
     }
 
@@ -121,7 +120,7 @@ public class PermissionOrganizationControllerTests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(PermissionOrganizationController.GetAllPermissions),
-            "organizationId", "labelId", "hideArchived");
+            "organizationId", "hideArchived");
 
         AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
         AssertHasAuthAttribute(method, "read", "permission");
