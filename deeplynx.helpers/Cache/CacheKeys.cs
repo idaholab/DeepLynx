@@ -6,4 +6,9 @@ public class CacheKeys
     {
         return $"project:{projectId}:storage_size";
     }
+
+    public static string UserExists(long userId, bool hideArchived)
+    {
+        return $"user:{userId}:exists:hide_archived:{hideArchived}";
+    }
 }

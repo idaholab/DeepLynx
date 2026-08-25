@@ -1,19 +1,56 @@
 using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.helpers
 {
     public static class ExistenceHelper
     {
+        private static readonly TimeSpan UserExistsCacheTtl = TimeSpan.FromHours(1);
+
         public static async Task EnsureUserExistsAsync(DeeplynxContext context, long userId, bool hideArchived = true)
         {
-            var userExists = hideArchived
-                ? await context.Users.AnyAsync(u => u.Id == userId && u.IsArchived == false)
-                : await context.Users.AnyAsync(u => u.Id == userId);
+            var cacheKey = CacheKeys.UserExists(userId, hideArchived);
+
+            var cachedExists = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+            if (cachedExists.HasValue)
+            {
+                if (!cachedExists.Value)
+                    throw new KeyNotFoundException($"User with id {userId} does not exist");
+
+                return;
+            }
+
+            var userExists = await BuildUserExistsFromDb(context, userId, hideArchived);
+
+            await CacheService.Instance.SetAsync(cacheKey, userExists, UserExistsCacheTtl);
 
             if (!userExists)
                 throw new KeyNotFoundException($"User with id {userId} does not exist");
+        }
+
+        private static async Task<bool> BuildUserExistsFromDb(DeeplynxContext context, long userId, bool hideArchived)
+        {
+            return hideArchived
+                ? await context.Users.AnyAsync(u => u.Id == userId && u.IsArchived == false)
+                : await context.Users.AnyAsync(u => u.Id == userId);
+        }
+
+        /// <summary>
+        ///     Invalidates both hide_archived variants of the user-exists cache for a given user.
+        ///     Call this after any mutation that can change a user's existence or archived state
+        ///     (create, delete, archive, unarchive, or an update that toggles IsArchived).
+        /// </summary>
+        public static Task InvalidateUserExistsCache(long userId)
+        {
+            var keys = new List<string>
+            {
+                CacheKeys.UserExists(userId, true),
+                CacheKeys.UserExists(userId, false)
+            };
+
+            return Task.WhenAll(keys.Select(CacheService.Instance.DeleteAsync));
         }
 
         /// <summary>

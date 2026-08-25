@@ -311,6 +311,8 @@ public class UserBusiness : IUserBusiness
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
 
+        await ExistenceHelper.InvalidateUserExistsCache(user.Id);
+
         return new UserResponseDto
         {
             Id = user.Id,
@@ -340,6 +342,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.InvalidateUserExistsCache(userId);
+
         return true;
     }
 
@@ -362,6 +367,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.InvalidateUserExistsCache(userId);
+
         return true;
     }
 
@@ -384,6 +392,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.InvalidateUserExistsCache(userId);
+
         return true;
     }
 
