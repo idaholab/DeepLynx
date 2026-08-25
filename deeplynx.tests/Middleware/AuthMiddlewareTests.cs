@@ -1,8 +1,11 @@
 using System.Security.Claims;
+using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Context;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -189,6 +192,113 @@ public class AuthMiddlewareTests : IntegrationTestBase
         Context.Set<OrganizationUser>().Add(orgUser);
         await Context.SaveChangesAsync();
     }
+
+    #region UserContextMiddleware Cache Tests
+
+    [Fact]
+    public async Task UserContextMiddleware_CacheMissHitAndInvalidation_RequeriesAndCachesUpdatedSysAdminStatus()
+    {
+        // Arrange
+        var sysAdminKey = CacheKeys.SysAdmin(userId1);
+        var orgAdminKey = CacheKeys.OrgAdmin(userId1, organizationId1);
+        var orgMemberKey = CacheKeys.OrgMember(userId1, organizationId1);
+
+        await CacheService.Instance.DeleteAsync(sysAdminKey);
+        await CacheService.Instance.DeleteAsync(orgAdminKey);
+        await CacheService.Instance.DeleteAsync(orgMemberKey);
+
+        _adminServiceMock
+            .SetupSequence(x => x.SysAdminCheck(userId1))
+            .ReturnsAsync(false)
+            .ReturnsAsync(true);
+        _adminServiceMock
+            .Setup(x => x.OrgAdminCheck(userId1, organizationId1))
+            .ReturnsAsync(false);
+        _adminServiceMock
+            .Setup(x => x.OrgMemberCheck(userId1, organizationId1))
+            .ReturnsAsync(false);
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, organizationId1))
+            .ReturnsAsync(organizationId1);
+
+        var services = new ServiceCollection();
+        services.AddSingleton(Context);
+        services.AddSingleton(_adminServiceMock.Object);
+        services.AddSingleton(_organizationServiceMock.Object);
+        var serviceProvider = services.BuildServiceProvider();
+
+        var observedSysAdminValues = new List<bool>();
+        RequestDelegate next = _ =>
+        {
+            observedSysAdminValues.Add(UserContextStorage.IsSysAdmin);
+            return Task.CompletedTask;
+        };
+
+        var middleware = new UserContextMiddleware(
+            next,
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            Mock.Of<ILogger<UserContextMiddleware>>());
+
+        DefaultHttpContext CreateRequest()
+        {
+            var context = new DefaultHttpContext();
+            var identity = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier, userId1.ToString()),
+                new Claim(ClaimTypes.Email, "user1@test.com")
+            ], "TestAuth");
+
+            context.User = new ClaimsPrincipal(identity);
+            context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+            return context;
+        }
+
+        try
+        {
+            // Act 1: cache miss. AdminService is queried and false is cached.
+            await middleware.InvokeAsync(CreateRequest());
+
+            Assert.Equal([false], observedSysAdminValues);
+            Assert.False(await CacheService.Instance.GetAsync<bool?>(sysAdminKey));
+            _adminServiceMock.Verify(x => x.SysAdminCheck(userId1), Times.Once);
+
+            // Act 2: cache hit. AdminService must not be queried again.
+            await middleware.InvokeAsync(CreateRequest());
+
+            Assert.Equal([false, false], observedSysAdminValues);
+            _adminServiceMock.Verify(x => x.SysAdminCheck(userId1), Times.Once);
+
+            // Act 3: the business mutation deletes the stale cache entry.
+            var userBusiness = new UserBusiness(Context);
+            var mutationResult = await userBusiness.SetSysAdmin(userId2, userId1, true);
+
+            Assert.True(mutationResult);
+            Assert.Null(await CacheService.Instance.GetAsync<bool?>(sysAdminKey));
+
+            // Act 4: the next request misses, requeries, and caches the updated value.
+            await middleware.InvokeAsync(CreateRequest());
+
+            Assert.Equal([false, false, true], observedSysAdminValues);
+            Assert.True(await CacheService.Instance.GetAsync<bool?>(sysAdminKey));
+            _adminServiceMock.Verify(x => x.SysAdminCheck(userId1), Times.Exactly(2));
+
+            // The organization flags remained cached across all three requests.
+            _adminServiceMock.Verify(
+                x => x.OrgAdminCheck(userId1, organizationId1),
+                Times.Once);
+            _adminServiceMock.Verify(
+                x => x.OrgMemberCheck(userId1, organizationId1),
+                Times.Once);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(sysAdminKey);
+            await CacheService.Instance.DeleteAsync(orgAdminKey);
+            await CacheService.Instance.DeleteAsync(orgMemberKey);
+        }
+    }
+
+    #endregion
 
     #region Middleware Tests - No Auth Attributes
 
