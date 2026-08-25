@@ -1123,6 +1123,18 @@ public class GraphBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
+        // Gate "read record" on this label (with no UserSensitivityLabel grant to uid1) so that
+        // a non-admin member needs an explicit grant to access records carrying it.
+        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
+        {
+            LabelId = label.Id,
+            Action = "read record",
+            Name = "read record",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        });
+        await Context.SaveChangesAsync();
+
         var labeledRecord = await Context.Records
             .Include(r => r.Labels)
             .FirstAsync(r => r.Id == record3Id);
@@ -1173,6 +1185,18 @@ public class GraphBusinessTests : IntegrationTestBase
             OrganizationId = oid
         };
         Context.SensitivityLabels.Add(label);
+        await Context.SaveChangesAsync();
+
+        // Gate "read record" on this label (with no UserSensitivityLabel grant to uid1) so that
+        // a non-admin member needs an explicit grant to access records carrying it.
+        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
+        {
+            LabelId = label.Id,
+            Action = "read record",
+            Name = "read record",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        });
         await Context.SaveChangesAsync();
 
         var rootRecord = await Context.Records
