@@ -27,7 +27,6 @@ public class PermissionProjectControllerTests : IDisposable
     private const long OrgId = 1L;
     private const long ProjectId = 2L;
     private const long UserId = 10L;
-    private const long LabelId = 8L;
     private const long PermissionId = 9L;
 
     public PermissionProjectControllerTests()
@@ -68,7 +67,7 @@ public class PermissionProjectControllerTests : IDisposable
             .ReturnsAsync(expected);
 
         var result = (await _permissionProjectController.GetAllPermissions(
-            OrgId, ProjectId, null, true)).Result as OkObjectResult;
+            OrgId, ProjectId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -83,7 +82,7 @@ public class PermissionProjectControllerTests : IDisposable
             .ReturnsAsync([]);
 
         var result = (await _permissionProjectController.GetAllPermissions(
-            OrgId, ProjectId, null, true)).Result as OkObjectResult;
+            OrgId, ProjectId, true)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -98,7 +97,7 @@ public class PermissionProjectControllerTests : IDisposable
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _permissionProjectController.GetAllPermissions(
-            OrgId, ProjectId, null, true));
+            OrgId, ProjectId, true));
     }
 
     [Fact]
@@ -110,7 +109,7 @@ public class PermissionProjectControllerTests : IDisposable
             .Setup(b => b.GetAllPermissions(null, ProjectId, OrgId, true))
             .ReturnsAsync(expected);
 
-        await _permissionProjectController.GetAllPermissions(OrgId, ProjectId, null, true);
+        await _permissionProjectController.GetAllPermissions(OrgId, ProjectId, true);
 
         _mockPermissionBusiness.Verify(
             b => b.GetAllPermissions(null, ProjectId, OrgId, true),
@@ -122,7 +121,7 @@ public class PermissionProjectControllerTests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(PermissionProjectController.GetAllPermissions),
-            "organizationId", "projectId", "labelId", "hideArchived");
+            "organizationId", "projectId", "hideArchived");
 
         AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
         AssertHasAuthAttribute(method, "read", "permission");
