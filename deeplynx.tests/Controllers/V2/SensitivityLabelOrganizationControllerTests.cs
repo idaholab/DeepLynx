@@ -21,6 +21,7 @@ namespace deeplynx.tests.Controllers.V2;
 public class SensitivityLabelOrganizationControllerTests : IDisposable
 {
     private readonly Mock<ISensitivityLabelBusiness> _mockSensitivityLabelBusiness;
+    private readonly Mock<IUserSensitivityLabelBusiness> _mockUserSensitivityLabelBusiness;
     private readonly Mock<ILogger<SensitivityLabelOrganizationController>> _mockLogger;
     private readonly SensitivityLabelOrganizationController _sensitivityLabelOrganizationController;
 
@@ -32,10 +33,12 @@ public class SensitivityLabelOrganizationControllerTests : IDisposable
     public SensitivityLabelOrganizationControllerTests()
     {
         _mockSensitivityLabelBusiness = new Mock<ISensitivityLabelBusiness>();
+        _mockUserSensitivityLabelBusiness = new Mock<IUserSensitivityLabelBusiness>();
         _mockLogger = new Mock<ILogger<SensitivityLabelOrganizationController>>();
 
         _sensitivityLabelOrganizationController = new SensitivityLabelOrganizationController(
             _mockSensitivityLabelBusiness.Object,
+            _mockUserSensitivityLabelBusiness.Object,
             _mockLogger.Object);
 
         UserContextStorage.UserId = UserId;

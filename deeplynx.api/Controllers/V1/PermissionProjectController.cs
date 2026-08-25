@@ -68,7 +68,6 @@ public class PermissionProjectController : ControllerBase
     }
 
 
-
     /// <summary>
     ///     Get a Permission 
     /// </summary>

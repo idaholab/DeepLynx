@@ -751,7 +751,6 @@ public class RoleBusiness : IRoleBusiness
             LastUpdatedAt = p.LastUpdatedAt,
             LastUpdatedBy = p.LastUpdatedBy,
             IsArchived = p.IsArchived,
-            LabelId = p.LabelId,
             ProjectId = p.ProjectId,
             OrganizationId = p.OrganizationId,
             IsDefault = p.IsDefault

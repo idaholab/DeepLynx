@@ -249,6 +249,7 @@ try
     builder.Services.AddTransient<IGroupBusiness, GroupBusiness>();
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
+    builder.Services.AddTransient<IUserSensitivityLabelBusiness, UserSensitivityLabelBusiness>();
     builder.Services.AddTransient<IMaintenanceBusiness, MaintenanceBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();

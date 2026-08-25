@@ -19,16 +19,20 @@ public class SensitivityLabelProjectController : ControllerBase
 {
     private readonly ILogger<SensitivityLabelProjectController> _logger;
     private readonly ISensitivityLabelBusiness _sensitivityLabelBusiness;
+    private readonly IUserSensitivityLabelBusiness _userSensitivityLabelBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="SensitivityLabelProjectController" /> class
     /// </summary>
     /// <param name="sensitivityLabelBusiness">The business logic interface for handling Sensitivity Label operations.</param>
+    /// <param name="userSensitivityLabelBusiness">The business logic interface for handling user access grants to Sensitivity Labels.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
     public SensitivityLabelProjectController(ISensitivityLabelBusiness sensitivityLabelBusiness,
+        IUserSensitivityLabelBusiness userSensitivityLabelBusiness,
         ILogger<SensitivityLabelProjectController> logger)
     {
         _sensitivityLabelBusiness = sensitivityLabelBusiness;
+        _userSensitivityLabelBusiness = userSensitivityLabelBusiness;
         _logger = logger;
     }
 
@@ -173,5 +177,113 @@ public class SensitivityLabelProjectController : ControllerBase
             var responseB = await _sensitivityLabelBusiness.UnarchiveSensitivityLabel(currentUserId, labelId, projectId,
                 organizationId);
             return Ok(responseB);
+    }
+
+
+
+    /// <summary>
+    ///     List Users with Access to a Sensitivity Label
+    /// </summary>
+    /// <param name="projectId">ID of the project to which the label belongs</param>
+    /// <param name="labelId">ID of the sensitivity label</param>
+    /// <returns>The list of users granted access to the label.</returns>
+    [HttpGet("{labelId:long}/users", Name = "api_get_sensitivity_label_project_users")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "sensitivity_label")]
+    public async Task<ActionResult<IEnumerable<UserSensitivityLabelResponseDto>>> GetUsersWithAccessToLabel(
+        long projectId,
+        long labelId)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var users = await _userSensitivityLabelBusiness.GetUsersWithAccessToLabel(labelId, organizationId, projectId);
+            return Ok(users);
+    }
+
+
+
+    /// <summary>
+    ///     Grant a User Access to a Sensitivity Label
+    /// </summary>
+    /// <param name="projectId">ID of the project to which the label belongs</param>
+    /// <param name="labelId">ID of the sensitivity label</param>
+    /// <param name="userId">ID of the user to grant access to</param>
+    /// <returns>The created access grant.</returns>
+    [HttpPost("{labelId:long}/users/{userId:long}", Name = "api_grant_sensitivity_label_project_user_access")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "sensitivity_label")]
+    public async Task<ActionResult<UserSensitivityLabelResponseDto>> GrantLabelAccess(
+        long projectId,
+        long labelId,
+        long userId)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
+            var grant = await _userSensitivityLabelBusiness.GrantLabelAccess(currentUserId, labelId, userId, organizationId, projectId);
+            return Ok(grant);
+    }
+
+
+
+    /// <summary>
+    ///     Revoke a User's Access to a Sensitivity Label
+    /// </summary>
+    /// <param name="projectId">ID of the project to which the label belongs</param>
+    /// <param name="labelId">ID of the sensitivity label</param>
+    /// <param name="userId">ID of the user to revoke access from</param>
+    /// <returns>True if the access grant was successfully revoked.</returns>
+    [HttpDelete("{labelId:long}/users/{userId:long}", Name = "api_revoke_sensitivity_label_project_user_access")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "sensitivity_label")]
+    public async Task<ActionResult<bool>> RevokeLabelAccess(
+        long projectId,
+        long labelId,
+        long userId)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var response = await _userSensitivityLabelBusiness.RevokeLabelAccess(labelId, userId, organizationId, projectId);
+            return Ok(response);
+    }
+
+
+
+    /// <summary>
+    ///     Replace the Set of Users with Access to a Sensitivity Label
+    /// </summary>
+    /// <param name="projectId">ID of the project to which the label belongs</param>
+    /// <param name="labelId">ID of the sensitivity label</param>
+    /// <param name="userIds">The complete set of user IDs that should have access after this call</param>
+    /// <returns>True if the access grants were successfully replaced.</returns>
+    [HttpPut("{labelId:long}/users", Name = "api_set_sensitivity_label_project_users")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("update", "sensitivity_label")]
+    public async Task<ActionResult<bool>> SetUsersForLabel(
+        long projectId,
+        long labelId,
+        [FromBody] long[] userIds)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var currentUserId = UserContextStorage.UserId;
+            var response = await _userSensitivityLabelBusiness.SetUsersForLabel(currentUserId, labelId, userIds, organizationId, projectId);
+            return Ok(response);
+    }
+
+
+
+    /// <summary>
+    ///     List Permissions Governed by a Sensitivity Label
+    /// </summary>
+    /// <param name="projectId">ID of the project to which the label belongs</param>
+    /// <param name="labelId">ID of the sensitivity label</param>
+    /// <returns>The list of actions governed by the label.</returns>
+    [HttpGet("{labelId:long}/permissions", Name = "api_get_sensitivity_label_project_permissions")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "sensitivity_label")]
+    public async Task<ActionResult<IEnumerable<SensitivityLabelPermissionResponseDto>>> GetPermissionsForLabel(
+        long projectId,
+        long labelId)
+    {
+            var organizationId = UserContextStorage.OrganizationId;
+            var permissions = await _userSensitivityLabelBusiness.GetPermissionsForLabel(labelId, organizationId, projectId);
+            return Ok(permissions);
     }
 }

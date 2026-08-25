@@ -172,7 +172,6 @@ public class DataSourceBusinessTests : IntegrationTestBase
         {
             Name = "read data source",
             Action = "read",
-            LabelId = lid,
             Resource = "data source",
             OrganizationId = oid,
             IsDefault = false,
