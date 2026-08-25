@@ -4562,5 +4562,134 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.NotNull(rex.Uri);
     }
 
+    [Fact]
+    public async Task QueryBuilder_RejectsSqlInjectionInFilter()
+    {
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "id = 1 OR 1=1 OR qr.id",
+            Operator = "=",
+            Value = "62"
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]));
+
+        Assert.Contains("Invalid filter field", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryBuilder_RejectsNonAllowlistedFilter()
+    {
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "Class", // not a real column - real column is "class_name"
+            Operator = "=",
+            Value = "File"
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]));
+
+        Assert.Contains("Invalid filter field", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryBuilder_AcceptsValidAllowlistedFilter()
+    {
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "name",
+            Operator = "=",
+            Value = "Captain Rex"
+        };
+
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
+
+        Assert.NotNull(result);
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public async Task QueryBuilder_AllowlistIsCaseInsensitive()
+    {
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "NAME", // uppercase - should still match "name"
+            Operator = "=",
+            Value = "Captain Rex"
+        };
+
+        var result = await _queryBusiness.QueryBuilder(uid, [dto], organizationId, [pid]);
+
+        Assert.NotNull(result);
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public async Task QueryBuilder_EmptyFilterArray_StillSucceeds()
+    {
+        // Empty filter array should bypass the per-condition validation entirely
+        // and just return records matching the base org/project scope.
+        var result = await _queryBusiness.QueryBuilder(uid, [], organizationId, [pid]);
+
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_RejectsSqlInjectionInFilter()
+    {
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(uid, pid, "read", "record"))
+            .ReturnsAsync(true);
+
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionsInProjects(uid, It.Is<long[]>(p => p.SequenceEqual(new long[] { pid })), "read", "record"))
+            .ReturnsAsync([pid]);
+
+        _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService, _projectRolePermissionServiceMock.Object);
+
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "id = 1 OR 1=1 OR qr.id",
+            Operator = "=",
+            Value = "62"
+        };
+
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _queryBusiness.QueryBuilderPaginated(uid, [dto], organizationId, [pid], paginated));
+
+        Assert.Contains("Invalid filter field", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_AcceptsValidAllowlistedFilter()
+    {
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(uid, pid, "read", "record"))
+            .ReturnsAsync(true);
+
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionsInProjects(uid, It.Is<long[]>(p => p.SequenceEqual(new long[] { pid })), "read", "record"))
+            .ReturnsAsync([pid]);
+
+        _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService, _projectRolePermissionServiceMock.Object);
+
+        var dto = new CustomQueryDtos.CustomQueryRequestDto
+        {
+            Filter = "name",
+            Operator = "=",
+            Value = "Captain Rex"
+        };
+
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var result = await _queryBusiness.QueryBuilderPaginated(uid, [dto], organizationId, [pid], paginated);
+
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+    }
     #endregion
 }
