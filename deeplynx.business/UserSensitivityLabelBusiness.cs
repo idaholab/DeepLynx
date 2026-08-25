@@ -17,26 +17,7 @@ public class UserSensitivityLabelBusiness : IUserSensitivityLabelBusiness
     {
         _context = context;
     }
-
-    private async Task<SensitivityLabel> GetScopedLabel(long labelId, long organizationId, long? projectId)
-    {
-        var query = _context.SensitivityLabels
-            .Where(l => l.Id == labelId && l.OrganizationId == organizationId);
-
-        if (projectId.HasValue)
-        {
-            query = query.Where(l => l.ProjectId == projectId || l.ProjectId == null);
-        }
-
-        var label = await query.FirstOrDefaultAsync();
-
-        if (label == null)
-            throw new KeyNotFoundException(
-                $"Sensitivity label with id {labelId} not found or does not belong to the specified organization/project context");
-
-        return label;
-    }
-
+    
     /// <summary>
     ///     List all users explicitly granted access to a given label
     /// </summary>
@@ -219,4 +200,24 @@ public class UserSensitivityLabelBusiness : IUserSensitivityLabelBusiness
             IsArchived = p.IsArchived
         });
     }
+    
+    private async Task<SensitivityLabel> GetScopedLabel(long labelId, long organizationId, long? projectId)
+    {
+        var query = _context.SensitivityLabels
+            .Where(l => l.Id == labelId && l.OrganizationId == organizationId);
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(l => l.ProjectId == projectId || l.ProjectId == null);
+        }
+
+        var label = await query.FirstOrDefaultAsync();
+
+        if (label == null)
+            throw new KeyNotFoundException(
+                $"Sensitivity label with id {labelId} not found or does not belong to the specified organization/project context");
+
+        return label;
+    }
+
 }
