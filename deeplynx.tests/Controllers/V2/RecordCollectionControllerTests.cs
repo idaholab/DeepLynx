@@ -600,6 +600,105 @@ public class RecordCollectionControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // GetSensitivityLabelsForRecordCollection Tests
+    // =========================================================================
+
+    #region GetSensitivityLabelsForRecordCollection Tests
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollection_Returns200_WithList()
+    {
+        var expected = new PaginatedResponse<SensitivityLabelResponseDto>
+        {
+            Items = new List<SensitivityLabelResponseDto> { new(), new() },
+            PageNumber = 1,
+            PageSize = 25,
+            TotalCount = 2
+        };
+
+        _mockRecordCollectionBusiness.Setup(b => b.GetSensitivityLabelsForRecordCollectionPaginated(
+            OrgId, ProjectId, CollectionId, It.IsAny<PaginatedRequestDto>()))
+                    .ReturnsAsync(expected);
+
+        var result = (await _recordCollectionController.GetSensitivityLabelsForRecordCollection(
+            OrgId, ProjectId, CollectionId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollection_Returns200_WithEmptyList()
+    {
+        _mockRecordCollectionBusiness.Setup(b => b.GetSensitivityLabelsForRecordCollectionPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<PaginatedRequestDto>()))
+                     .ReturnsAsync(new PaginatedResponse<SensitivityLabelResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        var result = (await _recordCollectionController.GetSensitivityLabelsForRecordCollection(
+            OrgId, ProjectId, CollectionId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.IsAssignableFrom<PaginatedResponse<SensitivityLabelResponseDto>>(result.Value);
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollection_Returns404_OnKeyNotFoundException()
+    {
+        _mockRecordCollectionBusiness.Setup(b => b.GetSensitivityLabelsForRecordCollectionPaginated(
+                         It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<PaginatedRequestDto>()))
+                     .ThrowsAsync(new KeyNotFoundException("record collection not found"));
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _recordCollectionController.GetSensitivityLabelsForRecordCollection(
+            OrgId, ProjectId, CollectionId));
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollection_PassesIdsAndPaginationToBusinessLayer()
+    {
+        _mockRecordCollectionBusiness.Setup(b => b.GetSensitivityLabelsForRecordCollectionPaginated(
+                         OrgId, ProjectId, CollectionId, It.IsAny<PaginatedRequestDto>()))
+                     .ReturnsAsync(new PaginatedResponse<SensitivityLabelResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 1,
+                         PageSize = 25,
+                         TotalCount = 0
+                     });
+
+        await _recordCollectionController.GetSensitivityLabelsForRecordCollection(
+            OrgId, ProjectId, CollectionId);
+
+        _mockRecordCollectionBusiness.Verify(b => b.GetSensitivityLabelsForRecordCollectionPaginated(
+            OrgId, ProjectId, CollectionId, It.IsAny<PaginatedRequestDto>()), Times.Once);
+    }
+
+    [Fact]
+    public void GetSensitivityLabelsForRecordCollection_HasHttpGetAndReadRecordCollectionAndReadSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(RecordCollectionController.GetSensitivityLabelsForRecordCollection),
+            "organizationId",
+            "projectId",
+            "recordCollectionId",
+            "paginatedRequestDto");
+
+        AssertHasHttpAttribute(method, "HttpGetAttribute");
+        AssertHasAuthAttribute(method, "read", "record_collection");
+        AssertHasAuthAttribute(method, "read", "sensitivity_label");
+        AssertHasSensitivityAttribute(method, "read record");
+    }
+
+    #endregion
+
+    // =========================================================================
     // AddRecordsToRecordCollection Tests
     // =========================================================================
 

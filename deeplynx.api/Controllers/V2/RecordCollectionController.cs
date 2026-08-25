@@ -470,18 +470,22 @@ public class RecordCollectionController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record collectionbelongs</param>
     /// <param name="recordCollectionId">The ID of the record collection</param>
-    /// <returns>A message stating the label was successfully attached to the record.</returns>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of sensitivity labels attached to the record collection.</returns>
     [HttpGet("{recordCollectionId:long}/sensitivity-labels", Name = "api_get_sensitivity_labels_for_record_collection")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record_collection")]
     [Auth("read", "sensitivity_label")]
     [Sensitivity("read record")]
-    public async Task<IActionResult> GetSensitivityLabelsForRecordCollection(
+    public async Task<ActionResult<PaginatedResponse<SensitivityLabelResponseDto>>> GetSensitivityLabelsForRecordCollection(
         long organizationId,
         long projectId,
-        long recordCollectionId)
+        long recordCollectionId,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
-            var sensitivityLabels = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollection(organizationId, projectId, recordCollectionId);
+            paginatedRequestDto ??= new PaginatedRequestDto();
+            var sensitivityLabels = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollectionPaginated(
+                organizationId, projectId, recordCollectionId, paginatedRequestDto);
             return Ok(sensitivityLabels);
     }
 
