@@ -1031,7 +1031,7 @@ public class QueryBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region Search Tests
+    #region Search (V1 / Legacy) Tests
 
     [Fact]
     public async Task Search_Success_FindsRecordByFullName()
@@ -1359,6 +1359,402 @@ public class QueryBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.Empty(records);
+    }
+
+    #endregion
+
+    #region SearchPaginated Tests
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByFullName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Captain Rex", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Captain Rex", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByPartialName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "capt", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Captain Rex", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByOriginalId()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "CT-9901", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByPartialDescription()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Omega", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Hunter", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByStringInProperties()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Sith", organizationId, [pid3], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Darth Vader", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsWithSpecialCharacters()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "CT-", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(5, result.Items.Count);
+        Assert.Equal(5, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_ReturnsEmptyForNonExistentTerm()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Wookiee", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_RestrictsResultsToSpecifiedProject()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "the", organizationId, [pid2], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.All(result.Items, r => Assert.Equal(pid2, r.ProjectId));
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByPartialTagName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Padme", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByPartialTagNameCaseInsensitive()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "padme", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByTagAcrossMultipleProjects()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Bounty", organizationId, pids, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsMultipleRecordsByJsonProperties()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "99", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByPartialOriginalId()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "CT-99", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByNumericPartialId()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "99", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByPartialDataSourceName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Yav", organizationId, pids, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByPartialProjectName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Rebel", organizationId, [pid2], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByShortPartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Bo", organizationId, [pid4], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(3, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByCaseInsensitivePartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "CAPT", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Captain Rex", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByMultipleWordPartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "grand adm", organizationId, [pid3], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Grand Admiral Thrawn", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByMiddleOfWordPartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "eck", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Wrecker", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsByUriPartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "8090", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(5, result.Items.Count);
+        Assert.Equal(5, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordByBeginningOfWordPartialMatch()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Wre", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Wrecker", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordsAcrossAllAccessibleProjects()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Captain", organizationId, pids, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsRecordUsingCrossProjectResources()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Death Star", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Tech", result.Items.First().Name);
+        Assert.Equal(pid, result.Items.First().ProjectId);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Success_FindsArchivedRecordByName()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Echo", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }, false);
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Echo", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Failure_IfEmptyString()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _queryBusiness.SearchPaginated(
+                uid, "", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }));
+
+        Assert.Contains("Search query is required", exception.Message);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Failure_IfNull()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _queryBusiness.SearchPaginated(
+                uid, null!, organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }));
+
+        Assert.Contains("Search query is required", exception.Message);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Failure_IfWhitespaceOnly()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _queryBusiness.SearchPaginated(
+                uid, "     ", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }));
+
+        Assert.Contains("Search query is required", exception.Message);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_ReturnsEmpty_IfRecordArchived()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Chewbacca", organizationId, [pid2], new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }, true);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_Paginates_Correctly()
+    {
+        // Act - two-page split, page size 2, over the 4 records matching "Padme" tag
+        var page1 = await _queryBusiness.SearchPaginated(
+            uid, "Padme", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = 2 });
+        var page2 = await _queryBusiness.SearchPaginated(
+            uid, "Padme", organizationId, [pid], new PaginatedRequestDto { PageNumber = 2, PageSize = 2 });
+
+        // Assert
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Equal(4, page1.TotalCount);
+        Assert.Equal(4, page2.TotalCount);
+
+        var page1Ids = page1.Items.Select(r => r.Id).ToHashSet();
+        var page2Ids = page2.Items.Select(r => r.Id).ToHashSet();
+        Assert.Empty(page1Ids.Intersect(page2Ids));
+    }
+
+    [Fact]
+    public async Task SearchPaginated_NoMatches_ReturnsEmptyPaginatedResponse()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Wookiee", organizationId, [pid], new PaginatedRequestDto { PageNumber = 1, PageSize = 25 });
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(25, result.PageSize);
+    }
+
+    [Fact]
+    public async Task SearchPaginated_PageSizeNegativeOne_ReturnsAll_IgnoringPageNumber()
+    {
+        // Act
+        var result = await _queryBusiness.SearchPaginated(
+            uid, "Padme", organizationId, [pid], new PaginatedRequestDto { PageNumber = 5, PageSize = -1 });
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.Items.Count, result.PageSize);
     }
 
     #endregion

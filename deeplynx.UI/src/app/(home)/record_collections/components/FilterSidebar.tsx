@@ -4,6 +4,9 @@ import { useLanguage } from "@/app/contexts/Language";
 import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 import { FacetOption } from "./recordCollections.types";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import { useEffect } from "react";
+import PaginationControls from "../../components/PaginationControls";
 
 type Props = {
   selectedSensitivityFilters: number[];
@@ -35,6 +38,23 @@ export default function FilterSidebar({
   onClearFacetFilters,
 }: Props) {
   const { t } = useLanguage();
+
+  const {
+    currentPage: tagPage,
+    pageSize: tagPageSize,
+    paginatedItems: paginatedTags,
+    resetPagination: resetTagPagination,
+    setCurrentPage: setTagPage,
+    setPageSize: setTagPageSize,
+    totalPages: tagTotalPages,
+  } = useLocalPagination({
+    items: filteredTagFacetOptions,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+      resetTagPagination();
+    }, [filteredTagFacetOptions, resetTagPagination]);
 
   return (
     <aside>
@@ -124,7 +144,7 @@ export default function FilterSidebar({
               />
               <div className="max-h-64 space-y-2 overflow-auto pr-1">
                 {filteredTagFacetOptions.length ? (
-                  filteredTagFacetOptions.map((option) => (
+                  paginatedTags.map((option) => (
                     <label
                       key={option.id ?? option.label}
                       className="flex cursor-pointer items-center justify-between gap-3 text-sm"
@@ -155,6 +175,17 @@ export default function FilterSidebar({
                     {t.translations.NO_TAGS_MATCH_SEARCH}
                   </p>
                 )}
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="mt-2 flex justify-end">
+                <PaginationControls
+                  currentPage={tagPage}
+                  pageSize={tagPageSize}
+                  totalPages={tagTotalPages}
+                  onPageChange={setTagPage}
+                  onPageSizeChange={setTagPageSize}
+                />
               </div>
             </div>
           </div>
