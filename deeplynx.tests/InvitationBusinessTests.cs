@@ -38,7 +38,6 @@ public class InvitationBusinessTests : IntegrationTestBase
     private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private UserBusiness _userBusiness = null!;
     private Mock<ILogger<InvitationBusiness>> _mockInvitationLogger = null!;
-    private Mock<IOrganizationService> _mockOrganizationService = null!;
     public long gid; // group ID
 
     public long oid; // organization ID
@@ -87,13 +86,11 @@ public class InvitationBusinessTests : IntegrationTestBase
             _mockAdminService.Object);
 
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
-        _mockOrganizationService = new Mock<IOrganizationService>();
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness,
-            _mockOrganizationService.Object, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
 
         _invitationBusiness = new InvitationBusiness(
             Context,

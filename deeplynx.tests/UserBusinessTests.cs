@@ -2148,15 +2148,15 @@ public class UserBusinessTests : IntegrationTestBase
             CacheKeys.SysAdmin(user.Id),
             CacheKeys.OrgAdmin(user.Id, oid),
             CacheKeys.OrgMember(user.Id, oid),
-            CacheKeys.ProjectAdmin(user.Id, oid, pid),
-            CacheKeys.ProjectAdmin(user.Id, oid, pid2)
+            CacheKeys.ProjectAdmin(user.Id, pid),
+            CacheKeys.ProjectAdmin(user.Id, pid2)
         };
         var otherUserCacheKeys = new[]
         {
             CacheKeys.SysAdmin(otherUser.Id),
             CacheKeys.OrgAdmin(otherUser.Id, oid),
             CacheKeys.OrgMember(otherUser.Id, oid),
-            CacheKeys.ProjectAdmin(otherUser.Id, oid, pid)
+            CacheKeys.ProjectAdmin(otherUser.Id, pid)
         };
 
         foreach (var key in userCacheKeys.Concat(otherUserCacheKeys))

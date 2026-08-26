@@ -65,7 +65,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
     private OlapBusiness _olapBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
-    private Mock<IOrganizationService> _mockOrganizationService = null!;
     private long cid; // class ID
     private long did; // datasource ID
     private long os1;
@@ -119,7 +118,6 @@ public class ProjectBusinessTests : IntegrationTestBase
         _mockEdgeBusiness = new Mock<IEdgeBusiness>();
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
-        _mockOrganizationService = new Mock<IOrganizationService>();
 
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
         _userBusiness = new UserBusiness(Context);
@@ -142,8 +140,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
-            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness,
-            _mockOrganizationService.Object, _fileAzureBusiness, _fileBusinessFactory.Object);
+            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _fileAzureBusiness, _fileBusinessFactory.Object);
 
         _relationshipBusiness = new Mock<IRelationshipBusiness>();
 
@@ -1570,13 +1567,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     public async Task AddProjectAdminUser_InvalidatesProjectAdminCache()
     {
         // Arrange
-        _mockOrganizationService
-            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
-                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { pid3 })),
-                null))
-            .ReturnsAsync(oid);
-
-        var cacheKey = CacheKeys.ProjectAdmin(uid, oid, pid3);
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid3);
         await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
 
         // Act
@@ -1596,12 +1587,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     public async Task AddMemberToProject_ForGroup_InvalidatesEveryGroupUsersCache()
     {
         // Arrange
-        _mockOrganizationService
-            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
-                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { pid3 })),
-                null))
-            .ReturnsAsync(oid);
-
         var group = await Context.Groups
             .Include(g => g.Users)
             .SingleAsync(g => g.Id == gid);
@@ -1612,9 +1597,9 @@ public class ProjectBusinessTests : IntegrationTestBase
         group.Users.Add(secondUser);
         await Context.SaveChangesAsync();
 
-        var firstKey = CacheKeys.ProjectAdmin(uid, oid, pid3);
-        var secondKey = CacheKeys.ProjectAdmin(uid3, oid, pid3);
-        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, oid, pid3);
+        var firstKey = CacheKeys.ProjectAdmin(uid, pid3);
+        var secondKey = CacheKeys.ProjectAdmin(uid3, pid3);
+        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid3);
 
         await CacheService.Instance.SetAsync(firstKey, false, TimeSpan.FromMinutes(2));
         await CacheService.Instance.SetAsync(secondKey, false, TimeSpan.FromMinutes(2));
@@ -1777,13 +1762,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     public async Task UpdateProjectMemberRole_WithAdminStatus_InvalidatesProjectAdminCache()
     {
         // Arrange
-        _mockOrganizationService
-            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
-                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { pid })),
-                null))
-            .ReturnsAsync(oid);
-
-        var cacheKey = CacheKeys.ProjectAdmin(uid, oid, pid);
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
         await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
 
         // Act
@@ -1803,7 +1782,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     public async Task UpdateProjectMemberRole_WithoutAdminStatus_DoesNotInvalidateProjectAdminCache()
     {
         // Arrange
-        var cacheKey = CacheKeys.ProjectAdmin(uid, oid, pid);
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
         await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
 
         // Act
@@ -1973,13 +1952,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     public async Task SetProjectAdminStatus_ForUser_InvalidatesProjectAdminCache()
     {
         // Arrange
-        _mockOrganizationService
-            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
-                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { pid })),
-                null))
-            .ReturnsAsync(oid);
-
-        var cacheKey = CacheKeys.ProjectAdmin(uid, oid, pid);
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
         await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
 
         // Act
@@ -1994,12 +1967,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     public async Task SetProjectAdminStatus_ForGroup_InvalidatesEveryGroupUsersCache()
     {
         // Arrange
-        _mockOrganizationService
-            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
-                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { pid5 })),
-                null))
-            .ReturnsAsync(oid);
-
         var group = await Context.Groups
             .Include(g => g.Users)
             .SingleAsync(g => g.Id == gid);
@@ -2010,9 +1977,9 @@ public class ProjectBusinessTests : IntegrationTestBase
         group.Users.Add(secondUser);
         await Context.SaveChangesAsync();
 
-        var firstKey = CacheKeys.ProjectAdmin(uid, oid, pid5);
-        var secondKey = CacheKeys.ProjectAdmin(uid3, oid, pid5);
-        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, oid, pid5);
+        var firstKey = CacheKeys.ProjectAdmin(uid, pid5);
+        var secondKey = CacheKeys.ProjectAdmin(uid3, pid5);
+        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid5);
 
         await CacheService.Instance.SetAsync(firstKey, false, TimeSpan.FromMinutes(2));
         await CacheService.Instance.SetAsync(secondKey, false, TimeSpan.FromMinutes(2));
@@ -2038,13 +2005,7 @@ public class ProjectBusinessTests : IntegrationTestBase
     public async Task RemoveMemberFromProject_InvalidatesProjectAdminCache()
     {
         // Arrange
-        _mockOrganizationService
-            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
-                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { pid })),
-                null))
-            .ReturnsAsync(oid);
-
-        var cacheKey = CacheKeys.ProjectAdmin(uid, oid, pid);
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
         await CacheService.Instance.SetAsync(cacheKey, true, TimeSpan.FromMinutes(2));
 
         // Act
@@ -2059,12 +2020,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     public async Task RemoveMemberFromProject_ForGroup_InvalidatesEveryGroupUsersCache()
     {
         // Arrange - pid5's ProjectMember row already grants access via GroupId = gid (see SeedTestDataAsync)
-        _mockOrganizationService
-            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
-                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { pid5 })),
-                null))
-            .ReturnsAsync(oid);
-
         var group = await Context.Groups
             .Include(g => g.Users)
             .SingleAsync(g => g.Id == gid);
@@ -2075,9 +2030,9 @@ public class ProjectBusinessTests : IntegrationTestBase
         group.Users.Add(secondUser);
         await Context.SaveChangesAsync();
 
-        var firstKey = CacheKeys.ProjectAdmin(uid, oid, pid5);
-        var secondKey = CacheKeys.ProjectAdmin(uid3, oid, pid5);
-        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, oid, pid5);
+        var firstKey = CacheKeys.ProjectAdmin(uid, pid5);
+        var secondKey = CacheKeys.ProjectAdmin(uid3, pid5);
+        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid5);
 
         await CacheService.Instance.SetAsync(firstKey, true, TimeSpan.FromMinutes(2));
         await CacheService.Instance.SetAsync(secondKey, true, TimeSpan.FromMinutes(2));

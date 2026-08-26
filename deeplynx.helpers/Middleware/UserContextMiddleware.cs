@@ -191,7 +191,7 @@ public class UserContextMiddleware
 
         foreach (var projectId in projectIds)
         {
-            var cacheKey = CacheKeys.ProjectAdmin(userId, organizationId, projectId);
+            var cacheKey = CacheKeys.ProjectAdmin(userId, projectId);
             var cached = await CacheService.Instance.GetAsync<bool?>(cacheKey);
 
             bool isAdmin;

@@ -37,7 +37,6 @@ public class ProjectBusiness : IProjectBusiness
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly INotificationBusiness _notificationBusiness;
     private readonly IOrganizationBusiness _organizationBusiness;
-    private readonly IOrganizationService _organizationService;
     private readonly IRoleBusiness _roleBusiness;
     private readonly TimeSpan cacheTTL = TimeSpan.FromHours(1);
     private readonly string ProjectsCacheKey = "projects";
@@ -51,7 +50,6 @@ public class ProjectBusiness : IProjectBusiness
     /// <param name="dataSourceBusiness">Used to create a default datasource on project creation.</param>
     /// <param name="notificationBusiness">The business logic interface for handling notification operations.</param>
     /// <param name="organizationBusiness">The business logic interface for handling organization operations.</param>
-    /// <param name="organizationService">Used for handling organization services.</param>
     /// <param name="eventBusiness">Used for logging events during create and update Operations.</param>
     /// <param name="logger">Used for uniformity in logging</param>
     /// <param name="objectStorageBusiness">Used to create a default object storage upon project creation.</param>
@@ -61,7 +59,7 @@ public class ProjectBusiness : IProjectBusiness
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
         IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness,
-        IOrganizationService organizationService, IFileBusiness fileAzureBusiness,
+        IFileBusiness fileAzureBusiness,
         IFileBusinessFactory fileBusinessFactory)
     {
         _context = context;
@@ -73,7 +71,6 @@ public class ProjectBusiness : IProjectBusiness
         _objectStorageBusiness = objectStorageBusiness;
         _eventBusiness = eventBusiness;
         _organizationBusiness = organizationBusiness;
-        _organizationService = organizationService;
         _fileAzureBusiness = fileAzureBusiness;
         _fileBusinessFactory = fileBusinessFactory;
     }
@@ -1516,13 +1513,11 @@ public class ProjectBusiness : IProjectBusiness
     /// </summary>
     private async Task InvalidateProjectAdminCache(long projectId, long? userId, long? groupId)
     {
-        long organizationId = await _organizationService.ResolveOrganizationIdFromProjectsAsync([projectId], null);
-
         if (userId.HasValue)
         {
             try
             {
-                await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, organizationId, projectId));
+                await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, projectId));
             }
             catch (Exception ex)
             {
@@ -1540,7 +1535,7 @@ public class ProjectBusiness : IProjectBusiness
             {
                 try
                 {
-                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, organizationId, projectId));
+                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, projectId));
                 }
                 catch (Exception ex)
                 {

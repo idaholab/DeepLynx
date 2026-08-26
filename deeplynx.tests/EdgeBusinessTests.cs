@@ -37,7 +37,6 @@ public class EdgeBusinessTests : IntegrationTestBase
     private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
     private Mock<IAdminService> _mockAdminService = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
-    private Mock<IOrganizationService> _mockOrganizationService = null!;
     public long destinationRecordId;
     public long destinationRecordId2;
     public long destinationRecordId3;
@@ -84,13 +83,11 @@ public class EdgeBusinessTests : IntegrationTestBase
             _mockRelationshipBusiness.Object, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
 
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
-        _mockOrganizationService = new Mock<IOrganizationService>();
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness,
-            _mockOrganizationService.Object, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()

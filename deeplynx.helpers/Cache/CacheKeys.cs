@@ -21,8 +21,8 @@ public class CacheKeys
         return $"orgmember:{userId}:{organizationId}";
     }
     
-    public static string ProjectAdmin(long userId, long organizationId, long projectId)
+    public static string ProjectAdmin(long userId, long projectId)
     {
-        return $"projectadmin:{userId}:{organizationId}:{projectId}";
+        return $"projectadmin:{userId}:{projectId}";
     }
 }
