@@ -2,6 +2,8 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Record = deeplynx.datalayer.Models.Record;
+using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.tests;
 
@@ -2496,6 +2498,280 @@ public class UserBusinessTests : IntegrationTestBase
         var updatedAuthorizer = await Context.Users.FindAsync(authorizer.Id);
         Assert.NotNull(updatedAuthorizer);
         Assert.True(updatedAuthorizer.IsSysAdmin);
+    }
+
+    #endregion
+
+    #region UserExists Cache Tests
+
+    // These tests cover two distinct behaviors:
+    //   1. Cache miss -> falls through to the DB and populates the cache with the correct value.
+    //   2. Cache hit  -> returns the cached value WITHOUT touching the DB (proven by poisoning the
+    //      cache with a value the DB would never return, then asserting that poisoned value wins).
+    // Model under test:
+    //   - One cache entry per user: CacheKeys.UserArchivedStatus(userId) -> bool (isArchived).
+    //     hideArchived is a filter applied to the cached/DB value at call time, NOT part of the key.
+    //   - Existing users (archived or not) are cached with NO TTL - only explicit mutations change them.
+    //   - Non-existent users are NEVER cached - every call for a missing id re-queries the DB.
+    //   - Deleted users are the one exception: CacheKeys.UserDeleted(userId) is set to true with a
+    //     short TTL immediately after delete, and the old UserArchivedStatus entry is cleared so it
+    //     can't outlive the short TTL and mislead a later read.
+    //   - CreateUser / CreateTestAccount populate the archived-status cache immediately (as not
+    //     archived), rather than leaving the first read to populate it.
+    //   - ArchiveUser / UnarchiveUser update the archived-status cache directly to the new value.
+    //   - UpdateUser only touches the cache if the update actually changes IsArchived.
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_CacheMiss_FallsBackToDatabase_AndSucceeds()
+    {
+        // Arrange - uid1 exists in the DB; nothing has populated the cache for it yet
+        var cacheKey = CacheKeys.UserArchivedStatus(uid1);
+        var precheck = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+        Assert.Null(precheck);
+
+        // Act & Assert - falls through to DB, finds the user (not archived), does not throw
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_CacheMiss_FallsBackToDatabase_AndThrowsForMissingUser()
+    {
+        // Arrange - uid3 was hard-deleted in seed data; nothing cached for it (and never will be)
+        var cacheKey = CacheKeys.UserArchivedStatus(uid3);
+        var precheck = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+        Assert.Null(precheck);
+
+        // Act & Assert - falls through to DB, finds nothing, throws
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid3, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_CacheMiss_PopulatesCache_WithCorrectArchivedStatus()
+    {
+        // Arrange - confirm nothing cached yet for uid1 (not archived) and uid2 (archived)
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1)));
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid2)));
+
+        // Act - first calls are cache misses; hideArchived:false so the archived uid2 doesn't throw
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: false);
+
+        // Assert - cache now holds the correct DB-backed archived flag for each
+        var cachedUid1 = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        var cachedUid2 = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid2));
+        Assert.NotNull(cachedUid1);
+        Assert.False(cachedUid1.Value); // uid1 is not archived
+        Assert.NotNull(cachedUid2);
+        Assert.True(cachedUid2.Value); // uid2 is archived
+    }
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_NonExistentUser_IsNeverCached()
+    {
+        // Arrange/Act - call for a missing user twice
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid3, hideArchived: true));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid3, hideArchived: true));
+
+        // Assert - still nothing cached for this id, proving negative results are never written
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid3));
+        Assert.Null(cached);
+    }
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_CacheHit_ReturnsCachedArchivedStatus_WithoutQueryingDatabase()
+    {
+        // Arrange - uid1 is genuinely NOT archived in the DB. Poison the cache with "true" (archived),
+        // a value the DB would never produce for uid1. If the method reads from cache, hideArchived:true
+        // will (incorrectly, by design of this test) throw; if it ignores the cache and hits the DB, it
+        // will not throw.
+        await CacheService.Instance.SetAsync(CacheKeys.UserArchivedStatus(uid1), true, (TimeSpan?)null);
+
+        // Act & Assert - the poisoned cached value wins, proving the DB was not consulted
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true));
+
+        // hideArchived:false should still succeed even with the (wrongly) cached archived=true,
+        // confirming hideArchived is applied as a post-cache-read filter, not baked into the cache key
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_HideArchivedFilter_AppliesToSingleCachedEntry()
+    {
+        // Arrange - uid2 is archived in the DB; prime the cache once via a hideArchived:false call
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: false);
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid2));
+        Assert.NotNull(cached);
+        Assert.True(cached.Value);
+
+        // Act & Assert - the SAME cache entry now correctly serves both filter variants without
+        // re-querying the DB or requiring a second cache key
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: false); // should not throw
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: true)); // archived users excluded
+    }
+
+    [Fact]
+    public async Task CreateUser_PopulatesArchivedStatusCache_Immediately()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Cache Test User",
+            Email = "cachetest@test.com",
+            Username = "cachetest"
+        };
+
+        // Act
+        var created = await _userBusiness.CreateUser(dto);
+
+        // Assert - cache is already populated with "not archived", without needing a read first
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(created.Id));
+        Assert.NotNull(cached);
+        Assert.False(cached.Value);
+
+        // And a subsequent existence check should not need to touch the DB to succeed
+        await ExistenceHelper.EnsureUserExistsAsync(Context, created.Id, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task CreateTestAccount_PopulatesArchivedStatusCache_Immediately()
+    {
+        // Act
+        var created = await _userBusiness.CreateTestAccount("Cache Test Account");
+
+        // Assert
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(created.Id));
+        Assert.NotNull(cached);
+        Assert.False(cached.Value);
+    }
+
+    [Fact]
+    public async Task DeleteUser_SetsShortTtlDeletedMarker_AndClearsArchivedStatusCache()
+    {
+        // Arrange - prime the archived-status cache for uid1 (not archived) before deleting
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true);
+        var primedCache = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(primedCache);
+
+        // Act
+        await _userBusiness.DeleteUser(uid1);
+
+        // Assert - the old no-TTL archived-status entry is gone
+        var staleCache = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.Null(staleCache);
+
+        // Assert - the short-TTL deleted marker is set
+        var deletedMarker = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserDeleted(uid1));
+        Assert.NotNull(deletedMarker);
+        Assert.True(deletedMarker.Value);
+
+        // Assert - existence check now correctly throws, served by the deleted marker rather than the DB
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task ArchiveUser_UpdatesArchivedStatusCache_ToTrue_WithoutClearingIt()
+    {
+        // Arrange - prime the cache with "not archived" (the correct pre-archive state)
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+        var before = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(before);
+        Assert.False(before.Value);
+
+        // Act
+        await _userBusiness.ArchiveUser(uid1);
+
+        // Assert - cache entry still exists (not cleared) but now reflects archived=true directly,
+        // without requiring a DB round-trip to repopulate it
+        var after = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(after);
+        Assert.True(after.Value);
+
+        // hideArchived:true now correctly excludes the archived user; hideArchived:false still finds them
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true));
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UnarchiveUser_UpdatesArchivedStatusCache_ToFalse_WithoutClearingIt()
+    {
+        // Arrange - uid2 starts archived; prime the cache with that correct state
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: false);
+        var before = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid2));
+        Assert.NotNull(before);
+        Assert.True(before.Value);
+
+        // Act
+        await _userBusiness.UnarchiveUser(uid2);
+
+        // Assert - cache entry still exists but now reflects archived=false directly
+        var after = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid2));
+        Assert.NotNull(after);
+        Assert.False(after.Value);
+
+        // Both filter variants now succeed since the user is no longer archived
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: true);
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UpdateUser_UpdatesArchivedStatusCache_WhenArchivingViaDto()
+    {
+        // Arrange - prime the cache with "not archived" for uid1
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+        var before = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(before);
+        Assert.False(before.Value);
+
+        var dto = new UpdateUserRequestDto
+        {
+            IsArchived = true
+        };
+
+        // Act
+        await _userBusiness.UpdateUser(uid1, dto);
+
+        // Assert - cache was updated to reflect the new archived status
+        var after = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(after);
+        Assert.True(after.Value);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true));
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UpdateUser_DoesNotTouchArchivedStatusCache_WhenArchivedFlagUnchanged()
+    {
+        // Arrange - prime the cache with "not archived" for uid1
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+
+        // Poison the cache afterward with an impossible value; if UpdateUser writes to the cache
+        // unconditionally, this poisoned value will be overwritten even though IsArchived didn't change
+        // in the dto. If UpdateUser correctly skips the cache write, the poisoned value survives.
+        await CacheService.Instance.SetAsync(CacheKeys.UserArchivedStatus(uid1), true, (TimeSpan?)null);
+
+        var dto = new UpdateUserRequestDto
+        {
+            Name = "Name Only Update"
+            // IsArchived intentionally omitted - should not change archived status
+        };
+
+        // Act
+        await _userBusiness.UpdateUser(uid1, dto);
+
+        // Assert - the poisoned value is untouched, proving UpdateUser did not write to the cache
+        // when the archived flag didn't change
+        var stillPoisoned = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(stillPoisoned);
+        Assert.True(stillPoisoned.Value);
     }
 
     #endregion

@@ -33,7 +33,11 @@ public class PermissionBusiness : IPermissionBusiness
     /// <summary>
     ///     List all permissions
     /// </summary>
-    /// <param name="labelId">(Optional)ID of a sensitivity label to filter by</param>
+    /// <param name="labelId">
+    ///     (Optional, v1-only) ID of a sensitivity label to filter by. Sourced from
+    ///     <see cref="deeplynx.datalayer.Models.SensitivityLabelPermission" /> rather than the
+    ///     <see cref="deeplynx.datalayer.Models.Permission" /> table, which no longer carries label data.
+    /// </param>
     /// <param name="projectId">(Optional)ID of a project to filter by</param>
     /// <param name="organizationId">(Optional)ID of an organization to filter by</param>
     /// <param name="hideArchived">Flag indicating whether to search on archived permissions</param>
@@ -42,13 +46,38 @@ public class PermissionBusiness : IPermissionBusiness
         long? labelId, long? projectId, long? organizationId,
         bool hideArchived = true)
     {
+        if (labelId.HasValue)
+        {
+            var labelPermissionQuery = _context.SensitivityLabelPermissions.Where(p =>
+                p.LabelId == labelId.Value &&
+                p.Label.OrganizationId == organizationId &&
+                (!projectId.HasValue || p.Label.ProjectId == projectId || p.Label.ProjectId == null));
+
+            if (hideArchived)
+                labelPermissionQuery = labelPermissionQuery.Where(p => !p.IsArchived);
+
+            return await labelPermissionQuery.Select(p => new PermissionResponseDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Description = p.Description,
+                Action = p.Action,
+                LastUpdatedAt = p.LastUpdatedAt,
+                LastUpdatedBy = p.LastUpdatedBy,
+                IsArchived = p.IsArchived,
+                ProjectId = p.Label.ProjectId,
+                OrganizationId = p.Label.OrganizationId,
+                IsDefault = false
+            })
+                .ToListAsync();
+        }
+
         // Always returns default permissions alongside those from the supplied org ID or project ID
         // This allows the user to see all permissions available for use in the given context (defaults being global)
         var permissionQuery = _context.Permissions.Where(p =>
             p.IsDefault || (!p.IsDefault &&
             (!projectId.HasValue || p.ProjectId == projectId || p.ProjectId == null) &&
-            p.OrganizationId == organizationId &&
-            (!labelId.HasValue || p.LabelId == labelId)));
+            p.OrganizationId == organizationId));
 
         if (hideArchived)
             permissionQuery = permissionQuery.Where(p => !p.IsArchived);
@@ -63,7 +92,6 @@ public class PermissionBusiness : IPermissionBusiness
             LastUpdatedAt = p.LastUpdatedAt,
             LastUpdatedBy = p.LastUpdatedBy,
             IsArchived = p.IsArchived,
-            LabelId = p.LabelId,
             ProjectId = p.ProjectId,
             OrganizationId = p.OrganizationId,
             IsDefault = p.IsDefault
@@ -104,7 +132,6 @@ public class PermissionBusiness : IPermissionBusiness
             LastUpdatedAt = permission.LastUpdatedAt,
             LastUpdatedBy = permission.LastUpdatedBy,
             IsArchived = permission.IsArchived,
-            LabelId = permission.LabelId,
             ProjectId = permission.ProjectId,
             OrganizationId = permission.OrganizationId,
             IsDefault = permission.IsDefault
@@ -127,15 +154,12 @@ public class PermissionBusiness : IPermissionBusiness
     {
         ValidationHelper.ValidateModel(dto);
 
-        // Note that the CreatePermission dto only allows for the creation of permissions
-        // using labelId. Any Default permissions such as "write projects" should not
-        // be manipulated by users.
+        // Any Default permissions such as "write projects" should not be manipulated by users.
         var permission = new Permission
         {
             Name = dto.Name,
             Description = dto.Description,
             Action = dto.Action,
-            LabelId = dto.LabelId,
             IsDefault = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = currentUserId,
@@ -171,7 +195,6 @@ public class PermissionBusiness : IPermissionBusiness
             LastUpdatedAt = permission.LastUpdatedAt,
             LastUpdatedBy = permission.LastUpdatedBy,
             IsArchived = permission.IsArchived,
-            LabelId = permission.LabelId,
             ProjectId = permission.ProjectId,
             OrganizationId = permission.OrganizationId,
             IsDefault = permission.IsDefault
@@ -206,7 +229,6 @@ public class PermissionBusiness : IPermissionBusiness
 
         permission.Name = dto.Name ?? permission.Name;
         permission.Description = dto.Description ?? permission.Description;
-        permission.LabelId = dto.LabelId ?? permission.LabelId;
         permission.Action = dto.Action ?? permission.Action;
         permission.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         permission.LastUpdatedBy = currentUserId;
@@ -238,7 +260,6 @@ public class PermissionBusiness : IPermissionBusiness
             LastUpdatedAt = permission.LastUpdatedAt,
             LastUpdatedBy = permission.LastUpdatedBy,
             IsArchived = permission.IsArchived,
-            LabelId = permission.LabelId,
             ProjectId = permission.ProjectId,
             OrganizationId = permission.OrganizationId,
             IsDefault = permission.IsDefault

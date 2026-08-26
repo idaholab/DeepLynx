@@ -21,4 +21,14 @@ public class CacheKeys
     {
         return $"system:data_source_count:hide_archived:{hideArchived}";
     }
+
+    public static string UserArchivedStatus(long userId)
+    {
+        return $"user:{userId}:archived_status";
+    }
+
+    public static string UserDeleted(long userId)
+    {
+        return $"user:{userId}:deleted";
+    }
 }
