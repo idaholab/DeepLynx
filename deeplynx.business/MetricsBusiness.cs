@@ -326,16 +326,6 @@ public class MetricsBusiness : IMetricsBusiness
         return await fileQuery.CountAsync();
     }
 
-    private async Task<long> BuildProjectStorageSizeFromDb(long projectId)
-    {
-        return await _context.Records
-            .Where(r =>
-                r.ProjectId == projectId &&
-                !r.IsArchived &&
-                r.FileSize != null)
-            .SumAsync(r => r.FileSize ?? 0);
-    }
-
     private async Task<long> GetProjectStorageSizeBytes(long projectId)
     {
         var cacheKey = CacheKeys.ProjectStorageSize(projectId);
@@ -346,7 +336,12 @@ public class MetricsBusiness : IMetricsBusiness
             return cachedSize.Value;
         }
         
-        var totalSize = await BuildProjectStorageSizeFromDb(projectId);
+        var totalSize = await _context.Records
+            .Where(r =>
+                r.ProjectId == projectId &&
+                !r.IsArchived &&
+                r.FileSize != null)
+            .SumAsync(r => r.FileSize ?? 0);
         
         await CacheService.Instance.SetAsync(cacheKey, totalSize, _storageSizeCacheTtl);
 
