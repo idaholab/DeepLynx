@@ -16,4 +16,14 @@ public class CacheKeys
     {
         return $"user:{userId}:deleted";
     }
+
+    public static string OrganizationArchivedStatus(long organizationId)
+    {
+        return $"organization:{organizationId}:archived_status";
+    }
+
+    public static string OrganizationDeleted(long organizationId)
+    {
+        return $"organization:{organizationId}:deleted";
+    }
 }
