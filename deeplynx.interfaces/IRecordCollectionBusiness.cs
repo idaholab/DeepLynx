@@ -12,7 +12,7 @@ public interface IRecordCollectionBusiness
         long currentUserId, long organizationId, long projectId, RecordCollectionQueryRequestDto dto,
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
-    Task<PaginatedResponse<RecordCollectionResponseDto>> GetAllRecordCollectionsPaginated(
+    Task<PaginatedResponse<RecordCollectionResponseDtoV2>> GetAllRecordCollectionsPaginated(
         long currentUserId, long organizationId, long projectId,
         string? search, long[]? sensitivityLabelIds, long[]? tagIds, string? sort,
         PaginatedRequestDto paginatedRequestDto,
@@ -23,7 +23,7 @@ public interface IRecordCollectionBusiness
     Task<List<RecordResponseDto>> GetRecordsInRecordCollection(
         long currentUserId, long organizationId, long projectId, long recordCollectionId, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
-    Task<PaginatedResponse<RecordResponseDto>> GetRecordsInRecordCollectionPaginated(
+    Task<PaginatedResponse<RecordResponseDtoV2>> GetRecordsInRecordCollectionPaginated(
         long currentUserId,
         long organizationId,
         long projectId,
@@ -40,7 +40,7 @@ public interface IRecordCollectionBusiness
         long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived,
         RecordCollectionQueryRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
-    Task<PaginatedResponse<RecordCollectionResponseDto>> GetRecordCollectionsForRecordPaginated(
+    Task<PaginatedResponse<RecordCollectionResponseDtoV2>> GetRecordCollectionsForRecordPaginated(
         long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived,
         PaginatedRequestDto paginatedRequestDto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
@@ -50,7 +50,7 @@ public interface IRecordCollectionBusiness
         long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
-    Task<PaginatedResponse<RecordCollectionResponseDto>> GetRecordCollectionsByTagsPaginated(
+    Task<PaginatedResponse<RecordCollectionResponseDtoV2>> GetRecordCollectionsByTagsPaginated(
         long currentUserId, long organizationId, long projectId, long[] tagIds, PaginatedRequestDto paginatedRequestDto,
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
@@ -65,7 +65,13 @@ public interface IRecordCollectionBusiness
     Task<RecordCollectionResponseDto> CreateRecordCollection(
         long currentUserId, long organizationId, long projectId, List<long>? sensitivityLabelIds, CreateRecordCollectionRequestDto dto);
 
+    Task<RecordCollectionResponseDtoV2> CreateRecordCollectionV2(
+        long currentUserId, long organizationId, long projectId, List<long>? sensitivityLabelIds, CreateRecordCollectionRequestDto dto);
+
     Task<RecordCollectionResponseDto> UpdateRecordCollection(
+        long currentUserId, long organizationId, long projectId, long recordCollectionId, UpdateRecordCollectionRequestDto dto);
+
+    Task<RecordCollectionResponseDtoV2> UpdateRecordCollectionV2(
         long currentUserId, long organizationId, long projectId, long recordCollectionId, UpdateRecordCollectionRequestDto dto);
 
     Task<bool> DeleteRecordCollection(

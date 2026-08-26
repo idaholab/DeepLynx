@@ -8,7 +8,16 @@ public interface IRecordBusiness
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived, string? fileType,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false);
 
+    Task<List<RecordResponseDtoV2>> GetAllRecordsV2(
+        long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived, string? fileType,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false);
+
     Task<PaginatedResponse<RecordResponseDto>> GetAllRecordsPaginated(
+        long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived, string? fileType,
+        PaginatedRequestDto paginated, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false,
+        bool isInsightEligible = false);
+
+    Task<PaginatedResponse<RecordResponseDtoV2>> GetAllRecordsPaginatedV2(
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived, string? fileType,
         PaginatedRequestDto paginated, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false,
         bool isInsightEligible = false);
@@ -17,7 +26,15 @@ public interface IRecordBusiness
         long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search, PaginatedRequestDto paginated,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
+    Task<PaginatedResponse<RecordResponseDtoV2>> SearchPaginatedV2(
+        long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search, PaginatedRequestDto paginated,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+
     Task<List<RecordResponseDto>> Search(
+        long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+
+    Task<List<RecordResponseDtoV2>> SearchV2(
         long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
@@ -26,12 +43,16 @@ public interface IRecordBusiness
     Task<List<RecordResponseDto>> GetRecordsByTags(
         long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
-    
-    Task<PaginatedResponse<RecordResponseDto>> GetRecordsByTagsPaginated(
+
+    Task<PaginatedResponse<RecordResponseDtoV2>> GetRecordsByTagsPaginated(
         long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived, PaginatedRequestDto paginatedRequestDto,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<RecordResponseDto> GetRecord(
+        long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false,
+        bool isProjectAdmin = false);
+
+    Task<RecordResponseDtoV2> GetRecordV2(
         long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false,
         bool isProjectAdmin = false);
 
@@ -43,7 +64,16 @@ public interface IRecordBusiness
         List<long>? sensitivityLabelIds = null, bool embedded = false, bool isSysAdmin = false, bool isOrgAdmin = false,
         bool isProjectAdmin = false);
 
+    Task<RecordResponseDtoV2> CreateRecordV2(
+        long currentUserId, long organizationId, long projectId, long dataSourceId, CreateRecordRequestDto dto,
+        List<long>? sensitivityLabelIds = null, bool embedded = false, bool isSysAdmin = false, bool isOrgAdmin = false,
+        bool isProjectAdmin = false);
+
     Task<List<RecordResponseDto>> BulkCreateRecords(
+        long currentUserId, long organizationId, long projectId, long dataSourceId, List<CreateRecordRequestDto> dtos, List<long>? sensitivityLabelIds = null,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+
+    Task<List<RecordResponseDtoV2>> BulkCreateRecordsV2(
         long currentUserId, long organizationId, long projectId, long dataSourceId, List<CreateRecordRequestDto> dtos, List<long>? sensitivityLabelIds = null,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
@@ -51,7 +81,15 @@ public interface IRecordBusiness
         long currentUserId, long organizationId, long projectId, long recordId, UpdateRecordRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false,
         bool isProjectAdmin = false);
 
+    Task<RecordResponseDtoV2> UpdateRecordV2(
+        long currentUserId, long organizationId, long projectId, long recordId, UpdateRecordRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false,
+        bool isProjectAdmin = false);
+
     Task<RecordResponseDto> UpdateFileContentHash(
+        long currentUserId, long organizationId, long projectId, long recordId,
+        UpdateFileContentHashRequestDto dto);
+
+    Task<RecordResponseDtoV2> UpdateFileContentHashV2(
         long currentUserId, long organizationId, long projectId, long recordId,
         UpdateFileContentHashRequestDto dto);
 
@@ -67,6 +105,8 @@ public interface IRecordBusiness
     Task<bool> BulkAttachLabels(
         long currentUserId, long organizationId, long projectId, List<long> recordIds, List<long> sensitiityLabelIds);
     Task<List<RecordResponseDto>> GetRecordsByOriginalId(long currentUserId, long organizationId, long projectId, long dataSourceId, List<string> originalIds,
+        bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+    Task<List<RecordResponseDtoV2>> GetRecordsByOriginalIdV2(long currentUserId, long organizationId, long projectId, long dataSourceId, List<string> originalIds,
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
     Task<List<LatticeRecordDto>> GetLatticeRecords(long organizationId, long projectId);
     Task<bool> BulkAttachTags(long currentUserId, long organizationId, long projectId,
