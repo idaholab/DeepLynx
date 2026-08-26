@@ -14,6 +14,7 @@ public class RecordCollectionLabelDto
     public string Name { get; set; }
 }
 
+[Obsolete("V1-only legacy DTO. Superseded by RecordCollectionResponseDtoV2. Remove once v1 record collection endpoints are sunset.", error: false)]
 public class RecordCollectionResponseDto
 {
     [Column("id")] public long Id { get; set; }
@@ -38,5 +39,5 @@ public class RecordCollectionResponseDto
     [NotMapped] public int RecordCount { get; set; }
 
     [NotMapped] public ICollection<RecordCollectionTagDto> Tags { get; set; }
-    [NotMapped] public ICollection<RecordCollectionLabelDto> SensitivityLabels { get; set; }
+    [NotMapped] public ICollection<RecordCollectionLabelDto> Labels { get; set; }
 }

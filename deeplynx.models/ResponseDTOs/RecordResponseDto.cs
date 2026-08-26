@@ -14,6 +14,7 @@ public class RecordLabelDto
     public string Name { get; set; }
 }
 
+[Obsolete("V1-only legacy DTO. Superseded by RecordResponseDtoV2. Remove once v1 record endpoints are sunset.", error: false)]
 public class RecordResponseDto
 {
     [Column("id")] public long Id { get; set; }
@@ -52,7 +53,7 @@ public class RecordResponseDto
     [Column("file_content_hash")] public string? FileContentHash { get; set; }
 
     [NotMapped] public ICollection<RecordTagDto> Tags { get; set; } = new List<RecordTagDto>();
-    [NotMapped] public ICollection<RecordLabelDto> SensitivityLabels { get; set; } = new List<RecordLabelDto>();
+    [NotMapped] public ICollection<RecordLabelDto> Labels { get; set; } = new List<RecordLabelDto>();
     
     [Column("embedded")] public bool Embedded { get; set; }
 }
