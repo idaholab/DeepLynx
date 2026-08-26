@@ -59,13 +59,13 @@ export default function CollectionEntitySelector({
     setPageSize: setOptionPageSize,
     totalPages: optionTotalPages,
   } = useLocalPagination({
-    items: selectedItems,
+    items: options,
     initialPageSize: 5,
   });
 
   useEffect(() => {
     resetOptionPagination();
-  }, [selectedItems, resetOptionPagination]);
+  }, [options, resetOptionPagination]);
 
   return (
     <div>

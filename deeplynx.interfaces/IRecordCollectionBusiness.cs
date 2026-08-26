@@ -76,6 +76,11 @@ public interface IRecordCollectionBusiness
     Task<bool> AttachLabel(long organizationId, long projectId, long recordCollectionId, long labelId);
     Task<bool> UnattachTag(long organizationId, long projectId, long recordCollectionId, long tagId);
     Task<bool> UnattachLabel(long organizationId, long projectId, long recordCollectionId, long labelId);
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by " +
+              "GetSensitivityLabelsForRecordCollectionPaginated. Remove once v1 record collection endpoints are sunset.", error: false)]
     Task<List<SensitivityLabel>> GetSensitivityLabelsForRecordCollection(long organizationId, long projectId,
         long recordCollectionId);
+
+    Task<PaginatedResponse<SensitivityLabelResponseDto>> GetSensitivityLabelsForRecordCollectionPaginated(
+        long organizationId, long projectId, long recordCollectionId, PaginatedRequestDto paginatedRequestDto);
 }
