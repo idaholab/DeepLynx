@@ -52,7 +52,7 @@ public class RecordResponseDto
     [Column("file_content_hash")] public string? FileContentHash { get; set; }
 
     [NotMapped] public ICollection<RecordTagDto> Tags { get; set; } = new List<RecordTagDto>();
-    [NotMapped] public ICollection<RecordLabelDto> Labels { get; set; } = new List<RecordLabelDto>();
+    [NotMapped] public ICollection<RecordLabelDto> SensitivityLabels { get; set; } = new List<RecordLabelDto>();
     
     [Column("embedded")] public bool Embedded { get; set; }
 }

@@ -145,7 +145,7 @@ public class RecordBusiness : IRecordBusiness
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            Labels = r.Labels.Select(l => new RecordLabelDto
+            SensitivityLabels = r.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
@@ -379,7 +379,7 @@ public class RecordBusiness : IRecordBusiness
                 Id = t.Id,
                 Name = t.Name
             })],
-            Labels = [.. r.Labels.Select(l => new RecordLabelDto
+            SensitivityLabels = [.. r.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
@@ -528,7 +528,7 @@ public class RecordBusiness : IRecordBusiness
                     Id = t.Id,
                     Name = t.Name
                 }).ToList(),
-                Labels = r.Labels.Select(l => new RecordLabelDto
+                SensitivityLabels = r.Labels.Select(l => new RecordLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name
@@ -622,7 +622,7 @@ public class RecordBusiness : IRecordBusiness
                     Id = t.Id,
                     Name = t.Name
                 }).ToList(),
-                Labels = r.Labels.Select(l => new RecordLabelDto
+                SensitivityLabels = r.Labels.Select(l => new RecordLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name
@@ -698,7 +698,7 @@ public class RecordBusiness : IRecordBusiness
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            Labels = record.Labels.Select(t => new RecordLabelDto
+            SensitivityLabels = record.Labels.Select(t => new RecordLabelDto
             {
                 Id = t.Id,
                 Name = t.Name
@@ -1254,7 +1254,7 @@ public class RecordBusiness : IRecordBusiness
                 FileSize = record.FileSize,
                 FileContentHash = record.FileContentHash,
                 Tags = tags,
-                Labels = record.Labels.Select(l => new RecordLabelDto
+                SensitivityLabels = record.Labels.Select(l => new RecordLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name
@@ -1566,7 +1566,7 @@ public class RecordBusiness : IRecordBusiness
 
             // Map labels (same labels applied to all records)
             if (labelNameMap.Count > 0)
-                record.Labels = sensitivityLabelIds!
+                record.SensitivityLabels = sensitivityLabelIds!
                     .Where(id => labelNameMap.ContainsKey(id))
                     .Select(id => new RecordLabelDto
                     {
@@ -1575,7 +1575,7 @@ public class RecordBusiness : IRecordBusiness
                     })
                     .ToList();
             else
-                record.Labels = new List<RecordLabelDto>();
+                record.SensitivityLabels = new List<RecordLabelDto>();
         }
 
         var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
@@ -1589,8 +1589,8 @@ public class RecordBusiness : IRecordBusiness
             var canExposeUri = isSysAdmin ||
                             isOrgAdmin ||
                             isProjectAdmin ||
-                            record.Labels.Count == 0 ||
-                            record.Labels.All(l => authorizedDownloadLabels.Contains(l.Id));
+                            record.SensitivityLabels.Count == 0 ||
+                            record.SensitivityLabels.All(l => authorizedDownloadLabels.Contains(l.Id));
 
             if (!canExposeUri)
                 record.Uri = null;
@@ -1959,7 +1959,7 @@ public class RecordBusiness : IRecordBusiness
             FileSize = returnedRecord.FileSize,
             FileContentHash = returnedRecord.FileContentHash,
             Tags = tags,
-            Labels = returnedRecord.Labels.Select(l => new RecordLabelDto
+            SensitivityLabels = returnedRecord.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
@@ -2185,7 +2185,7 @@ public class RecordBusiness : IRecordBusiness
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            Labels = r.Labels.Select(l => new RecordLabelDto
+            SensitivityLabels = r.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
@@ -2468,7 +2468,7 @@ public class RecordBusiness : IRecordBusiness
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            Labels = record.Labels.Select(l => new RecordLabelDto
+            SensitivityLabels = record.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name

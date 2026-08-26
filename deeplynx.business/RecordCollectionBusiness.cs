@@ -215,7 +215,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            Labels = record.Labels.Select(l => new RecordLabelDto
+            SensitivityLabels = record.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
@@ -627,7 +627,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 IsArchived = collection.IsArchived,
                 RecordCount = 0,
                 Tags = tags,
-                Labels = collection.Labels.Select(l => new RecordCollectionLabelDto
+                SensitivityLabels = collection.Labels.Select(l => new RecordCollectionLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name
@@ -1123,7 +1123,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     Id = t.Id,
                     Name = t.Name
                 }).ToList(),
-                Labels = r.Labels.Select(l => new RecordCollectionLabelDto
+                SensitivityLabels = r.Labels.Select(l => new RecordCollectionLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name
@@ -1234,7 +1234,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+            SensitivityLabels = c.Labels.Select(l => new RecordCollectionLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
@@ -1321,7 +1321,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            Labels = r.Labels.Select(l => new RecordLabelDto
+            SensitivityLabels = r.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
@@ -1435,7 +1435,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     Id = t.Id,
                     Name = t.Name
                 }).ToList(),
-                Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+                SensitivityLabels = c.Labels.Select(l => new RecordCollectionLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name
@@ -1529,7 +1529,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     Id = t.Id,
                     Name = t.Name
                 }).ToList(),
-                Labels = c.Labels.Select(l => new RecordCollectionLabelDto
+                SensitivityLabels = c.Labels.Select(l => new RecordCollectionLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name

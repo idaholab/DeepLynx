@@ -38,5 +38,5 @@ public class RecordCollectionResponseDto
     [NotMapped] public int RecordCount { get; set; }
 
     [NotMapped] public ICollection<RecordCollectionTagDto> Tags { get; set; }
-    [NotMapped] public ICollection<RecordCollectionLabelDto> Labels { get; set; }
+    [NotMapped] public ICollection<RecordCollectionLabelDto> SensitivityLabels { get; set; }
 }
