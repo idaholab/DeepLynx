@@ -375,8 +375,8 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Assert.False(collection.IsArchived);
         Assert.Single(collection.Tags);
         Assert.Equal(_tagId1, collection.Tags.First().Id);
-        Assert.Single(collection.SensitivityLabels);
-        Assert.Equal(_labelId, collection.SensitivityLabels.First().Id);
+        Assert.Single(collection.Labels);
+        Assert.Equal(_labelId, collection.Labels.First().Id);
     }
 
     [Fact]
@@ -1352,15 +1352,34 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         var result = await _recordCollectionBusiness.CreateRecordCollection(
             _userId, _organizationId, _projectId, new List<long> { _labelId, _labelId2 }, dto);
 
-        Assert.Equal(2, result.SensitivityLabels.Count);
-        Assert.Contains(result.SensitivityLabels, l => l.Id == _labelId);
-        Assert.Contains(result.SensitivityLabels, l => l.Id == _labelId2);
+        Assert.Equal(2, result.Labels.Count);
+        Assert.Contains(result.Labels, l => l.Id == _labelId);
+        Assert.Contains(result.Labels, l => l.Id == _labelId2);
 
         var persisted = await Context.RecordCollections
             .Include(c => c.Labels)
             .FirstAsync(c => c.Id == result.Id);
 
         Assert.Equal(2, persisted.Labels.Count);
+    }
+
+    [Fact]
+    public async Task CreateRecordCollectionV2_WithValidLabels_ReturnsSensitivityLabels()
+    {
+        var dto = new CreateRecordCollectionRequestDto
+        {
+            Name = "Labeled Collection V2",
+            Description = "collection with labels v2",
+            Properties = new JsonObject { ["status"] = "new" },
+            Tags = null
+        };
+
+        var result = await _recordCollectionBusiness.CreateRecordCollectionV2(
+            _userId, _organizationId, _projectId, new List<long> { _labelId, _labelId2 }, dto);
+
+        Assert.Equal(2, result.SensitivityLabels.Count);
+        Assert.Contains(result.SensitivityLabels, l => l.Id == _labelId);
+        Assert.Contains(result.SensitivityLabels, l => l.Id == _labelId2);
     }
 
     [Fact]
@@ -1432,7 +1451,7 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
             _userId, _organizationId, _projectId, null, dto);
 
         Assert.Equal("No Label Collection", result.Name);
-        Assert.Empty(result.SensitivityLabels);
+        Assert.Empty(result.Labels);
     }
     #endregion
 
@@ -1453,6 +1472,26 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Assert.Equal(_collectionId, result.Id);
         Assert.Equal("Updated Collection", result.Name);
         Assert.Equal("updated description", result.Description);
+        Assert.Equal("updated", JsonNode.Parse(result.Properties)?["status"]?.GetValue<string>());
+        Assert.Equal(_userId, result.LastUpdatedBy);
+    }
+
+    [Fact]
+    public async Task UpdateRecordCollectionV2_UpdatesMutableFields()
+    {
+        var dto = new UpdateRecordCollectionRequestDto
+        {
+            Name = "Updated Collection V2",
+            Description = "updated description v2",
+            Properties = new JsonObject { ["status"] = "updated" }
+        };
+
+        var result = await _recordCollectionBusiness.UpdateRecordCollectionV2(
+            _userId, _organizationId, _projectId, _collectionId, dto);
+
+        Assert.Equal(_collectionId, result.Id);
+        Assert.Equal("Updated Collection V2", result.Name);
+        Assert.Equal("updated description v2", result.Description);
         Assert.Equal("updated", JsonNode.Parse(result.Properties)?["status"]?.GetValue<string>());
         Assert.Equal(_userId, result.LastUpdatedBy);
     }
