@@ -2176,7 +2176,7 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
                 Id = t.Id,
                 Name = t.Name
             }).ToList() ?? new List<RecordTagDto>(),
-            Labels = record.Labels?.Select(l => new RecordLabelDto
+            SensitivityLabels = record.Labels?.Select(l => new RecordLabelDto
             {
                 // Map properties as needed
                 Id = l.Id,

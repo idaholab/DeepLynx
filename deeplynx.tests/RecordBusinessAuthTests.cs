@@ -265,7 +265,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         Assert.Contains(records, r => r.Id == rid2);
 
         var returnedRecord = records.First(r => r.Id == rid2);
-        Assert.Equal(2, returnedRecord.Labels.Count);
+        Assert.Equal(2, returnedRecord.SensitivityLabels.Count);
     }
 
     [Fact]

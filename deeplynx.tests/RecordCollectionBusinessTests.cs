@@ -375,8 +375,8 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Assert.False(collection.IsArchived);
         Assert.Single(collection.Tags);
         Assert.Equal(_tagId1, collection.Tags.First().Id);
-        Assert.Single(collection.Labels);
-        Assert.Equal(_labelId, collection.Labels.First().Id);
+        Assert.Single(collection.SensitivityLabels);
+        Assert.Equal(_labelId, collection.SensitivityLabels.First().Id);
     }
 
     [Fact]
@@ -549,8 +549,8 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Assert.False(collection.IsArchived);
         Assert.Single(collection.Tags);
         Assert.Equal(_tagId1, collection.Tags.First().Id);
-        Assert.Single(collection.Labels);
-        Assert.Equal(_labelId, collection.Labels.First().Id);
+        Assert.Single(collection.SensitivityLabels);
+        Assert.Equal(_labelId, collection.SensitivityLabels.First().Id);
     }
 
     [Fact]
@@ -768,8 +768,8 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         Assert.Equal(2, collection.RecordCount); // record1 + archivedRecord
         Assert.Single(collection.Tags);
         Assert.Equal(_tagId1, collection.Tags.First().Id);
-        Assert.Single(collection.Labels);
-        Assert.Equal(_labelId, collection.Labels.First().Id);
+        Assert.Single(collection.SensitivityLabels);
+        Assert.Equal(_labelId, collection.SensitivityLabels.First().Id);
     }
 
     [Fact]
@@ -1352,9 +1352,9 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         var result = await _recordCollectionBusiness.CreateRecordCollection(
             _userId, _organizationId, _projectId, new List<long> { _labelId, _labelId2 }, dto);
 
-        Assert.Equal(2, result.Labels.Count);
-        Assert.Contains(result.Labels, l => l.Id == _labelId);
-        Assert.Contains(result.Labels, l => l.Id == _labelId2);
+        Assert.Equal(2, result.SensitivityLabels.Count);
+        Assert.Contains(result.SensitivityLabels, l => l.Id == _labelId);
+        Assert.Contains(result.SensitivityLabels, l => l.Id == _labelId2);
 
         var persisted = await Context.RecordCollections
             .Include(c => c.Labels)
@@ -1432,7 +1432,7 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
             _userId, _organizationId, _projectId, null, dto);
 
         Assert.Equal("No Label Collection", result.Name);
-        Assert.Empty(result.Labels);
+        Assert.Empty(result.SensitivityLabels);
     }
     #endregion
 

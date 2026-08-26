@@ -1918,15 +1918,15 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Contains(record2.Tags, t => t.Name == "NEW");
 
         // Assert labels are attached to records in response
-        Assert.NotNull(record1.Labels);
-        Assert.Equal(2, record1.Labels.Count);
-        Assert.Contains(record1.Labels, l => l.Name == "secret sauce");
-        Assert.Contains(record1.Labels, l => l.Name == "Very Sensitive Label");
+        Assert.NotNull(record1.SensitivityLabels);
+        Assert.Equal(2, record1.SensitivityLabels.Count);
+        Assert.Contains(record1.SensitivityLabels, l => l.Name == "secret sauce");
+        Assert.Contains(record1.SensitivityLabels, l => l.Name == "Very Sensitive Label");
 
-        Assert.NotNull(record2.Labels);
-        Assert.Equal(2, record2.Labels.Count);
-        Assert.Contains(record2.Labels, l => l.Name == "secret sauce");
-        Assert.Contains(record2.Labels, l => l.Name == "Very Sensitive Label");
+        Assert.NotNull(record2.SensitivityLabels);
+        Assert.Equal(2, record2.SensitivityLabels.Count);
+        Assert.Contains(record2.SensitivityLabels, l => l.Name == "secret sauce");
+        Assert.Contains(record2.SensitivityLabels, l => l.Name == "Very Sensitive Label");
 
         // Verify records were actually created in database with tags and labels
         var dbRecord1 = await Context.Records
