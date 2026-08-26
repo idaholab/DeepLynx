@@ -449,10 +449,21 @@ function ExtractionDetailPanel({
 
   const fetchStaging = useCallback(async () => {
     const myRequestId = ++requestIdRef.current;
+
     try {
-      const data = await getExtractionStaging(organizationId, projectId, extractionId);
-      if (requestIdRef.current !== myRequestId) return; // stale — drop it
+      const data = await getExtractionStaging(
+        organizationId,
+        projectId,
+        extractionId,
+      );
+
+      if (requestIdRef.current !== myRequestId) return;
+
       setStaging(data);
+
+      if (NOT_RUNNING_STATUSES.includes(data.status)) {
+        onStatusChange?.();
+      }
       setApproved((prev) => ({
         records: new Set([...prev.records].filter((id) =>
           data.records.some((r) => r.id === id && !r.promoted_id && !r.rejected),
@@ -493,6 +504,7 @@ function ExtractionDetailPanel({
     organizationId,
     projectId,
     extractionId,
+    onStatusChange,
     t.translations.LATTICE_FAILED_LOAD_EXTRACTION,
   ]);
 
@@ -523,13 +535,26 @@ function ExtractionDetailPanel({
   }, [fetchStaging]);
 
   useEffect(() => {
-    if (!staging || staging.status !== "running") return;
+    if (!staging || NOT_RUNNING_STATUSES.includes(staging.status)) {
+      return;
+    }
 
-    const timeoutId = window.setTimeout(() => {
-      void fetchStaging();
-    }, 3000);
+    let cancelled = false;
 
-    return () => window.clearTimeout(timeoutId);
+    const poll = async () => {
+      await fetchStaging();
+
+      if (!cancelled) {
+        timeoutId = window.setTimeout(poll, 3000);
+      }
+    };
+
+    let timeoutId = window.setTimeout(poll, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
   }, [staging?.status, fetchStaging]);
 
   const handleSave = async () => {
@@ -925,22 +950,22 @@ export default function LatticeDecisionsPage() {
     return null;
   }
 
-    const {
-      currentPage: extractionPage,
-      pageSize: extractionPageSize,
-      paginatedItems: paginatedExtractions,
-      resetPagination: resetExtractionPagination,
-      setCurrentPage: setExtractionPage,
-      setPageSize: setExtractionPageSize,
-      totalPages: extractionTotalPages,
-    } = useLocalPagination({
-      items: items,
-      initialPageSize: 5,
-    });
+  const {
+    currentPage: extractionPage,
+    pageSize: extractionPageSize,
+    paginatedItems: paginatedExtractions,
+    resetPagination: resetExtractionPagination,
+    setCurrentPage: setExtractionPage,
+    setPageSize: setExtractionPageSize,
+    totalPages: extractionTotalPages,
+  } = useLocalPagination({
+    items: items,
+    initialPageSize: 5,
+  });
 
-    useEffect(() => {
-      resetExtractionPagination();
-    }, [resetExtractionPagination]);
+  useEffect(() => {
+    resetExtractionPagination();
+  }, [resetExtractionPagination]);
 
   return (
     <main className="min-h-screen bg-base-200/30">
