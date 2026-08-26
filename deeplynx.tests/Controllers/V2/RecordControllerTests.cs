@@ -69,12 +69,12 @@ public class RecordControllerTests : IDisposable
     [Fact]
     public async Task GetAllRecords_Returns200_WithList()
     {
-        var expected = new List<RecordResponseDto>
+        var expected = new List<RecordResponseDtoV2>
         {
             new() { Id = 1, Name = "Record 1" },
             new() { Id = 2, Name = "Record 2" }
         };
-        _mockBusiness.Setup(b => b.GetAllRecords(
+        _mockBusiness.Setup(b => b.GetAllRecordsV2(
                          UserId, OrgId, ProjectId, null, true, null, false, false, false))
                      .ReturnsAsync(expected);
 
@@ -88,7 +88,7 @@ public class RecordControllerTests : IDisposable
     [Fact]
     public async Task GetAllRecords_Returns200_WithEmptyList()
     {
-        _mockBusiness.Setup(b => b.GetAllRecords(
+        _mockBusiness.Setup(b => b.GetAllRecordsV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<long?>(), It.IsAny<bool>(), It.IsAny<string?>(),
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
@@ -98,13 +98,13 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<RecordResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<IEnumerable<RecordResponseDtoV2>>(result.Value);
     }
 
     [Fact]
     public async Task GetAllRecords_Returns500_OnUnexpectedException()
     {
-        _mockBusiness.Setup(b => b.GetAllRecords(
+        _mockBusiness.Setup(b => b.GetAllRecordsV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<long?>(), It.IsAny<bool>(), It.IsAny<string?>(),
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
@@ -117,13 +117,13 @@ public class RecordControllerTests : IDisposable
     public async Task GetAllRecords_PassesFiltersAndAdminFlagsToBusinessLayer()
     {
         UserContextStorage.IsSysAdmin = true;
-        _mockBusiness.Setup(b => b.GetAllRecords(
+        _mockBusiness.Setup(b => b.GetAllRecordsV2(
                          UserId, OrgId, ProjectId, DataSourceId, false, "pdf", true, false, false))
                      .ReturnsAsync([]);
 
         await _controller.GetAllRecords(OrgId, ProjectId, DataSourceId, "pdf", hideArchived: false);
 
-        _mockBusiness.Verify(b => b.GetAllRecords(
+        _mockBusiness.Verify(b => b.GetAllRecordsV2(
             UserId, OrgId, ProjectId, DataSourceId, false, "pdf", true, false, false), Times.Once);
     }
 
@@ -131,15 +131,15 @@ public class RecordControllerTests : IDisposable
     public async Task GetAllRecordsPaginated_Returns200_WithPaginatedResponse()
     {
         var paginatedDto = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
-        var expected = new PaginatedResponse<RecordResponseDto>
+        var expected = new PaginatedResponse<RecordResponseDtoV2>
         {
-            Items = new List<RecordResponseDto> { new() { Id = 1, Name = "Record 1" } },
+            Items = new List<RecordResponseDtoV2> { new() { Id = 1, Name = "Record 1" } },
             PageNumber = 1,
             PageSize = 25,
             TotalCount = 1
         };
 
-        _mockBusiness.Setup(b => b.GetAllRecordsPaginated(
+        _mockBusiness.Setup(b => b.GetAllRecordsPaginatedV2(
                          UserId, OrgId, ProjectId, null, true, null, paginatedDto, false, false, false, false))
                      .ReturnsAsync(expected);
 
@@ -156,14 +156,14 @@ public class RecordControllerTests : IDisposable
     {
         UserContextStorage.IsSysAdmin = true;
         var paginatedDto = new PaginatedRequestDto { PageNumber = 2, PageSize = 10 };
-        _mockBusiness.Setup(b => b.GetAllRecordsPaginated(
+        _mockBusiness.Setup(b => b.GetAllRecordsPaginatedV2(
                          UserId, OrgId, ProjectId, DataSourceId, false, "pdf", paginatedDto, true, false, false, true))
-                     .ReturnsAsync(new PaginatedResponse<RecordResponseDto>());
+                     .ReturnsAsync(new PaginatedResponse<RecordResponseDtoV2>());
 
         await _controller.GetAllRecordsPaginated(
             OrgId, ProjectId, DataSourceId, "pdf", hideArchived: false, isInsightEligible: true, paginatedDto);
 
-        _mockBusiness.Verify(b => b.GetAllRecordsPaginated(
+        _mockBusiness.Verify(b => b.GetAllRecordsPaginatedV2(
             UserId, OrgId, ProjectId, DataSourceId, false, "pdf", paginatedDto, true, false, false, true), Times.Once);
     }
 
@@ -205,7 +205,7 @@ public class RecordControllerTests : IDisposable
     [Fact]
     public async Task GetRecordsByTagsPaginated_Returns200_WithList()
     {
-        var expected = new PaginatedResponse<RecordResponseDto>
+        var expected = new PaginatedResponse<RecordResponseDtoV2>
         {
             Items = [new() { Id = 1, Name = "Tagged" }],
             PageNumber = 1,
@@ -245,7 +245,7 @@ public class RecordControllerTests : IDisposable
                          true, It.IsAny<PaginatedRequestDto>(), false, false, false))
                      .Callback<long, long, long, long[], bool, PaginatedRequestDto, bool, bool, bool>(
                          (_, _, _, _, _, dto, _, _, _) => capturedDto = dto)
-                     .ReturnsAsync(new PaginatedResponse<RecordResponseDto>
+                     .ReturnsAsync(new PaginatedResponse<RecordResponseDtoV2>
                      {
                          Items = [],
                          PageNumber = 1,
@@ -288,8 +288,8 @@ public class RecordControllerTests : IDisposable
     public async Task GetRecordsByOriginalId_Returns200_WithList()
     {
         var originalIds = new List<string> { "og-1", "og-2" };
-        var expected = new List<RecordResponseDto> { new() { Id = 1, OriginalId = "og-1" } };
-        _mockBusiness.Setup(b => b.GetRecordsByOriginalId(
+        var expected = new List<RecordResponseDtoV2> { new() { Id = 1, OriginalId = "og-1" } };
+        _mockBusiness.Setup(b => b.GetRecordsByOriginalIdV2(
                          UserId, OrgId, ProjectId, DataSourceId, originalIds, true, false, false, false))
                      .ReturnsAsync(expected);
 
@@ -304,7 +304,7 @@ public class RecordControllerTests : IDisposable
     [Fact]
     public async Task GetRecordsByOriginalId_Returns400_OnArgumentException()
     {
-        _mockBusiness.Setup(b => b.GetRecordsByOriginalId(
+        _mockBusiness.Setup(b => b.GetRecordsByOriginalIdV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<List<string>>(), It.IsAny<bool>(),
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
@@ -317,7 +317,7 @@ public class RecordControllerTests : IDisposable
     [Fact]
     public async Task GetRecordsByOriginalId_Returns404_OnKeyNotFoundException()
     {
-        _mockBusiness.Setup(b => b.GetRecordsByOriginalId(
+        _mockBusiness.Setup(b => b.GetRecordsByOriginalIdV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<List<string>>(), It.IsAny<bool>(),
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
@@ -330,7 +330,7 @@ public class RecordControllerTests : IDisposable
     [Fact]
     public async Task GetRecordsByOriginalId_Returns500_OnUnexpectedException()
     {
-        _mockBusiness.Setup(b => b.GetRecordsByOriginalId(
+        _mockBusiness.Setup(b => b.GetRecordsByOriginalIdV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<List<string>>(), It.IsAny<bool>(),
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
@@ -365,8 +365,8 @@ public class RecordControllerTests : IDisposable
     [Fact]
     public async Task GetRecord_Returns200_WithRecord()
     {
-        var expected = new RecordResponseDto { Id = RecordIdConst, Name = "Test Record" };
-        _mockBusiness.Setup(b => b.GetRecord(UserId, OrgId, ProjectId, RecordIdConst, true))
+        var expected = new RecordResponseDtoV2 { Id = RecordIdConst, Name = "Test Record" };
+        _mockBusiness.Setup(b => b.GetRecordV2(UserId, OrgId, ProjectId, RecordIdConst, true))
                      .ReturnsAsync(expected);
 
         var result = (await _controller.GetRecord(OrgId, ProjectId, RecordIdConst, true)).Result as OkObjectResult;
@@ -379,7 +379,7 @@ public class RecordControllerTests : IDisposable
     [Fact]
     public async Task GetRecord_Returns500_OnUnexpectedException()
     {
-        _mockBusiness.Setup(b => b.GetRecord(
+        _mockBusiness.Setup(b => b.GetRecordV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
@@ -463,8 +463,8 @@ public class RecordControllerTests : IDisposable
             Properties = new System.Text.Json.Nodes.JsonObject(),
             ClassId = ClassId
         };
-        var expected = new RecordResponseDto { Id = RecordIdConst, Name = "New Record" };
-        _mockBusiness.Setup(b => b.CreateRecord(UserId, OrgId, ProjectId, DataSourceId, dto, null, false))
+        var expected = new RecordResponseDtoV2 { Id = RecordIdConst, Name = "New Record" };
+        _mockBusiness.Setup(b => b.CreateRecordV2(UserId, OrgId, ProjectId, DataSourceId, dto, null, false))
                      .ReturnsAsync(expected);
 
         var result = (await _controller.CreateRecord(
@@ -485,7 +485,7 @@ public class RecordControllerTests : IDisposable
             OriginalId = "og-1",
             Properties = new System.Text.Json.Nodes.JsonObject()
         };
-        _mockBusiness.Setup(b => b.CreateRecord(
+        _mockBusiness.Setup(b => b.CreateRecordV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<CreateRecordRequestDto>(), It.IsAny<List<long>?>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
@@ -505,14 +505,14 @@ public class RecordControllerTests : IDisposable
             OriginalId = "og-1",
             Properties = new System.Text.Json.Nodes.JsonObject()
         };
-        _mockBusiness.Setup(b => b.CreateRecord(77L, OrgId, ProjectId, DataSourceId, dto, null, false))
-                     .ReturnsAsync(new RecordResponseDto { Id = 1 });
+        _mockBusiness.Setup(b => b.CreateRecordV2(77L, OrgId, ProjectId, DataSourceId, dto, null, false))
+                     .ReturnsAsync(new RecordResponseDtoV2 { Id = 1 });
 
         await _controller.CreateRecord(
             OrgId, ProjectId, DataSourceId, sensitivityLabelIds: null, dto: dto);
 
         _mockBusiness.Verify(
-            b => b.CreateRecord(77L, OrgId, ProjectId, DataSourceId, dto, null, false),
+            b => b.CreateRecordV2(77L, OrgId, ProjectId, DataSourceId, dto, null, false),
             Times.Once);
     }
 
@@ -549,12 +549,12 @@ public class RecordControllerTests : IDisposable
             new() { Name = "B", Description = "d", OriginalId = "og-b",
                     Properties = new System.Text.Json.Nodes.JsonObject() }
         };
-        var expected = new List<RecordResponseDto>
+        var expected = new List<RecordResponseDtoV2>
         {
             new() { Id = 1, Name = "A" },
             new() { Id = 2, Name = "B" }
         };
-        _mockBusiness.Setup(b => b.BulkCreateRecords(UserId, OrgId, ProjectId, DataSourceId, dtos, null))
+        _mockBusiness.Setup(b => b.BulkCreateRecordsV2(UserId, OrgId, ProjectId, DataSourceId, dtos, null))
                      .ReturnsAsync(expected);
 
         var result = (await _controller.BulkCreateRecords(
@@ -568,7 +568,7 @@ public class RecordControllerTests : IDisposable
     [Fact]
     public async Task BulkCreateRecords_Returns500_OnUnexpectedException()
     {
-        _mockBusiness.Setup(b => b.BulkCreateRecords(
+        _mockBusiness.Setup(b => b.BulkCreateRecordsV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<List<CreateRecordRequestDto>>(), It.IsAny<List<long>?>()))
                      .ThrowsAsync(new Exception("db error"));
@@ -604,8 +604,8 @@ public class RecordControllerTests : IDisposable
     public async Task UpdateRecord_Returns200_WithUpdatedRecord()
     {
         var dto = new UpdateRecordRequestDto { Name = "Updated" };
-        var expected = new RecordResponseDto { Id = RecordIdConst, Name = "Updated" };
-        _mockBusiness.Setup(b => b.UpdateRecord(UserId, OrgId, ProjectId, RecordIdConst, dto))
+        var expected = new RecordResponseDtoV2 { Id = RecordIdConst, Name = "Updated" };
+        _mockBusiness.Setup(b => b.UpdateRecordV2(UserId, OrgId, ProjectId, RecordIdConst, dto))
                      .ReturnsAsync(expected);
 
         var result = (await _controller.UpdateRecord(OrgId, ProjectId, RecordIdConst, dto)).Result as OkObjectResult;
@@ -618,7 +618,7 @@ public class RecordControllerTests : IDisposable
     [Fact]
     public async Task UpdateRecord_Returns500_OnUnexpectedException()
     {
-        _mockBusiness.Setup(b => b.UpdateRecord(
+        _mockBusiness.Setup(b => b.UpdateRecordV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<long>(), It.IsAny<UpdateRecordRequestDto>()))
                      .ThrowsAsync(new Exception("db error"));
@@ -1247,12 +1247,12 @@ public class RecordControllerTests : IDisposable
     {
         var search = new RecordSearchRequestDto();
         var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
-        var expected = new PaginatedResponse<RecordResponseDto>
+        var expected = new PaginatedResponse<RecordResponseDtoV2>
         {
             Items = [new() { Id = 1, Name = "Record 1" }, new() { Id = 2, Name = "Record 2" }],
             TotalCount = 2
         };
-        _mockBusiness.Setup(b => b.SearchPaginated(
+        _mockBusiness.Setup(b => b.SearchPaginatedV2(
                          UserId, OrgId, ProjectId, search, paginated,
                          false, false, false))
                      .ReturnsAsync(expected);
@@ -1269,8 +1269,8 @@ public class RecordControllerTests : IDisposable
     {
         var search = new RecordSearchRequestDto();
         var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
-        var expected = new PaginatedResponse<RecordResponseDto> { Items = [], TotalCount = 0 };
-        _mockBusiness.Setup(b => b.SearchPaginated(
+        var expected = new PaginatedResponse<RecordResponseDtoV2> { Items = [], TotalCount = 0 };
+        _mockBusiness.Setup(b => b.SearchPaginatedV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<RecordSearchRequestDto>(), It.IsAny<PaginatedRequestDto>(),
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
@@ -1280,7 +1280,7 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(0, (result.Value as PaginatedResponse<RecordResponseDto>)!.TotalCount);
+        Assert.Equal(0, (result.Value as PaginatedResponse<RecordResponseDtoV2>)!.TotalCount);
     }
 
     [Fact]
@@ -1288,7 +1288,7 @@ public class RecordControllerTests : IDisposable
     {
         var search = new RecordSearchRequestDto();
         var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
-        _mockBusiness.Setup(b => b.SearchPaginated(
+        _mockBusiness.Setup(b => b.SearchPaginatedV2(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<RecordSearchRequestDto>(), It.IsAny<PaginatedRequestDto>(),
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
@@ -1306,13 +1306,13 @@ public class RecordControllerTests : IDisposable
 
         var search = new RecordSearchRequestDto();
         var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
-        _mockBusiness.Setup(b => b.SearchPaginated(
+        _mockBusiness.Setup(b => b.SearchPaginatedV2(
                          UserId, OrgId, ProjectId, search, paginated, true, false, false))
-                     .ReturnsAsync(new PaginatedResponse<RecordResponseDto>());
+                     .ReturnsAsync(new PaginatedResponse<RecordResponseDtoV2>());
 
         await _controller.SearchPaginated(OrgId, ProjectId, search, paginated);
 
-        _mockBusiness.Verify(b => b.SearchPaginated(
+        _mockBusiness.Verify(b => b.SearchPaginatedV2(
             UserId, OrgId, ProjectId, search, paginated, true, false, false), Times.Once);
     }
 
@@ -1323,14 +1323,14 @@ public class RecordControllerTests : IDisposable
 
         var search = new RecordSearchRequestDto();
         var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
-        _mockBusiness.Setup(b => b.SearchPaginated(
+        _mockBusiness.Setup(b => b.SearchPaginatedV2(
                          99L, OrgId, ProjectId, search, paginated,
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
-                     .ReturnsAsync(new PaginatedResponse<RecordResponseDto>());
+                     .ReturnsAsync(new PaginatedResponse<RecordResponseDtoV2>());
 
         await _controller.SearchPaginated(OrgId, ProjectId, search, paginated);
 
-        _mockBusiness.Verify(b => b.SearchPaginated(
+        _mockBusiness.Verify(b => b.SearchPaginatedV2(
             99L, OrgId, ProjectId, search, paginated,
             It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()), Times.Once);
     }

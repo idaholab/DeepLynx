@@ -99,10 +99,10 @@ public class FileControllerTests : IDisposable
     {
         // Arrange
         var file = CreateMockFormFile();
-        var expected = new RecordResponseDto();
+        var expected = new RecordResponseDtoV2();
 
         _mockFileBusiness
-            .Setup(b => b.UploadFile(
+            .Setup(b => b.UploadFileV2(
                 UserId, OrgId, ProjectId, DataSourceId, ObjectStorageId,
                 file, null, null, false, null, null, UserJwt, false, false, false))
             .ReturnsAsync(expected);
@@ -118,7 +118,7 @@ public class FileControllerTests : IDisposable
         Assert.Equal(expected, result.Value);
 
         _mockFileBusiness.Verify(
-            b => b.UploadFile(
+            b => b.UploadFileV2(
                 UserId, OrgId, ProjectId, DataSourceId, ObjectStorageId,
                 file, null, null, false, null, null, UserJwt, false, false, false),
             Times.Once);
@@ -131,7 +131,7 @@ public class FileControllerTests : IDisposable
         var file = CreateMockFormFile();
 
         _mockFileBusiness
-            .Setup(b => b.UploadFile(
+            .Setup(b => b.UploadFileV2(
                 It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>(),
                 It.IsAny<IFormFile>(), It.IsAny<List<long>?>(), It.IsAny<IFormFile?>(), It.IsAny<bool>(),
                 It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
@@ -158,10 +158,10 @@ public class FileControllerTests : IDisposable
         UserContextStorage.IsOrgAdmin = true;
         UserContextStorage.IsProjectAdmin = true;
 
-        var expected = new RecordResponseDto();
+        var expected = new RecordResponseDtoV2();
 
         _mockFileBusiness
-            .Setup(b => b.UploadFile(
+            .Setup(b => b.UploadFileV2(
                 UserId, OrgId, ProjectId, DataSourceId, ObjectStorageId,
                 file, labelIds, null, embed, vlmConfigId, embeddingModelConfigId, UserJwt, true, true, true))
             .ReturnsAsync(expected);
@@ -173,7 +173,7 @@ public class FileControllerTests : IDisposable
 
         // Assert
         _mockFileBusiness.Verify(
-            b => b.UploadFile(
+            b => b.UploadFileV2(
                 UserId, OrgId, ProjectId, DataSourceId, ObjectStorageId,
                 file, labelIds, null, embed, vlmConfigId, embeddingModelConfigId, UserJwt, true, true, true),
             Times.Once);
@@ -202,10 +202,10 @@ public class FileControllerTests : IDisposable
     {
         // Arrange
         var file = CreateMockFormFile();
-        var expected = new RecordResponseDto();
+        var expected = new RecordResponseDtoV2();
 
         _mockFileBusiness
-            .Setup(b => b.UpdateFile(UserId, OrgId, ProjectId, RecordId, file, null, null, UserJwt))
+            .Setup(b => b.UpdateFileV2(UserId, OrgId, ProjectId, RecordId, file, null, null, UserJwt))
             .ReturnsAsync(expected);
 
         // Act
@@ -218,7 +218,7 @@ public class FileControllerTests : IDisposable
         Assert.Equal(expected, result.Value);
 
         _mockFileBusiness.Verify(
-            b => b.UpdateFile(UserId, OrgId, ProjectId, RecordId, file, null, null, UserJwt),
+            b => b.UpdateFileV2(UserId, OrgId, ProjectId, RecordId, file, null, null, UserJwt),
             Times.Once);
     }
 
@@ -229,7 +229,7 @@ public class FileControllerTests : IDisposable
         var file = CreateMockFormFile();
 
         _mockFileBusiness
-            .Setup(b => b.UpdateFile(
+            .Setup(b => b.UpdateFileV2(
                 It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                 It.IsAny<IFormFile>(), It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<string?>()))
             .ThrowsAsync(new Exception("update error"));
@@ -246,10 +246,10 @@ public class FileControllerTests : IDisposable
         const long vlmConfigId = 100L;
         const long embeddingModelConfigId = 200L;
 
-        var expected = new RecordResponseDto();
+        var expected = new RecordResponseDtoV2();
 
         _mockFileBusiness
-            .Setup(b => b.UpdateFile(UserId, OrgId, ProjectId, RecordId, file, vlmConfigId, embeddingModelConfigId, UserJwt))
+            .Setup(b => b.UpdateFileV2(UserId, OrgId, ProjectId, RecordId, file, vlmConfigId, embeddingModelConfigId, UserJwt))
             .ReturnsAsync(expected);
 
         // Act
@@ -257,7 +257,7 @@ public class FileControllerTests : IDisposable
 
         // Assert
         _mockFileBusiness.Verify(
-            b => b.UpdateFile(UserId, OrgId, ProjectId, RecordId, file, vlmConfigId, embeddingModelConfigId, UserJwt),
+            b => b.UpdateFileV2(UserId, OrgId, ProjectId, RecordId, file, vlmConfigId, embeddingModelConfigId, UserJwt),
             Times.Once);
     }
 
@@ -360,10 +360,10 @@ public class FileControllerTests : IDisposable
     {
         // Arrange
         var request = new FileUploadCompleteRequestDto { UploadId = UploadId, FileName = "updated.zip" };
-        var expected = new RecordResponseDto();
+        var expected = new RecordResponseDtoV2();
 
         _mockFileBusiness
-            .Setup(b => b.CompleteUpdateUpload(
+            .Setup(b => b.CompleteUpdateUploadV2(
                 UserId, OrgId, ProjectId, RecordId, request, null, null, UserJwt))
             .ReturnsAsync(expected);
 
@@ -384,7 +384,7 @@ public class FileControllerTests : IDisposable
         var request = new FileUploadCompleteRequestDto { UploadId = UploadId, FileName = "updated.zip" };
 
         _mockFileBusiness
-            .Setup(b => b.CompleteUpdateUpload(
+            .Setup(b => b.CompleteUpdateUploadV2(
                 It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                 It.IsAny<FileUploadCompleteRequestDto>(), It.IsAny<long?>(), It.IsAny<long?>(), It.IsAny<string?>()))
             .ThrowsAsync(new Exception("complete update error"));
@@ -402,10 +402,10 @@ public class FileControllerTests : IDisposable
         const long vlmConfigId = 100L;
         const long embeddingModelConfigId = 200L;
 
-        var expected = new RecordResponseDto();
+        var expected = new RecordResponseDtoV2();
 
         _mockFileBusiness
-            .Setup(b => b.CompleteUpdateUpload(
+            .Setup(b => b.CompleteUpdateUploadV2(
                 UserId, OrgId, ProjectId, RecordId, request, vlmConfigId, embeddingModelConfigId, UserJwt))
             .ReturnsAsync(expected);
 
@@ -415,7 +415,7 @@ public class FileControllerTests : IDisposable
 
         // Assert
         _mockFileBusiness.Verify(
-            b => b.CompleteUpdateUpload(
+            b => b.CompleteUpdateUploadV2(
                 UserId, OrgId, ProjectId, RecordId, request, vlmConfigId, embeddingModelConfigId, UserJwt),
             Times.Once);
     }
@@ -973,10 +973,10 @@ public class FileControllerTests : IDisposable
     {
         // Arrange
         var request = new FileUploadCompleteRequestDto { UploadId = UploadId, FileName = "big.zip" };
-        var expected = new RecordResponseDto();
+        var expected = new RecordResponseDtoV2();
 
         _mockFileBusiness
-            .Setup(b => b.CompleteUpload(
+            .Setup(b => b.CompleteUploadV2(
                 UserId, OrgId, ProjectId, DataSourceId, ObjectStorageId, request, null, request.Metadata, false, null, null))
             .ReturnsAsync(expected);
 
@@ -998,7 +998,7 @@ public class FileControllerTests : IDisposable
         var request = new FileUploadCompleteRequestDto { UploadId = UploadId, FileName = "big.zip" };
 
         _mockFileBusiness
-            .Setup(b => b.CompleteUpload(
+            .Setup(b => b.CompleteUploadV2(
                 It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long?>(), It.IsAny<long?>(),
                 It.IsAny<FileUploadCompleteRequestDto>(), It.IsAny<List<long>?>(), It.IsAny<CreateRecordFileUploadRequestDto?>(),
                 It.IsAny<bool>(), It.IsAny<long?>(), It.IsAny<long?>()))
@@ -1019,10 +1019,10 @@ public class FileControllerTests : IDisposable
         const long vlmConfigId = 100L;
         const long embeddingModelConfigId = 200L;
 
-        var expected = new RecordResponseDto();
+        var expected = new RecordResponseDtoV2();
 
         _mockFileBusiness
-            .Setup(b => b.CompleteUpload(
+            .Setup(b => b.CompleteUploadV2(
                 UserId, OrgId, ProjectId, DataSourceId, ObjectStorageId, request, labelIds, request.Metadata,
                 embed, vlmConfigId, embeddingModelConfigId))
             .ReturnsAsync(expected);
@@ -1033,7 +1033,7 @@ public class FileControllerTests : IDisposable
 
         // Assert
         _mockFileBusiness.Verify(
-            b => b.CompleteUpload(
+            b => b.CompleteUploadV2(
                 UserId, OrgId, ProjectId, DataSourceId, ObjectStorageId, request, labelIds, request.Metadata,
                 embed, vlmConfigId, embeddingModelConfigId),
             Times.Once);
