@@ -60,8 +60,6 @@ export interface ExtractionStagingResponseDTO {
   id: number;
   status: string;
   mode: string | null;
-  failure_message: string | null;
-  record_id: number | null;
   created_by: number | null;
   classes: StagedClassDTO[];
   records: StagedRecordDTO[];

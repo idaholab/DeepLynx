@@ -851,10 +851,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("properties");
 
-                    b.Property<long?>("RecordId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("record_id");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
