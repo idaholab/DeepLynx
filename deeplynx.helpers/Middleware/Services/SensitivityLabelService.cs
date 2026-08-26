@@ -55,33 +55,26 @@ public class SensitivityLabelService : ISensitivityLabelService
         if (projectIds == null || projectIds.Length == 0)
             return new List<long>();
 
-        // Direct permissions (user directly assigned to project with a role)
-        var directLabelIds = _context.ProjectMembers
-            .Where(pm => pm.UserId == currentUserId
-                         && projectIds.Any(id => id == pm.ProjectId)
-                         && pm.Project.OrganizationId == organizationId
-                         && pm.RoleId != null
-                         && !pm.Role.IsArchived)
-            .SelectMany(pm => pm.Role.Permissions)
-            .Where(p => p.LabelId != null && p.Action == userAction && !p.IsArchived)
-            .Select(p => p.LabelId.Value);
+        // Labels in scope for the given organization/projects (org-level labels inherit into every project)
+        var relevantLabels = _context.SensitivityLabels
+            .Where(l => l.OrganizationId == organizationId
+                        && (l.ProjectId == null || projectIds.Contains(l.ProjectId.Value)));
 
-        // Group-based permissions (user is member of a group that has a role in the project)
-        var groupLabelIds = _context.ProjectMembers
-            .Where(pm => pm.GroupId != null
-                         && projectIds.Any(id => id == pm.ProjectId)
-                         && pm.Project.OrganizationId == organizationId
-                         && pm.RoleId != null
-                         && !pm.Role.IsArchived
-                         && !pm.Group.IsArchived)
-            .Where(pm => pm.Group.Users.Any(u => u.Id == currentUserId))
-            .SelectMany(pm => pm.Role.Permissions)
-            .Where(p => p.LabelId != null && p.Action == userAction && !p.IsArchived)
-            .Select(p => p.LabelId.Value);
+        // Labels for which this action is actually gated (non-archived definition present)
+        var governedLabelIds = _context.SensitivityLabelPermissions
+            .Where(p => p.Action == userAction && !p.IsArchived)
+            .Select(p => p.LabelId);
 
-        // Combine and remove duplicates
-        var authorizedLabelIds = await directLabelIds
-            .Union(groupLabelIds)
+        // Labels this user has been explicitly granted access to
+        var grantedLabelIds = _context.UserSensitivityLabels
+            .Where(u => u.UserId == currentUserId)
+            .Select(u => u.LabelId);
+
+        // A label is "authorized" for this action if it isn't gated for that action at all,
+        // or the user has an explicit grant for it
+        var authorizedLabelIds = await relevantLabels
+            .Where(l => !governedLabelIds.Contains(l.Id) || grantedLabelIds.Contains(l.Id))
+            .Select(l => l.Id)
             .Distinct()
             .ToListAsync();
 

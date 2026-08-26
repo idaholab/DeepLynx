@@ -5,6 +5,7 @@ import {
   SavedSearchesResponseDto,
   PaginatedSavedSearchesResponseDto,
   QueryRecordViewResponseDto,
+  PaginatedResponse,
 } from "@/app/(home)/types/responseDTOs";
 import { CustomQueryRequestDto } from "@/app/(home)/types/requestDTOs";
 import api from "./api";
@@ -66,9 +67,19 @@ export async function saveSearch(
     if (textSearch) params.set("textSearch", textSearch);
     if (alias) params.set("alias", alias);
 
+    const normalizedFilterArray = filterArray.map((filter) => {
+      if (filter.jsonKey && filter.jsonValue) {
+        return {
+          ...filter,
+          json: JSON.stringify({ [filter.jsonKey]: filter.jsonValue }),
+        };
+      }
+      return filter;
+    });
+
     const res = await api.post<boolean>(
       `saved-searches?${params.toString()}`,
-      filterArray
+      normalizedFilterArray
     );
     return res.data;
   } catch (error) {
@@ -85,20 +96,22 @@ export async function saveSearch(
 export async function executeSavedSearch(
   savedSearchId: number,
   organizationId: number,
-  projectIds: number[]
-): Promise<QueryRecordViewResponseDto[]> {
+  projectIds: number[],
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<QueryRecordViewResponseDto>> {
   try {
-    const res = await api.get<QueryRecordViewResponseDto[]>(
+    const res = await api.get<PaginatedResponse<QueryRecordViewResponseDto>>(
       `saved-searches/organizations/${organizationId}`,
       {
-        params: { savedSearchId, projectIds },
+        params: { savedSearchId, projectIds, pageNumber, pageSize },
         // .NET expects repeated params: projectIds=1&projectIds=2
         // axios default bracket format (projectIds[]=1) would be rejected
         paramsSerializer: (p) => {
           const sp = new URLSearchParams();
           sp.set("savedSearchId", String(p.savedSearchId));
           (p.projectIds as number[]).forEach((id) =>
-            sp.append("projectIds", String(id))
+            sp.append("projects", String(id))
           );
           return sp.toString();
         },

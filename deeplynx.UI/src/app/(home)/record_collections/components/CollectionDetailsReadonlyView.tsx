@@ -309,13 +309,13 @@ export default function CollectionDetailsReadonlyView({
                 : t.translations
                     .RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED
             }
-            maxHeightClassName="max-h-fit"
+            maxHeightClassName="max-h-80"
             pinnedHeader={false}
           />
         )}
 
         {filteredRecords.length > recordsPerPage ? (
-          <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 text-sm sm:items-center sm:justify-between">
             <span className="text-base-content/70">
               {`${t.translations.SHOWING} ${(recordPage - 1) * recordsPerPage + 1}-${Math.min(
                 recordPage * recordsPerPage,

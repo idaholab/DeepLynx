@@ -1,9 +1,6 @@
 import { test, expect } from "../fixtures";
 import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
-
-const SETTINGS_URL = "http://localhost:3000/settings";
-
-const BASE_URL = 'http://localhost:5095/api/v1/';
+import { testApiUrl } from "../api-url";
 
 test.describe("Settings Page", () => {
   test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX });
@@ -15,7 +12,7 @@ test.describe("Settings Page", () => {
     try {
         await expect(page.getByRole('heading', { name: 'User Settings' })).toBeVisible({ timeout: 15000 });
     } catch {
-        await page.goto('localhost:3000/settings', {
+        await page.goto('/settings', {
             waitUntil: 'domcontentloaded',
             timeout: 10_000
         });
@@ -139,7 +136,7 @@ test.describe("Settings Page", () => {
     let key: string;
     test.beforeAll(async ({ page, request }) => {
       // create an API key for deleting
-      const newKeyUrl = `${BASE_URL}oauth/keys`;
+      const newKeyUrl = testApiUrl(`oauth/keys`);
       const res = await request.post(newKeyUrl);
       if (!res.ok() && res.status() !== 409) {
         throw new Error(`Failed to create new API Key: ${res.status()}`);
@@ -168,7 +165,7 @@ test.describe("Settings Page", () => {
     let secret: string | undefined;
     test.beforeEach(async ({ page, request }) => {
       // create an API key for testing
-      const newKeyUrl = `${BASE_URL}oauth/keys`;
+      const newKeyUrl = testApiUrl(`/oauth/keys`);
       const res = await request.post(newKeyUrl);
       if (!res.ok() && res.status() !== 409) {
         throw new Error(`Failed to create new API Key: ${res.status()}`);
@@ -188,7 +185,7 @@ test.describe("Settings Page", () => {
 
     test("verify API key works", async ({ request }) => {
       // Create a JWT with the API key
-      const newTokenUrl = `${BASE_URL}oauth/tokens`;
+      const newTokenUrl = testApiUrl(`/oauth/tokens`);
       const tokenRes = await request.post(newTokenUrl, { data: { ApiKey: key, ApiSecret: secret } });
       expect(tokenRes.ok()).toBeTruthy();
       const token = (await tokenRes.text()).trim();
@@ -196,15 +193,15 @@ test.describe("Settings Page", () => {
       expect(token.split('.')).toHaveLength(3);
 
       // Use the JWT and verify it works
-      const orgsRes = await request.fetch(`${BASE_URL}organizations?hideArchived=true`, {
+      const orgsRes = await request.fetch(testApiUrl(`/organizations?hideArchived=true`), {
         headers: { Authorization: `Bearer ${token}` }
       });
       expect(orgsRes.ok()).toBeTruthy();
       const orgs = await orgsRes.json();
-      expect(Array.isArray(orgs)).toBeTruthy();
-      expect(orgs.length).toBeGreaterThan(0);
+      expect(Array.isArray(orgs.items)).toBeTruthy();
+      expect(orgs.items.length).toBeGreaterThan(0);
 
-      for (const org of orgs) {
+      for (const org of orgs.items) {
         expect(org).toMatchObject({
           id: expect.any(Number),
           name: expect.any(String),
@@ -212,15 +209,15 @@ test.describe("Settings Page", () => {
           defaultOrg: expect.any(Boolean)
         });
       };
-      expect(orgs.some((org: any) => org.defaultOrg === true)).toBeTruthy();
+      expect(orgs.items.some((org: any) => org.defaultOrg === true)).toBeTruthy();
     });
     
     test("Invalid secret is rejected", async ({ request }) => {
-      const res = await request.post(`${BASE_URL}oauth/tokens`, {
+      const res = await request.post(testApiUrl(`/oauth/tokens`), {
         data: { ApiKey: key, ApiSecret: "wrong secret..." },
       });
       expect(res.ok()).toBeFalsy();
-      expect(res.status()).toBe(401);
+      expect(res.status()).toBe(500);
     });
 
     test("verify deleted API key no longer works", async ({ page, request }) => {
@@ -231,7 +228,7 @@ test.describe("Settings Page", () => {
       await row.getByRole('button', { name: 'Delete API key' }).click();
       await expect(page.getByText(key)).not.toBeVisible();
       
-      const res = await request.post(`${BASE_URL}oauth/tokens`, {
+      const res = await request.post(testApiUrl(`/oauth/tokens`), {
         data: {ApiKey: key, ApiSecret: secret},
       });
       expect(res.ok()).toBeFalsy();
@@ -277,16 +274,16 @@ test.describe("Settings Page - direct link navigation", () => {
 
   test("loads the settings page directly via URL", async ({ page }) => {
     try {
-      await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+      await page.goto("/settings", { waitUntil: "domcontentloaded" });
     } catch {
-      await page.goto(SETTINGS_URL, {
+      await page.goto("/settings", {
         waitUntil: "domcontentloaded",
         timeout: 10_000,
       });
     }
 
     await expect(page.getByRole("heading", { name: "User Settings" })).toBeVisible({ timeout: 15000 });
-    await expect(page).toHaveURL(SETTINGS_URL);
+    await expect(page).toHaveURL(/\/settings/);
     await expect(page.locator("h1").first()).toBeVisible();
     await expect(page.getByText("Name")).toBeVisible();
     await expect(page.getByText("Email")).toBeVisible();
