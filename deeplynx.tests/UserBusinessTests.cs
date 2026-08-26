@@ -2122,6 +2122,66 @@ public class UserBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task DeleteUser_InvalidatesAllUserCacheKeys()
+    {
+        // Arrange
+        var user = new User
+        {
+            Name = "Cache Delete User",
+            Email = "cache-delete-user@test.com",
+            Username = $"cache_delete_user_{Guid.NewGuid()}",
+            IsActive = true
+        };
+        var otherUser = new User
+        {
+            Name = "Other Cache User",
+            Email = "other-cache-user@test.com",
+            Username = $"other_cache_user_{Guid.NewGuid()}",
+            IsActive = true
+        };
+
+        Context.Users.AddRange(user, otherUser);
+        await Context.SaveChangesAsync();
+
+        var userCacheKeys = new[]
+        {
+            CacheKeys.SysAdmin(user.Id),
+            CacheKeys.OrgAdmin(user.Id, oid),
+            CacheKeys.OrgMember(user.Id, oid),
+            CacheKeys.ProjectAdmin(user.Id, oid, pid),
+            CacheKeys.ProjectAdmin(user.Id, oid, pid2)
+        };
+        var otherUserCacheKeys = new[]
+        {
+            CacheKeys.SysAdmin(otherUser.Id),
+            CacheKeys.OrgAdmin(otherUser.Id, oid),
+            CacheKeys.OrgMember(otherUser.Id, oid),
+            CacheKeys.ProjectAdmin(otherUser.Id, oid, pid)
+        };
+
+        foreach (var key in userCacheKeys.Concat(otherUserCacheKeys))
+            await CacheService.Instance.SetAsync(key, true, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _userBusiness.DeleteUser(user.Id);
+
+        // Assert
+        Assert.True(result);
+
+        foreach (var key in userCacheKeys)
+        {
+            var cachedValue = await CacheService.Instance.GetAsync<bool?>(key);
+
+            Assert.True(
+                cachedValue is null,
+                $"Cache key '{key}' was not invalidated.");
+        }
+
+        foreach (var key in otherUserCacheKeys)
+            Assert.True(await CacheService.Instance.GetAsync<bool>(key));
+    }
+
+    [Fact]
     public async Task DeleteUser_Fails_IfNotFound()
     {
         // Act

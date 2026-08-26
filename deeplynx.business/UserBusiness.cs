@@ -346,6 +346,9 @@ public class UserBusiness : IUserBusiness
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
 
+        // invalidate the cached admin/user info for the deleted user
+        await InvalidateUserCache(userId);
+
         return true;
     }
 
@@ -653,5 +656,34 @@ public class UserBusiness : IUserBusiness
             IsActive = u.IsActive,
             LastLogin = u.LastLogin
         };
+    }
+
+    /// <summary>
+    ///     Removes all cached user/admin info keys associated with a user.
+    /// </summary>
+    /// <param name="userId">user id</param>
+    private async Task InvalidateUserCache(long userId)
+    {
+        try
+        {
+            // The sysadmin key has no suffix, so we can delete it directly
+            await CacheService.Instance.DeleteAsync(CacheKeys.SysAdmin(userId));
+
+            string[] keyPrefixes = 
+            { 
+                $"orgadmin:{userId}:", 
+                $"orgmember:{userId}:", 
+                $"projectadmin:{userId}:" 
+            };
+            
+            foreach (string prefix in keyPrefixes)
+            {
+                await CacheService.Instance.DeleteByPrefixAsync(prefix);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache invalidation failed for deleted user {UserId}", userId);
+        }
     }
 }
