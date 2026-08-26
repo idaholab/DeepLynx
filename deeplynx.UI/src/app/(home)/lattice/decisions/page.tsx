@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRightIcon,
+  ArrowTopRightOnSquareIcon,
   CheckCircleIcon,
   ChevronDownIcon,
   ChevronUpIcon,
@@ -16,7 +17,8 @@ import {
   getExtractionStaging,
   listExtractions,
   promoteExtraction,
-  rejectExtraction
+  rejectExtraction,
+  triggerLatticeExtraction
 } from "@/app/lib/client_service/lattice_services.client";
 import {
   ExtractionListItemDTO,
@@ -33,6 +35,7 @@ import { isInsightHidden } from "@/app/lib/feature_flags";
 import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 import PaginationControls from "../../components/PaginationControls";
 import { getRecord } from "@/app/lib/client_service/record_services.client";
+import { TriggerLatticeExtractionMode } from "../../types/requestDTOs";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
@@ -386,6 +389,7 @@ function ExtractionDetailPanel({
   const [staging, setStaging] = useState<ExtractionStagingResponseDTO | null>(
     null,
   );
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState(false);
@@ -560,6 +564,57 @@ function ExtractionDetailPanel({
     };
   }, [staging?.status, fetchStaging]);
 
+  const handleTriggerLatticeExtraction = useCallback(async (staging: ExtractionStagingResponseDTO) => {
+    try {
+
+      const extraction = await getExtractionStaging(organizationId, projectId, staging.id);
+
+      const record = await getRecord(organizationId, projectId, extraction.record_id as number, true);
+
+      const newExtractionId = await triggerLatticeExtraction(
+        organizationId as number,
+        projectId,
+        extraction.record_id as number,
+        {
+          data_source_id: record.dataSourceId as number,
+          mode: staging!.mode as TriggerLatticeExtractionMode,
+        },
+      );
+
+      if (newExtractionId) {
+        router.replace(`/lattice/decisions?extractionId=${newExtractionId}`);
+      } else {
+        router.replace(`/lattice/decisions?extractionId=${staging.id}`);
+      }
+
+      onStatusChange?.();
+    } catch (error: any) {
+      if (error?.response?.status === 400) {
+        toast(t.translations.LATTICE_EMBEDDINGS_GENERATING, { icon: "⏳" });
+      } else {
+        console.error("Error triggering Lattice extraction:", error);
+        toast.error(t.translations.LATTICE_FAILED_TO_START_ANALYSIS);
+      }
+    }
+  }, [
+    organizationId,
+    projectId,
+    onStatusChange,
+    t.translations,
+  ]);
+
+  useEffect(() => {
+    if (staging?.status === "failed") {
+      const timeoutId = window.setTimeout(() => {
+        fetchStaging();
+      }, 3000);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
+    }
+  }, [staging?.status, fetchStaging]);
+
   const handleSave = async () => {
     if (!staging) return;
     try {
@@ -715,15 +770,39 @@ function ExtractionDetailPanel({
         {/* Row 2: description on left, note on right */}
         <div className="flex flex-wrap items-start justify-between gap-2">
           <p className="text-sm text-base-content/70">
-            {isRunning
-              ? t.translations.LATTICE_EXTRACTION_RUNNING
-              : canDecide
-                ? t.translations.LATTICE_EXTRACTION_REVIEW
-                : staging.status === "failed"
-                  ? t.translations.LATTICE_EXTRACTION_FAILED_MSG
-                  : staging.status === "rejected"
-                    ? t.translations.LATTICE_EXTRACTION_REJECTED_MSG
-                    : `${t.translations.LATTICE_EXTRACTION_BEEN} ${statusLabel(staging.status, t.translations)}.`}
+            {isRunning ? (
+              <span>{t.translations.LATTICE_EXTRACTION_RUNNING}</span>
+            ) : canDecide ? (
+              <span>{t.translations.LATTICE_EXTRACTION_REVIEW}</span>
+            ) : staging.status === "failed" ? (
+              <>
+                <p className="text-sm text-red-600 font-bold">
+                  {t.translations.LATTICE_EXTRACTION_FAILED_MSG}
+                </p>
+                <div className="mt-4 p-3 bg-red-100 text-red-600 rounded-lg">
+                  <p className="font-bold">{t.translations.ERROR_DETAILS}</p>
+                  <p>{staging.failure_message}</p>
+                </div>
+                {/* Retry Extraction Button */}
+                {staging.record_id && (
+                  <button
+                    className="btn btn-error btn-sm mt-4"
+                    onClick={() => handleTriggerLatticeExtraction(staging)}
+                  >
+                    {t.translations.RETRY} {t.translations.LATTICE_EXTRACTION_NUMBER}{staging.id}
+                  </button>
+                )}
+              </>
+            ) : staging.status === "rejected" ? (
+              <span>{t.translations.LATTICE_EXTRACTION_REJECTED_MSG}</span>
+            ) : (
+              <>
+                <span>{t.translations.LATTICE_EXTRACTION_BEEN}</span>{" "}
+                <span>{statusLabel(staging.status, t.translations)}.</span>
+                <ArrowTopRightOnSquareIcon className="size-4" />
+              </>
+            )}
+
           </p>
           {canDecide && (
             <div className="flex flex-wrap gap-2">
@@ -893,6 +972,15 @@ export default function LatticeDecisionsPage() {
       .then((response) => {
         if (response?.items) {
           setItems(response.items);
+
+
+          const latestExtraction = response.items.reduce((prev, current) =>
+            current.id > prev.id ? current : prev,
+            response.items[0]);
+
+          if (latestExtraction && !selectedId) {
+            router.replace(`/lattice/decisions?extractionId=${latestExtraction.id}`, { scroll: false });
+          }
         } else {
           setItems([]);
         }
@@ -900,7 +988,7 @@ export default function LatticeDecisionsPage() {
       .catch(() =>
         setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS),
       );
-  }, [orgId, projId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS]);
+  }, [orgId, projId, selectedId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS, router]);
 
   useEffect(() => {
     if (insightHidden) {
@@ -987,7 +1075,6 @@ export default function LatticeDecisionsPage() {
         (entry): entry is readonly [number, string] => entry !== null
       );
       if (!cancelled) {
-        console.log(validEntries);
         setNames(Object.fromEntries(validEntries));
       }
     }
