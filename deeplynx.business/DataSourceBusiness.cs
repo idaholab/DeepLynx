@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -279,6 +280,8 @@ public class DataSourceBusiness : IDataSourceBusiness
 
         await _context.SaveChangesAsync();
 
+        await InvalidateDataSourceCountCaches(organizationId, projectId);
+
         // Log DataSource Create Event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {
@@ -434,6 +437,8 @@ public class DataSourceBusiness : IDataSourceBusiness
         _context.DataSources.Remove(dataSource);
         await _context.SaveChangesAsync();
 
+        await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
+
         return true;
     }
 
@@ -475,6 +480,8 @@ public class DataSourceBusiness : IDataSourceBusiness
         dataSource.LastUpdatedBy = currentUserId;
 
         await _context.SaveChangesAsync();
+
+        await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
 
         // Log dataSource archive event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -528,6 +535,8 @@ public class DataSourceBusiness : IDataSourceBusiness
         dataSource.LastUpdatedBy = currentUserId;
         _context.DataSources.Update(dataSource);
         await _context.SaveChangesAsync();
+
+        await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
 
         // Log dataSource unarchive event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -647,5 +656,24 @@ public class DataSourceBusiness : IDataSourceBusiness
         await _context.DataSources
             .Where(d => d.OrganizationId == organizationId && d.ProjectId == null && d.Id != newDefaultId)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.Default, false));
+    }
+
+    private static Task InvalidateDataSourceCountCaches(long organizationId, long? projectId)
+    {
+        var keys = new List<string>
+        {
+            CacheKeys.SystemDataSourceCount(true),
+            CacheKeys.SystemDataSourceCount(false),
+            CacheKeys.OrganizationDataSourceCount(organizationId, true),
+            CacheKeys.OrganizationDataSourceCount(organizationId, false)
+        };
+
+        if (projectId.HasValue)
+        {
+            keys.Add(CacheKeys.ProjectDataSourceCount(projectId.Value, true));
+            keys.Add(CacheKeys.ProjectDataSourceCount(projectId.Value, false));
+        }
+
+        return Task.WhenAll(keys.Select(CacheService.Instance.DeleteAsync));
     }
 }
