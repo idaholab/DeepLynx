@@ -51,15 +51,6 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
 }) => {
   const { t } = useLanguage();
   const hasEditableRoles = roles.some((role) => !isSeededUserRole(role));
-  const matrixPermissionCategories = React.useMemo(() => {
-    // Matrix view intentionally excludes sensitivity-label permissions.
-    return permissionCategories
-      .map((category) => ({
-        ...category,
-        permissions: category.permissions.filter((perm) => perm.labelId == null),
-      }))
-      .filter((category) => category.permissions.length > 0);
-  }, [permissionCategories]);
 
   const editMatrixDisabledReason = !hasEditableRoles
     ? t.translations.MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES
@@ -168,7 +159,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {matrixPermissionCategories.map((category) => (
+                {permissionCategories.map((category) => (
                   <React.Fragment key={category.id}>
                     {/* Category Row */}
                     <tr className="bg-base-200">

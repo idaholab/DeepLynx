@@ -114,6 +114,14 @@ public class QueryBusiness : IQueryBusiness
                 for (var i = 0; i < request.Length; i++)
                 {
                     var query = request[i];
+
+                    //  verify filter belongs to one of valid filter columns
+                    if (string.IsNullOrWhiteSpace(query.Filter) || !AllowedQueryRecordFilterColumns.Contains(query.Filter))
+                    {
+                        throw new ArgumentException(
+                            $"Invalid filter field: '{query.Filter}'. Filter must be one of the allowed query_records columns.");
+                    }
+
                     if (string.IsNullOrWhiteSpace(query.Value) && query.Operator != "KEY_VALUE")
                         throw new ArgumentException("Value cannot be null or empty.");
                     var condition = "";
@@ -437,6 +445,15 @@ public class QueryBusiness : IQueryBusiness
                 for (var i = 0; i < request.Length; i++)
                 {
                     var query = request[i];
+
+                    // Validate filter against the allowed columns
+                    // before it's ever used, to prevent SQL injection.
+                    if (string.IsNullOrWhiteSpace(query.Filter) || !AllowedQueryRecordFilterColumns.Contains(query.Filter))
+                    {
+                        throw new ArgumentException(
+                            $"Invalid filter field: '{query.Filter}'. Filter must be one of the allowed query_records columns.");
+                    }
+
                     if (string.IsNullOrWhiteSpace(query.Value) && query.Operator != "KEY_VALUE")
                         throw new ArgumentException("Value cannot be null or empty.");
 
@@ -1024,6 +1041,16 @@ public class QueryBusiness : IQueryBusiness
             .Select(r => QueryRecordToResponse(r, isUriAuthorized(r)))
             .ToPaginatedAsync(paginatedRequestDto);
     }
+
+     // validate a query_records filter column
+    private static readonly HashSet<string> AllowedQueryRecordFilterColumns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "id", "uri", "properties", "original_id", "name", "description",
+        "class_id", "class_name", "data_source_id", "data_source_name",
+        "object_storage_id", "object_storage_name", "project_id", "project_name",
+        "organization_id", "file_type", "file_size", "tags", "labels",
+        "last_updated_at", "last_updated_by", "is_archived"
+    };
 
     #region Deprecated
 

@@ -179,6 +179,28 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         _labelId = label1.Id;
         _labelId2 = label2.Id;
 
+        // Gate "read record" on label1 and label2 (with no UserSensitivityLabel grant to _userId) so
+        // that, matching the old role/permission model's default-deny behavior, a non-admin user
+        // needs an explicit grant to access records/collections carrying either label.
+        Context.SensitivityLabelPermissions.AddRange(
+            new SensitivityLabelPermission
+            {
+                LabelId = _labelId,
+                Action = "read record",
+                Name = "read record",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                IsArchived = false
+            },
+            new SensitivityLabelPermission
+            {
+                LabelId = _labelId2,
+                Action = "read record",
+                Name = "read record",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                IsArchived = false
+            });
+        await Context.SaveChangesAsync();
+
         var record1 = new Record
         {
             Name = "record-one",
