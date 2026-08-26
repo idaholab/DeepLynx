@@ -87,7 +87,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             CreatedBy = currentUserId,
             Status = ExtractionStatus.Pending,
             Mode = mode,
-            ProjectId = projectId
+            ProjectId = projectId,
+            RecordId = recordId
         };
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
@@ -763,6 +764,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             Mode = extraction.Mode,
             CreatedBy = extraction.CreatedBy,
             FailureMessage = GetExtractionFailureMessage(extraction.Properties),
+            RecordId = extraction.RecordId,
             Classes = classes.Select(c => new StagedClassDto
             {
                 Id = c.Id,
@@ -1059,7 +1061,24 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var properties = GetExtractionProperties(extraction.Properties);
         properties["failure_stage"] = stage;
-        properties["failure_message"] = message;
+
+        HashSet<string> failureMessages;
+        if (properties.ContainsKey("failure_message"))
+        {
+            var failureMessageValue = properties["failure_message"]?.ToString();
+            failureMessages = failureMessageValue != null
+            ? [.. failureMessageValue.Split(" | ", StringSplitOptions.RemoveEmptyEntries)]
+            : [];
+        }
+        else
+        {
+            failureMessages = [];
+        }
+
+        failureMessages.Add(message);
+
+        properties["failure_message"] = string.Join(" | ", failureMessages);
+
         properties["failed_at"] = DateTimeOffset.UtcNow.ToString("O");
         extraction.Properties = properties.ToJsonString();
     }

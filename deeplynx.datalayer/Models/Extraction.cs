@@ -25,6 +25,9 @@ public class Extraction
     [Column("project_id")]
     public long? ProjectId { get; set; }
 
+    [Column("record_id")]
+    public long? RecordId { get; set; }
+
     [ForeignKey("CreatedBy")]
     public virtual User? CreatedByUser { get; set; }
 }
