@@ -137,7 +137,7 @@ const ExpandedProjectCard: React.FC<Props> = ({ project, onClose }) => {
       }
 
       if (membersResult.status === "fulfilled") {
-        setMembers(membersResult.value);
+        setMembers(membersResult.value.items);
       } else {
         console.error("Failed to fetch project members:", membersResult.reason);
         setMembers([]);

@@ -26,14 +26,18 @@ export async function getAllRecordsServer(
   projectId: number,
   dataSourceId?: number,
   fileType?: string,
-  hideArchived: boolean = true
-): Promise<RecordResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<RecordResponseDto>> {
   const params = new URLSearchParams();
   if (dataSourceId !== undefined) {
     params.append("dataSourceId", String(dataSourceId));
   }
   if (fileType) params.append('fileType', fileType);
   params.append('hideArchived', String(hideArchived));
+  params.append('pageNumber', String(pageNumber));
+  params.append('pageSize', String(pageSize));
 
   const res = await fetch(
     backendApiUrl(
@@ -44,7 +48,7 @@ export async function getAllRecordsServer(
       cache: "no-store",
     }
   );
-  return asJson<RecordResponseDto[]>(res);
+  return asJson<PaginatedResponse<RecordResponseDto>>(res);
 }
 
 export async function getRecordServer(
