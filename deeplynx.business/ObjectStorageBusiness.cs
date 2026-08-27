@@ -1,9 +1,13 @@
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Pgvector.EntityFrameworkCore;
+using ZstdSharp.Unsafe;
 
 namespace deeplynx.business;
 
@@ -13,12 +17,16 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     private readonly DeeplynxContext _context;
     private readonly IFileBusiness _fileAzureBusiness;
     private readonly EncryptionHelper _encryptionHelper;
+    private readonly ILogger<ObjectStorageBusiness>? _logger;
+    private static readonly TimeSpan ObjectStorageCacheTtl = TimeSpan.FromHours(1);
 
-    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper, IFileBusiness fileAzureBusiness)
+    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper, 
+        IFileBusiness fileAzureBusiness, ILogger<ObjectStorageBusiness>? logger = null)
     {
         _encryptionHelper = encryptionHelper;
         _context = context;
         _fileAzureBusiness = fileAzureBusiness;
+        _logger = logger;
     }
 
     /// <summary>
@@ -239,6 +247,12 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
             await transaction.CommitAsync();
 
+            // Update cached default object storage
+            if (dto.Default)
+            {
+                await UpdateDefaultObjectStorageCache(newObjectStorage.Id, organizationId, projectId);
+            }
+
             return new ObjectStorageResponseDto
             {
                 Id = newObjectStorage.Id,
@@ -338,6 +352,12 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
+
+            // Update cached default object storage
+            if (dto.Default)
+            {
+                await UpdateDefaultObjectStorageCache(objectStorageId, organizationId, projectId);
+            }
 
             return new ObjectStorageResponseDto
             {
@@ -547,29 +567,52 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     {
         long? defaultObjectStorageId = null;
 
-        if (projectId.HasValue)
+        string cacheKey = projectId.HasValue
+            ? CacheKeys.ProjectDefaultObjectStorage(projectId.Value)
+            : CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+        
+        long? cachedId = null;
+        try
         {
-            var project = await _context.Projects
-                .Where(p => p.Id == projectId.Value && p.OrganizationId == organizationId)
-                .Select(p => new { p.DefaultObjectStorageId })
-                .FirstOrDefaultAsync();
+            cachedId = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache read failed for default-object-storage key {CacheKey}", cacheKey);
+        }
 
-            if (project == null)
-                throw new KeyNotFoundException($"Project with id {projectId.Value} not found");
+        bool cacheHit = cachedId.HasValue;
 
-            defaultObjectStorageId = project.DefaultObjectStorageId;
+        if (cacheHit)
+        {
+            defaultObjectStorageId = cachedId;
         }
         else
         {
-            var organization = await _context.Organizations
-                .Where(o => o.Id == organizationId)
-                .Select(o => new { o.DefaultObjectStorageId })
-                .FirstOrDefaultAsync();
+            if (projectId.HasValue)
+            {
+                var project = await _context.Projects
+                    .Where(p => p.Id == projectId.Value && p.OrganizationId == organizationId)
+                    .Select(p => new { p.DefaultObjectStorageId })
+                    .FirstOrDefaultAsync();
 
-            if (organization == null)
-                throw new KeyNotFoundException($"Organization with id {organizationId} not found");
+                if (project == null)
+                    throw new KeyNotFoundException($"Project with id {projectId.Value} not found");
 
-            defaultObjectStorageId = organization.DefaultObjectStorageId;
+                defaultObjectStorageId = project.DefaultObjectStorageId;
+            }
+            else
+            {
+                var organization = await _context.Organizations
+                    .Where(o => o.Id == organizationId)
+                    .Select(o => new { o.DefaultObjectStorageId })
+                    .FirstOrDefaultAsync();
+
+                if (organization == null)
+                    throw new KeyNotFoundException($"Organization with id {organizationId} not found");
+
+                defaultObjectStorageId = organization.DefaultObjectStorageId;
+            }
         }
 
         if (defaultObjectStorageId == null)
@@ -581,6 +624,19 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (returnedObjectStorage == null)
             throw new KeyNotFoundException("Default object storage not found or is archived");
+
+        // Repopulate cache on miss for subsequent reads
+        if (!cacheHit)
+        {
+            try
+            {
+                await CacheService.Instance.SetAsync(cacheKey, returnedObjectStorage.Id, ObjectStorageCacheTtl);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Cache population failed for default-object-storage key {cacheKey}", cacheKey);
+            }
+        }
 
         return new ObjectStorageResponseDto
         {
@@ -647,6 +703,8 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         await _context.SaveChangesAsync();
 
         await transaction.CommitAsync();
+
+        await UpdateDefaultObjectStorageCache(objectStorageId, organizationId, projectId);
 
         return new ObjectStorageResponseDto
         {
@@ -756,5 +814,30 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         await _context.ObjectStorages
             .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
+    }
+
+    private async Task UpdateDefaultObjectStorageCache(
+        long objectStorageId,
+        long organizationId,
+        long? projectId)
+    {
+        var key = projectId.HasValue
+            ? CacheKeys.ProjectDefaultObjectStorage(projectId.Value)
+            : CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+
+        try
+        {
+            await CacheService.Instance.SetAsync(
+                key,
+                objectStorageId,
+                ObjectStorageCacheTtl);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(
+                ex,
+                "Default object storage cache update failed for key {CacheKey}",
+                key);
+        }
     }
 }

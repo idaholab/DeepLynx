@@ -6,4 +6,14 @@ public class CacheKeys
     {
         return $"project:{projectId}:storage_size";
     }
+
+    public static string OrganizationDefaultObjectStorage(long organizationId)
+    {
+        return $"orgdefaultobjectstorage:{organizationId}";
+    }
+
+    public static string ProjectDefaultObjectStorage(long projectId)
+    {
+        return $"projectdefaultobjectstorage:{projectId}";
+    }
 }
