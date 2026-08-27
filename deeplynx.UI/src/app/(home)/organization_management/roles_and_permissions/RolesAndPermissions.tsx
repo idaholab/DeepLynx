@@ -242,9 +242,9 @@ const RolesAndPermissions = ({
     new Set(),
   );
 
-  const handleStartEditingPermissions = (activePermissionTab: string) => {
+  const handleStartEditingPermissions = () => {
     if (!currentRole) return;
-    if (isSeededUserRole(currentRole) && activePermissionTab !== t.translations.SENSITIVITY_LABELS) {
+    if (isSeededUserRole(currentRole)) {
       toast.error(
         t.translations.SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED,
       );
@@ -270,9 +270,9 @@ const RolesAndPermissions = ({
     });
   };
 
-  const handleSavePermissions = async (activePermissionTab: string) => {
+  const handleSavePermissions = async () => {
     if (!currentRole) return;
-    if (isSeededUserRole(currentRole) && activePermissionTab !== t.translations.SENSITIVITY_LABELS) {
+    if (isSeededUserRole(currentRole)) {
       toast.error(
         t.translations.SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED,
       );

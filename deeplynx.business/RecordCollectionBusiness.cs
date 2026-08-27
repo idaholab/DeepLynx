@@ -997,11 +997,58 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <summary>
     /// Get Sensitivity Labels for Record Collection
     /// </summary>
-    /// <param name="organizationId"></param>
-    /// <param name="projectId"></param>
-    /// <param name="recordCollectionId"></param>
-    /// <returns></returns>
-    /// <exception cref="KeyNotFoundException"></exception>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record collection belongs</param>
+    /// <param name="recordCollectionId">The ID of the record collection</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of sensitivity labels attached to the record collection.</returns>
+    /// <exception cref="KeyNotFoundException">Returned if the record collection was not found or is archived.</exception>
+    public async Task<PaginatedResponse<SensitivityLabelResponseDto>> GetSensitivityLabelsForRecordCollectionPaginated(
+        long organizationId, long projectId, long recordCollectionId, PaginatedRequestDto paginatedRequestDto)
+    {
+        var collectionExists = await _context.RecordCollections.AnyAsync(rc =>
+            rc.Id == recordCollectionId
+            && rc.OrganizationId == organizationId
+            && rc.ProjectId == projectId
+            && !rc.IsArchived);
+
+        if (!collectionExists)
+            throw new KeyNotFoundException($"Record collection with id {recordCollectionId} not found or is archived.");
+
+        var labelQuery = _context.SensitivityLabels
+            .Where(l => l.RecordCollections.Any(rc => rc.Id == recordCollectionId))
+            .OrderBy(l => l.Id);
+
+        return await labelQuery
+            .Select(l => new SensitivityLabelResponseDto
+            {
+                Id = l.Id,
+                Name = l.Name,
+                Description = l.Description,
+                LastUpdatedAt = l.LastUpdatedAt,
+                LastUpdatedBy = l.LastUpdatedBy,
+                ProjectId = l.ProjectId,
+                OrganizationId = l.OrganizationId,
+                IsArchived = l.IsArchived
+            })
+            .ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Get sensitivity labels for a record collection without pagination.
+    ///     Superseded by <see cref="GetSensitivityLabelsForRecordCollectionPaginated"/>. Do not call this from new
+    ///     controller versions; it exists solely to back the deprecated v1 record collection controllers and should
+    ///     be deleted once those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record collection belongs</param>
+    /// <param name="recordCollectionId">The ID of the record collection</param>
+    /// <returns>The list of sensitivity labels attached to the record collection.</returns>
+    /// <exception cref="KeyNotFoundException">Returned if the record collection was not found or is archived.</exception>
+    [Obsolete("V1-only. Used by deprecated v1 record collection endpoints. Superseded by " +
+              "GetSensitivityLabelsForRecordCollectionPaginated. Remove once v1 record collection endpoints are sunset.", error: false)]
     public async Task<List<SensitivityLabel>> GetSensitivityLabelsForRecordCollection(long organizationId,
         long projectId, long recordCollectionId)
     {
@@ -1018,8 +1065,6 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         return recordCollection.Labels.ToList();
     }
-
-    #region Deprecated
 
     /// <summary>
     ///     [DEPRECATED - V1 ONLY] Get all records that contain all given tags.

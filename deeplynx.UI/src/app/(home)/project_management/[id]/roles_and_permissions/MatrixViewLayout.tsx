@@ -52,15 +52,6 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
   isProjectRole,
 }) => {
   const { t } = useLanguage();
-  const matrixPermissionCategories = React.useMemo(() => {
-    // Matrix view intentionally excludes sensitivity-label permissions.
-    return permissionCategories
-      .map((category) => ({
-        ...category,
-        permissions: category.permissions.filter((perm) => perm.labelId == null),
-      }))
-      .filter((category) => category.permissions.length > 0);
-  }, [permissionCategories]);
 
   // Determine if there are editable (project-only) roles
   const hasEditableRoles = roles.some(
@@ -192,7 +183,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {matrixPermissionCategories.map((category) => (
+                {permissionCategories.map((category) => (
                   <React.Fragment key={category.id}>
                     {/* Category Row */}
                     <tr className="bg-base-200">

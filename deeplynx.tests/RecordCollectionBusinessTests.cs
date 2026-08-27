@@ -179,6 +179,28 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         _labelId = label1.Id;
         _labelId2 = label2.Id;
 
+        // Gate "read record" on label1 and label2 (with no UserSensitivityLabel grant to _userId) so
+        // that, matching the old role/permission model's default-deny behavior, a non-admin user
+        // needs an explicit grant to access records/collections carrying either label.
+        Context.SensitivityLabelPermissions.AddRange(
+            new SensitivityLabelPermission
+            {
+                LabelId = _labelId,
+                Action = "read record",
+                Name = "read record",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                IsArchived = false
+            },
+            new SensitivityLabelPermission
+            {
+                LabelId = _labelId2,
+                Action = "read record",
+                Name = "read record",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                IsArchived = false
+            });
+        await Context.SaveChangesAsync();
+
         var record1 = new Record
         {
             Name = "record-one",
@@ -1797,6 +1819,116 @@ public class RecordCollectionBusinessTests : IntegrationTestBase
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _recordCollectionBusiness.GetSensitivityLabelsForRecordCollection(
                 _organizationId, _projectId2, _collectionId));
+    }
+
+    #endregion
+
+    #region GetSensitivityLabelsForRecordCollectionPaginated Tests
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollectionPaginated_ReturnsLabels()
+    {
+        // _collectionId is seeded with _labelId in seed data
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        var result = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollectionPaginated(
+            _organizationId, _projectId, _collectionId, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+        Assert.Contains(result.Items, l => l.Id == _labelId);
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollectionPaginated_NoLabels_ReturnsEmptyPage()
+    {
+        // Create a collection with no labels
+        var collection = new RecordCollection
+        {
+            Name = "No Label Collection",
+            Description = "Has no labels",
+            Properties = "{}",
+            ProjectId = _projectId,
+            OrganizationId = _organizationId,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = _userId,
+            IsArchived = false,
+            Labels = new List<SensitivityLabel>()
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        var result = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollectionPaginated(
+            _organizationId, _projectId, collection.Id, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollectionPaginated_NotFound_ThrowsKeyNotFoundException()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordCollectionBusiness.GetSensitivityLabelsForRecordCollectionPaginated(
+                _organizationId, _projectId, long.MaxValue, paginatedRequest));
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollectionPaginated_ArchivedCollection_ThrowsKeyNotFoundException()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordCollectionBusiness.GetSensitivityLabelsForRecordCollectionPaginated(
+                _organizationId, _projectId, _archivedCollectionId, paginatedRequest));
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollectionPaginated_WrongProject_ThrowsKeyNotFoundException()
+    {
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordCollectionBusiness.GetSensitivityLabelsForRecordCollectionPaginated(
+                _organizationId, _projectId2, _collectionId, paginatedRequest));
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollectionPaginated_Pagination_ReturnsCorrectPage()
+    {
+        await _recordCollectionBusiness.AttachLabel(_organizationId, _projectId, _collectionId, _labelId2);
+
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 1 };
+
+        var result = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollectionPaginated(
+            _organizationId, _projectId, _collectionId, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(1, result.PageSize);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelsForRecordCollectionPaginated_PageSizeMinusOne_ReturnsAllLabels()
+    {
+        await _recordCollectionBusiness.AttachLabel(_organizationId, _projectId, _collectionId, _labelId2);
+
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = -1 };
+
+        var result = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollectionPaginated(
+            _organizationId, _projectId, _collectionId, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
+        Assert.Equal(2, result.Items.Count);
     }
 
     #endregion
