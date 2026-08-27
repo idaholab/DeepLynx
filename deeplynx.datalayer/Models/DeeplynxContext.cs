@@ -220,6 +220,11 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.CreatedBy)
                 .OnDelete(DeleteBehavior.NoAction)
                 .HasConstraintName(null);
+            
+            entity.HasOne(e => e.SourceRecord)
+                .WithMany()
+                .HasForeignKey(e => e.SourceRecordId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<DataSource>(entity =>
