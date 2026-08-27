@@ -494,7 +494,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         ValidateRejectedNotSelected(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
             selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
 
-        ValidateDependencies(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
+        await ValidateDependencies(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
             selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
 
         var classesPromotedBefore = stagingClasses.Where(c => c.PromotedId.HasValue).Select(c => c.Id).ToHashSet();
