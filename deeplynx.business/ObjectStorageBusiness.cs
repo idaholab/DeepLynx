@@ -709,15 +709,8 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage is null)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
 
-        await CacheService.Instance.SetAsync(
-            CacheKeys.ObjectStorageStatus(returnedObjectStorage.Id), 
-            new ObjectStorageCacheEntry
-            {
-                OrganizationId = returnedObjectStorage.OrganizationId,
-                ProjectId = returnedObjectStorage.ProjectId,
-                Status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active
-            },
-            _objectStorageStatusCache);
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status);
 
         return new ObjectStorageDecryptedDto
         {
