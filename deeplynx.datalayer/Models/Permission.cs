@@ -18,8 +18,6 @@ public class Permission
 
     [Column("is_default")] public bool IsDefault { get; set; } = false;
 
-    [Column("label_id")] public long? LabelId { get; set; }
-
     [Column("project_id")] public long? ProjectId { get; set; }
 
     [Column("organization_id")] public long? OrganizationId { get; set; }
@@ -30,10 +28,6 @@ public class Permission
     public DateTime LastUpdatedAt { get; set; }
 
     [Column("is_archived")] public bool IsArchived { get; set; }
-
-    [ForeignKey("LabelId")]
-    [InverseProperty("Permissions")]
-    public virtual SensitivityLabel? Label { get; set; }
 
     [ForeignKey("ProjectId")]
     [InverseProperty("Permissions")]

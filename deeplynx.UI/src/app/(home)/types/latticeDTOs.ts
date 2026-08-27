@@ -54,6 +54,7 @@ export interface ExtractionListItemDTO {
   mode: string | null;
   created_by: number | null;
   project_id: number | null;
+  source_record_id: number | null;
 }
 
 export interface ExtractionStagingResponseDTO {

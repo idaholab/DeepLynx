@@ -168,23 +168,27 @@ public class RecordCollectionController : ControllerBase
     /// <param name="projectId">The ID of the project to which the records belong</param>
     /// <param name="tagIds">The list of tag IDs to filter records by - records must contain all IDs in the list</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
-    /// <returns>A list of record collections that have all the specified tags.</returns>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of record collections that have all the specified tags.</returns>
     [HttpGet("by-tags", Name = "api_get_record_collections_by_tags")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record_collection")]
     [Auth("read", "tag")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<IEnumerable<RecordCollectionResponseDto>>> GetRecordCollectionsByTags(
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetRecordCollectionsByTags(
         long organizationId,
         long projectId,
         [FromQuery] long[] tagIds,
-        [FromQuery] bool hideArchived = true)
+        [FromQuery] bool hideArchived = true,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
+            paginatedRequestDto ??= new PaginatedRequestDto();
             var currentUserId = UserContextStorage.UserId;
             var isSysAdmin = UserContextStorage.IsSysAdmin;
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records = await _recordCollectionBusiness.GetRecordCollectionsByTags(currentUserId, organizationId, projectId, tagIds, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            var records = await _recordCollectionBusiness.GetRecordCollectionsByTagsPaginated(
+                currentUserId, organizationId, projectId, tagIds, paginatedRequestDto, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
             return Ok(records);
     }
 
@@ -466,18 +470,22 @@ public class RecordCollectionController : ControllerBase
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
     /// <param name="projectId">The ID of the project to which the record collectionbelongs</param>
     /// <param name="recordCollectionId">The ID of the record collection</param>
-    /// <returns>A message stating the label was successfully attached to the record.</returns>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of sensitivity labels attached to the record collection.</returns>
     [HttpGet("{recordCollectionId:long}/sensitivity-labels", Name = "api_get_sensitivity_labels_for_record_collection")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record_collection")]
     [Auth("read", "sensitivity_label")]
     [Sensitivity("read record")]
-    public async Task<IActionResult> GetSensitivityLabelsForRecordCollection(
+    public async Task<ActionResult<PaginatedResponse<SensitivityLabelResponseDto>>> GetSensitivityLabelsForRecordCollection(
         long organizationId,
         long projectId,
-        long recordCollectionId)
+        long recordCollectionId,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
-            var sensitivityLabels = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollection(organizationId, projectId, recordCollectionId);
+            paginatedRequestDto ??= new PaginatedRequestDto();
+            var sensitivityLabels = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollectionPaginated(
+                organizationId, projectId, recordCollectionId, paginatedRequestDto);
             return Ok(sensitivityLabels);
     }
 
