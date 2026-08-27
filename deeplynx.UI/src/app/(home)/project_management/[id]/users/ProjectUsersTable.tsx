@@ -250,7 +250,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
           organizationId,
           projectId,
         );
-        setTableData(buildTableData(updatedMembers));
+        setTableData(buildTableData(updatedMembers.items));
       } else {
         const updatedMembers = await getAllUsers(organizationId);
         setTableData(buildTableData(updatedMembers.items));
@@ -383,7 +383,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
       // Refresh the members list
       const updatedMembers = await getProjectMembers(organizationId, projectId);
-      setTableData(buildTableData(updatedMembers));
+      setTableData(buildTableData(updatedMembers.items));
       await refreshAccessIfAffected("group", groupId);
 
       setShowAddGroupModal(false);

@@ -670,7 +670,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetAllRecords Tests
+    #region GetAllRecords (Deprecated) Tests
 
     [Fact]
     public async Task GetAllRecords_ValidProjectId_ReturnsRecords()
@@ -724,6 +724,10 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.NotNull(correctFileTypeResponse);
         Assert.Equal("pdf", correctFileTypeResponse.First().FileType);
     }
+
+    #endregion
+
+    #region GetAllRecordsPaginated Tests
 
     [Fact]
     public async Task GetAllRecordsPaginated_ReturnsRequestedPageAndTotalCount()

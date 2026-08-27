@@ -620,42 +620,83 @@ public class ProjectControllerTests : IDisposable
 
     [Fact]
     public async Task GetProjectMembers_Returns200_WithMembers()
+{
+    var expected = new PaginatedResponse<ProjectMemberResponseDto>
     {
-        var expected = new List<ProjectMemberResponseDto>
-        {
-            new()
-        };
-
-        _mockBusiness.Setup(b => b.GetProjectMembers(ProjectId))
-                    .ReturnsAsync(expected);
-
-        var result = (await _controller.GetProjectMembers(
-            OrgId, ProjectId)).Result as OkObjectResult;
-
-        Assert.NotNull(result);
-        Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
-    }
+        Items = new List<ProjectMemberResponseDto> { new() },
+        PageNumber = 1,
+        PageSize = 20,
+        TotalCount = 1
+    };
+    _mockBusiness.Setup(b => b.GetProjectMembersPaginated(ProjectId, It.IsAny<PaginatedRequestDto>()))
+                .ReturnsAsync(expected);
+    var result = (await _controller.GetProjectMembers(
+        OrgId, ProjectId, new PaginatedRequestDto())).Result as OkObjectResult;
+    Assert.NotNull(result);
+    Assert.Equal(200, result.StatusCode);
+    Assert.Equal(expected, result.Value);
+}
 
     [Fact]
     public async Task GetProjectMembers_Returns500_OnUnexpectedException()
     {
-        _mockBusiness.Setup(b => b.GetProjectMembers(It.IsAny<long>()))
+        _mockBusiness.Setup(b => b.GetProjectMembersPaginated(It.IsAny<long>(), It.IsAny<PaginatedRequestDto>()))
                     .ThrowsAsync(new Exception("db error"));
-
         await Assert.ThrowsAsync<Exception>(() => _controller.GetProjectMembers(
-            OrgId, ProjectId));
+            OrgId, ProjectId, new PaginatedRequestDto()));
     }
 
     [Fact]
     public async Task GetProjectMembers_PassesProjectIdToBusinessLayer()
     {
-        _mockBusiness.Setup(b => b.GetProjectMembers(ProjectId))
-                    .ReturnsAsync(new List<ProjectMemberResponseDto>());
+        _mockBusiness.Setup(b => b.GetProjectMembersPaginated(ProjectId, It.IsAny<PaginatedRequestDto>()))
+                    .ReturnsAsync(new PaginatedResponse<ProjectMemberResponseDto>
+                    {
+                        Items = new List<ProjectMemberResponseDto>(),
+                        PageNumber = 1,
+                        PageSize = 20,
+                        TotalCount = 0
+                    });
+        await _controller.GetProjectMembers(OrgId, ProjectId, new PaginatedRequestDto());
+        _mockBusiness.Verify(b => b.GetProjectMembersPaginated(ProjectId, It.IsAny<PaginatedRequestDto>()), Times.Once);
+    }
 
-        await _controller.GetProjectMembers(OrgId, ProjectId);
-
-        _mockBusiness.Verify(b => b.GetProjectMembers(ProjectId), Times.Once);
+    [Fact]
+    public async Task GetProjectMembers_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        _mockBusiness.Setup(b => b.GetProjectMembersPaginated(
+                        ProjectId,
+                        It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25)))
+                    .ReturnsAsync(new PaginatedResponse<ProjectMemberResponseDto>
+                    {
+                        Items = [],
+                        PageNumber = 1,
+                        PageSize = 25,
+                        TotalCount = 0
+                    });
+        await _controller.GetProjectMembers(OrgId, ProjectId, null);
+        _mockBusiness.Verify(b => b.GetProjectMembersPaginated(
+            ProjectId,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25)), Times.Once);
+    }
+    [Fact]
+    public async Task GetProjectMembers_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var pagination = new PaginatedRequestDto { PageNumber = 3, PageSize = 10 };
+        _mockBusiness.Setup(b => b.GetProjectMembersPaginated(
+                        ProjectId,
+                        It.Is<PaginatedRequestDto>(p => p.PageNumber == 3 && p.PageSize == 10)))
+                    .ReturnsAsync(new PaginatedResponse<ProjectMemberResponseDto>
+                    {
+                        Items = [],
+                        PageNumber = 3,
+                        PageSize = 10,
+                        TotalCount = 0
+                    });
+        await _controller.GetProjectMembers(OrgId, ProjectId, pagination);
+        _mockBusiness.Verify(b => b.GetProjectMembersPaginated(
+            ProjectId,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 3 && p.PageSize == 10)), Times.Once);
     }
 
     #endregion
@@ -986,8 +1027,8 @@ public class ProjectControllerTests : IDisposable
         var method = GetControllerMethod(
             nameof(ProjectController.GetProjectMembers),
             "organizationId",
-            "projectId");
-
+            "projectId",
+            "paginatedRequestDto");
         AssertHasHttpAttribute(method, "HttpGetAttribute");
         AssertHasAuthAttribute(method, "read", "project");
         AssertHasAuthAttribute(method, "read", "user");
