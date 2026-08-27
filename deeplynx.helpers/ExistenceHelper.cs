@@ -2,6 +2,8 @@ using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 using deeplynx.helpers.Cache;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace deeplynx.helpers
 {
@@ -229,6 +231,8 @@ namespace deeplynx.helpers
             }
         }
 
+        private static readonly TimeSpan _deletedObjectStorageCacheTtl = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan _objectStorageArchivedStatusTtl = TimeSpan.FromHours(1);
         public static async Task EnsureObjectStorageExistsAsync(
             DeeplynxContext context,
             long organizationId,
@@ -236,21 +240,54 @@ namespace deeplynx.helpers
             long objectStorageId,
             bool hideArchived = true)
         {
-            var objectStorageExists = hideArchived
-                ? await context.ObjectStorages.AnyAsync(os =>
-                    os.Id == objectStorageId &&
-                    os.OrganizationId == organizationId &&
-                    (os.ProjectId == null || os.ProjectId == projectId) &&
-                    os.IsArchived == false)
-                : await context.ObjectStorages.AnyAsync(os =>
-                    os.Id == objectStorageId &&
-                    os.OrganizationId == organizationId &&
-                    (os.ProjectId == null || os.ProjectId == projectId));
+            // Check to see if the object storage is deleted first
+            var deletedCacheKey = CacheKeys.ObjectStorageDeleted(objectStorageId);
+            var cachedDeleted = await CacheService.Instance.GetAsync<bool?>(deletedCacheKey);
+            if (cachedDeleted.HasValue && cachedDeleted.Value)
+                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found in project with id {projectId}");
+
+            var orgCacheKey = CacheKeys.OrganizationObjectStorageArchivedStatus(organizationId, objectStorageId);
+            var projectCacheKey = CacheKeys.ProjectObjectStorageArchivedStatus(projectId, objectStorageId);
+
+            var cachedOrgIsArchived = await CacheService.Instance.GetAsync<bool?>(orgCacheKey);
+            var cachedProjectIsArchived = await CacheService.Instance.GetAsync<bool?>(projectCacheKey);
+
+            bool objectStorageExists;
+            bool isArchived = false;
+
+            // if there is a cached archive status value then the object storage must exist
+            if (cachedOrgIsArchived.HasValue || cachedProjectIsArchived.HasValue)
+            {
+                objectStorageExists = true;
+                isArchived = cachedOrgIsArchived ?? cachedProjectIsArchived!.Value;
+            }
+            // if no cached value is found check the db
+            else
+            {
+                var objectStorage = await context.ObjectStorages
+                    .Where(os =>
+                        os.Id == objectStorageId &&
+                        os.OrganizationId == organizationId &&
+                        (os.ProjectId == null || os.ProjectId == projectId))
+                    .Select(os => new { os.ProjectId, os.IsArchived })
+                    .FirstOrDefaultAsync();
+
+                objectStorageExists = objectStorage != null;
+
+                // if object storage is found in the db then update the cache
+                if (objectStorageExists)
+                {
+                    isArchived = objectStorage!.IsArchived;
+                    var cacheKeyToSet = objectStorage.ProjectId == null ? orgCacheKey : projectCacheKey;
+                    await CacheService.Instance.SetAsync(cacheKeyToSet, isArchived, _objectStorageArchivedStatusTtl);
+                }
+            }
 
             if (!objectStorageExists)
-            {
                 throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found in project with id {projectId}");
-            }
+
+            if (hideArchived && isArchived)
+                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found in project with id {projectId}");
         }
     }
 }

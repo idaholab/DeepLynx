@@ -42,14 +42,9 @@ public class CacheKeys
         return $"organization:{projectId}:object_storage:{objectStorageId}:archived_status";
     }
 
-    public static string OrganizationObjectStorageDeletedStatus(long organizationId, long objectStorageId)
+    public static string ObjectStorageDeleted(long objectStorageId)
     {
-        return $"organization:{organizationId}:object_storage:{objectStorageId}:deleted";
-    }
-
-    public static string ProjectObjectStorageDeletedStatus(long projectId, long objectStorageId)
-    {
-        return $"organization:{projectId}:object_storage:{objectStorageId}:deleted";
+        return $"object_storage:{objectStorageId}:deleted";
     }
 
     public static string OrganizationArchivedStatus(long organizationId)
