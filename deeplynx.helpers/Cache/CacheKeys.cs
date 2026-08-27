@@ -60,4 +60,14 @@ public class CacheKeys
     {
         return $"projectadmin:{userId}:{projectId}";
     }
+
+    public static string OrganizationDefaultAiModelConfig(long organizationId, string modelType)
+    {
+        return $"orgdefaultaimodelconfig:{organizationId}:{modelType}";
+    }
+
+    public static string ProjectDefaultAiModelConfig(long projectId, string modelType)
+    {
+        return $"projectdefaultaimodelconfig:{projectId}:{modelType}";
+    }
 }
