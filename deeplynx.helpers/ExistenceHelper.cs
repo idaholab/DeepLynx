@@ -231,8 +231,9 @@ namespace deeplynx.helpers
             }
         }
 
-        private static readonly TimeSpan _deletedObjectStorageCacheTtl = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan _objectStorageArchivedStatusTtl = TimeSpan.FromHours(1);
+        
+        private static readonly TimeSpan _objectStorageCacheTtl = TimeSpan.FromHours(1);
+
         public static async Task EnsureObjectStorageExistsAsync(
             DeeplynxContext context,
             long organizationId,
@@ -240,54 +241,48 @@ namespace deeplynx.helpers
             long objectStorageId,
             bool hideArchived = true)
         {
-            // Check to see if the object storage is deleted first
-            var deletedCacheKey = CacheKeys.ObjectStorageDeleted(objectStorageId);
-            var cachedDeleted = await CacheService.Instance.GetAsync<bool?>(deletedCacheKey);
-            if (cachedDeleted.HasValue && cachedDeleted.Value)
-                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found in project with id {projectId}");
+            var cacheKey = CacheKeys.ObjectStorageStatus(objectStorageId);
+            var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
 
-            var orgCacheKey = CacheKeys.OrganizationObjectStorageArchivedStatus(organizationId, objectStorageId);
-            var projectCacheKey = CacheKeys.ProjectObjectStorageArchivedStatus(projectId, objectStorageId);
+            ObjectStorageCacheEntry entry;
 
-            var cachedOrgIsArchived = await CacheService.Instance.GetAsync<bool?>(orgCacheKey);
-            var cachedProjectIsArchived = await CacheService.Instance.GetAsync<bool?>(projectCacheKey);
-
-            bool objectStorageExists;
-            bool isArchived = false;
-
-            // if there is a cached archive status value then the object storage must exist
-            if (cachedOrgIsArchived.HasValue || cachedProjectIsArchived.HasValue)
+            if (cached != null)
             {
-                objectStorageExists = true;
-                isArchived = cachedOrgIsArchived ?? cachedProjectIsArchived!.Value;
+                entry = cached;
+                if (entry.Status == ObjectStorageStatus.Deleted)
+                    throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
             }
-            // if no cached value is found check the db
             else
             {
                 var objectStorage = await context.ObjectStorages
-                    .Where(os =>
-                        os.Id == objectStorageId &&
-                        os.OrganizationId == organizationId &&
-                        (os.ProjectId == null || os.ProjectId == projectId))
-                    .Select(os => new { os.ProjectId, os.IsArchived })
+                    .Where(os => os.Id == objectStorageId)
+                    .Select(os => new { os.OrganizationId, os.ProjectId, os.IsArchived })
                     .FirstOrDefaultAsync();
 
-                objectStorageExists = objectStorage != null;
+                if (objectStorage == null)
+                    throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
 
-                // if object storage is found in the db then update the cache
-                if (objectStorageExists)
+                entry = new ObjectStorageCacheEntry
                 {
-                    isArchived = objectStorage!.IsArchived;
-                    var cacheKeyToSet = objectStorage.ProjectId == null ? orgCacheKey : projectCacheKey;
-                    await CacheService.Instance.SetAsync(cacheKeyToSet, isArchived, _objectStorageArchivedStatusTtl);
-                }
+                    OrganizationId = objectStorage.OrganizationId,
+                    ProjectId = objectStorage.ProjectId,
+                    Status = objectStorage.IsArchived
+                            ? ObjectStorageStatus.Archived
+                            : ObjectStorageStatus.Active
+                };
+
+                await CacheService.Instance.SetAsync(cacheKey, entry, _objectStorageCacheTtl);
             }
 
-            if (!objectStorageExists)
-                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found in project with id {projectId}");
+            var belongsToScope =
+                entry.OrganizationId == organizationId &&
+                (entry.ProjectId == null || entry.ProjectId == projectId);
 
-            if (hideArchived && isArchived)
-                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found in project with id {projectId}");
+            if (!belongsToScope || entry.Status == ObjectStorageStatus.Deleted)
+                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
+
+            if (hideArchived && entry.Status == ObjectStorageStatus.Archived)
+                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
         }
     }
 }

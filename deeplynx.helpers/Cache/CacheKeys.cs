@@ -32,21 +32,6 @@ public class CacheKeys
         return $"user:{userId}:deleted";
     }
 
-    public static string OrganizationObjectStorageArchivedStatus(long organizationId, long objectStorageId)
-    {
-        return $"organization:{organizationId}:object_storage:{objectStorageId}:archived_status";
-    }
-
-    public static string ProjectObjectStorageArchivedStatus(long projectId, long objectStorageId)
-    {
-        return $"organization:{projectId}:object_storage:{objectStorageId}:archived_status";
-    }
-
-    public static string ObjectStorageDeleted(long objectStorageId)
-    {
-        return $"object_storage:{objectStorageId}:deleted";
-    }
-
     public static string OrganizationArchivedStatus(long organizationId)
     {
         return $"organization:{organizationId}:archived_status";
@@ -74,5 +59,10 @@ public class CacheKeys
     public static string ProjectAdmin(long userId, long projectId)
     {
         return $"projectadmin:{userId}:{projectId}";
+    }
+
+    public static string ObjectStorageStatus(long objectStorageId)
+    {
+        return $"object_storage:{objectStorageId}:status";
     }
 }
