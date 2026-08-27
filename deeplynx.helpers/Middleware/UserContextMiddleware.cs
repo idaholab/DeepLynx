@@ -16,8 +16,6 @@ public class UserContextMiddleware
     private readonly RequestDelegate _next;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    private static readonly TimeSpan AdminFlagCacheTtl = TimeSpan.FromHours(1);
-
     public UserContextMiddleware(
         RequestDelegate next,
         IServiceScopeFactory serviceScopeFactory,
