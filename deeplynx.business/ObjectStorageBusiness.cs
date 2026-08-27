@@ -1,5 +1,6 @@
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using DotNetEnv;
@@ -13,6 +14,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     private readonly DeeplynxContext _context;
     private readonly IFileBusiness _fileAzureBusiness;
     private readonly EncryptionHelper _encryptionHelper;
+    private readonly TimeSpan _objectStorageStatusCache = TimeSpan.FromHours(1);
 
     public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper, IFileBusiness fileAzureBusiness)
     {
@@ -86,6 +88,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (returnedObjectStorage is null)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status); 
 
         if (hideArchived && returnedObjectStorage.IsArchived)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} is archived");
@@ -239,6 +244,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
             await transaction.CommitAsync();
 
+            var status = newObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+            await SetObjectStorageStatusCache(newObjectStorage, status); 
+
             return new ObjectStorageResponseDto
             {
                 Id = newObjectStorage.Id,
@@ -339,6 +347,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
             await transaction.CommitAsync();
 
+            var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+            await SetObjectStorageStatusCache(returnedObjectStorage, status); 
+
             return new ObjectStorageResponseDto
             {
                 Id = returnedObjectStorage.Id,
@@ -399,6 +410,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         _context.ObjectStorages.Remove(returnedObjectStorage);
         await _context.SaveChangesAsync();
+
+        await SetObjectStorageStatusCache(returnedObjectStorage, ObjectStorageStatus.Deleted); 
+
         return true;
     }
 
@@ -465,6 +479,10 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         returnedObjectStorage.LastUpdatedBy = currentUserId;
         await _context.SaveChangesAsync();
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status); 
+
         return true;
     }
 
@@ -532,6 +550,10 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         returnedObjectStorage.LastUpdatedBy = currentUserId;
         await _context.SaveChangesAsync();
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status); 
+
         return true;
     }
 
@@ -581,6 +603,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (returnedObjectStorage == null)
             throw new KeyNotFoundException("Default object storage not found or is archived");
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status);  
 
         return new ObjectStorageResponseDto
         {
@@ -648,6 +673,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         await transaction.CommitAsync();
 
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status);
+
         return new ObjectStorageResponseDto
         {
             Id = returnedObjectStorage.Id,
@@ -680,6 +708,16 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (returnedObjectStorage is null)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
+
+        await CacheService.Instance.SetAsync(
+            CacheKeys.ObjectStorageStatus(returnedObjectStorage.Id), 
+            new ObjectStorageCacheEntry
+            {
+                OrganizationId = returnedObjectStorage.OrganizationId,
+                ProjectId = returnedObjectStorage.ProjectId,
+                Status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active
+            },
+            _objectStorageStatusCache);
 
         return new ObjectStorageDecryptedDto
         {
@@ -723,6 +761,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             query = query.Where(os => objectStorageIds.Contains(os.Id));
 
         var objectStorages = await query.ToListAsync();
+        
         return objectStorages
             .Select(os => new ObjectStorageDecryptedDto
             {
@@ -756,5 +795,18 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         await _context.ObjectStorages
             .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
+    }
+
+    private async Task SetObjectStorageStatusCache(ObjectStorage os, ObjectStorageStatus status)
+    {
+        await CacheService.Instance.SetAsync(
+            CacheKeys.ObjectStorageStatus(os.Id), 
+            new ObjectStorageCacheEntry
+            {
+                OrganizationId = os.OrganizationId,
+                ProjectId = os.ProjectId,
+                Status = status
+            },
+            _objectStorageStatusCache);   
     }
 }
