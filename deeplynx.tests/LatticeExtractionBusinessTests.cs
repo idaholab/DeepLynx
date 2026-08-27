@@ -1,5 +1,6 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +25,10 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
     private Mock<HttpMessageHandler> _mockHandler = null!;
     private InsightServiceClient _client = null!;
     private Mock<IProvenanceBusiness> _mockProvenance = null!;
-    private Mock<ITagBusiness> _mockTagBusiness;
+    private Mock<IEventBusiness> _mockEventBusiness;
+    private Mock<IAdminService> _mockAdminService;
+    private Mock<IProjectRolePermissionService> _mockPermissionService;
+    private TagBusiness _tagBusiness;
     private Mock<ILogger<LatticeExtractionBusiness>> _mockLogger = null!;
 
     private const long NotFoundId = 99_999L;
@@ -60,11 +64,18 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         _client = new InsightServiceClient(new HttpClient(_mockHandler.Object));
         _mockLogger = new Mock<ILogger<LatticeExtractionBusiness>>();
         _mockProvenance = new Mock<IProvenanceBusiness>();
-        _mockTagBusiness = new Mock<ITagBusiness>();
+        _mockEventBusiness = new Mock<IEventBusiness>();
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _tagBusiness = new TagBusiness(
+            Context,
+            _mockEventBusiness.Object,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
 
         _business = new LatticeExtractionBusiness(
             Context, _latticeCtx,
-            _mockInsight.Object, _client, _mockProvenance.Object, _mockLogger.Object, _mockTagBusiness.Object);
+            _mockInsight.Object, _client, _mockProvenance.Object, _mockLogger.Object, _tagBusiness);
     }
 
     public override async Task DisposeAsync()
@@ -885,6 +896,60 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         _latticeCtx.ChangeTracker.Clear();
         var stagingRel = _latticeCtx.ExtractionRelationships.Find(ids.RelId);
         Assert.NotNull(stagingRel!.PromotedId);
+    }
+
+    [Fact]
+    public async Task PromoteRecords_CreatesNewRecordsAndTags()
+    {
+        // Arrange
+        await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.Valid);
+
+        var stagingRecords = new List<ExtractionRecord>
+        {
+            new ExtractionRecord
+            {
+                ExtractionId = completeExtractionId,
+                ExtractionClassId = cid1,
+                Name = "Record 1",
+                OrganizationId = oid,
+                ProjectId = pid,
+                DataSourceId = dsid,
+                ValidationStatus = ExtractionValidationStatus.Valid,
+                Attributes = @"{ ""tags"": [""Tag1"", ""Tag2""] }",
+                SourceRecordId = 479812
+            },
+            new ExtractionRecord
+            {
+                ExtractionId = completeExtractionId,
+                ExtractionClassId = cid1,
+                Name = "Record 2",
+                OrganizationId = oid,
+                ProjectId = pid,
+                DataSourceId = dsid,
+                ValidationStatus = ExtractionValidationStatus.Valid,
+                Attributes = @"{ ""tags"": [""Tag3"", ""Tag4""] }",
+                SourceRecordId = 712947
+            }
+        };
+        _latticeCtx.ExtractionRecords.AddRange(stagingRecords);
+        await _latticeCtx.SaveChangesAsync();
+
+        var recsBefore = Context.Records.Count();
+        var tagsBefore = Context.Tags.Count();
+
+        // Act
+        await PromoteAllAsync(completeExtractionId);
+
+        // Assert
+        Context.ChangeTracker.Clear();
+        Assert.Equal(recsBefore + 4, Context.Records.Count());
+        Assert.Equal(tagsBefore + 4, Context.Tags.Count());
+
+        var createdTags = Context.Tags.Where(t => t.ProjectId == pid).Select(t => t.Name).ToList();
+        Assert.Contains("Tag1", createdTags);
+        Assert.Contains("Tag2", createdTags);
+        Assert.Contains("Tag3", createdTags);
+        Assert.Contains("Tag4", createdTags);
     }
 
     [Fact]
