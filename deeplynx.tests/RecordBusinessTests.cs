@@ -197,63 +197,6 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal("Test Tag", dto.Tags.First().Name);
     }
 
-    [Fact]
-    public void RecordResponseDtoV2_AllProperties_CanBeSetAndRetrieved()
-    {
-        // Arrange
-        var now = DateTime.UtcNow;
-        var tags = new List<RecordTagDto>
-        {
-            new() { Id = 1, Name = "Test Tag" }
-        };
-        var sensitivityLabels = new List<RecordLabelDto>
-        {
-            new() { Id = 1, Name = "Test Label" }
-        };
-
-        var dto = new RecordResponseDtoV2
-        {
-            Id = 1,
-            Name = "Test Record",
-            Description = "Test Description",
-            Uri = "test://uri",
-            Properties = "{\"test\":\"value\"}",
-            ObjectStorageId = 100,
-            OriginalId = "original-123",
-            ClassId = 200,
-            DataSourceId = 300,
-            ProjectId = 400,
-            LastUpdatedAt = now,
-            LastUpdatedBy = uid,
-            IsArchived = false,
-            FileType = "pdf",
-            FileContentHash = "abc123",
-            Tags = tags,
-            SensitivityLabels = sensitivityLabels
-        };
-
-        // Assert
-        Assert.Equal(1, dto.Id);
-        Assert.Equal("Test Record", dto.Name);
-        Assert.Equal("Test Description", dto.Description);
-        Assert.Equal("test://uri", dto.Uri);
-        Assert.Equal("{\"test\":\"value\"}", dto.Properties);
-        Assert.Equal(100, dto.ObjectStorageId);
-        Assert.Equal("original-123", dto.OriginalId);
-        Assert.Equal(200, dto.ClassId);
-        Assert.Equal(300, dto.DataSourceId);
-        Assert.Equal(400, dto.ProjectId);
-        Assert.Equal(now, dto.LastUpdatedAt);
-        Assert.Equal(uid, dto.LastUpdatedBy);
-        Assert.False(dto.IsArchived);
-        Assert.Equal("pdf", dto.FileType);
-        Assert.Equal("abc123", dto.FileContentHash);
-        Assert.Single(dto.Tags);
-        Assert.Equal("Test Tag", dto.Tags.First().Name);
-        Assert.Single(dto.SensitivityLabels);
-        Assert.Equal("Test Label", dto.SensitivityLabels.First().Name);
-    }
-
     #endregion
 
     #region File Content Hash Tests
@@ -2011,43 +1954,6 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Contains(dbRecord2.Labels, l => l.Name == "Very Sensitive Label");
     }
 
-    [Fact]
-    public async Task BulkCreateRecordsV2_WithLabelsAndTags_ReturnsSensitivityLabels()
-    {
-        // Arrange
-        var records = new List<CreateRecordRequestDto>
-        {
-            new()
-            {
-                Name = "Bulk Record V2 1",
-                Description = "Bulk Record V2 1 Description",
-                ObjectStorageId = osid,
-                OriginalId = "brv2-1",
-                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!,
-                Tags = new List<string> { "UNIQUE TAG" }
-            }
-        };
-
-        var label = new CreateSensitivityLabelRequestDto
-        {
-            Name = "secret sauce v2",
-            Description = "secret sauce v2 description",
-        };
-        var labelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label, pid, organizationId);
-
-        // Act
-        var result = await _recordBusiness.BulkCreateRecordsV2(
-            uid, organizationId, pid, did, records, new List<long> { labelResponse.Id });
-
-        // Assert
-        Assert.NotNull(result);
-        var record = Assert.Single(result);
-        Assert.Equal("Bulk Record V2 1", record.Name);
-        Assert.NotNull(record.SensitivityLabels);
-        Assert.Single(record.SensitivityLabels);
-        Assert.Contains(record.SensitivityLabels, l => l.Name == "secret sauce v2");
-    }
-
     #endregion
 
     #region UpdateRecord Tests
@@ -2956,33 +2862,6 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.True(result);
         var updatedRecord = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == record.Id);
         Assert.Contains(updatedRecord.Labels, l => l.Id == newLabelResponse.Id);
-    }
-
-    [Fact]
-    public async Task GetRecordV2_AfterAttachLabel_ReturnsSensitivityLabels()
-    {
-        // Arrange
-        var newLabel = new CreateSensitivityLabelRequestDto
-        {
-            Name = "New Label V2",
-            Description = "New Label V2"
-        };
-        var newLabelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(
-            uid, newLabel, pid, organizationId);
-
-        var record = await Context.Records.Include(r => r.Labels).FirstAsync(r => r.Id == rid);
-        record.Labels.Clear(); // ensure label not already attached
-        await Context.SaveChangesAsync();
-        Context.ChangeTracker.Clear();
-
-        await _recordBusiness.AttachLabel(uid, organizationId, pid, record.Id, newLabelResponse.Id);
-
-        // Act
-        var result = await _recordBusiness.GetRecordV2(uid, organizationId, pid, record.Id, true);
-
-        // Assert
-        Assert.NotNull(result.SensitivityLabels);
-        Assert.Contains(result.SensitivityLabels, l => l.Id == newLabelResponse.Id);
     }
 
     [Fact]

@@ -25,23 +25,6 @@ public interface IFileControllerBusiness
         bool isOrgAdmin,
         bool isProjectAdmin);
 
-    Task<RecordResponseDtoV2> UploadFileV2(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long? dataSourceId,
-        long? objectStorageId,
-        IFormFile file,
-        List<long>? sensitivityLabelIds,
-        IFormFile? metadataFile,
-        bool embed,
-        long? vlmConfigId,
-        long? embeddingModelConfigId,
-        string? userJwt,
-        bool isSysAdmin,
-        bool isOrgAdmin,
-        bool isProjectAdmin);
-
     // Update file
     Task<RecordResponseDto> UpdateFile(
         long currentUserId,
@@ -54,25 +37,7 @@ public interface IFileControllerBusiness
         string? userJwt,
         IFormFile? metadataFile = null);
 
-    Task<RecordResponseDtoV2> UpdateFileV2(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long recordId,
-        IFormFile file,
-        long? vlmConfigId,
-        long? embeddingModelConfigId,
-        string? userJwt,
-        IFormFile? metadataFile = null);
-
     Task<RecordResponseDto> UpdateFileContentHash(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long recordId,
-        UpdateFileContentHashRequestDto dto);
-
-    Task<RecordResponseDtoV2> UpdateFileContentHashV2(
         long currentUserId,
         long organizationId,
         long projectId,
@@ -161,31 +126,7 @@ public interface IFileControllerBusiness
         long? vlmConfigId,
         long? embeddingModelConfigId);
 
-    Task<RecordResponseDtoV2> CompleteUploadV2(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long? dataSourceId,
-        long? objectStorageId,
-        FileUploadCompleteRequestDto request,
-        List<long>? sensitivityLabelIds,
-        CreateRecordFileUploadRequestDto? metadata,
-        bool embed,
-        long? vlmConfigId,
-        long? embeddingModelConfigId);
-
     Task<RecordResponseDto> CompleteUpdateUpload(
-        long currentUserId,
-        long organizationId,
-        long projectId,
-        long recordId,
-        FileUploadCompleteRequestDto request,
-        long? vlmConfigId,
-        long? embeddingModelConfigId,
-        string? userJwt,
-        CreateRecordFileUploadRequestDto? metadata = null);
-
-    Task<RecordResponseDtoV2> CompleteUpdateUploadV2(
         long currentUserId,
         long organizationId,
         long projectId,

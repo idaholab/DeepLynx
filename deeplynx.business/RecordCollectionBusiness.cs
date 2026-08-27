@@ -65,7 +65,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A paginated list of record collections based on the applied filters.</returns>
-    public async Task<PaginatedResponse<RecordCollectionResponseDtoV2>> GetAllRecordCollectionsPaginated(
+    public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetAllRecordCollectionsPaginated(
         long currentUserId, long organizationId, long projectId,
         string? search, long[]? sensitivityLabelIds, long[]? tagIds, string? sort,
         PaginatedRequestDto paginatedRequestDto,
@@ -131,7 +131,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             .Include(r => r.Tags)
             .Include(r => r.Labels)
             .Include(r => r.Records)
-            .Select(c => RecordCollectionToResponseV2(c))
+            .Select(c => RecordCollectionToResponse(c))
             .ToPaginatedAsync(paginatedRequestDto);
     }
 
@@ -150,7 +150,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="isProjectAdmin"></param>
     /// <returns></returns>
     /// <exception cref="KeyNotFoundException"></exception>
-    public async Task<PaginatedResponse<RecordResponseDtoV2>> GetRecordsInRecordCollectionPaginated(
+    public async Task<PaginatedResponse<RecordResponseDto>> GetRecordsInRecordCollectionPaginated(
         long currentUserId,
         long organizationId,
         long projectId,
@@ -191,7 +191,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
 
         var orderedQuery = recordQuery.OrderBy(r => r.Id);
 
-        var projectedQuery = orderedQuery.Select(record => new RecordResponseDtoV2
+        var projectedQuery = orderedQuery.Select(record => new RecordResponseDto
         {
             Id = record.Id,
             Description = record.Description,
@@ -215,7 +215,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            SensitivityLabels = record.Labels.Select(l => new RecordLabelDto
+            Labels = record.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
@@ -239,7 +239,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="isProjectAdmin"></param>
     /// <returns></returns>
     /// <exception cref="KeyNotFoundException"></exception>
-    public async Task<PaginatedResponse<RecordCollectionResponseDtoV2>> GetRecordCollectionsForRecordPaginated(
+    public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetRecordCollectionsForRecordPaginated(
         long currentUserId, long organizationId, long projectId, long recordId, bool hideArchived,
         PaginatedRequestDto paginatedRequestDto, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
@@ -274,7 +274,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         var orderedQuery = collectionQuery.Include(r => r.Tags).Include(r => r.Labels).Include(r => r.Records).OrderBy(c => c.Id);
 
         return await orderedQuery
-            .Select(c => RecordCollectionToResponseV2(c))
+            .Select(c => RecordCollectionToResponse(c))
             .ToPaginatedAsync(paginatedRequestDto);
     }
 
@@ -291,7 +291,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A paginated list of record collections that have all the specified tags.</returns>
-    public async Task<PaginatedResponse<RecordCollectionResponseDtoV2>> GetRecordCollectionsByTagsPaginated(
+    public async Task<PaginatedResponse<RecordCollectionResponseDto>> GetRecordCollectionsByTagsPaginated(
         long currentUserId, long organizationId, long projectId, long[] tagIds, PaginatedRequestDto paginatedRequestDto,
         bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
@@ -318,7 +318,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         var orderedQuery = recordCollectionQuery.Include(r => r.Tags).Include(r => r.Labels).Include(r => r.Records).OrderBy(c => c.Id);
 
         return await orderedQuery
-            .Select(c => RecordCollectionToResponseV2(c))
+            .Select(c => RecordCollectionToResponse(c))
             .ToPaginatedAsync(paginatedRequestDto);
     }
 
@@ -627,100 +627,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 IsArchived = collection.IsArchived,
                 RecordCount = 0,
                 Tags = tags,
-                Labels =collection.Labels.Select(l => new RecordCollectionLabelDto
-                {
-                    Id = l.Id,
-                    Name = l.Name
-                }).ToList()
-            };
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-    }
-
-    public async Task<RecordCollectionResponseDtoV2> CreateRecordCollectionV2(long currentUserId, long organizationId, long projectId, List<long>? sensitivityLabelIds,
-     CreateRecordCollectionRequestDto dto)
-    {
-        var maxDepth = CalculateJsonMaxDepth(dto.Properties);
-        if (maxDepth > 3)
-            throw new Exception(
-                $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
-
-        await using var transaction = await _context.Database.BeginTransactionAsync();
-
-        List<SensitivityLabel> sensitivityLabelsToAdd = new List<SensitivityLabel>();
-
-        if (sensitivityLabelIds != null && sensitivityLabelIds.Any())
-        {
-            sensitivityLabelsToAdd = await _context.SensitivityLabels
-                .Where(sl => sensitivityLabelIds.Contains(sl.Id) &&
-                             (sl.ProjectId == projectId ||
-                              (sl.ProjectId == null && sl.OrganizationId == organizationId)))
-                .ToListAsync();
-
-            var missingLabelIds = sensitivityLabelIds
-                .Where(id => sensitivityLabelsToAdd.All(sl => sl.Id != id))
-                .ToList();
-
-            if (missingLabelIds.Any())
-                throw new KeyNotFoundException(
-                    $"Sensitivity labels not found inside this organization/project: {string.Join(", ", missingLabelIds)}");
-        }
-
-        try
-        {
-            var collection = new RecordCollection
-            {
-                ProjectId = projectId,
-                Properties = dto.Properties.ToString()!,
-                Name = dto.Name,
-                Description = dto.Description,
-                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-                LastUpdatedBy = currentUserId,
-                OrganizationId = organizationId,
-                Labels = sensitivityLabelsToAdd
-            };
-
-            _context.RecordCollections.Add(collection);
-            await _context.SaveChangesAsync();
-
-            // Process tags (can be created on-the-fly)
-            var tags = await ProcessTags(
-                currentUserId, organizationId, projectId, collection.Id, dto.Tags);
-
-            // Log Record Collection Create Event
-            await _eventBusiness.CreateEvent(
-                currentUserId,
-                organizationId,
-                projectId,
-                new CreateEventRequestDto
-                {
-                    EntityType = "record_collection",
-                    EntityId = collection.Id,
-                    EntityName = collection.Name,
-                    Operation = "create",
-                    Properties = "{}"
-                });
-
-            await transaction.CommitAsync();
-
-            return new RecordCollectionResponseDtoV2
-            {
-                Id = collection.Id,
-                Description = collection.Description,
-                Properties = collection.Properties,
-                Name = collection.Name,
-                ProjectId = collection.ProjectId,
-                OrganizationId = collection.OrganizationId,
-                LastUpdatedBy = collection.LastUpdatedBy,
-                LastUpdatedAt = collection.LastUpdatedAt,
-                IsArchived = collection.IsArchived,
-                RecordCount = 0,
-                Tags = tags,
-                SensitivityLabels = collection.Labels.Select(l => new RecordCollectionLabelDto
+                Labels = collection.Labels.Select(l => new RecordCollectionLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name
@@ -799,63 +706,6 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
             LastUpdatedAt = returnedRecordCollection.LastUpdatedAt,
             IsArchived = returnedRecordCollection.IsArchived,
             RecordCount = recordCount,
-        };
-    }
-
-    public async Task<RecordCollectionResponseDtoV2> UpdateRecordCollectionV2(
-        long currentUserId, long organizationId, long projectId, long recordCollectionId, UpdateRecordCollectionRequestDto dto)
-    {
-        ValidationHelper.ValidateModel(dto);
-
-        var query = _context.RecordCollections
-            .Where(c => c.Id == recordCollectionId && c.OrganizationId == organizationId && c.ProjectId == projectId && !c.IsArchived);
-
-        var returnedRecordCollection = await query.FirstOrDefaultAsync();
-
-        if (returnedRecordCollection is null)
-            throw new KeyNotFoundException($"Record Collection with ID {recordCollectionId} not found.");
-
-        var maxDepth = CalculateJsonMaxDepth(dto.Properties);
-        if (maxDepth > 3)
-            throw new Exception(
-                $"The depth of the JSON structure exceeds the maximum allowed depth of 3. Current depth of properties is {maxDepth}.");
-
-        returnedRecordCollection.Properties = dto.Properties != null ? dto.Properties.ToString() : returnedRecordCollection.Properties;
-        returnedRecordCollection.Name = dto.Name ?? returnedRecordCollection.Name;
-        returnedRecordCollection.Description = dto.Description ?? returnedRecordCollection.Description;
-        returnedRecordCollection.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        returnedRecordCollection.LastUpdatedBy = currentUserId;
-
-        _context.RecordCollections.Update(returnedRecordCollection);
-        await _context.SaveChangesAsync();
-
-        var recordCountV2 = await _context.RecordCollections
-            .Where(c => c.Id == returnedRecordCollection.Id)
-            .Select(c => c.Records.Count())
-            .FirstAsync();
-
-        // Log Record Update Event
-        await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
-        {
-            EntityType = "record_collection",
-            EntityId = returnedRecordCollection.Id,
-            EntityName = returnedRecordCollection.Name,
-            Operation = "update",
-            Properties = "{}",
-        });
-
-        return new RecordCollectionResponseDtoV2
-        {
-            Id = returnedRecordCollection.Id,
-            Description = returnedRecordCollection.Description,
-            Properties = returnedRecordCollection.Properties,
-            Name = returnedRecordCollection.Name,
-            ProjectId = returnedRecordCollection.ProjectId,
-            OrganizationId = returnedRecordCollection.OrganizationId,
-            LastUpdatedBy = returnedRecordCollection.LastUpdatedBy,
-            LastUpdatedAt = returnedRecordCollection.LastUpdatedAt,
-            IsArchived = returnedRecordCollection.IsArchived,
-            RecordCount = recordCountV2,
         };
     }
 
@@ -1273,7 +1123,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     Id = t.Id,
                     Name = t.Name
                 }).ToList(),
-                Labels =r.Labels.Select(l => new RecordCollectionLabelDto
+                Labels = r.Labels.Select(l => new RecordCollectionLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name
@@ -1365,9 +1215,9 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
         return inserted.ToDictionary(t => t.Name, t => t);
     }
 
-    private static RecordCollectionResponseDtoV2 RecordCollectionToResponseV2(RecordCollection c)
+    private static RecordCollectionResponseDto RecordCollectionToResponse(RecordCollection c)
     {
-        return new RecordCollectionResponseDtoV2
+        return new RecordCollectionResponseDto
         {
             Id = c.Id,
             Description = c.Description,
@@ -1384,7 +1234,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            SensitivityLabels = c.Labels.Select(l => new RecordCollectionLabelDto
+            Labels = c.Labels.Select(l => new RecordCollectionLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
@@ -1471,7 +1321,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                 Id = t.Id,
                 Name = t.Name
             }).ToList(),
-            Labels =r.Labels.Select(l => new RecordLabelDto
+            Labels = r.Labels.Select(l => new RecordLabelDto
             {
                 Id = l.Id,
                 Name = l.Name
@@ -1585,7 +1435,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     Id = t.Id,
                     Name = t.Name
                 }).ToList(),
-                Labels =c.Labels.Select(l => new RecordCollectionLabelDto
+                Labels = c.Labels.Select(l => new RecordCollectionLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name
@@ -1679,7 +1529,7 @@ public class RecordCollectionBusiness : IRecordCollectionBusiness
                     Id = t.Id,
                     Name = t.Name
                 }).ToList(),
-                Labels =c.Labels.Select(l => new RecordCollectionLabelDto
+                Labels = c.Labels.Select(l => new RecordCollectionLabelDto
                 {
                     Id = l.Id,
                     Name = l.Name

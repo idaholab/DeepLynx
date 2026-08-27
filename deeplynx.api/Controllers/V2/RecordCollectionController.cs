@@ -55,7 +55,7 @@ public class RecordCollectionController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record_collection")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDtoV2>>> GetAllRecordCollections(
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetAllRecordCollections(
         long organizationId,
         long projectId,
         [FromQuery] string? search,
@@ -93,7 +93,7 @@ public class RecordCollectionController : ControllerBase
     [Auth("read", "record_collection")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<PaginatedResponse<RecordResponseDtoV2>>> GetRecordsInRecordCollection(
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetRecordsInRecordCollection(
         long organizationId,
         long projectId,
         long recordCollectionId,
@@ -134,7 +134,7 @@ public class RecordCollectionController : ControllerBase
     [Auth("read", "record_collection")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDtoV2>>> GetRecordCollectionsForARecord(
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetRecordCollectionsForARecord(
         long organizationId,
         long projectId,
         long recordId,
@@ -175,7 +175,7 @@ public class RecordCollectionController : ControllerBase
     [Auth("read", "record_collection")]
     [Auth("read", "tag")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDtoV2>>> GetRecordCollectionsByTags(
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetRecordCollectionsByTags(
         long organizationId,
         long projectId,
         [FromQuery] long[] tagIds,
@@ -206,14 +206,14 @@ public class RecordCollectionController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record_collection")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<RecordCollectionResponseDtoV2>> UpdateRecordCollection(
+    public async Task<ActionResult<RecordCollectionResponseDto>> UpdateRecordCollection(
         long organizationId,
         long projectId,
         long recordCollectionId,
         [FromBody] UpdateRecordCollectionRequestDto dto)
     {
             var currentUserId = UserContextStorage.UserId;
-            var updatedRecordCollection = await _recordCollectionBusiness.UpdateRecordCollectionV2(currentUserId, organizationId, projectId, recordCollectionId, dto);
+            var updatedRecordCollection = await _recordCollectionBusiness.UpdateRecordCollection(currentUserId, organizationId, projectId, recordCollectionId, dto);
             return Ok(updatedRecordCollection);
     }
 
@@ -294,7 +294,7 @@ public class RecordCollectionController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "record_collection")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<RecordCollectionResponseDtoV2>> CreateRecordCollection(
+    public async Task<ActionResult<RecordCollectionResponseDto>> CreateRecordCollection(
         long organizationId,
         long projectId,
         [FromQuery] List<long>? sensitivityLabelIds,
@@ -302,7 +302,7 @@ public class RecordCollectionController : ControllerBase
     {
             var currentUserId = UserContextStorage.UserId;
             var recordCollection =
-                await _recordCollectionBusiness.CreateRecordCollectionV2(currentUserId, organizationId, projectId,
+                await _recordCollectionBusiness.CreateRecordCollection(currentUserId, organizationId, projectId,
                     sensitivityLabelIds, dto);
             return Ok(recordCollection);
     }

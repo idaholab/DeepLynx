@@ -14,7 +14,6 @@ public class RecordLabelDto
     public string Name { get; set; }
 }
 
-[Obsolete("V1-only legacy DTO. Superseded by RecordResponseDtoV2. Remove once v1 record endpoints are sunset.", error: false)]
 public class RecordResponseDto
 {
     [Column("id")] public long Id { get; set; }

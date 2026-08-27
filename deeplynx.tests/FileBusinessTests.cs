@@ -418,43 +418,6 @@ public class FileBusinessTests : IntegrationTestBase
     #region UploadFile Tests
 
     [Fact]
-    public async Task UploadFileV2_WithSensitivityLabelIds_ReturnsSensitivityLabels()
-    {
-        // Arrange
-        var label = new CreateSensitivityLabelRequestDto
-        {
-            Name = "Upload V2 Label",
-            Description = "Upload V2 Label"
-        };
-        var labelResponse = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label, pid, oid);
-
-        var content = "Test file with sensitivity label";
-        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
-        var file = new FormFile(ms, 0, ms.Length, "file", "labeled-v2.txt")
-        {
-            Headers = new HeaderDictionary(),
-            ContentType = "text/plain"
-        };
-
-        // Act
-        var result = await _fileBusiness.UploadFileV2(
-            uid,
-            oid,
-            pid,
-            did,
-            osid,
-            file,
-            new List<long> { labelResponse.Id },
-            isSysAdmin: true
-        );
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.NotNull(result.SensitivityLabels);
-        Assert.Contains(result.SensitivityLabels, l => l.Id == labelResponse.Id);
-    }
-
-    [Fact]
     public async Task UploadFile_WithSpecificObjectStorageId_UsesSpecifiedStorage()
     {
         // Arrange
