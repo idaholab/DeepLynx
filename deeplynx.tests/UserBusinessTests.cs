@@ -1556,6 +1556,191 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.False(result.HasNext);
     }
 
+    [Fact]
+    public async Task GetAllUsersPaginated_ActiveOnly_ReturnsOnlyActiveUsers()
+    {
+        // Arrange - dedicated users so this test doesn't depend on shared fixture counts
+        var activeUser = new User
+        {
+            Name = "Active Filter User",
+            Email = "activefilter@test.com",
+            Username = "activefilteruser",
+            IsActive = true
+        };
+        var inactiveUser = new User
+        {
+            Name = "Inactive Filter User",
+            Email = "inactivefilter@test.com",
+            Username = "inactivefilteruser",
+            IsActive = false
+        };
+        Context.Users.AddRange(activeUser, inactiveUser);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = -1 },
+            null, null,
+            includeArchived: false,
+            includeServiceAccounts: false,
+            includeTestAccounts: false,
+            activeOnly: true);
+
+        // Assert
+        Assert.Contains(result.Items, u => u.Id == activeUser.Id);
+        Assert.DoesNotContain(result.Items, u => u.Id == inactiveUser.Id);
+        Assert.All(result.Items, u => Assert.True(u.IsActive));
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_ActiveOnlyFalse_ReturnsBothActiveAndInactiveUsers()
+    {
+        // Arrange
+        var activeUser = new User
+        {
+            Name = "Active Default User",
+            Email = "activedefault@test.com",
+            Username = "activedefaultuser",
+            IsActive = true
+        };
+        var inactiveUser = new User
+        {
+            Name = "Inactive Default User",
+            Email = "inactivedefault@test.com",
+            Username = "inactivedefaultuser",
+            IsActive = false
+        };
+        Context.Users.AddRange(activeUser, inactiveUser);
+        await Context.SaveChangesAsync();
+
+        // Act - activeOnly defaults to false
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = -1 },
+            null, null);
+
+        // Assert
+        Assert.Contains(result.Items, u => u.Id == activeUser.Id);
+        Assert.Contains(result.Items, u => u.Id == inactiveUser.Id);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_RecentLoginOnly_ReturnsOnlyUsersLoggedInWithinLast30Days()
+    {
+        // Arrange
+        var recentLoginUser = new User
+        {
+            Name = "Recent Login User",
+            Email = "recentlogin@test.com",
+            Username = "recentloginuser",
+            IsActive = true,
+            LastLogin = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddDays(-5)
+        };
+        var staleLoginUser = new User
+        {
+            Name = "Stale Login User",
+            Email = "stalelogin@test.com",
+            Username = "staleloginuser",
+            IsActive = true,
+            LastLogin = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddDays(-45)
+        };
+        var neverLoggedInUser = new User
+        {
+            Name = "Never Logged In User",
+            Email = "neverloggedin@test.com",
+            Username = "neverloggedinuser",
+            IsActive = true,
+            LastLogin = null
+        };
+        Context.Users.AddRange(recentLoginUser, staleLoginUser, neverLoggedInUser);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = -1 },
+            null, null,
+            includeArchived: false,
+            includeServiceAccounts: false,
+            includeTestAccounts: false,
+            activeOnly: false,
+            recentLoginOnly: true);
+
+        // Assert
+        Assert.Contains(result.Items, u => u.Id == recentLoginUser.Id);
+        Assert.DoesNotContain(result.Items, u => u.Id == staleLoginUser.Id);
+        Assert.DoesNotContain(result.Items, u => u.Id == neverLoggedInUser.Id);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_RecentLoginOnlyFalse_IncludesUsersRegardlessOfLastLogin()
+    {
+        // Arrange
+        var staleLoginUser = new User
+        {
+            Name = "Stale Login Default User",
+            Email = "staledefault@test.com",
+            Username = "staledefaultuser",
+            IsActive = true,
+            LastLogin = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddDays(-90)
+        };
+        Context.Users.Add(staleLoginUser);
+        await Context.SaveChangesAsync();
+
+        // Act - recentLoginOnly defaults to false
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = -1 },
+            null, null);
+
+        // Assert
+        Assert.Contains(result.Items, u => u.Id == staleLoginUser.Id);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_ActiveOnlyAndRecentLoginOnly_AppliesBothFiltersTogether()
+    {
+        // Arrange
+        var activeRecentUser = new User
+        {
+            Name = "Active Recent User",
+            Email = "activerecent@test.com",
+            Username = "activerecentuser",
+            IsActive = true,
+            LastLogin = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddDays(-2)
+        };
+        var activeStaleUser = new User
+        {
+            Name = "Active Stale User",
+            Email = "activestale@test.com",
+            Username = "activestaleuser",
+            IsActive = true,
+            LastLogin = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddDays(-60)
+        };
+        var inactiveRecentUser = new User
+        {
+            Name = "Inactive Recent User",
+            Email = "inactiverecent@test.com",
+            Username = "inactiverecentuser",
+            IsActive = false,
+            LastLogin = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddDays(-2)
+        };
+        Context.Users.AddRange(activeRecentUser, activeStaleUser, inactiveRecentUser);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = -1 },
+            null, null,
+            includeArchived: false,
+            includeServiceAccounts: false,
+            includeTestAccounts: false,
+            activeOnly: true,
+            recentLoginOnly: true);
+
+        // Assert
+        Assert.Contains(result.Items, u => u.Id == activeRecentUser.Id);
+        Assert.DoesNotContain(result.Items, u => u.Id == activeStaleUser.Id);
+        Assert.DoesNotContain(result.Items, u => u.Id == inactiveRecentUser.Id);
+    }
+
     #endregion
 
     #region GetUser Tests
