@@ -331,11 +331,14 @@ export async function getProjectFileCount(
  */
 export async function getProjectMembers(
   organizationId: number,
-  projectId: number
-): Promise<ProjectMemberResponseDto[]> {
+  projectId: number,
+  pageNumber = 1,
+  pageSize = -1
+): Promise<PaginatedResponse<ProjectMemberResponseDto>> {
   try {
     const res = await api.get(
-      `/organizations/${organizationId}/projects/${projectId}/members`
+      `/organizations/${organizationId}/projects/${projectId}/members`,
+      { params: { pageNumber, pageSize } }
     );
     return res.data;
   } catch (error) {

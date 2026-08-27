@@ -1951,6 +1951,7 @@ export const translations = {
       SOME_UPLOADS_FAILED_CHECK_FILE_CARDS:
         "Some uploads failed. Check the file cards.",
       SOURCE: "Source: ",
+      SOURCE_RECORD: "Source Record: ",
       SPLIT_VIEW: "Split View",
       STANDARD_FILE: "Standard File",
       STANDARD_ROLE: "Standard Role (Read-Only)",
@@ -4309,6 +4310,7 @@ export const translations = {
       SOME_UPLOADS_FAILED_CHECK_FILE_CARDS:
         "Algunas cargas fallaron. Revise las tarjetas de los archivos.",
       SOURCE: "Fuente: ",
+      SOURCE_RECORD: "Registro Fuente: ",
       SITE: "Sitio",
       SPLIT_VIEW: "Vista dividida",
       STANDARD_FILE: "Archivo estándar",

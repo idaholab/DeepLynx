@@ -106,6 +106,31 @@ namespace deeplynx.business
         }
 
         /// <summary>
+        /// Deletes all cache entries whose keys begin with the provided prefix.
+        /// </summary>
+        /// <param name="prefix">The key prefix to match.</param>
+        /// <returns>bool based on prefix delete success</returns>
+        public async Task<bool> DeleteByPrefixAsync(string prefix)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
+
+            var endpoints = _redis.GetEndPoints();
+            foreach (var endpoint in endpoints)
+            {
+                var server = _redis.GetServer(endpoint);
+
+                await foreach (var key in server.KeysAsync(
+                                database: _db.Database,
+                                pattern: $"{prefix}*"))
+                {
+                    await _db.KeyDeleteAsync(key);
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Operation to flush all existing data
         /// </summary>
         /// <returns>bool based on flush success</returns>

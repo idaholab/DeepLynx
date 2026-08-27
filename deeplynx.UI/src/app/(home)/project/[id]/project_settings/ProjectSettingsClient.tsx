@@ -64,7 +64,7 @@ export default function ProjectSettingsClient({
           organization?.organizationId as number,
           Number(selectedProjectId)
         );
-        setProjectMembers(users);
+        setProjectMembers(users.items);
         setIsMembersLoading(false);
       } catch (err) {
         console.error(err);
@@ -78,7 +78,7 @@ export default function ProjectSettingsClient({
         organization?.organizationId as number,
         Number(selectedProjectId)
       );
-      setProjectMembers(users);
+      setProjectMembers(users.items);
     }
   };
 
