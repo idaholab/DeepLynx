@@ -41,4 +41,14 @@ public class CacheKeys
     {
         return $"organization:{organizationId}:deleted";
     }
+
+    public static string ProjectArchivedStatus(long projectId)
+    {
+        return $"project:{projectId}:archived_status";
+    }
+
+    public static string ProjectDeleted(long projectId)
+    {
+        return $"project:{projectId}:deleted";
+    }
 }

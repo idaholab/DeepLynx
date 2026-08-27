@@ -37,8 +37,6 @@ public class ProjectBusiness : IProjectBusiness
     private readonly INotificationBusiness _notificationBusiness;
     private readonly IOrganizationBusiness _organizationBusiness;
     private readonly IRoleBusiness _roleBusiness;
-    private readonly TimeSpan cacheTTL = TimeSpan.FromHours(1);
-    private readonly string ProjectsCacheKey = "projects";
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ProjectBusiness" /> class.
@@ -212,6 +210,8 @@ public class ProjectBusiness : IProjectBusiness
         await _context.SaveChangesAsync();
         var projectId = project.Id;
 
+        await ExistenceHelper.SetProjectArchivedStatusCache(projectId, project.IsArchived);
+
         var projectResponseDto = new ProjectResponseDto
         {
             Id = projectId,
@@ -257,18 +257,6 @@ public class ProjectBusiness : IProjectBusiness
                 OrganizationId = objectStorageResponse.OrganizationId
             };
         }
-
-        // Update the Project Cache List
-        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
-
-        if (cachedProjectList == null) cachedProjectList = new List<ProjectResponseDto>();
-
-        // add the new project to the project list and set the cache
-        cachedProjectList.Add(projectResponseDto);
-        await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
-
-        // If project cache count differs from the database refresh it to match the database and return
-        if (cachedProjectList.Count != _context.Projects.Count()) await RefreshProjectsCache();
 
         // Log create Project event
         var eventLog = new CreateEventRequestDto
@@ -775,7 +763,7 @@ public class ProjectBusiness : IProjectBusiness
             Properties = JsonSerializer.Serialize(new { project.Name })
         });
 
-        var updatedProject = new ProjectResponseDto
+        return new ProjectResponseDto
         {
             Id = project.Id,
             Name = project.Name,
@@ -789,25 +777,6 @@ public class ProjectBusiness : IProjectBusiness
             RequireSensitivityLabel = project.RequireSensitivityLabel,
             DefaultObjectStorageId = project.DefaultObjectStorageId
         };
-
-        // Update the Project Cache List
-        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
-
-        // If cache list is empty, refresh it to match the database and return
-        if (cachedProjectList == null)
-        {
-            await RefreshProjectsCache();
-            return updatedProject;
-        }
-
-        // If cache exists, update the project in the list
-        var projectIndex = cachedProjectList.FindIndex(p => p.Id == updatedProject.Id);
-        if (projectIndex != -1) cachedProjectList[projectIndex] = updatedProject;
-
-        // Set the updated list back to the cache
-        await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
-
-        return updatedProject;
     }
 
     /// <summary>
@@ -828,28 +797,13 @@ public class ProjectBusiness : IProjectBusiness
         if (project == null)
             throw new KeyNotFoundException($"Project with id {projectId} not found.");
 
-        var projectName = project.Name;
-
         var records = _context.Records.Where(r => r.ProjectId == projectId);
         await RecordFileHelper.TryDeleteFiles(records, _fileBusinessFactory, _objectStorageBusiness);
 
         _context.Projects.Remove(project);
         await _context.SaveChangesAsync();
 
-        // Update the Project Cache List
-        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
-
-        // If cache list is empty, refresh it to match the database and return
-        if (cachedProjectList == null)
-        {
-            await RefreshProjectsCache();
-            return true;
-        }
-
-        var projectIndex = cachedProjectList.FindIndex(p => p.Id == projectId);
-        if (projectIndex != -1) cachedProjectList.RemoveAt(projectIndex);
-
-        await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
+        await ExistenceHelper.SetProjectDeletedCache(projectId);
 
         return true;
     }
@@ -905,36 +859,7 @@ public class ProjectBusiness : IProjectBusiness
         // Refresh the entity from the database to get updated values
         await _context.Entry(project).ReloadAsync();
 
-        var projectResponse = new ProjectResponseDto
-        {
-            Id = project.Id,
-            OrganizationId = organizationId,
-            Name = project.Name,
-            Description = project.Description,
-            Abbreviation = project.Abbreviation,
-            LastUpdatedAt = project.LastUpdatedAt,
-            LastUpdatedBy = project.LastUpdatedBy,
-            IsArchived = project.IsArchived,
-            Banner = project.Banner
-        };
-
-        // Update the Project Cache List
-        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
-
-        // If cache list is empty, refresh it to match the database and return
-        if (cachedProjectList == null)
-        {
-            await RefreshProjectsCache();
-        }
-        else
-        {
-            // If cache exists, update the project in the list
-            var projectIndex = cachedProjectList.FindIndex(p => p.Id == projectResponse.Id);
-            if (projectIndex != -1) cachedProjectList[projectIndex] = projectResponse;
-
-            // Set the updated list back to the cache
-            await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
-        }
+        await ExistenceHelper.SetProjectArchivedStatusCache(projectId, true);
 
         // Log the archive event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -1000,36 +925,7 @@ public class ProjectBusiness : IProjectBusiness
             // Refresh the entity from the database to get updated values
             await _context.Entry(project).ReloadAsync();
 
-            var projectResponse = new ProjectResponseDto
-            {
-                Id = project.Id,
-                OrganizationId = organizationId,
-                Name = project.Name,
-                Description = project.Description,
-                Abbreviation = project.Abbreviation,
-                LastUpdatedAt = project.LastUpdatedAt,
-                LastUpdatedBy = project.LastUpdatedBy,
-                IsArchived = project.IsArchived,
-                Banner = project.Banner
-            };
-
-            // Update the Project Cache List
-            var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
-
-            // If cache list is empty, refresh it to match the database and return
-            if (cachedProjectList == null)
-            {
-                await RefreshProjectsCache();
-            }
-            else
-            {
-                // If cache exists, update the project in the list
-                var projectIndex = cachedProjectList.FindIndex(p => p.Id == projectResponse.Id);
-                if (projectIndex != -1) cachedProjectList[projectIndex] = projectResponse;
-
-                // Set the updated list back to the cache
-                await CacheService.Instance.SetAsync(ProjectsCacheKey, cachedProjectList, cacheTTL);
-            }
+            await ExistenceHelper.SetProjectArchivedStatusCache(projectId, false);
 
             // Log the unarchive event
             await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -1422,28 +1318,6 @@ public class ProjectBusiness : IProjectBusiness
     }
 
     // PRIVATE HELPER FUNCTIONS //
-    private async Task<bool> RefreshProjectsCache()
-    {
-        var dbProjects = await _context.Projects.ToListAsync();
-        var projectResponseDtoList = MapProjectsToResponseDto(dbProjects);
-        await CacheService.Instance.SetAsync(ProjectsCacheKey, projectResponseDtoList, cacheTTL);
-        return true;
-    }
-
-    private List<ProjectResponseDto> MapProjectsToResponseDto(List<Project> projects)
-    {
-        return projects.Select(p => new ProjectResponseDto
-        {
-            Id = p.Id,
-            Name = p.Name,
-            Description = p.Description,
-            Abbreviation = p.Abbreviation,
-            LastUpdatedBy = p.LastUpdatedBy,
-            LastUpdatedAt = p.LastUpdatedAt,
-            IsArchived = p.IsArchived,
-            OrganizationId = p.OrganizationId
-        }).ToList();
-    }
 
     private async Task SetProjectDefaults(long currentUserId, long organizationId, long projectId)
     {
