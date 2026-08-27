@@ -1042,7 +1042,7 @@ export default function LatticeDecisionsPage() {
                           {t.translations.LATTICE_EXTRACTION_NUMBER}
                           {item.id}
                         </p>
-                        <p className="truncate text-sm">{names[item.id] ? `${t.translations.SOURCE_RECORD} ${names[item.id]}` : ""}</p>
+                        <p className="truncate text-sm">{names[item.id] ? names[item.id] : ""}</p>
                         <div className="mt-2 grid grid-cols-2 gap-x-2">
                           <div>
                             <p
