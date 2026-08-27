@@ -229,13 +229,25 @@ namespace deeplynx.helpers
             }
         }
 
-        public static async Task EnsureObjectStorageExistsForProjectAsync(DeeplynxContext context, long objectStorageId, long projectId, bool hideArchived = true)
+        public static async Task EnsureObjectStorageExistsAsync(
+            DeeplynxContext context,
+            long organizationId,
+            long projectId,
+            long objectStorageId,
+            bool hideArchived = true)
         {
-            var dataSourceExists = hideArchived
-                ? await context.ObjectStorages.AnyAsync(os => os.ProjectId == projectId && os.Id == objectStorageId && os.IsArchived == false)
-                : await context.ObjectStorages.AnyAsync(os => os.ProjectId == projectId && os.Id == objectStorageId);
+            var objectStorageExists = hideArchived
+                ? await context.ObjectStorages.AnyAsync(os =>
+                    os.Id == objectStorageId &&
+                    os.OrganizationId == organizationId &&
+                    (os.ProjectId == null || os.ProjectId == projectId) &&
+                    os.IsArchived == false)
+                : await context.ObjectStorages.AnyAsync(os =>
+                    os.Id == objectStorageId &&
+                    os.OrganizationId == organizationId &&
+                    (os.ProjectId == null || os.ProjectId == projectId));
 
-            if (!dataSourceExists)
+            if (!objectStorageExists)
             {
                 throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found in project with id {projectId}");
             }
