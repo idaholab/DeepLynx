@@ -272,23 +272,4 @@ public class UserController : ControllerBase
         return Ok(counts);
     }
 
-
-
-    /// <summary>
-    ///     Get rolling active user counts and active user details
-    /// </summary>
-    /// <param name="projectId">(Optional) ID of project that users are associated with</param>
-    /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
-    /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
-    /// <returns>Active user counts and users active in the 30-day window.</returns>
-//     [HttpGet("active-users", Name = "api_get_active_users")]
-//     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-//     public async Task<ActionResult<UserActivityUsersDto>> GetActiveUsers(
-//         [FromQuery] long? projectId,
-//         [FromQuery] long? organizationId,
-//         [FromQuery] bool includeServiceAccounts = false)
-//     {
-//         var activity = await _userBusiness.GetActiveUsers(projectId, organizationId, includeServiceAccounts);
-//         return Ok(activity);
-//     }
 }
