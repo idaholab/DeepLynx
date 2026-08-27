@@ -216,7 +216,7 @@ public class ProjectController : ControllerBase
 
 
     /// <summary>
-    ///     Get Project Members ok?
+    ///     Get Project Members Paginated
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the project belongs</param>
     /// <param name="projectId">(Optional)ID of the project</param>

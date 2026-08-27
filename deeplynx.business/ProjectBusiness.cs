@@ -1112,9 +1112,8 @@ public class ProjectBusiness : IProjectBusiness
                 IsProjectAdmin = pm.IsProjectAdmin
             });
 
-        var combined = users.Union(groups)
-        .OrderBy(m => m.Type)
-        .ThenBy(m => m.Name);
+        var combined = users.Union(groups);
+        
 
 
         return await combined.ToPaginatedAsync(paginatedRequestDto);
