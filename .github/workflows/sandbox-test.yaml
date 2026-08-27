@@ -352,7 +352,8 @@ jobs:
             --from-literal=rabbitmq-default-user="${{ vars.RABBITMQ_DEFAULT_USER }}" \
             --namespace=deeplynx-test \
             --dry-run=client -o yaml | kubectl apply -f -
-            - shell: bash
+            
+      - shell: bash
         name: Create Certificate ConfigMap
         run: |
           curl -fsSL -o /tmp/inl-root.crt https://certstore.inl.gov/pki/CAINLROOT_B64.crt
