@@ -202,6 +202,8 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.Organizations.Add(organization);
         await _context.SaveChangesAsync();
 
+        await ExistenceHelper.SetOrganizationArchivedStatusCache(organization.Id, organization.IsArchived);
+
         var orgUser = new OrganizationUser
         {
             UserId = currentUserId,
@@ -368,6 +370,8 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.Organizations.Update(organization);
         await _context.SaveChangesAsync();
 
+        await ExistenceHelper.SetOrganizationArchivedStatusCache(organizationId, true);
+
         // Log organization archive event
         await _eventBusiness.CreateEvent(
             currentUserId,
@@ -405,6 +409,8 @@ public class OrganizationBusiness : IOrganizationBusiness
         organization.LastUpdatedBy = currentUserId;
         await _context.SaveChangesAsync();
 
+        await ExistenceHelper.SetOrganizationArchivedStatusCache(organizationId, false);
+
         // Log organization archive event
         await _eventBusiness.CreateEvent(
             currentUserId,
@@ -437,6 +443,8 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         _context.Organizations.Remove(organization);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetOrganizationDeletedCache(organizationId);
 
         return true;
     }
@@ -504,7 +512,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             var defaultStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
             objectStorageId = defaultStorage.Id;
         }
-        
+
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
 
         if (objectStorage.Config.MountPath != null)

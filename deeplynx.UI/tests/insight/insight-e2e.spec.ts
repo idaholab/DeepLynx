@@ -96,11 +96,11 @@ async function getRecordsByName(
 ): Promise<RecordSummary[]> {
   const url = testApiUrl(
     `/organizations/${orgId}/projects/${projectId}/records` +
-      `?hideArchived=true&isInsightEligible=false`,
+      `?hideArchived=true&isInsightEligible=false&pageSize=-1`,
   );
   const res = await request.fetch(url);
   if (!res.ok()) throw new Error(`Failed to fetch records: ${res.status()}`);
-  const records = await res.json();
+  const { items: records } = await res.json();
   return records
     .filter((r: any) => r.name === fileName)
     .map((r: any) => ({ id: String(r.id), name: r.name, projectId: String(r.projectId) }));
