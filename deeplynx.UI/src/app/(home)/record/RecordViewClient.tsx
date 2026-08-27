@@ -210,6 +210,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
+  const [isRecordInsightEmbedding, setIsRecordInsightEmbedding] = useState(false);
   const [endpointHealth, setEndpointHealth] = useState<InsightEndpointHealthByRole>(EMPTY_ENDPOINT_HEALTH);
   const isQueryModelUnavailable =
     endpointHealth.query.response !== null
@@ -1014,18 +1015,29 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           fileId: recordId,
         });
 
-        // const pipelineStatus = await fetchInsightPipelineStatus({
-        //   organizationId: organization.organizationId as number,
-        //   projectId,
-        //   fileId: recordId
-        // });
-
-        // console.log(`Record Id: ${pipelineStatus.file_id}\nProgress: ${pipelineStatus.progress}\nStage: ${pipelineStatus.stage}\nStatus: ${pipelineStatus.status}\nJob Id: ${pipelineStatus.job_id}\nError: ${pipelineStatus.error}`);
+        try {
+          const pipelineStatus = await fetchInsightPipelineStatus({
+            organizationId: organization.organizationId as number,
+            projectId,
+            fileId: recordId
+          });
+          console.log(pipelineStatus.status);
+          if (pipelineStatus.status == "in progress") {
+            setIsRecordInsightEmbedding(true);
+          } else if (pipelineStatus.status == "completed") {
+            setIsRecordInsightEmbedding(false);
+          } else if (pipelineStatus.status == "No pipeline status exists for this record yet.") {
+            setIsRecordInsightEmbedding(false);
+          }
+        } catch (error) {
+          console.log("No pipeline status exists for this record yet.")
+        }
 
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
         setIsRecordInsightEmbedded(status.indexed);
+        console.log(status.indexed);
 
         if (status.indexed) {
           if (recordEmbedPollRef.current) {
@@ -1405,6 +1417,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                               t.translations.LATTICE_QUEUE_FOR_EMBEDDING
                             )}
                           </button>
+                        </div>
+                      )}
+                    {!isRecordInsightEmbedded &&
+                      isRecordInsightEmbedding && (
+                        <div className="alert alert-warning">
+                          <span className="flex-1 text-sm">
+                            {t.translations.PROJECT_INSIGHT_STATUS_PROCESSING}
+                          </span>
                         </div>
                       )}
 
