@@ -1113,8 +1113,6 @@ public class ProjectBusiness : IProjectBusiness
             });
 
         var combined = users.Union(groups);
-        
-
 
         return await combined.ToPaginatedAsync(paginatedRequestDto);
     }
