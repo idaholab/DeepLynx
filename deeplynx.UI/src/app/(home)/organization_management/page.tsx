@@ -54,7 +54,7 @@ const OrganizationManagementPage = async ({
   // Fetch projects filtered by organization
   let projects: ProjectResponseDto[] = [];
   try {
-    const apiProjects = await getAllProjectsServer(
+    const { items: apiProjects } = await getAllProjectsServer(
       organizationId as number,
       true,
     );
@@ -66,7 +66,7 @@ const OrganizationManagementPage = async ({
   // Fetch groups filtered by organization
   let groups: GroupResponseDto[] = [];
   try {
-    const apiGroups = await getAllGroupsServer(organizationId as number, true);
+    const { items: apiGroups } = await getAllGroupsServer(organizationId as number, true);
     groups = apiGroups.map(mapToGroupResponseDtos);
   } catch (error) {
     console.error("getAllGroups failed:", error);
@@ -79,7 +79,8 @@ const OrganizationManagementPage = async ({
 
   try {
     // First, fetch roles for the organization
-    roles = await getAllOrgRolesServer(Number(organizationId));
+    const { items } = await getAllOrgRolesServer(Number(organizationId));
+    roles = items;
     permissions = await getAllOrgPermissionsServer(Number(organizationId), true);
     labels = await getAllSensitivityLabelsOrg(Number(organizationId));
   } catch (error) {

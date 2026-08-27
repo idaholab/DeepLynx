@@ -4,6 +4,8 @@ namespace deeplynx.interfaces;
 
 public interface IRecordBusiness
 {
+    [Obsolete("Used by deprecated v1 record endpoints and NexusFlightServer. Superseded by GetAllRecordsPaginated. " +
+              "Remove once those callers are migrated to the paginated variant.", error: false)]
     Task<List<RecordResponseDto>> GetAllRecords(
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived, string? fileType,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false);
@@ -21,8 +23,14 @@ public interface IRecordBusiness
         long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
+    [Obsolete("V1-only. Used by deprecated v1 record endpoints. Superseded by GetRecordsByTagsPaginated. " +
+              "Remove once v1 record endpoints are sunset.", error: false)]
     Task<List<RecordResponseDto>> GetRecordsByTags(
         long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+    
+    Task<PaginatedResponse<RecordResponseDto>> GetRecordsByTagsPaginated(
+        long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived, PaginatedRequestDto paginatedRequestDto,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<RecordResponseDto> GetRecord(

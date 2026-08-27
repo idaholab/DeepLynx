@@ -1,6 +1,7 @@
 using System.Text.Json;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.Configuration;
@@ -41,8 +42,52 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context = context;
         _eventBusiness = eventBusiness;
         _roleBusiness = roleBusiness;
-        _logger = logger;
         _objectStorageBusiness = objectStorageBusiness;
+        _logger = logger;
+    }
+
+    /// <summary>
+    ///     Retrieves all organizations
+    /// </summary>
+    /// <param name="userId">The ID of the requesting user</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all matching organizations</param>
+    /// <param name="isSysAdmin">Boolean determining if the requesting user is a system admin</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
+    /// <returns>A list of organizations</returns>
+    public async Task<PaginatedResponse<OrganizationResponseDto>> GetAllOrganizationsPaginated(long userId, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true, bool isSysAdmin = false)
+    {
+        return await GetAllOrganizationsForUserPaginated(userId, paginatedRequestDto, hideArchived, isSysAdmin);
+    }
+
+    /// <summary>
+    ///     Retrieves organizations for current user with pagination
+    /// </summary>
+    /// <param name="userId">ID of the User executing this method.</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all matching organizations</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived organizations from the result</param>
+    /// <param name="isSysAdmin">Boolean value determining if the requesting user is a system admin</param>
+    /// <returns>A paginated list of organizations</returns>
+    public async Task<PaginatedResponse<OrganizationResponseDto>> GetAllOrganizationsForUserPaginated(
+        long userId,
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true,
+        bool isSysAdmin = false)
+    {
+        var query = _context.Organizations.AsQueryable();
+
+        if (!isSysAdmin)
+        {
+            query = query.Where(o => o.OrganizationUsers.Any(ou => ou.UserId == userId));
+        }
+
+        if (hideArchived)
+        {
+            query = query.Where(o => !o.IsArchived);
+        }
+
+        var orderedQuery = query.OrderBy(o => o.Id);
+
+        return await orderedQuery.Select(o => OrganizationToResponse(o)).ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -125,8 +170,9 @@ public class OrganizationBusiness : IOrganizationBusiness
             DefaultOrg = organization.DefaultOrg,
             Banner = organization.Banner,
             Theme = organization.Theme,
-            CreateContainerPerProject = organization.CreateContainerPerProject
-
+            CreateContainerPerProject = organization.CreateContainerPerProject,
+            DisableFileTransfer = organization.DisableFileTransfer,
+            DefaultObjectStorageId = organization.DefaultObjectStorageId
         };
     }
 
@@ -156,6 +202,8 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         _context.Organizations.Add(organization);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetOrganizationArchivedStatusCache(organization.Id, organization.IsArchived);
 
         var orgUser = new OrganizationUser
         {
@@ -196,7 +244,9 @@ public class OrganizationBusiness : IOrganizationBusiness
             Banner = organization.Banner,
             RequireSensitivityLabel = organization.RequireSensitivityLabel,
             Theme = organization.Theme,
-            CreateContainerPerProject = organization.CreateContainerPerProject
+            CreateContainerPerProject = organization.CreateContainerPerProject,
+            DisableFileTransfer = organization.DisableFileTransfer,
+            DefaultObjectStorageId = organization.DefaultObjectStorageId
         };
     }
 
@@ -245,6 +295,16 @@ public class OrganizationBusiness : IOrganizationBusiness
             organization.CreateContainerPerProject = dto.CreateContainerPerProject.Value;
         }
 
+        if (dto.DisableFileTransfer != null)
+        {
+            organization.DisableFileTransfer = dto.DisableFileTransfer.Value;
+        }
+
+        if (dto.DefaultObjectStorageId != null)
+        {
+            organization.DefaultObjectStorageId = dto.DefaultObjectStorageId;
+        }
+
         organization.Name = dto.Name ?? organization.Name;
         organization.Description = dto.Description ?? organization.Description;
         organization.DefaultOrg = dto.DefaultOrg ?? organization.DefaultOrg;
@@ -284,7 +344,9 @@ public class OrganizationBusiness : IOrganizationBusiness
             Banner = organization.Banner,
             RequireSensitivityLabel = organization.RequireSensitivityLabel,
             Theme = organization.Theme,
-            CreateContainerPerProject = organization.CreateContainerPerProject
+            CreateContainerPerProject = organization.CreateContainerPerProject,
+            DisableFileTransfer = organization.DisableFileTransfer,
+            DefaultObjectStorageId = organization.DefaultObjectStorageId
         };
     }
 
@@ -308,6 +370,8 @@ public class OrganizationBusiness : IOrganizationBusiness
         organization.LastUpdatedBy = currentUserId;
         _context.Organizations.Update(organization);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetOrganizationArchivedStatusCache(organizationId, true);
 
         // Log organization archive event
         await _eventBusiness.CreateEvent(
@@ -346,6 +410,8 @@ public class OrganizationBusiness : IOrganizationBusiness
         organization.LastUpdatedBy = currentUserId;
         await _context.SaveChangesAsync();
 
+        await ExistenceHelper.SetOrganizationArchivedStatusCache(organizationId, false);
+
         // Log organization archive event
         await _eventBusiness.CreateEvent(
             currentUserId,
@@ -378,6 +444,8 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         _context.Organizations.Remove(organization);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetOrganizationDeletedCache(organizationId);
 
         return true;
     }
@@ -423,6 +491,17 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Add(orgUser);
         await _context.SaveChangesAsync();
 
+        // overwrite the cached member and admin flags now that they've changed
+        try
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.OrgMember(userId, organizationId), true, (TimeSpan?)null);
+            await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, (TimeSpan?)null);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache overwrite failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+        }
+
         return true;
     }
 
@@ -433,8 +512,20 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <returns>True if the file is successfully removed, false otherwise.</returns>
     public async Task<bool> RemoveLogoFileAsync(long organizationId)
     {
-        var realObjectStorageId = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId.Id);
+        var organization = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId) ?? throw new ArgumentException("Organization not found.");
+
+        long objectStorageId;
+        if (organization.LogoObjectStorageId.HasValue)
+        {
+            objectStorageId = organization.LogoObjectStorageId.Value;
+        }
+        else
+        {
+            var defaultStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
+            objectStorageId = defaultStorage.Id;
+        }
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
 
         if (objectStorage.Config.MountPath != null)
         {
@@ -567,6 +658,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         if (logoFile.Length > maxFileSize)
             throw new ArgumentException("File size exceeds the 5MB limit.");
 
+        var organization = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId) ?? throw new ArgumentException("Organization not found.");
         var realObjectStorageId = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId.Id);
 
@@ -584,6 +676,9 @@ public class OrganizationBusiness : IOrganizationBusiness
 
             if (!SanitizeFilePath.IsValidFilePath(baseFilePath))
                 throw new ArgumentException("Invalid Azure file path. Allowed characters are letters (a-z, A-Z), numbers (0-9), and '/'.");
+
+            organization.LogoObjectStorageId = (int?)realObjectStorageId.Id;
+            await _context.SaveChangesAsync();
 
             var newLogoFileId2 = $"logo_{Guid.NewGuid()}";
             var fileName2 = $"{newLogoFileId2}.{fileExtension}";
@@ -614,13 +709,14 @@ public class OrganizationBusiness : IOrganizationBusiness
                 await metadataBlobClient.UploadAsync(ms, overwrite: true);
             }
 
-            Console.WriteLine("uri clint: " + blobClient.Uri.ToString());
-
             return blobClient.Uri.ToString();
         }
 
         if (objectStorage.Config.MountPath == null)
             throw new Exception("File system mount path not set in object storage.");
+
+        organization.LogoObjectStorageId = (int?)realObjectStorageId.Id;
+        await _context.SaveChangesAsync();
 
         var logosFolderPath = Path.Combine(
             objectStorage.Config.MountPath,
@@ -679,8 +775,20 @@ public class OrganizationBusiness : IOrganizationBusiness
     /// <returns>Record Id of Logo</returns>
     public async Task<(Stream Stream, string FullPath)?> GetOrganizationLogoStreamAsync(long organizationId)
     {
-        var realObjectStorageId = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId.Id);
+        var organization = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId) ?? throw new ArgumentException("Organization not found.");
+
+        long objectStorageId;
+        if (organization.LogoObjectStorageId.HasValue)
+        {
+            objectStorageId = organization.LogoObjectStorageId.Value;
+        }
+        else
+        {
+            var defaultStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
+            objectStorageId = defaultStorage.Id;
+        }
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
 
         if (objectStorage.Config.MountPath != null)
         {
@@ -807,6 +915,17 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Update(existingOrgUser);
         await _context.SaveChangesAsync();
 
+        // overwrite the cached admin flag now that it's changed
+        try
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, (TimeSpan?)null);
+
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache overwrite failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+        }
+
         return true;
     }
 
@@ -828,6 +947,17 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         _context.OrganizationUsers.Remove(existingOrgUser);
         await _context.SaveChangesAsync();
+
+        // invalidate the cached admin flag now that it's changed
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrgMember(userId, organizationId));
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrgAdmin(userId, organizationId));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+        }
 
         return true;
     }
@@ -922,16 +1052,23 @@ public class OrganizationBusiness : IOrganizationBusiness
             organizationId, null);
     }
 
-    private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
+    private static OrganizationResponseDto OrganizationToResponse(Organization organization)
     {
-        if (objectStorageId.HasValue)
+        return new OrganizationResponseDto
         {
-            // object storage could be org-level so just return object storage, don't check for project existence
-            return objectStorageId.Value;
-        }
-
-        var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
-            ?? throw new KeyNotFoundException("Default object storage not found");
-        return defaultObjectStorage.Id;
+            Id = organization.Id,
+            Name = organization.Name,
+            Description = organization.Description,
+            LastUpdatedAt = organization.LastUpdatedAt,
+            LastUpdatedBy = organization.LastUpdatedBy,
+            IsArchived = organization.IsArchived,
+            DefaultOrg = organization.DefaultOrg,
+            Banner = organization.Banner,
+            RequireSensitivityLabel = organization.RequireSensitivityLabel,
+            Theme = organization.Theme,
+            CreateContainerPerProject = organization.CreateContainerPerProject,
+            DisableFileTransfer = organization.DisableFileTransfer,
+            DefaultObjectStorageId = organization.DefaultObjectStorageId
+        };
     }
 }

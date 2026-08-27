@@ -22,7 +22,7 @@ const TeamMembersWidget: React.FC = () => {
           organization?.organizationId as number,
           project?.projectId as number,
         );
-        setUsers(data);
+        setUsers(data.items);
       } catch (error) {
         console.error("Failed to fetch projects:", error);
       }

@@ -98,7 +98,7 @@ export default function SelectedRecordsPreviewPanel({
       </div>
 
       {shownCount > pageSize ? (
-        <div className="mt-3 flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-3 flex flex-col gap-3 text-sm sm:items-center sm:justify-between">
           <span className="text-base-content/70">
             {`${t.translations.SHOWING} ${(currentPage - 1) * pageSize + 1}-${Math.min(
               currentPage * pageSize,

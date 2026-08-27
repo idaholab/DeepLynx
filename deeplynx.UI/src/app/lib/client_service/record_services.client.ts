@@ -16,35 +16,7 @@ import { GraphResponse, RecordTagLinkDto } from "@/app/(home)/types/types";
 import api from "./api";
 
 
-/**
- * Get all records for a project
- * @param organizationId - The ID of the organization
- * @param projectId - The ID of the project
- * @param dataSourceId - Optional data source ID to filter records
- * @param fileType - Optional file extension to filter by (e.g., pdf, png, jpg)
- * @param hideArchived - Flag to hide archived records (default: true)
- * @returns Promise with array of RecordResponseDto
- */
-export async function getAllRecords(
-  organizationId: number,
-  projectId: number,
-  dataSourceId?: number,
-  fileType?: string,
-  hideArchived: boolean = true
-): Promise<RecordResponseDto[]> {
-  try {
-    const res = await api.get(
-      `/organizations/${organizationId}/projects/${projectId}/records`,
-      { params: { dataSourceId, fileType, hideArchived } }
-    );
-    return res.data;
-  } catch (error) {
-    console.error("Error getting all records:", error);
-    throw error;
-  }
-}
-
-type GetAllRecordsPaginatedOptions = {
+type GetAllRecordsOptions = {
   dataSourceId?: number;
   fileType?: string;
   hideArchived?: boolean;
@@ -54,16 +26,16 @@ type GetAllRecordsPaginatedOptions = {
 };
 
 /**
- * Get a paginated page of records for a project
+ * Get all records for a project
  * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
- * @param options - Optional filters and pagination details
+ * @param options - Optional filters and pagination details; pageSize defaults to -1 (fetch all)
  * @returns Promise with paginated RecordResponseDto
  */
-export async function getAllRecordsPaginated(
+export async function getAllRecords(
   organizationId: number,
   projectId: number,
-  options: GetAllRecordsPaginatedOptions = {}
+  options: GetAllRecordsOptions = {}
 ): Promise<PaginatedResponse<RecordResponseDto>> {
   const {
     dataSourceId,
@@ -71,12 +43,12 @@ export async function getAllRecordsPaginated(
     hideArchived = true,
     isInsightEligible = false,
     pageNumber = 1,
-    pageSize = 25,
+    pageSize = -1,
   } = options;
 
   try {
     const res = await api.get<PaginatedResponse<RecordResponseDto>>(
-      `/organizations/${organizationId}/projects/${projectId}/records/paginated`,
+      `/organizations/${organizationId}/projects/${projectId}/records`,
       {
         params: {
           dataSourceId,
@@ -179,18 +151,24 @@ function sanitizeSearchQuery(query: string): string {
  * @param projectId - The ID of the project
  * @param tagIds - Array of tag IDs to filter by (records must contain all tags)
  * @param hideArchived - Flag to hide archived records (default: true)
- * @returns Promise with array of RecordResponseDto
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all projects (default: -1)
+ * @returns Promise with paginated RecordResponseDto
  */
 export async function getRecordsByTags(
   organizationId: number,
   projectId: number,
   tagIds: number[],
-  hideArchived: boolean = true
-): Promise<RecordResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<RecordResponseDto>> {
   try {
     const params = new URLSearchParams();
     tagIds.forEach((tagId) => params.append("tagIds", tagId.toString()));
     params.append("hideArchived", hideArchived.toString());
+    params.append("pageNumber", pageNumber.toString());
+    params.append("pageSize", pageSize.toString());
 
     const res = await api.get(
       `/organizations/${organizationId}/projects/${projectId}/records/by-tags?${params.toString()}`

@@ -30,6 +30,9 @@ import toast from "react-hot-toast";
 import { useLanguage } from "@/app/contexts/Language";
 import { BetaBadge } from "@/app/(home)/components/BetaBadge";
 import { isInsightHidden } from "@/app/lib/feature_flags";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "../../components/PaginationControls";
+import { getRecord } from "@/app/lib/client_service/record_services.client";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
@@ -369,11 +372,13 @@ function RelationshipCard({ rel, isApproved,
 
 function ExtractionDetailPanel({
   extractionId,
+  extractionName,
   organizationId,
   projectId,
   onStatusChange,
 }: {
   extractionId: number;
+  extractionName: string;
   organizationId: number;
   projectId: number;
   onStatusChange?: () => void;
@@ -447,10 +452,21 @@ function ExtractionDetailPanel({
 
   const fetchStaging = useCallback(async () => {
     const myRequestId = ++requestIdRef.current;
+
     try {
-      const data = await getExtractionStaging(organizationId, projectId, extractionId);
-      if (requestIdRef.current !== myRequestId) return; // stale — drop it
+      const data = await getExtractionStaging(
+        organizationId,
+        projectId,
+        extractionId,
+      );
+
+      if (requestIdRef.current !== myRequestId) return;
+
       setStaging(data);
+
+      if (NOT_RUNNING_STATUSES.includes(data.status)) {
+        onStatusChange?.();
+      }
       setApproved((prev) => ({
         records: new Set([...prev.records].filter((id) =>
           data.records.some((r) => r.id === id && !r.promoted_id && !r.rejected),
@@ -491,6 +507,7 @@ function ExtractionDetailPanel({
     organizationId,
     projectId,
     extractionId,
+    onStatusChange,
     t.translations.LATTICE_FAILED_LOAD_EXTRACTION,
   ]);
 
@@ -521,13 +538,26 @@ function ExtractionDetailPanel({
   }, [fetchStaging]);
 
   useEffect(() => {
-    if (!staging || staging.status !== "running") return;
+    if (!staging || NOT_RUNNING_STATUSES.includes(staging.status)) {
+      return;
+    }
 
-    const timeoutId = window.setTimeout(() => {
-      void fetchStaging();
-    }, 3000);
+    let cancelled = false;
 
-    return () => window.clearTimeout(timeoutId);
+    const poll = async () => {
+      await fetchStaging();
+
+      if (!cancelled) {
+        timeoutId = window.setTimeout(poll, 3000);
+      }
+    };
+
+    let timeoutId = window.setTimeout(poll, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
   }, [staging?.status, fetchStaging]);
 
   const handleSave = async () => {
@@ -656,6 +686,7 @@ function ExtractionDetailPanel({
         <h2 className="text-lg font-bold">
           {t.translations.LATTICE_EXTRACTION_NUMBER}
           {staging.id}
+          {extractionName ? ` -  ${extractionName}` : ""}
         </h2>
 
         {/* Row 1: status + mode on left, buttons on right */}
@@ -846,6 +877,7 @@ export default function LatticeDecisionsPage() {
   const [items, setItems] = useState<ExtractionListItemDTO[]>([]);
   const [isListLoading, setIsListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+  const [names, setNames] = useState<Record<string, string>>({});
 
   const selectedId = searchParams.get("extractionId")
     ? Number(searchParams.get("extractionId"))
@@ -858,7 +890,13 @@ export default function LatticeDecisionsPage() {
   const refreshList = useCallback(() => {
     if (!orgId || !projId) return;
     listExtractions(orgId, projId)
-      .then(setItems)
+      .then((response) => {
+        if (response?.items) {
+          setItems(response.items);
+        } else {
+          setItems([]);
+        }
+      })
       .catch(() =>
         setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS),
       );
@@ -873,11 +911,23 @@ export default function LatticeDecisionsPage() {
   useEffect(() => {
     if (insightHidden) return;
     if (!orgId || !projId) return;
+
     setIsListLoading(true);
+
     listExtractions(orgId, projId)
-      .then(setItems)
-      .catch(() => setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS))
-      .finally(() => setIsListLoading(false));
+      .then((response) => {
+        if (response?.items) {
+          setItems(response.items);
+        } else {
+          setItems([]);
+        }
+      })
+      .catch(() => {
+        setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS);
+      })
+      .finally(() => {
+        setIsListLoading(false);
+      });
   }, [
     insightHidden,
     orgId,
@@ -904,6 +954,46 @@ export default function LatticeDecisionsPage() {
   if (insightHidden) {
     return null;
   }
+
+  const {
+    currentPage: extractionPage,
+    pageSize: extractionPageSize,
+    paginatedItems: paginatedExtractions,
+    resetPagination: resetExtractionPagination,
+    setCurrentPage: setExtractionPage,
+    setPageSize: setExtractionPageSize,
+    totalPages: extractionTotalPages,
+  } = useLocalPagination({
+    items: items,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetExtractionPagination();
+  }, [resetExtractionPagination]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadNames() {
+      const entries = await Promise.all(
+        paginatedExtractions.map(async (item) => {
+          let res = null;
+          if (item.source_record_id == null) return null;
+          res = await getRecord(Number(orgId), Number(projId), item.source_record_id);
+          return [item.id, res.name] as const;
+        })
+      );
+      const validEntries = entries.filter(
+        (entry): entry is readonly [number, string] => entry !== null
+      );
+      if (!cancelled) {
+        console.log(validEntries);
+        setNames(Object.fromEntries(validEntries));
+      }
+    }
+    loadNames();
+    return () => { cancelled = true };
+  }, [paginatedExtractions, orgId, projId])
 
   return (
     <main className="min-h-screen bg-base-200/30">
@@ -941,7 +1031,7 @@ export default function LatticeDecisionsPage() {
       </section>
 
       <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
-        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
           {/* Left: extraction list */}
           <aside className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden self-start">
             <div className="border-b border-base-300 px-4 py-3">
@@ -962,7 +1052,7 @@ export default function LatticeDecisionsPage() {
               </p>
             ) : (
               <ul className="divide-y divide-base-200 max-h-[60vh] overflow-y-auto">
-                {items.map((item) => (
+                {paginatedExtractions.map((item) => (
                   <li key={item.id}>
                     <button
                       type="button"
@@ -977,6 +1067,7 @@ export default function LatticeDecisionsPage() {
                           {t.translations.LATTICE_EXTRACTION_NUMBER}
                           {item.id}
                         </p>
+                        <p className="truncate text-sm">{names[item.id] ? names[item.id] : ""}</p>
                         <div className="mt-2 grid grid-cols-2 gap-x-2">
                           <div>
                             <p
@@ -1019,6 +1110,14 @@ export default function LatticeDecisionsPage() {
                     </button>
                   </li>
                 ))}
+
+                <PaginationControls
+                  currentPage={extractionPage}
+                  pageSize={extractionPageSize}
+                  totalPages={extractionTotalPages}
+                  onPageChange={setExtractionPage}
+                  onPageSizeChange={setExtractionPageSize}
+                />
               </ul>
             )}
           </aside>
@@ -1029,6 +1128,7 @@ export default function LatticeDecisionsPage() {
               <ExtractionDetailPanel
                 key={selectedId}
                 extractionId={selectedId}
+                extractionName={names[selectedId]}
                 organizationId={orgId}
                 projectId={projId}
                 onStatusChange={refreshList}

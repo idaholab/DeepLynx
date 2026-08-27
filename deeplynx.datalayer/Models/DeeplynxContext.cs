@@ -43,6 +43,10 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<OauthApplication> OauthApplications { get; set; }
 
+    public virtual DbSet<OauthDeviceAuthorizationRequest> OauthDeviceAuthorizationRequests { get; set; }
+
+    public virtual DbSet<OauthRefreshToken> OauthRefreshTokens { get; set; }
+
     public virtual DbSet<OauthToken> OauthTokens { get; set; }
 
     public virtual DbSet<ObjectStorage> ObjectStorages { get; set; }
@@ -72,6 +76,10 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<SavedSearch> SavedSearches { get; set; }
 
     public virtual DbSet<SensitivityLabel> SensitivityLabels { get; set; }
+
+    public virtual DbSet<SensitivityLabelPermission> SensitivityLabelPermissions { get; set; }
+
+    public virtual DbSet<UserSensitivityLabel> UserSensitivityLabels { get; set; }
 
     public virtual DbSet<Subscription> Subscriptions { get; set; }
 
@@ -212,6 +220,11 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.CreatedBy)
                 .OnDelete(DeleteBehavior.NoAction)
                 .HasConstraintName(null);
+            
+            entity.HasOne(e => e.SourceRecord)
+                .WithMany()
+                .HasForeignKey(e => e.SourceRecordId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<DataSource>(entity =>
@@ -607,6 +620,83 @@ public partial class DeeplynxContext : DbContext
                 .HasConstraintName("oauth_tokens_user_id_fkey");
         });
 
+        modelBuilder.Entity<OauthDeviceAuthorizationRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("oauth_device_auth_requests_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_oauth_device_auth_requests_id");
+
+            entity.HasIndex(e => e.DeviceCodeHash)
+                .HasDatabaseName("idx_oauth_device_auth_device_code_hash")
+                .IsUnique();
+
+            entity.HasIndex(e => e.UserCodeHash)
+                .HasDatabaseName("idx_oauth_device_auth_user_code_hash")
+                .IsUnique();
+
+            entity.HasIndex(e => e.ApplicationId)
+                .HasDatabaseName("idx_oauth_device_auth_application_id");
+
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("idx_oauth_device_auth_user_id");
+
+            entity.HasIndex(e => e.Status)
+                .HasDatabaseName("idx_oauth_device_auth_status");
+
+            entity.HasIndex(e => e.ExpiresAt)
+                .HasDatabaseName("idx_oauth_device_auth_expires_at");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.PollingIntervalSeconds).HasDefaultValue(5);
+            entity.Property(e => e.PollCount).HasDefaultValue(0);
+            entity.Property(e => e.Status).HasDefaultValue(OauthDeviceAuthorizationStatus.Pending);
+
+            entity.HasOne(d => d.OauthApplication).WithMany(p => p.OauthDeviceAuthorizationRequests)
+                .HasForeignKey(d => d.ApplicationId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("oauth_device_auth_requests_application_id_fkey");
+
+            entity.HasOne(d => d.User).WithMany(p => p.OauthDeviceAuthorizationRequests)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("oauth_device_auth_requests_user_id_fkey");
+        });
+
+        modelBuilder.Entity<OauthRefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("oauth_refresh_tokens_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_oauth_refresh_tokens_id");
+
+            entity.HasIndex(e => e.TokenHash)
+                .HasDatabaseName("idx_oauth_refresh_tokens_token_hash")
+                .IsUnique();
+
+            entity.HasIndex(e => e.ApplicationId)
+                .HasDatabaseName("idx_oauth_refresh_tokens_application_id");
+
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("idx_oauth_refresh_tokens_user_id");
+
+            entity.HasIndex(e => e.ExpiresAt)
+                .HasDatabaseName("idx_oauth_refresh_tokens_expires_at");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.Revoked).HasDefaultValue(false);
+
+            entity.HasOne(d => d.OauthApplication).WithMany(p => p.OauthRefreshTokens)
+                .HasForeignKey(d => d.ApplicationId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("oauth_refresh_tokens_application_id_fkey");
+
+            entity.HasOne(d => d.User).WithMany(p => p.OauthRefreshTokens)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("oauth_refresh_tokens_user_id_fkey");
+        });
+
         // Org-level entity \\
         modelBuilder.Entity<ObjectStorage>(entity =>
         {
@@ -624,6 +714,8 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.Property(e => e.IsArchived).HasDefaultValue(false);
+
+            entity.Property(e => e.FilesDeletable).HasDefaultValue(true);
 
             entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_object_storages_last_updated_by");
 
@@ -726,9 +818,6 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.ProjectId)
                 .HasDatabaseName("idx_permissions_project_id");
 
-            entity.HasIndex(e => e.LabelId)
-                .HasDatabaseName("idx_permissions_label_id");
-
             entity.HasIndex(e => e.Action)
                 .HasDatabaseName("idx_permissions_action");
 
@@ -737,19 +826,6 @@ public partial class DeeplynxContext : DbContext
 
             entity.HasIndex(e => e.IsDefault)
                 .HasDatabaseName("idx_permissions_is_default");
-
-            // Label-based permissions
-            // Organization-level (no project)
-            entity.HasIndex(e => new { e.OrganizationId, e.LabelId, e.Action })
-                .HasDatabaseName("permissions_unique_org_label_action")
-                .IsUnique()
-                .HasFilter("project_id IS NULL");
-
-            // Project-level (with project)
-            entity.HasIndex(e => new { e.OrganizationId, e.ProjectId, e.LabelId, e.Action })
-                .HasDatabaseName("permissions_unique_project_label_action")
-                .IsUnique()
-                .HasFilter("project_id IS NOT NULL");
 
             // Resource-based permissions
             // Organization-level (no project)
@@ -770,10 +846,10 @@ public partial class DeeplynxContext : DbContext
 
             entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_permissions_last_updated_by");
 
-            // Check constraint: if is_default is true, organization_id, project_id, and label_id must be null
+            // Check constraint: if is_default is true, organization_id and project_id must be null
             entity.ToTable(p => p.HasCheckConstraint(
                 "chk_default_permissions_no_org_project_label",
-                "is_default = false OR (organization_id IS NULL AND project_id IS NULL AND label_id IS NULL)"
+                "is_default = false OR (organization_id IS NULL AND project_id IS NULL)"
             ));
 
             entity.HasOne(d => d.LastUpdatedByUser)
@@ -781,10 +857,6 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.LastUpdatedBy)
                 .OnDelete(DeleteBehavior.NoAction)
                 .HasConstraintName(null);
-
-            entity.HasOne(d => d.Label).WithMany(p => p.Permissions)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("permissions_label_id_fkey");
 
             entity.HasOne(d => d.Project).WithMany(p => p.Permissions)
                 .OnDelete(DeleteBehavior.Cascade)
@@ -1288,6 +1360,73 @@ public partial class DeeplynxContext : DbContext
                 .HasConstraintName("sensitivity_label_project_id_fkey");
         });
 
+        modelBuilder.Entity<SensitivityLabelPermission>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("sensitivity_label_permissions_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_sensitivity_label_permissions_id");
+
+            entity.HasIndex(e => e.LabelId)
+                .HasDatabaseName("idx_sensitivity_label_permissions_label_id");
+
+            entity.HasIndex(e => e.Action)
+                .HasDatabaseName("idx_sensitivity_label_permissions_action");
+
+            entity.HasIndex(e => new { e.LabelId, e.Action })
+                .HasDatabaseName("unique_sensitivity_label_permission_label_action")
+                .IsUnique();
+
+            entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(e => e.IsArchived).HasDefaultValue(false);
+
+            entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_sensitivity_label_permissions_last_updated_by");
+
+            entity.HasOne(d => d.LastUpdatedByUser)
+                .WithMany(p => p.LastUpdatedSensitivityLabelPermissions)
+                .HasForeignKey(d => d.LastUpdatedBy)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName(null);
+
+            entity.HasOne(d => d.Label).WithMany(p => p.SensitivityLabelPermissions)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("sensitivity_label_permissions_label_id_fkey");
+        });
+
+        modelBuilder.Entity<UserSensitivityLabel>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("user_sensitivity_labels_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_user_sensitivity_labels_id");
+
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("idx_user_sensitivity_labels_user_id");
+
+            entity.HasIndex(e => e.LabelId)
+                .HasDatabaseName("idx_user_sensitivity_labels_label_id");
+
+            entity.HasIndex(e => new { e.UserId, e.LabelId })
+                .HasDatabaseName("unique_user_sensitivity_label")
+                .IsUnique();
+
+            entity.Property(e => e.GrantedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserSensitivityLabels)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("user_sensitivity_labels_user_id_fkey");
+
+            entity.HasOne(d => d.Label).WithMany(p => p.UserSensitivityLabels)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("user_sensitivity_labels_label_id_fkey");
+
+            entity.HasOne(d => d.GrantedByUser).WithMany(p => p.GrantedUserSensitivityLabels)
+                .HasForeignKey(d => d.GrantedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("user_sensitivity_labels_granted_by_fkey");
+        });
+
         modelBuilder.Entity<Subscription>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("subscriptions_pkey");
@@ -1568,46 +1707,7 @@ public partial class DeeplynxContext : DbContext
 
         modelBuilder.Entity<EmbeddingLogs>(entity =>
         {
-            entity.ToTable("embeddings_logs", schema: "dl_vector");
-
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Id)
-                .HasColumnName("id")
-                .IsRequired();
-
-            entity.Property(e => e.RecordId)
-                .HasColumnName("record_id")
-                .IsRequired();
-
-            entity.Property(e => e.JobId)
-                .HasColumnName("job_id")
-                .IsRequired();
-
-            entity.Property(e => e.Stage)
-                .HasColumnName("stage")
-                .IsRequired();
-
-            entity.Property(e => e.Status)
-                .HasColumnName("status")
-                .HasConversion<string>()
-                .IsRequired();
-
-            entity.Property(e => e.Worker)
-                .HasColumnName("worker")
-                .IsRequired();
-
-            entity.Property(e => e.Progress)
-                .HasColumnName("progress")
-                .IsRequired();
-
-            entity.Property(e => e.Error)
-                .HasColumnName("error")
-                .IsRequired();
-
-            entity.Property(e => e.Timestamp)
-                .HasColumnName("timestamp")
-                .IsRequired();
+            entity.Property(e => e.Id).UseIdentityAlwaysColumn();
         });
 
         modelBuilder.Entity<OntologyVector>(entity =>

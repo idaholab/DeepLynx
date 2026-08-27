@@ -3,6 +3,7 @@
 
 import {
   ArrowDownTrayIcon,
+  ArrowTopRightOnSquareIcon,
   CheckCircleIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -40,22 +41,34 @@ interface PropertyRow {
   isLink?: boolean;
 }
 
-// Returns true if `value` parses as an absolute URL (http/https/etc.)
-const isValidUrl = (value: string): boolean => {
+function isUrl(s: string): boolean {
   try {
-    const url = new URL(value);
-    return !!url.protocol;
+    const url = new URL(s);
+    // Only accept http/https (and optionally ftp) — excludes file:// and others
+    return ['http:', 'https:'].includes(url.protocol);
   } catch {
     return false;
   }
-};
+}
+
+function isValidUri(uri: string): boolean {
+  return uri.trim().length > 0 && uri.toLowerCase() !== "null";
+}
+
+/** @returns whether the record may be downloaded, redirected, or neither depending on detected URI type. */
+export function uriPermission(uri?: string | null, fileTransfers?: boolean): "download" | "redirect" | "none" | "downloadBlocked" {
+  if (!uri || !isValidUri(uri)) return "none";
+  if (isUrl(uri)) return "redirect";
+  if (fileTransfers) return "download";
+  return "downloadBlocked";
+}
 
 interface PropertyTableProps {
   title?: string;
   rows: PropertyRow[];
   className?: string;
-  download?: boolean;
   recordName?: string | null;
+  uri?: string;
   onEditProperties?: () => void;
 }
 
@@ -63,8 +76,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   title,
   rows,
   className,
-  download = false,
   recordName,
+  uri,
   onEditProperties,
 }) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -83,6 +96,14 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const [isPresignedUrl, setIsPresignedUrl] = useState<boolean>(false);
   const [preparingDownload, setPreparingDownload] = useState<boolean>(false);
 
+  const { organization, hasLoaded } = useOrganizationSession();
+
+  const uriType = uriPermission(uri, !organization?.disableFileTransfer);
+  const download = (uriType === "download");
+  const downloadBlocked = (uriType === "downloadBlocked");
+  const redirect = (uriType === "redirect");
+  const show = (uri !== undefined);
+
   const searchParams = useSearchParams();
   const [isFolder, setIsFolder] = useState(false);
   const isFolderRef = useRef(false);
@@ -91,9 +112,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
   const recordIdParam = searchParams.get("recordId");
   const projectId = projectIdParam ? Number(projectIdParam) : NaN;
   const recordId = recordIdParam ? Number(recordIdParam) : NaN;
-  const canDownload = Number.isFinite(projectId) && Number.isFinite(recordId);
+  const canDownload = !downloadBlocked && Number.isFinite(projectId) && Number.isFinite(recordId);
   const { t } = useLanguage();
-  const { organization, hasLoaded } = useOrganizationSession();
 
   useEffect(() => {
     isFolderRef.current = isFolder;
@@ -313,7 +333,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
     return (
       <React.Fragment key={index}>
         <div className={`grid grid-cols-12 border-b border-base-300/50`}>
-          <div className="col-span-4 p-3 font-medium text-base-content text-sm bg-base-200 border-r border-base-300/50 flex items-center relative">
+          <div className="col-span-4 p-3 font-medium text-base-content text-sm bg-base-200 border-r border-base-300/50 flex items-start relative">
             {/* Tree branch visualization */}
             {depth > 0 && (
               <div className="absolute left-0 top-0 bottom-0 flex">
@@ -363,7 +383,12 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                   )}
                 </button>
               )}
-              <span className="truncate ml-2">{row.label}</span>
+              <span
+                className="ml-2 whitespace-normal"
+                style={{ wordBreak: "break-word" }}
+              >
+                {row.label}
+              </span>
             </div>
           </div>
           <div className="col-span-7 p-3 text-sm text-base-content break-words">
@@ -398,9 +423,8 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                       )}
                   </span>
                 ) : row.isLink &&
-                  organization?.disableFileTransfer &&
                   typeof row.value === "string" &&
-                  isValidUrl(row.value) ? (
+                  isUrl(row.value) ? (
                   <a
                     href={row.value}
                     target="_blank"
@@ -492,7 +516,13 @@ const PropertyTable: React.FC<PropertyTableProps> = ({
                 </button>
               )}
 
-              {download && !organization?.disableFileTransfer && (
+              {show && redirect && (
+                <a href={uri} target="_blank" rel="noopener noreferrer">
+                  <ArrowTopRightOnSquareIcon className="w-8 h-8" />
+                </a>
+              )}
+
+              {show && (download || downloadBlocked) && (
                 <div className="flex items-center gap-3">
                   {/* Status indicator - show during preparation or for presigned URL downloads */}
                   {downloading && (preparingDownload || isPresignedUrl) && !showProgressBar && !isFolder && (

@@ -42,6 +42,11 @@ public partial class Project
     [MaxLength(255)]
     public string? FilePath { get; set; }
 
+    [Column("default_object_storage_id")]
+    public int? DefaultObjectStorageId { get; set; } = null;
+    [Column("logo_object_storage_id")]
+    public int? LogoObjectStorageId { get; set; } = null;
+
     [InverseProperty("Project")]
     public virtual ICollection<Action> Actions { get; set; } = new List<Action>();
 

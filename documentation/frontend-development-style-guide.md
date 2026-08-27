@@ -86,6 +86,62 @@ Keep API access behind service modules:
 
 Pages and components should not hand-roll `fetch` or `axios` calls when a service module exists for the domain.
 
+### API Version Configuration
+
+Keep the Nexus API base path separate from its URL-segment version. Local UI
+configuration should use:
+
+```dotenv
+NEXT_PUBLIC_API_URL=http://localhost:5095/api
+NEXT_PUBLIC_API_VERSION=v2
+BACKEND_BASE_URL=http://localhost:5095/api
+```
+
+- `NEXT_PUBLIC_API_URL` is the browser-visible API base path.
+- `NEXT_PUBLIC_API_VERSION` selects the default API version and falls back to
+  `v1` when it is missing or empty.
+- `BACKEND_BASE_URL` is the server-only API base path and may use an internal
+  hostname in deployed environments.
+- API versions must be `v` followed by a positive integer, such as `v1`, `v2`,
+  or `v12`.
+- `NEXT_PUBLIC_*` settings must be supplied when building the Next.js UI image.
+
+Use `withNexusApiVersion` from `src/app/lib/api-version.ts` to construct regular
+versioned API base URLs. Do not concatenate `/api/v1`, `/v2`, or another version
+segment in components, services, routes, or tests.
+
+```ts
+withNexusApiVersion(baseUrl); // configured version, with v1 fallback
+```
+
+Service modules use the single shared client from
+`src/app/lib/client_service/api.ts`:
+
+```ts
+import api from "./api";
+
+api.get("/projects"); // deployment-wide configured API version
+```
+
+Do not create per-service version clients or select versions inside service
+modules. The UI targets one API version per deployment. The backend must expose
+a complete surface for that version, including unchanged functionality, while
+preserving older versions for older consumers. When changing the configured UI
+version, update affected DTOs, error handling, and tests as one reviewed
+contract cutover.
+
+Playwright tests that call the backend directly must use `testApiUrl` from
+`tests/api-url.ts`. This keeps setup, RBAC, Insight, upload, and future tests on
+the same deployment-wide API version as the UI. Do not declare test-local
+backend base URLs or embed a version in test request strings.
+
+Routes whose layout differs from `/api/{version}`, such as Scalar's
+`/api/scalar/{version}` route, use their dedicated shared URL helper. Use
+`getNexusScalarUrl` for Scalar rather than appending `/scalar` to
+`withNexusApiVersion`, which produces the wrong route order. Server routes use
+`backendApiUrl` to append endpoint paths to the configured versioned backend
+base URL.
+
 ## State and Context
 
 Use the existing providers in `src/app/contexts` for app-wide state:
@@ -284,8 +340,15 @@ Run targeted tests during development and the broader suite before submitting si
 
 ```bash
 cd deeplynx.UI
+npm run test:unit
+npm run test:e2e
 npm run test
 ```
+
+`npm run test` runs the focused unit suite before the Playwright end-to-end
+suite. Keep API URL, authentication interceptor, session deduplication, and API
+error behavior covered in `tests/unit`; these tests do not start a browser or
+development server.
 
 ## Local Development Commands
 

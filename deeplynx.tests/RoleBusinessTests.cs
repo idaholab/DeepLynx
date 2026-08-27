@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using deeplynx.helpers.exceptions;
 
 namespace deeplynx.tests;
 
@@ -127,10 +128,10 @@ public class RoleBusinessTests : IntegrationTestBase
         mid = projectMember.Id;
 
         // Create permissions
-        var permission1 = new Permission { Name = "Permission 1", Action = "read", Resource = "test", IsDefault = true};
-        var permission2 = new Permission { Name = "Permission 2", Action = "write", Resource = "test", IsDefault = true};
-        var permission3 = new Permission { Name = "Permission 3", Action = "execute", Resource = "test2", IsDefault = true};
-        var permission4 = new Permission { Name = "Permission 4", Action = "glorbulon", Resource = "test", IsDefault = true};
+        var permission1 = new Permission { Name = "Permission 1", Action = "read", Resource = "test", IsDefault = true };
+        var permission2 = new Permission { Name = "Permission 2", Action = "write", Resource = "test", IsDefault = true };
+        var permission3 = new Permission { Name = "Permission 3", Action = "execute", Resource = "test2", IsDefault = true };
+        var permission4 = new Permission { Name = "Permission 4", Action = "glorbulon", Resource = "test", IsDefault = true };
         Context.Permissions.AddRange(permission1, permission2, permission3, permission4);
         await Context.SaveChangesAsync();
         permid1 = permission1.Id;
@@ -302,7 +303,7 @@ public class RoleBusinessTests : IntegrationTestBase
 
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<InvalidOperationException>(() => _roleBusiness.CreateRole(uid, dto, oid));
+            await Assert.ThrowsAsync<ResourceConflictException>(() => _roleBusiness.CreateRole(uid, dto, oid));
 
         Assert.Contains("already exists", exception.Message);
     }
@@ -377,7 +378,7 @@ public class RoleBusinessTests : IntegrationTestBase
         Assert.Equal(oid, secondRole.OrganizationId);
         Assert.Null(secondRole.ProjectId);
         Assert.NotEqual(0, secondRole.Id);
-        
+
         var events = await Context.Events.ToListAsync();
         Assert.Single(events);
     }
@@ -621,8 +622,8 @@ public class RoleBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetAllRole Tests
-    
+    #region GetAllRole (V1 / Legacy) Tests
+
     [Fact]
     public async Task GetAllRoles_ShowsOrgInheritance()
     {
@@ -636,7 +637,7 @@ public class RoleBusinessTests : IntegrationTestBase
         Assert.DoesNotContain(result, r => r.Id == rid3);
         Assert.Contains(result, r => r.Id == rid4);
         Assert.DoesNotContain(result, r => r.Id == rid5);
-        
+
     }
 
     [Fact]
@@ -644,19 +645,176 @@ public class RoleBusinessTests : IntegrationTestBase
     {
         // Act
         var result = (await _roleBusiness.GetAllRoles(oid, null)).ToList();
-        
+
         // Assert.All(result, r => Assert.Equal(false, r.IsArchived));
         Assert.Contains(result, r => r.Id == rid1);
     }
-    
+
     [Fact]
     public async Task GetAllRoles_ForProjectAndOrgInheritance()
     {
         // Act
         var result = (await _roleBusiness.GetAllRoles(oid, pid)).ToList();
-        
+
         Assert.Contains(result, r => r.Id == rid1);
         Assert.Contains(result, r => r.Id == rid4);
+    }
+
+    #endregion
+
+    #region GetAllRolesPaginated Tests
+
+    private static PaginatedRequestDto DefaultPagination(int pageNumber = 1, int pageSize = 100)
+    {
+        return new PaginatedRequestDto
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
+    [Fact]
+    public async Task GetAllRolesPaginated_ShowsOrgInheritance()
+    {
+        // Act - Get project roles (should include org-level roles too)
+        var result = await _roleBusiness.GetAllRolesPaginated(oid, pid, DefaultPagination());
+
+        // Assert
+        Assert.All(result.Items, r => Assert.False(r.IsArchived));
+        Assert.Contains(result.Items, r => r.Id == rid1);
+        Assert.DoesNotContain(result.Items, r => r.Id == rid2);
+        Assert.DoesNotContain(result.Items, r => r.Id == rid3);
+        Assert.Contains(result.Items, r => r.Id == rid4);
+        Assert.DoesNotContain(result.Items, r => r.Id == rid5);
+    }
+
+    [Fact]
+    public async Task GetAllRolesPaginated_OnlyForOrganization()
+    {
+        // Act - no projectId supplied, should only return org-level, unarchived roles
+        var result = await _roleBusiness.GetAllRolesPaginated(oid, null, DefaultPagination());
+
+        // Assert - only rid1 qualifies (rid2 is archived org-level, rid3 was deleted)
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Contains(result.Items, r => r.Id == rid1);
+    }
+
+    [Fact]
+    public async Task GetAllRolesPaginated_ForProjectAndOrgInheritance()
+    {
+        // Act
+        var result = await _roleBusiness.GetAllRolesPaginated(oid, pid, DefaultPagination());
+
+        // Assert - rid1 (org-level) + rid4 (pid) = 2; rid5 belongs to pid2, excluded
+        Assert.Equal(2, result.TotalCount);
+        Assert.Contains(result.Items, r => r.Id == rid1);
+        Assert.Contains(result.Items, r => r.Id == rid4);
+    }
+
+    [Fact]
+    public async Task GetAllRolesPaginated_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Act
+        var withArchived = await _roleBusiness.GetAllRolesPaginated(oid, pid, DefaultPagination(), false);
+        var withoutArchived = await _roleBusiness.GetAllRolesPaginated(oid, pid, DefaultPagination(), true);
+
+        // Assert - rid2 (archived, org-level) only appears when hideArchived = false
+        Assert.Equal(3, withArchived.TotalCount);
+        Assert.Contains(withArchived.Items, r => r.Id == rid2 && r.IsArchived);
+
+        Assert.Equal(2, withoutArchived.TotalCount);
+        Assert.DoesNotContain(withoutArchived.Items, r => r.Id == rid2);
+    }
+
+    [Fact]
+    public async Task GetAllRolesPaginated_ExcludesDeletedRoles()
+    {
+        // Act - role3 was created then hard-deleted in SeedTestDataAsync
+        var result = await _roleBusiness.GetAllRolesPaginated(oid, null, DefaultPagination(), false);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, r => r.Id == rid3);
+    }
+
+    [Fact]
+    public async Task GetAllRolesPaginated_DoesNotReturnRolesFromOtherProject()
+    {
+        // Act - rid5 belongs to pid2, should not appear when querying pid
+        var result = await _roleBusiness.GetAllRolesPaginated(oid, pid, DefaultPagination(), false);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, r => r.Id == rid5);
+    }
+
+    [Fact]
+    public async Task GetAllRolesPaginated_Paginates_Correctly()
+    {
+        // Arrange - oid/pid combination has exactly 2 matching roles (rid1, rid4) with hideArchived = true
+        var pageOne = DefaultPagination(pageNumber: 1, pageSize: 1);
+        var pageTwo = DefaultPagination(pageNumber: 2, pageSize: 1);
+
+        // Act
+        var firstPage = await _roleBusiness.GetAllRolesPaginated(oid, pid, pageOne);
+        var secondPage = await _roleBusiness.GetAllRolesPaginated(oid, pid, pageTwo);
+
+        // Assert
+        Assert.Equal(2, firstPage.TotalCount);
+        Assert.Single(firstPage.Items);
+        Assert.Equal(2, secondPage.TotalCount);
+        Assert.Single(secondPage.Items);
+
+        // Ordered by Id ascending: role1 was created before role4, so rid1 is page 1, rid4 is page 2
+        Assert.Equal(rid1, firstPage.Items[0].Id);
+        Assert.Equal(rid4, secondPage.Items[0].Id);
+    }
+
+    [Fact]
+    public async Task GetAllRolesPaginated_PageSizeNegativeOne_ReturnsAll_IgnoringPageNumber()
+    {
+        // Arrange
+        var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+        // Act
+        var result = await _roleBusiness.GetAllRolesPaginated(oid, pid, sentinel);
+
+        // Assert
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(2, result.PageSize);
+        Assert.Contains(result.Items, r => r.Id == rid1);
+        Assert.Contains(result.Items, r => r.Id == rid4);
+    }
+
+    [Fact]
+    public async Task GetAllRolesPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+    {
+        // Arrange
+        var zeroSize = DefaultPagination(pageNumber: 1, pageSize: 0);
+
+        // Act
+        var result = await _roleBusiness.GetAllRolesPaginated(oid, pid, zeroSize);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllRolesPaginated_NoRolesForOrganization_ReturnsEmptyPaginatedResponse()
+    {
+        // Act - an organization id with no seeded roles
+        var result = await _roleBusiness.GetAllRolesPaginated(999999, null, DefaultPagination());
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(100, result.PageSize);
     }
 
     #endregion
@@ -735,7 +893,7 @@ public class RoleBusinessTests : IntegrationTestBase
             $"Role with id {rid4} not found or does not belong to the specified organization/project context",
             exception.Message);
     }
-    
+
     [Fact]
     public async Task GetRole_Succeeds_WhenExistsWithinOrg()
     {
@@ -845,7 +1003,7 @@ public class RoleBusinessTests : IntegrationTestBase
 
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            await Assert.ThrowsAsync<ResourceConflictException>(() =>
                 _roleBusiness.UpdateRole(uid, rid1, oid, null, dto));
 
         Assert.Contains("already exists", exception.Message);
@@ -1018,7 +1176,7 @@ public class RoleBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
-    
+
     [Fact]
     public async Task ArchiveRole_Fails_IfArchivingOrgRoleFromProject()
     {
@@ -1164,7 +1322,7 @@ public class RoleBusinessTests : IntegrationTestBase
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
     }
-    
+
     [Fact]
     public async Task DeleteRole_Fails_IfTryingToDeleteOrgRoleFromProject()
     {

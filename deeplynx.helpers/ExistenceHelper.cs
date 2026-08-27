@@ -1,20 +1,92 @@
 using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.helpers
 {
     public static class ExistenceHelper
     {
+        private static readonly TimeSpan DeletedUserCacheTtl = TimeSpan.FromMinutes(5);
+
         public static async Task EnsureUserExistsAsync(DeeplynxContext context, long userId, bool hideArchived = true)
         {
-            var userExists = hideArchived
-                ? await context.Users.AnyAsync(u => u.Id == userId && u.IsArchived == false)
-                : await context.Users.AnyAsync(u => u.Id == userId);
+            var deletedCacheKey = CacheKeys.UserDeleted(userId);
+            var cachedDeleted = await CacheService.Instance.GetAsync<bool?>(deletedCacheKey);
+            if (cachedDeleted.HasValue && cachedDeleted.Value)
+                throw new KeyNotFoundException($"User with id {userId} does not exist");
+
+            var cacheKey = CacheKeys.UserArchivedStatus(userId);
+            var cachedIsArchived = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+
+            bool userExists;
+            bool isArchived;
+
+            if (cachedIsArchived.HasValue)
+            {
+                userExists = true;
+                isArchived = cachedIsArchived.Value;
+            }
+            else
+            {
+                var user = await context.Users
+                    .Where(u => u.Id == userId)
+                    .Select(u => new { u.IsArchived })
+                    .FirstOrDefaultAsync();
+
+                userExists = user != null;
+
+                if (userExists)
+                {
+                    isArchived = user!.IsArchived;
+                    await CacheService.Instance.SetAsync(cacheKey, isArchived, (TimeSpan?)null);
+                }
+                else
+                {
+                    isArchived = false;
+                }
+            }
 
             if (!userExists)
                 throw new KeyNotFoundException($"User with id {userId} does not exist");
+
+            if (hideArchived && isArchived)
+                throw new KeyNotFoundException($"User with id {userId} does not exist");
         }
+
+        /// <summary>
+        ///     Sets the cached archived status for a user, with no expiration. Call this whenever
+        ///     a mutation determines a user's archived status directly (create, archive, unarchive,
+        ///     or an update that changes IsArchived), so the cache reflects the new state.
+        /// </summary>
+        public static Task SetUserArchivedStatusCache(long userId, bool isArchived)
+        {
+            return CacheService.Instance.SetAsync(CacheKeys.UserArchivedStatus(userId), isArchived, (TimeSpan?)null);
+        }
+
+        /// <summary>
+        ///     Marks a user as not-existing in the cache with a short TTL. Used after a hard delete:
+        ///     unlike the general "user doesn't exist" case (never cached, see summary above), we
+        ///     know definitively that this specific ID was just deleted, so caching that briefly
+        ///     avoids a burst of repeat DB lookups right after the delete without permanently
+        ///     committing to caching a non-existent id indefinitely.
+        ///
+        ///     Also clears the no-TTL UserArchivedStatus entry for this id, if one exists. Without
+        ///     this, a stale "exists, archived: false/true" entry could sit there indefinitely
+        ///     (that key has no TTL by design) alongside the new short-TTL "deleted" entry - and
+        ///     once the deleted-entry TTL expires, the stale permanent entry could be read as if
+        ///     the user still existed.
+        /// </summary>
+        public static async Task SetUserDeletedCache(long userId)
+        {
+            // Represented as a distinct "deleted" cache entry rather than reusing the archived-status
+            // key/shape, since deleted is a different state than archived (archived users still
+            // exist and have a real IsArchived flag; deleted users don't exist at all).
+            await CacheService.Instance.SetAsync(CacheKeys.UserDeleted(userId), true, DeletedUserCacheTtl);
+            await CacheService.Instance.DeleteAsync(CacheKeys.UserArchivedStatus(userId));
+        }
+
+        private static readonly TimeSpan DeletedOrganizationCacheTtl = TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// Check if an organization exists
@@ -28,12 +100,68 @@ namespace deeplynx.helpers
             long organizationId,
             bool hideArchived = true)
         {
-            var organizationExists = hideArchived
-                ? await context.Organizations.AnyAsync(o => o.Id == organizationId && o.IsArchived == false)
-                : await context.Organizations.AnyAsync(o => o.Id == organizationId);
+            var deletedCacheKey = CacheKeys.OrganizationDeleted(organizationId);
+            var cachedDeleted = await CacheService.Instance.GetAsync<bool?>(deletedCacheKey);
+            if (cachedDeleted.HasValue && cachedDeleted.Value)
+                throw new KeyNotFoundException($"Organization with id {organizationId} does not exist");
+
+            var cacheKey = CacheKeys.OrganizationArchivedStatus(organizationId);
+            var cachedIsArchived = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+
+            bool organizationExists;
+            bool isArchived;
+
+            if (cachedIsArchived.HasValue)
+            {
+                organizationExists = true;
+                isArchived = cachedIsArchived.Value;
+            }
+            else
+            {
+                var organization = await context.Organizations
+                    .Where(o => o.Id == organizationId)
+                    .Select(o => new { o.IsArchived })
+                    .FirstOrDefaultAsync();
+
+                organizationExists = organization != null;
+
+                if (organizationExists)
+                {
+                    isArchived = organization!.IsArchived;
+                    await CacheService.Instance.SetAsync(cacheKey, isArchived, (TimeSpan?)null);
+                }
+                else
+                {
+                    isArchived = false;
+                }
+            }
 
             if (!organizationExists)
                 throw new KeyNotFoundException($"Organization with id {organizationId} does not exist");
+
+            if (hideArchived && isArchived)
+                throw new KeyNotFoundException($"Organization with id {organizationId} does not exist");
+        }
+
+        /// <summary>
+        ///     Sets the cached archived status for an organization, with no expiration. Call this whenever
+        ///     a mutation determines an organization's archived status directly (create, archive,
+        ///     unarchive), so the cache reflects the new state.
+        /// </summary>
+        public static Task SetOrganizationArchivedStatusCache(long organizationId, bool isArchived)
+        {
+            return CacheService.Instance.SetAsync(CacheKeys.OrganizationArchivedStatus(organizationId), isArchived, (TimeSpan?)null);
+        }
+
+        /// <summary>
+        ///     Marks an organization as not-existing in the cache with a short TTL, mirroring
+        ///     SetUserDeletedCache. Also clears the no-TTL OrganizationArchivedStatus entry so it can't
+        ///     outlive the short TTL and mislead a later read.
+        /// </summary>
+        public static async Task SetOrganizationDeletedCache(long organizationId)
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.OrganizationDeleted(organizationId), true, DeletedOrganizationCacheTtl);
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrganizationArchivedStatus(organizationId));
         }
 
         public static async Task<ProjectResponseDto> EnsureProjectExistsAsync(

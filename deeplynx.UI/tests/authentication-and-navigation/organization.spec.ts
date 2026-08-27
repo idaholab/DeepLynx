@@ -1,10 +1,10 @@
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS } from "../deeplynx-config";
 import { test, expect } from "../fixtures";
 
 test.describe("Organizations", () => {
   test.use({
     actingUser: sysAdmin,
-    actingOrg: "PW Org A",
+    actingOrg: ORGS.orgA,
   });
 
   test("user is automatically assigned an organization on startup", async ({
@@ -31,9 +31,6 @@ test.describe("Organizations", () => {
 
     // Verifies the box is open
     await expect(page.getByRole('listitem').filter({ hasText: 'Switch Organization' })).toBeVisible();
-
-    // There should be a "Current" badge next to the active organization
-    await expect(page.getByText(/Current$/)).toBeVisible();
   });
 
   test("Organization dropdown has a button to view all organizations", async ({

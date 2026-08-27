@@ -34,7 +34,10 @@ public class TagBusiness : ITagBusiness
     }
 
     /// <summary>
-    ///     Retrieves all tags for a specified project.
+    ///     [DEPRECATED - V1 ONLY] Retrieves all tags without pagination.
+    ///     Superseded by <see cref="GetAllTagsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 tags controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
     /// </summary>
     /// <param name="currentUserId">The ID of the current user for which the data source belongs to</param>
     /// <param name="projectIds">The IDs of the project whose tags are to be retrieved.</param>
@@ -43,6 +46,8 @@ public class TagBusiness : ITagBusiness
     /// <param name="isSysAdmin">Flag indicating whether you are a system admin or not</param>
     /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin or not</param>
     /// <returns>A list of tags belonging to the project.</returns>
+    [Obsolete("V1-only. Used by deprecated v1 tag endpoints. Superseded by GetAllTagsPaginated. " +
+              "Remove once v1 tag endpoints are sunset.", error: false)]
     public async Task<List<TagResponseDto>> GetAllTags(
         long currentUserId,
         long organizationId,
@@ -121,6 +126,95 @@ public class TagBusiness : ITagBusiness
             OrganizationId = t.OrganizationId,
             IsArchived = t.IsArchived
         }).ToListAsync();
+    }
+
+    /// <summary>
+    ///     Retrieves all tags for a specified project with pagination
+    /// </summary>
+    /// <param name="currentUserId">The ID of the current user for which the data source belongs to</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all matching organizations</param>
+    /// <param name="projectIds">The IDs of the project whose tags are to be retrieved.</param>
+    /// <param name="organizationId">The ID of the organization whose tags are to be retrieved.</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result</param>
+    /// <param name="isSysAdmin">Flag indicating whether you are a system admin or not</param>
+    /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin or not</param>
+    /// <returns>A paginated list of organizations</returns>
+    public async Task<PaginatedResponse<TagResponseDto>> GetAllTagsPaginated(
+        long currentUserId,
+        long organizationId,
+        long[]? projectIds,
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false)
+    {
+        var userProjectAdminStatus = new Dictionary<long, bool>();
+
+        if (projectIds?.Length > 0)
+        {
+            var adminProjectIds = await _context.ProjectMembers
+                .Where(pm =>
+                    pm.IsProjectAdmin &&
+                    projectIds.Contains(pm.ProjectId) &&
+                    (
+                        (pm.UserId != null && pm.UserId == currentUserId) ||
+                        pm.Group!.Users.Any(u => u.Id == currentUserId)
+                    ))
+                .Select(pm => pm.ProjectId)
+                .Distinct()
+                .ToHashSetAsync();
+
+            foreach (var projectId in projectIds)
+            {
+                userProjectAdminStatus[projectId] = adminProjectIds.Contains(projectId);
+            }
+        }
+
+        var authorizedProjectIds = new List<long>();
+        foreach (var projectId in projectIds ?? [])
+        {
+            if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId, false))
+            {
+                authorizedProjectIds.Add(projectId);
+                continue;
+            }
+
+            var hasPermission = await _projectRolePermissionService.PermissionInProject(
+                currentUserId, projectId, "read", "tag");
+
+            if (hasPermission)
+            {
+                authorizedProjectIds.Add(projectId);
+            }
+        }
+
+        if (projectIds != null && projectIds.Length > 0 && authorizedProjectIds.Count == 0)
+        {
+            return new PaginatedResponse<TagResponseDto>
+            {
+                Items = [],
+                PageNumber = paginatedRequestDto.PageNumber,
+                PageSize = paginatedRequestDto.PageSize,
+                TotalCount = 0
+            };
+        }
+
+        var tagQuery = _context.Tags
+            .Where(t => t.OrganizationId == organizationId && (!hideArchived || !t.IsArchived));
+
+        if (authorizedProjectIds.Count > 0)
+        {
+            tagQuery = tagQuery.Where(t =>
+                (t.ProjectId.HasValue && authorizedProjectIds.Contains(t.ProjectId.Value)) || t.ProjectId == null);
+        }
+        else
+        {
+            tagQuery = tagQuery.Where(t => t.ProjectId == null);
+        }
+
+        tagQuery = tagQuery.OrderBy(t => t.Id);
+
+        return await tagQuery.Select(g => TagsToResponse(g)).ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -620,5 +714,19 @@ public class TagBusiness : ITagBusiness
             IsArchived = t.IsArchived,
             OrganizationId = organizationId,
         }).ToList();
+    }
+
+    private static TagResponseDto TagsToResponse(Tag t)
+    {
+        return new TagResponseDto
+        {
+            Id = t.Id,
+            Name = t.Name,
+            ProjectId = t.ProjectId,
+            LastUpdatedBy = t.LastUpdatedBy,
+            LastUpdatedAt = t.LastUpdatedAt,
+            IsArchived = t.IsArchived,
+            OrganizationId = t.OrganizationId,
+        };
     }
 }

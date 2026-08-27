@@ -10,12 +10,12 @@ stage, so it only has a few tools developed. If you want to know how to run and 
 
 To set up the server, there are only two variables which you need to worry about.
 **These variables should already be pre-configured in the kubernetes files for deployed and dockerized instances of Nexus.**
-For local instances, these variables can be found in the `.env-sample` file in the `deeplynx.mcp` directory.
+For local instances, these variables can be found in the `.env_sample` file in the `deeplynx.mcp` directory.
 To populate them, simply copy the contents of this file to a new file named `.env` and put in your specified values:
 
 ```bash
 # in deeplynx.mcp directory
-cp .env-sample .env
+cp .env_sample .env
 ```
 
 `MCP_SERVER_URL` controls which address and port the MCP server listens on internally.
@@ -29,7 +29,11 @@ For deployed instances behind a reverse proxy, users will access the MCP server 
 `NEXUS_API_URL` is the origin (and any deployment base path) where the Nexus API server is hosted. Do not include an
 API version in it. The MCP server appends its reviewed `/api/v1` pin in code, so changing an environment variable cannot
 silently move the consumer to a different API error contract. A future v2 cutover must be a code change and must adopt
-RFC 7807 ProblemDetails handling.
+RFC 7807 ProblemDetails handling. This is an intentional compatibility pin to the frozen and deprecated v1 API, which
+remains accessible; new integrations should otherwise use v2.
+
+For backward compatibility, an existing value ending in `/api/v1` is also accepted. Do not configure another version
+in this variable; changing the MCP API version requires a reviewed code and contract change.
 
 For local development instances of the app, you can run the mcp server by `cd`ing into the `deeplynx.mcp` directory.
 If it is your first time running the server, you can use the command `dotnet build && dotnet run`.

@@ -1,9 +1,10 @@
-using System.ComponentModel.DataAnnotations;
-using deeplynx.datalayer.Migrations;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace deeplynx.business;
@@ -11,14 +12,17 @@ namespace deeplynx.business;
 public class UserBusiness : IUserBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly ILogger<UserBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="UserBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the user operations.</param>
-    public UserBusiness(DeeplynxContext context)
+    /// <param name="logger">Used for uniformity in logging</param>
+    public UserBusiness(DeeplynxContext context, ILogger<UserBusiness>? logger = null)
     {
         _context = context;
+        _logger = logger;
     }
 
     /// <summary>
@@ -30,7 +34,9 @@ public class UserBusiness : IUserBusiness
     /// <param name="includeServiceAccounts">Optional Param to include service accounts- defaults to false</param>
     /// <param name="includeTestAccounts">Optional Param to include test accounts- defaults to false</param>
     /// <returns>A list of users, optionally filtered by project or organization</returns>
-    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false, 
+    [Obsolete("V1-only. Used by deprecated v1 user endpoints. Superseded by GetAllUsersPaginated. " +
+                "Remove once v1 user endpoints are sunset.", error: false)]
+    public async Task<IEnumerable<UserResponseDto>> GetAllUsers(long? projectId, long? organizationId, bool includeArchived = false,
         bool includeServiceAccounts = false, bool includeTestAccounts = false)
     {
         var users = includeArchived
@@ -67,6 +73,50 @@ public class UserBusiness : IUserBusiness
             IsActive = p.IsActive,
             LastLogin = p.LastLogin
         });
+    }
+
+    /// <summary>
+    ///     Get all users with pagination
+    /// </summary>
+    /// <param name="dto">Pagination parameters; if PageSize == -1, returns all members</param>
+    /// <param name="projectId">Optional project ID to filter users by</param>
+    /// <param name="organizationId">Optional organization ID to filter users by</param>
+    /// <param name="includeArchived">Whether to include archived users</param>
+    /// <param name="includeServiceAccounts">Whether to include service accounts</param>
+    /// <param name="includeTestAccounts">Whether to include test accounts</param>
+    /// <returns>Paginated list of users</returns>
+    public async Task<PaginatedResponse<UserResponseDto>> GetAllUsersPaginated(
+        PaginatedRequestDto dto,
+        long? projectId,
+        long? organizationId,
+        bool includeArchived = false,
+        bool includeServiceAccounts = false,
+        bool includeTestAccounts = false)
+    {
+        dto ??= new PaginatedRequestDto { PageNumber = 1, PageSize = 25 };
+
+        var users = includeArchived
+            ? _context.Users.AsQueryable()
+            : _context.Users.Where(p => !p.IsArchived);
+
+        if (!includeServiceAccounts) users = users.Where(u => u.AccountType != AccountType.Service);
+        if (!includeTestAccounts) users = users.Where(u => u.AccountType != AccountType.Test);
+
+        if (projectId != null)
+            users = users.Where(u =>
+                u.ProjectMembers.Any(p => p.ProjectId == projectId && p.UserId == u.Id) ||
+                u.Groups.Any(g => g.ProjectMembers.Any(pm => pm.ProjectId == projectId && pm.GroupId == g.Id))
+            );
+
+        if (organizationId != null)
+            users = users.Where(u =>
+                u.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.UserId == u.Id) ||
+                u.Groups.Any(g => g.OrganizationId == organizationId)
+            );
+
+        var usersQuery = users.Select(u => UserToResponse(u, organizationId));
+
+        return await usersQuery.ToPaginatedAsync(dto);
     }
 
     /// <summary>
@@ -198,6 +248,8 @@ public class UserBusiness : IUserBusiness
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
+        await ExistenceHelper.SetUserArchivedStatusCache(user.Id, user.IsArchived);
+
         return MapToResponseDto(user);
     }
 
@@ -225,6 +277,8 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetUserArchivedStatusCache(user.Id, user.IsArchived);
 
         return MapToResponseDto(user);
     }
@@ -258,6 +312,8 @@ public class UserBusiness : IUserBusiness
         if (user == null)
             throw new KeyNotFoundException("User not found.");
 
+        var previousIsArchived = user.IsArchived;
+
         user.Name = dto.Name ?? user.Name;
         user.Username = dto.Username ?? user.Username;
         user.IsArchived = dto.IsArchived ?? user.IsArchived;
@@ -265,6 +321,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
+
+        if (user.IsArchived != previousIsArchived)
+            await ExistenceHelper.SetUserArchivedStatusCache(user.Id, user.IsArchived);
 
         return new UserResponseDto
         {
@@ -295,6 +354,13 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetUserDeletedCache(userId);
+
+
+        // invalidate the cached admin/user info for the deleted user
+        await InvalidateUserCache(userId);
+
         return true;
     }
 
@@ -317,6 +383,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetUserArchivedStatusCache(userId, true);
+
         return true;
     }
 
@@ -339,6 +408,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetUserArchivedStatusCache(userId, false);
+
         return true;
     }
 
@@ -376,6 +448,17 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(candidate);
         await _context.SaveChangesAsync();
+
+        // overwrite the cached admin flag now that it's changed
+        try
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.SysAdmin(candidateId), userIsAdmin, (TimeSpan?)null);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache overwrite failed for user {UserId}", candidateId);
+        }
+
         return true;
     }
 
@@ -572,5 +655,53 @@ public class UserBusiness : IUserBusiness
     private static DateTime UtcNowWithoutTimezone()
     {
         return DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+    }
+
+    private static UserResponseDto UserToResponse(User u, long? organizationId)
+    {
+        return new UserResponseDto
+        {
+            Id = u.Id,
+            Name = u.Name,
+            Username = u.Username,
+            Email = u.Email,
+            IsSysAdmin = u.IsSysAdmin,
+            IsOrgAdmin = organizationId != null
+                ? u.OrganizationUsers.Any(ou => ou.OrganizationId == organizationId && ou.IsOrgAdmin)
+                : null,
+            AccountType = u.AccountType,
+            IsArchived = u.IsArchived,
+            IsActive = u.IsActive,
+            LastLogin = u.LastLogin
+        };
+    }
+
+    /// <summary>
+    ///     Removes all cached user/admin info keys associated with a user.
+    /// </summary>
+    /// <param name="userId">user id</param>
+    private async Task InvalidateUserCache(long userId)
+    {
+        try
+        {
+            // The sysadmin key has no suffix, so we can delete it directly
+            await CacheService.Instance.DeleteAsync(CacheKeys.SysAdmin(userId));
+
+            string[] keyPrefixes = 
+            { 
+                $"orgadmin:{userId}:", 
+                $"orgmember:{userId}:", 
+                $"projectadmin:{userId}:" 
+            };
+            
+            foreach (string prefix in keyPrefixes)
+            {
+                await CacheService.Instance.DeleteByPrefixAsync(prefix);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache invalidation failed for deleted user {UserId}", userId);
+        }
     }
 }

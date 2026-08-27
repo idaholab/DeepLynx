@@ -27,6 +27,31 @@ Built containers must always be rebuilt after code changes, including pulled cod
 docker compose up --build
 ```
 
+### Selecting the UI API Version
+
+Docker Compose reads `NEXT_PUBLIC_API_VERSION` from the shell or the root
+`.env` file and uses `v2` when it is not set. For example:
+
+```dotenv
+NEXT_PUBLIC_API_VERSION=v2
+```
+
+To reuse the UI's `deeplynx.UI/.env.local` file instead, pass it explicitly:
+
+```bash
+docker compose --env-file deeplynx.UI/.env.local up --build
+```
+
+`NEXT_PUBLIC_*` values are compiled into the Next.js browser bundle, so the UI
+image must be rebuilt after changing the version. Developer `.env.*` files are
+excluded from the Docker build context to prevent local URLs and secrets from
+being copied into an image; Compose passes the selected version as a build
+argument instead.
+
+The deployed Dev UI does not use local env files. Its API URL and version come
+from the GitHub Development environment variables used by the image-build
+workflow.
+
 ### Running with DeepLynx Insight
 
 The `deeplynx.insight` services are optional and are behind a Docker Compose profile. By default they are excluded from a standard `docker compose up`, so you can run Nexus without them if you don't need the insight functionality.

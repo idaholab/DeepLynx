@@ -112,10 +112,6 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         {
             query = query.Where(t => t.ProjectId == projectId || t.ProjectId == null);
         }
-        else
-        {   
-            query = query.Where(t => t.ProjectId == null);
-        }
 
         var label = await query.FirstOrDefaultAsync();
         
@@ -183,15 +179,12 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                 ("delete", "file", "Permission to delete {0} labeled files")
             };
 
-            var permissions = permissionActions.Select(p => new Permission
+            var permissions = permissionActions.Select(p => new SensitivityLabelPermission
             {
                 Name = dto.Name,
                 Description = string.Format(p.Item3, dto.Name),
                 Action = $"{p.Item1} {p.Item2}",
                 LabelId = label.Id,
-                IsDefault = false,
-                ProjectId = projectId,
-                OrganizationId = organizationId,
                 LastUpdatedAt = now,
                 LastUpdatedBy = currentUserId
             }).ToList();
@@ -327,15 +320,12 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                     ("delete", "file", "Permission to delete {0} labeled files")
                 };
 
-                var permissions = permissionActions.Select(p => new Permission
+                var permissions = permissionActions.Select(p => new SensitivityLabelPermission
                 {
                     Name = label.Name,
                     Description = string.Format(p.Item3, label.Name),
                     Action = $"{p.Item1} {p.Item2}",
                     LabelId = label.Id,
-                    IsDefault = false,
-                    ProjectId = projectId,
-                    OrganizationId = organizationId,
                     LastUpdatedAt = now,
                     LastUpdatedBy = currentUserId
                 }).ToList();
@@ -411,7 +401,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             _context.SensitivityLabels.Update(label);
 
             // Update Permissions Associated with Label
-            var permissions = await _context.Permissions
+            var permissions = await _context.SensitivityLabelPermissions
                 .Where(p => p.LabelId == labelId)
                 .ToListAsync();
 
@@ -434,7 +424,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                 permission.LastUpdatedBy = currentUserId;
             }
 
-            _context.Permissions.UpdateRange(permissions);
+            _context.SensitivityLabelPermissions.UpdateRange(permissions);
 
             // Log update SensitivityLabel event
             var eventLog = new CreateEventRequestDto
@@ -527,7 +517,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             }
 
             // Remove the permissions associated with the label
-            await _context.Permissions
+            await _context.SensitivityLabelPermissions
                 .Where(p => p.LabelId == labelId)
                 .ExecuteDeleteAsync();
 
@@ -613,8 +603,8 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                     $"Cannot archive. Sensitivity label with id {labelId} is used on {recordCount} records.");
             }
 
-            // Archive permissions for this sensitivity label 
-            await _context.Permissions
+            // Archive permissions for this sensitivity label
+            await _context.SensitivityLabelPermissions
                 .Where(p => p.LabelId == labelId)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(p => p.IsArchived, true)
@@ -701,7 +691,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             label.LastUpdatedBy = currentUserId;
 
             // Unarchive Permissions associated with the label
-            await _context.Permissions
+            await _context.SensitivityLabelPermissions
                 .Where(p => p.LabelId == labelId)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(p => p.IsArchived, false)

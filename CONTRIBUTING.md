@@ -69,16 +69,20 @@ When you're ready to submit your changes, follow these steps:
     - Using Rider, this can be performed with the play button in the top right: ![alt text](markdown-assets/buildApp.png)
     - if the resulting browser window doesn't show API routes, there is something wrong with the build. Please address any build issues before submitting your PR.
 
-4. If you added API endpoints, test them in scalar.
-    - Following the instructions in step 3 should bring you to a page like this. You can also find it by navigating to `localhost:5095`.
+4. If you added or changed API endpoints, test the affected API version in Scalar.
+    - Following the instructions in step 3 should bring you to a page like this. You can also open Scalar at `http://localhost:5095/api/scalar`.
     ![alt text](markdown-assets/scalar.png)
-    - Test each endpoint that you created. 
+    - Scalar provides separate `v1` and `v2` OpenAPI documents in its version selector. v1 is the default document.
+    - Select `v2` for new endpoints and forward development, and verify that requests use `/api/v2/...`.
+    - v1 is frozen and deprecated. Do not add or modify v1 endpoints. Select `v1` only when regression testing the preserved `/api/v1/...` contract.
+    - If a change intentionally affects more than one non-frozen API version, select and test each affected OpenAPI document.
+    - Test each endpoint that you created or changed.
         - Doing so may require you to insert some dummy data in other domains.
         - For example, to create a record, you need to create a project and a datasource first.
-        - Data created via scalar, just like via Postman or other tools, will live on in your database. This means that if you have previously created additional objects for testing, you will likely not need to re-create new ones.
-    - To do your testing, you can use scalar, Postman, or any other API client of your choice. Scalar is just highlighted here because it is conveniently built in to the project.
+        - Data created via Scalar, just like via Postman or other tools, will live on in your database. This means that if you have previously created additional objects for testing, you will likely not need to re-create new ones.
+    - You can use Scalar, Postman, or another API client. Scalar is highlighted because it is built into the project and exposes the per-version OpenAPI documents.
 
-4. Create a pull request: Provide a clear description of your changes and any related issues.
+5. Create a pull request: Provide a clear description of your changes and any related issues.
 
 ### Communication
 If you need any help or have questions, feel free to reach out. 
@@ -97,7 +101,8 @@ Below is the home for several technical "gotchas" that may be useful for other p
     /// <param name="paramName"></param>
     /// <returns></returns>
     ```
-* Controllers should include error handling on each route in try-catch format
+* Existing route-level `try`/`catch` applies only to frozen, deprecated v1 controller code. Do not modify v1 controllers or actions, and do not strip their catches.
+* v2 and later controllers must not use controller-level `try`/`catch` for logging or HTTP error translation. Let domain exceptions reach the global RFC 7807 `ProblemDetails` handlers.
 * Routes names and the corresponding Controller and Business method names should be descriptive, such as "CreateDataSource"
 * Two `Dto` object should be used within each domain: A `RequestDto` object, containing the fields which a user submits upon POST or PUT, and a `ResponseDto` object, containing the fields which should be exposed to the user upon return.
 * To ensure all `Dtos` are included in the open api auto-generated document, they should be explicitly called in the return type of controller methods: 

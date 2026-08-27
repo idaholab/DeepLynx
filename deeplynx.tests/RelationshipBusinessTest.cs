@@ -27,6 +27,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
     private Mock<IAdminService> _mockAdminService = null!;
     private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _mockOrganizationBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
@@ -67,6 +68,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
 
         _relationshipBusiness = new RelationshipBusiness(
             Context, _mockEdgeBusiness.Object, _eventBusiness);
@@ -81,7 +83,7 @@ public class RelationshipBusinessTests : IntegrationTestBase
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -770,6 +772,215 @@ public class RelationshipBusinessTests : IntegrationTestBase
         // Assert
         Assert.Contains(listWithArchived, r => r.Id == rid2);
         Assert.DoesNotContain(listWithoutArchived, r => r.Id == rid2);
+    }
+
+    #endregion
+
+    #region GetAllRelationshipsPaginated Tests
+
+    private static PaginatedRequestDto DefaultPagination(int pageNumber = 1, int pageSize = 100)
+    {
+        return new PaginatedRequestDto
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
+    [Fact]
+    public async Task GetAllRelationshipsPaginated_ReturnsOnlyForProject()
+    {
+        // Arrange
+        var p2 = new Project
+        {
+            Name = "ExtraProj",
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+
+        Context.Projects.Add(p2);
+        await Context.SaveChangesAsync();
+
+        var p2Class1 = new Class
+        {
+            Name = $"P2 Class 1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = p2.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+
+        var p2Class2 = new Class
+        {
+            Name = $"P2 Class 2 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            OrganizationId = oid,
+            ProjectId = p2.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+
+        Context.Classes.AddRange(p2Class1, p2Class2);
+        await Context.SaveChangesAsync();
+
+        var p2Relationship = new Relationship
+        {
+            Name = "P2 Relationship",
+            OrganizationId = oid,
+            ProjectId = p2.Id,
+            OriginId = p2Class1.Id,
+            DestinationId = p2Class2.Id,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+
+        Context.Relationships.Add(p2Relationship);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _relationshipBusiness.GetAllRelationshipsPaginated(oid, [pid], DefaultPagination(), true);
+
+        // Assert
+        Assert.All(result.Items, r => Assert.Equal(pid, r.ProjectId));
+        Assert.DoesNotContain(result.Items, r => r.Id == p2Relationship.Id);
+    }
+
+    [Fact]
+    public async Task GetAllRelationshipsPaginated_ExcludesSoftDeleted()
+    {
+        // Act
+        var listWithArchived = await _relationshipBusiness.GetAllRelationshipsPaginated(oid, [pid], DefaultPagination(), false);
+        var listWithoutArchived = await _relationshipBusiness.GetAllRelationshipsPaginated(oid, [pid], DefaultPagination(), true);
+
+        // Assert
+        Assert.Contains(listWithArchived.Items, r => r.Id == rid2);
+        Assert.DoesNotContain(listWithoutArchived.Items, r => r.Id == rid2);
+        Assert.Equal(2, listWithArchived.TotalCount);
+        Assert.Equal(1, listWithoutArchived.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetAllRelationshipsPaginated_Paginates_Correctly()
+    {
+        // Arrange - pid already has 1 unarchived relationship (rid); add 2 more so there are 3 total
+        await _relationshipBusiness.CreateRelationship(uid, oid, pid, new CreateRelationshipRequestDto
+        {
+            Name = $"Extra Relationship 1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Test",
+            OriginId = cid,
+            DestinationId = cid2
+        });
+        await _relationshipBusiness.CreateRelationship(uid, oid, pid, new CreateRelationshipRequestDto
+        {
+            Name = $"Extra Relationship 2 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Test",
+            OriginId = cid,
+            DestinationId = cid2
+        });
+
+        var pageOne = DefaultPagination(pageNumber: 1, pageSize: 2);
+        var pageTwo = DefaultPagination(pageNumber: 2, pageSize: 2);
+
+        // Act
+        var firstPage = await _relationshipBusiness.GetAllRelationshipsPaginated(oid, [pid], pageOne, true);
+        var secondPage = await _relationshipBusiness.GetAllRelationshipsPaginated(oid, [pid], pageTwo, true);
+
+        // Assert
+        Assert.Equal(3, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.Equal(3, secondPage.TotalCount);
+        Assert.Single(secondPage.Items);
+
+        // No overlap between pages
+        var firstPageIds = firstPage.Items.Select(r => r.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(r => r.Id).ToHashSet();
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    [Fact]
+    public async Task GetAllRelationshipsPaginated_PageSizeNegativeOne_ReturnsAllRelationships_IgnoringPageNumber()
+    {
+        // Arrange - pid has 1 unarchived relationship total; ask for a page far beyond that range
+        var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+        // Act
+        var result = await _relationshipBusiness.GetAllRelationshipsPaginated(oid, [pid], sentinel, true);
+
+        // Assert - PageNumber is ignored entirely, every matching relationship comes back on "page 1"
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(1, result.PageSize);
+        Assert.Contains(result.Items, r => r.Id == rid);
+        Assert.DoesNotContain(result.Items, r => r.Id == rid2);
+    }
+
+    [Fact]
+    public async Task GetAllRelationshipsPaginated_PageSizeNegativeOne_RespectsHideArchivedAndProjectFilters()
+    {
+        // Act - request everything, but with hideArchived = false so the archived relationship should be included
+        var result = await _relationshipBusiness.GetAllRelationshipsPaginated(
+            oid, [pid], DefaultPagination(pageSize: -1), false);
+
+        // Assert - "return all" still applies the same filters as the paginated path
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, r => r.Id == rid2 && r.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllRelationshipsPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+    {
+        // Arrange - pid has 1 unarchived relationship total
+        var zeroSize = DefaultPagination(pageNumber: 1, pageSize: 0);
+
+        // Act
+        var result = await _relationshipBusiness.GetAllRelationshipsPaginated(oid, [pid], zeroSize, true);
+
+        // Assert - Items is empty, but TotalCount still reflects the full matching set
+        Assert.Empty(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllRelationshipsPaginated_RespectsProjectIdsAndHideArchivedFilters()
+    {
+        // Arrange - a relationship in a different project
+        var p2 = new Project
+        {
+            Name = "ExtraProj",
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Projects.Add(p2);
+        await Context.SaveChangesAsync();
+
+        var p2Relationship = new Relationship
+        {
+            Name = "P2 Relationship",
+            OrganizationId = oid,
+            ProjectId = p2.Id,
+            OriginId = cid,
+            DestinationId = cid2,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.Relationships.Add(p2Relationship);
+        await Context.SaveChangesAsync();
+
+        // Act - filter to pid only, hiding archived
+        var result = await _relationshipBusiness.GetAllRelationshipsPaginated(oid, [pid], DefaultPagination(), true);
+
+        // Assert - only pid's unarchived relationship (rid) comes back; p2's and pid's archived one do not
+        Assert.Equal(1, result.TotalCount);
+        Assert.Contains(result.Items, r => r.Id == rid);
+        Assert.DoesNotContain(result.Items, r => r.Id == rid2);
+        Assert.DoesNotContain(result.Items, r => r.Id == p2Relationship.Id);
     }
 
     #endregion

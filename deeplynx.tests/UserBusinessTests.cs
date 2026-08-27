@@ -1,7 +1,11 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.models;
 using Record = deeplynx.datalayer.Models.Record;
+using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.tests;
 
@@ -861,7 +865,7 @@ public class UserBusinessTests : IntegrationTestBase
     }
 
     #endregion
-    
+
     #region CreateTestAccount Tests
 
     [Fact]
@@ -1305,6 +1309,314 @@ public class UserBusinessTests : IntegrationTestBase
         Context.Users.Add(serviceAccount);
         await Context.SaveChangesAsync();
         return serviceAccount.Id;
+    }
+
+    #endregion
+
+    #region GetAllUsersPaginated Tests
+
+    [Fact]
+    public async Task GetAllUsersPaginated_NoFilters_ReturnsAllNonArchivedUsers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null);
+
+        // Assert
+        Assert.Equal(9, result.TotalCount);
+        Assert.Equal(9, result.Items.Count);
+        Assert.All(result.Items, u => Assert.False(u.IsArchived));
+        Assert.Contains(result.Items, u => u.Id == uid5);
+        Assert.DoesNotContain(result.Items, u => u.Id == uid2); // archived
+        Assert.DoesNotContain(result.Items, u => u.Id == uid3); // archived
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_FilterByProjectId_ReturnsOnlyProjectMembers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, pid, null);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.All(result.Items, u => Assert.False(u.IsArchived));
+        Assert.Contains(result.Items, u => u.Id == uid1);
+        Assert.Contains(result.Items, u => u.Id == ouid2);
+        Assert.Contains(result.Items, u => u.Id == guid1); // group is project member
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_FilterByOrganizationId_ReturnsOnlyOrgMembers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, oid);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.All(result.Items, u => Assert.False(u.IsArchived));
+        Assert.Contains(result.Items, u => u.Id == ouid1);
+        Assert.Contains(result.Items, u => u.Id == ouid2);
+        Assert.Contains(result.Items, u => u.Id == guid2); // group is in organization
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_FilterByBothProjectAndOrg_ReturnsUsersInBoth()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, pid, oid);
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Contains(result.Items, u => u.Id == ouid2); // ou2 is in both org and proj
+        Assert.DoesNotContain(result.Items, u => u.Id == ouid1); // ou1 is not in proj
+        Assert.DoesNotContain(result.Items, u => u.Id == uid4); // u4 is not in org
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_FilterByNonExistentProject_ReturnsEmpty()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, pid4, null);
+
+        // Assert
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_FilterByNonExistentOrg_ReturnsEmpty()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, oid2);
+
+        // Assert
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_IncludeArchived_ReturnsAllUsers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null, includeArchived: true);
+
+        // Assert
+        Assert.Equal(10, result.TotalCount);
+        Assert.Equal(10, result.Items.Count);
+        Assert.Contains(result.Items, u => u.Id == uid2);
+        Assert.DoesNotContain(result.Items, u => u.Id == uid3); // hard-deleted, not just archived
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_ExcludeArchived_OmitsArchivedUsers()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null, includeArchived: false);
+
+        // Assert
+        Assert.Equal(9, result.TotalCount);
+        Assert.All(result.Items, u => Assert.False(u.IsArchived));
+        Assert.DoesNotContain(result.Items, u => u.Id == uid2);
+        Assert.DoesNotContain(result.Items, u => u.Id == uid3);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_ExcludesServiceAccounts_ByDefault()
+    {
+        // Arrange
+        var serviceAccountId = await CreateServiceAccount();
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, u => u.Id == serviceAccountId);
+        Assert.All(result.Items, u => Assert.Equal(AccountType.Standard, u.AccountType));
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_IncludeServiceAccounts_ReturnsServiceAccounts()
+    {
+        // Arrange
+        var serviceAccountId = await CreateServiceAccount();
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null, includeServiceAccounts: true);
+
+        // Assert
+        Assert.Contains(result.Items, u => u.Id == serviceAccountId && u.AccountType == AccountType.Service);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_ExcludesTestAccounts_ByDefault()
+    {
+        // Arrange
+        var testAccount = await _userBusiness.CreateTestAccount("Test Account");
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, u => u.Id == testAccount.Id);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_IncludeTestAccounts_ReturnsTestAccounts()
+    {
+        // Arrange
+        var testAccount = await _userBusiness.CreateTestAccount("Test Account");
+
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null, includeTestAccounts: true);
+
+        // Assert
+        Assert.Contains(result.Items, u => u.Id == testAccount.Id && u.AccountType == AccountType.Test);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_ReturnsCorrectMetadata_ForRequestedPage()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 3 }, null, null);
+
+        // Assert
+        Assert.Equal(9, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(3, result.PageSize);
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(3, result.TotalPages);
+        Assert.False(result.HasPrevious);
+        Assert.True(result.HasNext);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_MiddlePage_HasPreviousAndNext()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 2, PageSize = 3 }, null, null);
+
+        // Assert
+        Assert.Equal(2, result.PageNumber);
+        Assert.Equal(3, result.Items.Count);
+        Assert.True(result.HasPrevious);
+        Assert.True(result.HasNext);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_LastPage_HasPreviousOnly()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 3, PageSize = 3 }, null, null);
+
+        // Assert
+        Assert.Equal(3, result.PageNumber);
+        Assert.Equal(3, result.Items.Count);
+        Assert.True(result.HasPrevious);
+        Assert.False(result.HasNext);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_PagesCoverAllUsersWithoutDuplicates()
+    {
+        // Act
+        var page1 = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 3 }, null, null);
+        var page2 = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 2, PageSize = 3 }, null, null);
+        var page3 = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 3, PageSize = 3 }, null, null);
+
+        // Assert
+        var allIds = page1.Items.Select(u => u.Id)
+            .Concat(page2.Items.Select(u => u.Id))
+            .Concat(page3.Items.Select(u => u.Id))
+            .ToList();
+
+        Assert.Equal(9, allIds.Count);
+        Assert.Equal(allIds.Count, allIds.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_PageBeyondResults_ReturnsEmptyItems()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 99, PageSize = 3 }, null, null);
+
+        // Assert
+        Assert.Equal(9, result.TotalCount);
+        Assert.Empty(result.Items);
+        Assert.True(result.HasPrevious);
+        Assert.False(result.HasNext);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_NullDto_FallsBackToDefaultPagination()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(null, null, null);
+
+        // Assert
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(25, result.PageSize);
+        Assert.Equal(9, result.TotalCount);
+        Assert.Equal(9, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_IsOrgAdmin_ReflectsOrgAdminStatusWhenOrgSpecified()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, oid);
+
+        // Assert
+        Assert.All(result.Items, u => Assert.NotNull(u.IsOrgAdmin));
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_IsOrgAdmin_NullWhenNoOrgSpecified()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = 25 }, null, null);
+
+        // Assert
+        Assert.All(result.Items, u => Assert.Null(u.IsOrgAdmin));
+    }
+
+    [Fact]
+    public async Task GetAllUsersPaginated_PageSizeNegativeOne_ReturnsAllUsersInSinglePage()
+    {
+        // Act
+        var result = await _userBusiness.GetAllUsersPaginated(
+            new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }, null, null);
+
+        // Assert
+        Assert.Equal(9, result.TotalCount);
+        Assert.Equal(9, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(9, result.PageSize); // PageSize collapses to item count when returning all
+        Assert.Equal(1, result.TotalPages);
+        Assert.False(result.HasPrevious);
+        Assert.False(result.HasNext);
     }
 
     #endregion
@@ -1812,6 +2124,66 @@ public class UserBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task DeleteUser_InvalidatesAllUserCacheKeys()
+    {
+        // Arrange
+        var user = new User
+        {
+            Name = "Cache Delete User",
+            Email = "cache-delete-user@test.com",
+            Username = $"cache_delete_user_{Guid.NewGuid()}",
+            IsActive = true
+        };
+        var otherUser = new User
+        {
+            Name = "Other Cache User",
+            Email = "other-cache-user@test.com",
+            Username = $"other_cache_user_{Guid.NewGuid()}",
+            IsActive = true
+        };
+
+        Context.Users.AddRange(user, otherUser);
+        await Context.SaveChangesAsync();
+
+        var userCacheKeys = new[]
+        {
+            CacheKeys.SysAdmin(user.Id),
+            CacheKeys.OrgAdmin(user.Id, oid),
+            CacheKeys.OrgMember(user.Id, oid),
+            CacheKeys.ProjectAdmin(user.Id, pid),
+            CacheKeys.ProjectAdmin(user.Id, pid2)
+        };
+        var otherUserCacheKeys = new[]
+        {
+            CacheKeys.SysAdmin(otherUser.Id),
+            CacheKeys.OrgAdmin(otherUser.Id, oid),
+            CacheKeys.OrgMember(otherUser.Id, oid),
+            CacheKeys.ProjectAdmin(otherUser.Id, pid)
+        };
+
+        foreach (var key in userCacheKeys.Concat(otherUserCacheKeys))
+            await CacheService.Instance.SetAsync(key, true, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _userBusiness.DeleteUser(user.Id);
+
+        // Assert
+        Assert.True(result);
+
+        foreach (var key in userCacheKeys)
+        {
+            var cachedValue = await CacheService.Instance.GetAsync<bool?>(key);
+
+            Assert.True(
+                cachedValue is null,
+                $"Cache key '{key}' was not invalidated.");
+        }
+
+        foreach (var key in otherUserCacheKeys)
+            Assert.True(await CacheService.Instance.GetAsync<bool>(key));
+    }
+
+    [Fact]
     public async Task DeleteUser_Fails_IfNotFound()
     {
         // Act
@@ -1946,6 +2318,49 @@ public class UserBusinessTests : IntegrationTestBase
     #endregion
 
     #region SetSysAdmin Tests
+
+    [Fact]
+    public async Task SetSysAdmin_UpdatesCandidateSysAdminCache()
+    {
+        // Arrange
+        var authorizer = new User
+        {
+            Name = "Cache Test Admin",
+            Email = "cache-admin@test.com",
+            Username = $"cache_admin_{Guid.NewGuid()}",
+            IsActive = true,
+            IsSysAdmin = true
+        };
+        var candidate = new User
+        {
+            Name = "Cache Test Candidate",
+            Email = "cache-candidate@test.com",
+            Username = $"cache_candidate_{Guid.NewGuid()}",
+            IsActive = true,
+            IsSysAdmin = false
+        };
+
+        Context.Users.AddRange(authorizer, candidate);
+        await Context.SaveChangesAsync();
+
+        var cacheKey = CacheKeys.SysAdmin(candidate.Id);
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _userBusiness.SetSysAdmin(
+            authorizer.Id,
+            candidate.Id,
+            true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
 
     [Fact]
     public async Task SetSysAdmin_Succeeds_WhenAuthorizerIsSysAdmin()
@@ -2188,6 +2603,280 @@ public class UserBusinessTests : IntegrationTestBase
         var updatedAuthorizer = await Context.Users.FindAsync(authorizer.Id);
         Assert.NotNull(updatedAuthorizer);
         Assert.True(updatedAuthorizer.IsSysAdmin);
+    }
+
+    #endregion
+
+    #region UserExists Cache Tests
+
+    // These tests cover two distinct behaviors:
+    //   1. Cache miss -> falls through to the DB and populates the cache with the correct value.
+    //   2. Cache hit  -> returns the cached value WITHOUT touching the DB (proven by poisoning the
+    //      cache with a value the DB would never return, then asserting that poisoned value wins).
+    // Model under test:
+    //   - One cache entry per user: CacheKeys.UserArchivedStatus(userId) -> bool (isArchived).
+    //     hideArchived is a filter applied to the cached/DB value at call time, NOT part of the key.
+    //   - Existing users (archived or not) are cached with NO TTL - only explicit mutations change them.
+    //   - Non-existent users are NEVER cached - every call for a missing id re-queries the DB.
+    //   - Deleted users are the one exception: CacheKeys.UserDeleted(userId) is set to true with a
+    //     short TTL immediately after delete, and the old UserArchivedStatus entry is cleared so it
+    //     can't outlive the short TTL and mislead a later read.
+    //   - CreateUser / CreateTestAccount populate the archived-status cache immediately (as not
+    //     archived), rather than leaving the first read to populate it.
+    //   - ArchiveUser / UnarchiveUser update the archived-status cache directly to the new value.
+    //   - UpdateUser only touches the cache if the update actually changes IsArchived.
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_CacheMiss_FallsBackToDatabase_AndSucceeds()
+    {
+        // Arrange - uid1 exists in the DB; nothing has populated the cache for it yet
+        var cacheKey = CacheKeys.UserArchivedStatus(uid1);
+        var precheck = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+        Assert.Null(precheck);
+
+        // Act & Assert - falls through to DB, finds the user (not archived), does not throw
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_CacheMiss_FallsBackToDatabase_AndThrowsForMissingUser()
+    {
+        // Arrange - uid3 was hard-deleted in seed data; nothing cached for it (and never will be)
+        var cacheKey = CacheKeys.UserArchivedStatus(uid3);
+        var precheck = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+        Assert.Null(precheck);
+
+        // Act & Assert - falls through to DB, finds nothing, throws
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid3, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_CacheMiss_PopulatesCache_WithCorrectArchivedStatus()
+    {
+        // Arrange - confirm nothing cached yet for uid1 (not archived) and uid2 (archived)
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1)));
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid2)));
+
+        // Act - first calls are cache misses; hideArchived:false so the archived uid2 doesn't throw
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: false);
+
+        // Assert - cache now holds the correct DB-backed archived flag for each
+        var cachedUid1 = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        var cachedUid2 = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid2));
+        Assert.NotNull(cachedUid1);
+        Assert.False(cachedUid1.Value); // uid1 is not archived
+        Assert.NotNull(cachedUid2);
+        Assert.True(cachedUid2.Value); // uid2 is archived
+    }
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_NonExistentUser_IsNeverCached()
+    {
+        // Arrange/Act - call for a missing user twice
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid3, hideArchived: true));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid3, hideArchived: true));
+
+        // Assert - still nothing cached for this id, proving negative results are never written
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid3));
+        Assert.Null(cached);
+    }
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_CacheHit_ReturnsCachedArchivedStatus_WithoutQueryingDatabase()
+    {
+        // Arrange - uid1 is genuinely NOT archived in the DB. Poison the cache with "true" (archived),
+        // a value the DB would never produce for uid1. If the method reads from cache, hideArchived:true
+        // will (incorrectly, by design of this test) throw; if it ignores the cache and hits the DB, it
+        // will not throw.
+        await CacheService.Instance.SetAsync(CacheKeys.UserArchivedStatus(uid1), true, (TimeSpan?)null);
+
+        // Act & Assert - the poisoned cached value wins, proving the DB was not consulted
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true));
+
+        // hideArchived:false should still succeed even with the (wrongly) cached archived=true,
+        // confirming hideArchived is applied as a post-cache-read filter, not baked into the cache key
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task EnsureUserExistsAsync_HideArchivedFilter_AppliesToSingleCachedEntry()
+    {
+        // Arrange - uid2 is archived in the DB; prime the cache once via a hideArchived:false call
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: false);
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid2));
+        Assert.NotNull(cached);
+        Assert.True(cached.Value);
+
+        // Act & Assert - the SAME cache entry now correctly serves both filter variants without
+        // re-querying the DB or requiring a second cache key
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: false); // should not throw
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: true)); // archived users excluded
+    }
+
+    [Fact]
+    public async Task CreateUser_PopulatesArchivedStatusCache_Immediately()
+    {
+        // Arrange
+        var dto = new CreateUserRequestDto
+        {
+            Name = "Cache Test User",
+            Email = "cachetest@test.com",
+            Username = "cachetest"
+        };
+
+        // Act
+        var created = await _userBusiness.CreateUser(dto);
+
+        // Assert - cache is already populated with "not archived", without needing a read first
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(created.Id));
+        Assert.NotNull(cached);
+        Assert.False(cached.Value);
+
+        // And a subsequent existence check should not need to touch the DB to succeed
+        await ExistenceHelper.EnsureUserExistsAsync(Context, created.Id, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task CreateTestAccount_PopulatesArchivedStatusCache_Immediately()
+    {
+        // Act
+        var created = await _userBusiness.CreateTestAccount("Cache Test Account");
+
+        // Assert
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(created.Id));
+        Assert.NotNull(cached);
+        Assert.False(cached.Value);
+    }
+
+    [Fact]
+    public async Task DeleteUser_SetsShortTtlDeletedMarker_AndClearsArchivedStatusCache()
+    {
+        // Arrange - prime the archived-status cache for uid1 (not archived) before deleting
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true);
+        var primedCache = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(primedCache);
+
+        // Act
+        await _userBusiness.DeleteUser(uid1);
+
+        // Assert - the old no-TTL archived-status entry is gone
+        var staleCache = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.Null(staleCache);
+
+        // Assert - the short-TTL deleted marker is set
+        var deletedMarker = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserDeleted(uid1));
+        Assert.NotNull(deletedMarker);
+        Assert.True(deletedMarker.Value);
+
+        // Assert - existence check now correctly throws, served by the deleted marker rather than the DB
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task ArchiveUser_UpdatesArchivedStatusCache_ToTrue_WithoutClearingIt()
+    {
+        // Arrange - prime the cache with "not archived" (the correct pre-archive state)
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+        var before = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(before);
+        Assert.False(before.Value);
+
+        // Act
+        await _userBusiness.ArchiveUser(uid1);
+
+        // Assert - cache entry still exists (not cleared) but now reflects archived=true directly,
+        // without requiring a DB round-trip to repopulate it
+        var after = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(after);
+        Assert.True(after.Value);
+
+        // hideArchived:true now correctly excludes the archived user; hideArchived:false still finds them
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true));
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UnarchiveUser_UpdatesArchivedStatusCache_ToFalse_WithoutClearingIt()
+    {
+        // Arrange - uid2 starts archived; prime the cache with that correct state
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: false);
+        var before = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid2));
+        Assert.NotNull(before);
+        Assert.True(before.Value);
+
+        // Act
+        await _userBusiness.UnarchiveUser(uid2);
+
+        // Assert - cache entry still exists but now reflects archived=false directly
+        var after = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid2));
+        Assert.NotNull(after);
+        Assert.False(after.Value);
+
+        // Both filter variants now succeed since the user is no longer archived
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: true);
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid2, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UpdateUser_UpdatesArchivedStatusCache_WhenArchivingViaDto()
+    {
+        // Arrange - prime the cache with "not archived" for uid1
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+        var before = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(before);
+        Assert.False(before.Value);
+
+        var dto = new UpdateUserRequestDto
+        {
+            IsArchived = true
+        };
+
+        // Act
+        await _userBusiness.UpdateUser(uid1, dto);
+
+        // Assert - cache was updated to reflect the new archived status
+        var after = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(after);
+        Assert.True(after.Value);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: true));
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UpdateUser_DoesNotTouchArchivedStatusCache_WhenArchivedFlagUnchanged()
+    {
+        // Arrange - prime the cache with "not archived" for uid1
+        await ExistenceHelper.EnsureUserExistsAsync(Context, uid1, hideArchived: false);
+
+        // Poison the cache afterward with an impossible value; if UpdateUser writes to the cache
+        // unconditionally, this poisoned value will be overwritten even though IsArchived didn't change
+        // in the dto. If UpdateUser correctly skips the cache write, the poisoned value survives.
+        await CacheService.Instance.SetAsync(CacheKeys.UserArchivedStatus(uid1), true, (TimeSpan?)null);
+
+        var dto = new UpdateUserRequestDto
+        {
+            Name = "Name Only Update"
+            // IsArchived intentionally omitted - should not change archived status
+        };
+
+        // Act
+        await _userBusiness.UpdateUser(uid1, dto);
+
+        // Assert - the poisoned value is untouched, proving UpdateUser did not write to the cache
+        // when the archived flag didn't change
+        var stillPoisoned = await CacheService.Instance.GetAsync<bool?>(CacheKeys.UserArchivedStatus(uid1));
+        Assert.NotNull(stillPoisoned);
+        Assert.True(stillPoisoned.Value);
     }
 
     #endregion

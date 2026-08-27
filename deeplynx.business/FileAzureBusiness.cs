@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.IO.Pipelines;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using Azure.Storage.Blobs;
@@ -15,6 +16,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using System.ComponentModel;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace deeplynx.business;
 
@@ -22,13 +24,18 @@ public class FileAzureBusiness : IFileBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly EncryptionHelper _encryptionHelper;
+    private readonly ITimeLimitedDataProtector _downloadProtector;
 
     public FileAzureBusiness(
         DeeplynxContext context,
-        EncryptionHelper encryptionHelper)
+        EncryptionHelper encryptionHelper,
+        IDataProtectionProvider dataProtectionProvider)
     {
         _context = context;
         _encryptionHelper = encryptionHelper;
+        _downloadProtector = dataProtectionProvider
+            .CreateProtector(RecordUrlHelper.DownloadProtector)
+            .ToTimeLimitedDataProtector();
     }
 
     public async Task<string?> CalculateFileContentHash(
@@ -95,7 +102,10 @@ public class FileAzureBusiness : IFileBusiness
             ? $"organization_{organizationId}/project_{projectId}/datasource_{datasourceId}/{guid}_{file.FileName}"
             : $"{baseFilePath.TrimEnd('/')}/{guid}_{file.FileName}";
 
+
+
         var containerClient = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+        // TODO(DL-2856): fix SAS fallback download URL by removing blob "exists" checks
         await containerClient.CreateIfNotExistsAsync();
 
         var blobClient = containerClient.GetBlobClient(filePath);
@@ -216,9 +226,11 @@ public class FileAzureBusiness : IFileBusiness
             await containerClient.CreateIfNotExistsAsync();
         }
 
+        var objectStorageName = ContainerName.UniqueContainerNameFromString(containerName);
+
         var newObjectStorageDto = new CreateObjectStorageRequestDto
         {
-            Name = ContainerName.UniqueContainerNameFromString(containerName),
+            Name = objectStorageName,
             Config = new ObjectStorageConfigDto
             {
                 AzureObjectConfig = new AzureObjectConfigDto
@@ -257,6 +269,7 @@ public class FileAzureBusiness : IFileBusiness
             objectStorageConfig.AzureObjectConfig.AzureConnectionString,
             objectStorageConfig.AzureObjectConfig.AzureContainerName);
 
+        // TODO(DL-2856): fix SAS fallback download URL by removing container "exists" checks
         if (!await container.ExistsAsync())
         {
             throw new InvalidOperationException("Azure Object Storage container does not exist");
@@ -264,6 +277,7 @@ public class FileAzureBusiness : IFileBusiness
 
         var blob = container.GetBlobClient(record.Uri);
 
+        // TODO(DL-2856): fix SAS fallback download URL by removing blob "exists" checks
         if (!await blob.ExistsAsync())
         {
             throw new FileNotFoundException($"File not found: {record.Uri}");
@@ -543,18 +557,22 @@ public class FileAzureBusiness : IFileBusiness
     }
 
     /// <summary>
-    /// Generates a pre-signed URL (SAS token) for downloading a file directly from Azure Blob Storage
+    /// Generates a pre-signed URL (SAS token) for downloading a file directly from Azure Blob Storage.
+    /// Falls back to generic download URL that allows downloading records directly if SAS is disabled.
     /// </summary>
     /// <param name="record"></param>
     /// <param name="objectStorageConfig"></param>
     /// <param name="expirationHours">Hours until the SAS token expires (default: 1)</param>
+    /// <param name="directUrl">Direct download URL for token auth (default: null)</param>
     /// <returns>Pre-signed URL with SAS token for direct download</returns>
     /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="FileNotFoundException"></exception>
     public async Task<string> GenerateDownloadUrl(
         RecordResponseDto record,
         ObjectStorageConfigDto objectStorageConfig,
-        int expirationHours = 1)
+        int expirationHours = 1,
+        string? directUrl = null)
     {
         if (record.Uri == null)
         {
@@ -570,6 +588,13 @@ public class FileAzureBusiness : IFileBusiness
         var containerClient = new BlobContainerClient(
             objectStorageConfig.AzureObjectConfig.AzureConnectionString,
             objectStorageConfig.AzureObjectConfig.AzureContainerName);
+
+        if (!containerClient.CanGenerateSasUri)
+        {
+            // TODO(DL-2856): uploading/downloading Azure files from SAS fallback URL will fail
+            //                because of permission issues when checking blob/container exists
+            return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, directUrl, record.Id, record.Uri, expirationHours);
+        }
 
         // Verify container exists
         if (!await containerClient.ExistsAsync())
@@ -587,11 +612,12 @@ public class FileAzureBusiness : IFileBusiness
             throw new FileNotFoundException($"File not found: {record.Uri}");
         }
 
-        // Check if the blob client can generate SAS URI
+        // Fall back to generic download if SAS fails
         if (!blobClient.CanGenerateSasUri)
         {
-            await DownloadFile(record, objectStorageConfig);
-            return "Cannot Create SAS URI";
+            // TODO(DL-2856): uploading/downloading Azure files from SAS fallback URL will fail
+            //                because of permission issues when checking blob/container exists
+            return RecordUrlHelper.GenerateGenericDownloadUrl(_downloadProtector, directUrl, record.Id, record.Uri, expirationHours);
         }
 
         // Create SAS builder with read permissions
@@ -1182,6 +1208,114 @@ public class FileAzureBusiness : IFileBusiness
     private ObjectStorageConfigDto DeserializeAndDecryptConfig(string encryptedConfig)
     {
         return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
+    }
+
+    /// <summary>
+    /// Scrapes at most (batchSize * maxBatches) blobs from an Azure Blob storage, starting from the given cursor.
+    /// </summary>
+    /// <param name="config">Config.AzureObjectConfig</param>
+    /// <param name="objectStorageId">The ID of the object storage being scraped</param>
+    /// <param name="cursor">Continuation token from a previous call, or null to start from the beginning</param>
+    /// <param name="batchSize">Number of records per batch</param>
+    /// <param name="maxBatches">Maximum number of batches to process before returning</param>
+    /// <param name="cancellationToken">Token checked between pages</param>
+    /// <exception cref="InvalidOperationException"></exception>
+    public static async Task<ScrapeResult> ScrapeAzureBlob(
+        AzureObjectConfigDto config,
+        long objectStorageId,
+        string? cursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(config.AzureConnectionString))
+            throw new InvalidOperationException("AzureObjectConfig is missing a connection string.");
+        if (string.IsNullOrWhiteSpace(config.AzureContainerName))
+            throw new InvalidOperationException("AzureObjectConfig is missing a container name.");
+
+        var containerClient = new BlobContainerClient(config.AzureConnectionString, config.AzureContainerName);
+
+        var result = new ScrapeResult();
+        var currentBatch = new List<CreateRecordRequestDto>(batchSize);
+        var batchesCompleted = 0;
+        string? continuationToken = cursor;
+
+        var pageable = containerClient.GetBlobsAsync(cancellationToken: cancellationToken)
+            .AsPages(continuationToken);
+
+        await foreach (var page in pageable)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            foreach (var blobItem in page.Values)
+            {
+                var properties = new JsonObject
+                {
+                    ["lastModified"] = blobItem.Properties.LastModified?.ToString("o"),
+                    ["contentType"] = blobItem.Properties.ContentType,
+                    ["etag"] = blobItem.Properties.ETag?.ToString()
+                };
+
+                var extension = Path.GetExtension(blobItem.Name);
+
+                currentBatch.Add(new CreateRecordRequestDto
+                {
+                    Name = Path.GetFileName(blobItem.Name),
+                    Description = blobItem.Name,
+                    ObjectStorageId = objectStorageId,
+                    Uri = blobItem.Name,
+                    Properties = properties,
+                    OriginalId = blobItem.Name,
+                    FileType = string.IsNullOrEmpty(extension) ? null : extension.TrimStart('.'),
+                    FileSize = blobItem.Properties.ContentLength ?? 0
+                });
+
+                if (currentBatch.Count >= batchSize)
+                {
+                    result.Records.AddRange(currentBatch);
+                    currentBatch = new List<CreateRecordRequestDto>(batchSize);
+                    batchesCompleted++;
+                }
+            }
+
+            continuationToken = page.ContinuationToken;
+
+            if (batchesCompleted >= maxBatches && !string.IsNullOrEmpty(continuationToken))
+            {
+                break;
+            }
+
+            if (string.IsNullOrEmpty(continuationToken))
+            {
+                break;
+            }
+        }
+
+        if (currentBatch.Count > 0)
+        {
+            result.Records.AddRange(currentBatch);
+        }
+
+        result.NextCursor = string.IsNullOrEmpty(continuationToken) ? null : continuationToken;
+
+        return result;
+    }
+
+    public async Task<ScrapeResult> ScrapeAsync(
+        ObjectStorageDecryptedDto objectStorage,
+        string? afterCursor,
+        int batchSize,
+        int maxBatches,
+        CancellationToken cancellationToken = default)
+    {
+        return await ScrapeAzureBlob(
+            objectStorage.Config.AzureObjectConfig
+                ?? throw new InvalidOperationException("Azure Blob storage is missing its configuration."),
+            objectStorage.Id,
+            afterCursor,
+            batchSize,
+            maxBatches,
+            cancellationToken);
     }
 }
 

@@ -33,8 +33,8 @@ const AddProjectMember = ({
     if (isOpen && organization?.organizationId) {
       // Fetch users
       getAllUsers()
-        .then((response: UserResponseDto[]) => {
-          setUsers(response);
+        .then((response) => {
+          setUsers(response.items);
         })
         .catch((error) => {
           console.error("Error fetching users:", error);
@@ -42,8 +42,8 @@ const AddProjectMember = ({
 
       // Fetch roles for the specific project
       getAllRoles(organization.organizationId as number, projectId)
-        .then((response: RoleResponseDto[]) => {
-          setRoles(response);
+        .then(({ items }) => {
+          setRoles(items);
         })
         .catch((error) => {
           console.error("Error fetching roles:", error);

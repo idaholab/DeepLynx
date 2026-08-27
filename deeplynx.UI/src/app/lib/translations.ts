@@ -41,7 +41,8 @@ export const translations = {
       ADD_GROUP_TO_PROJECT: "Add Group to Project",
       ADD_GROUP_TO_PROJECT_DESCRIPTION:
         "Select an existing group and assign a role. A role is required to add them to the project.",
-      ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS: "Administrator role with full permissions",
+      ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS:
+        "Administrator role with full permissions",
       ADD_GROUPS: "Add Groups",
       ADD_NEW_MEMBER: "Add New Member",
       ADD_NEW_PROPERTY: "Add New Property",
@@ -70,8 +71,10 @@ export const translations = {
         "All {count} records are valid and ready to upload.",
       ALL_YOUR_PROJECTS: "All your Projects",
       AND: "and",
-      ANY_RECORD_CLASS_REMOVED: "Any record using this class will have the class removed from it.",
-      ANY_RELATIONSHIP_CLASS_UNABLE_TO_EDIT: "Any relationship using this class will not be able to be edited while the class is archived.",
+      ANY_RECORD_CLASS_REMOVED:
+        "Any record using this class will have the class removed from it.",
+      ANY_RELATIONSHIP_CLASS_UNABLE_TO_EDIT:
+        "Any relationship using this class will not be able to be edited while the class is archived.",
       API_ID_TOOLTIP_DESCRIPTION:
         "Use these IDs when using the API scoped to your current organization and project.",
       API_KEYPAIRS: "API Keys",
@@ -103,9 +106,12 @@ export const translations = {
       ARCHIVED_TAG_RESTORED_LATER:
         "This tag will no longer be available for new usage, but it can be restored later.",
       ARCHIVING: "Archiving...",
-      ARCHIVE_PROJECT_DESCRIPTION: "Archive this project to remove it from your active projects. Archived projects can be restored later.",
-      ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE_THIS_PROJECT_RESTORE_LATER: "Are you sure you want to archive this project? You'll be able to restore it later from your archived projects.",
-      ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_PROJECT: "Are you sure you want to delete this project? This action cannot be undone and all data will be permanently lost.",
+      ARCHIVE_PROJECT_DESCRIPTION:
+        "Archive this project to remove it from your active projects. Archived projects can be restored later.",
+      ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE_THIS_PROJECT_RESTORE_LATER:
+        "Are you sure you want to archive this project? You'll be able to restore it later from your archived projects.",
+      ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_PROJECT:
+        "Are you sure you want to delete this project? This action cannot be undone and all data will be permanently lost.",
       ARE_YOU_SURE: "Are you sure you want to unlink?",
       ARE_YOU_SURE_TO_REMOVE_LOGO_FROM_ORG:
         "Are you sure you want to remove the organization logo?",
@@ -125,9 +131,11 @@ export const translations = {
       AXIS_SELECTION: "Axis Selection",
       AZURE_BLOB_STORAGE: "Azure Blob Storage",
       AZURE_DEFAULT_CONNECTION_STRING: "Azure Default Connection String",
+      AZURE_TYPE_ONLY: "Azure Object Storage type ONLY",
       BACK: "Back",
       BACK_TO_CLASS_SELECTION: "← Back to class selection",
-      BACKEND_CONFIG_AWS: "The backend configuration for AWS S3 storage is currently being finalized.",
+      BACKEND_CONFIG_AWS:
+        "The backend configuration for AWS S3 storage is currently being finalized.",
       BANNER_EXAMPLE_CUI:
         'e.g. "This organization space contains CUI/ECI data that must be protected accordingly."',
       BANNER_TEXT: "Banner Text",
@@ -140,7 +148,8 @@ export const translations = {
       BRANDING_AND_BANNER: "Branding & Banner",
       BRIEF_DESCRIPTION: "Brief description",
       BULK_CSV_UPLOAD: "Bulk CSV Upload",
-      BUILD_COMPLEX_QUERIES_BY_COMBINING_MULTIPLE_CONDITIONS: "Build complex queries by combining multiple conditions",
+      BUILD_COMPLEX_QUERIES_BY_COMBINING_MULTIPLE_CONDITIONS:
+        "Build complex queries by combining multiple conditions",
       BULK_METADATA: "Bulk Metadata",
       BULK_METADATA_INSTRUCTIONS:
         "Create multiple records at once by uploading a CSV file with metadata. No actual files are uploaded - only record metadata is created.",
@@ -155,7 +164,8 @@ export const translations = {
       CANCEL_SELECTION: "Cancel Selection",
       CONTAINS_TEXT_SEARCH: "Contains text search...",
       CANCELLING_SHORT: "Cancelling...",
-      CREATE_AND_MANAGE_USER_GROUPS_FOR_YOUR_ORGANIZATION: "Create and manage user groups for your organization",
+      CREATE_AND_MANAGE_USER_GROUPS_FOR_YOUR_ORGANIZATION:
+        "Create and manage user groups for your organization",
       CANNOT_DEFINE_ADDITIONAL_PROJECT_LABELS:
         "cannot define additional project labels",
       CANNOT_DEFINE_ADDITIONAL_PROJECT_TAGS:
@@ -164,7 +174,8 @@ export const translations = {
         "cannot define additional sensitivity labels",
       CANNOT_DEFINE_NEW_LABELS: "cannot define new labels",
       CANNOT_DEFINE_NEW_TAGS: "cannot define new tags",
-      CANNOT_REMOVE_SELF_FROM_PROJECT: "You cannot remove yourself from a project",
+      CANNOT_REMOVE_SELF_FROM_PROJECT:
+        "You cannot remove yourself from a project",
       CANT_SWITCH_TO_SINGLE_FILE: "Can't switch to single-file",
       CHANGES_DISCARDED: "Changes discarded",
       CHANGE_LOGO: "Change Logo",
@@ -181,8 +192,10 @@ export const translations = {
       CLASS: "Class",
       CLASS_CREATED_AND_APPLIED: "Class created and applied!",
       CLASS_ID: "Class ID",
-      CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH: "Class Name {name} does not match Class ID {id}",
-      CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION: "Update the metadata so the Class Name matches the Class Id.",
+      CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH:
+        "Class Name {name} does not match Class ID {id}",
+      CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION:
+        "Update the metadata so the Class Name matches the Class Id.",
       CLASS_ID_DOES_NOT_EXIST_IN_PROJECT:
         "Class ID {id} does not exist in this project",
       CLASS_ID_MUST_BE_GREATER_THAN_ZERO: "Class ID must be greater than 0",
@@ -191,11 +204,14 @@ export const translations = {
       CAPTURE_CORE_CLASS_DEFINITION: "Capture the core class definition.",
       CLASS_ARCHIVED: "Class archived.",
       CLASS_CREATED: "Class created.",
-      CLASS_DESCRIPTION_HELP: "Explain what records belong to this class and how teams will use it.",
+      CLASS_DESCRIPTION_HELP:
+        "Explain what records belong to this class and how teams will use it.",
       CLASS_INSPECTOR: "Class Inspector",
       CLASS_RESTORED: "Class restored.",
-      CREATE_RELATIONSHIP_DESCRIPTION: "Set the edge label and choose the classes it connects.",
-      CREATE_REVIEW_ARCHIVE_AND_REFINE_RECORD_CLASSES: "Create, review, archive, and refine record classes.",
+      CREATE_RELATIONSHIP_DESCRIPTION:
+        "Set the edge label and choose the classes it connects.",
+      CREATE_REVIEW_ARCHIVE_AND_REFINE_RECORD_CLASSES:
+        "Create, review, archive, and refine record classes.",
       CLASS_ID_MUST_BE_NUMBER_NOT_STRING:
         "Class ID must be a number, not a string.",
       CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION:
@@ -260,7 +276,8 @@ export const translations = {
       CREATE_OAUTH_APPLICATION: "Create OAuth Application",
       CREATE_OBJECT_STORAGE: "Create Object Storage",
       CREATE_ORGANIZATION: "Create Organization",
-      CREATE_PROJECT_CONTAINER_HELPER: "Create an organization-managed container in Azure Blob Storage. This is the fastest and easiest way to get started.",
+      CREATE_PROJECT_CONTAINER_HELPER:
+        "Create an organization-managed container in Azure Blob Storage. This is the fastest and easiest way to get started.",
       CREATE_PROJECT_CONTAINER: "Create Project Container",
       CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
         "Create your first organization to get started.",
@@ -296,37 +313,51 @@ export const translations = {
       DATA_SOURCE_NAME: "Data Source Name",
       DATA_SOURCES: "Data Sources",
       DATA_TYPE: "Data Type",
-      DASHBOARD_TOUR_ADD_RECORD_TEXT: "Click here to add new records to your existing projects. This helps you track progress and updates.",
+      DASHBOARD_TOUR_ADD_RECORD_TEXT:
+        "Click here to add new records to your existing projects. This helps you track progress and updates.",
       DASHBOARD_TOUR_ADD_RECORD_TITLE: "Add Records",
-      DASHBOARD_TOUR_COMPLETE_TEXT: "That's it! You now know the basics. You can always restart this tour by clicking the help button in the header.",
+      DASHBOARD_TOUR_COMPLETE_TEXT:
+        "That's it! You now know the basics. You can always restart this tour by clicking the help button in the header.",
       DASHBOARD_TOUR_COMPLETE_TITLE: "You're All Set! 🎉",
-      DASHBOARD_TOUR_CREATE_PROJECT_TEXT: "Start a new project by clicking this button. You can set up all the project details and begin tracking immediately.",
+      DASHBOARD_TOUR_CREATE_PROJECT_TEXT:
+        "Start a new project by clicking this button. You can set up all the project details and begin tracking immediately.",
       DASHBOARD_TOUR_CREATE_PROJECT_TITLE: "Create New Projects",
-      DASHBOARD_TOUR_EXPAND_PROJECT_TEXT: "Click this arrow to see more details about a project.",
+      DASHBOARD_TOUR_EXPAND_PROJECT_TEXT:
+        "Click this arrow to see more details about a project.",
       DASHBOARD_TOUR_EXPAND_PROJECT_TITLE: "Expand a project",
-      DASHBOARD_TOUR_PROJECT_DETAILS_TEXT: "Here's the expanded panel with quick actions and recent info.",
+      DASHBOARD_TOUR_PROJECT_DETAILS_TEXT:
+        "Here's the expanded panel with quick actions and recent info.",
       DASHBOARD_TOUR_PROJECT_DETAILS_TITLE: "Project details",
-      DASHBOARD_TOUR_PROJECTS_TEXT: "This is where all your projects are displayed. You can see project names, descriptions, and when they were last updated.",
+      DASHBOARD_TOUR_PROJECTS_TEXT:
+        "This is where all your projects are displayed. You can see project names, descriptions, and when they were last updated.",
       DASHBOARD_TOUR_PROJECTS_TITLE: "Your Projects",
-      DASHBOARD_TOUR_SEARCH_TEXT: "Use this search bar to quickly find projects by name or description.",
+      DASHBOARD_TOUR_SEARCH_TEXT:
+        "Use this search bar to quickly find projects by name or description.",
       DASHBOARD_TOUR_SEARCH_TITLE: "Search Your Projects",
-      DASHBOARD_TOUR_WELCOME_TEXT: "Let's take a quick tour to help you get started with managing your projects and records.",
+      DASHBOARD_TOUR_WELCOME_TEXT:
+        "Let's take a quick tour to help you get started with managing your projects and records.",
       DASHBOARD_TOUR_WELCOME_TITLE: "Welcome to Your Dashboard! 👋",
       DEEPLYNX_ECOSYSTEM_SERVICES: "DeepLynx Ecosystem Services",
       DEEPLYNX_LOGO: "DeepLynx logo",
       DELETE_SAVED_SEARCH: "Delete saved search?",
-      DATA_SCHEMA_DESCRIPTION: "Creation and management of classes and relationships to assign to records and edges.",
-      DEFINE_WHICH_CLASSES_CAN_CONNECT_AND_HOW_EDGE_SHOULD_READ: "Define which classes can connect and how that edge should read.",
+      DATA_SCHEMA_DESCRIPTION:
+        "Creation and management of classes and relationships to assign to records and edges.",
+      DEFINE_WHICH_CLASSES_CAN_CONNECT_AND_HOW_EDGE_SHOULD_READ:
+        "Define which classes can connect and how that edge should read.",
       DESTINATION: "Destination",
       DESTINATION_CLASS: "Destination Class",
-      DELETE_SAVED_SEARCH_WARNING: "will be permanently removed. This cannot be undone.",
+      DELETE_SAVED_SEARCH_WARNING:
+        "will be permanently removed. This cannot be undone.",
       DISABLE_FILE_TRANSFER: "Disable File Transfers",
-      DISABLE_FILE_TRANSFER_HELPER: "Members won't be able to upload or download files through this organization.",
+      DISABLE_FILE_TRANSFER_HELPER:
+        "Members won't be able to upload or download files through this organization.",
       DONE: "Done",
       DEFAULT_BADGE: "Default",
       DEFAULT_PROJECT_BADGE: "Default (Project)",
       DEFAULT_ORGANIZATION_BADGE: "Default (Organization)",
       DEFAULT_STORAGE: "Delete Storage",
+      DEFAULT_STORAGE_CANNOT_BE_DELETED_OR_ARCHIVED:
+        "Switch to another object storage before deleting/archiving this one.",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
         "This will be the default storage for data sources in this project",
       DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY:
@@ -335,7 +366,8 @@ export const translations = {
       DEFAULT_DATA_SOURCE: "Default Data Source",
       DETAILS: "Details",
       DEFAULT_UNMOUNT_STORAGE: "Default Unmounted Object Storage",
-      DEFINE_AND_MANAGE_ORGANIZATION_LEVEL_ROLES_AND_PERMISSIONS: "Define and manage organization-level roles and permissions. These settings will propagate to all projects.",
+      DEFINE_AND_MANAGE_ORGANIZATION_LEVEL_ROLES_AND_PERMISSIONS:
+        "Define and manage organization-level roles and permissions. These settings will propagate to all projects.",
       DEFINE_ORGANIZATION_LEVEL_SENSITIVITY_LABEL_DESCRIPTION:
         "Define an organization-level sensitivity label. Projects inherit this label and can use it across their assets.",
       DEFINE_ORGANIZATION_LEVEL_TAG_DESCRIPTION:
@@ -347,7 +379,8 @@ export const translations = {
       DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH:
         "Define project-level tags for classification, workflows, and search. Organization-level locks determine whether this project can define additional tags beyond those inherited from the organization.",
       DELETE: "Delete",
-      DELETE_PROJECT_DESCRIPTION: "Permanently delete this project. This action cannot be undone.",
+      DELETE_PROJECT_DESCRIPTION:
+        "Permanently delete this project. This action cannot be undone.",
       DELETE_ALL_FILTERS: "Delete all filters",
       DELETE_ORGANIZATION: "Delete Organization",
       DELETE_ROLE: "Delete Role",
@@ -391,7 +424,8 @@ export const translations = {
       EDIT_GROUP_DETAILS: "Edit Group Details",
       EDIT_STORAGE: "Edit Storage",
       EDIT_TAG: "Edit Tag",
-      EDIT_SELECTED_CLASS_COMPARE_LINKED_RELATIONSHIPS: "Edit the selected class, then compare its linked relationships.",
+      EDIT_SELECTED_CLASS_COMPARE_LINKED_RELATIONSHIPS:
+        "Edit the selected class, then compare its linked relationships.",
       EXAMPLE_ASSET: "Example: Asset",
       EXAMPLE_INSTALLED_IN: "Example: Installed In",
       EDIT_USER: "Edit User",
@@ -488,7 +522,8 @@ export const translations = {
       FAILED_TO_UPDATE_STORAGE: "Failed to update storage",
       FAILED_TO_UPDATE_TAGS: "Failed to update tags",
       FAILED_TO_UPLOAD_LOGO: "Failed to upload logo",
-      FAILED_TO_UPDATE_FILE_TRANSFER_SETTING: "Failed to update file transfer setting",
+      FAILED_TO_UPDATE_FILE_TRANSFER_SETTING:
+        "Failed to update file transfer setting",
       FILE: "File",
       FILE_A_BUG: "File A Bug",
       FILE_PATH: "File Path",
@@ -507,12 +542,18 @@ export const translations = {
       FILE_SIZE: "File Size",
       FILE_SIZE_MUST_BE_5MB: "File size must be less than 5MB",
       FILE_TRANSFER: "File Transfer",
-      FILE_TRANSFER_DESCRIPTION: "Control whether members of this organization can upload or download files.",
-      FILE_TRANSFER_DISABLED_SUCCESSFULLY: "File transfer disabled for this organization",
-      FILE_TRANSFER_ENABLED_SUCCESSFULLY: "File transfer enabled for this organization",
+      FILE_TRANSFER_DESCRIPTION:
+        "Control whether members of this organization can upload or download files.",
+      FILE_TRANSFER_DISABLED_SUCCESSFULLY:
+        "File transfer disabled for this organization",
+      FILE_TRANSFER_ENABLED_SUCCESSFULLY:
+        "File transfer enabled for this organization",
       FILE_TYPE: "File Type",
       FILE_UPLOAD: "File Upload",
       FILE_UPLOADED_SUCCESSFULLY: "File uploaded successfully!",
+      FINALIZING_UPLOAD: "Finalizing upload...",
+      FINALIZING_UPLOAD_MESSAGE:
+        "Your file has finished uploading. Please wait while it is finalized.",
       FILES_LABEL: "files",
       FILESYSTEM: "Filesystem",
       FILESYSTEM_PATH: "Filesystem Path",
@@ -534,6 +575,10 @@ export const translations = {
       GRAPH_DEPTH_1: "Depth 1",
       GRAPH_DEPTH_2: "Depth 2",
       GRAPH_DEPTH_3_PLUS: "Depth 3+",
+      GRAPH_EDGE_PERMISSION_REQUIRED:
+        "Edge access is needed to view the graph.",
+      GRAPH_EDGE_PERMISSION_REQUIRED_SUBTEXT:
+        "Ask a project administrator to grant edge read access to see connections for this record.",
       GRAPH_EXACT_CONNECTIONS_FOR: "Exact connections for {name}.",
       GRAPH_FAILED_TO_LOAD: "Failed to load graph data.",
       GRAPH_HIDE_EXTRA_LABELS: "Hide extra labels",
@@ -767,8 +812,10 @@ export const translations = {
       INVITE_USER_TO_PROJECT: "Invite User to Project",
       INVITE_USERS_TO_ORG: "Invite Users to this Organization",
       INHERITED_FROM_ORGANIZATION: "Inherited from organization",
-      JSON_DEPTH_EXCEEDED: "The JSON structure exceeds the maximum allowed depth of {allowedDepth}. Current depth of properties is {currentDepth}.",
-      JSON_DEPTH_EXCEEDED_SUGGESTION: "Reduce the nesting of objects or arrays in the properties section of the metadata.",
+      JSON_DEPTH_EXCEEDED:
+        "The JSON structure exceeds the maximum allowed depth of {allowedDepth}. Current depth of properties is {currentDepth}.",
+      JSON_DEPTH_EXCEEDED_SUGGESTION:
+        "Reduce the nesting of objects or arrays in the properties section of the metadata.",
       KEEP_INVITE: "Keep Invite",
       KEY: "Key",
       KEY_VALUE: "Key / Value",
@@ -780,7 +827,8 @@ export const translations = {
       LABEL_CREATED: "Label created",
       LABEL_CREATED_AND_ATTACHED: "created and attached",
       LABEL_CREATED_BUT_FAILED_TO_ATTACH: "created but failed to attach",
-      LABEL_IN_USE: "Label is currently in use. Remove the label from the record(s) before archiving.",
+      LABEL_IN_USE:
+        "Label is currently in use. Remove the label from the record(s) before archiving.",
       LABEL_NAME: "Label Name",
       LABEL_NAME_PLACEHOLDER: "e.g., CUI, ITAR, Public",
       LABELS_ARE_LOCKED: "Labels are locked",
@@ -831,7 +879,8 @@ export const translations = {
         "Automatically extract records, classes, relationships, and edges from this document. Results are staged for review before anything is added to the knowledge graph or data schema.",
       LATTICE_HOW_IT_WORKS: "How it works",
       LATTICE_STEP_EMBED: "Queue this document for AI embedding using Insight",
-      LATTICE_STEP_ONTOLOGY: "Before running a Lattice extraction, add at least 2 classes and 1 relationship to your project's ontology. Once the minimum ontology is in place, you can start an extraction.",
+      LATTICE_STEP_ONTOLOGY:
+        "Before running a Lattice extraction, add at least 2 classes and 1 relationship to your project's ontology. Once the minimum ontology is in place, you can start an extraction.",
       LATTICE_STEP_MODE: "Choose an extraction mode",
       LIKE: "Like",
       LATTICE_STEP_TRIGGER:
@@ -966,7 +1015,8 @@ export const translations = {
         "Manage users and groups assigned to this project. A role is required for each member.",
       MANAGE_USERS_AND_GROUPS_WITH_ACCESS_TO_THIS_PROJECT:
         "Manage users and groups with access to this project",
-      MANAGE_CATALOG_DATA_SOURCES_FOR_THIS_PROJECT: "Manage catalog data sources for this project",
+      MANAGE_CATALOG_DATA_SOURCES_FOR_THIS_PROJECT:
+        "Manage catalog data sources for this project",
       MANAGE_USERS_IN_ORG_DESCRIPTION:
         "Manage users in your organization. Invite new users via email or add them directly.",
       MANAGE_USERS_IN_SITE_DESCRIPTION:
@@ -1000,12 +1050,14 @@ export const translations = {
       METADATA_FILE_JSON_ONLY: "Only .json metadata files are allowed.",
       METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES:
         "Metadata file is unavailable for large files.",
-      METADATA_PREVIEW_CLASS: "Class",
+      METADATA_PREVIEW_CLASS: "Class Name",
       METADATA_PREVIEW_DESCRIPTION: "Description",
       METADATA_PREVIEW_NAME: "Name",
-      MIRROR_ADD_EDGE_WORKFLOW: "Mirror the add-edge workflow by defining which classes the edge can span.",
+      MIRROR_ADD_EDGE_WORKFLOW:
+        "Mirror the add-edge workflow by defining which classes the edge can span.",
       METADATA_PREVIEW_ORIGINAL_ID: "Original ID",
       METADATA_PREVIEW_PROPERTIES: "Properties",
+      METADATA_PREVIEW_TAGS: "Tags",
       METADATA_PREVIEW_SELECT_FILE:
         "Upload a metadata JSON file to preview key values.",
       METADATA_PREVIEW_TITLE: "Metadata Preview",
@@ -1074,7 +1126,8 @@ export const translations = {
       NO_DATASOURCES_FOUND: "No datasources found",
       NO_TAGS_FOUND: "No tags found",
       NO_DESCRIPTION: "No description",
-      NO_GROUPS_FOUND_CREATE_FIRST_GROUP: "No groups found. Create your first group to get started.",
+      NO_GROUPS_FOUND_CREATE_FIRST_GROUP:
+        "No groups found. Create your first group to get started.",
       NO_MEMBERS_IN_THIS_GROUP_YET: "No members in this group yet",
       NO_USERS_FOUND: "No users found",
       NO_MEMBERS_MATCH_SEARCH: "No members match your search",
@@ -1097,8 +1150,10 @@ export const translations = {
       NO_CLASSES_FOUND_IN_DATABASE: "No classes were found in the database.",
       NO_CLASSES_MATCH_CURRENT_FILTER: "No classes match the current filter.",
       NO_RELATIONSHIP_FLOWS_AVAILABLE: "No relationship flows are available.",
-      NO_RELATIONSHIPS_FOUND_IN_DATABASE: "No relationships were found in the database.",
-      NO_RELATIONSHIPS_MATCH_CURRENT_FILTER: "No relationships match the current filter.",
+      NO_RELATIONSHIPS_FOUND_IN_DATABASE:
+        "No relationships were found in the database.",
+      NO_RELATIONSHIPS_MATCH_CURRENT_FILTER:
+        "No relationships match the current filter.",
       NO_PROJECT_LABELS_DEFINED_WHEN_UNLOCKED:
         "No project labels defined. When unlocked, you can extend the organization label set with project-specific labels.",
       NO_PROJECT_LABELS_MATCH_SEARCH: "No project labels match your search.",
@@ -1131,6 +1186,22 @@ export const translations = {
       NOT_CONNECTED: "Not Connected",
       NOT_FOUND: "Not Found",
       OAUTH_APPLICATION: "OAuth Application",
+      OAUTH_DEVICE_APPLICATION: "Application",
+      OAUTH_DEVICE_APPROVE: "Approve",
+      OAUTH_DEVICE_APPROVING: "Approving",
+      OAUTH_DEVICE_BRAND: "Nexus",
+      OAUTH_DEVICE_CHECKING: "Checking",
+      OAUTH_DEVICE_CLIENT_ID: "Client ID",
+      OAUTH_DEVICE_CODE: "Device code",
+      OAUTH_DEVICE_CONTINUE: "Continue",
+      OAUTH_DEVICE_DENY: "Deny",
+      OAUTH_DEVICE_DENYING: "Denying",
+      OAUTH_DEVICE_ENTER_CODE: "Enter a device code.",
+      OAUTH_DEVICE_EXPIRES: "Expires",
+      OAUTH_DEVICE_SCOPE: "Scope",
+      OAUTH_DEVICE_STATUS: "Status",
+      OAUTH_DEVICE_TITLE: "Device authorization",
+      OAUTH_DEVICE_UNABLE_TO_COMPLETE: "Unable to complete request.",
       OBJECT_STORAGE_ID_PLACEHOLDER: "object_storage_id",
       OBJECT_STORAGE: "Object Storage",
       OBJECT_STORAGE_ID: "Object Storage ID",
@@ -1143,13 +1214,15 @@ export const translations = {
       OBJECT_STORAGES: "Object storages",
       OF: "of",
       OKAY: "Okay, got it",
-      ORGANIZATION_MANAGEMENT_DESCRIPTION: "Manage organizations and assign administrators to control access and oversee projects within each organizational unit.",
+      ORGANIZATION_MANAGEMENT_DESCRIPTION:
+        "Manage organizations and assign administrators to control access and oversee projects within each organizational unit.",
       ONLY_ONE_LARGE_FILE_ALLOWED:
         "Only one file 500MB or larger can be selected at a time.",
       ONLY_STANDARD_ROLES_NO_CUSTOM_TO_EDIT:
         "Only standard roles exist; no custom roles to edit.",
       ONSITE_DB: "Onsite Database",
-      OAUTH_APPLICATION_DESCRIPTION: "Register and manage OAuth 2.0 applications for secure third-party integrations with your organization's resources.",
+      OAUTH_APPLICATION_DESCRIPTION:
+        "Register and manage OAuth 2.0 applications for secure third-party integrations with your organization's resources.",
       OPERATOR: "Operator",
       OPTIMAL_SIZE_FOR_LOGO: "Optimal size: 256×256 pixels",
       OPTIONAL: "Optional",
@@ -1198,7 +1271,8 @@ export const translations = {
       ORGANIZATION_TAGS_DESCRIPTION:
         "Tags for classification, workflows, and search. All projects inherit these and can optionally add their own.",
       ORGANIZATION_USERS: "Organization Users",
-      OPTIONAL_AUTO_GENERATED_IF_LEFT_BLANK: "Optional, auto-generated if left blank.",
+      OPTIONAL_AUTO_GENERATED_IF_LEFT_BLANK:
+        "Optional, auto-generated if left blank.",
       ORIGIN: "Origin",
       ORIGIN_CLASS: "Origin Class",
       ORIGIN_TO_DESTINATION: "Origin to Destination",
@@ -1234,54 +1308,70 @@ export const translations = {
         "Contact your project administrator to request the necessary permissions.",
       PERMISSIONS: "Permissions",
       PERMISSIONS_STILL_LOADING: "Permissions are still loading.",
-      PERMISSION_TO_EMBED_FILES_IN_INSIGHT: "Permission to embed files in Insight",
+      PERMISSION_TO_EMBED_FILES_IN_INSIGHT:
+        "Permission to embed files in Insight",
       PERMISSION_TO_MODIFY_CLASSES: "Permission to modify classes",
       PERMISSION_TO_MODIFY_DATA_SOURCES: "Permission to modify data sources",
       PERMISSION_TO_MODIFY_FILES: "Permission to modify files",
       PERMISSION_TO_MODIFY_GROUPS: "Permission to modify groups",
-      PERMISSION_TO_MODIFY_OBJECT_STORAGE: "Permission to modify object storage",
-      PERMISSION_TO_MODIFY_ORGANIZATION_INFORMATION: "Permission to modify organization information",
+      PERMISSION_TO_MODIFY_OBJECT_STORAGE:
+        "Permission to modify object storage",
+      PERMISSION_TO_MODIFY_ORGANIZATION_INFORMATION:
+        "Permission to modify organization information",
       PERMISSION_TO_MODIFY_PERMISSIONS: "Permission to modify permissions",
-      PERMISSION_TO_MODIFY_PROJECT_INFORMATION: "Permission to modify project information",
+      PERMISSION_TO_MODIFY_PROJECT_INFORMATION:
+        "Permission to modify project information",
       PERMISSION_TO_MODIFY_RECORDS: "Permission to modify records",
       PERMISSION_TO_MODIFY_RELATIONSHIPS: "Permission to modify relationships",
       PERMISSION_TO_MODIFY_ROLES: "Permission to modify roles",
       PERMISSION_TO_UPDATE_USERS: "Permission to update users",
       PERMISSION_TO_MODIFY_TAGS: "Permission to modify tags",
-      PERMISSION_TO_MODIFY_USER_INFORMATION: "Permission to modify user information",
-      PERMISSION_TO_READ_A_RECORD_COLLECTION: "Permission to read a record collection",
+      PERMISSION_TO_MODIFY_USER_INFORMATION:
+        "Permission to modify user information",
+      PERMISSION_TO_READ_A_RECORD_COLLECTION:
+        "Permission to read a record collection",
       PERMISSION_TO_READ_CLASSES: "Permission to read classes",
       PERMISSION_TO_READ_DATA_SOURCES: "Permission to read data sources",
       PERMISSION_TO_READ_FILES: "Permission to read files",
       PERMISSION_TO_READ_GROUPS: "Permission to read groups",
       PERMISSION_TO_READ_OBJECT_STORAGE: "Permission to read object storage",
-      PERMISSION_TO_READ_ORGANIZATION_INFORMATION: "Permission to read organization information",
+      PERMISSION_TO_READ_ORGANIZATION_INFORMATION:
+        "Permission to read organization information",
       PERMISSION_TO_READ_PERMISSIONS: "Permission to read permissions",
-      PERMISSION_TO_READ_PROJECT_INFORMATION: "Permission to read project information",
+      PERMISSION_TO_READ_PROJECT_INFORMATION:
+        "Permission to read project information",
       PERMISSION_TO_READ_RECORDS: "Permission to read records",
       PERMISSION_TO_READ_RELATIONSHIPS: "Permission to read relationships",
       PERMISSION_TO_READ_ROLES: "Permission to read roles",
       PERMISSION_TO_READ_TAGS: "Permission to read tags",
-      PERMISSION_TO_READ_USER_INFORMATION: "Permission to read user information",
-      PERMISSION_TO_UPDATE_A_RECORD_COLLECTION: "Permission to update a record collection",
+      PERMISSION_TO_READ_USER_INFORMATION:
+        "Permission to read user information",
+      PERMISSION_TO_UPDATE_A_RECORD_COLLECTION:
+        "Permission to update a record collection",
       PERMISSION_TO_UPDATE_PROJECT_DATA: "Permission to update project data",
-      PERMISSION_TO_MODIFY_SENSITIVITY_LABELS: "Permission to modify sensitivity labels",
-      PERMISSION_TO_READ_SENSITIVITY_LABELS: "Permission to read sensitivity labels",
+      PERMISSION_TO_MODIFY_SENSITIVITY_LABELS:
+        "Permission to modify sensitivity labels",
+      PERMISSION_TO_READ_SENSITIVITY_LABELS:
+        "Permission to read sensitivity labels",
       PERMISSION_TO_UPDATE_DATA_SOURCES: "Permission to update data sources",
       PERMISSION_TO_UPDATE_EDGES: "Permission to update edges",
       PERMISSION_TO_UPDATE_GROUPS: "Permission to update groups",
       PERMISSION_TO_UPDATE_ROLES: "Permission to update roles",
-      PERMISSION_TO_UPDATE_SENSITIVITY_LABELS: "Permission to update sensitivity labels",
+      PERMISSION_TO_UPDATE_SENSITIVITY_LABELS:
+        "Permission to update sensitivity labels",
       PERMISSION_TO_UPDATE_TAGS: "Permission to update tags",
-      PERMISSION_TO_READ_RESULTS_FROM_INSIGHT: "Permission to read results from Insight",
+      PERMISSION_TO_READ_RESULTS_FROM_INSIGHT:
+        "Permission to read results from Insight",
       PERMISSION_TO_UPDATE_CLASSES: "Permission to update classes",
       PERMISSION_TO_UPDATE_FILES: "Permission to update files",
       PERMISSION_TO_UPDATE_ORGANIZATIONS: "Permission to update organizations",
       PERMISSION_TO_UPDATE_RECORDS: "Permission to update records",
       PERMISSION_TO_MODIFY_EDGES: "Permission to modify edges",
       PERMISSION_TO_READ_EDGES: "Permission to read edges",
-      PERMISSION_TO_UPDATE_OBJECT_STORAGE: "Permission to update object storage",
-      PERMISSION_TO_WRITE_A_RECORD_COLLECTION: "Permission to write a record collection",
+      PERMISSION_TO_UPDATE_OBJECT_STORAGE:
+        "Permission to update object storage",
+      PERMISSION_TO_WRITE_A_RECORD_COLLECTION:
+        "Permission to write a record collection",
       PERMISSION_TO_UPDATE_PERMISSIONS: "Permission to update permissions",
       PERMISSION_TO_UPDATE_RELATIONSHIPS: "Permission to update relationships",
       PERSON: "person",
@@ -1671,9 +1761,11 @@ export const translations = {
       RECORD_MODE_ARIA: "Record mode",
       RELATIONSHIP_ARCHIVED: "Relationship archived.",
       RELATIONSHIP_CREATED: "Relationship created.",
-      RELATIONSHIP_DESCRIPTION_HELP: "Describe when this relationship should be assigned between records.",
+      RELATIONSHIP_DESCRIPTION_HELP:
+        "Describe when this relationship should be assigned between records.",
       RELATIONSHIP_FLOW: "Relationship Flow",
-      RELATIONSHIP_FLOW_DESCRIPTION: "A more visual alternative for defining allowed class-to-class edges.",
+      RELATIONSHIP_FLOW_DESCRIPTION:
+        "A more visual alternative for defining allowed class-to-class edges.",
       RELATIONSHIP_INSPECTOR: "Relationship Inspector",
       RELATIONSHIP_NAME: "Relationship Name",
       RELATIONSHIP_RESTORED: "Relationship restored.",
@@ -1813,7 +1905,8 @@ export const translations = {
       SELECTED_RECORD: "Selected record:",
       SELECTED_RECORDS: "Selected Records",
       SELECT_LOGO: "Select Logo",
-      SENSITIVITY_LABELS_COMMA_SEPARATED: "sensitivity_labels (comma-separated)",
+      SENSITIVITY_LABELS_COMMA_SEPARATED:
+        "sensitivity_labels (comma-separated)",
       SEND_INVITATION: "Send Invitation",
       SEND_INVITATIONS: "Send invitation(s)",
       SENSITIVITY_LABEL_REMOVED: "Sensitivity label removed",
@@ -1833,6 +1926,7 @@ export const translations = {
       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
         "Set the default unmounted object storage location for this organization.",
       STORAGE_SIZE: "Storage Size",
+      STORAGE_FILES_DELETABLE: "Delete files when the record is deleted",
       SET_UP: "Set Up",
       SETTINGS: "Settings",
       SHOW: "Show",
@@ -1857,12 +1951,15 @@ export const translations = {
       SOME_UPLOADS_FAILED_CHECK_FILE_CARDS:
         "Some uploads failed. Check the file cards.",
       SOURCE: "Source: ",
+      SOURCE_RECORD: "Source Record: ",
       SPLIT_VIEW: "Split View",
       STANDARD_FILE: "Standard File",
       STANDARD_ROLE: "Standard Role (Read-Only)",
       SEARCH_RELATIONSHIPS: "Search relationships",
-      SELECT_CLASS_TO_INSPECT_AND_EDIT: "Select a class to inspect and edit it.",
-      SELECT_RELATIONSHIP_TO_INSPECT_AND_EDIT: "Select a relationship to inspect and edit it.",
+      SELECT_CLASS_TO_INSPECT_AND_EDIT:
+        "Select a class to inspect and edit it.",
+      SELECT_RELATIONSHIP_TO_INSPECT_AND_EDIT:
+        "Select a relationship to inspect and edit it.",
       STANDARD_ROLE_DESC:
         "This is a standard role and cannot be modified. Create a custom role if you need different permissions.",
       STANDARD_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED:
@@ -1927,7 +2024,8 @@ export const translations = {
       TAGS_REMOVED: "Tag(s) removed!",
       TEXT_SEARCH: "text search",
       TEXT_SEARCH_TERM: "Text Search Term",
-      TRY_ADJUSTING_YOUR_FILTERS_OR_SEARCH_TERM: "Try adjusting your filters or search term",
+      TRY_ADJUSTING_YOUR_FILTERS_OR_SEARCH_TERM:
+        "Try adjusting your filters or search term",
       ETA: "ETA",
       TAGS_UPDATED_SUCCESS: "Tags updated successfully",
       TEAM_MEMBERS: "Team Members",
@@ -1943,7 +2041,7 @@ export const translations = {
       THIS_ORG_SPACE_MAY_CONTAIN_SENSITIVE_DATA:
         "This organization space may contain sensitive data that must be protected accordingly.",
       THIS_ROLE_IS_INHERITED:
-        "This role is inherited from the organization and cannot be modified at the project level. You can view its permissions or create a custom project role.",
+        "This role is inherited from the organization and can only be modified by an Organization Admin. You can view its permissions or create a custom project role.",
       THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT:
         "This storage is already set as default",
       TIMESERIES: "Timeseries",
@@ -1952,7 +2050,8 @@ export const translations = {
       TIMESERIES_VIEWER: "Timeseries Viewer",
       TO: "To",
       TO_DESTINATION: "To Destination",
-      TRY_ADJUSTING_YOUR_SEARCH_TERMS_OR_FILTERS: "Try adjusting your search terms or filters",
+      TRY_ADJUSTING_YOUR_SEARCH_TERMS_OR_FILTERS:
+        "Try adjusting your search terms or filters",
       TO_THE_SYSTEM: "to the system.",
       TOTAL: "Total",
       TOTAL_RECORDS: "Total Records",
@@ -2004,7 +2103,8 @@ export const translations = {
       UPLOAD_CENTER_DESCRIPTION:
         "Choose an upload mode, configure destination resources, then upload.",
       UPLOAD_CENTER_DISABLED: "File transfer is disabled for this organization",
-      UPLOAD_CENTER_DISABLED_DETAIL: "An administrator has disabled file uploads and downloads for this organization.",
+      UPLOAD_CENTER_DISABLED_DETAIL:
+        "An administrator has disabled file uploads and downloads for this organization.",
       UPLOAD_FAILED_CHECK_FILE_CARD: "Upload failed. Check the file card.",
       UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW:
         "Upload failed. Please check the error details below.",
@@ -2126,7 +2226,8 @@ export const translations = {
         "A DAG, or Directed Acyclic Graph, is an Airflow workflow. Nexus uses Airflow's public APIs to list DAGs, retrieve their details and configuration parameters, and trigger runs. To review the run history for a specific DAG, open the Airflow instance.",
       TRIGGER_DAG: "Trigger DAG",
       TRIGGER_DAG_TOOLTIP: "Trigger this DAG with optional run configuration",
-      DAG_PAUSED_TOOLTIP: "This DAG is paused in Airflow and cannot be triggered",
+      DAG_PAUSED_TOOLTIP:
+        "This DAG is paused in Airflow and cannot be triggered",
       TRIGGER: "Trigger",
       FAILED_TO_TRIGGER: "Failed to trigger",
       DAG_RUN_SUBMITTED: "Submitting DAG run for",
@@ -2141,14 +2242,15 @@ export const translations = {
       CONFIGURATION_JSON: "Configuration (JSON)",
       LOADING_DAG_PARAMETERS: "Loading DAG parameters...",
       CONF_HELP: "Optional JSON object passed to the DAG run as conf.",
-      CONF_MUST_BE_OBJECT: 'Conf must be a JSON object, e.g. { "key": "value" }.',
+      CONF_MUST_BE_OBJECT:
+        'Conf must be a JSON object, e.g. { "key": "value" }.',
       CONF_INVALID_JSON: "Conf is not valid JSON.",
       LOGICAL_DATE: "Logical Date",
       RUN_AFTER: "Run After",
       DATA_INTERVAL_START: "Data Interval Start",
       DATA_INTERVAL_END: "Data Interval End",
       NOTE: "Note",
-      NOTE_PLACEHOLDER: "Optional note for this run"
+      NOTE_PLACEHOLDER: "Optional note for this run",
     },
   },
   es: {
@@ -2181,7 +2283,8 @@ export const translations = {
       ADD_EXISTING_USER: "Agregar usuario existente",
       ADD_GROUP: "Agregar grupo",
       ADD_MEMBERS: "Agregar miembros",
-      ALL_USERS_ALREADY_IN_THIS_GROUP: "Todos los usuarios ya están en este grupo",
+      ALL_USERS_ALREADY_IN_THIS_GROUP:
+        "Todos los usuarios ya están en este grupo",
       ADD_GROUP_TO_PROJECT: "Agregar grupo al proyecto",
       ADD_GROUP_TO_PROJECT_DESCRIPTION:
         "Selecciona un grupo existente y asigna un rol. Se requiere un rol para agregarlo al proyecto.",
@@ -2201,13 +2304,15 @@ export const translations = {
       ADD_DATA_SOURCE: "Agregar fuente de datos",
       ADDING: "Agregando...",
       ADDITIONAL_FILTERS: "Filtros adicionales",
-      ADMIN_ROLE_FULL_PERMISSIONS: "Rol de administrador con permisos completos",
+      ADMIN_ROLE_FULL_PERMISSIONS:
+        "Rol de administrador con permisos completos",
       ADDITIONAL_PROPERTIES: "Propiedades adicionales",
       ADDITIONAL_SETTINGS_COMING_SOON:
         "Configuraciones adicionales próximamente",
       ADMIN: "Admin",
       ADMIN_OVERVIEW: "Resumen de administración",
-      ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS: "Rol de administrador con permisos completos",
+      ADMINISTRATOR_ROLE_WITH_FULL_PERMISSIONS:
+        "Rol de administrador con permisos completos",
       ALIAS: "Alias:",
       AFTER: "Después",
       APPLY: "Aplicar",
@@ -2221,24 +2326,31 @@ export const translations = {
         "Los {count} registros son válidos y están listos para cargarse.",
       ALL_YOUR_PROJECTS: "Todos tus proyectos",
       AND: "y",
-      ANY_RECORD_CLASS_REMOVED: "Cualquier registro que use esta clase tendrá la clase eliminada.",
-      ANY_RELATIONSHIP_CLASS_UNABLE_TO_EDIT: "Cualquier relación que use esta clase no se podrá editar mientras la clase esté archivada.",
+      ANY_RECORD_CLASS_REMOVED:
+        "Cualquier registro que use esta clase tendrá la clase eliminada.",
+      ANY_RELATIONSHIP_CLASS_UNABLE_TO_EDIT:
+        "Cualquier relación que use esta clase no se podrá editar mientras la clase esté archivada.",
       API_ID_TOOLTIP_DESCRIPTION:
         "Usa estos identificadores al usar la API en el ámbito de tu organización y proyecto actuales.",
       API_KEYPAIRS: "Claves API",
       API_KEYPAIR_CREATED_SUCCESS:
         "¡Par de claves API creado correctamente! Guárdalas en un lugar seguro:",
       API_KEYPAIR_CREATION_FAILED: "La creación del par de claves API falló.",
-      API_KEYPAIR_DELETED_SUCCESS: "¡Par de claves API eliminado correctamente!",
-      API_KEYPAIR_DELETION_FAILED: "La eliminación del par de claves API falló.",
+      API_KEYPAIR_DELETED_SUCCESS:
+        "¡Par de claves API eliminado correctamente!",
+      API_KEYPAIR_DELETION_FAILED:
+        "La eliminación del par de claves API falló.",
       API_KEYS_DESCRIPTION: "Administra tus claves de autenticación API",
       APP_OWNER_EMAIL: "Correo del propietario de la aplicación",
       APPEAR_ON_TOP_RIGHT_NEXT_TO_ORG_NAME:
         "Aparece junto al nombre de la organización en el encabezado. Recomendado: PNG, 256×256, fondo transparente.",
       ARCHIVE: "Archivar",
-      ARCHIVE_PROJECT_DESCRIPTION: "Archiva este proyecto para eliminarlo de tus proyectos activos. Los proyectos archivados se pueden restaurar más tarde.",
-      ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE_THIS_PROJECT_RESTORE_LATER: "¿Estás seguro de que deseas archivar este proyecto? Podrás restaurarlo más tarde desde tus proyectos archivados.",
-      ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_PROJECT: "¿Estás seguro de que deseas eliminar este proyecto? Esta acción no se puede deshacer y todos los datos se perderán permanentemente.",
+      ARCHIVE_PROJECT_DESCRIPTION:
+        "Archiva este proyecto para eliminarlo de tus proyectos activos. Los proyectos archivados se pueden restaurar más tarde.",
+      ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE_THIS_PROJECT_RESTORE_LATER:
+        "¿Estás seguro de que deseas archivar este proyecto? Podrás restaurarlo más tarde desde tus proyectos archivados.",
+      ARE_YOU_SURE_YOU_WANT_TO_DELETE_THIS_PROJECT:
+        "¿Estás seguro de que deseas eliminar este proyecto? Esta acción no se puede deshacer y todos los datos se perderán permanentemente.",
       ARCHIVE_LABEL: "Archivar etiqueta",
       ARCHIVE_SELECTED_GROUPS: "¿Archivar los grupos seleccionados?",
       ARCHIVE_SOFT_DELETE_LABEL: "Archivar etiqueta (eliminación suave)",
@@ -2280,10 +2392,13 @@ export const translations = {
       AWS_S3: "AWS S3",
       AXIS_SELECTION: "Selección de Ejes",
       AZURE_BLOB_STORAGE: "Azure Blob Storage",
-      AZURE_DEFAULT_CONNECTION_STRING: "Cadena de conexión predeterminada de Azure",
+      AZURE_DEFAULT_CONNECTION_STRING:
+        "Cadena de conexión predeterminada de Azure",
+      AZURE_TYPE_ONLY: "Solo tipo de almacenamiento de objetos de Azure",
       BACK: "Atrás",
       BACK_TO_CLASS_SELECTION: "← Volver a la seleccion de clase",
-      BACKEND_CONFIG_AWS: "La configuración del backend para el almacenamiento AWS S3 está actualmente en proceso de finalización.",
+      BACKEND_CONFIG_AWS:
+        "La configuración del backend para el almacenamiento AWS S3 está actualmente en proceso de finalización.",
       BANNER_EXAMPLE_CUI:
         'Ej. "Este espacio de la organización contiene datos CUI/ECI que deben protegerse adecuadamente."',
       BANNER_TEXT: "Texto del banner",
@@ -2300,7 +2415,8 @@ export const translations = {
       BULK_METADATA_INSTRUCTIONS:
         "Cree múltiples registros a la vez cargando un archivo CSV con metadatos. No se cargan archivos reales; solo se crean los metadatos de los registros.",
       BULK_METADATA_UPLOAD: "Carga masiva de metadatos",
-      BUILD_COMPLEX_QUERIES_BY_COMBINING_MULTIPLE_CONDITIONS: "Crea consultas complejas combinando múltiples condiciones",
+      BUILD_COMPLEX_QUERIES_BY_COMBINING_MULTIPLE_CONDITIONS:
+        "Crea consultas complejas combinando múltiples condiciones",
       BULK_UPLOAD_SUCCESS_WITH_COUNT:
         "Se cargaron correctamente {count} registros.",
       CALLBACK_URL: "URL de devolución de llamada",
@@ -2320,7 +2436,8 @@ export const translations = {
         "no pueden definir etiquetas de sensitividad adicionales",
       CANNOT_DEFINE_NEW_LABELS: "no pueden definir nuevas etiquetas",
       CANNOT_DEFINE_NEW_TAGS: "no pueden definir nuevas etiquetas",
-      CANNOT_REMOVE_SELF_FROM_PROJECT: "No puedes eliminarte a ti mismo de un proyecto",
+      CANNOT_REMOVE_SELF_FROM_PROJECT:
+        "No puedes eliminarte a ti mismo de un proyecto",
       CANT_SWITCH_TO_SINGLE_FILE: "No se puede cambiar a archivo único",
       CHANGES_DISCARDED: "Cambios descartados",
       CHANGE_LOGO: "Cambiar logotipo",
@@ -2338,7 +2455,8 @@ export const translations = {
       CLASS_CREATED_AND_APPLIED: "Clase creada y aplicada!",
       CLASS_ID: "ID de clase",
       CLASS_ID_PLACEHOLDER: "id_de_clase",
-      CLASS_ID_DOES_NOT_EXIST_IN_PROJECT: "El ID de clase {id} no existe en este proyecto",
+      CLASS_ID_DOES_NOT_EXIST_IN_PROJECT:
+        "El ID de clase {id} no existe en este proyecto",
       CLASS_NAME_PLACEHOLDER: "nombre_de_clase",
       CLASS_ID_MUST_BE_GREATER_THAN_ZERO: "El ID de clase debe ser mayor que 0",
       CLASS_ID_MUST_BE_INTEGER: "El ID de clase debe ser un entero",
@@ -2346,15 +2464,18 @@ export const translations = {
         "El ID de clase debe ser un número, no una cadena.",
       CLASS_ID_NOT_FOUND_IN_PROJECT_SUGGESTION:
         "Verifique que el ID de clase exista en el proyecto seleccionado.",
-      CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH: "El ID de clase y el nombre de clase no coinciden",
-      CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION: "Verifique que el ID de clase coincida con el nombre de clase seleccionado.",
+      CLASS_ID_AND_CLASS_NAME_DO_NOT_MATCH:
+        "El ID de clase y el nombre de clase no coinciden",
+      CLASS_ID_AND_CLASS_NAME_MISMATCH_SUGGESTION:
+        "Verifique que el ID de clase coincida con el nombre de clase seleccionado.",
       CLASS_NAME: "Nombre de la clase",
       CLASS_NAME_REQUIRED: "Nombre de la clase *",
       CLASS_NAME_UPDATED: "Nombre de la clase actualizado",
       CLASS_UPDATED_SUCCESSFULLY: "Clase actualizada correctamente!",
       CLASSES: "Clases",
       CLEAR: "Borrar",
-      CREATE_AND_MANAGE_USER_GROUPS_FOR_YOUR_ORGANIZATION: "Crea y administra grupos de usuarios para tu organización",
+      CREATE_AND_MANAGE_USER_GROUPS_FOR_YOUR_ORGANIZATION:
+        "Crea y administra grupos de usuarios para tu organización",
       CLEAR_ALL: "Limpiar todo",
       CLEAR_SEARCH: "Limpiar búsqueda",
       CLICK_CREATE_STORAGE_TO_ADD_ONE:
@@ -2374,7 +2495,8 @@ export const translations = {
         "Configura la identidad visual y administra tu proyecto",
       CONFIRM_BULK_UPLOAD: "Confirmar carga masiva",
       CONFIRM_UPLOAD: "Confirmar carga",
-      CONNECT_STORAGE_MANUALLY_INSTEAD: "Conectar el almacenamiento manualmente en su lugar",
+      CONNECT_STORAGE_MANUALLY_INSTEAD:
+        "Conectar el almacenamiento manualmente en su lugar",
       CONNECTION_STRING: "Cadena de conexión",
       CONNECTIONS: "Conexiones",
       CONNECTOR: "Conector",
@@ -2394,14 +2516,18 @@ export const translations = {
       CREATE_EDIT_MANAGE_STORAGE_LOCATIONS:
         "Crear, editar y administrar tus ubicaciones de almacenamiento",
       CREATE_GROUP: "Crear grupo",
-      CAPTURE_CORE_CLASS_DEFINITION: "Captura la definición principal de la clase.",
+      CAPTURE_CORE_CLASS_DEFINITION:
+        "Captura la definición principal de la clase.",
       CLASS_ARCHIVED: "Clase archivada.",
       CLASS_CREATED: "Clase creada.",
-      CLASS_DESCRIPTION_HELP: "Explica qué registros pertenecen a esta clase y cómo la utilizarán los equipos.",
+      CLASS_DESCRIPTION_HELP:
+        "Explica qué registros pertenecen a esta clase y cómo la utilizarán los equipos.",
       CLASS_INSPECTOR: "Inspector de clase",
       CLASS_RESTORED: "Clase restaurada.",
-      CREATE_RELATIONSHIP_DESCRIPTION: "Define la relación y selecciona las clases que conecta.",
-      CREATE_REVIEW_ARCHIVE_AND_REFINE_RECORD_CLASSES: "Crea, revisa, archiva y refina clases de registros.",
+      CREATE_RELATIONSHIP_DESCRIPTION:
+        "Define la relación y selecciona las clases que conecta.",
+      CREATE_REVIEW_ARCHIVE_AND_REFINE_RECORD_CLASSES:
+        "Crea, revisa, archiva y refina clases de registros.",
       CREATE_LABEL: "Crear etiqueta",
       CREATE_NEW_CLASS: "Crear nueva clase",
       CREATE_NEW_GROUP: "Crear nuevo grupo",
@@ -2420,7 +2546,8 @@ export const translations = {
       CREATE_FIRST_ORGANIZATION_TO_GET_STARTED:
         "Crea tu primera organización para comenzar.",
       CREATE_PROJECT: "Crear nuevo proyecto",
-      CREATE_PROJECT_CONTAINER_HELPER: "Cree un contenedor administrado por la organización en Azure Blob Storage. Esta es la forma más rápida y sencilla de empezar.",
+      CREATE_PROJECT_CONTAINER_HELPER:
+        "Cree un contenedor administrado por la organización en Azure Blob Storage. Esta es la forma más rápida y sencilla de empezar.",
       CREATE_PROJECT_CONTAINER: "Crear contenedor de proyecto",
       CREATE_CLASS: "Crear clase",
       CREATE_RELATIONSHIP: "Crear relacion",
@@ -2455,29 +2582,41 @@ export const translations = {
       DATA_SOURCES: "Fuentes de datos",
       DATA_TYPE: "Tipo de dato",
       DELETE_SAVED_SEARCH: "¿Eliminar búsqueda guardada?",
-      DELETE_SAVED_SEARCH_WARNING: "se eliminará permanentemente. Esta acción no se puede deshacer.",
+      DELETE_SAVED_SEARCH_WARNING:
+        "se eliminará permanentemente. Esta acción no se puede deshacer.",
       DISABLE_FILE_TRANSFER: "Desactivar la transferencia de archivos",
-      DISABLE_FILE_TRANSFER_HELPER: "Los miembros no podrán cargar ni descargar archivos a través de esta organización.",
+      DISABLE_FILE_TRANSFER_HELPER:
+        "Los miembros no podrán cargar ni descargar archivos a través de esta organización.",
       DONE: "Hecho",
-      DATA_SCHEMA_DESCRIPTION: "Creación y administración de clases y relaciones para asignarlas a registros y aristas.",
-      DEFINE_WHICH_CLASSES_CAN_CONNECT_AND_HOW_EDGE_SHOULD_READ: "Define qué clases pueden conectarse y cómo debe interpretarse esa relación.",
+      DATA_SCHEMA_DESCRIPTION:
+        "Creación y administración de clases y relaciones para asignarlas a registros y aristas.",
+      DEFINE_WHICH_CLASSES_CAN_CONNECT_AND_HOW_EDGE_SHOULD_READ:
+        "Define qué clases pueden conectarse y cómo debe interpretarse esa relación.",
       DESTINATION: "Destino",
       DESTINATION_CLASS: "Clase de destino",
-      DASHBOARD_TOUR_ADD_RECORD_TEXT: "Haz clic aquí para agregar nuevos registros a tus proyectos existentes. Esto te ayuda a realizar un seguimiento del progreso y las actualizaciones.",
+      DASHBOARD_TOUR_ADD_RECORD_TEXT:
+        "Haz clic aquí para agregar nuevos registros a tus proyectos existentes. Esto te ayuda a realizar un seguimiento del progreso y las actualizaciones.",
       DASHBOARD_TOUR_ADD_RECORD_TITLE: "Agregar registros",
-      DASHBOARD_TOUR_COMPLETE_TEXT: "¡Eso es todo! Ya conoces lo básico. Siempre puedes reiniciar este recorrido haciendo clic en el botón de ayuda del encabezado.",
+      DASHBOARD_TOUR_COMPLETE_TEXT:
+        "¡Eso es todo! Ya conoces lo básico. Siempre puedes reiniciar este recorrido haciendo clic en el botón de ayuda del encabezado.",
       DASHBOARD_TOUR_COMPLETE_TITLE: "¡Todo listo! 🎉",
-      DASHBOARD_TOUR_CREATE_PROJECT_TEXT: "Inicia un nuevo proyecto haciendo clic en este botón. Puedes configurar todos los detalles del proyecto y comenzar a trabajar de inmediato.",
+      DASHBOARD_TOUR_CREATE_PROJECT_TEXT:
+        "Inicia un nuevo proyecto haciendo clic en este botón. Puedes configurar todos los detalles del proyecto y comenzar a trabajar de inmediato.",
       DASHBOARD_TOUR_CREATE_PROJECT_TITLE: "Crear nuevos proyectos",
-      DASHBOARD_TOUR_EXPAND_PROJECT_TEXT: "Haz clic en esta flecha para ver más detalles sobre un proyecto.",
+      DASHBOARD_TOUR_EXPAND_PROJECT_TEXT:
+        "Haz clic en esta flecha para ver más detalles sobre un proyecto.",
       DASHBOARD_TOUR_EXPAND_PROJECT_TITLE: "Expandir un proyecto",
-      DASHBOARD_TOUR_PROJECT_DETAILS_TEXT: "Este es el panel expandido con acciones rápidas e información reciente.",
+      DASHBOARD_TOUR_PROJECT_DETAILS_TEXT:
+        "Este es el panel expandido con acciones rápidas e información reciente.",
       DASHBOARD_TOUR_PROJECT_DETAILS_TITLE: "Detalles del proyecto",
-      DASHBOARD_TOUR_PROJECTS_TEXT: "Aquí se muestran todos tus proyectos. Puedes ver los nombres, las descripciones y la fecha de la última actualización.",
+      DASHBOARD_TOUR_PROJECTS_TEXT:
+        "Aquí se muestran todos tus proyectos. Puedes ver los nombres, las descripciones y la fecha de la última actualización.",
       DASHBOARD_TOUR_PROJECTS_TITLE: "Tus proyectos",
-      DASHBOARD_TOUR_SEARCH_TEXT: "Usa esta barra de búsqueda para encontrar proyectos rápidamente por nombre o descripción.",
+      DASHBOARD_TOUR_SEARCH_TEXT:
+        "Usa esta barra de búsqueda para encontrar proyectos rápidamente por nombre o descripción.",
       DASHBOARD_TOUR_SEARCH_TITLE: "Buscar tus proyectos",
-      DASHBOARD_TOUR_WELCOME_TEXT: "Hagamos un recorrido rápido para ayudarte a comenzar a administrar tus proyectos y registros.",
+      DASHBOARD_TOUR_WELCOME_TEXT:
+        "Hagamos un recorrido rápido para ayudarte a comenzar a administrar tus proyectos y registros.",
       DASHBOARD_TOUR_WELCOME_TITLE: "¡Bienvenido a tu panel! 👋",
       DEEPLYNX_ECOSYSTEM_SERVICES: "Servicios del ecosistema DeepLynx",
       DEFAULT_DATA_SOURCE: "Fuente de datos predeterminada",
@@ -2486,12 +2625,15 @@ export const translations = {
       DEFAULT_PROJECT_BADGE: "Predeterminado (Proyecto)",
       DEFAULT_ORGANIZATION_BADGE: "Predeterminado (Organización)",
       DEFAULT_STORAGE: "Eliminar almacenamiento",
+      DEFAULT_STORAGE_CANNOT_BE_DELETED_OR_ARCHIVED:
+        "Cambie a otro almacenamiento de objetos antes de eliminar/archivar este.",
       DEFAULT_STORAGE_FOR_DATA_SOURCES_HELPER:
         "Este será el almacenamiento predeterminado para las fuentes de datos en este proyecto",
       DEFAULT_STORAGE_LOCATION_UPDATED_SUCCESSFULLY:
         "La ubicación de almacenamiento predeterminada se actualizó correctamente",
       DEFAULT_STORAGE_TAB: "Almacenamiento predeterminado",
-      DEFINE_AND_MANAGE_ORGANIZATION_LEVEL_ROLES_AND_PERMISSIONS: "Define y administra roles y permisos a nivel de organización. Esta configuración se propagará a todos los proyectos.",
+      DEFINE_AND_MANAGE_ORGANIZATION_LEVEL_ROLES_AND_PERMISSIONS:
+        "Define y administra roles y permisos a nivel de organización. Esta configuración se propagará a todos los proyectos.",
       DEFAULT_UNMOUNT_STORAGE:
         "Almacenamiento de objetos no montado predeterminado",
       DEFINE_ORGANIZATION_LEVEL_SENSITIVITY_LABEL_DESCRIPTION:
@@ -2506,7 +2648,8 @@ export const translations = {
         "Define etiquetas a nivel de proyecto para clasificación, flujos de trabajo y búsqueda. Los bloqueos a nivel de organización determinan si este proyecto puede definir etiquetas adicionales además de las heredadas de la organización.",
       DELETE: "Eliminar",
       DETAILS: "Detalles",
-      DELETE_PROJECT_DESCRIPTION: "Elimina permanentemente este proyecto. Esta acción no se puede deshacer.",
+      DELETE_PROJECT_DESCRIPTION:
+        "Elimina permanentemente este proyecto. Esta acción no se puede deshacer.",
       DELETE_ALL_FILTERS: "Eliminar todos los filtros",
       DELETE_ORGANIZATION: "Eliminar Organización",
       DELETE_ROLE: "Eliminar Rol",
@@ -2529,7 +2672,8 @@ export const translations = {
         "Verifique si hay IDs duplicados o confirme que el registro no exista ya en el sistema.",
       EDGE: "Arista",
       EDIT: "Editar",
-      ENTER_ROLE_DESCRIPTION_OPTIONAL: "Ingresa la descripción del rol (opcional)",
+      ENTER_ROLE_DESCRIPTION_OPTIONAL:
+        "Ingresa la descripción del rol (opcional)",
       ENTER_ROLE_NAME: "Ingresa el nombre del rol",
       EDIT_ADDITIONAL_PROPERTIES: "Editar propiedades adicionales",
       EDIT_PROPERTIES: "Editar propiedades",
@@ -2568,7 +2712,8 @@ export const translations = {
       ENTITY_NAME: "Nombre de entidad",
       ENTITY_TYPE: "Tipo de entidad",
       EVENTS: "Eventos",
-      EDIT_SELECTED_CLASS_COMPARE_LINKED_RELATIONSHIPS: "Edita la clase seleccionada y compara sus relaciones vinculadas.",
+      EDIT_SELECTED_CLASS_COMPARE_LINKED_RELATIONSHIPS:
+        "Edita la clase seleccionada y compara sus relaciones vinculadas.",
       EXAMPLE_ASSET: "Ejemplo: Activo",
       EXAMPLE_INSTALLED_IN: "Ejemplo: Instalado en",
       EDIT_GROUP_DETAILS: "Editar detalles del grupo",
@@ -2603,8 +2748,10 @@ export const translations = {
       FAILED_TO_DELETE_STORAGE: "No se pudo eliminar el almacenamiento",
       FAILED_TO_FETCH_CLASSES: "No se pudieron obtener las clases",
       FAILED_TO_FETCH_RECORD: "Error al obtener el registro",
-      FAILED_TO_DELETE_PLEASE_TRY_AGAIN: "No se pudo eliminar. Inténtalo de nuevo.",
-      FAILED_TO_LOAD_SAVED_SEARCHES: "No se pudieron cargar las búsquedas guardadas.",
+      FAILED_TO_DELETE_PLEASE_TRY_AGAIN:
+        "No se pudo eliminar. Inténtalo de nuevo.",
+      FAILED_TO_LOAD_SAVED_SEARCHES:
+        "No se pudieron cargar las búsquedas guardadas.",
       FILTER_SEARCHES: "Filtrar búsquedas",
       FILTERS: "Filtros",
       FIND_SAVED_SEARCHES_BY_NAME: "Buscar búsquedas guardadas por nombre...",
@@ -2666,7 +2813,8 @@ export const translations = {
       FAILED_TO_UPDATE_STORAGE: "No se pudo actualizar el almacenamiento",
       FAILED_TO_UPDATE_TAGS: "Error al actualizar las etiquetas",
       FAILED_TO_UPLOAD_LOGO: "No se pudo subir el logotipo",
-      FAILED_TO_UPDATE_FILE_TRANSFER_SETTING: "No se pudo actualizar la configuración de transferencia de archivos.",
+      FAILED_TO_UPDATE_FILE_TRANSFER_SETTING:
+        "No se pudo actualizar la configuración de transferencia de archivos.",
       FILE_A_BUG: "Reportar un error",
       FILE_CARD_TITLE: "Archivo {index}: {name}",
       FILE_COUNT: "Conteo de archivos",
@@ -2677,12 +2825,18 @@ export const translations = {
       FILTER_OPTIONS: "Opciones de filtro",
       FILE_SIZE_MUST_BE_5MB: "El tamaño del archivo debe ser menor a 5 MB",
       FILE_TRANSFER: "Transferencia de archivos",
-      FILE_TRANSFER_DESCRIPTION: "Controla si los miembros de esta organización pueden subir o descargar archivos.",
-      FILE_TRANSFER_DISABLED_SUCCESSFULLY: "Transferencia de archivos deshabilitada para esta organización.",
-      FILE_TRANSFER_ENABLED_SUCCESSFULLY: "Transferencia de archivos habilitada para esta organización.",
+      FILE_TRANSFER_DESCRIPTION:
+        "Controla si los miembros de esta organización pueden subir o descargar archivos.",
+      FILE_TRANSFER_DISABLED_SUCCESSFULLY:
+        "Transferencia de archivos deshabilitada para esta organización.",
+      FILE_TRANSFER_ENABLED_SUCCESSFULLY:
+        "Transferencia de archivos habilitada para esta organización.",
       FILE_TYPE: "Tipo de archivo",
       FILE_UPLOAD: "Carga de archivos",
       FILE_UPLOADED_SUCCESSFULLY: "¡Archivo cargado correctamente!",
+      FINALIZING_UPLOAD: "Finalizando la carga...",
+      FINALIZING_UPLOAD_MESSAGE:
+        "Tu archivo ha terminado de subirse. Por favor, espera mientras se finaliza.",
       FILES_LABEL: "archivos",
       FILESYSTEM: "Sistema de archivos",
       FILESYSTEM_PATH: "Ruta del sistema de archivos",
@@ -2708,6 +2862,10 @@ export const translations = {
       GRAPH_DEPTH_1: "Profundidad 1",
       GRAPH_DEPTH_2: "Profundidad 2",
       GRAPH_DEPTH_3_PLUS: "Profundidad 3+",
+      GRAPH_EDGE_PERMISSION_REQUIRED:
+        "Se necesita acceso a las relaciones para ver el grafo.",
+      GRAPH_EDGE_PERMISSION_REQUIRED_SUBTEXT:
+        "Solicita a un administrador del proyecto que te otorgue permiso de lectura de relaciones para ver las conexiones de este registro.",
       GRAPH_EXACT_CONNECTIONS_FOR: "Conexiones exactas para {name}.",
       GRAPH_FAILED_TO_LOAD: "No se pudieron cargar los datos del grafo.",
       GRAPH_HIDE_EXTRA_LABELS: "Ocultar etiquetas extra",
@@ -2956,8 +3114,10 @@ export const translations = {
       INVITE_USER_TO_PROJECT: "Invitar usuario al proyecto",
       INVITE_USERS_TO_ORG: "Invitar a usuarios a la organización",
       INHERITED_FROM_ORGANIZATION: "Heredadas de la organización",
-      JSON_DEPTH_EXCEEDED: "La estructura JSON supera la profundidad máxima permitida de {allowedDepth}. La profundidad actual es {currentDepth}.",
-      JSON_DEPTH_EXCEEDED_SUGGESTION: "Reduzca el nivel de anidamiento de objetos o arreglos en la sección de propiedades de los metadatos.",
+      JSON_DEPTH_EXCEEDED:
+        "La estructura JSON supera la profundidad máxima permitida de {allowedDepth}. La profundidad actual es {currentDepth}.",
+      JSON_DEPTH_EXCEEDED_SUGGESTION:
+        "Reduzca el nivel de anidamiento de objetos o arreglos en la sección de propiedades de los metadatos.",
       KEEP_INVITE: "Mantener invitación",
       KEY: "Clave",
       KEY_VALUE: "Clave / Valor",
@@ -2972,7 +3132,8 @@ export const translations = {
       LABEL_CREATED: "Etiqueta creada",
       LABEL_CREATED_AND_ATTACHED: "creada y adjuntada",
       LABEL_CREATED_BUT_FAILED_TO_ATTACH: "creada pero no se pudo adjuntar",
-      LABEL_IN_USE: "La etiqueta está en uso actualmente. Quita la etiqueta del(los) registro(s) antes de archivarlo(s).",
+      LABEL_IN_USE:
+        "La etiqueta está en uso actualmente. Quita la etiqueta del(los) registro(s) antes de archivarlo(s).",
       LABEL_NAME: "Nombre de la etiqueta",
       LABEL_NAME_PLACEHOLDER: "p. ej., CUI, ITAR, Pública",
       LABELS_ARE_LOCKED: "Las etiquetas de sensibilidad están bloqueadas",
@@ -3031,7 +3192,8 @@ export const translations = {
       LATTICE_HOW_IT_WORKS: "Cómo funciona",
       LATTICE_STEP_EMBED:
         "Poner este documento en cola para incrustación con IA",
-      LATTICE_STEP_ONTOLOGY: "Antes de ejecutar una extracción de Lattice, agregue al menos 2 clases y 1 relación a la ontología de su proyecto. Una vez que la ontología mínima esté configurada, podrá iniciar una extracción.",
+      LATTICE_STEP_ONTOLOGY:
+        "Antes de ejecutar una extracción de Lattice, agregue al menos 2 clases y 1 relación a la ontología de su proyecto. Una vez que la ontología mínima esté configurada, podrá iniciar una extracción.",
       LATTICE_STEP_MODE: "Elegir un modo de extracción",
       LATTICE_STEP_TRIGGER:
         "Activar extracción — los resultados se preparan para revisión",
@@ -3164,7 +3326,8 @@ export const translations = {
       MAIN_PROJECT_SETTINGS: "Configuración principal del proyecto",
       MANAGE_STORAGES_TAB: "Gestionar almacenamientos",
       MANAGE: "Gestionar",
-      MIRROR_ADD_EDGE_WORKFLOW: "Replica el flujo de creación de aristas definiendo qué clases puede conectar la relación.",
+      MIRROR_ADD_EDGE_WORKFLOW:
+        "Replica el flujo de creación de aristas definiendo qué clases puede conectar la relación.",
       MANAGE_USERS_AND_GROUPS_ASSIGNED_TO_THIS_PROJECT_A_ROLE_IS_REQUIRED_FOR_EACH_MEMBER:
         "Administra los usuarios y grupos asignados a este proyecto. Se requiere un rol para cada miembro.",
       MANAGE_USERS_AND_GROUPS_WITH_ACCESS_TO_THIS_PROJECT:
@@ -3177,7 +3340,8 @@ export const translations = {
         "Administra los usuarios de tu organización. Invita a nuevos usuarios por correo electrónico o agrégalos directamente.",
       MANAGING_SETTINGS_FOR_PROJECT:
         "Administración de la configuración del proyecto",
-      MANAGE_CATALOG_DATA_SOURCES_FOR_THIS_PROJECT: "Gestiona las fuentes de datos del catálogo para este proyecto",
+      MANAGE_CATALOG_DATA_SOURCES_FOR_THIS_PROJECT:
+        "Gestiona las fuentes de datos del catálogo para este proyecto",
       MATCHES: "coincidencias",
       MATCHING_ANY_TERM: "Coincidiendo con cualquier término",
       MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES:
@@ -3204,11 +3368,12 @@ export const translations = {
       METADATA_FILE_JSON_ONLY: "Solo se permiten archivos de metadatos .json.",
       METADATA_FILE_UNAVAILABLE_FOR_LARGE_FILES:
         "El archivo de metadatos no está disponible para archivos grandes.",
-      METADATA_PREVIEW_CLASS: "Clase",
+      METADATA_PREVIEW_CLASS: "Nombre Clase",
       METADATA_PREVIEW_DESCRIPTION: "Descripción",
       METADATA_PREVIEW_NAME: "Nombre",
       METADATA_PREVIEW_ORIGINAL_ID: "ID original",
       METADATA_PREVIEW_PROPERTIES: "Propiedades",
+      METADATA_PREVIEW_TAGS: "Etiquetas",
       METADATA_PREVIEW_SELECT_FILE:
         "Sube un archivo JSON de metadatos para previsualizar valores clave.",
       METADATA_PREVIEW_TITLE: "Vista previa de metadatos",
@@ -3251,7 +3416,8 @@ export const translations = {
       GOT_IT: "Entendido",
       NEXUS_DEFAULT: "Nexus predeterminado",
       NO_DESCRIPTION: "Sin descripción",
-      NO_GROUPS_FOUND_CREATE_FIRST_GROUP: "No se encontraron grupos. Crea tu primer grupo para comenzar.",
+      NO_GROUPS_FOUND_CREATE_FIRST_GROUP:
+        "No se encontraron grupos. Crea tu primer grupo para comenzar.",
       NO_MEMBERS_IN_THIS_GROUP_YET: "Aún no hay miembros en este grupo",
       NO_USERS_FOUND: "No se encontraron usuarios",
       NO: "No",
@@ -3296,11 +3462,16 @@ export const translations = {
       NO_PERMISSIONS_AVAILABLE: "No hay permisos disponibles",
       NO_PROJECT: "Sin proyecto",
       NEW: "Nuevo",
-      NO_CLASSES_FOUND_IN_DATABASE: "No se encontraron clases en la base de datos.",
-      NO_CLASSES_MATCH_CURRENT_FILTER: "Ninguna clase coincide con el filtro actual.",
-      NO_RELATIONSHIP_FLOWS_AVAILABLE: "No hay flujos de relaciones disponibles.",
-      NO_RELATIONSHIPS_FOUND_IN_DATABASE: "No se encontraron relaciones en la base de datos.",
-      NO_RELATIONSHIPS_MATCH_CURRENT_FILTER: "Ninguna relación coincide con el filtro actual.",
+      NO_CLASSES_FOUND_IN_DATABASE:
+        "No se encontraron clases en la base de datos.",
+      NO_CLASSES_MATCH_CURRENT_FILTER:
+        "Ninguna clase coincide con el filtro actual.",
+      NO_RELATIONSHIP_FLOWS_AVAILABLE:
+        "No hay flujos de relaciones disponibles.",
+      NO_RELATIONSHIPS_FOUND_IN_DATABASE:
+        "No se encontraron relaciones en la base de datos.",
+      NO_RELATIONSHIPS_MATCH_CURRENT_FILTER:
+        "Ninguna relación coincide con el filtro actual.",
       NO_PROJECT_FOUND: "No se encontró ningún proyecto...",
       NO_PROJECT_LABELS_DEFINED_WHEN_UNLOCKED:
         "No hay etiquetas de proyecto definidas. Cuando estén desbloqueadas, puedes ampliar el conjunto de etiquetas de la organización con etiquetas específicas del proyecto.",
@@ -3339,7 +3510,24 @@ export const translations = {
       NOT_CONNECTED: "No conectado",
       NOT_FOUND: "No encontrado",
       OAUTH_APPLICATION: "Aplicación OAuth",
-      ORGANIZATION_MANAGEMENT_DESCRIPTION: "Administra organizaciones y asigna administradores para controlar el acceso y supervisar los proyectos dentro de cada unidad organizativa.",
+      OAUTH_DEVICE_APPLICATION: "Aplicación",
+      OAUTH_DEVICE_APPROVE: "Aprobar",
+      OAUTH_DEVICE_APPROVING: "Aprobando",
+      OAUTH_DEVICE_BRAND: "Nexus",
+      OAUTH_DEVICE_CHECKING: "Comprobando",
+      OAUTH_DEVICE_CLIENT_ID: "ID de cliente",
+      OAUTH_DEVICE_CODE: "Código del dispositivo",
+      OAUTH_DEVICE_CONTINUE: "Continuar",
+      OAUTH_DEVICE_DENY: "Denegar",
+      OAUTH_DEVICE_DENYING: "Denegando",
+      OAUTH_DEVICE_ENTER_CODE: "Ingresa un código del dispositivo.",
+      OAUTH_DEVICE_EXPIRES: "Expira",
+      OAUTH_DEVICE_SCOPE: "Alcance",
+      OAUTH_DEVICE_STATUS: "Estado",
+      OAUTH_DEVICE_TITLE: "Autorización del dispositivo",
+      OAUTH_DEVICE_UNABLE_TO_COMPLETE: "No se pudo completar la solicitud.",
+      ORGANIZATION_MANAGEMENT_DESCRIPTION:
+        "Administra organizaciones y asigna administradores para controlar el acceso y supervisar los proyectos dentro de cada unidad organizativa.",
       OBJECT_STORAGE_ID_PLACEHOLDER: "id_de_almacenamiento_de_objetos",
       OBJECT_STORAGE: "Almacenamiento de objetos",
       OBJECT_STORAGE_ID: "ID del almacenamiento de objetos",
@@ -3401,7 +3589,8 @@ export const translations = {
         "Configura la identidad visual, el almacenamiento y los servicios del ecosistema de esta organización",
       ORGANIZATION_TAG: "Etiqueta de la organización",
       ORGANIZATION_TAG_CREATED: "Etiqueta de la organización creada.",
-      OAUTH_APPLICATION_DESCRIPTION: "Registra y administra aplicaciones OAuth 2.0 para integraciones seguras con recursos de terceros dentro de tu organización.",
+      OAUTH_APPLICATION_DESCRIPTION:
+        "Registra y administra aplicaciones OAuth 2.0 para integraciones seguras con recursos de terceros dentro de tu organización.",
       ORGANIZATION_TAG_MANAGEMENT:
         "Administración de etiquetas de la organización",
       ORGANIZATION_TAG_UPDATED: "Etiqueta de la organización actualizada.",
@@ -3419,7 +3608,8 @@ export const translations = {
       ORGANIZATION_WARNING_BANNER: "Banner de advertencia de la organización",
       ORGANIZATIONS: "Organizaciones",
       ORIGINAL_ID: "ID original",
-      OPTIONAL_AUTO_GENERATED_IF_LEFT_BLANK: "Opcional, se genera automáticamente si se deja en blanco.",
+      OPTIONAL_AUTO_GENERATED_IF_LEFT_BLANK:
+        "Opcional, se genera automáticamente si se deja en blanco.",
       ORIGIN: "Origen",
       ORIGIN_CLASS: "Clase de origen",
       ORIGIN_TO_DESTINATION: "Origen a destino",
@@ -3447,53 +3637,74 @@ export const translations = {
         "Póngase en contacto con el administrador del proyecto para solicitar los permisos necesarios.",
       PERMISSIONS: "Permisos",
       PERMISSIONS_STILL_LOADING: "Los permisos aún se están cargando.",
-      PERMISSION_TO_EMBED_FILES_IN_INSIGHT: "Permiso para incrustar archivos en Insight",
+      PERMISSION_TO_EMBED_FILES_IN_INSIGHT:
+        "Permiso para incrustar archivos en Insight",
       PERMISSION_TO_MODIFY_CLASSES: "Permiso para modificar clases",
-      PERMISSION_TO_MODIFY_DATA_SOURCES: "Permiso para modificar fuentes de datos",
+      PERMISSION_TO_MODIFY_DATA_SOURCES:
+        "Permiso para modificar fuentes de datos",
       PERMISSION_TO_MODIFY_FILES: "Permiso para modificar archivos",
       PERMISSION_TO_MODIFY_GROUPS: "Permiso para modificar grupos",
-      PERMISSION_TO_MODIFY_OBJECT_STORAGE: "Permiso para modificar almacenamiento de objetos",
-      PERMISSION_TO_MODIFY_ORGANIZATION_INFORMATION: "Permiso para modificar información de la organización",
+      PERMISSION_TO_MODIFY_OBJECT_STORAGE:
+        "Permiso para modificar almacenamiento de objetos",
+      PERMISSION_TO_MODIFY_ORGANIZATION_INFORMATION:
+        "Permiso para modificar información de la organización",
       PERMISSION_TO_MODIFY_PERMISSIONS: "Permiso para modificar permisos",
-      PERMISSION_TO_MODIFY_PROJECT_INFORMATION: "Permiso para modificar información del proyecto",
+      PERMISSION_TO_MODIFY_PROJECT_INFORMATION:
+        "Permiso para modificar información del proyecto",
       PERMISSION_TO_MODIFY_RECORDS: "Permiso para modificar registros",
       PERMISSION_TO_MODIFY_RELATIONSHIPS: "Permiso para modificar relaciones",
       PERMISSION_TO_MODIFY_ROLES: "Permiso para modificar roles",
       PERMISSION_TO_MODIFY_TAGS: "Permiso para modificar etiquetas",
-      PERMISSION_TO_MODIFY_USER_INFORMATION: "Permiso para modificar información del usuario",
-      PERMISSION_TO_READ_A_RECORD_COLLECTION: "Permiso para leer una colección de registros",
+      PERMISSION_TO_MODIFY_USER_INFORMATION:
+        "Permiso para modificar información del usuario",
+      PERMISSION_TO_READ_A_RECORD_COLLECTION:
+        "Permiso para leer una colección de registros",
       PERMISSION_TO_READ_CLASSES: "Permiso para leer clases",
       PERMISSION_TO_READ_DATA_SOURCES: "Permiso para leer fuentes de datos",
       PERMISSION_TO_READ_FILES: "Permiso para leer archivos",
       PERMISSION_TO_READ_GROUPS: "Permiso para leer grupos",
-      PERMISSION_TO_READ_OBJECT_STORAGE: "Permiso para leer almacenamiento de objetos",
-      PERMISSION_TO_READ_ORGANIZATION_INFORMATION: "Permiso para leer información de la organización",
+      PERMISSION_TO_READ_OBJECT_STORAGE:
+        "Permiso para leer almacenamiento de objetos",
+      PERMISSION_TO_READ_ORGANIZATION_INFORMATION:
+        "Permiso para leer información de la organización",
       PERMISSION_TO_READ_PERMISSIONS: "Permiso para leer permisos",
-      PERMISSION_TO_READ_PROJECT_INFORMATION: "Permiso para leer información del proyecto",
+      PERMISSION_TO_READ_PROJECT_INFORMATION:
+        "Permiso para leer información del proyecto",
       PERMISSION_TO_READ_RECORDS: "Permiso para leer registros",
       PERMISSION_TO_READ_RELATIONSHIPS: "Permiso para leer relaciones",
       PERMISSION_TO_READ_ROLES: "Permiso para leer roles",
       PERMISSION_TO_READ_TAGS: "Permiso para leer etiquetas",
-      PERMISSION_TO_READ_USER_INFORMATION: "Permiso para leer información del usuario",
-      PERMISSION_TO_UPDATE_A_RECORD_COLLECTION: "Permiso para actualizar una colección de registros",
-      PERMISSION_TO_UPDATE_PROJECT_DATA: "Permiso para actualizar los datos del proyecto",
-      PERMISSION_TO_MODIFY_SENSITIVITY_LABELS: "Permiso para modificar etiquetas de sensibilidad",
-      PERMISSION_TO_READ_SENSITIVITY_LABELS: "Permiso para leer etiquetas de sensibilidad",
-      PERMISSION_TO_UPDATE_DATA_SOURCES: "Permiso para actualizar fuentes de datos",
+      PERMISSION_TO_READ_USER_INFORMATION:
+        "Permiso para leer información del usuario",
+      PERMISSION_TO_UPDATE_A_RECORD_COLLECTION:
+        "Permiso para actualizar una colección de registros",
+      PERMISSION_TO_UPDATE_PROJECT_DATA:
+        "Permiso para actualizar los datos del proyecto",
+      PERMISSION_TO_MODIFY_SENSITIVITY_LABELS:
+        "Permiso para modificar etiquetas de sensibilidad",
+      PERMISSION_TO_READ_SENSITIVITY_LABELS:
+        "Permiso para leer etiquetas de sensibilidad",
+      PERMISSION_TO_UPDATE_DATA_SOURCES:
+        "Permiso para actualizar fuentes de datos",
       PERMISSION_TO_UPDATE_EDGES: "Permiso para actualizar aristas",
       PERMISSION_TO_UPDATE_GROUPS: "Permiso para actualizar grupos",
       PERMISSION_TO_UPDATE_ROLES: "Permiso para actualizar roles",
-      PERMISSION_TO_UPDATE_SENSITIVITY_LABELS: "Permiso para actualizar etiquetas de sensibilidad",
+      PERMISSION_TO_UPDATE_SENSITIVITY_LABELS:
+        "Permiso para actualizar etiquetas de sensibilidad",
       PERMISSION_TO_UPDATE_TAGS: "Permiso para actualizar etiquetas",
-      PERMISSION_TO_READ_RESULTS_FROM_INSIGHT: "Permiso para leer resultados de Insight",
+      PERMISSION_TO_READ_RESULTS_FROM_INSIGHT:
+        "Permiso para leer resultados de Insight",
       PERMISSION_TO_UPDATE_CLASSES: "Permiso para actualizar clases",
       PERMISSION_TO_UPDATE_FILES: "Permiso para actualizar archivos",
-      PERMISSION_TO_UPDATE_ORGANIZATIONS: "Permiso para actualizar organizaciones",
+      PERMISSION_TO_UPDATE_ORGANIZATIONS:
+        "Permiso para actualizar organizaciones",
       PERMISSION_TO_UPDATE_RECORDS: "Permiso para actualizar registros",
       PERMISSION_TO_MODIFY_EDGES: "Permiso para modificar aristas",
       PERMISSION_TO_READ_EDGES: "Permiso para leer aristas",
-      PERMISSION_TO_UPDATE_OBJECT_STORAGE: "Permiso para actualizar almacenamiento de objetos",
-      PERMISSION_TO_WRITE_A_RECORD_COLLECTION: "Permiso para escribir una colección de registros",
+      PERMISSION_TO_UPDATE_OBJECT_STORAGE:
+        "Permiso para actualizar almacenamiento de objetos",
+      PERMISSION_TO_WRITE_A_RECORD_COLLECTION:
+        "Permiso para escribir una colección de registros",
       PERMISSION_TO_UPDATE_USERS: "Permiso para actualizar usuarios",
       PERMISSION_TO_UPDATE_PERMISSIONS: "Permiso para actualizar permisos",
       PERMISSION_TO_UPDATE_RELATIONSHIPS: "Permiso para actualizar relaciones",
@@ -3913,9 +4124,11 @@ export const translations = {
       RECORD_NAME: "Nombre de Registro",
       RELATIONSHIP_ARCHIVED: "Relación archivada.",
       RELATIONSHIP_CREATED: "Relación creada.",
-      RELATIONSHIP_DESCRIPTION_HELP: "Describe cuándo debe asignarse esta relación entre registros.",
+      RELATIONSHIP_DESCRIPTION_HELP:
+        "Describe cuándo debe asignarse esta relación entre registros.",
       RELATIONSHIP_FLOW: "Flujo de relaciones",
-      RELATIONSHIP_FLOW_DESCRIPTION: "Una alternativa visual para definir las conexiones permitidas entre clases.",
+      RELATIONSHIP_FLOW_DESCRIPTION:
+        "Una alternativa visual para definir las conexiones permitidas entre clases.",
       RELATIONSHIP_INSPECTOR: "Inspector de relación",
       RELATIONSHIP_NAME: "Nombre de la relación",
       RELATIONSHIP_RESTORED: "Relación restaurada.",
@@ -4069,8 +4282,10 @@ export const translations = {
       SET_DEFAULT_UNMOUNTED_OBJECT_STORAGE:
         "Establecer la ubicación predeterminada del almacenamiento de objetos no montado para esta organización.",
       STORAGE_SIZE: "Tamaño de almacenamiento",
+      STORAGE_FILES_DELETABLE: "Eliminar archivos al eliminar el registro",
       SET_UP: "Configuración",
-      SENSITIVITY_LABELS_COMMA_SEPARATED: "etiquetas de sensibilidad (separadas por comas)",
+      SENSITIVITY_LABELS_COMMA_SEPARATED:
+        "etiquetas de sensibilidad (separadas por comas)",
       SETTINGS: "Configuración",
       SEARCH_ACROSS_ALL_RECORDS: "Buscar en todos los registros...",
       SHOW: "Mostrar",
@@ -4095,6 +4310,7 @@ export const translations = {
       SOME_UPLOADS_FAILED_CHECK_FILE_CARDS:
         "Algunas cargas fallaron. Revise las tarjetas de los archivos.",
       SOURCE: "Fuente: ",
+      SOURCE_RECORD: "Registro Fuente: ",
       SITE: "Sitio",
       SPLIT_VIEW: "Vista dividida",
       STANDARD_FILE: "Archivo estándar",
@@ -4138,8 +4354,10 @@ export const translations = {
       SEARCH_RELATIONSHIPS: "Buscar relaciones",
       SEARCH_THIS_PAGE: "Buscar en esta página...",
       START_DATE: "Fecha inicial",
-      SELECT_CLASS_TO_INSPECT_AND_EDIT: "Selecciona una clase para inspeccionarla y editarla.",
-      SELECT_RELATIONSHIP_TO_INSPECT_AND_EDIT: "Selecciona una relación para inspeccionarla y editarla.",
+      SELECT_CLASS_TO_INSPECT_AND_EDIT:
+        "Selecciona una clase para inspeccionarla y editarla.",
+      SELECT_RELATIONSHIP_TO_INSPECT_AND_EDIT:
+        "Selecciona una relación para inspeccionarla y editarla.",
       SYSTEM_ADMIN: "Administrador del sistema",
       SYSTEM_ADMIN_ACCESS_UPDATED:
         "Se actualizo el acceso de administrador del sistema.",
@@ -4171,7 +4389,8 @@ export const translations = {
       TAGS_LOWER: "etiquetas",
       TEXT_SEARCH: "búsqueda de texto",
       TEXT_SEARCH_TERM: "Término de búsqueda de texto",
-      TRY_ADJUSTING_YOUR_FILTERS_OR_SEARCH_TERM: "Intenta ajustar tus filtros o el término de búsqueda",
+      TRY_ADJUSTING_YOUR_FILTERS_OR_SEARCH_TERM:
+        "Intenta ajustar tus filtros o el término de búsqueda",
       TAGS_REMOVED: "Etiqueta(s) eliminada(s)!",
       ETA: "ETA",
       TAGS_UPDATED_SUCCESS: "Etiquetas actualizadas correctamente",
@@ -4188,7 +4407,7 @@ export const translations = {
       THIS_ORG_SPACE_MAY_CONTAIN_SENSITIVE_DATA:
         "Este espacio de la organización puede contener datos sensibles que deben protegerse adecuadamente.",
       THIS_ROLE_IS_INHERITED:
-        "Este rol se hereda de la organización y no se puede modificar a nivel de proyecto. Puede consultar sus permisos o crear un rol de proyecto personalizado.",
+        "Este rol se hereda de la organización y solo puede ser modificado por un Administrador de la Organización. Puede consultar sus permisos o crear un rol de proyecto personalizado.",
       THIS_STORAGE_IS_ALREADY_SET_AS_DEFAULT:
         "Este almacenamiento ya está configurado como predeterminado",
       TIMESERIES: "Series de tiempo",
@@ -4197,7 +4416,8 @@ export const translations = {
       TIMESERIES_VIEWER: "Visor de series de tiempo",
       TO: "Hacia",
       TO_DESTINATION: "Hacia el destino",
-      TRY_ADJUSTING_YOUR_SEARCH_TERMS_OR_FILTERS: "Intenta ajustar tus términos de búsqueda o filtros",
+      TRY_ADJUSTING_YOUR_SEARCH_TERMS_OR_FILTERS:
+        "Intenta ajustar tus términos de búsqueda o filtros",
       TO_THE_SYSTEM: "al sistema.",
       TOTAL: "Total",
       TOTAL_MEMBERS: "Total de miembros",
@@ -4248,8 +4468,10 @@ export const translations = {
       UPLOAD_CENTER: "Centro de carga",
       UPLOAD_CENTER_DESCRIPTION:
         "Elige un modo de carga, configura los recursos de destino y luego carga.",
-      UPLOAD_CENTER_DISABLED: "La transferencia de archivos está deshabilitada para esta organización.",
-      UPLOAD_CENTER_DISABLED_DETAIL: "Un administrador ha deshabilitado la carga y descarga de archivos para esta organización.",
+      UPLOAD_CENTER_DISABLED:
+        "La transferencia de archivos está deshabilitada para esta organización.",
+      UPLOAD_CENTER_DISABLED_DETAIL:
+        "Un administrador ha deshabilitado la carga y descarga de archivos para esta organización.",
       UPLOAD_FAILED_CHECK_FILE_CARD:
         "La carga falló. Revise la tarjeta del archivo.",
       UPLOAD_FAILED_PLEASE_CHECK_ERROR_DETAILS_BELOW:
@@ -4276,8 +4498,7 @@ export const translations = {
       USE_DEFAULT_DATA_STORAGE_FOR_NEW_PROJECTS:
         "Se usa como valor predeterminado al crear nuevas fuentes de datos para los proyectos.",
       USE_EXISTING_CONTAINER: "Usar contenedor existente",
-      USE_ORGANIZATION_STORAGE:
-        "Utilizar el almacenamiento de la organización",
+      USE_ORGANIZATION_STORAGE: "Utilizar el almacenamiento de la organización",
       USE_SELECTOR_TO_ADD_LABELS:
         "Usa el selector de arriba para agregar etiquetas de sensibilidad.",
       USE_SELECTOR_TO_ADD_TAGS:
@@ -4293,7 +4514,8 @@ export const translations = {
       USER_ARCHIVED_SUCCESSFULLY: "Usuario archivado correctamente.",
       USER_MANAGEMENT: "Gestión de usuarios",
       USER_REMOVED_FROM_ORG: "Usuario eliminado de la organización",
-      USER_ROLE_WITH_LIMITED_PERMISSIONS: "Rol de usuario con permisos limitados",
+      USER_ROLE_WITH_LIMITED_PERMISSIONS:
+        "Rol de usuario con permisos limitados",
       USER_SETTINGS: "Configuración de usuario",
       USER_UPDATED_SUCCESSFULLY: "Usuario actualizado correctamente.",
       USER_WITH_ACTIVE_ACCESS: "Usuarios con acceso activo",
@@ -4377,7 +4599,8 @@ export const translations = {
         "Un DAG, o grafo acíclico dirigido, es un flujo de trabajo de Airflow. Nexus usa las API públicas de Airflow para listar DAG, recuperar sus detalles y parámetros de configuración, y ejecutar DAG. Para revisar el historial de ejecuciones de un DAG específico, abra la instancia de Airflow.",
       TRIGGER_DAG: "Ejecutar DAG",
       TRIGGER_DAG_TOOLTIP: "Ejecutar este DAG con configuración opcional",
-      DAG_PAUSED_TOOLTIP: "Este DAG está pausado en Airflow y no se puede ejecutar",
+      DAG_PAUSED_TOOLTIP:
+        "Este DAG está pausado en Airflow y no se puede ejecutar",
       TRIGGER: "Ejecutar",
       FAILED_TO_TRIGGER: "Error al ejecutar",
       DAG_RUN_SUBMITTED: "Enviando ejecución de DAG para",
@@ -4386,20 +4609,23 @@ export const translations = {
       DAG_RUN_SUCCEEDED: "La ejecución del DAG terminó correctamente para",
       DAG_RUN_FAILED: "La ejecución del DAG falló para",
       DAG_RUN_STILL_RUNNING: "La ejecución del DAG aún está en curso para",
-      FAILED_TO_CHECK_DAG_RUN_STATUS: "Error al verificar el estado de la ejecución del DAG para",
+      FAILED_TO_CHECK_DAG_RUN_STATUS:
+        "Error al verificar el estado de la ejecución del DAG para",
       RUN_ID: "ID de ejecución",
       RUN_ID_PLACEHOLDER: "Déjalo en blanco para que Airflow genere uno",
       CONFIGURATION_JSON: "Configuración (JSON)",
       LOADING_DAG_PARAMETERS: "Cargando parámetros del DAG...",
-      CONF_HELP: "Objeto JSON opcional que se pasa a la ejecución del DAG como conf.",
-      CONF_MUST_BE_OBJECT: 'Conf debe ser un objeto JSON, p. ej. { "key": "value" }.',
+      CONF_HELP:
+        "Objeto JSON opcional que se pasa a la ejecución del DAG como conf.",
+      CONF_MUST_BE_OBJECT:
+        'Conf debe ser un objeto JSON, p. ej. { "key": "value" }.',
       CONF_INVALID_JSON: "Conf no es un JSON válido.",
       LOGICAL_DATE: "Fecha lógica",
       RUN_AFTER: "Ejecutar después de",
       DATA_INTERVAL_START: "Inicio del intervalo de datos",
       DATA_INTERVAL_END: "Fin del intervalo de datos",
       NOTE: "Nota",
-      NOTE_PLACEHOLDER: "Nota opcional para esta ejecución"
+      NOTE_PLACEHOLDER: "Nota opcional para esta ejecución",
     },
   },
 };

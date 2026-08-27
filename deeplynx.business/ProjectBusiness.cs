@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Context;
 using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
@@ -32,6 +33,7 @@ public class ProjectBusiness : IProjectBusiness
     };
 
     private readonly ILogger<ProjectBusiness> _logger;
+    private readonly IFileBusinessFactory _fileBusinessFactory;
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly INotificationBusiness _notificationBusiness;
     private readonly IOrganizationBusiness _organizationBusiness;
@@ -57,7 +59,8 @@ public class ProjectBusiness : IProjectBusiness
         IClassBusiness classBusiness, IRoleBusiness roleBusiness, IDataSourceBusiness dataSourceBusiness,
         IObjectStorageBusiness objectStorageBusiness, IEventBusiness eventBusiness,
         IOrganizationBusiness organizationBusiness, INotificationBusiness notificationBusiness,
-        IFileBusiness fileAzureBusiness)
+        IFileBusiness fileAzureBusiness,
+        IFileBusinessFactory fileBusinessFactory)
     {
         _context = context;
         _logger = logger;
@@ -69,6 +72,7 @@ public class ProjectBusiness : IProjectBusiness
         _eventBusiness = eventBusiness;
         _organizationBusiness = organizationBusiness;
         _fileAzureBusiness = fileAzureBusiness;
+        _fileBusinessFactory = fileBusinessFactory;
     }
 
     /// <summary>
@@ -76,8 +80,68 @@ public class ProjectBusiness : IProjectBusiness
     /// </summary>
     /// <param name="userId">ID of user querying projects</param>
     /// <param name="organizationId">(Required)Organization ID within which to constrain returned projects</param>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching projects are returned unpaginated</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived projects from the result</param>
+    /// <returns>A paginated list of projects, or all projects if no pagination is specified</returns>
+    public async Task<PaginatedResponse<ProjectResponseDto>> GetAllProjectsPaginated(
+        long userId,
+        long organizationId,
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null) throw new ArgumentException($"User with id {userId} not found.");
+
+        var isOrgAdmin = await _context.OrganizationUsers
+            .AnyAsync(ou => ou.UserId == userId
+                            && ou.OrganizationId == organizationId
+                            && ou.IsOrgAdmin);
+
+        var projectQuery = _context.Projects
+            .Where(p => p.OrganizationId == organizationId
+                        && (!hideArchived || !p.IsArchived));
+
+        if (!user.IsSysAdmin && !isOrgAdmin)
+            projectQuery = projectQuery.Where(p =>
+                p.ProjectMembers.Any(pm =>
+                    pm.UserId == userId ||
+                    (pm.GroupId.HasValue && pm.Group != null && pm.Group.Users.Any(u => u.Id == userId))
+                )
+            );
+
+        return await projectQuery
+            .OrderBy(p => p.Id)
+            .Select(p => new ProjectResponseDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Description = p.Description,
+                Abbreviation = p.Abbreviation,
+                LastUpdatedAt = p.LastUpdatedAt,
+                LastUpdatedBy = p.LastUpdatedBy,
+                IsArchived = p.IsArchived,
+                OrganizationId = p.OrganizationId,
+                Banner = p.Banner,
+                RequireSensitivityLabel = p.RequireSensitivityLabel,
+                DefaultObjectStorageId = p.DefaultObjectStorageId
+            })
+            .ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all projects without pagination.
+    ///     Superseded by <see cref="GetAllProjectsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 project controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="userId">ID of user querying projects</param>
+    /// <param name="organizationId">(Required)Organization ID within which to constrain returned projects</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived projects from the result</param>
     /// <returns>A list of projects</returns>
+    [Obsolete("V1-only. Used by deprecated v1 project endpoints. Superseded by GetAllProjectsPaginated. " +
+              "Remove once v1 project endpoints are sunset.", error: false)]
     public async Task<IEnumerable<ProjectResponseDto>> GetAllProjects(
         long userId,
         long organizationId,
@@ -118,6 +182,8 @@ public class ProjectBusiness : IProjectBusiness
             .ToListAsync();
     }
 
+    #endregion
+
     /// <summary>
     ///     Creates a new project based on the data transfer object supplied.
     /// </summary>
@@ -157,7 +223,8 @@ public class ProjectBusiness : IProjectBusiness
             LastUpdatedAt = project.LastUpdatedAt,
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
-            RequireSensitivityLabel = dto.RequireSensitivityLabel
+            RequireSensitivityLabel = dto.RequireSensitivityLabel,
+            DefaultObjectStorageId = project.DefaultObjectStorageId
         };
 
         var organization = await _context.Organizations
@@ -253,6 +320,7 @@ public class ProjectBusiness : IProjectBusiness
         if (logoFile.Length > maxFileSize)
             throw new ArgumentException("File size exceeds the 5MB limit.");
 
+        var project = await _context.Projects.FirstOrDefaultAsync(o => o.Id == projectId) ?? throw new ArgumentException("Project not found.");
         var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId) ?? throw new Exception("Object storage not found or failed to decrypt.");
         if (objectStorage.Config == null)
@@ -272,6 +340,9 @@ public class ProjectBusiness : IProjectBusiness
 
             if (!SanitizeFilePath.IsValidFilePath(baseFilePath))
                 throw new ArgumentException("Invalid Azure file path. Allowed characters are letters (a-z, A-Z), numbers (0-9), and '/'.");
+
+            project.LogoObjectStorageId = (int?)realObjectStorageId;
+            await _context.SaveChangesAsync();
 
             var newLogoFileId = $"logo_{Guid.NewGuid()}";
             var fileName = $"{newLogoFileId}.{fileExtension}";
@@ -305,6 +376,9 @@ public class ProjectBusiness : IProjectBusiness
 
         if (string.IsNullOrEmpty(objectStorage.Config.MountPath))
             throw new Exception("File system mount path not set in object storage.");
+
+        project.LogoObjectStorageId = (int?)realObjectStorageId;
+        await _context.SaveChangesAsync();
 
         var logosFolderPathFs = Path.Combine(
             objectStorage.Config.MountPath,
@@ -369,8 +443,19 @@ public class ProjectBusiness : IProjectBusiness
         long projectId,
         long? objectStorageId)
     {
-        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+        var project = await _context.Projects.FirstOrDefaultAsync(o => o.Id == projectId) ?? throw new ArgumentException("Project not found.");
+
+        if (project.LogoObjectStorageId.HasValue)
+        {
+            objectStorageId = project.LogoObjectStorageId.Value;
+        }
+        else
+        {
+            var defaultStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
+            objectStorageId = defaultStorage.Id;
+        }
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage((long)objectStorageId);
 
         if (objectStorage.Config == null)
             throw new Exception("Object storage config is null.");
@@ -482,8 +567,19 @@ public class ProjectBusiness : IProjectBusiness
         long projectId,
         long? objectStorageId)
     {
-        var realObjectStorageId = await ResolveObjectStorageId(organizationId, projectId, objectStorageId);
-        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(realObjectStorageId);
+        var project = await _context.Projects.FirstOrDefaultAsync(o => o.Id == projectId) ?? throw new ArgumentException("Project not found.");
+
+        if (project.LogoObjectStorageId.HasValue)
+        {
+            objectStorageId = project.LogoObjectStorageId.Value;
+        }
+        else
+        {
+            var defaultStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
+            objectStorageId = defaultStorage.Id;
+        }
+
+        var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage((long)objectStorageId);
 
         if (objectStorage.Config == null)
             throw new Exception("Object storage config is null.");
@@ -588,27 +684,30 @@ public class ProjectBusiness : IProjectBusiness
     /// <exception cref="KeyNotFoundException">Returned if project not found or is archived</exception>
     public async Task<ProjectResponseDto> GetProject(long organizationId, long projectId, bool hideArchived = true)
     {
-        var cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
+        var project = await _context.Projects
+            .Where(o => o.Id == projectId)
+            .FirstOrDefaultAsync();
 
-        // If no projects are cached update the Cache
-        if (cachedProjectList == null || !cachedProjectList.Any())
+        if (project == null)
+            throw new KeyNotFoundException($"Project with id {projectId} does not exist");
+
+        if (hideArchived && project.IsArchived)
+            throw new KeyNotFoundException($"Project with id {projectId} is archived");
+
+        return new ProjectResponseDto
         {
-            await RefreshProjectsCache();
-            cachedProjectList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>(ProjectsCacheKey);
-
-            if (cachedProjectList == null) cachedProjectList = new List<ProjectResponseDto>();
-        }
-
-        var cachedProject =
-            cachedProjectList.FirstOrDefault(p => p.Id == projectId && p.OrganizationId == organizationId);
-
-        if (hideArchived && cachedProject != null)
-            if (cachedProject.IsArchived)
-                cachedProject = null;
-
-        if (cachedProject == null) throw new KeyNotFoundException($"Project with id {projectId} not found");
-
-        return cachedProject;
+            Id = project.Id,
+            Name = project.Name,
+            Description = project.Description,
+            Abbreviation = project.Abbreviation,
+            LastUpdatedAt = project.LastUpdatedAt,
+            LastUpdatedBy = project.LastUpdatedBy,
+            IsArchived = project.IsArchived,
+            OrganizationId = project.OrganizationId,
+            Banner = project.Banner,
+            RequireSensitivityLabel = project.RequireSensitivityLabel,
+            DefaultObjectStorageId = project.DefaultObjectStorageId
+        };
     }
 
     /// <summary>
@@ -652,6 +751,9 @@ public class ProjectBusiness : IProjectBusiness
         if (dto.RequireSensitivityLabel != null)
             project.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
 
+        if (dto.DefaultObjectStorageId != null)
+            project.DefaultObjectStorageId = dto.DefaultObjectStorageId;
+
         project.Name = dto.Name ?? project.Name;
         project.Description = dto.Description ?? project.Description;
         project.Abbreviation = dto.Abbreviation ?? project.Abbreviation;
@@ -686,6 +788,7 @@ public class ProjectBusiness : IProjectBusiness
             OrganizationId = project.OrganizationId,
             Banner = project.Banner,
             RequireSensitivityLabel = project.RequireSensitivityLabel,
+            DefaultObjectStorageId = project.DefaultObjectStorageId
         };
 
         // Update the Project Cache List
@@ -727,6 +830,9 @@ public class ProjectBusiness : IProjectBusiness
             throw new KeyNotFoundException($"Project with id {projectId} not found.");
 
         var projectName = project.Name;
+
+        var records = _context.Records.Where(r => r.ProjectId == projectId);
+        await RecordFileHelper.TryDeleteFiles(records, _fileBusinessFactory, _objectStorageBusiness);
 
         _context.Projects.Remove(project);
         await _context.SaveChangesAsync();
@@ -975,8 +1081,12 @@ public class ProjectBusiness : IProjectBusiness
     /// </summary>
     /// <param name="projectId">ID of the project to get members for</param>
     /// <returns></returns>
-    public async Task<IEnumerable<ProjectMemberResponseDto>> GetProjectMembers(long projectId)
-    {
+    public async Task<PaginatedResponse<ProjectMemberResponseDto>> GetProjectMembersPaginated(
+        long projectId,
+        PaginatedRequestDto paginatedRequestDto
+    )
+    {   
+        var returnAll = paginatedRequestDto.PageSize == -1;
         var users = _context.ProjectMembers
             .Where(pm => pm.ProjectId == projectId && pm.UserId != null)
             .Select(pm => new ProjectMemberResponseDto
@@ -1003,7 +1113,9 @@ public class ProjectBusiness : IProjectBusiness
                 IsProjectAdmin = pm.IsProjectAdmin
             });
 
-        return await users.Union(groups).ToListAsync();
+        var combined = users.Union(groups);
+
+        return await combined.ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -1071,6 +1183,12 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Add(projMember);
         await _context.SaveChangesAsync();
 
+        // overwrite the cached admin flag now that it's changed
+        if (makeProjectAdmin)
+        {
+            await OverwriteProjectAdminCache(projectId, userId, groupId, makeProjectAdmin);
+        }
+
         if (userId.HasValue && userId != UserContextStorage.UserId)
         {
             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -1136,6 +1254,12 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Update(existingProjectMember);
         await _context.SaveChangesAsync();
 
+        // overwrite the cached admin flag, but only if it was actually touched
+        if (isProjectAdmin.HasValue)
+        {
+            await OverwriteProjectAdminCache(projectId, userId, groupId, isProjectAdmin.Value);
+        }
+
         return true;
     }
 
@@ -1174,6 +1298,9 @@ public class ProjectBusiness : IProjectBusiness
         existingProjectMember.IsProjectAdmin = isAdmin;
         _context.ProjectMembers.Update(existingProjectMember);
         await _context.SaveChangesAsync();
+
+        // overwrite the cached admin flag now that it's changed
+        await OverwriteProjectAdminCache(projectId, userId, groupId, isAdmin);
 
         return true;
     }
@@ -1226,6 +1353,9 @@ public class ProjectBusiness : IProjectBusiness
         // remove project member
         _context.ProjectMembers.Remove(existingProjectMember);
         await _context.SaveChangesAsync();
+
+        // delete the cached admin flag now that it's changed
+        await OverwriteProjectAdminCache(projectId, userId, groupId, isAdmin: false, deleting: true);
 
         return true;
     }
@@ -1316,6 +1446,49 @@ public class ProjectBusiness : IProjectBusiness
             createContainer: false);
     }
 
+    #region Deprecated
+
+     /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all classes without pagination.
+    ///     Superseded by <see cref="GetProjectMembersPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 class controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="projectId">ID of the project to get members for</param>
+    /// <returns></returns>
+    public async Task<IEnumerable<ProjectMemberResponseDto>> GetProjectMembers(long projectId)
+    {
+        var users = _context.ProjectMembers
+            .Where(pm => pm.ProjectId == projectId && pm.UserId != null)
+            .Select(pm => new ProjectMemberResponseDto
+            {
+                Name = pm.User.Name,
+                MemberId = pm.UserId,
+                Email = pm.User.Email,
+                Role = pm.Role.Name,
+                Type = "user",
+                RoleId = pm.Role.Id,
+                IsProjectAdmin = pm.IsProjectAdmin
+            });
+
+        var groups = _context.ProjectMembers
+            .Where(pm => pm.ProjectId == projectId && pm.GroupId != null)
+            .Select(pm => new ProjectMemberResponseDto
+            {
+                Name = pm.Group.Name,
+                MemberId = pm.GroupId,
+                Email = string.Empty,
+                Role = pm.Role.Name,
+                Type = "group",
+                RoleId = pm.Role.Id,
+                IsProjectAdmin = pm.IsProjectAdmin
+            });
+
+        return await users.Union(groups).ToListAsync();
+    }
+
+    #endregion
+
     // PRIVATE HELPER FUNCTIONS //
     private async Task<bool> RefreshProjectsCache()
     {
@@ -1382,5 +1555,56 @@ public class ProjectBusiness : IProjectBusiness
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
             ?? throw new KeyNotFoundException("Default object storage not found");
         return defaultObjectStorage.Id;
+    }
+
+    /// <summary>
+    /// Overwrite or delete the cached ProjectAdmin flag for whichever member(s) a project-admin-affecting mutation just touched.
+    /// </summary>
+    private async Task OverwriteProjectAdminCache(long projectId, long? userId, long? groupId, bool isAdmin, bool deleting = false)
+    {
+        if (userId.HasValue)
+        {
+            try
+            {
+                if (deleting)
+                {
+                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, projectId));
+                }
+                else
+                {
+                    await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(userId.Value, projectId), isAdmin, (TimeSpan?)null);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Cache overwrite failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
+            }
+        }
+        else if (groupId.HasValue)
+        {
+            var memberUserIds = await _context.Groups
+                .Where(g => g.Id == groupId.Value)
+                .SelectMany(g => g.Users.Select(u => u.Id))
+                .ToListAsync();
+
+            foreach (var memberId in memberUserIds)
+            {
+                try
+                {
+                    if (deleting)
+                    {
+                        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, projectId));
+                    }
+                    else
+                    {
+                        await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(memberId, projectId), isAdmin, (TimeSpan?)null);
+                    }  
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Cache overwrite failed for user {UserId}, project {ProjectId}", memberId, projectId);
+                }
+            }
+        }
     }
 }

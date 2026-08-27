@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
-using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
@@ -17,12 +17,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Record = deeplynx.datalayer.Models.Record;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
+using deeplynx.helpers.BigData;
 
 namespace deeplynx.tests;
 
 [Collection("Test Suite Collection")]
 public class ProjectBusinessTests : IntegrationTestBase
 {
+    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "ProjectBusinessTests");
     private ClassBusiness _classBusiness = null!;
     private FileAzureBusiness _fileAzureBusiness;
     private UserBusiness _userBusiness = null!;
@@ -34,7 +38,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
-    private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<ILogger<AdminService>> _adminServiceLogger;
     private INotificationBusiness _notificationBusiness = null!;
@@ -47,9 +50,25 @@ public class ProjectBusinessTests : IntegrationTestBase
     private ProjectBusiness _projectBusiness = null!;
     private RoleBusiness _roleBusiness = null!;
     private Mock<IBulkCopyUpsertExecutor> _bulkCopyUpsertExecutor = null!;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness;
+    private RecordBusiness _recordBusiness;
+    private TagBusiness _tagBusiness = null!;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
+    private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
+    private SensitivityLabelService _sensitivityLabelService = null!;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private FileBusiness _fileBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private OlapBusiness _olapBusiness = null!;
+    private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private long cid; // class ID
     private long did; // datasource ID
     private long os1;
+    private long osid;
     private long gid; // group ID
     private long gid2;
     private long oid; // org IDs
@@ -95,7 +114,6 @@ public class ProjectBusinessTests : IntegrationTestBase
         _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _logger = new Mock<ILogger<ProjectRolePermissionService>>();
         _permissionService = new ProjectRolePermissionService(Context, _logger.Object);
-        _mockRecordBusiness = new Mock<IRecordBusiness>();
         _mockRelationshipBusiness = new Mock<IRelationshipBusiness>();
         _mockEdgeBusiness = new Mock<IEdgeBusiness>();
         _mockLogger = new Mock<ILogger<ProjectBusiness>>();
@@ -105,15 +123,62 @@ public class ProjectBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _dataSourceBusiness = new DataSourceBusiness(
             Context, _mockEdgeBusiness.Object,
-            _mockRecordBusiness.Object, _eventBusiness, _permissionService, _mockAdminService.Object);
+            _recordBusiness, _eventBusiness, _permissionService, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
-            Context, _mockRecordBusiness.Object,
+            Context, _recordBusiness,
             _mockRelationshipBusiness.Object, _eventBusiness, _permissionService, _adminService);
-        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper, protectProvider);
+
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
+
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(realFileFilesystemBusiness);
+
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness, _dataSourceBusiness,
-            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _fileAzureBusiness);
+            _objectStorageBusiness, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _fileAzureBusiness, _fileBusinessFactory.Object);
+
+        _relationshipBusiness = new Mock<IRelationshipBusiness>();
+
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _eventBusiness,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
+
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _insightBusiness = new Mock<IInsightBusiness>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness,
+            protectProvider
+        );
     }
 
     #region GetProjectStats Tests
@@ -137,8 +202,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         await base.SeedTestDataAsync();
 
         // Add org
-        var testOrg = new Organization { Name = "Test Org" };
-        var deletedOrg = new Organization { Name = "Delete Me" };
+        var testOrg = new Organization { Name = "Test Org", CreateContainerPerProject = false };
+        var deletedOrg = new Organization { Name = "Delete Me", CreateContainerPerProject = false };
         Context.Organizations.AddRange(testOrg, deletedOrg);
         await Context.SaveChangesAsync();
         oid = testOrg.Id;
@@ -379,6 +444,25 @@ public class ProjectBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         // Add object storage
+        var config = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
+        var objectStorageFs = new ObjectStorage
+        {
+            Name = "Object Storage 1",
+            Type = "filesystem",
+            ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            OrganizationId = oid
+        };
+        Context.ObjectStorages.Add(objectStorageFs);
+        await Context.SaveChangesAsync();
+        osid = objectStorageFs.Id;
+
+        // Add object storage
         var os1Config = new JsonObject
         {
             ["MountPath"] = "../data/duckdb"
@@ -615,7 +699,7 @@ public class ProjectBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetAllProjects Tests
+    #region GetAllProjects (V1 / Legacy) Tests
 
     [Fact]
     public async Task GetAllProjects_ReturnsProjectsForUser()
@@ -757,6 +841,334 @@ public class ProjectBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetAllProjectsPaginated Tests
+
+    private static PaginatedRequestDto DefaultPagination(int pageNumber = 1, int pageSize = 100)
+    {
+        return new PaginatedRequestDto
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_ReturnsProjectsForUser()
+    {
+        // Act
+        var forTestUser = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), true);
+        var forLonely = await _projectBusiness.GetAllProjectsPaginated(uid3, oid, DefaultPagination(), true);
+
+        // Assert
+        Assert.Equal(2, forTestUser.TotalCount);
+        Assert.Equal(2, forTestUser.Items.Count);
+        Assert.Contains(forTestUser.Items, p => p.Id == pid);
+        Assert.Contains(forTestUser.Items, p => p.Id == pid2);
+
+        Assert.Equal(1, forLonely.TotalCount);
+        Assert.Single(forLonely.Items);
+        Assert.Contains(forLonely.Items, p => p.Id == pid3);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_ExcludesArchived_ByDefault()
+    {
+        // Act - uid is a member of pid4 (archived), but hideArchived defaults to true
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination());
+
+        // Assert
+        Assert.DoesNotContain(result.Items, p => p.Id == pid4);
+        Assert.All(result.Items, p => Assert.False(p.IsArchived));
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_HideArchivedFalse_IncludesArchivedProjects()
+    {
+        // Act - uid is a direct member of pid4 (archived)
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), false);
+
+        // Assert
+        Assert.Equal(3, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid4 && p.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_SysAdmin_ReturnsAllNonArchivedProjects()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), true);
+
+        // Assert - sees all non-archived org projects, membership no longer matters
+        Assert.Equal(4, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid);
+        Assert.Contains(result.Items, p => p.Id == pid2);
+        Assert.Contains(result.Items, p => p.Id == pid3);
+        Assert.Contains(result.Items, p => p.Id == pid5);
+        Assert.DoesNotContain(result.Items, p => p.Id == pid4);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_SysAdmin_HideArchivedFalse_ReturnsAllProjects()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), false);
+
+        // Assert - all 5 projects in the org, including archived
+        Assert.Equal(5, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid4 && p.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_OrgAdmin_ReturnsAllOrganizationProjects()
+    {
+        // Arrange - lonelyUser is only a direct member of pid3, but org admin should see the whole org
+        Context.OrganizationUsers.Add(new OrganizationUser
+        {
+            OrganizationId = oid,
+            UserId = uid3,
+            IsOrgAdmin = true
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid3, oid, DefaultPagination(), true);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid);
+        Assert.Contains(result.Items, p => p.Id == pid2);
+        Assert.Contains(result.Items, p => p.Id == pid3);
+        Assert.Contains(result.Items, p => p.Id == pid5);
+        Assert.DoesNotContain(result.Items, p => p.Id == pid4);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_GroupMembership_GrantsAccess()
+    {
+        // Arrange - pid5's ProjectMember row grants access via GroupId = gid; add lonelyUser to that group
+        var group = await Context.Groups.FindAsync(gid);
+        var lonelyUser = await Context.Users.FindAsync(uid3);
+        group!.Users.Add(lonelyUser!);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid3, oid, DefaultPagination(), true);
+
+        // Assert - lonelyUser now sees pid3 (direct), plus pid2 and pid5 (via group gid)
+        Assert.Equal(3, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid3);
+        Assert.Contains(result.Items, p => p.Id == pid5);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_NonMemberNonAdmin_ReturnsEmptyPaginatedResponse()
+    {
+        // Arrange - a user with no project memberships and no admin rights
+        var outsider = new User { Email = "outsider@example.com", Name = "Outsider", IsSysAdmin = false };
+        Context.Users.Add(outsider);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(outsider.Id, oid, DefaultPagination(), true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(100, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_Fails_IfUserDoesNotExist()
+    {
+        // Arrange
+        const long nonExistentUserId = 999999;
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _projectBusiness.GetAllProjectsPaginated(nonExistentUserId, oid, DefaultPagination(), true));
+
+        Assert.Contains($"User with id {nonExistentUserId} not found.", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_Fails_IfUserWasDeleted()
+    {
+        // Act & Assert - uid2 (missingUser) was added then removed in SeedTestDataAsync
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _projectBusiness.GetAllProjectsPaginated(uid2, oid, DefaultPagination(), true));
+
+        Assert.Contains($"User with id {uid2} not found.", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_FiltersByOrganizationId()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), true);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.All(result.Items, p => Assert.Equal(oid, p.OrganizationId));
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_ReturnsAllProperties_Correctly()
+    {
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(), true);
+        var dto = result.Items.First(p => p.Id == pid);
+
+        // Assert
+        Assert.Equal(pid, dto.Id);
+        Assert.Equal("Test Project", dto.Name);
+        Assert.Equal("Test project for unit tests", dto.Description);
+        Assert.Equal("TST", dto.Abbreviation);
+        Assert.Equal(oid, dto.OrganizationId);
+        Assert.False(dto.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_Paginates_Correctly()
+    {
+        // Arrange - sys admin sees 4 non-archived projects total (pid, pid2, pid3, pid5)
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        var pageOne = DefaultPagination(pageNumber: 1, pageSize: 3);
+        var pageTwo = DefaultPagination(pageNumber: 2, pageSize: 3);
+
+        // Act
+        var firstPage = await _projectBusiness.GetAllProjectsPaginated(uid, oid, pageOne, true);
+        var secondPage = await _projectBusiness.GetAllProjectsPaginated(uid, oid, pageTwo, true);
+
+        // Assert
+        Assert.Equal(4, firstPage.TotalCount);
+        Assert.Equal(3, firstPage.Items.Count);
+        Assert.Equal(4, secondPage.TotalCount);
+        Assert.Single(secondPage.Items);
+
+        var firstPageIds = firstPage.Items.Select(p => p.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(p => p.Id).ToHashSet();
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_PageSizeNegativeOne_ReturnsAllProjects_IgnoringPageNumber()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, sentinel, true);
+
+        // Assert
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(4, result.PageSize);
+        Assert.DoesNotContain(result.Items, p => p.Id == pid4);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_PageSizeNegativeOne_RespectsHideArchivedFilter()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        // Act - request everything with hideArchived = false
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, DefaultPagination(pageSize: -1), false);
+
+        // Assert
+        Assert.Equal(5, result.TotalCount);
+        Assert.Contains(result.Items, p => p.Id == pid4 && p.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_PageSizeNegativeOne_NonMemberNonAdmin_ReturnsEmptyPaginatedResponse()
+    {
+        // Arrange
+        var outsider = new User { Email = "outsider2@example.com", Name = "Outsider Two", IsSysAdmin = false };
+        Context.Users.Add(outsider);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(
+            outsider.Id, oid, DefaultPagination(pageSize: -1), true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+    {
+        // Arrange - sys admin sees 4 non-archived projects total
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        var zeroSize = DefaultPagination(pageNumber: 1, pageSize: 0);
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, zeroSize, true);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllProjectsPaginated_PageSizeZero_OnAnyPageNumber_StillReturnsEmptyItems()
+    {
+        // Arrange
+        var user = await Context.Users.FindAsync(uid);
+        user!.IsSysAdmin = true;
+        await Context.SaveChangesAsync();
+
+        var zeroSizePageThree = DefaultPagination(pageNumber: 3, pageSize: 0);
+
+        // Act
+        var result = await _projectBusiness.GetAllProjectsPaginated(uid, oid, zeroSizePageThree, true);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(3, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
+    #endregion
+
     #region UpdateProject Tests
 
     [Fact]
@@ -851,6 +1263,63 @@ public class ProjectBusinessTests : IntegrationTestBase
                 _projectBusiness.DeleteProject(uid, oid, nonExistentId));
 
         Assert.Contains($"Project with id {nonExistentId} not found.", exception.Message);
+    }
+
+    #endregion
+
+    #region Integration DeleteProject Tests
+
+    [Fact]
+    public async Task DeleteProject_FileDeleted_DeletesProjectFile()
+    {
+        // Create record file
+        var file = CreateMockFile("file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Delete project and files
+        var result = await _projectBusiness.DeleteProject(uid, oid, pid);
+        Assert.True(result);
+
+        // Check file
+        Assert.False(File.Exists(record.Uri));
+    }
+
+    [Fact]
+    public async Task DeleteProject_FileSaved_DeletesProjectNotFile()
+    {
+        // Disable file deletion
+        var os = await Context.ObjectStorages.FindAsync(osid);
+        os!.FilesDeletable = false;
+        await Context.SaveChangesAsync();
+
+        // Create record file
+        var file = CreateMockFile("not_file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // Delete project but not files
+        var result = await _projectBusiness.DeleteProject(uid, oid, pid);
+        Assert.True(result);
+
+        // Check file
+        Assert.True(File.Exists(record.Uri));
+    }
+
+    private static FormFile CreateMockFile(string fileName, string content = "Mock File")
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
+
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
     }
 
     #endregion
@@ -1095,6 +1564,88 @@ public class ProjectBusinessTests : IntegrationTestBase
     #region AddMemberToProject Tests
 
     [Fact]
+    public async Task AddProjectAdminUser_UpdatesProjectAdminCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid3);
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.AddMemberToProject(
+            pid3,
+            null,
+            uid,
+            null,
+            makeProjectAdmin: true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
+
+    [Fact]
+    public async Task AddMemberToProject_ForGroup_UpdatesEveryGroupUsersCache()
+    {
+        // Arrange
+        var group = await Context.Groups
+            .Include(g => g.Users)
+            .SingleAsync(g => g.Id == gid);
+        var firstUser = await Context.Users.SingleAsync(u => u.Id == uid);
+        var secondUser = await Context.Users.SingleAsync(u => u.Id == uid3);
+
+        group.Users.Add(firstUser);
+        group.Users.Add(secondUser);
+        await Context.SaveChangesAsync();
+
+        var firstKey = CacheKeys.ProjectAdmin(uid, pid3);
+        var secondKey = CacheKeys.ProjectAdmin(uid3, pid3);
+        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid3);
+
+        await CacheService.Instance.SetAsync(
+            firstKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            secondKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            unrelatedKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.AddMemberToProject(
+            pid3,
+            null,
+            null,
+            gid,
+            makeProjectAdmin: true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(firstKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(secondKey));
+        Assert.Equal(
+            false,
+            await CacheService.Instance.GetAsync<bool?>(unrelatedKey));
+
+        await CacheService.Instance.DeleteAsync(firstKey);
+        await CacheService.Instance.DeleteAsync(secondKey);
+        await CacheService.Instance.DeleteAsync(unrelatedKey);
+    }
+
+    [Fact]
     public async Task AddMemberToProject_CanAddUserToProject_WithoutRole()
     {
         // Act
@@ -1229,6 +1780,53 @@ public class ProjectBusinessTests : IntegrationTestBase
     #endregion
 
     #region UpdateProjectMemberRole Tests
+
+    [Fact]
+    public async Task UpdateProjectMemberRole_WithAdminStatus_UpdatesProjectAdminCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.UpdateProjectMemberRole(
+            pid,
+            rid,
+            uid,
+            null,
+            isProjectAdmin: true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
+
+    [Fact]
+    public async Task UpdateProjectMemberRole_WithoutAdminStatus_DoesNotInvalidateProjectAdminCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
+        await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.UpdateProjectMemberRole(
+            pid,
+            rid,
+            uid,
+            null);
+
+        // Assert
+        Assert.True(result);
+        Assert.False(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        await CacheService.Instance.DeleteAsync(cacheKey);
+    }
 
     [Fact]
     public async Task UpdateProjectMemberRole_CanUpdateUserRole()
@@ -1377,7 +1975,139 @@ public class ProjectBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region SetProjectAdminStatus Cache Tests
+
+    [Fact]
+    public async Task SetProjectAdminStatus_ForUser_UpdatesProjectAdminCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.SetProjectAdminStatus(
+            pid,
+            uid,
+            null,
+            true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
+
+    [Fact]
+    public async Task SetProjectAdminStatus_ForGroup_UpdatesEveryGroupUsersCache()
+    {
+        // Arrange
+        var group = await Context.Groups
+            .Include(g => g.Users)
+            .SingleAsync(g => g.Id == gid);
+        var firstUser = await Context.Users.SingleAsync(u => u.Id == uid);
+        var secondUser = await Context.Users.SingleAsync(u => u.Id == uid3);
+
+        group.Users.Add(firstUser);
+        group.Users.Add(secondUser);
+        await Context.SaveChangesAsync();
+
+        var firstKey = CacheKeys.ProjectAdmin(uid, pid5);
+        var secondKey = CacheKeys.ProjectAdmin(uid3, pid5);
+        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid5);
+
+        await CacheService.Instance.SetAsync(
+            firstKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            secondKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            unrelatedKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.SetProjectAdminStatus(
+            pid5,
+            null,
+            gid,
+            true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(firstKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(secondKey));
+        Assert.Equal(
+            false,
+            await CacheService.Instance.GetAsync<bool?>(unrelatedKey));
+
+        await CacheService.Instance.DeleteAsync(firstKey);
+        await CacheService.Instance.DeleteAsync(secondKey);
+        await CacheService.Instance.DeleteAsync(unrelatedKey);
+    }
+
+    #endregion
+
     #region RemoveMemberFromProject Tests
+
+    [Fact]
+    public async Task RemoveMemberFromProject_InvalidatesProjectAdminCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
+        await CacheService.Instance.SetAsync(cacheKey, true, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.RemoveMemberFromProject(pid, uid, null, null);
+
+        // Assert
+        Assert.True(result);
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
+
+    [Fact]
+    public async Task RemoveMemberFromProject_ForGroup_InvalidatesEveryGroupUsersCache()
+    {
+        // Arrange - pid5's ProjectMember row already grants access via GroupId = gid (see SeedTestDataAsync)
+        var group = await Context.Groups
+            .Include(g => g.Users)
+            .SingleAsync(g => g.Id == gid);
+        var firstUser = await Context.Users.SingleAsync(u => u.Id == uid);
+        var secondUser = await Context.Users.SingleAsync(u => u.Id == uid3);
+
+        group.Users.Add(firstUser);
+        group.Users.Add(secondUser);
+        await Context.SaveChangesAsync();
+
+        var firstKey = CacheKeys.ProjectAdmin(uid, pid5);
+        var secondKey = CacheKeys.ProjectAdmin(uid3, pid5);
+        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid5);
+
+        await CacheService.Instance.SetAsync(firstKey, true, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(secondKey, true, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(unrelatedKey, true, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.RemoveMemberFromProject(pid5, null, gid, null);
+
+        // Assert
+        Assert.True(result);
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(firstKey));
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(secondKey));
+        Assert.True(await CacheService.Instance.GetAsync<bool?>(unrelatedKey));
+
+        await CacheService.Instance.DeleteAsync(unrelatedKey);
+    }
 
     [Fact]
     public async Task RemoveMemberFromProject_CanRemoveUser()
@@ -1746,7 +2476,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     {
         // Arrange
         long organizationId = 1;
-        long projectId = 1;
 
         var testFileName = "test-logo.png";
         var testFileContent = "Fake image content for testing";
@@ -1754,8 +2483,8 @@ public class ProjectBusinessTests : IntegrationTestBase
         var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
 
         // Act
-        await _projectBusiness.UploadProjectLogo(organizationId, projectId, os1, testFormFile);
-        var result = await _projectBusiness.RemoveLogoFileAsync(organizationId, projectId, os1);
+        await _projectBusiness.UploadProjectLogo(organizationId, pid, os1, testFormFile);
+        var result = await _projectBusiness.RemoveLogoFileAsync(organizationId, pid, os1);
 
         // Assert
         Assert.True(result);
@@ -1772,7 +2501,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     {
         // Arrange
         long organizationId = 1;
-        long projectId = 1;
 
         var testFileName = "test-logo.png";
         var testFileContent = "Fake image content for testing"; // This can be any string or real binary data
@@ -1780,7 +2508,7 @@ public class ProjectBusinessTests : IntegrationTestBase
         var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
 
         // Act
-        string uploadedFilePath = await _projectBusiness.UploadProjectLogo(organizationId, projectId, os1, testFormFile);
+        string uploadedFilePath = await _projectBusiness.UploadProjectLogo(organizationId, pid, os1, testFormFile);
 
         // Assert
         Assert.False(string.IsNullOrEmpty(uploadedFilePath));
@@ -1798,7 +2526,6 @@ public class ProjectBusinessTests : IntegrationTestBase
     {
         // Arrange
         long organizationId = 1;
-        long projectId = 1;
 
         var testFileName = "test-logo.png";
         var testFileContent = "Fake image content for testing";
@@ -1806,10 +2533,10 @@ public class ProjectBusinessTests : IntegrationTestBase
         var testFormFile = CreateTestFormFile(testFileName, testFileContent, "image/png");
 
         // Upload a logo so there is an active logo file
-        string uploadedFilePath = await _projectBusiness.UploadProjectLogo(organizationId, projectId, os1, testFormFile);
+        string uploadedFilePath = await _projectBusiness.UploadProjectLogo(organizationId, pid, os1, testFormFile);
 
         // Act
-        var result = await _projectBusiness.GetProjectLogoStreamAsync(organizationId, projectId, os1);
+        var result = await _projectBusiness.GetProjectLogoStreamAsync(organizationId, pid, os1);
 
         // Assert
         Assert.NotNull(result);

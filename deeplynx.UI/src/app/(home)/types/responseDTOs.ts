@@ -174,6 +174,7 @@ export type ObjectStorageResponseDto = {
   lastUpdatedAt: string;
   lastUpdatedBy: string;
   isArchived: boolean;
+  filesDeletable: boolean;
 };
 
 export type OrganizationResponseDto = {
@@ -189,6 +190,7 @@ export type OrganizationResponseDto = {
   theme?: string;
   createContainerPerProject: boolean;
   disableFileTransfer?: boolean;
+  defaultObjectStorageId?: number
 };
 
 export type PermissionResponseDto = {
@@ -198,7 +200,6 @@ export type PermissionResponseDto = {
   action: string;
   resource?: string | null;
   isDefault: boolean;
-  labelId?: number | string;
   lastUpdatedAt?: Date;
   lastUpdatedBy?: string | null;
   isArchived: boolean;
@@ -226,6 +227,7 @@ export type ProjectResponseDto = {
   isArchived: boolean;
   organizationId: number | string;
   banner?: string;
+  defaultObjectStorageId?: number | null;
 };
 
 export type ProjectStatResponseDto = {
@@ -342,6 +344,15 @@ export type OauthApplicationSecureResponseDto = {
   name: string;
   clientId: string;
   clientSecretRaw: string;
+};
+
+export type DeviceVerificationLookupResponseDto = {
+  user_code: string;
+  client_id: string;
+  application_name: string;
+  scope?: string | null;
+  expires_at: string;
+  status: string;
 };
 
 export type PaginatedEventsResponseDto = PaginatedResponse<EventResponseDto>;

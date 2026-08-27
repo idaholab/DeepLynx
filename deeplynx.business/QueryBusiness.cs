@@ -114,6 +114,14 @@ public class QueryBusiness : IQueryBusiness
                 for (var i = 0; i < request.Length; i++)
                 {
                     var query = request[i];
+
+                    //  verify filter belongs to one of valid filter columns
+                    if (string.IsNullOrWhiteSpace(query.Filter) || !AllowedQueryRecordFilterColumns.Contains(query.Filter))
+                    {
+                        throw new ArgumentException(
+                            $"Invalid filter field: '{query.Filter}'. Filter must be one of the allowed query_records columns.");
+                    }
+
                     if (string.IsNullOrWhiteSpace(query.Value) && query.Operator != "KEY_VALUE")
                         throw new ArgumentException("Value cannot be null or empty.");
                     var condition = "";
@@ -335,44 +343,34 @@ public class QueryBusiness : IQueryBusiness
                 return new PaginatedResponse<QueryRecordViewResponseDto>();
             }
 
-            var userProjectAdminStatus = new Dictionary<long, bool>();
+            // Batch fetch admin project IDs
+            var adminProjectIds = await _context.ProjectMembers
+                .Where(pm =>
+                    pm.IsProjectAdmin &&
+                    projectIds.Contains(pm.ProjectId) &&
+                    (
+                        (pm.UserId != null && pm.UserId == currentUserId) ||
+                        pm.Group.Users.Any(u => u.Id == currentUserId)
+                    ))
+                .Select(pm => pm.ProjectId)
+                .Distinct()
+                .ToHashSetAsync();
 
-            var isProjectAdmin = false;
+            var userProjectAdminStatus = projectIds.ToDictionary(pid => pid, adminProjectIds.Contains);
 
-            foreach (var projectId in projectIds)
-            {
-                isProjectAdmin = await _context.ProjectMembers
-                    .AnyAsync(pm =>
-                        pm.ProjectId == projectId &&
-                        pm.IsProjectAdmin &&
-                        (
-                            (pm.UserId != null && pm.UserId == currentUserId) ||
-                            pm.Group.Users.Any(u => u.Id == currentUserId) // group membership
-                        )
-                    );
-
-                userProjectAdminStatus[projectId] = isProjectAdmin;
-            }
-
-            // Filter project IDs based on user permission
             var authorizedProjectIds = new List<long>();
-            foreach (var projectId in projectIds)
+
+            authorizedProjectIds.AddRange(
+                projectIds.Where(p => isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(p)));
+
+            var nonAdminProjects = projectIds.Except(authorizedProjectIds).ToArray();
+
+            if (nonAdminProjects.Any())
             {
-                if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId))
-                {
-                    // Admin access: include project without further permission checks
-                    authorizedProjectIds.Add(projectId);
-                    continue;
-                }
+                var permittedProjects = await _projectRolePermissionService.PermissionsInProjects(
+                    currentUserId, nonAdminProjects, "read", "record");
 
-                // Check read permission for non-admin projects
-                var hasPermission = await _projectRolePermissionService.PermissionInProject(
-                    currentUserId, projectId, "read", "record");
-
-                if (hasPermission)
-                    authorizedProjectIds.Add(projectId);
-                else
-                    Console.WriteLine($"User {currentUserId} lacks read permission on project {projectId}, excluding.");
+                authorizedProjectIds.AddRange(permittedProjects);
             }
 
             if (!authorizedProjectIds.Any())
@@ -380,10 +378,6 @@ public class QueryBusiness : IQueryBusiness
                 Console.WriteLine($"User {currentUserId} has no access to any requested projects.");
                 return new PaginatedResponse<QueryRecordViewResponseDto>();
             }
-
-            var nonAdminProjects = authorizedProjectIds
-                .Where(p => !userProjectAdminStatus.GetValueOrDefault(p))
-                .ToArray();
 
             List<long> authorizedLabelIds = new List<long>();
             if (nonAdminProjects.Any() && !isSysAdmin && !isOrgAdmin)
@@ -396,68 +390,70 @@ public class QueryBusiness : IQueryBusiness
             if (!isSysAdmin && !isOrgAdmin)
             {
                 authorizationFilter = @"
-                    AND (
-                        qr.project_id = ANY(@adminProjects)
-                        OR (
-                            qr.project_id = ANY(@nonAdminProjects)
-                            AND (
-                                NOT EXISTS (
-                                    SELECT 1 FROM deeplynx.record_labels rl WHERE rl.record_id = qr.id
-                                )
-                                OR
-                                NOT EXISTS (
-                                    SELECT 1 FROM deeplynx.record_labels rl2 WHERE rl2.record_id = qr.id AND rl2.label_id != ALL(@authorizedLabelIds)
-                                )
+                AND (
+                    qr.project_id = ANY(@adminProjects)
+                    OR (
+                        qr.project_id = ANY(@nonAdminProjects)
+                        AND (
+                            NOT EXISTS (
+                                SELECT 1 FROM deeplynx.record_labels rl WHERE rl.record_id = qr.id
+                            )
+                            OR
+                            NOT EXISTS (
+                                SELECT 1 FROM deeplynx.record_labels rl2 WHERE rl2.record_id = qr.id AND rl2.label_id != ALL(@authorizedLabelIds)
                             )
                         )
-                    )";
+                    )
+                )";
             }
 
             var sql = $@"
-                SELECT
-                    qr.*,
-                    qr.class_id as ClassId,
-                    qr.class_name as ClassName,
-                    qr.original_id as OriginalId,
-                    qr.data_source_name as DataSourceName,
-                    qr.data_source_id as DataSourceId,
-                    qr.project_name as ProjectName,
-                    qr.project_id as ProjectId,
-                    qr.last_updated_at as LastUpdatedAt,
-                    qr.last_updated_by as LastUpdatedBy,
-                    qr.object_storage_name as ObjectStorageName,
-                    qr.object_storage_id as ObjectStorageId,
-                    qr.id as RecordId,
-                    qr.is_archived as IsArchived
-                FROM deeplynx.query_records qr
-                WHERE qr.is_archived = false
-                AND qr.project_id = ANY(@authorizedProjectIds)
-                AND qr.organization_id = @organizationId
-                {authorizationFilter}";
+            SELECT
+                qr.*,
+                qr.class_id as ClassId,
+                qr.class_name as ClassName,
+                qr.original_id as OriginalId,
+                qr.data_source_name as DataSourceName,
+                qr.data_source_id as DataSourceId,
+                qr.project_name as ProjectName,
+                qr.project_id as ProjectId,
+                qr.last_updated_at as LastUpdatedAt,
+                qr.last_updated_by as LastUpdatedBy,
+                qr.object_storage_name as ObjectStorageName,
+                qr.object_storage_id as ObjectStorageId,
+                qr.id as RecordId,
+                qr.is_archived as IsArchived
+            FROM deeplynx.query_records qr
+            WHERE qr.is_archived = false
+            AND qr.project_id = ANY(@authorizedProjectIds)
+            AND qr.organization_id = @organizationId
+            {authorizationFilter}";
 
             var parameters = new List<NpgsqlParameter>
-            {
-                new NpgsqlParameter("authorizedProjectIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedProjectIds.ToArray() },
-                new NpgsqlParameter("organizationId", organizationId),
-                new NpgsqlParameter("adminProjects", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedProjectIds.Where(p => userProjectAdminStatus.GetValueOrDefault(p)).ToArray() },
-                new NpgsqlParameter("nonAdminProjects", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = nonAdminProjects },
-                new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedLabelIds.ToArray() }
-            };
+        {
+            new NpgsqlParameter("authorizedProjectIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedProjectIds.ToArray() },
+            new NpgsqlParameter("organizationId", organizationId),
+            new NpgsqlParameter("adminProjects", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedProjectIds.Where(p => userProjectAdminStatus.GetValueOrDefault(p)).ToArray() },
+            new NpgsqlParameter("nonAdminProjects", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = nonAdminProjects },
+            new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = authorizedLabelIds.ToArray() }
+        };
 
-            if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-            {
-                parameters.Add(new NpgsqlParameter("authorizedLabelIds", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
-                {
-                    Value = authorizedLabelIds.ToArray()
-                });
-            }
-
+            // Handle dynamic query-building logic (filters, text search, etc.)
             var conditions = new List<string>();
             if (request?.Length > 0)
             {
                 for (var i = 0; i < request.Length; i++)
                 {
                     var query = request[i];
+
+                    // Validate filter against the allowed columns
+                    // before it's ever used, to prevent SQL injection.
+                    if (string.IsNullOrWhiteSpace(query.Filter) || !AllowedQueryRecordFilterColumns.Contains(query.Filter))
+                    {
+                        throw new ArgumentException(
+                            $"Invalid filter field: '{query.Filter}'. Filter must be one of the allowed query_records columns.");
+                    }
+
                     if (string.IsNullOrWhiteSpace(query.Value) && query.Operator != "KEY_VALUE")
                         throw new ArgumentException("Value cannot be null or empty.");
 
@@ -471,76 +467,23 @@ public class QueryBusiness : IQueryBusiness
                     }
                     else if (query.Operator == "LIKE")
                     {
-                        var jsonbColumns = new[] { "properties", "tags" };
-
-                        if (jsonbColumns.Contains(query.Filter.ToLower()))
-                        {
-                            if (query.Filter.ToLower() == "tags")
-                                condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' ILIKE @{paramName})";
-                            else
-                                condition = $"EXISTS (SELECT 1 FROM jsonb_each_text(qr.{query.Filter}) WHERE value ILIKE @{paramName})";
-                        }
-                        else
-                        {
-                            condition = $"qr.{query.Filter} ILIKE @{paramName}";
-                        }
+                        condition = $"qr.{query.Filter} ILIKE @{paramName}";
                         parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
                     }
                     else if (query.Operator == "=")
                     {
-                        var jsonbColumns = new[] { "properties", "tags" };
-
-                        if (jsonbColumns.Contains(query.Filter.ToLower()))
-                        {
-                            if (query.Filter.ToLower() == "tags")
-                            {
-                                condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' = @{paramName})";
-                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
-                            }
-                            else
-                            {
-                                condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
-                                parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
-                            }
-                        }
-                        else
-                        {
-                            if (int.TryParse(query.Value, out var intVal))
-                            {
-                                condition = $"qr.{query.Filter} = @{paramName}";
-                                parameters.Add(new NpgsqlParameter(paramName, intVal));
-                            }
-                            else if (DateTime.TryParse(query.Value, out var dateVal))
-                            {
-                                var startOfDay = dateVal.Date;
-                                var startOfNextDay = dateVal.Date.AddDays(1);
-                                var paramName2 = $"p{parameters.Count + 1}";
-                                condition = $"qr.{query.Filter} >= @{paramName} AND qr.{query.Filter} < @{paramName2}";
-                                parameters.Add(new NpgsqlParameter(paramName, startOfDay));
-                                parameters.Add(new NpgsqlParameter(paramName2, startOfNextDay));
-                            }
-                            else
-                            {
-                                condition = $"qr.{query.Filter} = @{paramName}";
-                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
-                            }
-                        }
+                        condition = $"qr.{query.Filter} = @{paramName}";
+                        parameters.Add(new NpgsqlParameter(paramName, query.Value));
                     }
                     else if (query.Operator == ">")
                     {
                         condition = $"qr.{query.Filter} > @{paramName}";
-                        if (DateTime.TryParse(query.Value, out var dateVal))
-                            parameters.Add(new NpgsqlParameter(paramName, dateVal));
-                        else
-                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                        parameters.Add(new NpgsqlParameter(paramName, query.Value));
                     }
                     else if (query.Operator == "<")
                     {
                         condition = $"qr.{query.Filter} < @{paramName}";
-                        if (DateTime.TryParse(query.Value, out var dateVal))
-                            parameters.Add(new NpgsqlParameter(paramName, dateVal));
-                        else
-                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                        parameters.Add(new NpgsqlParameter(paramName, query.Value));
                     }
                     else
                     {
@@ -554,17 +497,7 @@ public class QueryBusiness : IQueryBusiness
 
             if (conditions.Any())
             {
-                sql += " AND (";
-                for (var i = 0; i < conditions.Count; i++)
-                {
-                    if (i > 0)
-                    {
-                        var connector = request[i].Connector?.ToUpper() == "OR" ? " OR " : " AND ";
-                        sql += connector;
-                    }
-                    sql += conditions[i];
-                }
-                sql += ")";
+                sql += " AND (" + string.Join(" AND ", conditions) + ")";
             }
 
             if (!string.IsNullOrWhiteSpace(textSearch))
@@ -576,25 +509,25 @@ public class QueryBusiness : IQueryBusiness
                 parameters.Add(new NpgsqlParameter("originalQuery", textSearch));
 
                 sql += @"
-                    AND (
-                        to_tsvector('english',
-                                coalesce(name, '') || ' ' ||
-                                coalesce(description, '') || ' ' ||
-                                coalesce(class_name, '') || ' ' ||
-                                coalesce(uri, '') || ' ' ||
-                                coalesce(original_id, '') || ' ' ||
-                                coalesce(data_source_name, '') || ' ' ||
-                                coalesce(project_name, '') || ' ' ||
-                                coalesce(properties::text, '') || ' ' ||
-                                coalesce(tags::text, '')
-                            ) @@ to_tsquery('english', @processedQuery)
-                        OR qr.name ILIKE '%' || @originalQuery || '%'
-                        OR qr.description ILIKE '%' || @originalQuery || '%'
-                        OR qr.original_id ILIKE '%' || @originalQuery || '%'
-                        OR qr.data_source_name ILIKE '%' || @originalQuery || '%'
-                        OR qr.project_name ILIKE '%' || @originalQuery || '%'
-                        OR qr.class_name ILIKE '%' || @originalQuery || '%'
-                    )";
+                AND (
+                    to_tsvector('english',
+                            coalesce(name, '') || ' ' ||
+                            coalesce(description, '') || ' ' ||
+                            coalesce(class_name, '') || ' ' ||
+                            coalesce(uri, '') || ' ' ||
+                            coalesce(original_id, '') || ' ' ||
+                            coalesce(data_source_name, '') || ' ' ||
+                            coalesce(project_name, '') || ' ' ||
+                            coalesce(properties::text, '') || ' ' ||
+                            coalesce(tags::text, '')
+                        ) @@ to_tsquery('english', @processedQuery)
+                    OR qr.name ILIKE '%' || @originalQuery || '%'
+                    OR qr.description ILIKE '%' || @originalQuery || '%'
+                    OR qr.original_id ILIKE '%' || @originalQuery || '%'
+                    OR qr.data_source_name ILIKE '%' || @originalQuery || '%'
+                    OR qr.project_name ILIKE '%' || @originalQuery || '%'
+                    OR qr.class_name ILIKE '%' || @originalQuery || '%'
+                )";
             }
 
             sql += " ORDER BY qr.id, qr.last_updated_at DESC";
@@ -606,9 +539,11 @@ public class QueryBusiness : IQueryBusiness
                 currentUserId,
                 organizationId,
                 authorizedProjectIds.ToArray(),
-                isSysAdmin || isOrgAdmin || isProjectAdmin);
+                isSysAdmin || isOrgAdmin || userProjectAdminStatus.Values.Any(x => x));
 
-            return await Paginator.Paginate(paginated, queryRecordResults, r => QueryRecordToResponse(r, isUriAuthorized(r)));
+            var records = queryRecordResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
+
+            return await records.ToPaginatedAsync(paginated);
         }
         catch (PostgresException ex) when (ex.SqlState == "42703")
         {
@@ -634,6 +569,156 @@ public class QueryBusiness : IQueryBusiness
             throw new ArgumentException($"Error executing query: {ex.Message}", ex);
         }
     }
+
+    /// <summary>
+    ///     Full text records search
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="userQuery">String query</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectIds">Project ids that a user has access to</param>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching projects are returned unpaginated</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>A paginated list of record response dtos from the query view that match provided query parameters</returns>
+    public async Task<PaginatedResponse<QueryRecordViewResponseDto>> SearchPaginated(
+        long currentUserId, string userQuery, long organizationId, long[] projectIds, PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+    {
+        if (string.IsNullOrWhiteSpace(userQuery))
+            throw new Exception("Search query is required.");
+
+        // if user is not admin, filter out unauthorized labels
+        var authorizedLabelIds = new List<long>();
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                    currentUserId, organizationId, projectIds, "read record");
+        }
+
+        var processedQuery = string.Join(" & ",
+            userQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(word => word.Trim() + ":*"));
+
+        var authorizationFilter = (!isSysAdmin && !isOrgAdmin && !isProjectAdmin) ? @"
+            AND (
+                NOT EXISTS (
+                    SELECT 1
+                    FROM deeplynx.record_labels rl
+                    WHERE rl.record_id = qr.id
+                )
+                OR
+                NOT EXISTS (
+                    SELECT 1
+                    FROM deeplynx.record_labels rl2
+                    WHERE rl2.record_id = qr.id
+                    AND rl2.label_id != ALL(@authorized_label_ids)
+                )
+            )" : "";
+
+        var hideArchivedFilter = hideArchived ? @"
+            AND qr.is_archived = false
+            " : "";
+
+        var sql = $@"
+            SELECT
+            qr.*,
+            qr.class_id as ClassId,
+            qr.class_name as ClassName,
+            qr.original_id as OriginalId,
+            qr.data_source_name as DataSourceName,
+            qr.data_source_id as DataSourceId,
+            qr.project_name as ProjectName,
+            qr.project_id as ProjectId,
+            qr.last_updated_at as LastUpdatedAt,
+            qr.last_updated_by as LastUpdatedBy,
+            qr.object_storage_name as ObjectStorageName,
+            qr.object_storage_id as ObjectStorageId,
+            qr.id as RecordId,
+            qr.is_archived as IsArchived
+        FROM deeplynx.query_records qr
+        WHERE qr.project_id = ANY(@project_ids)
+        AND qr.organization_id = @organization_id
+        {hideArchivedFilter}
+        {authorizationFilter}
+        AND (
+            to_tsvector('english',
+                    coalesce(name, '') || ' ' ||
+                    coalesce(description, '') || ' ' ||
+                    coalesce(class_name, '') || ' ' ||
+                    coalesce(uri, '') || ' ' ||
+                    coalesce(original_id, '') || ' ' ||
+                    coalesce(data_source_name, '') || ' ' ||
+                    coalesce(project_name, '') || ' ' ||
+                    coalesce(properties::text, '') || ' ' ||
+                    coalesce(tags::text, '')
+                ) @@ to_tsquery('english', @processed_query)
+            OR qr.name ILIKE '%' || @original_query || '%'
+            OR qr.description ILIKE '%' || @original_query || '%'
+            OR qr.original_id ILIKE '%' || @original_query || '%'
+            OR qr.data_source_name ILIKE '%' || @original_query || '%'
+            OR qr.project_name ILIKE '%' || @original_query || '%'
+            OR qr.class_name ILIKE '%' || @original_query || '%'
+        )
+        ORDER BY qr.id, qr.last_updated_at DESC";
+
+        var parameters = new List<NpgsqlParameter>
+        {
+            new NpgsqlParameter("processed_query", processedQuery),
+            new NpgsqlParameter("original_query", userQuery),
+            new NpgsqlParameter("project_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint) { Value = projectIds },
+            new NpgsqlParameter("organization_id", organizationId)
+        };
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            parameters.Add(new NpgsqlParameter("authorized_label_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint)
+            {
+                Value = authorizedLabelIds.ToArray()
+            });
+        }
+
+        var entityQuery = _context.QueryRecords.FromSqlRaw(sql, parameters.ToArray());
+
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService, currentUserId, organizationId, projectIds,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        if (paginatedRequestDto.PageSize == -1)
+        {
+            var all = await entityQuery.ToListAsync();
+            var allItems = all.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToList();
+            return new PaginatedResponse<QueryRecordViewResponseDto>
+            {
+                Items = allItems,
+                PageNumber = 1,
+                PageSize = allItems.Count,
+                TotalCount = allItems.Count,
+            };
+        }
+
+        var totalCount = await entityQuery.CountAsync();
+
+        var page = await entityQuery
+            .OrderBy(r => r.Id) 
+            .Skip((paginatedRequestDto.PageNumber - 1) * paginatedRequestDto.PageSize)
+            .Take(paginatedRequestDto.PageSize)
+            .ToListAsync();
+
+        var items = page.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToList();
+
+        return new PaginatedResponse<QueryRecordViewResponseDto>
+        {
+            Items = items,
+            PageNumber = paginatedRequestDto.PageNumber,
+            PageSize = paginatedRequestDto.PageSize,
+            TotalCount = totalCount,
+        };
+    }
+
+    #region Deprecated
 
     /// <summary>
     ///     Full text records search
@@ -757,6 +842,8 @@ public class QueryBusiness : IQueryBusiness
         return await queryRecordsResults.Select(r => QueryRecordToResponse(r, isUriAuthorized(r))).ToListAsync();
     }
 
+    #endregion
+
     /// <summary>
     ///     Retrieves current records for projects, ordered by last_updated_at first
     /// </summary>
@@ -856,7 +943,9 @@ public class QueryBusiness : IQueryBusiness
             projectId,
             isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-        return await Paginator.Paginate(paginated, query, r => QueryRecordToResponse(r, isUriAuthorized(r)));
+        var records = query.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
+
+        return await records.ToPaginatedAsync(paginated);
     }
 
     static private QueryRecordViewResponseDto QueryRecordToResponse(
@@ -888,13 +977,99 @@ public class QueryBusiness : IQueryBusiness
     ///     Retrieves all records for multiple projects.
     /// </summary>
     /// <param name="currentUserId">The ID of current user</param>
-    /// <param name="organizationId"> Orginization Id of projects</param>
+    /// <param name="organizationId"> Organization Id of projects</param>
+    /// <param name="projects">Array of project ids whose records are to be retrieved</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if null, all matching edges are returned unpaginated</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <returns>A list of records based on the applied filters.</returns>
+    public async Task<PaginatedResponse<QueryRecordViewResponseDto>> GetMultiProjectRecordsPaginated(
+        long currentUserId,
+        long organizationId,
+        long[] projects,
+        bool hideArchived,
+        PaginatedRequestDto paginatedRequestDto,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false)
+    {
+        if (projects.Length == 0)
+        {
+            return new PaginatedResponse<QueryRecordViewResponseDto>
+            {
+                Items = [],
+                PageNumber = paginatedRequestDto.PageNumber,
+                PageSize = paginatedRequestDto.PageSize,
+                TotalCount = 0
+            };
+        }
+
+        var projectSet = new HashSet<long>(projects);
+
+        var recordQuery = _context.QueryRecords
+            .Where(r => projectSet.Contains(r.ProjectId) && r.OrganizationId == organizationId)
+            .AsQueryable();
+
+        if (hideArchived)
+            recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var authorizedLabelIds = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projects, "read record");
+
+            var authorizedRecordIds = _context.Records
+                .Where(rec => rec.OrganizationId == organizationId && projects.Contains(rec.ProjectId))
+                .WithAuthorizedLabels(authorizedLabelIds)
+                .Select(rec => rec.Id);
+
+            recordQuery = recordQuery.Where(r => authorizedRecordIds.Contains(r.Id));
+        }
+
+        var orderedQuery = recordQuery.OrderBy(r => r.Id);
+
+        var isUriAuthorized = await ExposeUriHelper.GetQueryRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            projects,
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        return await orderedQuery
+            .Select(r => QueryRecordToResponse(r, isUriAuthorized(r)))
+            .ToPaginatedAsync(paginatedRequestDto);
+    }
+
+     // validate a query_records filter column
+    private static readonly HashSet<string> AllowedQueryRecordFilterColumns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "id", "uri", "properties", "original_id", "name", "description",
+        "class_id", "class_name", "data_source_id", "data_source_name",
+        "object_storage_id", "object_storage_name", "project_id", "project_name",
+        "organization_id", "file_type", "file_size", "tags", "labels",
+        "last_updated_at", "last_updated_by", "is_archived"
+    };
+
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all specified records without pagination.
+    ///     Superseded by <see cref="GetMultiProjectRecordsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 query controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId"> Organization Id of projects</param>
     /// <param name="projects">Array of project ids whose records are to be retrieved</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
     /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
     /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>A list of records based on the applied filters.</returns>
+    [Obsolete("V1-only. Used by deprecated v1 query endpoints. Superseded by GetMultiProjectRecordsPaginated. " +
+              "Remove once v1 query endpoints are sunset.", error: false)]
     public async Task<IEnumerable<QueryRecordViewResponseDto>> GetMultiProjectRecords(
         long currentUserId, long organizationId, long[] projects, bool hideArchived,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
@@ -933,4 +1108,6 @@ public class QueryBusiness : IQueryBusiness
 
         return records.Select(r => QueryRecordToResponse(r, isUriAuthorized(r)));
     }
+
+    #endregion
 }

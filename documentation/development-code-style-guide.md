@@ -21,18 +21,17 @@ The goal is consistency:
 
 The repository is organized as a .NET solution with separate projects for API, business logic, interfaces, models, data access, helpers, tests, API tests, documentation, and MCP tooling.
 
-| Project or folder | Responsibility |
-|---|---|
-| `deeplynx.api` | ASP.NET Core API host, controllers, API startup configuration, middleware pipeline, OpenAPI/Scalar configuration. |
-| `deeplynx.business` | Domain/business logic implementations. Business classes own validation, EF queries, persistence orchestration, event creation, and domain-specific rules. |
-| `deeplynx.interfaces` | Interfaces for business-layer services. Controllers depend on these interfaces rather than concrete business classes. |
-| `deeplynx.models` | Request DTOs, response DTOs, configuration models, and API-facing data shapes. |
-| `deeplynx.datalayer` | Entity Framework contexts, entity models, migrations, database version checks, and migration runner support. |
-| `deeplynx.helpers` | Shared middleware, auth helpers, validation helpers, cache helpers, clients, exceptions, SignalR hubs, and cross-cutting utilities. |
-| `deeplynx.tests` | .NET integration/unit tests, especially business-layer tests backed by Testcontainers. |
-| `deeplynx.apitest` | Python API-level tests. |
-| `documentation` | Architecture notes, ADRs, and developer documentation. |
-| `deeplynx.mcp` | MCP server and tools. Keep this separate from normal API behavior unless the change explicitly touches MCP. |
+| Project or folder     | Responsibility                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deeplynx.api`        | ASP.NET Core API host, versioned controllers under `Controllers/V{major}`, API startup configuration, middleware pipeline, OpenAPI/Scalar configuration.  |
+| `deeplynx.business`   | Domain/business logic implementations. Business classes own validation, EF queries, persistence orchestration, event creation, and domain-specific rules. |
+| `deeplynx.interfaces` | Interfaces for business-layer services. Controllers depend on these interfaces rather than concrete business classes.                                     |
+| `deeplynx.models`     | Request DTOs, response DTOs, configuration models, and API-facing data shapes.                                                                            |
+| `deeplynx.datalayer`  | Entity Framework contexts, entity models, migrations, database version checks, and migration runner support.                                              |
+| `deeplynx.helpers`    | Shared middleware, auth helpers, validation helpers, cache helpers, clients, exceptions, SignalR hubs, and cross-cutting utilities.                       |
+| `deeplynx.tests`      | .NET integration/unit tests, for business layer, helpers, and controllers backed by Testcontainers.                                                       |
+| `documentation`       | Architecture notes, ADRs, and developer documentation.                                                                                                    |
+| `deeplynx.mcp`        | MCP server and tools. Keep this separate from normal API behavior unless the change explicitly touches MCP.                                               |
 
 ## Backend Layering Rules
 
@@ -53,25 +52,35 @@ Do not accept EF entities as API request bodies. Use request DTOs.
 
 The API is hosted by `deeplynx.api/Program.cs`.
 
-The app uses URL-segment API versioning:
+The app uses Asp.Versioning with URL-segment API versioning:
 
 ```text
-api/v{version:apiVersion}/
+/api/v{version}/...
 ```
 
-Controller routes are written without the version prefix. A global route-prefix convention adds the versioned API prefix at startup. For example:
+`NexusApiVersions.Default` configures v1 as the default version. Public callers should still include an explicit version segment so the intended contract is unambiguous:
+
+```text
+/api/v1/organizations/{organizationId}/projects   # frozen and deprecated
+/api/v2/organizations/{organizationId}/projects   # forward-development path
+```
+
+Controller routes are written without the version prefix. `ApiVersionRoutePrefixConvention` adds `api/v{version:apiVersion}` at startup. For example:
 
 ```csharp
 [Route("organizations/{organizationId:long}/projects")]
 ```
 
-The resulting API path is:
+The resulting paths are:
 
 ```text
 /api/v1/organizations/{organizationId}/projects
+/api/v2/organizations/{organizationId}/projects
 ```
 
-Controllers that have not been explicitly versioned are treated as unchanged APIs by the default API version convention. They are currently registered for both v1 and v2 so endpoints without version-specific behavior remain visible and callable from either Scalar document.
+Controllers that have not been explicitly versioned are treated as unchanged APIs by `DefaultApiVersionConvention`. They are currently registered for both v1 and v2 so endpoints without version-specific behavior remain visible and callable from either Scalar document. Do not add endpoints to an unannotated shared controller: doing so would also expand the frozen v1 API. First make the controller's supported versions explicit and map new work only to v2 or later.
+
+v1 is supported, frozen, and deprecated. Do not modify v1 controllers or actions, and do not remove their legacy `try`/`catch`. New endpoints and breaking contract changes belong in v2 or later.
 
 ### API Startup Flow
 
@@ -128,12 +137,25 @@ Controllers should:
 - Use `[ForbidServiceAccounts]` on endpoints service accounts should not be able to access.
 - Keep route methods small.
 - For v2 and later actions, return the success response and allow exceptions to reach the global handlers.
-- Preserve controller-level catches only where they are required by a frozen v1 contract or another documented exception.
+- Preserve controller-level catches only where they are required by the frozen v1 contract.
 
-Example:
+#### Frozen v1 Controller Shape
+
+v1 controllers and actions are legacy code whose routes, status codes, response bodies, and controller-level error handling form a frozen contract. Do not modify them, add endpoints to them, or remove their `try`/`catch`. A change intended for forward development must be implemented as a v2 or later action instead. See [Legacy v1 Controller Pattern](#legacy-v1-controller-pattern) for the preserved shape.
+
+#### V2 and Later Controller Shape
+
+v2 and later controllers contain the success path only. They do not use controller-level `try`/`catch` for logging or HTTP error translation; domain exceptions flow to the global RFC 7807 `ProblemDetails` handlers. See [V2 and Later Controller Pattern](#v2-and-later-controller-pattern) for the error-handling rules.
+
+Preferred v2 template:
 
 ```csharp
+using Asp.Versioning;
+
+namespace deeplynx.api.Controllers.V2;
+
 [ApiController]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects")]
 [Authorize]
 public class ProjectController : ControllerBase
@@ -164,18 +186,18 @@ Controllers should return the most specific HTTP status code that describes the 
 
 #### Successful Responses
 
-| Scenario | Preferred response | Use when |
-|---|---:|---|
-| Read one resource | `200 OK` | The resource exists and is returned in the response body. |
-| Read a collection | `200 OK` | The request succeeds, even when the collection is empty. Return an empty array/list rather than `404`. |
-| Create resource | `201 Created` | A new resource was created. Include the created response DTO. Use `CreatedAtRoute` when there is a route that can fetch the new resource. |
-| Create action without a stable fetch route | `200 OK` | A resource or workflow result is created, but the API does not expose a clean location route. This matches several existing controller patterns. |
-| Full update | `200 OK` | The updated resource is returned. |
-| Partial update, archive, or unarchive | `200 OK` | The updated resource or a status message is returned. |
-| Delete with response message | `200 OK` | The API returns a message such as `{ message = "Deleted project 123" }`. |
-| Delete without response body | `204 No Content` | The delete succeeds and there is nothing useful to return. |
-| Long-running operation accepted | `202 Accepted` | Work has started but is not complete, such as background extraction, ingestion, or queued processing. Include a status ID or polling location when available. |
-| File download or stream | `200 OK` | The file exists and the response contains the stream with appropriate content type and length where possible. |
+| Scenario                                   | Preferred response | Use when                                                                                                                                                      |
+| ------------------------------------------ | -----------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read one resource                          |           `200 OK` | The resource exists and is returned in the response body.                                                                                                     |
+| Read a collection                          |           `200 OK` | The request succeeds, even when the collection is empty. Return an empty array/list rather than `404`.                                                        |
+| Create resource                            |      `201 Created` | A new resource was created. Include the created response DTO. Use `CreatedAtRoute` when there is a route that can fetch the new resource.                     |
+| Create action without a stable fetch route |           `200 OK` | A resource or workflow result is created, but the API does not expose a clean location route. This matches several existing controller patterns.              |
+| Full update                                |           `200 OK` | The updated resource is returned.                                                                                                                             |
+| Partial update, archive, or unarchive      |           `200 OK` | The updated resource or a status message is returned.                                                                                                         |
+| Delete with response message               |           `200 OK` | The API returns a message such as `{ message = "Deleted project 123" }`.                                                                                      |
+| Delete without response body               |   `204 No Content` | The delete succeeds and there is nothing useful to return.                                                                                                    |
+| Long-running operation accepted            |     `202 Accepted` | Work has started but is not complete, such as background extraction, ingestion, or queued processing. Include a status ID or polling location when available. |
+| File download or stream                    |           `200 OK` | The file exists and the response contains the stream with appropriate content type and length where possible.                                                 |
 
 Example create response with a route:
 
@@ -195,25 +217,25 @@ return Ok(projects);
 
 #### Client Error Responses
 
-| Scenario | Preferred response | Use when |
-|---|---:|---|
-| Invalid body, query, or route value | `400 Bad Request` | The request cannot be processed because caller-provided input is invalid. |
-| Missing or invalid authentication | `401 Unauthorized` | The caller is not authenticated. Middleware usually handles this. |
-| Authenticated but not allowed | `403 Forbidden` | The caller is authenticated but lacks the required role, permission, or admin status. Middleware usually handles this. |
-| Resource not found | `404 Not Found` | The requested entity does not exist, belongs to a different scope, or is intentionally hidden by archive filtering. |
-| Wrong HTTP method | `405 Method Not Allowed` | ASP.NET Core usually handles this automatically when routes are configured correctly. |
-| Conflict with current state | `409 Conflict` | The request is valid, but cannot be completed because of current server state, such as dependent data, duplicate unique values, or state transitions that are not allowed. |
-| Unsupported media type | `415 Unsupported Media Type` | The request content type is not supported. ASP.NET Core usually handles this for body binding. |
-| Validation shape is correct but semantic validation fails | `400 Bad Request` or `409 Conflict` | Use `400` for invalid input. Use `409` when the input is valid but conflicts with existing state. |
+| Scenario                                                  |                  Preferred response | Use when                                                                                                                                                                   |
+| --------------------------------------------------------- | ----------------------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invalid body, query, or route value                       |                   `400 Bad Request` | The request cannot be processed because caller-provided input is invalid.                                                                                                  |
+| Missing or invalid authentication                         |                  `401 Unauthorized` | The caller is not authenticated. Middleware usually handles this.                                                                                                          |
+| Authenticated but not allowed                             |                     `403 Forbidden` | The caller is authenticated but lacks the required role, permission, or admin status. Middleware usually handles this.                                                     |
+| Resource not found                                        |                     `404 Not Found` | The requested entity does not exist, belongs to a different scope, or is intentionally hidden by archive filtering.                                                        |
+| Wrong HTTP method                                         |            `405 Method Not Allowed` | ASP.NET Core usually handles this automatically when routes are configured correctly.                                                                                      |
+| Conflict with current state                               |                      `409 Conflict` | The request is valid, but cannot be completed because of current server state, such as dependent data, duplicate unique values, or state transitions that are not allowed. |
+| Unsupported media type                                    |        `415 Unsupported Media Type` | The request content type is not supported. ASP.NET Core usually handles this for body binding.                                                                             |
+| Validation shape is correct but semantic validation fails | `400 Bad Request` or `409 Conflict` | Use `400` for invalid input. Use `409` when the input is valid but conflicts with existing state.                                                                          |
 
 #### Server and Dependency Error Responses
 
-| Scenario | Preferred response | Use when |
-|---|---:|---|
-| Unexpected server failure | `500 Internal Server Error` | An unhandled or unexpected backend failure occurred. Log details and return a safe message. |
-| Upstream service failed | `502 Bad Gateway` | A dependency such as Insight or another service failed or returned an unusable response. |
-| Upstream service unavailable | `503 Service Unavailable` | A required dependency is temporarily unavailable and the request may succeed later. |
-| Upstream timeout | `504 Gateway Timeout` | A dependency did not respond in time. |
+| Scenario                     |          Preferred response | Use when                                                                                    |
+| ---------------------------- | --------------------------: | ------------------------------------------------------------------------------------------- |
+| Unexpected server failure    | `500 Internal Server Error` | An unhandled or unexpected backend failure occurred. Log details and return a safe message. |
+| Upstream service failed      |           `502 Bad Gateway` | A dependency such as Insight or another service failed or returned an unusable response.    |
+| Upstream service unavailable |   `503 Service Unavailable` | A required dependency is temporarily unavailable and the request may succeed later.         |
+| Upstream timeout             |       `504 Gateway Timeout` | A dependency did not respond in time.                                                       |
 
 #### Response Body Rules
 
@@ -240,11 +262,11 @@ Use names that describe the operation and resource. Avoid vague names such as `a
 
 Most resources are scoped at one of these levels:
 
-| Scope | Route pattern |
-|---|---|
-| Organization | `organizations/{organizationId:long}/...` |
-| Project | `organizations/{organizationId:long}/projects/{projectId:long}/...` |
-| User/global | Resource-specific routes that do not include `organizationId` or `projectId`. Protected with `[SysAdmin]`, `[OrgAdmin(unscoped: true)]`, or left unauthorized when appropriate. |
+| Scope        | Route pattern                                                                                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Organization | `organizations/{organizationId:long}/...`                                                                                                                                       |
+| Project      | `organizations/{organizationId:long}/projects/{projectId:long}/...`                                                                                                             |
+| User/global  | Resource-specific routes that do not include `organizationId` or `projectId`. Protected with `[SysAdmin]`, `[OrgAdmin(unscoped: true)]`, or left unauthorized when appropriate. |
 
 When a route needs authorization based on organization or project membership, include the relevant route IDs so `AuthMiddleware` can evaluate permissions.
 
@@ -354,39 +376,64 @@ Nexus uses URL-segment API versioning. Public controller routes are shaped as:
 /api/v{version}/...
 ```
 
+v1 is supported but **FROZEN and deprecated**. It remains accessible. Do not modify v1 controllers or actions, add v1 endpoints, or strip their legacy `try`/`catch`. v2 is the forward-development version: new endpoints and breaking changes, including RFC 7807 error-contract changes, belong in v2 or later.
+
 Do not put the `api/v1` prefix in controller `[Route]` attributes. Controller routes should stay resource-focused:
 
 ```csharp
+namespace deeplynx.api.Controllers.V2;
+
 [ApiController]
+[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
 public class ClassProjectController : ControllerBase
 {
 }
 ```
 
-Existing unannotated controllers are registered for the currently supported default versions. Do not add `[ApiVersion(1)]` or `[ApiVersion(2)]` to every controller or action just for consistency. That creates churn without changing behavior.
+Organize controllers by major API version. A resource that is available in v1 and v2 has two files:
 
-When a controller starts supporting a new API version, make that controller's supported versions explicit:
+```text
+deeplynx.api/
+  Controllers/
+    V1/
+      ClassProjectController.cs
+    V2/
+      ClassProjectController.cs
+```
+
+Use the version in both the folder and namespace. The two classes intentionally have the same unversioned class name because the namespace distinguishes them:
 
 ```csharp
+// Controllers/V1/ClassProjectController.cs
+namespace deeplynx.api.Controllers.V1;
+
 [ApiController]
 [ApiVersion(1)]
-[ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
 public class ClassProjectController : ControllerBase
 {
     [HttpGet]
-    [MapToApiVersion(1)]
-    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV1(...)
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClasses(...)
     {
         // Existing legacy behavior.
     }
+}
+```
 
+```csharp
+// Controllers/V2/ClassProjectController.cs
+namespace deeplynx.api.Controllers.V2;
+
+[ApiController]
+[ApiVersion(2)]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
+public class ClassProjectController : ControllerBase
+{
     /// <summary>Get Classes</summary>
     [HttpGet]
-    [MapToApiVersion(2)]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV2(...)
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClasses(...)
     {
         // New v2 behavior.
     }
@@ -395,19 +442,20 @@ public class ClassProjectController : ControllerBase
 
 Versioning rules:
 
-- Leave untouched controllers unannotated; they are treated as unchanged APIs and are available in the configured default versions.
-- Once a controller gets version-specific behavior, add explicit `[ApiVersion(1)]` and `[ApiVersion(2)]` at the controller level.
-- If a controller declares only `[ApiVersion(1)]`, its actions are v1 by default; do not add `[MapToApiVersion(1)]` to every action.
-- Use `[MapToApiVersion(...)]` when two actions share the same HTTP verb and route but have version-specific behavior.
-- If an action behaves identically across declared controller versions, one action can serve all declared versions by omitting `[MapToApiVersion]`.
-- If an action is explicitly mapped with `[MapToApiVersion(1)]`, it is v1-only. To keep the same action available in v2, either omit `[MapToApiVersion]` when the controller declares both versions, or map the action to both versions intentionally.
+- Put every new versioned controller in `deeplynx.api/Controllers/V{major}` and use the matching `deeplynx.api.Controllers.V{major}` namespace.
+- Declare exactly one `[ApiVersion(...)]` per controller. The declared major version must match its folder and namespace.
+- Give corresponding controllers and actions the same names across versions. Do not add `V1`, `V2`, or similar suffixes; the namespace supplies the distinction.
+- Keep the complete controller surface for a version in that version's folder. When adding v3, copy the applicable v2 controller into `Controllers/V3` and change it there, including unchanged actions that remain part of the contract.
+- Do not mix actions for multiple API versions in one controller. With one controller per version, `[MapToApiVersion(...)]` is unnecessary and should not be used.
+- Duplicate small amounts of HTTP orchestration across versions when necessary to keep contracts independent. Extract genuinely version-neutral behavior into the business layer or a shared service, not a controller base class that couples versioned HTTP contracts.
 - Keep v1 behavior byte-for-byte compatible unless the ticket explicitly changes the v1 contract.
 - Put breaking response, status-code, route, request DTO, or error-contract changes in a new API version.
 - Add a Scalar version badge to an action introduced or changed in a newer API version. Use the uppercase major-version label and the standard badge styling: `[Badge("V2", BadgePosition.Before, "#72e6a1")]`.
-- Put version badges on the version-specific action, not on the controller. Unchanged actions inherited by the newer version should not be labeled as new.
-- Scalar badges are documentation metadata only. They do not replace `[ApiVersion]` or `[MapToApiVersion]` and do not affect routing.
+- Put version badges on the changed action, not on the controller. An unchanged action copied into the newer version should not be labeled as new.
+- Scalar badges are documentation metadata only. They do not replace `[ApiVersion]` and do not affect routing.
 - Scalar renders operation badges in the endpoint details, but not in the sidebar. Keep operations in their normal functional group and do not duplicate tags solely to display version metadata in the sidebar.
 - Update OpenAPI/Scalar documentation and route smoke tests when adding a new API version.
+- Mirror the production layout in controller tests, for example `deeplynx.tests/Controllers/V1` and `deeplynx.tests/Controllers/V2`, and import the version-specific controller namespace explicitly.
 - Register new public API versions in `deeplynx.api/NexusApiVersions.cs`. This is the source of truth for default API versioning, supported versions, OpenAPI documents, and the Scalar document dropdown:
 
 ```csharp
@@ -434,7 +482,7 @@ public static IReadOnlyList<string> OpenApiDocumentNames { get; } =
 ];
 ```
 
-Scalar loads versioned docs by document name, so a new API version is not visible in the Scalar dropdown until the matching document name is added to `OpenApiDocumentNames`.
+`AddNexusOpenApi` registers an OpenAPI group for every value in `OpenApiDocumentNames`, and `Program.cs` adds those same document names to Scalar. A new version does not appear in Scalar's selector until its matching document name, such as `"v3"`, is present in `OpenApiDocumentNames`.
 
 #### API Version Catalogs in Standalone Consumers
 
@@ -483,14 +531,13 @@ using Scalar.AspNetCore;
 
 /// <summary>Create a Class</summary>
 [HttpPost]
-[MapToApiVersion(2)]
 [Badge("V2", BadgePosition.Before, "#72e6a1")]
-public async Task<ActionResult<ClassResponseDto>> CreateClassV2(...)
+public async Task<ActionResult<ClassResponseDto>> CreateClass(...)
 ```
 
-Use the badge label `V{major}`, such as `V2` or `V3`, so version badges remain consistent across controllers. Add the badge only to the version-specific action introduced or materially changed in that version. Do not badge an unchanged action that is inherited by a newer API version.
+Use the badge label `V{major}`, such as `V2` or `V3`, so version badges remain consistent across controllers. Add the badge only to the version-specific action introduced or materially changed in that version. Do not badge an unchanged action copied into a newer version.
 
-The `Badge` annotation affects OpenAPI/Scalar documentation only. It does not assign an API version, constrain a route, or replace `[ApiVersion]` and `[MapToApiVersion]`. The versioned URL communicates which API document and route the user is viewing; the badge highlights the operations that differ in that version.
+The `Badge` annotation affects OpenAPI/Scalar documentation only. It does not assign an API version, constrain a route, or replace `[ApiVersion]`. The versioned URL communicates which API document and route the user is viewing; the badge highlights the operations that differ in that version.
 
 `Program.cs` enables `ReportApiVersions`, so valid versioned controller responses include API version reporting headers:
 
@@ -498,42 +545,86 @@ The `Badge` annotation affects OpenAPI/Scalar documentation only. It does not as
 api-supported-versions: 1.0
 ```
 
-`api-deprecated-versions` is only populated when a version is explicitly marked deprecated, such as with a deprecated API version convention or `[ApiVersion(1, Deprecated = true)]`. These headers are expected on versioned controller endpoints. Do not assume they will be present on manually mapped non-controller endpoints such as health checks, SignalR hubs, Scalar, or OpenAPI JSON.
+v1's deprecation is currently a product and documentation status. The running API does not mark v1 as deprecated through Asp.Versioning, so do not claim that responses emit an `api-deprecated-versions` header. If runtime metadata is added later, document and test the header separately.
 
-To deprecate a controller version with attributes, mark the version as deprecated on the controller:
+To deprecate a controller version with attributes, mark that version's controller as deprecated. Other versions remain in their own files:
 
 ```csharp
+// Controllers/V1/ClassProjectController.cs
+namespace deeplynx.api.Controllers.V1;
+
 [ApiController]
 [ApiVersion(1, Deprecated = true)]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
+public class ClassProjectController : ControllerBase
+{
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClasses(...)
+    {
+        // Deprecated v1 behavior.
+    }
+}
+```
+
+```csharp
+// Controllers/V2/ClassProjectController.cs
+namespace deeplynx.api.Controllers.V2;
+
+[ApiController]
 [ApiVersion(2)]
 [Route("organizations/{organizationId:long}/projects/{projectId:long}/classes")]
 public class ClassProjectController : ControllerBase
 {
     [HttpGet]
-    [MapToApiVersion(1)]
-    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV1(...)
-    {
-        // Deprecated v1 behavior.
-    }
-
-    [HttpGet]
-    [MapToApiVersion(2)]
-    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClassesV2(...)
+    public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetClasses(...)
     {
         // Current v2 behavior.
     }
 }
 ```
 
+Deprecated v1 controller responses also report the deprecation date:
+
+```text
+Deprecation: @1785888000
+```
+
+`Deprecation` uses the RFC 9745 Structured Field Date syntax and represents
+2026-08-05 00:00:00 UTC. No v1 sunset date is currently scheduled, so responses
+do not include a `Sunset` header.
+
+The policy-document `Link` header is intentionally deferred because no
+published policy URL exists yet. When that document is available, v1 responses
+must link to it with `rel="deprecation"`.
+
+#### Header Application Mechanism
+
+Nexus applies the `Deprecation` header through a global MVC
+`IAsyncResultFilter`, registered with `AddControllers` in `Program.cs`. The
+result filter runs within the MVC pipeline after routing and API-version
+resolution, allowing it to inspect the resolved requested version before the
+response body is written. It adds lifecycle headers only when the resolved
+version is v1.
+
+A result filter was selected instead of middleware because the headers apply
+specifically to versioned controller responses. This avoids manually inferring
+the API version from the request path and naturally excludes non-controller
+endpoints such as Scalar, OpenAPI documents, health checks, and SignalR hubs.
+
 If the controller is configured through API versioning conventions instead of attributes, use `HasDeprecatedApiVersion`:
 
 ```csharp
-options.Conventions.Controller<ClassProjectController>()
-    .HasDeprecatedApiVersion(new ApiVersion(1))
+options.Conventions
+    .Controller<deeplynx.api.Controllers.V1.ClassProjectController>()
+    .HasDeprecatedApiVersion(new ApiVersion(1));
+
+options.Conventions
+    .Controller<deeplynx.api.Controllers.V2.ClassProjectController>()
     .HasApiVersion(new ApiVersion(2));
 ```
 
-After v1 is deprecated, valid responses for that controller should report both headers:
+After v1 is deprecated, valid responses for that controller should report both
+API versioning headers:
 
 ```text
 api-supported-versions: 2.0
@@ -541,6 +632,114 @@ api-deprecated-versions: 1.0
 ```
 
 Deprecation advertises that a version is on the way out; it does not remove the route. Keep deprecated versions working until the removal is explicitly scheduled, documented, and coordinated with clients.
+
+#### Deprecated API Version Removal Strategy
+
+Use this strategy for every sunset API version. A sunset date authorizes removal
+only after the required consumer, usage, and release checks have passed; reaching
+the date by itself is not sufficient. Perform removal in a dedicated ticket and
+release rather than as part of the deprecation change.
+
+Before removing a version, confirm all of the following:
+
+- The published sunset date has passed and customers received the required
+  advance notifications.
+- Every internal consumer has migrated to a supported version and its contract
+  tests pass.
+- Every operation in the sunset version has a supported-version replacement or
+  an explicitly approved discontinuation.
+- The removal ticket contains an inventory of the affected code, routes,
+  documentation, tests, and owners, along with a rollback plan.
+
+##### Code Removal Checklist
+
+Complete every applicable step so the sunset version is removed from runtime
+routing and from the generated API documentation:
+
+1. Inventory all version references across application code, tests,
+   configuration, generated response URLs, and documentation. Search for the
+   version's `ApiVersion`, `MapToApiVersion`, central version constant, document
+   name, and literal `/api/v{major}` path. Treat the search results as the
+   starting inventory rather than assuming controller attributes are the only
+   exposure.
+2. Delete controller actions and controllers that exist only for the sunset
+   version. Remove its `[ApiVersion(...)]`, `[MapToApiVersion(...)]`, convention
+   registrations, and version-specific badges from controllers that continue
+   to serve supported versions. Remove DTOs, mapping code, and compatibility
+   branches only after confirming that no supported operation uses them.
+3. Update `NexusApiVersions`: remove the sunset version from the supported or
+   deprecated collections, remove its lifecycle dates and constant when no
+   longer referenced, and change `Default` if it points to the removed version.
+   Confirm that the resulting API-version reporting headers advertise only
+   versions that still exist.
+4. Remove or update lifecycle-header filters and other version-specific
+   behavior. If no deprecated versions remain, unregister and delete the
+   lifecycle filter. Otherwise, preserve the filter for the remaining
+   deprecated versions and remove only the sunset version's configuration.
+5. Review manually mapped endpoints and compatibility aliases in `Program.cs`,
+   including health checks, SignalR hubs, OpenAPI aliases, Scalar aliases, and
+   redirects containing the retired version. Migrate or remove each route
+   deliberately; these endpoints are not governed by MVC API-version
+   attributes.
+6. Remove the version's name from `OpenApiDocumentNames`. Nexus uses this list
+   both to register OpenAPI documents in `AddNexusOpenApi` and to populate the
+   Scalar document selector. Ensure `DefaultOpenApiDocumentName` names a
+   supported version, remove any version-specific OpenAPI or Scalar aliases,
+   and verify that requesting the retired document no longer succeeds. Update
+   `OpenApiGenerateDocumentsOptions` in the API project so build-time artifact
+   generation no longer targets the sunset document, remove stale generated
+   artifacts, and coordinate any generated SDK update.
+7. Remove version-specific response and compatibility behavior outside routing.
+   Examples include hard-coded `Location` headers, error-shape branches,
+   serializers, client constants, environment examples, and links containing
+   the retired path.
+8. Update tests to remove frozen-contract coverage that is no longer relevant
+   and add removal regressions. At minimum, verify that:
+   - A representative retired-version API route returns the configured
+     unsupported-version response and cannot invoke a controller action.
+   - API version-reporting headers no longer list the retired version.
+   - The retired OpenAPI document is unavailable.
+   - Supported OpenAPI documents contain only supported operations.
+   - Scalar neither lists nor defaults to the retired document.
+   - Removed manual aliases and hard-coded response URLs do not expose the
+     retired path.
+9. Run the full server and consumer test suites, publish release notes recording
+   the removal, update the deprecation policy, and monitor unsupported-version
+   responses after deployment. Use the ticket's rollback plan if unexpected
+   active consumers are discovered.
+
+##### V1 Removal Application
+
+For the current v1 retirement, the deprecation date is August 5, 2026. No sunset
+date has been scheduled. The Next.js UI is deployment-configurable and currently
+targets v2 in the standard local and Dev configurations, while `deeplynx.mcp`
+remains pinned to v1 as recorded in `documentation/api-consumer-versioning.md`.
+V1 removal is blocked until MCP has migrated and its v2 contract tests pass.
+External v1 usage must also satisfy the approved removal threshold.
+
+The dedicated v1 removal ticket must build and maintain an exact inventory. At
+minimum, review these known code areas:
+
+- `NexusApiVersions.V1`, `Default`, `Deprecated`, the v1 deprecation date,
+  `OpenApiDocumentNames`, and `DefaultOpenApiDocumentName`.
+- All `[ApiVersion(1, ...)]` and `[MapToApiVersion(1)]` attributes and the
+  corresponding v1-only controller actions.
+- `ApiVersionLifecycleHeadersFilter` registration and its v1 header logic.
+- V1 compatibility branches such as
+  `VersionedInvalidModelStateResponseFactory`.
+- The `ApiV1BasePath` routes in `Program.cs`, including health, SignalR,
+  OpenAPI, Scalar, and redirect aliases.
+- The API project's `OpenApiGenerateDocumentsOptions`, the generated
+  `artifacts/openapi/nexus-v1.json` contract, and downstream SDK generation.
+- Literal `/api/v1` response values such as resumable-upload `Location`
+  headers, plus client, configuration, test, and documentation references.
+- V1 header, frozen-contract, OpenAPI, Scalar, unsupported-version, and
+  consumer tests.
+
+After removal, `/api/v1/...` must not resolve to a controller or manually mapped
+endpoint, `/api/openapi/v1.json` must be unavailable, and Scalar must not list a
+v1 document. V2 and later supported routes and documents must continue to pass
+their regression and contract tests.
 
 ### Query Parameters, Filtering, and Pagination
 
@@ -596,6 +795,7 @@ Scalar uses document-name URLs for API docs:
 
 ```text
 /api/scalar/v1
+/api/scalar/v2
 ```
 
 The Scalar document version controls which OpenAPI document is displayed. OpenAPI operation paths include the URL-segment version, such as `/api/v1/...` or `/api/v2/...`; OpenAPI server URLs should be host-only so generated examples do not duplicate the API prefix.
@@ -693,14 +893,14 @@ Dependency injection registrations live in `deeplynx.api/Program.cs`.
 
 Current common lifetimes:
 
-| Registration | Lifetime | Notes |
-|---|---|---|
-| `DeeplynxContext` | Transient | Main EF context. Configured with Npgsql and pgvector support. |
-| `StagingContext` | Transient | Staging EF context. |
-| Business interfaces | Transient | Most `I...Business` services are transient. |
-| `IBulkCopyUpsertExecutor` | Scoped | Bulk database operation helper. |
-| `ISensitivityLabelService` | Scoped | Sensitivity-label service. |
-| Typed HTTP clients | Managed by `AddHttpClient` | Example: `InsightServiceClient`. |
+| Registration               | Lifetime                   | Notes                                                         |
+| -------------------------- | -------------------------- | ------------------------------------------------------------- |
+| `DeeplynxContext`          | Transient                  | Main EF context. Configured with Npgsql and pgvector support. |
+| `StagingContext`           | Transient                  | Staging EF context.                                           |
+| Business interfaces        | Transient                  | Most `I...Business` services are transient.                   |
+| `IBulkCopyUpsertExecutor`  | Scoped                     | Bulk database operation helper.                               |
+| `ISensitivityLabelService` | Scoped                     | Sensitivity-label service.                                    |
+| Typed HTTP clients         | Managed by `AddHttpClient` | Example: `InsightServiceClient`.                              |
 
 ### DI Rules
 
@@ -862,7 +1062,7 @@ catch (Exception exc)
 
 Business classes throw exceptions for invalid domain states, missing records, validation failures, dependency conflicts, and failed operations.
 
-Keep these catches when they are required to preserve a frozen v1 contract. Do not remove a broad catch from an action shared by v1 and later versions because doing so silently changes v1 error responses. Split the action by API version before adopting global exception handling for v2 and later.
+Keep these catches when they are required to preserve a frozen v1 contract. Do not remove a broad catch while copying a controller into a newer version if doing so would also alter the v1 controller. Keep the v1 action unchanged and adopt global exception handling only in the controller under `Controllers/V2` or later.
 
 ### Automatic Model-State Validation
 
@@ -874,7 +1074,7 @@ The model-state response envelope is versioned globally through `VersionedInvali
 - v2 and later resolved API versions use `BadRequestProblemDetailsFactory.CreateForModelState` and return the unified bad-request envelope.
 - Both branches return `application/problem+json`.
 
-Do not reproduce or override this behavior in individual controllers. Changes to the v1 model-state envelope are breaking API changes and require an explicit contract decision plus an update to the frozen v1 golden test. Changes intended only for v2 and later belong in `BadRequestProblemDetailsFactory.CreateForModelState`.
+Do not reproduce or override this behavior in individual controllers. The v1 model-state envelope is frozen and must not be changed. Changes intended for v2 and later belong in `BadRequestProblemDetailsFactory.CreateForModelState`.
 
 The global `BadRequestExceptionHandler` handles uncaught `ValidationException` and `InvalidRequestException` instances. It is effectively used by v2 and later APIs because legacy v1 controllers catch exceptions and return their established controller-specific responses.
 
@@ -882,21 +1082,21 @@ The global `BadRequestExceptionHandler` handles uncaught `ValidationException` a
 
 For v2 and later actions, allow exceptions to reach the registered global handlers. The handlers own exception logging, response status selection, and the Problem Details envelope.
 
-| Exception or condition | Current global status | Notes |
-|---|---:|---|
-| `ValidationException` | `400 Bad Request` | Request body fails data annotation or long ID validation. Message is passed through to the client unsanitized — keep it client-safe. |
-| `ArgumentException` | `500 Internal Server Error` | Intentionally falls through to the fallback handler pending the throw-site audit described in `BadRequestExceptionHandler`; the response detail is sanitized outside Development. |
-| `InvalidRequestException` | `400 Bad Request` | Domain request is malformed or unsupported. Message is passed through to the client unsanitized — keep it client-safe (no env-var names, file paths, SQL fragments, internal IDs). |
-| `KeyNotFoundException` | `404 Not Found` | Requested entity does not exist or is hidden by archive filtering. |
-| `NoResultsException` | `404 Not Found` | Query succeeded but no result exists when one is required. |
-| `DependencyDeletionException` | `409 Conflict` | Delete is blocked by dependent records. |
-| `InvalidOperationException` | `500 Internal Server Error` | Currently falls through to the fallback handler. Introduce or use a specifically mapped exception when the operation should produce `409` or `400`. |
-| External service failure | `502 Bad Gateway` | Requires a narrow controller translation or a specifically registered global handler. |
-| Unexpected `Exception` | `500 Internal Server Error` | The fallback handler logs the exception and sanitizes the response outside Development. |
+| Exception or condition                              |       Current global status | Notes                                                                                                                                                                                              |
+| --------------------------------------------------- | --------------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValidationException`                               |           `400 Bad Request` | Request body fails data annotation or long ID validation. Message is passed through to the client unsanitized — keep it client-safe.                                                               |
+| `ArgumentException`                                 | `500 Internal Server Error` | Intentionally falls through to the fallback handler pending the throw-site audit described in `BadRequestExceptionHandler`; the response detail is sanitized outside Development.                  |
+| `InvalidRequestException`                           |           `400 Bad Request` | Domain request is malformed or unsupported. Message is passed through to the client unsanitized — keep it client-safe (no env-var names, file paths, SQL fragments, internal IDs).                 |
+| `KeyNotFoundException`                              |             `404 Not Found` | Requested entity does not exist or is hidden by archive filtering.                                                                                                                                 |
+| `NoResultsException`                                |             `404 Not Found` | Query succeeded but no result exists when one is required.                                                                                                                                         |
+| `DependencyDeletionException`                       |              `409 Conflict` | Delete is blocked by dependent records.                                                                                                                                                            |
+| `InvalidOperationException`                         | `500 Internal Server Error` | Currently falls through to the fallback handler. Introduce or use a specifically mapped exception when the operation should produce `409` or `400`.                                                |
+| External service failure without a specific handler | `500 Internal Server Error` | Currently reaches the fallback. Add a client-safe exception type and global handler when the contract requires `502 Bad Gateway` or `504 Gateway Timeout`; do not translate it in a v2 controller. |
+| Unexpected `Exception`                              | `500 Internal Server Error` | The fallback handler logs the exception and sanitizes the response outside Development.                                                                                                            |
 
 ### V2 and Later Controller Pattern
 
-New v2 and later actions should normally contain only the success path. Do not add a broad `try`/`catch` merely to log an exception or return a status already produced by a global handler.
+New v2 and later actions contain only the success path. Do not add controller-level `try`/`catch` for logging, rethrowing, cleanup, or HTTP error translation.
 
 ```csharp
 var currentUserId = UserContextStorage.UserId;
@@ -911,14 +1111,7 @@ return Ok(result);
 
 If the business call throws, execution never reaches the success response. The exception continues to the global handler that maps its type. The controller should still choose the correct success result, such as `Ok`, `CreatedAtAction`, `NoContent`, or `Accepted`; global exception handling does not make every successful action an `Ok` response.
 
-Use a controller-level `try`/`catch` only when the action must:
-
-- Preserve a frozen v1 response contract.
-- Perform HTTP-specific cleanup or compensation before the response ends.
-- Translate a narrowly scoped third-party exception that has no appropriate global mapping.
-- Add essential context and rethrow without also logging the exception.
-
-Do not log and rethrow the same exception when a global handler will log it. That creates duplicate log entries. If a controller no longer performs any logging after its v2 migration, remove its unused `ILogger<T>` dependency.
+Controller-level `try`/`catch` is a v1 legacy shape only. When v2 needs a status that is not mapped, add an appropriate exception type and global handler rather than catching it in the controller. If a v2 controller does not perform independent operational logging, do not inject `ILogger<T>`.
 
 ### Business Layer Error Rules
 
@@ -955,20 +1148,13 @@ if (project.IsArchived && hideArchived)
 
 When calling an external service, separate upstream failures from internal failures.
 
-- Return `502 Bad Gateway` when the upstream service responds with an error or cannot be reached.
-- Return `504 Gateway Timeout` if timeout handling is added and the upstream service times out.
+- Map an upstream error or unreachable service to `502 Bad Gateway` only through a specifically registered global exception handler.
+- Map an upstream timeout to `504 Gateway Timeout` only after adding a specifically registered global exception handler.
 - Log enough context to identify the upstream dependency and operation.
 - Do not return upstream secrets, internal URLs, bearer tokens, or raw response bodies that may contain sensitive data.
+- Do not catch an upstream exception in a v2 controller. Translate it to a client-safe domain exception in the service or business layer and let the global handler create the HTTP response.
 
-Example:
-
-```csharp
-catch (HttpRequestException exc)
-{
-    _logger.LogError(exc, "Insight service request failed while embedding record {RecordId}", recordId);
-    return StatusCode(StatusCodes.Status502BadGateway, "Insight service request failed");
-}
-```
+No dedicated `502` or `504` global handler is currently registered. Until one is added, an uncaught upstream exception reaches `InternalServerErrorExceptionHandler` and returns `500 Internal Server Error`.
 
 ### Middleware Errors
 
@@ -976,12 +1162,12 @@ Middleware may short-circuit requests for authentication, authorization, context
 
 Expected middleware responses:
 
-| Condition | Status |
-|---|---:|
-| Missing or invalid authenticated user | `401 Unauthorized` |
-| Authenticated user lacks required role permission | `403 Forbidden` |
-| Required organization/project context is missing | `400 Bad Request` |
-| Required organization admin or system admin access is missing | `403 Forbidden` |
+| Condition                                                     |             Status |
+| ------------------------------------------------------------- | -----------------: |
+| Missing or invalid authenticated user                         | `401 Unauthorized` |
+| Authenticated user lacks required role permission             |    `403 Forbidden` |
+| Required organization/project context is missing              |  `400 Bad Request` |
+| Required organization admin or system admin access is missing |    `403 Forbidden` |
 
 Middleware should return small JSON error objects and avoid leaking internal implementation details.
 
@@ -990,14 +1176,14 @@ Middleware should return small JSON error objects and avoid leaking internal imp
 - Log the exception object, not only the interpolated string.
 - Return client-safe messages. Avoid returning stack traces or full exception details in new code.
 - Include useful resource IDs in logs.
-- When a narrow catch is justified, catch specific exceptions before generic exceptions.
+- Outside v2 controllers, when a narrow catch is justified, catch specific exceptions before generic exceptions.
 - Use `LogWarning` for expected client or domain errors.
 - Use `LogError` for unexpected server errors or failed dependencies.
 - Do not swallow exceptions in business classes.
 - Do not return `null` to mean failure; throw a meaningful exception or return an explicit empty result when empty is valid.
 - Keep validation errors deterministic and easy to test.
 - Do not use exceptions for normal branching when a simple conditional is clearer.
-- Keep API error responses consistent within the controller or domain being changed.
+- Keep API error responses consistent within the API version and domain being changed.
 
 ## Validation
 
@@ -1038,6 +1224,10 @@ Context.ChangeTracker.Clear();
 ## Configuration and Secrets
 
 Configuration comes from app settings, environment variables, Docker Compose, and deployment configuration.
+
+API-server versioning requires no environment variable or deployment configuration. The default version, supported versions, OpenAPI document names, and Scalar selector entries are defined in `deeplynx.api/NexusApiVersions.cs`. Do not add an environment-variable switch that silently changes an API contract.
+
+Internal consumers select their target version in source code as described in [API Version Catalogs in Standalone Consumers](#api-version-catalogs-in-standalone-consumers). Their base-URL variables identify the server origin and optional deployment base path; they do not select the API version.
 
 Configuration rules:
 
@@ -1097,14 +1287,14 @@ Logging conventions:
 
 ### Logging Levels
 
-| Level | Use for |
-|---|---|
-| `LogTrace` | Very detailed temporary diagnostics. Avoid in normal application code. |
-| `LogDebug` | Developer diagnostics that are safe but too noisy for normal operations. |
-| `LogInformation` | Application lifecycle, startup, migrations, successful major background operations. |
-| `LogWarning` | Expected failures such as validation errors, not-found cases, blocked deletes, or denied domain operations. |
-| `LogError` | Unexpected exceptions, failed dependencies, failed persistence operations, and unrecoverable request failures. |
-| `LogCritical` | Application-level failures that require immediate attention or cause shutdown. |
+| Level            | Use for                                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- |
+| `LogTrace`       | Very detailed temporary diagnostics. Avoid in normal application code.                                         |
+| `LogDebug`       | Developer diagnostics that are safe but too noisy for normal operations.                                       |
+| `LogInformation` | Application lifecycle, startup, migrations, successful major background operations.                            |
+| `LogWarning`     | Expected failures such as validation errors, not-found cases, blocked deletes, or denied domain operations.    |
+| `LogError`       | Unexpected exceptions, failed dependencies, failed persistence operations, and unrecoverable request failures. |
+| `LogCritical`    | Application-level failures that require immediate attention or cause shutdown.                                 |
 
 ### Structured Logging
 
@@ -1221,7 +1411,7 @@ Use this checklist when adding a new backend resource.
 5. Add an interface in `deeplynx.interfaces`.
 6. Add a business implementation in `deeplynx.business`.
 7. Register the business implementation in `Program.cs`.
-8. Add a controller in `deeplynx.api/Controllers`.
+8. Add a controller in each supported version folder under `deeplynx.api/Controllers/V{major}` and use its matching version namespace and `[ApiVersion]` attribute.
 9. Add `[Authorize]` and the correct `[Auth]`, `[SysAdmin]`, or `[OrgAdmin]` attributes.
 10. Use explicit `ActionResult<T>` types.
 11. Add XML comments for controller methods.

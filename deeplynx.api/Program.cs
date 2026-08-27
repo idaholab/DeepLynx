@@ -36,8 +36,7 @@ builder.WebHost.ConfigureKestrel(options => { options.Limits.MaxRequestBodySize 
 
 builder.Services.Configure<FormOptions>(options => { options.MultipartBodyLengthLimit = 2L * 1024 * 1024 * 1024; });
 
-builder.Services.AddGrpc().AddFlightServer<NexusFlightServer>();
-builder.Services.AddGrpcReflection();
+
 
 var connectionString = ConnectionStringsProvider.GetPostgresConnectionString(builder.Configuration);
 
@@ -146,6 +145,7 @@ try
     builder.Services.AddControllers(options =>
         {
             options.Conventions.Add(new ApiVersionRoutePrefixConvention("api/v{version:apiVersion}"));
+            options.Filters.Add(new ApiVersionLifecycleHeadersFilter());
         })
         .AddJsonOptions(options =>
         {
@@ -173,15 +173,18 @@ try
             options.ApiVersionReader = new UrlSegmentApiVersionReader();
             options.UnsupportedApiVersionStatusCode = StatusCodes.Status400BadRequest;
         })
-        .AddMvc(options =>
-        {
-            options.Conventions.Add(new DefaultApiVersionConvention(NexusApiVersions.Supported.ToArray()));
-        })
+        .AddMvc()
         .AddApiExplorer(options =>
         {
             options.GroupNameFormat = "'v'V";
             options.SubstituteApiVersionInUrl = true;
         });
+
+    builder.Services.AddDataProtection();
+        // // If running multiple server instances behind a load balancer, state must be shared
+        // .PersistKeysToFileSystem(new DirectoryInfo(@"/shared/keys"))
+        // // or .PersistKeysToAzureBlobStorage(...), .PersistKeysToStackExchangeRedis(...), etc.
+        // .SetApplicationName("Nexus");
 
     /*
     ╔════════════════════════════╗
@@ -193,16 +196,22 @@ try
     var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
     dataSourceBuilder.UseVector();
     var dataSource = dataSourceBuilder.Build();
-
-    builder.Services.AddDbContext<DeeplynxContext>(
-        options => options.UseNpgsql(dataSource),
+    
+    builder.Services.AddDbContext<DeeplynxContext>(options =>
+         options.UseNpgsql(dataSource, npgsqlOptions =>
+        {
+            npgsqlOptions.CommandTimeout(120);
+        }),
         ServiceLifetime.Transient
     );
 
-    builder.Services.AddDbContext<LatticeContext>(
-        options => options.UseNpgsql(connectionString),
-        ServiceLifetime.Transient
-    );
+    builder.Services.AddDbContext<LatticeContext>(options =>
+          options.UseNpgsql(connectionString, npgsqlOptions =>
+         {
+             npgsqlOptions.CommandTimeout(120);
+         }),
+         ServiceLifetime.Transient
+     );
 
     builder.Services.AddSignalR(); // Used for event system pub/sub and notifications
 
@@ -220,6 +229,7 @@ try
     builder.Services.AddTransient<INotificationBusiness, NotificationBusiness>();
     builder.Services.AddTransient<ITokenBusiness, TokenBusiness>();
     builder.Services.AddTransient<IOauthApplicationBusiness, OauthApplicationBusiness>();
+    builder.Services.AddTransient<IOauthDeviceAuthorizationBusiness, OauthDeviceAuthorizationBusiness>();
     builder.Services.AddTransient<IProvenanceBusiness, ProvenanceBusiness>();
     builder.Services.AddTransient<IQueryBusiness, QueryBusiness>();
     builder.Services.AddTransient<IMetadataBusiness, MetadataBusiness>();
@@ -239,6 +249,7 @@ try
     builder.Services.AddTransient<IGroupBusiness, GroupBusiness>();
     builder.Services.AddTransient<IRoleBusiness, RoleBusiness>();
     builder.Services.AddTransient<ISensitivityLabelBusiness, SensitivityLabelBusiness>();
+    builder.Services.AddTransient<IUserSensitivityLabelBusiness, UserSensitivityLabelBusiness>();
     builder.Services.AddTransient<IMaintenanceBusiness, MaintenanceBusiness>();
     builder.Services.AddTransient<IPermissionBusiness, PermissionBusiness>();
     builder.Services.AddTransient<IProjectRolePermissionService, ProjectRolePermissionService>();
@@ -260,6 +271,9 @@ try
     builder.Services.AddHttpClient<AirflowServiceClient>();
     builder.Services.AddSingleton<EncryptionHelper>();
 
+    builder.Services.AddGrpc().AddFlightServer<NexusFlightServer>();
+    builder.Services.AddGrpcReflection();
+
     /*
     ╔════════════════════════════╗
     ║  Global Exception Handling ║
@@ -272,6 +286,7 @@ try
     builder.Services.AddExceptionHandler<BadRequestExceptionHandler>();
     builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
     builder.Services.AddExceptionHandler<ConflictExceptionHandler>();
+    builder.Services.AddExceptionHandler<OauthExceptionHandler>();
     builder.Services.AddExceptionHandler<InternalServerErrorExceptionHandler>();
 
     //OpenApi Documentation
@@ -426,9 +441,7 @@ finally
     Log.CloseAndFlush();
 }
 
-// Top-level statements generate an internal "Program" class by default.
-// Making it public here lets deeplynx.tests host this exact app with
-// WebApplicationFactory<Program> for integration tests - nothing else changes.
+// Expose the generated top-level Program class so integration tests can host this application.
 public partial class Program
 {
 }

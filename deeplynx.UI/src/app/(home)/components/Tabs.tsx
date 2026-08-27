@@ -29,11 +29,13 @@ const Tabs: React.FC<TabsProps> = ({
     setActiveIndex(index !== -1 ? index : 0);
   }, [activeTab, tabs]);
 
-  const handleTabClick = (index: number, label: string) => {
-    setActiveIndex(index);
-    if (onTabChange) {
-      onTabChange(label);
-    }
+  const handleTabClick = (label: string) => {
+    // Don't update activeIndex directly - activeTab prop is the single
+    // source of truth. If the parent accepts the change (by updating the
+    // activeTab prop it passes in), the useEffect above will sync
+    // activeIndex accordingly. If the parent rejects the change (e.g. to
+    // block switching while editing), nothing here should switch tabs.
+    onTabChange?.(label);
   };
 
   return (
@@ -44,10 +46,9 @@ const Tabs: React.FC<TabsProps> = ({
           {tabs.map((tab, index) => (
             <a
               key={index}
-              className={`tab tab-bordered mr-2 sm:mr-4 ${
-                activeIndex === index ? "tab-active text-secondary" : ""
-              }`}
-              onClick={() => handleTabClick(index, tab.label)}
+              className={`tab tab-bordered mr-2 sm:mr-4 ${activeIndex === index ? "tab-active text-secondary" : ""
+                }`}
+              onClick={() => handleTabClick(tab.label)}
             >
               {tab.displayLabel ?? tab.label}
             </a>

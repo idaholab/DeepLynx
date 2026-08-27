@@ -21,7 +21,6 @@ import {
 import {
   PermissionResponseDto,
   RoleResponseDto,
-  UserAdminInfoDto,
 } from "@/app/(home)/types/responseDTOs";
 
 import { LockClosedIcon } from "@heroicons/react/24/outline";
@@ -35,7 +34,6 @@ import ProjectEditRoleModal from "./ProjectEditRoleModal";
 import MatrixViewLayout from "./MatrixViewLayout";
 import SplitViewLayout from "./SplitViewLayout";
 import { useLanguage } from "@/app/contexts/Language";
-import { getCurrentUser } from "@/app/lib/client_service/user_services.client";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -83,7 +81,6 @@ const ProjectRolesAndPermissions = ({
   >({});
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [currentUserInfo, setCurrentUserInfo] = useState<UserAdminInfoDto | null>(null);
 
   const { organization } = useOrganizationSession();
 
@@ -155,6 +152,7 @@ const ProjectRolesAndPermissions = ({
           project?.projectId as number,
           newRole.id,
           userPermissionIds,
+          false,
         );
 
         setRolePermissions((prev) => ({
@@ -309,6 +307,7 @@ const ProjectRolesAndPermissions = ({
         project?.projectId as number,
         currentRole.id,
         Array.from(tempPermissions),
+        isOrganizationRole(currentRole),
       );
 
       const updatedPerms = permissions.filter((p) =>
@@ -416,6 +415,7 @@ const ProjectRolesAndPermissions = ({
           project?.projectId as number,
           role.id,
           newPermissions,
+          false,
         );
       });
 
@@ -555,17 +555,6 @@ const ProjectRolesAndPermissions = ({
   /* ------------------------------------------------------------------------ */
 
   useEffect(() => {
-    if (!organization?.organizationId || !project?.projectId) return;
-
-    getCurrentUser(organization.organizationId as number, project.projectId as number)
-      .then((userInfo) => setCurrentUserInfo(userInfo))
-      .catch((error) => {
-        console.error("Failed to get current user info:", error);
-        toast.error("Failed to get user info");
-      });
-  }, [organization?.organizationId, project?.projectId]);
-
-  useEffect(() => {
     if (!initialLoadComplete && roles.length > 0) {
       fetchAllRolePermissions();
     }
@@ -598,7 +587,7 @@ const ProjectRolesAndPermissions = ({
     if (!organization?.organizationId || !project?.projectId) return;
 
     try {
-      const updatedRoles = await getAllRoles(
+      const { items: updatedRoles } = await getAllRoles(
         organization.organizationId as number,
         project.projectId as number,
         true,
@@ -697,7 +686,6 @@ const ProjectRolesAndPermissions = ({
           onCancelEditingPermissions={handleCancelEditingPermissions}
           onSavePermissions={handleSavePermissions}
           onTogglePermission={handleTogglePermission}
-          isAdmin={currentUserInfo?.isOrgAdmin === true || currentUserInfo?.isSysAdmin === true}
         />
       )}
 

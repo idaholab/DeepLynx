@@ -3,6 +3,7 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -27,6 +28,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
     private readonly Mock<IRecordBusiness> _mockRecordBusiness;
     private readonly INotificationBusiness _notificationBusiness = null!;
     private DataSourceBusiness _dataSourceBusiness;
+    private MetricsBusiness _metricsBusiness = null!;
     public long did;
     public long did2;
     public long did3;
@@ -62,6 +64,7 @@ public class DataSourceBusinessTests : IntegrationTestBase
             _eventBusiness,
             _permissionService,
             _adminService);
+        _metricsBusiness = new MetricsBusiness(Context);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -172,7 +175,6 @@ public class DataSourceBusinessTests : IntegrationTestBase
         {
             Name = "read data source",
             Action = "read",
-            LabelId = lid,
             Resource = "data source",
             OrganizationId = oid,
             IsDefault = false,
@@ -1914,6 +1916,145 @@ public class DataSourceBusinessTests : IntegrationTestBase
         Assert.NotNull(updatedDataSource.LastUpdatedByUser);
         Assert.Equal("John Smith", updatedDataSource.LastUpdatedByUser.Name);
         Assert.Equal("Updated Description", updatedDataSource.Description);
+    }
+
+    #endregion
+
+    #region DataSourceCount Cache Invalidation Tests
+
+    // Each test poisons the relevant cache key(s) with a value the DB would never return. This
+    // proves the getters actually read from cache (not the DB) pre-mutation, then the mutation is
+    // asserted to either replace the poisoned value with the correct DB-backed count (invalidated)
+    // or leave the poisoned value in place (deliberately not invalidated).
+
+    [Fact]
+    public async Task CreateDataSource_InvalidatesProjectOrganizationAndSystemDataSourceCountCache()
+    {
+        // Arrange - get the real pre-mutation counts, then poison the caches with a bogus value
+        var projectCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid);
+        var orgCountBefore = await _metricsBusiness.GetOrganizationDataSourceCount(oid, null);
+        var systemCountBefore = await _metricsBusiness.GetSystemDataSourceCount();
+
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectDataSourceCount(pid, true), 9999, TimeSpan.FromHours(1));
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationDataSourceCount(oid, true), 9999, TimeSpan.FromHours(1));
+        await CacheService.Instance.SetAsync(CacheKeys.SystemDataSourceCount(true), 9999, TimeSpan.FromHours(1));
+
+        // Confirms the getters actually read from cache instead of the DB
+        Assert.Equal(9999, await _metricsBusiness.GetProjectDataSourceCount(pid));
+        Assert.Equal(9999, await _metricsBusiness.GetOrganizationDataSourceCount(oid, null));
+        Assert.Equal(9999, await _metricsBusiness.GetSystemDataSourceCount());
+
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Cache Invalidation Source",
+            Type = "PostgreSQL"
+        };
+
+        // Act
+        await _dataSourceBusiness.CreateDataSource(oid, pid, uid, dto);
+
+        // Assert - poisoned values are gone; the correct DB-backed counts are returned instead
+        Assert.Equal(projectCountBefore + 1, await _metricsBusiness.GetProjectDataSourceCount(pid));
+        Assert.Equal(orgCountBefore + 1, await _metricsBusiness.GetOrganizationDataSourceCount(oid, null));
+        Assert.Equal(systemCountBefore + 1, await _metricsBusiness.GetSystemDataSourceCount());
+    }
+
+    [Fact]
+    public async Task CreateDataSource_OrgLevel_DoesNotAffectUnrelatedProjectDataSourceCountCache()
+    {
+        // Arrange - poison the cache for a project that does not own the new org-level source
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectDataSourceCount(pid2, true), 9999, TimeSpan.FromHours(1));
+
+        // Confirms the getter actually reads from cache instead of the DB
+        Assert.Equal(9999, await _metricsBusiness.GetProjectDataSourceCount(pid2));
+
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "New Org-Level Source",
+            Type = "PostgreSQL"
+        };
+
+        // Act - create an org-level data source (ProjectId == null)
+        await _dataSourceBusiness.CreateDataSource(oid, null, uid, dto);
+
+        // Assert - still the poisoned value, proving this project's cache was left untouched
+        // (GetProjectDataSourceCount never inherits org-level sources, so it shouldn't be invalidated)
+        Assert.Equal(9999, await _metricsBusiness.GetProjectDataSourceCount(pid2));
+    }
+
+    [Fact]
+    public async Task DeleteDataSource_InvalidatesProjectOrganizationAndSystemDataSourceCountCache()
+    {
+        // Arrange - get the real pre-mutation counts, then poison the caches with a bogus value
+        var projectCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid);
+        var orgCountBefore = await _metricsBusiness.GetOrganizationDataSourceCount(oid, null);
+        var systemCountBefore = await _metricsBusiness.GetSystemDataSourceCount();
+
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectDataSourceCount(pid, true), 9999, TimeSpan.FromHours(1));
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationDataSourceCount(oid, true), 9999, TimeSpan.FromHours(1));
+        await CacheService.Instance.SetAsync(CacheKeys.SystemDataSourceCount(true), 9999, TimeSpan.FromHours(1));
+
+        // Confirms the getters actually read from cache instead of the DB
+        Assert.Equal(9999, await _metricsBusiness.GetProjectDataSourceCount(pid));
+        Assert.Equal(9999, await _metricsBusiness.GetOrganizationDataSourceCount(oid, null));
+        Assert.Equal(9999, await _metricsBusiness.GetSystemDataSourceCount());
+
+        // Act
+        await _dataSourceBusiness.DeleteDataSource(oid, pid, did);
+
+        // Assert - poisoned values are gone; the correct DB-backed counts are returned instead
+        Assert.Equal(projectCountBefore - 1, await _metricsBusiness.GetProjectDataSourceCount(pid));
+        Assert.Equal(orgCountBefore - 1, await _metricsBusiness.GetOrganizationDataSourceCount(oid, null));
+        Assert.Equal(systemCountBefore - 1, await _metricsBusiness.GetSystemDataSourceCount());
+    }
+
+    [Fact]
+    public async Task ArchiveDataSource_InvalidatesDataSourceCountCache_ForHideArchivedTrueOnly()
+    {
+        // Arrange - get the real pre-mutation counts for both variants, then poison both caches
+        var activeCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: true);
+        var allCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: false);
+
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectDataSourceCount(pid, true), 9999, TimeSpan.FromHours(1));
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectDataSourceCount(pid, false), 9999, TimeSpan.FromHours(1));
+
+        // Confirms the getters actually read from cache instead of the DB
+        Assert.Equal(9999, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: true));
+        Assert.Equal(9999, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: false));
+
+        // Act
+        await _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, did);
+
+        // Assert - both variants' caches were invalidated; active count reflects the drop, total
+        // count (including archived) is unchanged, but both are now correct DB-backed values, not
+        // the poisoned one
+        Assert.Equal(activeCountBefore - 1, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: true));
+        Assert.Equal(allCountBefore, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: false));
+    }
+
+    [Fact]
+    public async Task UnarchiveDataSource_InvalidatesDataSourceCountCache_ForHideArchivedTrueOnly()
+    {
+        // Arrange - get the real pre-mutation counts for both variants (did3 starts archived), then
+        // poison both caches
+        var activeCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: true);
+        var allCountBefore = await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: false);
+
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectDataSourceCount(pid, true), 9999, TimeSpan.FromHours(1));
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectDataSourceCount(pid, false), 9999, TimeSpan.FromHours(1));
+
+        // Confirms the getters actually read from cache instead of the DB
+        Assert.Equal(9999, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: true));
+        Assert.Equal(9999, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: false));
+
+        // Act
+        await _dataSourceBusiness.UnarchiveDataSource(oid, pid, uid, did3);
+
+        // Assert - both variants' caches were invalidated; active count reflects the increase, total
+        // count (including archived) is unchanged, but both are now correct DB-backed values, not
+        // the poisoned one
+        Assert.Equal(activeCountBefore + 1, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: true));
+        Assert.Equal(allCountBefore, await _metricsBusiness.GetProjectDataSourceCount(pid, hideArchived: false));
     }
 
     #endregion

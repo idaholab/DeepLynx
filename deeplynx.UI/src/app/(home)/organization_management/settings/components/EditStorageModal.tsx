@@ -12,11 +12,13 @@ interface StorageConfig {
 }
 
 interface StorageFormData {
+  id: number;
   name: string;
   config: StorageConfig;
   default: boolean;
   createContainerPerProject: boolean;
   existingStorage?: boolean;
+  filesDeletable: boolean;
 }
 
 interface EditStorageModalProps {
@@ -85,6 +87,24 @@ const EditStorageModal = ({
             </label>
           </div>
 
+          {/* Set as Files Deletable */}
+          <div className="form-control mb-4">
+            <label className="cursor-pointer label flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-primary"
+                checked={storageFormData.filesDeletable}
+                onChange={(e) =>
+                  setStorageFormData({
+                    ...storageFormData,
+                    filesDeletable: e.target.checked,
+                  })
+                }
+              />
+              <span className="label-text">{t.translations.STORAGE_FILES_DELETABLE}</span>
+            </label>
+          </div>
+
           {/* Create Container Per Project */}
           <div className="form-control mb-4">
             <label className="cursor-pointer label flex items-center gap-2">
@@ -110,7 +130,7 @@ const EditStorageModal = ({
               onClick={() => {
                 onToggle(false);
                 setEditingStorage(null);
-                setStorageFormData({ name: "", config: {}, default: false, createContainerPerProject: false });
+                setStorageFormData({ id: -1, name: "", config: {}, default: false, createContainerPerProject: false, filesDeletable: true });
               }}
             >
               {t.translations.CANCEL}

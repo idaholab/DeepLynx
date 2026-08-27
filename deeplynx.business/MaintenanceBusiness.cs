@@ -1,5 +1,7 @@
+using System.Runtime.InteropServices;
 using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -13,19 +15,202 @@ public class MaintenanceBusiness : IMaintenanceBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly FileAzureBusiness _fileAzureBusiness;
+    private readonly IFileBusinessFactory _fileBusinessFactory;
+    private readonly IObjectStorageBusiness _objectStorageBusiness;
+    private readonly IRecordBusiness _recordBusiness;
+    private readonly IDataSourceBusiness _dataSourceBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for database retrieval</param>
     /// <param name="fileBusinessFactory">Factory to create storage-specific file business instances</param>
+    /// <param name="objectStorageBusiness">Business layer service used to retrieve and decrypt object storage configuration</param>
+    /// <param name="recordBusiness">Business layer service used to bulk create records from scraped files</param>
+    /// <param name="dataSourceBusiness">Business layer service used to retrieve the default data source of a project</param>
     public MaintenanceBusiness(
         DeeplynxContext context,
-        FileAzureBusiness fileAzureBusiness)
+        FileAzureBusiness fileAzureBusiness,
+        IFileBusinessFactory fileBusinessFactory,
+        IObjectStorageBusiness objectStorageBusiness,
+        IRecordBusiness recordBusiness,
+        IDataSourceBusiness dataSourceBusiness)
     {
         _context = context;
         _fileAzureBusiness = fileAzureBusiness;
+        _fileBusinessFactory = fileBusinessFactory;
+        _objectStorageBusiness = objectStorageBusiness;
+        _recordBusiness = recordBusiness;
+        _dataSourceBusiness = dataSourceBusiness;
     }
+
+    /// <summary>
+    /// Copies regular file-backed records from a mounted filesystem object storage to Azure Blob Storage.
+    /// Source files are never deleted. Each record is updated only after its destination SHA-256 is verified.
+    /// Directory/appended records are intentionally skipped by this minimal migration.
+    /// </summary>
+    public async Task<FileStorageMigrationResponseDto> MigrateFilesystemRecordsToAzure(
+        FileStorageMigrationRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidationHelper.ValidateModel(request);
+
+        if (request.SourceObjectStorageId == request.TargetObjectStorageId)
+            throw new ArgumentException("Source and target object storage IDs must be different.");
+
+        var sourceStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(request.SourceObjectStorageId);
+        var targetStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(request.TargetObjectStorageId);
+
+        if (sourceStorage.Type != "filesystem")
+            throw new ArgumentException("Source object storage must have type 'filesystem'.");
+        if (targetStorage.Type != "azure_object")
+            throw new ArgumentException("Target object storage must have type 'azure_object'.");
+        if (sourceStorage.OrganizationId != request.OrganizationId || targetStorage.OrganizationId != request.OrganizationId)
+            throw new ArgumentException("Source and target object storages must belong to the requested organization.");
+        if (string.IsNullOrWhiteSpace(sourceStorage.Config.MountPath))
+            throw new InvalidOperationException("Source filesystem mount path is missing.");
+        if (targetStorage.Config.AzureObjectConfig == null)
+            throw new InvalidOperationException("Target Azure object storage configuration is missing.");
+
+        var azureConfig = targetStorage.Config.AzureObjectConfig;
+        if (string.IsNullOrWhiteSpace(azureConfig.AzureConnectionString) ||
+            string.IsNullOrWhiteSpace(azureConfig.AzureContainerName))
+            throw new InvalidOperationException("Target Azure connection string or container name is missing.");
+
+        var container = new BlobContainerClient(azureConfig.AzureConnectionString, azureConfig.AzureContainerName);
+        if (!request.DryRun)
+            await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+
+        var query = _context.Records
+            .AsNoTracking()
+            .Where(r => r.OrganizationId == request.OrganizationId &&
+                        r.ObjectStorageId == request.SourceObjectStorageId &&
+                        r.Uri != null);
+
+        if (request.RecordId.HasValue)
+            query = query.Where(r => r.Id == request.RecordId.Value);
+        else if (request.AfterRecordId.HasValue)
+            query = query.Where(r => r.Id > request.AfterRecordId.Value);
+
+        var records = await query
+            .OrderBy(r => r.Id)
+            .Take(request.BatchSize)
+            .ToListAsync(cancellationToken);
+
+        var response = new FileStorageMigrationResponseDto
+        {
+            DryRun = request.DryRun,
+            Scanned = records.Count,
+            LastRecordId = records.Count == 0 ? request.AfterRecordId : records[^1].Id
+        };
+
+        var normalizedMount = Path.GetFullPath(sourceStorage.Config.MountPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        foreach (var record in records)
+        {
+            var item = new FileStorageMigrationItemDto
+            {
+                RecordId = record.Id,
+                SourceUri = record.Uri
+            };
+            response.Items.Add(item);
+
+            try
+            {
+                var sourcePath = Path.GetFullPath(record.Uri!);
+                EnsurePathIsInsideMount(sourcePath, normalizedMount);
+
+                if (Directory.Exists(sourcePath))
+                    throw new NotSupportedException("Directory/appended records require the follow-up prefix migration.");
+                if (!File.Exists(sourcePath))
+                    throw new FileNotFoundException("The source file does not exist. Source Path: " + sourcePath);
+
+                var fileName = Path.GetFileName(sourcePath);
+                if (string.IsNullOrWhiteSpace(fileName))
+                    throw new InvalidOperationException("Could not determine the source file name.");
+
+                var destinationUri =
+                    $"organization_{record.OrganizationId}/project_{record.ProjectId}/datasource_{record.DataSourceId}/{fileName}";
+                item.DestinationUri = destinationUri;
+
+                if (request.DryRun)
+                {
+                    item.Status = "ready";
+                    continue;
+                }
+
+                string sourceHash;
+                await using (var hashStream = new FileStream(
+                                 sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                                 bufferSize: 1024 * 1024, useAsync: true))
+                {
+                    sourceHash = await Sha256HashHelper.ComputeHexAsync(hashStream, cancellationToken);
+                }
+
+                var blob = container.GetBlobClient(destinationUri);
+                await using (var uploadStream = new FileStream(
+                                 sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                                 bufferSize: 1024 * 1024, useAsync: true))
+                {
+                    await blob.UploadAsync(uploadStream, overwrite: true, cancellationToken: cancellationToken);
+                }
+
+                var blobProperties = await blob.GetPropertiesAsync(cancellationToken: cancellationToken);
+                var sourceLength = new FileInfo(sourcePath).Length;
+                if (blobProperties.Value.ContentLength != sourceLength)
+                    throw new InvalidDataException("Destination content length does not match the source file.");
+
+                var download = await blob.DownloadStreamingAsync(cancellationToken: cancellationToken);
+                await using var destinationStream = download.Value.Content;
+                var destinationHash = await Sha256HashHelper.ComputeHexAsync(destinationStream, cancellationToken);
+                if (!string.Equals(sourceHash, destinationHash, StringComparison.Ordinal))
+                    throw new InvalidDataException("Destination SHA-256 does not match the source file.");
+
+                // Optimistic predicate: do not overwrite a record changed while its file was being copied.
+                var updated = await _context.Records
+                    .Where(r => r.Id == record.Id &&
+                                r.ObjectStorageId == request.SourceObjectStorageId &&
+                                r.Uri == record.Uri)
+                    .ExecuteUpdateAsync(setters => setters
+                            .SetProperty(r => r.Uri, destinationUri)
+                            .SetProperty(r => r.ObjectStorageId, request.TargetObjectStorageId)
+                            .SetProperty(r => r.FileContentHash, sourceHash),
+                        cancellationToken);
+
+                if (updated != 1)
+                    throw new InvalidOperationException("Record changed during migration; its database locator was not updated.");
+
+                item.Status = "migrated";
+                response.Migrated++;
+            }
+            catch (Exception ex)
+            {
+                item.Status = "failed";
+                item.Error = ex.Message;
+                response.Failed++;
+            }
+        }
+
+        return response;
+    }
+
+    private static void EnsurePathIsInsideMount(string sourcePath, string normalizedMount)
+    {
+        var mountPrefix = normalizedMount + Path.DirectorySeparatorChar;
+
+        var comparison = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        if (!sourcePath.Equals(normalizedMount, comparison) &&
+            !sourcePath.StartsWith(mountPrefix, comparison))
+        {
+            throw new InvalidOperationException("Record URI is outside the configured filesystem mount path.");
+        }
+    }
+
+
     /// <summary>
     /// Gets the records that have been uploaded using our old timeseries methods,
     /// enriched with project and datasource info so callers can group/select before migrating.
@@ -157,5 +342,181 @@ public class MaintenanceBusiness : IMaintenanceBusiness
         }
     }
 
+    /// <summary>
+    ///     Scrapes files from a given object storage and creates records for them. 
+    /// </summary>
+    /// <param name="objectStorageId">The ID of the object storage to be scraped</param>
+    /// <param name="currentUserId">ID of the User executing this method.</param>
+    /// <param name="afterCursor">Cursor returned from a previous call, or null to start from the beginning</param>
+    /// <param name="batchSize">Number of records per upsert batch</param>
+    /// <param name="maxBatches">Maximum number of batches to process before returning</param>
+    /// <param name="sensitivityLabelIds">The IDs of the labels to attach</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <param name="cancellationToken">Token checked during the scrape; canceling stops early with whatever was processed so far still committed</param>
+    /// <returns>Number of records processed this call, plus a cursor for the next call (null if complete)</returns>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="KeyNotFoundException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
+    /// <exception cref="NotSupportedException"></exception>
+    public async Task<ScrapeObjectStorageResponseDto> ScrapeObjectStorageToCatalog(
+        long objectStorageId,
+        long currentUserId,
+        string? afterCursor = null,
+        int batchSize = 500,
+        int maxBatches = 5,
+        List<long>? sensitivityLabelIds = null,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false,
+        bool isProjectAdmin = false,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateScraperParameters(batchSize, maxBatches);
+        sensitivityLabelIds = NormalizeAndValidateSensitivityLabelIds(sensitivityLabelIds);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Retrieve the storage and translate a missing result into an expected 404.
+        var objectStorage =
+            await _objectStorageBusiness.GetDecryptedObjectStorage(
+                objectStorageId);
+
+        if (objectStorage == null)
+        {
+            throw new KeyNotFoundException(
+                $"Object storage {objectStorageId} was not found.");
+        }
+
+        if (!objectStorage.OrganizationId.HasValue)
+        {
+            throw new InvalidOperationException(
+                $"Object storage {objectStorageId} does not have an organization.");
+        }
+
+        if (!objectStorage.ProjectId.HasValue)
+        {
+            throw new InvalidOperationException(
+                $"Object storage {objectStorageId} is not assigned to a project.");
+        }
+
+        long organizationId = objectStorage.OrganizationId.Value;
+        long projectId = objectStorage.ProjectId.Value;
+
+        DataSourceResponseDto dataSourceResponse = await _dataSourceBusiness.GetDefaultDataSource(organizationId, projectId);
+        long dataSourceId = dataSourceResponse.Id;
+
+        // Validate every requested label before BulkCreateRecords reaches the FK.
+        if (sensitivityLabelIds is { Count: > 0 })
+        {
+            var existingLabelIds =
+                await _context.SensitivityLabels
+                    .Where(label =>
+                        sensitivityLabelIds.Contains(label.Id) &&
+                        !label.IsArchived &&
+                        label.OrganizationId == organizationId &&
+                        (
+                            label.ProjectId == projectId ||
+                            label.ProjectId == null
+                        ))
+                    .Select(label => label.Id)
+                    .ToListAsync(cancellationToken);
+
+            var missingLabelIds = sensitivityLabelIds
+                .Except(existingLabelIds)
+                .OrderBy(id => id)
+                .ToList();
+
+            if (missingLabelIds.Count > 0)
+            {
+                throw new KeyNotFoundException(
+                    $"Sensitivity label IDs were not found for project " +
+                    $"{projectId}: {string.Join(", ", missingLabelIds)}");
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var fileBusiness = _fileBusinessFactory.CreateFileBusiness(objectStorage.Type);
+
+        ScrapeResult scrapeResult = await fileBusiness.ScrapeAsync(
+            objectStorage,
+            afterCursor,
+            batchSize,
+            maxBatches,
+            cancellationToken);
+
+        if (scrapeResult.Records.Count == 0)
+        {
+            return new ScrapeObjectStorageResponseDto
+            {
+                Processed = 0,
+                NextCursor = scrapeResult.NextCursor
+            };
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var recordResponseDtos =
+            await _recordBusiness.BulkCreateRecords(
+                currentUserId,
+                organizationId,
+                projectId,
+                dataSourceId,
+                scrapeResult.Records,
+                sensitivityLabelIds,
+                isSysAdmin,
+                isOrgAdmin,
+                isProjectAdmin);
+
+        return new ScrapeObjectStorageResponseDto
+        {
+            Processed = recordResponseDtos.Count,
+            NextCursor = scrapeResult.NextCursor
+        };
+    }
+
+    private static void ValidateScraperParameters(
+        int batchSize,
+        int maxBatches)
+    {
+
+        if (batchSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(batchSize),
+                batchSize,
+                "Batch size must be greater than zero.");
+        }
+
+        if (maxBatches <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxBatches),
+                maxBatches,
+                "Maximum batches must be greater than zero.");
+        }
+    }
+
+    private static List<long>? NormalizeAndValidateSensitivityLabelIds(
+        List<long>? sensitivityLabelIds)
+    {
+        sensitivityLabelIds = sensitivityLabelIds?
+            .Distinct()
+            .ToList();
+
+        if (sensitivityLabelIds?.Any(id => id <= 0) == true)
+        {
+            var invalidIds = sensitivityLabelIds.Where(id => id <= 0);
+
+            throw new ArgumentException(
+                $"Sensitivity label IDs must be greater than zero. " +
+                $"Invalid IDs: {string.Join(", ", invalidIds)}",
+                nameof(sensitivityLabelIds));
+        }
+
+        return sensitivityLabelIds;
+    }
 
 }

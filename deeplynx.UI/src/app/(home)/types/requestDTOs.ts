@@ -65,6 +65,7 @@ export type UpdateOrganizationRequestDto = {
   theme?: string | null;
   createContainerPerProject?: boolean | null;
   disableFileTransfer?: boolean;
+  defaultObjectStorageId?: number | null
 };
 
 export type CreateOauthApplicationRequestDto = {
@@ -87,12 +88,14 @@ export type CreateObjectStorageRequestDto = {
   name: string;
   config: Record<string, unknown>;
   default?: boolean;
+  filesDeletable?: boolean;
 };
 
 export type UpdateObjectStorageRequestDto = {
   name: string;
-  default: boolean;
+  default?: boolean;
   existingContainer?: boolean;
+  filesDeletable?: boolean;
 };
 
 export type CreateClassRequestDto = {
@@ -183,7 +186,6 @@ export type CreatePermissionRequestDto = {
   name: string;
   description?: string;
   action: string;
-  labelId?: number;
   projectId?: number;
   organizationId?: number;
 };
@@ -192,7 +194,6 @@ export type UpdatePermissionRequestDto = {
   name?: string;
   description?: string;
   action?: string;
-  labelId?: number;
 };
 
 export type CreateProjectRequestDto = {
@@ -209,6 +210,7 @@ export type UpdateProjectRequestDto = {
   abbreviation?: string;
   banner?: string | null;
   filePath?: string | null;
+  defaultObjectStorageId?: number | null
 };
 
 export type RecordSearchRequestDto = {
@@ -376,4 +378,5 @@ export type CreateRecordFileUploadRequestDto = {
   originalId: string;
   classId?: number | null;
   className?: string | null;
+  Tags?: string[];
 }

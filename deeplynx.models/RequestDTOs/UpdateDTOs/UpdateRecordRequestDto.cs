@@ -25,6 +25,9 @@ public class UpdateRecordRequestDto
     [JsonPropertyName("class_name")]
     public string? ClassName { get; set; }
 
+    [JsonPropertyName("tags")]
+    public List<string>? Tags { get; set; }
+
     [JsonPropertyName("description")]
     [MaxLength(250)]
     public string? Description { get; set; }

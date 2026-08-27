@@ -6,7 +6,7 @@ import {
   ArchiveBoxIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
-import React from "react";
+import React, { useEffect } from "react";
 import CollectionEntitySelector from "./CollectionEntitySelector";
 import CollectionDetailsReadonlyView from "./CollectionDetailsReadonlyView";
 import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
@@ -14,6 +14,9 @@ import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsT
 import SectionCard from "./SectionCard";
 import { interpolateTemplate } from "@/app/lib/record_helpers";
 import type { CollectionDetailsController } from "../[collectionId]/hooks/useCollectionDetails";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "../../components/PaginationControls";
+import { RecordResponseDto } from "../../types/responseDTOs";
 
 type Props = {
   controller: CollectionDetailsController["detailsController"];
@@ -147,6 +150,23 @@ export default function SelectedCollectionDetailsTab({
       {t.translations.ARCHIVE}
     </button>
   );
+
+  const {
+    currentPage: visibleRecordPage,
+    pageSize: visibleRecordPageSize,
+    paginatedItems: paginatedVisibleRecords,
+    resetPagination: resetVisibleRecordPagination,
+    setCurrentPage: setVisibleRecordPage,
+    setPageSize: setVisibleRecordPageSize,
+    totalPages: visibleRecordTotalPages,
+  } = useLocalPagination({
+    items: editRecordResults as RecordResponseDto[],
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetVisibleRecordPagination();
+  }, [editRecordResults, resetVisibleRecordPagination]);
 
   return (
     <div className="mt-4 space-y-4">
@@ -494,7 +514,7 @@ export default function SelectedCollectionDetailsTab({
               />
 
               <CollectionRecordSearchResultsTable
-                rows={editRecordResults.map((record) => {
+                rows={paginatedVisibleRecords.map((record) => {
                   const recordId =
                     typeof record.id === "number" ? record.id : null;
                   const isAssigned =
@@ -624,6 +644,17 @@ export default function SelectedCollectionDetailsTab({
                         .RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED
                 }
               />
+
+              {/* Pagination Controls */}
+              <div className="mt-2 flex justify-end">
+                <PaginationControls
+                  currentPage={visibleRecordPage}
+                  pageSize={visibleRecordPageSize}
+                  totalPages={visibleRecordTotalPages}
+                  onPageChange={setVisibleRecordPage}
+                  onPageSizeChange={setVisibleRecordPageSize}
+                />
+              </div>
 
               {recordSearchLoading ? (
                 <div className="mt-3 flex items-center gap-2 text-sm text-base-content/70">

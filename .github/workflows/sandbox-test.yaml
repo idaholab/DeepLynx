@@ -59,6 +59,8 @@ jobs:
             --build-arg NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
             --build-arg SERVICE_TOKEN="$SERVICE_TOKEN" \
             --build-arg BACKEND_BASE_URL="$BACKEND_BASE_URL" \
+            --build-arg NEXT_PUBLIC_API_URL="${{ vars.NEXT_PUBLIC_API_URL }}" \
+            --build-arg NEXT_PUBLIC_API_VERSION="${{ vars.NEXT_PUBLIC_API_VERSION }}" \
             --build-arg NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION=$NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION \
             .
 

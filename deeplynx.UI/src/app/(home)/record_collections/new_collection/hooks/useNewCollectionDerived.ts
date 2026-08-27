@@ -24,7 +24,6 @@ type Params = {
   newCollectionLabelSearchTerm: string;
   newCollectionTagSearchTerm: string;
   newCollectionRecordSearchResults: NewCollectionSelectedRecord[];
-  newCollectionRecordPage: number;
   newCollectionSelectedRecordIds: number[];
   newCollectionSelectedRecords: NewCollectionSelectedRecord[];
   newCollectionReviewSearchTerm: string;
@@ -41,7 +40,6 @@ export function useNewCollectionDerived({
   newCollectionLabelSearchTerm,
   newCollectionTagSearchTerm,
   newCollectionRecordSearchResults,
-  newCollectionRecordPage,
   newCollectionSelectedRecordIds,
   newCollectionSelectedRecords,
   newCollectionReviewSearchTerm,
@@ -128,22 +126,7 @@ export function useNewCollectionDerived({
         newCollectionLabelSearchTerm.trim().toLowerCase(),
     );
 
-  const newCollectionRecordPageCount = Math.max(
-    1,
-    Math.ceil(newCollectionRecordSearchResults.length / recordsPerPage),
-  );
-
-  const visibleNewCollectionRecords = useMemo(() => {
-    const startIndex = (newCollectionRecordPage - 1) * recordsPerPage;
-    return newCollectionRecordSearchResults.slice(
-      startIndex,
-      startIndex + recordsPerPage,
-    );
-  }, [
-    newCollectionRecordPage,
-    newCollectionRecordSearchResults,
-    recordsPerPage,
-  ]);
+  const visibleNewCollectionRecords = newCollectionRecordSearchResults;
 
   const visibleNewCollectionRecordIds = useMemo(
     () =>
@@ -245,7 +228,6 @@ export function useNewCollectionDerived({
     filteredNewCollectionTagOptions,
     canAddTypedNewCollectionTag,
     canAddTypedNewCollectionLabel,
-    newCollectionRecordPageCount,
     visibleNewCollectionRecords,
     visibleNewCollectionRecordIds,
     visibleSelectionState,

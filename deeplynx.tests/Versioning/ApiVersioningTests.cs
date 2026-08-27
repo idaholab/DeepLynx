@@ -2,8 +2,10 @@ using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
+using deeplynx.models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -84,29 +86,100 @@ public class ApiVersioningTests : IntegrationTestBase
 
     #region Versioning Headers
 
-    //Todo: add this back when v1 is deprecated
-    // https://nstinl.atlassian-us-gov-mod.net/browse/DL-2720
+    [Theory]
+    [InlineData("v1")]
+    [InlineData("v2")]
+    public async Task VersionedResponse_ReportsV2AsSupportedAndV1AsDeprecated(string version)
+    {
+        var response = await _client.GetAsync(ApiPath(version, ProjectTagsRoute));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var supportedVersions = Assert.Single(response.Headers.GetValues("api-supported-versions"));
+        var deprecatedVersions = Assert.Single(response.Headers.GetValues("api-deprecated-versions"));
+
+        Assert.Multiple(
+            () => Assert.Matches(@"^2(?:\.0)?$", supportedVersions),
+            () => Assert.Matches(@"^1(?:\.0)?$", deprecatedVersions));
+    }
 
     [Fact]
-    public async Task V2Response_DoesNotHaveDeprecatedVersionsHeader()
+    public async Task V1Response_HasDeprecationHeaderWithoutSunsetHeader()
+    {
+        var response = await _client.GetAsync(ApiPath("v1", ProjectTagsRoute));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("@1785888000", Assert.Single(response.Headers.GetValues("Deprecation")));
+        Assert.False(response.Headers.Contains("Sunset"));
+    }
+
+    [Fact]
+    public async Task V2Response_DoesNotHaveDeprecationOrSunsetHeaders()
     {
         var response = await _client.GetAsync(ApiPath("v2", ProjectTagsRoute));
 
-        Assert.False(response.Headers.Contains("api-deprecated-versions"),
-            "v2 is the current version and should not be marked deprecated.");
-    }
-
-    [Fact]
-    public async Task BothVersions_HaveSupportedVersionsHeader()
-    {
-        var v1Response = await _client.GetAsync(ApiPath("v1", ProjectTagsRoute));
-        var v2Response = await _client.GetAsync(ApiPath("v2", ProjectTagsRoute));
-
-        Assert.True(v1Response.Headers.Contains("api-supported-versions"));
-        Assert.True(v2Response.Headers.Contains("api-supported-versions"));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(response.Headers.Contains("Deprecation"));
+        Assert.False(response.Headers.Contains("Sunset"));
     }
 
     #endregion
+
+    // =========================================================================
+    // OpenAPI deprecation metadata consumed by Scalar
+    // =========================================================================
+
+    #region OpenAPI Deprecation Metadata
+
+    [Theory]
+    [InlineData("v1", true)]
+    [InlineData("v2", false)]
+    public async Task OpenApiDocument_MarksOnlyV1OperationsAsDeprecated(
+        string documentName,
+        bool expectedDeprecated)
+    {
+        var response = await _client.GetAsync($"/api/openapi/{documentName}.json");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        await using var content = await response.Content.ReadAsStreamAsync();
+        using var document = await JsonDocument.ParseAsync(content);
+        var operations = GetOpenApiOperations(document.RootElement);
+
+        Assert.NotEmpty(operations);
+
+        var incorrectlyMarkedOperations = operations
+            .Where(operation => operation.Deprecated != expectedDeprecated)
+            .Select(operation => $"{operation.Method.ToUpperInvariant()} {operation.Path}")
+            .ToArray();
+
+        Assert.True(
+            incorrectlyMarkedOperations.Length == 0,
+            $"The {documentName} OpenAPI document contains operations with incorrect deprecation metadata: " +
+            string.Join(", ", incorrectlyMarkedOperations));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // Scalar default document
+    // =========================================================================
+
+    [Fact]
+    public async Task Scalar_DefaultsToV2()
+    {
+        var response = await _client.GetAsync("/api/scalar");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains(
+            """{"title":"v2","url":"api/openapi/v2.json","default":true}""",
+            html);
+        Assert.DoesNotContain(
+            """{"title":"v1","url":"api/openapi/v1.json","default":true}""",
+            html);
+    }
 
     // =========================================================================
     // Unsupported version segment
@@ -159,10 +232,11 @@ public class ApiVersioningTests : IntegrationTestBase
     {
         var mockBusiness = new Mock<ITagBusiness>();
         mockBusiness
-            .Setup(b => b.GetAllTags(
+            .Setup(b => b.GetAllTagsPaginated(
                 It.IsAny<long>(),
                 It.IsAny<long>(),
                 It.IsAny<long[]?>(),
+                It.IsAny<PaginatedRequestDto>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>()))
@@ -188,10 +262,11 @@ public class ApiVersioningTests : IntegrationTestBase
     {
         var mockBusiness = new Mock<ITagBusiness>();
         mockBusiness
-            .Setup(b => b.GetAllTags(
+            .Setup(b => b.GetAllTagsPaginated(
                 It.IsAny<long>(),
                 It.IsAny<long>(),
                 It.IsAny<long[]?>(),
+                It.IsAny<PaginatedRequestDto>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>()))
@@ -304,6 +379,34 @@ public class ApiVersioningTests : IntegrationTestBase
     // =========================================================================
     // Test Helpers
     // =========================================================================
+
+    private static IReadOnlyList<OpenApiOperationStatus> GetOpenApiOperations(JsonElement root)
+    {
+        var operations = new List<OpenApiOperationStatus>();
+
+        foreach (var path in root.GetProperty("paths").EnumerateObject())
+        {
+            foreach (var candidate in path.Value.EnumerateObject())
+            {
+                if (!IsHttpMethod(candidate.Name))
+                    continue;
+
+                var deprecated = candidate.Value.TryGetProperty("deprecated", out var value)
+                                 && value.ValueKind == JsonValueKind.True;
+
+                operations.Add(new OpenApiOperationStatus(path.Name, candidate.Name, deprecated));
+            }
+        }
+
+        return operations;
+    }
+
+    private static bool IsHttpMethod(string value)
+    {
+        return value is "get" or "put" or "post" or "delete" or "patch" or "options" or "head" or "trace";
+    }
+
+    private sealed record OpenApiOperationStatus(string Path, string Method, bool Deprecated);
 
     /// <summary>
     ///     Returns a copy of the factory with ITagBusiness replaced by the given mock,

@@ -1,46 +1,108 @@
 import { test, expect, APIRequestContext, Page } from "../fixtures";
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS, orgAdminA, projectAdminX } from "../deeplynx-config";
 import { RoleResponseDto } from "@/app/(home)/types/responseDTOs";
-
-type Organization = {
-  id: number;
-  name: string;
-};
+import { getOrgIdByName } from "../helpers/api";
+import { getProjectIdByName } from "../helpers/upload-helpers";
+import { testApiUrl } from "../api-url";
 
 let orgId: string;
 
-// Resolves an org name (e.g. "PW Org A") to its numeric ID (as a string,
-// to match how projectId/URLs are handled throughout this file). We can
-// no longer assume orgId === "1" now that fixtures let tests run as
-// accounts scoped to arbitrary orgs.
-async function getOrgIdByName(
-  request: APIRequestContext, orgName: string
-): Promise<string> {
-  const BASE_URL = 'http://localhost:5095/api/v1';
-  const res = await request.fetch(`${BASE_URL}/organizations`);
-  if (!res.ok()) throw new Error(`Failed to fetch organizations: ${res.status()}`);
-  const orgs: Organization[] = await res.json();
-  const match = orgs.find((org) => org.name === orgName);
-  if (!match) {
-    throw new Error(`Could not find organization named "${orgName}" in ${JSON.stringify(orgs)}`);
-  }
-  return String(match.id);
+async function navigateToProjLevelSensitivityLabelPermissions(page: Page) {
+  await page.getByRole('link', { name: 'Project Settings' }).click();
+  await page.getByText('Roles & Permissions').click();
+  await page.getByRole('button', { name: 'User ORG User role with' }).click();
+  await page.getByText('Sensitivity Labels', { exact: true }).click();
 }
+
+test.describe("Org Admin editing Permissions of Proj level SLs", () => {
+  test.use({
+    actingUser: orgAdminA,
+    actingOrg: ORGS.orgA,
+    actingProject: PROJECTS.projectX,
+  });
+
+  // Unique per test run so parallel runs / reruns never collide on name.
+  let uniqueLabelName: string;
+  let createdLabelId: number;
+  let apiContext: APIRequestContext;
+  let projectId: string;
+
+  test.beforeAll(async ({ request }, testInfo) => {
+    apiContext = request;
+    orgId = await getOrgIdByName(request, ORGS.orgA.name);
+    projectId = await getProjectIdByName(request, orgId, PROJECTS.projectX.name);
+    uniqueLabelName = `Test SL-${testInfo.testId}`;
+
+    const createResponse = await apiContext.post(
+      testApiUrl(`/projects/${projectId}/labels`),
+      {
+        data: {
+          name: uniqueLabelName,
+          description: "Created by Playwright test - safe to delete",
+        },
+      },
+    );
+
+    if (!createResponse.ok()) {
+      console.log("Status:", createResponse.status());
+      console.log("Body:", await createResponse.text());
+    }
+    expect(createResponse.ok()).toBeTruthy();
+    const created = await createResponse.json();
+    createdLabelId = created.id;
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (!createdLabelId) return;
+    apiContext = request;
+
+    const deleteResponse = await apiContext.delete(
+      testApiUrl(`/projects/${projectId}/labels/${createdLabelId}`),
+    );
+
+    expect(deleteResponse.ok()).toBeTruthy();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await expect(page).toHaveURL(/\/project\/\d+/);
+    await navigateToProjLevelSensitivityLabelPermissions(page);
+  });
+
+  test("Org Admin can edit proj level sensitivity label permissions", async ({ page }) => {
+    await page.getByRole('button', { name: 'Edit Permissions' }).click();
+    await page.getByText('Resource Permissions', { exact: true }).click();
+    await expect(page.locator('div').filter({ hasText: 'Please save' }).first()).toBeVisible();
+    await page.getByTitle(`Permission to delete ${uniqueLabelName} labeled files`).getByLabel('delete file').check();
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(page.locator('div').filter({ hasText: 'Permissions updated' }).first()).toBeVisible();
+  });
+});
+
+test.describe("Project Admin editing Permissions of Proj level SLs on Org level roles", () => {
+  test.use({
+    actingUser: projectAdminX,
+    actingOrg: ORGS.orgA,
+    actingProject: PROJECTS.projectX,
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await expect(page).toHaveURL(/\/project\/\d+/);
+    await navigateToProjLevelSensitivityLabelPermissions(page);
+  });
+
+  test("Project Admin can't edit proj level sensitivity label permissions for Org level roles", async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Edit Permissions' })).toBeDisabled();
+  });
+});
 
 test.describe("Roles & Permissions", () => {
   test.use({
     actingUser: sysAdmin,
-    actingOrg: "PW Org A",
-    actingProject: "PW Project X",
+    actingOrg: ORGS.orgA,
+    actingProject: PROJECTS.projectX,
   });
 
   test.beforeEach(async ({ page, request }) => {
-    await page.getByTestId("project-select").click();
-
-    await page
-      .getByRole("button", { name: "PW Project X", exact: true })
-      .click();
-
     await expect(page).toHaveURL(/\/project\/\d+/);
     // Navigate to Project Settings via sidebar
     await page.locator("aside a", { hasText: "Project Settings" }).click();
@@ -59,13 +121,14 @@ test.describe("Roles & Permissions", () => {
     request: APIRequestContext, projectId: string | undefined, page: Page, orgId: string,
   ) {
     if (!projectId) return;
-    const BASE_URL = 'http://localhost:5095/api/v1';
-    const getAllUrl = `${BASE_URL}/organizations/${orgId}/projects/${projectId}/roles?hideArchived=true`;
+    const getAllUrl = testApiUrl(
+      `/organizations/${orgId}/projects/${projectId}/roles?hideArchived=true`,
+    );
     try {
       let res = await request.fetch(getAllUrl);
       if (!res.ok()) throw new Error(`Failed to fetch roles: ${res.status()}`);
       let roles = await res.json();
-      if (roles.length === 1) {
+      if (roles.items.length === 1) {
         // create new role
         await page.getByRole('button', { name: 'Create Role' }).click();
         await page.getByRole('textbox', { name: 'Enter role name' }).click();
@@ -74,7 +137,7 @@ test.describe("Roles & Permissions", () => {
         return "Playwright test role";
       }
       // return non user
-      return (roles.find((role: RoleResponseDto) => role.name !== "User")).name;
+      return (roles.items.find((role: RoleResponseDto) => role.name !== "User")).name;
     } catch (err) {
       console.warn(`Error getting different role.`, err);
       return undefined;
@@ -155,6 +218,7 @@ test.describe("Roles & Permissions", () => {
 
     test("displays role details panel for selected role", async ({ page }) => {
       // The right panel should show the selected role name as a heading
+      await page.getByRole('button', { name: 'User ORG User role with' }).click();
       const roleHeading = page.locator(".card-title").filter({
         hasText: /^(Admin|User)$/,
       });
@@ -210,7 +274,7 @@ test.describe("Roles & Permissions", () => {
       // make sure a second role is set up
       const url = new URL(page.url());
       const projectId = url.pathname.split('/').pop();
-      orgId = await getOrgIdByName(request, "PW Org A");
+      orgId = await getOrgIdByName(request, ORGS.orgA.name);
 
       // Click a different role than "User" in the sidebar (role buttons contain Source: text)
       const nonUserRole = await getNonUserRole(request, projectId, page, orgId);

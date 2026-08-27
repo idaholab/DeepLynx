@@ -1,6 +1,6 @@
 // src/app/lib/record_services.server.ts
 import "server-only";
-import { RecordResponseDto } from "../../(home)/types/responseDTOs";
+import { PaginatedResponse, RecordResponseDto } from "../../(home)/types/responseDTOs";
 import { UpdateRecordRequestDto } from "../../(home)/types/requestDTOs";
 import { apiErrorFromResponse } from "../api-error";
 import { backendApiUrl } from "./backend-api-url.server";
@@ -26,14 +26,18 @@ export async function getAllRecordsServer(
   projectId: number,
   dataSourceId?: number,
   fileType?: string,
-  hideArchived: boolean = true
-): Promise<RecordResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<RecordResponseDto>> {
   const params = new URLSearchParams();
   if (dataSourceId !== undefined) {
     params.append("dataSourceId", String(dataSourceId));
   }
   if (fileType) params.append('fileType', fileType);
   params.append('hideArchived', String(hideArchived));
+  params.append('pageNumber', String(pageNumber));
+  params.append('pageSize', String(pageSize));
 
   const res = await fetch(
     backendApiUrl(
@@ -44,7 +48,7 @@ export async function getAllRecordsServer(
       cache: "no-store",
     }
   );
-  return asJson<RecordResponseDto[]>(res);
+  return asJson<PaginatedResponse<RecordResponseDto>>(res);
 }
 
 export async function getRecordServer(
@@ -72,11 +76,15 @@ export async function getRecordsByTagsServer(
   organizationId: number,
   projectId: number,
   tagIds: number[],
-  hideArchived: boolean = true
-): Promise<RecordResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<RecordResponseDto>> {
   const params = new URLSearchParams();
   tagIds.forEach((tagId) => params.append("tagIds", tagId.toString()));
   params.append("hideArchived", hideArchived.toString());
+  params.append("pageNumber", pageNumber.toString());
+  params.append("pageSize", pageSize.toString());
 
   const res = await fetch(
     backendApiUrl(
@@ -87,7 +95,7 @@ export async function getRecordsByTagsServer(
       cache: "no-store",
     }
   );
-  return asJson<RecordResponseDto[]>(res);
+  return asJson<PaginatedResponse<RecordResponseDto>>(res);
 }
 
 export async function updateRecordServer(

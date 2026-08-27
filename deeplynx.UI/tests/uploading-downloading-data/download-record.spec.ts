@@ -1,5 +1,5 @@
 import { test, expect, Page } from "../fixtures";
-import { sysAdmin } from '../deeplynx-config';
+import { sysAdmin, ORGS, PROJECTS } from '../deeplynx-config';
 import path from "path";
 import * as os from 'os';
 import * as fs from 'fs';
@@ -40,12 +40,10 @@ async function checkDataSourcesAndStorageDestinations(page: Page) {
 }
 
 test.describe("Download an uploaded file", () => {
-  test.use({ actingUser: sysAdmin, actingOrg: 'PW Org A', actingProject: 'PW Project X' });
+  test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA, actingProject: PROJECTS.projectX });
   let filePath: string;
 
   test.beforeEach(async ({ page }) => {
-    await page.getByRole('link', { name: 'PW Project X' }).click();
-
     // Create the file locally
     filePath = path.join(os.tmpdir(), 'uploaded-test-file');
 

@@ -1,12 +1,12 @@
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 import { test, expect } from "../fixtures";
 
-test.use({ actingUser: sysAdmin});
-test.use({ actingOrg: "PW Org A"});
+test.use({ actingUser: sysAdmin, actingOrg: ORGS.orgA});
 
 test.describe("Data Catalog - All Records", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/data_catalog/all_records", { waitUntil: "domcontentloaded" });
+    await page.getByRole('link').nth(2).click();
+    await expect(page.getByRole('heading', { name: 'All Records' })).toBeVisible();
   });
 
   test("Data Catalog page renders with heading", async ({ page }) => {

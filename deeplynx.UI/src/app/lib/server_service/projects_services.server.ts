@@ -2,6 +2,7 @@
 import "server-only";
 import {
   ProjectResponseDto,
+  PaginatedResponse,
   ProjectStatResponseDto,
   ProjectMemberResponseDto,
 } from "../../(home)/types/responseDTOs";
@@ -14,20 +15,32 @@ import { apiFetch, asJson } from "./api.server";
 
 export async function getAllProjectsServer(
   organizationId?: number,
-  hideArchived: boolean = true
-): Promise<ProjectResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<ProjectResponseDto>> {
   // If no organizationId provided, return empty array or fetch from a different endpoint
   if (!organizationId) {
-    return [];
+    return {
+      items: [],
+      pageNumber,
+      pageSize,
+      totalCount: 0,
+      totalPages: 0,
+      hasPrevious: false,
+      hasNext: false
+    };
   }
 
   const params = new URLSearchParams();
   params.append("hideArchived", String(hideArchived));
+  params.append("pageNumber", String(pageNumber));
+  params.append("pageSize", String(pageSize));
 
   const res = await apiFetch(
     `/organizations/${organizationId}/projects?${params.toString()}`
   );
-  return asJson<ProjectResponseDto[]>(res);
+  return asJson<PaginatedResponse<ProjectResponseDto>>(res);
 }
 
 export async function createProjectServer(
@@ -112,13 +125,19 @@ export async function deleteProjectServer(
 
 export async function getProjectMembersServer(
   organizationId: number,
-  projectId: number
-): Promise<ProjectMemberResponseDto[]> {
+  projectId: number,
+  pageNumber = 1,
+  pageSize = -1
+): Promise<PaginatedResponse<ProjectMemberResponseDto>> {
+  const params = new URLSearchParams({
+    pageNumber: String(pageNumber),
+    pageSize: String(pageSize),
+  });
   const res = await apiFetch(
-    `/organizations/${organizationId}/projects/${projectId}/members`
+    `/organizations/${organizationId}/projects/${projectId}/members?${params.toString()}`
   );
   // API docs say "A list of groups and users in the project"
-  return asJson<ProjectMemberResponseDto[]>(res);
+  return asJson<PaginatedResponse<ProjectMemberResponseDto>>(res);
 }
 
 export async function addMemberServer(
