@@ -51,4 +51,33 @@ public class CacheKeys
     {
         return $"organization:{projectId}:object_storage:{objectStorageId}:deleted";
     }
+
+    public static string OrganizationArchivedStatus(long organizationId)
+    {
+        return $"organization:{organizationId}:archived_status";
+    }
+
+    public static string OrganizationDeleted(long organizationId)
+    {
+        return $"organization:{organizationId}:deleted";
+    }
+
+    public static string SysAdmin(long userId) {
+        return $"sysadmin:{userId}";
+    }
+
+    public static string OrgAdmin(long userId, long organizationId) 
+    {
+        return $"orgadmin:{userId}:{organizationId}";  
+    }
+
+    public static string OrgMember(long userId, long organizationId) 
+    {
+        return $"orgmember:{userId}:{organizationId}";
+    }
+    
+    public static string ProjectAdmin(long userId, long projectId)
+    {
+        return $"projectadmin:{userId}:{projectId}";
+    }
 }

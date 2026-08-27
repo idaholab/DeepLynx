@@ -19,7 +19,10 @@ public interface IProjectBusiness
     Task<bool> ArchiveProject(long currentUserId, long organizationId, long projectId);
     Task<bool> UnarchiveProject(long currentUserId, long organizationId, long projectId);
     Task<ProjectStatResponseDto> GetProjectStats(long organizationId, long projectId);
+    [Obsolete("V1-only. Used by deprecated v1 project endpoints. Superseded by GetAllProjectsPaginated. " +
+              "Remove once v1 project endpoints are sunset.", error: false)]
     Task<IEnumerable<ProjectMemberResponseDto>> GetProjectMembers(long projectId);
+    Task<PaginatedResponse<ProjectMemberResponseDto>> GetProjectMembersPaginated(long projectId, PaginatedRequestDto paginatedRequestDto);
     Task<bool> AddMemberToProject(long projectId, long? roleId, long? userId,
         long? groupId, bool makeProjectAdmin = false, bool allowServiceAccount = false);
     Task<bool> UpdateProjectMemberRole(long projectId, long roleId, long? userId, long? groupId,
