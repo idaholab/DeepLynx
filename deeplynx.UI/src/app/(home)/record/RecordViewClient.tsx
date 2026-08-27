@@ -868,6 +868,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         embeddingModelConfigId: selectedInsightModels.embeddingModelConfigId ?? undefined,
       });
       toast.success(t.translations.LATTICE_QUEUED_SUCCESS);
+      setIsRecordInsightEmbedding(true);
     } catch {
       toast.error(t.translations.LATTICE_QUEUE_FAILED);
     } finally {
@@ -1021,8 +1022,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
             projectId,
             fileId: recordId
           });
-          console.log(pipelineStatus.status);
-          if (pipelineStatus.status == "in progress") {
+          if (pipelineStatus.status == "in_progress") {
             setIsRecordInsightEmbedding(true);
           } else if (pipelineStatus.status == "completed") {
             setIsRecordInsightEmbedding(false);
@@ -1037,9 +1037,12 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
         setHasCheckedInsightHealth(true);
         setIsRecordInsightEmbedded(status.indexed);
-        console.log(status.indexed);
 
         if (status.indexed) {
+          if (!isInitial) {
+            toast.success(t.translations.EMBEDDED_SUCCESSFULLY)
+          }
+
           if (recordEmbedPollRef.current) {
             clearInterval(recordEmbedPollRef.current);
             recordEmbedPollRef.current = null;
@@ -1398,9 +1401,18 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                   </div>
                 ) : (
                   <> 
-                  {/* LATTICE STARTS HERE !!! */}
                     {!isRecordInsightEmbedded &&
-                      !isCheckingLatticeReadiness && (
+                        isRecordInsightEmbedding && (
+                          <div className="alert alert-warning">
+                            <span className="flex-1 text-sm">
+                              <span className="loading loading-spinner loading-sm" />
+                              {t.translations.PROJECT_INSIGHT_STATUS_PROCESSING}
+                            </span>
+                          </div>
+                        )}
+                    {!isRecordInsightEmbedded &&
+                      !isCheckingLatticeReadiness &&
+                      !isRecordInsightEmbedding && (
                         <div className="alert alert-warning">
                           <span className="flex-1 text-sm">
                             {t.translations.LATTICE_NOT_EMBEDDED_WARNING}
@@ -1417,14 +1429,6 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                               t.translations.LATTICE_QUEUE_FOR_EMBEDDING
                             )}
                           </button>
-                        </div>
-                      )}
-                    {!isRecordInsightEmbedded &&
-                      isRecordInsightEmbedding && (
-                        <div className="alert alert-warning">
-                          <span className="flex-1 text-sm">
-                            {t.translations.PROJECT_INSIGHT_STATUS_PROCESSING}
-                          </span>
                         </div>
                       )}
 
