@@ -431,14 +431,14 @@ public class UserBusiness : IUserBusiness
         _context.Users.Update(candidate);
         await _context.SaveChangesAsync();
 
-        // invalidate the cached admin flag now that it's changed
+        // overwrite the cached admin flag now that it's changed
         try
         {
-            await CacheService.Instance.DeleteAsync(CacheKeys.SysAdmin(candidateId));
+            await CacheService.Instance.SetAsync(CacheKeys.SysAdmin(candidateId), userIsAdmin, TimeSpan.FromHours(1));
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "Cache invalidation failed for user {UserId}", candidateId);
+            _logger?.LogWarning(ex, "Cache overwrite failed for user {UserId}", candidateId);
         }
 
         return true;

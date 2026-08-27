@@ -1564,11 +1564,15 @@ public class ProjectBusinessTests : IntegrationTestBase
     #region AddMemberToProject Tests
 
     [Fact]
-    public async Task AddProjectAdminUser_InvalidatesProjectAdminCache()
+    public async Task AddProjectAdminUser_UpdatesProjectAdminCache()
     {
         // Arrange
         var cacheKey = CacheKeys.ProjectAdmin(uid, pid3);
-        await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
 
         // Act
         var result = await _projectBusiness.AddMemberToProject(
@@ -1580,11 +1584,13 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.True(result);
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
     }
 
     [Fact]
-    public async Task AddMemberToProject_ForGroup_InvalidatesEveryGroupUsersCache()
+    public async Task AddMemberToProject_ForGroup_UpdatesEveryGroupUsersCache()
     {
         // Arrange
         var group = await Context.Groups
@@ -1601,9 +1607,18 @@ public class ProjectBusinessTests : IntegrationTestBase
         var secondKey = CacheKeys.ProjectAdmin(uid3, pid3);
         var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid3);
 
-        await CacheService.Instance.SetAsync(firstKey, false, TimeSpan.FromMinutes(2));
-        await CacheService.Instance.SetAsync(secondKey, false, TimeSpan.FromMinutes(2));
-        await CacheService.Instance.SetAsync(unrelatedKey, false, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            firstKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            secondKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            unrelatedKey,
+            false,
+            TimeSpan.FromMinutes(2));
 
         // Act
         var result = await _projectBusiness.AddMemberToProject(
@@ -1615,10 +1630,18 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.True(result);
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(firstKey));
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(secondKey));
-        Assert.False(await CacheService.Instance.GetAsync<bool?>(unrelatedKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(firstKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(secondKey));
+        Assert.Equal(
+            false,
+            await CacheService.Instance.GetAsync<bool?>(unrelatedKey));
 
+        await CacheService.Instance.DeleteAsync(firstKey);
+        await CacheService.Instance.DeleteAsync(secondKey);
         await CacheService.Instance.DeleteAsync(unrelatedKey);
     }
 
@@ -1759,11 +1782,15 @@ public class ProjectBusinessTests : IntegrationTestBase
     #region UpdateProjectMemberRole Tests
 
     [Fact]
-    public async Task UpdateProjectMemberRole_WithAdminStatus_InvalidatesProjectAdminCache()
+    public async Task UpdateProjectMemberRole_WithAdminStatus_UpdatesProjectAdminCache()
     {
         // Arrange
         var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
-        await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
 
         // Act
         var result = await _projectBusiness.UpdateProjectMemberRole(
@@ -1775,7 +1802,9 @@ public class ProjectBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.True(result);
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
     }
 
     [Fact]
@@ -1949,22 +1978,31 @@ public class ProjectBusinessTests : IntegrationTestBase
     #region SetProjectAdminStatus Cache Tests
 
     [Fact]
-    public async Task SetProjectAdminStatus_ForUser_InvalidatesProjectAdminCache()
+    public async Task SetProjectAdminStatus_ForUser_UpdatesProjectAdminCache()
     {
         // Arrange
         var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
-        await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
 
         // Act
-        var result = await _projectBusiness.SetProjectAdminStatus(pid, uid, null, true);
+        var result = await _projectBusiness.SetProjectAdminStatus(
+            pid,
+            uid,
+            null,
+            true);
 
         // Assert
         Assert.True(result);
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
     }
 
     [Fact]
-    public async Task SetProjectAdminStatus_ForGroup_InvalidatesEveryGroupUsersCache()
+    public async Task SetProjectAdminStatus_ForGroup_UpdatesEveryGroupUsersCache()
     {
         // Arrange
         var group = await Context.Groups
@@ -1981,19 +2019,40 @@ public class ProjectBusinessTests : IntegrationTestBase
         var secondKey = CacheKeys.ProjectAdmin(uid3, pid5);
         var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid5);
 
-        await CacheService.Instance.SetAsync(firstKey, false, TimeSpan.FromMinutes(2));
-        await CacheService.Instance.SetAsync(secondKey, false, TimeSpan.FromMinutes(2));
-        await CacheService.Instance.SetAsync(unrelatedKey, false, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            firstKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            secondKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            unrelatedKey,
+            false,
+            TimeSpan.FromMinutes(2));
 
         // Act
-        var result = await _projectBusiness.SetProjectAdminStatus(pid5, null, gid, true);
+        var result = await _projectBusiness.SetProjectAdminStatus(
+            pid5,
+            null,
+            gid,
+            true);
 
         // Assert
         Assert.True(result);
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(firstKey));
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(secondKey));
-        Assert.False(await CacheService.Instance.GetAsync<bool?>(unrelatedKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(firstKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(secondKey));
+        Assert.Equal(
+            false,
+            await CacheService.Instance.GetAsync<bool?>(unrelatedKey));
 
+        await CacheService.Instance.DeleteAsync(firstKey);
+        await CacheService.Instance.DeleteAsync(secondKey);
         await CacheService.Instance.DeleteAsync(unrelatedKey);
     }
 

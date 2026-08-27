@@ -2318,7 +2318,7 @@ public class UserBusinessTests : IntegrationTestBase
     #region SetSysAdmin Tests
 
     [Fact]
-    public async Task SetSysAdmin_InvalidatesCandidateSysAdminCache()
+    public async Task SetSysAdmin_UpdatesCandidateSysAdminCache()
     {
         // Arrange
         var authorizer = new User
@@ -2342,14 +2342,22 @@ public class UserBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
 
         var cacheKey = CacheKeys.SysAdmin(candidate.Id);
-        await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
 
         // Act
-        var result = await _userBusiness.SetSysAdmin(authorizer.Id, candidate.Id, true);
+        var result = await _userBusiness.SetSysAdmin(
+            authorizer.Id,
+            candidate.Id,
+            true);
 
         // Assert
         Assert.True(result);
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
     }
 
     [Fact]

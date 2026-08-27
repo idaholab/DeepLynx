@@ -196,7 +196,7 @@ public class AuthMiddlewareTests : IntegrationTestBase
     #region UserContextMiddleware Cache Tests
 
     [Fact]
-    public async Task UserContextMiddleware_CacheMissHitAndInvalidation_RequeriesAndCachesUpdatedSysAdminStatus()
+    public async Task UserContextMiddleware_CacheMissHitAndUpdate_UsesUpdatedSysAdminStatus()
     {
         // Arrange
         var sysAdminKey = CacheKeys.SysAdmin(userId1);
@@ -208,9 +208,8 @@ public class AuthMiddlewareTests : IntegrationTestBase
         await CacheService.Instance.DeleteAsync(orgMemberKey);
 
         _adminServiceMock
-            .SetupSequence(x => x.SysAdminCheck(userId1))
-            .ReturnsAsync(false)
-            .ReturnsAsync(true);
+            .Setup(x => x.SysAdminCheck(userId1))
+            .ReturnsAsync(false);
         _adminServiceMock
             .Setup(x => x.OrgAdminCheck(userId1, organizationId1))
             .ReturnsAsync(false);
@@ -249,7 +248,9 @@ public class AuthMiddlewareTests : IntegrationTestBase
             ], "TestAuth");
 
             context.User = new ClaimsPrincipal(identity);
-            context.Request.RouteValues["organizationId"] = organizationId1.ToString();
+            context.Request.RouteValues["organizationId"] =
+                organizationId1.ToString();
+
             return context;
         }
 
@@ -259,30 +260,47 @@ public class AuthMiddlewareTests : IntegrationTestBase
             await middleware.InvokeAsync(CreateRequest());
 
             Assert.Equal([false], observedSysAdminValues);
-            Assert.False(await CacheService.Instance.GetAsync<bool?>(sysAdminKey));
-            _adminServiceMock.Verify(x => x.SysAdminCheck(userId1), Times.Once);
+            Assert.Equal(
+                false,
+                await CacheService.Instance.GetAsync<bool?>(sysAdminKey));
+            _adminServiceMock.Verify(
+                x => x.SysAdminCheck(userId1),
+                Times.Once);
 
-            // Act 2: cache hit. AdminService must not be queried again.
+            // Act 2: cache hit. AdminService is not queried again.
             await middleware.InvokeAsync(CreateRequest());
 
             Assert.Equal([false, false], observedSysAdminValues);
-            _adminServiceMock.Verify(x => x.SysAdminCheck(userId1), Times.Once);
+            _adminServiceMock.Verify(
+                x => x.SysAdminCheck(userId1),
+                Times.Once);
 
-            // Act 3: the business mutation deletes the stale cache entry.
+            // Act 3: the business mutation updates the cached value directly.
             var userBusiness = new UserBusiness(Context);
-            var mutationResult = await userBusiness.SetSysAdmin(userId2, userId1, true);
+            var mutationResult = await userBusiness.SetSysAdmin(
+                userId2,
+                userId1,
+                true);
 
             Assert.True(mutationResult);
-            Assert.Null(await CacheService.Instance.GetAsync<bool?>(sysAdminKey));
+            Assert.Equal(
+                true,
+                await CacheService.Instance.GetAsync<bool?>(sysAdminKey));
 
-            // Act 4: the next request misses, requeries, and caches the updated value.
+            // Act 4: the next request reads the updated cached value.
             await middleware.InvokeAsync(CreateRequest());
 
             Assert.Equal([false, false, true], observedSysAdminValues);
-            Assert.True(await CacheService.Instance.GetAsync<bool?>(sysAdminKey));
-            _adminServiceMock.Verify(x => x.SysAdminCheck(userId1), Times.Exactly(2));
+            Assert.Equal(
+                true,
+                await CacheService.Instance.GetAsync<bool?>(sysAdminKey));
 
-            // The organization flags remained cached across all three requests.
+            // Only the initial cache miss queried AdminService.
+            _adminServiceMock.Verify(
+                x => x.SysAdminCheck(userId1),
+                Times.Once);
+
+            // Organization flags remained cached across all three requests.
             _adminServiceMock.Verify(
                 x => x.OrgAdminCheck(userId1, organizationId1),
                 Times.Once);

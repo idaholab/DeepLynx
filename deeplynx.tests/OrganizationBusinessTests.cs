@@ -1158,22 +1158,34 @@ public class OrganizationBusinessTests : IntegrationTestBase
     #region AddUser Tests
 
     [Fact]
-    public async Task AddUserToOrganization_InvalidatesOrgMemberAndOrgAdminCache()
+    public async Task AddUserToOrganization_UpdatesOrgMemberAndOrgAdminCache()
     {
         // Arrange
         var orgMemberKey = CacheKeys.OrgMember(uid2, oid);
         var orgAdminKey = CacheKeys.OrgAdmin(uid2, oid);
 
-        await CacheService.Instance.SetAsync(orgMemberKey, false, TimeSpan.FromMinutes(2));
-        await CacheService.Instance.SetAsync(orgAdminKey, true, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            orgMemberKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Use the opposite value to prove the cache is updated.
+        await CacheService.Instance.SetAsync(
+            orgAdminKey,
+            true,
+            TimeSpan.FromMinutes(2));
 
         // Act
         var result = await _organizationBusiness.AddUserToOrganization(oid, uid2);
 
         // Assert
         Assert.True(result);
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(orgMemberKey));
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(orgAdminKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(orgMemberKey));
+        Assert.Equal(
+            false,
+            await CacheService.Instance.GetAsync<bool?>(orgAdminKey));
     }
 
     [Fact]
@@ -1297,23 +1309,39 @@ public class OrganizationBusinessTests : IntegrationTestBase
     #region UpdateUserAdmin Tests
 
     [Fact]
-    public async Task SetOrganizationAdminStatus_InvalidatesOnlyOrgAdminCache()
+    public async Task SetOrganizationAdminStatus_UpdatesOnlyOrgAdminCache()
     {
         // Arrange
         var orgAdminKey = CacheKeys.OrgAdmin(uid, oid);
         var orgMemberKey = CacheKeys.OrgMember(uid, oid);
 
-        await CacheService.Instance.SetAsync(orgAdminKey, false, TimeSpan.FromMinutes(2));
-        await CacheService.Instance.SetAsync(orgMemberKey, true, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            orgAdminKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            orgMemberKey,
+            true,
+            TimeSpan.FromMinutes(2));
 
         // Act
-        var result = await _organizationBusiness.SetOrganizationAdminStatus(oid, uid, true);
+        var result = await _organizationBusiness.SetOrganizationAdminStatus(
+            oid,
+            uid,
+            true);
 
         // Assert
         Assert.True(result);
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(orgAdminKey));
-        Assert.True(await CacheService.Instance.GetAsync<bool?>(orgMemberKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(orgAdminKey));
 
+        // The unrelated member cache value should remain unchanged.
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(orgMemberKey));
+
+        await CacheService.Instance.DeleteAsync(orgAdminKey);
         await CacheService.Instance.DeleteAsync(orgMemberKey);
     }
 

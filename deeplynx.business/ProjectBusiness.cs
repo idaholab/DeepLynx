@@ -1177,10 +1177,10 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Add(projMember);
         await _context.SaveChangesAsync();
 
-        // invalidate the cached admin flag now that it's changed
+        // overwrite the cached admin flag now that it's changed
         if (makeProjectAdmin)
         {
-            await InvalidateProjectAdminCache(projectId, userId, groupId);
+            await OverwriteProjectAdminCache(projectId, userId, groupId, makeProjectAdmin);
         }
 
         if (userId.HasValue && userId != UserContextStorage.UserId)
@@ -1248,10 +1248,10 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Update(existingProjectMember);
         await _context.SaveChangesAsync();
 
-        // invalidate the cached admin flag, but only if it was actually touched
+        // overwrite the cached admin flag, but only if it was actually touched
         if (isProjectAdmin.HasValue)
         {
-            await InvalidateProjectAdminCache(projectId, userId, groupId);
+            await OverwriteProjectAdminCache(projectId, userId, groupId, isProjectAdmin.Value);
         }
 
         return true;
@@ -1293,8 +1293,8 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Update(existingProjectMember);
         await _context.SaveChangesAsync();
 
-        // invalidate the cached admin flag now that it's changed
-        await InvalidateProjectAdminCache(projectId, userId, groupId);
+        // overwrite the cached admin flag now that it's changed
+        await OverwriteProjectAdminCache(projectId, userId, groupId, isAdmin);
 
         return true;
     }
@@ -1348,8 +1348,8 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Remove(existingProjectMember);
         await _context.SaveChangesAsync();
 
-        // invalidate the cached admin flag now that it's changed
-        await InvalidateProjectAdminCache(projectId, userId, groupId);
+        // delete the cached admin flag now that it's changed
+        await OverwriteProjectAdminCache(projectId, userId, groupId, isAdmin: false, deleting: true);
 
         return true;
     }
@@ -1509,19 +1509,26 @@ public class ProjectBusiness : IProjectBusiness
     }
 
     /// <summary>
-    /// Invalidates the cached ProjectAdmin flag for whichever member(s) a project-admin-affecting mutation just touched.
+    /// Overwrite or delete the cached ProjectAdmin flag for whichever member(s) a project-admin-affecting mutation just touched.
     /// </summary>
-    private async Task InvalidateProjectAdminCache(long projectId, long? userId, long? groupId)
+    private async Task OverwriteProjectAdminCache(long projectId, long? userId, long? groupId, bool isAdmin, bool deleting = false)
     {
         if (userId.HasValue)
         {
             try
             {
-                await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, projectId));
+                if (deleting)
+                {
+                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, projectId));
+                }
+                else
+                {
+                    await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(userId.Value, projectId), isAdmin, cacheTTL);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
+                _logger.LogWarning(ex, "Cache overwrite failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
             }
         }
         else if (groupId.HasValue)
@@ -1535,11 +1542,18 @@ public class ProjectBusiness : IProjectBusiness
             {
                 try
                 {
-                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, projectId));
+                    if (deleting)
+                    {
+                        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, projectId));
+                    }
+                    else
+                    {
+                        await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(memberId, projectId), isAdmin, cacheTTL);
+                    }  
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Cache invalidation failed for user {UserId}, project {ProjectId}", memberId, projectId);
+                    _logger.LogWarning(ex, "Cache overwrite failed for user {UserId}, project {ProjectId}", memberId, projectId);
                 }
             }
         }
