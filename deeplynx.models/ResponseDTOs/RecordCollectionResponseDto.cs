@@ -39,4 +39,50 @@ public class RecordCollectionResponseDto
 
     [NotMapped] public ICollection<RecordCollectionTagDto> Tags { get; set; }
     [NotMapped] public ICollection<RecordCollectionLabelDto> Labels { get; set; }
+
+    public RecordCollectionResponseDtoV2 ToV2()
+    {
+        return new RecordCollectionResponseDtoV2
+        {
+            Id = Id,
+            Name = Name,
+            Description = Description,
+            Properties = Properties,
+            ProjectId = ProjectId,
+            OrganizationId = OrganizationId,
+            LastUpdatedAt = LastUpdatedAt,
+            LastUpdatedBy = LastUpdatedBy,
+            IsArchived = IsArchived,
+            RecordCount = RecordCount,
+            Tags = Tags,
+            SensitivityLabels = Labels
+        };
+    }
+}
+
+public class RecordCollectionResponseDtoV2
+{
+    [Column("id")] public long Id { get; set; }
+
+    [Column("name")] public string Name { get; set; }
+
+    [Column("description")] public string Description { get; set; }
+
+    [Column("properties")] public string? Properties { get; set; } = null!;
+
+    [Column("project_id")] public long ProjectId { get; set; }
+
+    [Column("organization_id")] public long OrganizationId { get; set; }
+
+    [Column("last_updated_at", TypeName = "timestamp without time zone")]
+    public DateTime LastUpdatedAt { get; set; }
+
+    [Column("last_updated_by")] public long? LastUpdatedBy { get; set; }
+
+    [Column("is_archived")] public bool IsArchived { get; set; } = false;
+
+    [NotMapped] public int RecordCount { get; set; }
+
+    [NotMapped] public ICollection<RecordCollectionTagDto> Tags { get; set; }
+    [NotMapped] public ICollection<RecordCollectionLabelDto> SensitivityLabels { get; set; }
 }
