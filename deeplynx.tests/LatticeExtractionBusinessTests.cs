@@ -904,31 +904,43 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         // Arrange
         await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.Valid);
 
+         var sc = new ExtractionClass
+        {
+            ExtractionId = completeExtractionId,
+            Name = "Military Organization",
+            OrganizationId = oid,
+            ProjectId = pid,
+            ValidationStatus = ExtractionValidationStatus.Valid,
+            OntologyClassId = cid1
+        };
+        _latticeCtx.ExtractionClasses.Add(sc);
+        await _latticeCtx.SaveChangesAsync();
+
         var stagingRecords = new List<ExtractionRecord>
         {
             new ExtractionRecord
             {
                 ExtractionId = completeExtractionId,
-                ExtractionClassId = cid1,
+                ExtractionClassId = sc.Id,
                 Name = "Record 1",
                 OrganizationId = oid,
                 ProjectId = pid,
                 DataSourceId = dsid,
                 ValidationStatus = ExtractionValidationStatus.Valid,
                 Attributes = @"{ ""tags"": [""Tag1"", ""Tag2""] }",
-                SourceRecordId = 479812
+                SourceRecordId = recordId
             },
             new ExtractionRecord
             {
                 ExtractionId = completeExtractionId,
-                ExtractionClassId = cid1,
+                ExtractionClassId = sc.Id,
                 Name = "Record 2",
                 OrganizationId = oid,
                 ProjectId = pid,
                 DataSourceId = dsid,
                 ValidationStatus = ExtractionValidationStatus.Valid,
                 Attributes = @"{ ""tags"": [""Tag3"", ""Tag4""] }",
-                SourceRecordId = 712947
+                SourceRecordId = recordId
             }
         };
         _latticeCtx.ExtractionRecords.AddRange(stagingRecords);
