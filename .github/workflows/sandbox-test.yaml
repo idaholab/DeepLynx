@@ -352,6 +352,16 @@ jobs:
             --from-literal=rabbitmq-default-user="${{ vars.RABBITMQ_DEFAULT_USER }}" \
             --namespace=deeplynx-test \
             --dry-run=client -o yaml | kubectl apply -f -
+            - shell: bash
+        name: Create Certificate ConfigMap
+        run: |
+          curl -fsSL -o /tmp/inl-root.crt https://certstore.inl.gov/pki/CAINLROOT_B64.crt
+          curl -fsSL -o /tmp/sectigo-root-r46.crt http://crt.sectigo.com/SectigoPublicServerAuthenticationRootR46_USERTrust.crt
+          cat /tmp/inl-root.crt /tmp/sectigo-root-r46.crt > /tmp/sectigo-root-r46.pem
+          kubectl create configmap sectigo-root-ca \
+            --from-file=sectigo-root-r46.pem=/tmp/sectigo-root-r46.pem \
+            --namespace=deeplynx-test \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - shell: bash
         name: Manifest env substitute
