@@ -4,6 +4,8 @@ namespace deeplynx.interfaces;
 
 public interface IRecordBusiness
 {
+    [Obsolete("Used by deprecated v1 record endpoints and NexusFlightServer. Superseded by GetAllRecordsPaginated. " +
+              "Remove once those callers are migrated to the paginated variant.", error: false)]
     Task<List<RecordResponseDto>> GetAllRecords(
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived, string? fileType,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false);
