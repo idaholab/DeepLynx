@@ -195,6 +195,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   // UI State
   const { project, setProject } = useProjectSession();
   const [activeTab, setActiveTab] = useState(0);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const [isPropertiesEditorOpen, setIsPropertiesEditorOpen] = useState(false);
   const [isSavingProperties, setIsSavingProperties] = useState(false);
@@ -278,7 +279,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     const loadProject = async () => {
       const recordProject = await getProject(Number(organizationId), projectId);
       if (cancelled) return;
-      setProject({projectId, projectName: recordProject.name})
+      setProject({ projectId, projectName: recordProject.name })
     };
     loadProject();
     return () => {
@@ -825,12 +826,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         },
       );
 
-      const params = new URLSearchParams({
-        extractionId: String(result.extraction_id),
-        projectId: String(projectId),
-        organizationId: String(organization!.organizationId),
-      });
-      router.push(`/lattice/decisions?${params.toString()}`);
+      handleSelect(Number(result))
+      router.push(`/lattice/decisions`);
     } catch (error: any) {
       if (error?.response?.status === 400) {
         toast(t.translations.LATTICE_EMBEDDINGS_GENERATING, { icon: "⏳" });
@@ -850,6 +847,11 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     latticeMode,
     router,
   ]);
+
+  const handleSelect = (id: number) => {
+    setSelectedId(id);
+    if (projectId) localStorage.setItem(storageKey(projectId), String(id));
+  };
 
   const handleQueueInsightUpload = useCallback(async () => {
     if (isIngestionUnavailable) return;
@@ -897,6 +899,10 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     t.translations.LATTICE_ONTOLOGY_QUEUE_FAILED,
     isEmbeddingModelUnavailable,
   ]);
+
+  function storageKey(projId: number) {
+    return `lattice_selected_extraction_${projId}`;
+  }
 
   const recordEmbedPollRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
