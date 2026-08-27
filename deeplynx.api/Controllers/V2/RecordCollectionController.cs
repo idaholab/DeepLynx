@@ -55,7 +55,7 @@ public class RecordCollectionController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record_collection")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetAllRecordCollections(
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDtoV2>>> GetAllRecordCollections(
         long organizationId,
         long projectId,
         [FromQuery] string? search,
@@ -74,7 +74,7 @@ public class RecordCollectionController : ControllerBase
                 await _recordCollectionBusiness.GetAllRecordCollectionsPaginated(
                     currentUserId, organizationId, projectId, search, sensitivityLabelIds, tagIds, sort,
                     paginatedRequestDto, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
-            return Ok(recordCollections);
+            return Ok(ToV2Page(recordCollections));
     }
 
 
@@ -93,7 +93,7 @@ public class RecordCollectionController : ControllerBase
     [Auth("read", "record_collection")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetRecordsInRecordCollection(
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDtoV2>>> GetRecordsInRecordCollection(
         long organizationId,
         long projectId,
         long recordCollectionId,
@@ -115,7 +115,7 @@ public class RecordCollectionController : ControllerBase
                 isSysAdmin,
                 isOrgAdmin,
                 isProjectAdmin);
-            return Ok(records);
+            return Ok(ToV2Page(records));
     }
 
 
@@ -134,7 +134,7 @@ public class RecordCollectionController : ControllerBase
     [Auth("read", "record_collection")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetRecordCollectionsForARecord(
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDtoV2>>> GetRecordCollectionsForARecord(
         long organizationId,
         long projectId,
         long recordId,
@@ -156,7 +156,7 @@ public class RecordCollectionController : ControllerBase
                 isSysAdmin,
                 isOrgAdmin,
                 isProjectAdmin);
-            return Ok(collections);
+            return Ok(ToV2Page(collections));
     }
 
 
@@ -175,7 +175,7 @@ public class RecordCollectionController : ControllerBase
     [Auth("read", "record_collection")]
     [Auth("read", "tag")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDto>>> GetRecordCollectionsByTags(
+    public async Task<ActionResult<PaginatedResponse<RecordCollectionResponseDtoV2>>> GetRecordCollectionsByTags(
         long organizationId,
         long projectId,
         [FromQuery] long[] tagIds,
@@ -189,7 +189,7 @@ public class RecordCollectionController : ControllerBase
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var records = await _recordCollectionBusiness.GetRecordCollectionsByTagsPaginated(
                 currentUserId, organizationId, projectId, tagIds, paginatedRequestDto, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
-            return Ok(records);
+            return Ok(ToV2Page(records));
     }
 
 
@@ -206,7 +206,7 @@ public class RecordCollectionController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record_collection")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<RecordCollectionResponseDto>> UpdateRecordCollection(
+    public async Task<ActionResult<RecordCollectionResponseDtoV2>> UpdateRecordCollection(
         long organizationId,
         long projectId,
         long recordCollectionId,
@@ -214,7 +214,7 @@ public class RecordCollectionController : ControllerBase
     {
             var currentUserId = UserContextStorage.UserId;
             var updatedRecordCollection = await _recordCollectionBusiness.UpdateRecordCollection(currentUserId, organizationId, projectId, recordCollectionId, dto);
-            return Ok(updatedRecordCollection);
+            return Ok(updatedRecordCollection.ToV2());
     }
 
 
@@ -294,7 +294,7 @@ public class RecordCollectionController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "record_collection")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<RecordCollectionResponseDto>> CreateRecordCollection(
+    public async Task<ActionResult<RecordCollectionResponseDtoV2>> CreateRecordCollection(
         long organizationId,
         long projectId,
         [FromQuery] List<long>? sensitivityLabelIds,
@@ -304,7 +304,7 @@ public class RecordCollectionController : ControllerBase
             var recordCollection =
                 await _recordCollectionBusiness.CreateRecordCollection(currentUserId, organizationId, projectId,
                     sensitivityLabelIds, dto);
-            return Ok(recordCollection);
+            return Ok(recordCollection.ToV2());
     }
 
 
@@ -487,6 +487,28 @@ public class RecordCollectionController : ControllerBase
             var sensitivityLabels = await _recordCollectionBusiness.GetSensitivityLabelsForRecordCollectionPaginated(
                 organizationId, projectId, recordCollectionId, paginatedRequestDto);
             return Ok(sensitivityLabels);
+    }
+
+    private static PaginatedResponse<RecordCollectionResponseDtoV2> ToV2Page(PaginatedResponse<RecordCollectionResponseDto> page)
+    {
+        return new PaginatedResponse<RecordCollectionResponseDtoV2>
+        {
+            Items = page.Items?.Select(rc => rc.ToV2()).ToList() ?? new List<RecordCollectionResponseDtoV2>(),
+            PageNumber = page.PageNumber,
+            PageSize = page.PageSize,
+            TotalCount = page.TotalCount
+        };
+    }
+
+    private static PaginatedResponse<RecordResponseDtoV2> ToV2Page(PaginatedResponse<RecordResponseDto> page)
+    {
+        return new PaginatedResponse<RecordResponseDtoV2>
+        {
+            Items = page.Items?.Select(r => r.ToV2()).ToList() ?? new List<RecordResponseDtoV2>(),
+            PageNumber = page.PageNumber,
+            PageSize = page.PageSize,
+            TotalCount = page.TotalCount
+        };
     }
 
 }
