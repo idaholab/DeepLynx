@@ -67,7 +67,6 @@ public class PermissionOrganizationController : ControllerBase
     }
 
 
-
     /// <summary>
     ///     Get a Permission 
     /// </summary>

@@ -1,7 +1,7 @@
 import { test, expect, Page, APIRequestContext } from "../fixtures";
 import { ORGS, PROJECTS, orgAdminA } from "../deeplynx-config";
 import { getOrgIdByName } from "../helpers/api";
-import { TEST_API_BASE_URL } from "../api-url";
+import { testApiUrl } from "../api-url";
 // Adjust this base URL to match whichever environment the test config points at.
 
 async function navigateToOrgLevelSensitivityLabelPermissions(page: Page) {
@@ -27,7 +27,7 @@ test.describe("Roles & Permissions", () => {
         uniqueLabelName = `Test SL-${testInfo.testId}`;
 
         const createResponse = await request.post(
-        `${TEST_API_BASE_URL}/organizations/${orgId}/labels`,
+        testApiUrl(`/organizations/${orgId}/labels`),
         {
             data: {
                 name: uniqueLabelName,
@@ -45,7 +45,7 @@ test.describe("Roles & Permissions", () => {
         if (!createdLabelId) return;
 
         const deleteResponse = await request.delete(
-            `${TEST_API_BASE_URL}/organizations/${orgId}/labels/${createdLabelId}`,
+            testApiUrl(`/organizations/${orgId}/labels/${createdLabelId}`),
         );
 
         expect(deleteResponse.ok()).toBeTruthy();

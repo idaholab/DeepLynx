@@ -69,6 +69,42 @@ namespace deeplynx.tests
         }
 
         [Fact]
+        public async Task DeleteByPrefixAsync_DeletesOnlyMatchingKeys()
+        {
+            // Arrange
+            var testId = Guid.NewGuid();
+            var prefix = $"memory-prefix-test:{testId}:user:1:";
+
+            var matchingKey1 = $"{prefix}orgadmin";
+            var matchingKey2 = $"{prefix}projectadmin";
+            var nonMatchingKey = $"memory-prefix-test:{testId}:user:10:orgadmin";
+
+            await CacheService.Instance.SetAsync(
+                matchingKey1,
+                true,
+                TimeSpan.FromMinutes(2));
+
+            await CacheService.Instance.SetAsync(
+                matchingKey2,
+                false,
+                TimeSpan.FromMinutes(2));
+
+            await CacheService.Instance.SetAsync(
+                nonMatchingKey,
+                true,
+                TimeSpan.FromMinutes(2));
+
+            // Act
+            var result = await CacheService.Instance.DeleteByPrefixAsync(prefix);
+
+            // Assert
+            Assert.True(result);
+            Assert.Null(await CacheService.Instance.GetAsync<bool?>(matchingKey1));
+            Assert.Null(await CacheService.Instance.GetAsync<bool?>(matchingKey2));
+            Assert.True(await CacheService.Instance.GetAsync<bool>(nonMatchingKey));
+        }
+
+        [Fact]
         public async Task FlushCache_Success()
         {
             // Arrange

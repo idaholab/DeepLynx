@@ -125,13 +125,19 @@ export async function deleteProjectServer(
 
 export async function getProjectMembersServer(
   organizationId: number,
-  projectId: number
-): Promise<ProjectMemberResponseDto[]> {
+  projectId: number,
+  pageNumber = 1,
+  pageSize = -1
+): Promise<PaginatedResponse<ProjectMemberResponseDto>> {
+  const params = new URLSearchParams({
+    pageNumber: String(pageNumber),
+    pageSize: String(pageSize),
+  });
   const res = await apiFetch(
-    `/organizations/${organizationId}/projects/${projectId}/members`
+    `/organizations/${organizationId}/projects/${projectId}/members?${params.toString()}`
   );
   // API docs say "A list of groups and users in the project"
-  return asJson<ProjectMemberResponseDto[]>(res);
+  return asJson<PaginatedResponse<ProjectMemberResponseDto>>(res);
 }
 
 export async function addMemberServer(

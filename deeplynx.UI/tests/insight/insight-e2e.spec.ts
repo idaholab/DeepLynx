@@ -1,5 +1,5 @@
 import { test, expect, Page, APIRequestContext } from "../fixtures";
-import { sysAdmin } from "../deeplynx-config";
+import { sysAdmin, ORGS, PROJECTS } from "../deeplynx-config";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -74,7 +74,11 @@ async function getOrgIdByName(
 ): Promise<string> {
   const res = await request.fetch(testApiUrl("/organizations"));
   if (!res.ok()) throw new Error(`Failed to fetch organizations: ${res.status()}`);
-  const orgs: Organization[] = await res.json();
+  const body = await res.json();
+  const orgs: Organization[] = Array.isArray(body) ? body : body.items;
+  if (!Array.isArray(orgs)) {
+    throw new Error(`Expected array of organizations, got: ${JSON.stringify(body).slice(0, 300)}`);
+  }
   const match = orgs.find((org) => org.name === orgName);
   if (!match) {
     throw new Error(`Could not find organization named "${orgName}" in ${JSON.stringify(orgs)}`);
@@ -92,11 +96,11 @@ async function getRecordsByName(
 ): Promise<RecordSummary[]> {
   const url = testApiUrl(
     `/organizations/${orgId}/projects/${projectId}/records` +
-      `?hideArchived=true&isInsightEligible=false`,
+      `?hideArchived=true&isInsightEligible=false&pageSize=-1`,
   );
   const res = await request.fetch(url);
   if (!res.ok()) throw new Error(`Failed to fetch records: ${res.status()}`);
-  const records = await res.json();
+  const { items: records } = await res.json();
   return records
     .filter((r: any) => r.name === fileName)
     .map((r: any) => ({ id: String(r.id), name: r.name, projectId: String(r.projectId) }));
@@ -112,8 +116,8 @@ test.describe("Insight E2E", () => {
 
   test.use({
     actingUser: sysAdmin,
-    actingOrg: ORG_NAME,
-    actingProject: "PW Project X",
+    actingOrg: ORGS.orgA,
+        actingProject: PROJECTS.projectX,
   });
 
   test.beforeEach(async ({ page, request }, testInfo) => {

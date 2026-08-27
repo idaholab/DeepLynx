@@ -8,7 +8,6 @@ public class PermissionResponseDto
     public string Action { get; set; }
     public string? Resource { get; set; }
     public bool IsDefault { get; set; }
-    public long? LabelId { get; set; }
     public DateTime LastUpdatedAt { get; set; }
     public long? LastUpdatedBy { get; set; }
     public bool IsArchived { get; set; }

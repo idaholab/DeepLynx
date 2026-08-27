@@ -670,7 +670,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetAllRecords Tests
+    #region GetAllRecords (Deprecated) Tests
 
     [Fact]
     public async Task GetAllRecords_ValidProjectId_ReturnsRecords()
@@ -724,6 +724,10 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.NotNull(correctFileTypeResponse);
         Assert.Equal("pdf", correctFileTypeResponse.First().FileType);
     }
+
+    #endregion
+
+    #region GetAllRecordsPaginated Tests
 
     [Fact]
     public async Task GetAllRecordsPaginated_ReturnsRequestedPageAndTotalCount()
@@ -1891,21 +1895,6 @@ public class RecordBusinessTests : IntegrationTestBase
 
         var label1response = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label1, pid, organizationId);
         var label2response = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label2, pid, organizationId);
-
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstAsync(r => r.Id == roleId);
-
-        var label1WritePermission = Context.Permissions
-            .FirstOrDefault(p => p.LabelId == label1response.Id && p.Action == "write record");
-
-        var label2WritePermission = Context.Permissions
-            .FirstOrDefault(p => p.LabelId == label2response.Id && p.Action == "write record");
-
-        role.Permissions.Add(label1WritePermission);
-        role.Permissions.Add(label2WritePermission);
-
-        await Context.SaveChangesAsync();
 
         // Act
         var result = await _recordBusiness.BulkCreateRecords(
@@ -4113,43 +4102,25 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
-        var permission = new Permission
+        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
         {
             Name = $"Download File Permission {Guid.NewGuid()}",
-            Description = "Allows file download for this label",
+            Description = "Governs file download for this label",
             Action = "download file",
             LabelId = label.Id,
-            OrganizationId = organizationId,
-            ProjectId = pid,
             LastUpdatedBy = adminUser.Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            IsDefault = false
-        };
+            IsArchived = false
+        });
 
-        var role = new Role
-        {
-            Name = $"Download Role {Guid.NewGuid()}",
-            Description = "Role with download file permission",
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            Permissions = new List<Permission> { permission }
-        };
-
-        Context.Roles.Add(role);
-        await Context.SaveChangesAsync();
-
-        var projectMember = new ProjectMember
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
         {
             UserId = adminUser.Id,
-            ProjectId = pid,
-            RoleId = role.Id
-        };
+            LabelId = label.Id,
+            GrantedBy = adminUser.Id,
+            GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
+        });
 
-        Context.ProjectMembers.Add(projectMember);
         await Context.SaveChangesAsync();
 
         var expectedUri = $"../data/test/{Guid.NewGuid()}_protected-file.txt";
@@ -4234,54 +4205,34 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
-        var uploadPermission = new Permission
-        {
-            Name = $"Upload File Permission {Guid.NewGuid()}",
-            Description = "Allows file upload for this label",
-            Action = "update file",
-            LabelId = label.Id,
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            IsDefault = false
-        };
+        Context.SensitivityLabelPermissions.AddRange(
+            new SensitivityLabelPermission
+            {
+                Name = $"Upload File Permission {Guid.NewGuid()}",
+                Description = "Governs file upload for this label",
+                Action = "update file",
+                LabelId = label.Id,
+                LastUpdatedBy = adminUser.Id,
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                IsArchived = false
+            },
+            new SensitivityLabelPermission
+            {
+                Name = $"Download File Permission {Guid.NewGuid()}",
+                Description = "Governs file download for this label",
+                Action = "download file",
+                LabelId = label.Id,
+                LastUpdatedBy = adminUser.Id,
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                IsArchived = false
+            });
 
-        var downloadPermission = new Permission
-        {
-            Name = $"Download File Permission {Guid.NewGuid()}",
-            Description = "Allows file download for this label",
-            Action = "download file",
-            LabelId = label.Id,
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            IsDefault = false
-        };
-
-        var role = new Role
-        {
-            Name = $"Upload Download Role {Guid.NewGuid()}",
-            Description = "Role with upload and download file permission",
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            Permissions = new List<Permission> { uploadPermission, downloadPermission }
-        };
-
-        Context.Roles.Add(role);
-        await Context.SaveChangesAsync();
-
-        Context.ProjectMembers.Add(new ProjectMember
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
         {
             UserId = adminUser.Id,
-            ProjectId = pid,
-            RoleId = role.Id
+            LabelId = label.Id,
+            GrantedBy = adminUser.Id,
+            GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
         });
 
         await Context.SaveChangesAsync();
@@ -4727,64 +4678,29 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
-        var readPermission = new Permission
-        {
-            Name = $"Read Record Permission {Guid.NewGuid()}",
-            Description = "Allows record read for this label",
-            Action = "read record",
-            LabelId = label.Id,
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            IsDefault = false
-        };
-
-        var adminPermissions = permissionActions.Select(action => new Permission
+        // Gate the requested actions on this label. Access is now per-user via UserSensitivityLabel
+        // (a single grant unlocks ALL actions on a label), so "read record" is deliberately left
+        // ungoverned here — both users can read the record, only the gated actions differ.
+        var labelPermissions = permissionActions.Select(action => new SensitivityLabelPermission
         {
             Name = $"{action} Permission {Guid.NewGuid()}",
-            Description = $"Allows {action} for this label",
+            Description = $"Governs {action} for this label",
             Action = action,
             LabelId = label.Id,
-            OrganizationId = organizationId,
-            ProjectId = pid,
             LastUpdatedBy = adminUser.Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            IsDefault = false
+            IsArchived = false
         }).ToList();
 
-        var adminRole = new Role
+        Context.SensitivityLabelPermissions.AddRange(labelPermissions);
+
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
         {
-            Name = $"Admin URI Role {Guid.NewGuid()}",
-            Description = "Role with URI permission",
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            Permissions = new List<Permission> { readPermission }.Concat(adminPermissions).ToList()
-        };
-
-        var restrictedRole = new Role
-        {
-            Name = $"Restricted URI Role {Guid.NewGuid()}",
-            Description = "Role with read permission only",
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            Permissions = new List<Permission> { readPermission }
-        };
-
-        Context.Roles.AddRange(adminRole, restrictedRole);
-        await Context.SaveChangesAsync();
-
-        Context.ProjectMembers.AddRange(
-            new ProjectMember { UserId = adminUser.Id, ProjectId = pid, RoleId = adminRole.Id },
-            new ProjectMember { UserId = restrictedUser.Id, ProjectId = pid, RoleId = restrictedRole.Id });
+            UserId = adminUser.Id,
+            LabelId = label.Id,
+            GrantedBy = adminUser.Id,
+            GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
+        });
 
         await Context.SaveChangesAsync();
 
@@ -5153,6 +5069,18 @@ public class RecordBusinessTests : IntegrationTestBase
 
         Context.Users.Add(otherUser);
         Context.Records.Add(restrictedRecord);
+        await Context.SaveChangesAsync();
+
+        // Gate "read record" on the label with no UserSensitivityLabel grant to otherUser,
+        // so the label is not open-by-default under the new access model.
+        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
+        {
+            LabelId = restrictedLabel.Id,
+            Action = "read record",
+            Name = "read record",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        });
         await Context.SaveChangesAsync();
 
         // Act
@@ -5646,6 +5574,18 @@ public class RecordBusinessTests : IntegrationTestBase
 
         Context.Users.Add(otherUser);
         Context.Records.Add(restrictedRecord);
+        await Context.SaveChangesAsync();
+
+        // Gate "read record" on the label with no UserSensitivityLabel grant to otherUser,
+        // so the label is not open-by-default under the new access model.
+        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
+        {
+            LabelId = restrictedLabel.Id,
+            Action = "read record",
+            Name = "read record",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        });
         await Context.SaveChangesAsync();
 
         // Act

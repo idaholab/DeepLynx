@@ -5,6 +5,11 @@ public class DependencyDeletionException : Exception
     public DependencyDeletionException(string message) : base(message) { }
 }
 
+public class ResourceConflictException : Exception
+{
+    public ResourceConflictException(string message) : base(message) { }
+}
+
 public class NoResultsException : Exception
 {
     public NoResultsException(string message) : base(message) { }
