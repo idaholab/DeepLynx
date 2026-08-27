@@ -1523,7 +1523,7 @@ public class ProjectBusiness : IProjectBusiness
                 }
                 else
                 {
-                    await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(userId.Value, projectId), isAdmin, cacheTTL);
+                    await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(userId.Value, projectId), isAdmin, (TimeSpan?)null);
                 }
             }
             catch (Exception ex)
@@ -1548,7 +1548,7 @@ public class ProjectBusiness : IProjectBusiness
                     }
                     else
                     {
-                        await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(memberId, projectId), isAdmin, cacheTTL);
+                        await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(memberId, projectId), isAdmin, (TimeSpan?)null);
                     }  
                 }
                 catch (Exception ex)

@@ -486,8 +486,8 @@ public class OrganizationBusiness : IOrganizationBusiness
         // overwrite the cached member and admin flags now that they've changed
         try
         {
-            await CacheService.Instance.SetAsync(CacheKeys.OrgMember(userId, organizationId), true, TimeSpan.FromHours(1));
-            await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, TimeSpan.FromHours(1));
+            await CacheService.Instance.SetAsync(CacheKeys.OrgMember(userId, organizationId), true, (TimeSpan?)null);
+            await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, (TimeSpan?)null);
         }
         catch (Exception ex)
         {
@@ -910,7 +910,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         // overwrite the cached admin flag now that it's changed
         try
         {
-            await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, TimeSpan.FromHours(1));
+            await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, (TimeSpan?)null);
 
         }
         catch (Exception ex)

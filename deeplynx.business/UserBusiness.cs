@@ -452,7 +452,7 @@ public class UserBusiness : IUserBusiness
         // overwrite the cached admin flag now that it's changed
         try
         {
-            await CacheService.Instance.SetAsync(CacheKeys.SysAdmin(candidateId), userIsAdmin, TimeSpan.FromHours(1));
+            await CacheService.Instance.SetAsync(CacheKeys.SysAdmin(candidateId), userIsAdmin, (TimeSpan?)null);
         }
         catch (Exception ex)
         {

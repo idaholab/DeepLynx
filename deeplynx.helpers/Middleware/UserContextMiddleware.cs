@@ -171,7 +171,7 @@ public class UserContextMiddleware
         }
 
         var result = await factory();
-        await CacheService.Instance.SetAsync(key, result, AdminFlagCacheTtl);
+        await CacheService.Instance.SetAsync(key, result, (TimeSpan?)null);
         return result;
     }
 
@@ -202,7 +202,7 @@ public class UserContextMiddleware
             else
             {
                 isAdmin = await adminService.ProjectAdminCheck(userId, organizationId, new List<long> { projectId });
-                await CacheService.Instance.SetAsync(cacheKey, isAdmin, AdminFlagCacheTtl);
+                await CacheService.Instance.SetAsync(cacheKey, isAdmin, (TimeSpan?)null);
             }
 
             results.Add(isAdmin);
