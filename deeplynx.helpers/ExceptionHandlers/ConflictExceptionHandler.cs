@@ -32,7 +32,7 @@ public class ConflictExceptionHandler : IExceptionHandler
 
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        if (exception is not DependencyDeletionException)
+        if (exception is not DependencyDeletionException && exception is not ResourceConflictException)
             return false;
 
         _logger.LogWarning(exception, "Conflict on {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
@@ -40,9 +40,11 @@ public class ConflictExceptionHandler : IExceptionHandler
         httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
 
         // For security purposes, sanitize the error message returned in production environments
-        var detail = _hostEnvironment.IsDevelopment()
+        var detail = exception is ResourceConflictException
             ? exception.Message
-            : "The request conflicts with the current state of the resource.";
+            : _hostEnvironment.IsDevelopment()
+                ? exception.Message
+                : "The request conflicts with the current state of the resource.";
 
         return await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {

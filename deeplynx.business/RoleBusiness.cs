@@ -196,6 +196,22 @@ public class RoleBusiness : IRoleBusiness
     {
         ValidationHelper.ValidateModel(dto);
 
+
+    // Explicit case-insensitive duplicate check
+    var normalizedName = dto.Name.Trim().ToLower();
+    var duplicateExists = await _context.Roles.AnyAsync(r =>
+        r.OrganizationId == organizationId &&
+        r.ProjectId == projectId &&
+        r.Name.ToLower() == normalizedName);
+
+    if (duplicateExists)
+    {
+        var scope = projectId.HasValue ? "project" : "organization";
+        throw new ResourceConflictException(
+            $"A role with the name '{dto.Name}' already exists in this {scope}");
+    }
+
+
         var role = new Role
         {
             Name = dto.Name,
@@ -396,6 +412,27 @@ public class RoleBusiness : IRoleBusiness
         if (projectId.HasValue && role.ProjectId == null)
         {
             throw new InvalidOperationException("Organization roles cannot be updated from the child projects.");
+        }
+
+        // Explicit case-insensitive duplicate check, same as CreateRole. Only
+        // relevant when the name is actually changing - skip the check (and
+        // avoid a false-positive self-collision) if the name isn't being updated.
+        var newName = dto.Name ?? role.Name;
+        if (dto.Name != null && !string.Equals(dto.Name.Trim(), role.Name, StringComparison.Ordinal))
+        {
+            var normalizedName = newName.Trim().ToLower();
+            var duplicateExists = await _context.Roles.AnyAsync(r =>
+                r.Id != role.Id &&
+                r.OrganizationId == organizationId &&
+                r.ProjectId == role.ProjectId &&
+                r.Name.ToLower() == normalizedName);
+
+            if (duplicateExists)
+            {
+                var scope = role.ProjectId.HasValue ? "project" : "organization";
+                throw new ResourceConflictException(
+                    $"A role with the name '{newName}' already exists in this {scope}");
+            }
         }
 
         // Update fields

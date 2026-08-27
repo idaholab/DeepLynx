@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using deeplynx.helpers.exceptions;
 
 namespace deeplynx.tests;
 
@@ -302,7 +303,7 @@ public class RoleBusinessTests : IntegrationTestBase
 
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<InvalidOperationException>(() => _roleBusiness.CreateRole(uid, dto, oid));
+            await Assert.ThrowsAsync<ResourceConflictException>(() => _roleBusiness.CreateRole(uid, dto, oid));
 
         Assert.Contains("already exists", exception.Message);
     }
@@ -1002,7 +1003,7 @@ public class RoleBusinessTests : IntegrationTestBase
 
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            await Assert.ThrowsAsync<ResourceConflictException>(() =>
                 _roleBusiness.UpdateRole(uid, rid1, oid, null, dto));
 
         Assert.Contains("already exists", exception.Message);
