@@ -489,6 +489,7 @@ public class RecordCollectionController : ControllerBase
             return Ok(sensitivityLabels);
     }
 
+    // Maps a page of V1 record collections to V2, page metadata unchanged.
     private static PaginatedResponse<RecordCollectionResponseDtoV2> ToV2Page(PaginatedResponse<RecordCollectionResponseDto> page)
     {
         return new PaginatedResponse<RecordCollectionResponseDtoV2>
@@ -500,6 +501,7 @@ public class RecordCollectionController : ControllerBase
         };
     }
 
+    // Maps a page of V1 records to V2, page metadata unchanged.
     private static PaginatedResponse<RecordResponseDtoV2> ToV2Page(PaginatedResponse<RecordResponseDto> page)
     {
         return new PaginatedResponse<RecordResponseDtoV2>

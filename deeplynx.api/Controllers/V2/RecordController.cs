@@ -682,6 +682,7 @@ public class RecordController : ControllerBase
         return Ok(edges);
     }
 
+    // Maps a page of V1 records to V2, page metadata unchanged.
     private static PaginatedResponse<RecordResponseDtoV2> ToV2Page(PaginatedResponse<RecordResponseDto> page)
     {
         return new PaginatedResponse<RecordResponseDtoV2>

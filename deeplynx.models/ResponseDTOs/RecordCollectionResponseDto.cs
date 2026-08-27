@@ -40,6 +40,7 @@ public class RecordCollectionResponseDto
     [NotMapped] public ICollection<RecordCollectionTagDto> Tags { get; set; }
     [NotMapped] public ICollection<RecordCollectionLabelDto> Labels { get; set; }
 
+    // V1 is a frozen contract, so we bridge to V2 here (renaming Labels to SensitivityLabels) instead of renaming in place.
     public RecordCollectionResponseDtoV2 ToV2()
     {
         return new RecordCollectionResponseDtoV2

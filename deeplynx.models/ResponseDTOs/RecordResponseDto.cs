@@ -56,6 +56,7 @@ public class RecordResponseDto
 
     [Column("embedded")] public bool Embedded { get; set; }
 
+    // V1 is a frozen contract, so we bridge to V2 here (renaming Labels to SensitivityLabels) instead of renaming in place.
     public RecordResponseDtoV2 ToV2()
     {
         return new RecordResponseDtoV2
