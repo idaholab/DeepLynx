@@ -6,10 +6,7 @@ import type {
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
-import {
-  searchRecords,
-  searchRecordsPaginated,
-} from "@/app/lib/client_service/record_services.client";
+import { searchRecords } from "@/app/lib/client_service/record_services.client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
@@ -64,10 +61,10 @@ export function useRecordSearch(
       if (cancel()) return [];
 
       // for first time loading. This is a hacky solution to find the total number of records with the initial empty filter search
-      setTotal((t) => Math.max(t, recordDtos.length));
-      setFound(recordDtos.length);
+      setTotal((t) => Math.max(t, recordDtos.totalCount));
+      setFound(recordDtos.totalCount);
 
-      return recordDtos;
+      return recordDtos.items;
     },
     [t],
   );
@@ -121,7 +118,7 @@ export function useRecordSearchPaginated(
       embedding: "embedded" | "pending",
       cancel: () => boolean,
     ) => {
-      const recordDtos = await searchRecordsPaginated(
+      const recordDtos = await searchRecords(
         organizationId,
         projectId,
         {
@@ -132,8 +129,10 @@ export function useRecordSearchPaginated(
           isInsightEligible: true,
           hideArchived: true,
         },
-        pageSize,
-        prePageSize.current !== pageSize ? 1 : page,
+        {
+          pageSize,
+          pageNumber: prePageSize.current !== pageSize ? 1 : page,
+        },
       );
       if (cancel()) return [];
 
