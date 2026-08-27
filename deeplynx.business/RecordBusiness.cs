@@ -65,94 +65,6 @@ public class RecordBusiness : IRecordBusiness
         _fileBusinessFactory = fileBusinessFactory;
     }
 
-    /// <summary>
-    ///     Retrieves all records for a specific project and datasource.
-    /// </summary>
-    /// <param name="currentUserId">The ID of current user</param>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
-    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
-    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
-    /// <param name="fileType">File extension to filter by (e.g., pdf, png, jpg)</param>
-    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
-    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
-    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
-    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
-    /// <returns>A list of records based on the applied filters.</returns>
-    public async Task<List<RecordResponseDto>> GetAllRecords(
-        long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
-        string? fileType = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false)
-    {
-        var recordQuery = _context.Records
-            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
-
-        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
-
-        if (isInsightEligible) recordQuery = recordQuery.WhereInsightEligible();
-
-        if (dataSourceId.HasValue) recordQuery = recordQuery.Where(r => r.DataSourceId == dataSourceId);
-
-        if (!string.IsNullOrWhiteSpace(fileType))
-        {
-            var formattedFileType = fileType.TrimStart('.').ToLower();
-            recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
-        }
-
-        // if user is not admin, filter out unauthorized labels
-        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
-        {
-            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
-                currentUserId, organizationId, projectId, "read record");
-
-            recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
-        }
-
-        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
-            _sensitivityLabelService,
-            currentUserId,
-            organizationId,
-            [projectId],
-            isSysAdmin || isOrgAdmin || isProjectAdmin);
-
-        var records = await recordQuery
-            .Include(r => r.Tags)
-            .Include(r => r.Labels)
-            .ToListAsync();
-
-        return records.Select(r => new RecordResponseDto
-        {
-            Id = r.Id,
-            Description = r.Description,
-            Uri = isUriAuthorized(r)
-                    ? r.Uri
-                    : null,
-            Properties = r.Properties,
-            OriginalId = r.OriginalId,
-            ObjectStorageId = r.ObjectStorageId,
-            Name = r.Name,
-            ClassId = r.ClassId,
-            DataSourceId = r.DataSourceId,
-            ProjectId = r.ProjectId,
-            OrganizationId = r.OrganizationId,
-            LastUpdatedBy = r.LastUpdatedBy,
-            LastUpdatedAt = r.LastUpdatedAt,
-            IsArchived = r.IsArchived,
-            FileType = r.FileType,
-            FileSize = r.FileSize,
-            FileContentHash = r.FileContentHash,
-            Tags = r.Tags.Select(t => new RecordTagDto
-            {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList(),
-            Labels = r.Labels.Select(l => new RecordLabelDto
-            {
-                Id = l.Id,
-                Name = l.Name
-            }).ToList()
-        }).ToList();
-    }
-
     private async Task<IQueryable<Record>> QuerySearch(
         long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
@@ -437,22 +349,12 @@ public class RecordBusiness : IRecordBusiness
             [projectId],
             isSysAdmin || isOrgAdmin || isProjectAdmin);
 
-        var totalCount = await recordQuery.CountAsync();
-        var records = await recordQuery
+        return await recordQuery
             .OrderBy(r => r.Id)
             .Include(r => r.Tags)
             .Include(r => r.Labels)
-            .Skip((paginated.PageNumber - 1) * paginated.PageSize)
-            .Take(paginated.PageSize)
-            .ToListAsync();
-
-        return new PaginatedResponse<RecordResponseDto>
-        {
-            Items = records.Select(r => RecordToResponse(r, isUriAuthorized)).ToList(),
-            PageNumber = paginated.PageNumber,
-            PageSize = paginated.PageSize,
-            TotalCount = totalCount
-        };
+            .Select(r => RecordToResponse(r, isUriAuthorized))
+            .ToPaginatedAsync(paginated);
     }
 
     /// <summary>
@@ -2515,4 +2417,101 @@ public class RecordBusiness : IRecordBusiness
             Uri = r.IsDBNull(iUri) ? null : r.GetString(iUri)
         };
     }
+
+    #region Deprecated
+
+    /// <summary>
+    ///     [DEPRECATED] Retrieves all records for a specific project and datasource without pagination.
+    ///     Superseded by <see cref="GetAllRecordsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 record endpoints and NexusFlightServer, and should be
+    ///     removed once those callers are migrated to the paginated variant.
+    /// </summary>
+    /// <param name="currentUserId">The ID of current user</param>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose records are to be retrieved</param>
+    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result</param>
+    /// <param name="fileType">File extension to filter by (e.g., pdf, png, jpg)</param>
+    /// <param name="isSysAdmin">Optional param determining if the requesting user is a system admin</param>
+    /// <param name="isOrgAdmin">Optional param determining if the requesting user is an organization admin</param>
+    /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
+    /// <param name="isInsightEligible">Restricts to records that are eligible for use in Insight if `true`</param>
+    /// <returns>A list of records based on the applied filters.</returns>
+    [Obsolete("Used by deprecated v1 record endpoints and NexusFlightServer. Superseded by GetAllRecordsPaginated. " +
+              "Remove once those callers are migrated to the paginated variant.", error: false)]
+    public async Task<List<RecordResponseDto>> GetAllRecords(
+        long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived,
+        string? fileType = null, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false)
+    {
+        var recordQuery = _context.Records
+            .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
+
+        if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
+
+        if (isInsightEligible) recordQuery = recordQuery.WhereInsightEligible();
+
+        if (dataSourceId.HasValue) recordQuery = recordQuery.Where(r => r.DataSourceId == dataSourceId);
+
+        if (!string.IsNullOrWhiteSpace(fileType))
+        {
+            var formattedFileType = fileType.TrimStart('.').ToLower();
+            recordQuery = recordQuery.Where(r => r.FileType == formattedFileType);
+        }
+
+        // if user is not admin, filter out unauthorized labels
+        if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
+        {
+            var userAuthorizedLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
+                currentUserId, organizationId, projectId, "read record");
+
+            recordQuery = recordQuery.WithAuthorizedLabels(userAuthorizedLabels);
+        }
+
+        var isUriAuthorized = await ExposeUriHelper.GetRecordUriExposer(
+            _sensitivityLabelService,
+            currentUserId,
+            organizationId,
+            [projectId],
+            isSysAdmin || isOrgAdmin || isProjectAdmin);
+
+        var records = await recordQuery
+            .Include(r => r.Tags)
+            .Include(r => r.Labels)
+            .ToListAsync();
+
+        return records.Select(r => new RecordResponseDto
+        {
+            Id = r.Id,
+            Description = r.Description,
+            Uri = isUriAuthorized(r)
+                    ? r.Uri
+                    : null,
+            Properties = r.Properties,
+            OriginalId = r.OriginalId,
+            ObjectStorageId = r.ObjectStorageId,
+            Name = r.Name,
+            ClassId = r.ClassId,
+            DataSourceId = r.DataSourceId,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId,
+            LastUpdatedBy = r.LastUpdatedBy,
+            LastUpdatedAt = r.LastUpdatedAt,
+            IsArchived = r.IsArchived,
+            FileType = r.FileType,
+            FileSize = r.FileSize,
+            FileContentHash = r.FileContentHash,
+            Tags = r.Tags.Select(t => new RecordTagDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            }).ToList(),
+            Labels = r.Labels.Select(l => new RecordLabelDto
+            {
+                Id = l.Id,
+                Name = l.Name
+            }).ToList()
+        }).ToList();
+    }
+
+    #endregion
 }
