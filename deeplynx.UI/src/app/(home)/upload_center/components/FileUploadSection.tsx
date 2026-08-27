@@ -19,7 +19,6 @@ interface FileUploadSectionProps {
   availableFiles: ExistingFile[];
   availableClasses: ClassResponseDto[];
   isLoadingClasses: boolean;
-  onSearchFiles: (query: string) => Promise<ExistingFile[]>;
   needsTarget: boolean;
   isUploading: boolean;
   canUpload: boolean;
@@ -27,6 +26,7 @@ interface FileUploadSectionProps {
   onClear: () => void;
   onRemoveAt: (idx: number) => void;
   projectId: number;
+  organizationId: number;
 }
 
 export default function FileUploadSection({
@@ -40,7 +40,6 @@ export default function FileUploadSection({
   availableFiles,
   availableClasses,
   isLoadingClasses,
-  onSearchFiles,
   needsTarget,
   isUploading,
   canUpload,
@@ -48,6 +47,7 @@ export default function FileUploadSection({
   onClear,
   onRemoveAt,
   projectId,
+  organizationId,
 }: FileUploadSectionProps) {
   const { t } = useLanguage();
   const isLargeFile = (file: File) => file.size >= CHUNK_THRESHOLD;
@@ -124,10 +124,9 @@ export default function FileUploadSection({
             disableMetadataFile={false}
             onMetadataChange={handleMetadataChange}
             onRemove={() => onRemoveAt(index)}
-            availableFiles={availableFiles}
             availableClasses={availableClasses}
             isLoadingClasses={isLoadingClasses}
-            onSearchFiles={onSearchFiles}
+            organizationId={organizationId}
             projectId={projectId}
             uploadError={uploadErrorByFileIndex[index]}
           />

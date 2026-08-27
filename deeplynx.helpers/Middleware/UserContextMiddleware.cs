@@ -1,5 +1,7 @@
 using deeplynx.datalayer.Models;
 using deeplynx.helpers.Context;
+using deeplynx.helpers.Cache;
+using deeplynx.interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -54,7 +56,7 @@ public class UserContextMiddleware
                     {
                         var dbContext = scope.ServiceProvider.GetRequiredService<DeeplynxContext>();
                         var user = await dbContext.Users
-                            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+                            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower() && !u.IsArchived);
 
                         if (user != null)
                         {
@@ -64,7 +66,9 @@ public class UserContextMiddleware
                             var adminService = scope.ServiceProvider.GetRequiredService<IAdminService>();
                             var organizationService = scope.ServiceProvider.GetRequiredService<IOrganizationService>();
 
-                            UserContextStorage.IsSysAdmin = await adminService.SysAdminCheck(user.Id);
+                            UserContextStorage.IsSysAdmin = await GetOrSetBoolAsync(
+                                CacheKeys.SysAdmin(user.Id),
+                                () => adminService.SysAdminCheck(user.Id));
 
                             var projectIds = ExtractProjectIds(context);
 
@@ -101,10 +105,16 @@ public class UserContextMiddleware
 
                             UserContextStorage.OrganizationId = resolvedOrganizationId;
 
-                            UserContextStorage.IsOrgAdmin = await adminService.OrgAdminCheck(user.Id, resolvedOrganizationId);
-                            UserContextStorage.IsOrgMember = await adminService.OrgMemberCheck(user.Id, resolvedOrganizationId);
+                            UserContextStorage.IsOrgAdmin = await GetOrSetBoolAsync(
+                                CacheKeys.OrgAdmin(user.Id, resolvedOrganizationId),
+                                () => adminService.OrgAdminCheck(user.Id, resolvedOrganizationId));
+
+                            UserContextStorage.IsOrgMember = await GetOrSetBoolAsync(
+                                CacheKeys.OrgMember(user.Id, resolvedOrganizationId),
+                                () => adminService.OrgMemberCheck(user.Id, resolvedOrganizationId));
+
                             UserContextStorage.IsProjectAdmin = projectIds.Any() &&
-                                await adminService.ProjectAdminCheck(user.Id, resolvedOrganizationId, projectIds);
+                                await IsProjectAdminForAllAsync(user.Id, resolvedOrganizationId, projectIds, adminService);
                         }
 
                         else
@@ -141,6 +151,62 @@ public class UserContextMiddleware
             UserContextStorage.IsOrgMember = false;
             UserContextStorage.IsProjectAdmin = false;
         }
+    }
+
+    /// <summary>
+    ///     Retrieves a cached Boolean value for the specified key. If the value is not
+    ///     cached, invokes the factory, caches its result, and returns it.
+    /// </summary>
+    /// <param name="key">The cache key associated with the Boolean value.</param>
+    /// <param name="factory">The asynchronous function used to retrieve the value on a cache miss.</param>
+    /// <returns>The cached or newly retrieved Boolean value.</returns>
+    private async Task<bool> GetOrSetBoolAsync(string key, Func<Task<bool>> factory)
+    {
+        var cached = await CacheService.Instance.GetAsync<bool?>(key);
+        if (cached.HasValue)
+        {
+            return cached.Value;
+        }
+
+        var result = await factory();
+        await CacheService.Instance.SetAsync(key, result, (TimeSpan?)null);
+        return result;
+    }
+
+    /// <summary>
+    ///     Determines whether a user is an administrator for every specified project,
+    ///     using cached project-admin values when available.
+    /// </summary>
+    /// <param name="userId">The ID of the user whose administrator status is checked.</param>
+    /// <param name="organizationId">The ID of the organization containing the projects.</param>
+    /// <param name="projectIds">The IDs of the projects to check.</param>
+    /// <param name="adminService">The service used to check administrator status on a cache miss.</param>
+    /// <returns>True if the user is an administrator for every specified project, otherwise false</returns>
+    private async Task<bool> IsProjectAdminForAllAsync(
+        long userId, long organizationId, List<long> projectIds, IAdminService adminService)
+    {
+        var results = new List<bool>();
+
+        foreach (var projectId in projectIds)
+        {
+            var cacheKey = CacheKeys.ProjectAdmin(userId, projectId);
+            var cached = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+
+            bool isAdmin;
+            if (cached.HasValue)
+            {
+                isAdmin = cached.Value;
+            }
+            else
+            {
+                isAdmin = await adminService.ProjectAdminCheck(userId, organizationId, new List<long> { projectId });
+                await CacheService.Instance.SetAsync(cacheKey, isAdmin, (TimeSpan?)null);
+            }
+
+            results.Add(isAdmin);
+        }
+
+        return results.All(isAdmin => isAdmin);
     }
 
     private static long? ExtractOrganizationId(HttpContext context)

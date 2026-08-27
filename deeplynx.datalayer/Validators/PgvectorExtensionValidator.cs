@@ -49,8 +49,7 @@ public static class PgvectorExtensionValidator
         catch (NpgsqlException ex)
         {
             throw new InvalidOperationException(
-                "Cannot verify pgvector because the configured PostgreSQL " +
-                "database could not be reached.",
+                "The configured DeepLynx Nexus PostgreSQL database could not be reached.",
                 ex);
         }
     }
