@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -1158,6 +1159,37 @@ public class OrganizationBusinessTests : IntegrationTestBase
     #region AddUser Tests
 
     [Fact]
+    public async Task AddUserToOrganization_UpdatesOrgMemberAndOrgAdminCache()
+    {
+        // Arrange
+        var orgMemberKey = CacheKeys.OrgMember(uid2, oid);
+        var orgAdminKey = CacheKeys.OrgAdmin(uid2, oid);
+
+        await CacheService.Instance.SetAsync(
+            orgMemberKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Use the opposite value to prove the cache is updated.
+        await CacheService.Instance.SetAsync(
+            orgAdminKey,
+            true,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _organizationBusiness.AddUserToOrganization(oid, uid2);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(orgMemberKey));
+        Assert.Equal(
+            false,
+            await CacheService.Instance.GetAsync<bool?>(orgAdminKey));
+    }
+
+    [Fact]
     public async Task AddUser_Succeeds_IfOrgAndUserExists()
     {
         // Act
@@ -1278,6 +1310,43 @@ public class OrganizationBusinessTests : IntegrationTestBase
     #region UpdateUserAdmin Tests
 
     [Fact]
+    public async Task SetOrganizationAdminStatus_UpdatesOnlyOrgAdminCache()
+    {
+        // Arrange
+        var orgAdminKey = CacheKeys.OrgAdmin(uid, oid);
+        var orgMemberKey = CacheKeys.OrgMember(uid, oid);
+
+        await CacheService.Instance.SetAsync(
+            orgAdminKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            orgMemberKey,
+            true,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _organizationBusiness.SetOrganizationAdminStatus(
+            oid,
+            uid,
+            true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(orgAdminKey));
+
+        // The unrelated member cache value should remain unchanged.
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(orgMemberKey));
+
+        await CacheService.Instance.DeleteAsync(orgAdminKey);
+        await CacheService.Instance.DeleteAsync(orgMemberKey);
+    }
+
+    [Fact]
     public async Task UpdateUserAdmin_Succeeds_IfOrgUserExists()
     {
         // Act - set user as admin
@@ -1306,6 +1375,25 @@ public class OrganizationBusinessTests : IntegrationTestBase
     #endregion
 
     #region RemoveUser Tests
+
+    [Fact]
+    public async Task RemoveUserFromOrganization_InvalidatesOrgMemberAndOrgAdminCache()
+    {
+        // Arrange
+        var orgMemberKey = CacheKeys.OrgMember(uid, oid);
+        var orgAdminKey = CacheKeys.OrgAdmin(uid, oid);
+
+        await CacheService.Instance.SetAsync(orgMemberKey, true, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(orgAdminKey, true, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _organizationBusiness.RemoveUserFromOrganization(oid, uid);
+
+        // Assert
+        Assert.True(result);
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(orgMemberKey));
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(orgAdminKey));
+    }
 
     [Fact]
     public async Task RemoveUser_Succeeds_IfOrgUserExists()
