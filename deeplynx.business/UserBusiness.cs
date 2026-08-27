@@ -243,6 +243,8 @@ public class UserBusiness : IUserBusiness
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
+        await ExistenceHelper.SetUserArchivedStatusCache(user.Id, user.IsArchived);
+
         return MapToResponseDto(user);
     }
 
@@ -270,6 +272,8 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetUserArchivedStatusCache(user.Id, user.IsArchived);
 
         return MapToResponseDto(user);
     }
@@ -303,6 +307,8 @@ public class UserBusiness : IUserBusiness
         if (user == null)
             throw new KeyNotFoundException("User not found.");
 
+        var previousIsArchived = user.IsArchived;
+
         user.Name = dto.Name ?? user.Name;
         user.Username = dto.Username ?? user.Username;
         user.IsArchived = dto.IsArchived ?? user.IsArchived;
@@ -310,6 +316,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
+
+        if (user.IsArchived != previousIsArchived)
+            await ExistenceHelper.SetUserArchivedStatusCache(user.Id, user.IsArchived);
 
         return new UserResponseDto
         {
@@ -340,6 +349,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetUserDeletedCache(userId);
+
         return true;
     }
 
@@ -362,6 +374,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetUserArchivedStatusCache(userId, true);
+
         return true;
     }
 
@@ -384,6 +399,9 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetUserArchivedStatusCache(userId, false);
+
         return true;
     }
 
