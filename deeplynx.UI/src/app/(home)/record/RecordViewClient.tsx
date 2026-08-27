@@ -77,6 +77,7 @@ import { EmbeddingStatusResponseDTO } from "@/app/(home)/types/latticeDTOs";
 import {
   fetchInsightEndpointHealth,
   fetchInsightIngestionStatus,
+  fetchInsightPipelineStatus,
   queueInsightUpload,
   type InsightEndpointHealthByRole,
   type InsightModelHealthState,
@@ -1013,6 +1014,14 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           fileId: recordId,
         });
 
+        // const pipelineStatus = await fetchInsightPipelineStatus({
+        //   organizationId: organization.organizationId as number,
+        //   projectId,
+        //   fileId: recordId
+        // });
+
+        // console.log(`Record Id: ${pipelineStatus.file_id}\nProgress: ${pipelineStatus.progress}\nStage: ${pipelineStatus.stage}\nStatus: ${pipelineStatus.status}\nJob Id: ${pipelineStatus.job_id}\nError: ${pipelineStatus.error}`);
+
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
@@ -1376,7 +1385,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                     </span>
                   </div>
                 ) : (
-                  <>
+                  <> 
+                  {/* LATTICE STARTS HERE !!! */}
                     {!isRecordInsightEmbedded &&
                       !isCheckingLatticeReadiness && (
                         <div className="alert alert-warning">
