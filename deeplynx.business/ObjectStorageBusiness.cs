@@ -581,6 +581,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         bool cacheHit = cachedId.HasValue;
 
+        // Check the cache before querying the db
         if (cacheHit)
         {
             defaultObjectStorageId = cachedId;
@@ -832,10 +833,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(
-                ex,
-                "Default object storage cache update failed for key {CacheKey}",
-                key);
+            _logger?.LogWarning(ex, "Default object storage cache update failed for key {CacheKey}", key);
         }
     }
 }
