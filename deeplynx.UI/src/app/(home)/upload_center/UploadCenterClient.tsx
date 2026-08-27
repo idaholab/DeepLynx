@@ -115,12 +115,10 @@ export default function UploadCenterClient() {
     let cancelled = false;
     (async () => {
       try {
-        const records = await getAllRecords(
+        const { items: records } = await getAllRecords(
           Number(organizationId),
           Number(projectId),
-          undefined,
-          undefined,
-          true,
+          { hideArchived: true },
         );
         if (cancelled) return;
 
