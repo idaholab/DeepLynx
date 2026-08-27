@@ -502,7 +502,7 @@ public class DataSourceBusiness : IDataSourceBusiness
         // Invalidate cached default data source
         if (dataSource.Default)
         {
-            await InvalidateDefaultDataSourceCache(dataSource.OrganizationId, dataSource.ProjectId);
+            await UpdateDefaultDataSourceCache(dataSourceId, dataSource.OrganizationId, dataSource.ProjectId, invalidateKey: true);
         }
 
         await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
@@ -552,7 +552,7 @@ public class DataSourceBusiness : IDataSourceBusiness
         // Invalidate cached default data source
         if (dataSource.Default)
         {
-            await InvalidateDefaultDataSourceCache(dataSource.OrganizationId, dataSource.ProjectId);
+            await UpdateDefaultDataSourceCache(dataSourceId, dataSource.OrganizationId, dataSource.ProjectId, invalidateKey: true);
         }
 
         await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
@@ -760,38 +760,34 @@ public class DataSourceBusiness : IDataSourceBusiness
         return Task.WhenAll(keys.Select(CacheService.Instance.DeleteAsync));
     }
 
-    private async Task UpdateDefaultDataSourceCache(long dataSourceId, long organizationId, long? projectId)
+    private async Task UpdateDefaultDataSourceCache(long dataSourceId, long organizationId, long? projectId, bool invalidateKey = false)
     {
         var key = projectId.HasValue
             ? CacheKeys.ProjectDefaultDataSource(projectId.Value)
             : CacheKeys.OrganizationDefaultDataSource(organizationId);
 
-        try
+        if (invalidateKey)
         {
-            await CacheService.Instance.SetAsync(
-                key,
-                dataSourceId,
-                DataSourceCacheTtl);
+            try
+            {
+                await CacheService.Instance.DeleteAsync(key);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Default data source cache invalidation failed for key {CacheKey}", key);
+            }
         }
-        catch (Exception ex)
+        else
         {
-            _logger?.LogWarning(ex, "Default data source cache update failed for key {CacheKey}", key);
+            try
+            {
+                await CacheService.Instance.SetAsync(key, dataSourceId, DataSourceCacheTtl);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Default data source cache update failed for key {CacheKey}", key);
+            }
         }
-    }
-
-    private async Task InvalidateDefaultDataSourceCache(long organizationId, long? projectId)
-    {
-        var key = projectId.HasValue
-            ? CacheKeys.ProjectDefaultDataSource(projectId.Value)
-            : CacheKeys.OrganizationDefaultDataSource(organizationId);
-
-        try
-        {
-            await CacheService.Instance.DeleteAsync(key);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "Default data source cache invalidation failed for key {CacheKey}", key);
-        }
+            
     }
 }
