@@ -72,7 +72,7 @@ internal static class NexusOpenApiExtensions
                     },
                     new()
                     {
-                        Url = "https://deeplynx-test.dev.inl.gov",
+                        Url = "https://deeplynx-test.zba.inl.gov",
                         Description = "Test"
                     }
                 };
