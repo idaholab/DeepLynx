@@ -6,8 +6,6 @@ using deeplynx.models;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Pgvector.EntityFrameworkCore;
-using ZstdSharp.Unsafe;
 
 namespace deeplynx.business;
 
