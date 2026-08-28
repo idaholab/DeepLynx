@@ -43,6 +43,12 @@ export interface FetchInsightEndpointHealthArgs {
   modelType: "llm" | "vlm" | "embedding";
 }
 
+export interface FetchInsightPipelineArgs {
+  organizationId: number;
+  projectId: number;
+  fileId: number;
+}
+
 export interface InsightUploadResponse {
   message?: string;
 }
@@ -60,6 +66,15 @@ export interface InsightEndpointHealthResponse {
   latency_ms?: number | null;
   model_metadata?: Record<string, unknown> | null;
   detail?: string | null;
+}
+
+export interface InsightPipelineStatusResponse {
+  file_id: number;
+  job_id?: string | null;
+  status: string;
+  stage?: string | null;
+  progress?: number | null;
+  error?: string | null;
 }
 
 export type InsightModelHealthState = {
@@ -294,6 +309,23 @@ export async function fetchInsightEndpointHealth(
       extractInsightErrorMessage(error?.response?.data) ||
       error?.message ||
       "Insight endpoint health check failed";
+    throw new Error(message);
+  }
+}
+
+export async function fetchInsightPipelineStatus(
+  statusRequest: FetchInsightPipelineArgs,
+): Promise<InsightPipelineStatusResponse> {
+  try {
+    const res = await api.get<InsightPipelineStatusResponse>(
+      `/organizations/${statusRequest.organizationId}/projects/${statusRequest.projectId}/insight/pipeline_status/${statusRequest.fileId}`,
+    );
+    return res.data;
+  } catch (error: any) {
+    const message =
+      extractInsightErrorMessage(error?.response?.data) ||
+      error?.message ||
+      "Insight status check failed";
     throw new Error(message);
   }
 }
