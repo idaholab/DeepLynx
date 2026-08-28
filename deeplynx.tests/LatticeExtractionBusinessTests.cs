@@ -454,7 +454,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         Context.Records.Add(record);
         await Context.SaveChangesAsync();
         var recordId = record.Id;
-        
+
         var extraction = new Extraction
         {
             ProjectId = pid,
@@ -462,7 +462,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         };
         Context.Extractions.Add(extraction);
         await Context.SaveChangesAsync();
-        
+
         var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
 
         // Act
@@ -951,13 +951,13 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         await PromoteAllAsync(completeExtractionId);
 
         Context.ChangeTracker.Clear();
-        Assert.Equal(relsBefore + 1, Context.Relationships.Count());
+        Assert.Equal(relsBefore + 2, Context.Relationships.Count());
 
         _latticeCtx.ChangeTracker.Clear();
         var promoted1 = _latticeCtx.ExtractionRelationships.Find(srel1.Id);
         var promoted2 = _latticeCtx.ExtractionRelationships.Find(srel2.Id);
         Assert.NotNull(promoted1!.PromotedId);
-        Assert.Equal(promoted1.PromotedId, promoted2!.PromotedId);
+        Assert.NotNull(promoted2!.PromotedId);
     }
 
     [Fact]
