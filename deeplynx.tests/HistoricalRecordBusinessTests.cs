@@ -67,6 +67,12 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         await base.InitializeAsync();
         _sensitivityLabelService = new SensitivityLabelService(Context);
         _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockPermissionService
+            .Setup(s => s.PermissionInProject(It.IsAny<long>(), It.IsAny<long>(), "read", "class"))
+            .ReturnsAsync(true);
+        _mockPermissionService
+            .Setup(s => s.PermissionInProject(It.IsAny<long>(), It.IsAny<long>(), "read", "tag"))
+            .ReturnsAsync(true);
         _historicalRecordBusiness = new HistoricalRecordBusiness(
             Context, _sensitivityLabelService, _mockPermissionService.Object);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
