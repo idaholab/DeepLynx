@@ -99,7 +99,7 @@ export type RecordResponseDto = {
   fileSize?: number | null;
   fileContentHash?: string | null;
   tags?: { id: number | null; name: string }[];
-  labels?: { id: number | null; name: string }[];
+  sensitivityLabels?: { id: number | null; name: string }[];
 };
 
 export type PaginatedResponse<T> = {
@@ -134,7 +134,7 @@ export type RecordCollectionResponseDto = {
   isArchived: boolean;
   recordCount: number;
   tags?: RecordCollectionTagDto[];
-  labels?: RecordCollectionLabelDto[];
+  sensitivityLabels?: RecordCollectionLabelDto[];
 };
 
 export type PaginatedRecordCollectionsResponseDto =

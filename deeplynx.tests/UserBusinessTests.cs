@@ -1,5 +1,7 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.models;
 using Record = deeplynx.datalayer.Models.Record;
 using deeplynx.helpers;
@@ -2122,6 +2124,66 @@ public class UserBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task DeleteUser_InvalidatesAllUserCacheKeys()
+    {
+        // Arrange
+        var user = new User
+        {
+            Name = "Cache Delete User",
+            Email = "cache-delete-user@test.com",
+            Username = $"cache_delete_user_{Guid.NewGuid()}",
+            IsActive = true
+        };
+        var otherUser = new User
+        {
+            Name = "Other Cache User",
+            Email = "other-cache-user@test.com",
+            Username = $"other_cache_user_{Guid.NewGuid()}",
+            IsActive = true
+        };
+
+        Context.Users.AddRange(user, otherUser);
+        await Context.SaveChangesAsync();
+
+        var userCacheKeys = new[]
+        {
+            CacheKeys.SysAdmin(user.Id),
+            CacheKeys.OrgAdmin(user.Id, oid),
+            CacheKeys.OrgMember(user.Id, oid),
+            CacheKeys.ProjectAdmin(user.Id, pid),
+            CacheKeys.ProjectAdmin(user.Id, pid2)
+        };
+        var otherUserCacheKeys = new[]
+        {
+            CacheKeys.SysAdmin(otherUser.Id),
+            CacheKeys.OrgAdmin(otherUser.Id, oid),
+            CacheKeys.OrgMember(otherUser.Id, oid),
+            CacheKeys.ProjectAdmin(otherUser.Id, pid)
+        };
+
+        foreach (var key in userCacheKeys.Concat(otherUserCacheKeys))
+            await CacheService.Instance.SetAsync(key, true, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _userBusiness.DeleteUser(user.Id);
+
+        // Assert
+        Assert.True(result);
+
+        foreach (var key in userCacheKeys)
+        {
+            var cachedValue = await CacheService.Instance.GetAsync<bool?>(key);
+
+            Assert.True(
+                cachedValue is null,
+                $"Cache key '{key}' was not invalidated.");
+        }
+
+        foreach (var key in otherUserCacheKeys)
+            Assert.True(await CacheService.Instance.GetAsync<bool>(key));
+    }
+
+    [Fact]
     public async Task DeleteUser_Fails_IfNotFound()
     {
         // Act
@@ -2256,6 +2318,49 @@ public class UserBusinessTests : IntegrationTestBase
     #endregion
 
     #region SetSysAdmin Tests
+
+    [Fact]
+    public async Task SetSysAdmin_UpdatesCandidateSysAdminCache()
+    {
+        // Arrange
+        var authorizer = new User
+        {
+            Name = "Cache Test Admin",
+            Email = "cache-admin@test.com",
+            Username = $"cache_admin_{Guid.NewGuid()}",
+            IsActive = true,
+            IsSysAdmin = true
+        };
+        var candidate = new User
+        {
+            Name = "Cache Test Candidate",
+            Email = "cache-candidate@test.com",
+            Username = $"cache_candidate_{Guid.NewGuid()}",
+            IsActive = true,
+            IsSysAdmin = false
+        };
+
+        Context.Users.AddRange(authorizer, candidate);
+        await Context.SaveChangesAsync();
+
+        var cacheKey = CacheKeys.SysAdmin(candidate.Id);
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _userBusiness.SetSysAdmin(
+            authorizer.Id,
+            candidate.Id,
+            true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
 
     [Fact]
     public async Task SetSysAdmin_Succeeds_WhenAuthorizerIsSysAdmin()

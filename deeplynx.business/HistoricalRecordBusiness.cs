@@ -11,17 +11,24 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly ISensitivityLabelService _sensitivityLabelService;
+    private readonly IProjectRolePermissionService _projectRolePermissionService;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="HistoricalRecordBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the record operations.</param>
     /// <param name="sensitivityLabelService">The sensitivity Label Service. </param>
-    public HistoricalRecordBusiness(DeeplynxContext context, ISensitivityLabelService sensitivityLabelService)
+    /// <param name="projectRolePermissionService">Used to check class/tag read permissions in a project, ahead of querying.</param>
+    public HistoricalRecordBusiness(
+        DeeplynxContext context,
+        ISensitivityLabelService sensitivityLabelService,
+        IProjectRolePermissionService projectRolePermissionService)
     {
         _context = context;
         _sensitivityLabelService = sensitivityLabelService;
+        _projectRolePermissionService = projectRolePermissionService;
     }
+
 
     /// <summary>
     ///     Retrieves all Historical Records for a specific project and datasource
@@ -41,6 +48,10 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         long currentUserId, long projectId, long organizationId, PaginatedRequestDto paginatedRequestDto, long? dataSourceId = null, DateTime? pointInTime = null,
         bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
+        // Permission check happens first, ahead of any historical-record query.
+        var (canReadClass, canReadTags) = await GetHistoricalFieldPermissions(
+            currentUserId, projectId, isSysAdmin, isOrgAdmin, isProjectAdmin);
+
         var recordQuery = _context.HistoricalRecords
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
 
@@ -52,9 +63,34 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             recordQuery = recordQuery.Where(r => r.LastUpdatedAt <= unspecifiedPointInTime);
         }
 
+        // Project the class/tag columns conditionally so the query itself never asks the
+        // database for fields the caller isn't authorized to see.
         var records = await recordQuery
             .GroupBy(e => e.RecordId)
             .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).First())
+            .Select(r => new
+            {
+                r.RecordId,
+                r.Uri,
+                r.Properties,
+                r.OriginalId,
+                r.Name,
+                r.Description,
+                ClassId = canReadClass ? r.ClassId : null,
+                ClassName = canReadClass ? r.ClassName : null,
+                r.DataSourceId,
+                r.DataSourceName,
+                r.ObjectStorageId,
+                r.ObjectStorageName,
+                r.ProjectId,
+                r.ProjectName,
+                Tags = canReadTags ? r.Tags : "[]",
+                r.LastUpdatedBy,
+                r.FileType,
+                r.FileSize,
+                r.IsArchived,
+                r.LastUpdatedAt
+            })
             .ToListAsync();
 
         if (hideArchived && records.Count > 0)
@@ -114,7 +150,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 ProjectId = r.ProjectId,
                 ProjectName = r.ProjectName,
                 Tags = r.Tags,
-                Labels = r.Labels,
+                Labels = currentRecord?.Labels?.Select(l => l.Name).ToList(),
                 LastUpdatedBy = r.LastUpdatedBy,
                 FileType = r.FileType,
                 FileSize = r.FileSize,
@@ -172,6 +208,10 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         long currentUserId, long projectId, long organizationId, long? dataSourceId = null, DateTime? pointInTime = null,
         bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
+        // Permission check happens first, ahead of any historical-record query.
+        var (canReadClass, canReadTags) = await GetHistoricalFieldPermissions(
+            currentUserId, projectId, isSysAdmin, isOrgAdmin, isProjectAdmin);
+
         var recordQuery = _context.HistoricalRecords
             .Where(r => r.ProjectId == projectId && r.OrganizationId == organizationId);
 
@@ -186,6 +226,29 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         var records = await recordQuery
             .GroupBy(e => e.RecordId)
             .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
+            .Select(r => new
+            {
+                r.RecordId,
+                r.Uri,
+                r.Properties,
+                r.OriginalId,
+                r.Name,
+                r.Description,
+                ClassId = canReadClass ? r.ClassId : null,
+                ClassName = canReadClass ? r.ClassName : null,
+                r.DataSourceId,
+                r.DataSourceName,
+                r.ObjectStorageId,
+                r.ObjectStorageName,
+                r.ProjectId,
+                r.ProjectName,
+                Tags = canReadTags ? r.Tags : "[]",
+                r.LastUpdatedBy,
+                r.FileType,
+                r.FileSize,
+                r.IsArchived,
+                r.LastUpdatedAt
+            })
             .ToListAsync();
 
         // need to check for archived after DB retrieval since filtering before querying could
@@ -193,7 +256,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         if (hideArchived && records.Count > 0)
             records = records.Where(r => !r.IsArchived).ToList();
 
-        
+
         // if user is not admin, filter out unauthorized labels
 
         var recordIds = records.Select(r => r.RecordId).ToList();
@@ -204,7 +267,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                         .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
             records = records.Where(r => authorizedIds.Contains(r.RecordId)).ToList();
         }
-        
+
         var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
             currentUserId,
             organizationId,
@@ -237,7 +300,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 ProjectId = r.ProjectId,
                 ProjectName = r.ProjectName,
                 Tags = r.Tags,
-                Labels = r.Labels,
+                Labels = currentRecord?.Labels?.Select(l => l.Name).ToList(),
                 LastUpdatedBy = r.LastUpdatedBy,
                 FileType = r.FileType,
                 FileSize = r.FileSize,
@@ -258,13 +321,19 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <param name="isOrgAdmin">Whether the current user is an organization administrator</param>
     /// <param name="isProjectAdmin">Whether the current user is a project administrator</param>
     /// <returns>An array of record instances for the given record</returns>
-    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetHistoryForRecord(long currentUserId, long recordId, 
+    public async Task<IEnumerable<HistoricalRecordResponseDto>> GetHistoryForRecord(long currentUserId, long recordId,
     long organizationId, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
+        // We need the record's ProjectId to run the permission check, so this one small lookup
+        // has to happen before we know canReadClass/canReadTags. Everything after this point —
+        // the actual historical-record query — is still shaped by the permission result.
         var record = await _context.Records
             .Include(r => r.Labels)
             .FirstOrDefaultAsync(r => r.Id == recordId && r.OrganizationId == organizationId);
         if (record == null) throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        var (canReadClass, canReadTags) = await GetHistoricalFieldPermissions(
+            currentUserId, record.ProjectId, isSysAdmin, isOrgAdmin, isProjectAdmin);
 
         var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
             currentUserId,
@@ -292,15 +361,15 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 OriginalId = r.OriginalId,
                 Name = r.Name,
                 Description = r.Description,
-                ClassId = r.ClassId,
-                ClassName = r.ClassName,
+                ClassId = canReadClass ? r.ClassId : null,
+                ClassName = canReadClass ? r.ClassName : null,
                 DataSourceId = r.DataSourceId,
                 DataSourceName = r.DataSourceName,
                 ObjectStorageId = r.ObjectStorageId,
                 ObjectStorageName = r.ObjectStorageName,
                 ProjectId = r.ProjectId,
                 ProjectName = r.ProjectName,
-                Tags = r.Tags,
+                Tags = canReadTags ? r.Tags : "[]",
                 LastUpdatedBy = r.LastUpdatedBy,
                 FileType = r.FileType,
                 FileSize = r.FileSize,
@@ -369,6 +438,9 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         if (currentRecord == null)
             throw new KeyNotFoundException($"Record with id {recordId} not found");
 
+        var (canReadClass, canReadTags) = await GetHistoricalFieldPermissions(
+            currentUserId, record.ProjectId, isSysAdmin, isOrgAdmin, isProjectAdmin);
+
         var authorizedDownloadLabels = await _sensitivityLabelService.GetAuthorizedSensitivityLabels(
             currentUserId,
             organizationId,
@@ -390,22 +462,48 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             OriginalId = record.OriginalId,
             Name = record.Name,
             Description = record.Description,
-            ClassId = record.ClassId,
-            ClassName = record.ClassName,
+            ClassId = canReadClass ? record.ClassId : null,
+            ClassName = canReadClass ? record.ClassName : null,
             DataSourceId = record.DataSourceId,
             DataSourceName = record.DataSourceName,
             ObjectStorageId = record.ObjectStorageId,
             ObjectStorageName = record.ObjectStorageName,
             ProjectId = record.ProjectId,
             ProjectName = record.ProjectName,
-            Tags = record.Tags,
-            Labels = record.Labels,
+            Tags = canReadTags ? record.Tags : "[]",
+            Labels = currentRecord?.Labels?.Select(l => l.Name).ToList(),
             LastUpdatedBy = record.LastUpdatedBy,
             FileType = record.FileType,
             FileSize = record.FileSize,
             IsArchived = record.IsArchived,
             LastUpdatedAt = record.LastUpdatedAt
         };
+    }
+
+
+    /// <summary>
+    ///     Checks, ahead of any historical-record query, whether the caller may see class and tag
+    ///     data for the given project. Admins see both; non-admins are checked individually against
+    ///     <see cref="IProjectRolePermissionService.PermissionInProject"/>. The result is used to decide
+    ///     what the subsequent database query actually selects — unauthorized fields are never
+    ///     retrieved, not stripped out afterward.
+    /// </summary>
+    private async Task<(bool canReadClass, bool canReadTags)> GetHistoricalFieldPermissions(
+        long currentUserId,
+        long projectId,
+        bool isSysAdmin,
+        bool isOrgAdmin,
+        bool isProjectAdmin)
+    {
+        if (isSysAdmin || isOrgAdmin || isProjectAdmin)
+            return (true, true);
+
+        var canReadClass = await _projectRolePermissionService.PermissionInProject(
+            currentUserId, projectId, "read", "class");
+        var canReadTags = await _projectRolePermissionService.PermissionInProject(
+            currentUserId, projectId, "read", "tag");
+
+        return (canReadClass, canReadTags);
     }
 
 }
