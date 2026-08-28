@@ -369,7 +369,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
         try
         {
-            var isFirstOfType = !await HasExistingConfigOfType(organizationId, projectId, dto.ModelType.ToLower());
+            var shouldAutoDefault = await ShouldAutoDefault(organizationId, projectId, dto.ModelType.ToLower());
 
             var newConfig = new AiModelConfig
             {
@@ -380,7 +380,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 ModelName = dto.ModelName,
                 ModelType = dto.ModelType.ToLower(),
                 RequiresToken = dto.RequiresToken,
-                Default = dto.Default || isFirstOfType,
+                Default = dto.Default || shouldAutoDefault,
                 IsArchived = false,
                 LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                 LastUpdatedBy = currentUserId
@@ -524,9 +524,9 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 }
 
                 var effectiveModelType = dto.ModelType ?? returnedModelConfig.ModelType;
-                var isOnlyOfType = dto.ModelType != null &&
+                var shouldAutoDefault = dto.ModelType != null &&
                     !string.Equals(dto.ModelType, returnedModelConfig.ModelType, StringComparison.OrdinalIgnoreCase) &&
-                    !await HasExistingConfigOfType(organizationId, projectId, effectiveModelType);
+                    await ShouldAutoDefault(organizationId, projectId, effectiveModelType);
 
                 if (dto.Default != null)
                 {
@@ -536,7 +536,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                             "Must assign another AI Model Configuration to be the new default before unassigning.");
                     }
 
-                    if (!returnedModelConfig.Default && (dto.Default.Value || isOnlyOfType))
+                    if (!returnedModelConfig.Default && (dto.Default.Value || shouldAutoDefault))
                     {
                         if (projectId.HasValue)
                             await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id, effectiveModelType);
@@ -544,7 +544,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                             await ResetOrganizationDefaults(organizationId, returnedModelConfig.Id, effectiveModelType);
                     }
                 }
-                else if (!returnedModelConfig.Default && isOnlyOfType)
+                else if (!returnedModelConfig.Default && shouldAutoDefault)
                 {
                     if (projectId.HasValue)
                         await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id, effectiveModelType);
@@ -556,7 +556,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 returnedModelConfig.ModelType = dto.ModelType ?? returnedModelConfig.ModelType;
                 returnedModelConfig.ServerUrl = dto.ServerUrl ?? returnedModelConfig.ServerUrl;
                 returnedModelConfig.RequiresToken = dto.RequiresToken ?? returnedModelConfig.RequiresToken;
-                returnedModelConfig.Default = (dto.Default ?? returnedModelConfig.Default) || isOnlyOfType;
+                returnedModelConfig.Default = (dto.Default ?? returnedModelConfig.Default) || shouldAutoDefault;
 
                 returnedModelConfig.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
                 returnedModelConfig.LastUpdatedBy = currentUserId;
@@ -730,10 +730,10 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
     }
 
     /// <summary>
-    ///     Checks whether any config of the given type already exists in the given scope (org- or project-level).
-    ///     Used to auto-promote the first config of a type to be its default.
+    ///     Determines whether a config should be auto-promoted to Default because no default for this ModelType is currently reachable in this scope. 
+    ///     At the project scope, an org-level default should be used and blocks auto-promotion.
     /// </summary>
-    private async Task<bool> HasExistingConfigOfType(long organizationId, long? projectId, string modelType)
+    private async Task<bool> ShouldAutoDefault(long organizationId, long? projectId, string modelType)
     {
         var query = _context.AiModelConfigs
             .Where(x => x.OrganizationId == organizationId && x.ModelType == modelType && !x.IsArchived)
@@ -743,6 +743,25 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             ? query.Where(x => x.ProjectId == projectId)
             : query.Where(x => x.ProjectId == null);
 
-        return await query.AnyAsync();
+        bool hasExistingConfigOfType =  await query.AnyAsync();
+
+        if (hasExistingConfigOfType)
+            return false; 
+
+        if (projectId.HasValue)
+        {
+            bool hasOrganizationDefaultOfType = await _context.AiModelConfigs
+                .Where(x => x.OrganizationId == organizationId
+                            && x.ProjectId == null
+                            && x.ModelType == modelType
+                            && x.Default
+                            && !x.IsArchived)
+                .AnyAsync();
+
+            if (hasOrganizationDefaultOfType)
+                return false; 
+        }
+
+        return true;
     }
 }
