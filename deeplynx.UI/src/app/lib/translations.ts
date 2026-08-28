@@ -437,6 +437,7 @@ export const translations = {
         "An invitation email will be sent with instructions to join the organization. The user will be able to access all organization resources once they accept the invitation.",
       EMAIL_INVITATIONS: "Email invitations",
       EMAIL_NOTIFICATIONS: "Email Notifications",
+      EMBEDDED_SUCCESSFULLY: "Record successfully embedded.",
       ENGLISH: "English",
       ENTER_CLASS_DESCRIPTION_OPTIONAL: "Enter class description (optional)",
       ENTER_CLASS_NAME: "Enter class name",
@@ -2703,6 +2704,7 @@ export const translations = {
         "Se enviará un correo de invitación con instrucciones para unirse a la organización. El usuario podrá acceder a todos los recursos de la organización una vez que acepte la invitación.",
       EMAIL_INVITATIONS: "Invitaciones por correo electrónico",
       EMAIL_NOTIFICATIONS: "Notificaciones por correo",
+      EMBEDDED_SUCCESSFULLY: "Registro insertado con éxito",
       ENGLISH: "English",
       ENTER_CLASS_DESCRIPTION_OPTIONAL:
         "Ingresa la descripcion de la clase (opcional)",
