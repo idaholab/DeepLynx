@@ -70,4 +70,14 @@ public class CacheKeys
     {
         return $"projectdefaultobjectstorage:{projectId}";
     }
+
+    public static string OrganizationDefaultDataSource(long organizationId)
+    {
+        return $"orgdefaultdatasource:{organizationId}";
+    }
+
+    public static string ProjectDefaultDataSource(long projectId)
+    {
+        return $"projectdefaultdatasource:{projectId}";
+    }
 }
