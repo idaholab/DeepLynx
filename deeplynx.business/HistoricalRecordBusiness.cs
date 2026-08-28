@@ -63,11 +63,12 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             recordQuery = recordQuery.Where(r => r.LastUpdatedAt <= unspecifiedPointInTime);
         }
 
-        // Project the class/tag columns conditionally so the query itself never asks the
-        // database for fields the caller isn't authorized to see.
-        var records = await recordQuery
+        var latestPerRecord = await recordQuery
             .GroupBy(e => e.RecordId)
             .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).First())
+            .ToListAsync();
+
+        var records = latestPerRecord
             .Select(r => new
             {
                 r.RecordId,
@@ -91,7 +92,7 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 r.IsArchived,
                 r.LastUpdatedAt
             })
-            .ToListAsync();
+            .ToList();
 
         if (hideArchived && records.Count > 0)
             records = records.Where(r => !r.IsArchived).ToList();
@@ -208,7 +209,6 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
         long currentUserId, long projectId, long organizationId, long? dataSourceId = null, DateTime? pointInTime = null,
         bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
-        // Permission check happens first, ahead of any historical-record query.
         var (canReadClass, canReadTags) = await GetHistoricalFieldPermissions(
             currentUserId, projectId, isSysAdmin, isOrgAdmin, isProjectAdmin);
 
@@ -223,9 +223,12 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             recordQuery = recordQuery.Where(r => r.LastUpdatedAt <= unspecifiedPointInTime);
         }
 
-        var records = await recordQuery
+        var latestPerRecord = await recordQuery
             .GroupBy(e => e.RecordId)
             .Select(g => g.OrderByDescending(r => r.LastUpdatedAt).FirstOrDefault())
+            .ToListAsync();
+
+        var records = latestPerRecord
             .Select(r => new
             {
                 r.RecordId,
@@ -249,16 +252,14 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
                 r.IsArchived,
                 r.LastUpdatedAt
             })
-            .ToListAsync();
+            .ToList();
 
         // need to check for archived after DB retrieval since filtering before querying could
         // result in inaccurate "most recent" results if a record has been archived
         if (hideArchived && records.Count > 0)
             records = records.Where(r => !r.IsArchived).ToList();
 
-
-        // if user is not admin, filter out unauthorized labels
-
+        // if user is not admin, filter out unauthorized labels    
         var recordIds = records.Select(r => r.RecordId).ToList();
 
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
