@@ -1,8 +1,10 @@
+using System.Linq.Expressions;
 using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
 
@@ -163,7 +165,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     ///     An ancestor is "satisfied" if it matched an existing ontology entity, was promoted in a
     ///     prior round, or is being promoted in this same round.
     /// </summary>
-    private static void ValidateDependencies(
+    private async Task ValidateDependencies(
         List<ExtractionClass> stagingClasses,
         List<ExtractionRecord> stagingRecords,
         List<ExtractionRelationship> stagingRelationships,
@@ -173,57 +175,112 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         HashSet<long> selectedRelIds,
         HashSet<long> selectedEdgeIds)
     {
-        var classById = stagingClasses.ToDictionary(c => c.Id);
-        var recordById = stagingRecords.ToDictionary(r => r.Id);
-        var relById = stagingRelationships.ToDictionary(r => r.Id);
-        var edgeById = stagingEdges.ToDictionary(e => e.Id);
-
-        bool ClassSatisfied(long id)
+        try
         {
-            return classById.TryGetValue(id, out var c) && !c.Rejected &&
-                   (c.OntologyClassId.HasValue || c.PromotedId.HasValue || selectedClassIds.Contains(id));
-        }
+            var classById = stagingClasses.ToDictionary(c => c.Id);
+            var recordById = stagingRecords.ToDictionary(r => r.Id);
+            var relById = stagingRelationships.ToDictionary(r => r.Id);
+            var edgeById = stagingEdges.ToDictionary(e => e.Id);
 
-        bool RecordSatisfied(long id)
+            bool ClassSatisfied(long id)
+            {
+                return classById.TryGetValue(id, out var c) && !c.Rejected &&
+                    (c.OntologyClassId.HasValue || c.PromotedId.HasValue || selectedClassIds.Contains(id));
+            }
+
+            bool RecordSatisfied(long id)
+            {
+                return recordById.TryGetValue(id, out var r) && !r.Rejected &&
+                    (r.PromotedId.HasValue || selectedRecordIds.Contains(id));
+            }
+
+            bool RelSatisfied(long id)
+            {
+                return relById.TryGetValue(id, out var r) && !r.Rejected &&
+                    (r.OntologyRelationshipId.HasValue || r.PromotedId.HasValue || selectedRelIds.Contains(id));
+            }
+
+            var errors = new List<string>();
+
+            foreach (var id in selectedRecordIds)
+                if (recordById.TryGetValue(id, out var r) && !ClassSatisfied(r.ExtractionClassId))
+                    errors.Add($"Record '{r.Name}' (id {id}) requires its class to be approved or already promoted.");
+
+            foreach (var id in selectedRelIds)
+                if (relById.TryGetValue(id, out var rel) &&
+                    (!ClassSatisfied(rel.OriginClassId) || !ClassSatisfied(rel.DestinationClassId)))
+                    errors.Add($"Relationship '{rel.Name}' (id {id}) requires its origin and destination classes to be approved or already promoted.");
+
+            foreach (var id in selectedEdgeIds)
+            {
+                if (!edgeById.TryGetValue(id, out var edge)) continue;
+
+                var missing = new List<string>();
+
+                recordById.TryGetValue(edge.OriginRecordId, out var originExtractionRecord);
+                var originPromotedId = originExtractionRecord?.PromotedId;
+
+                recordById.TryGetValue(edge.DestinationRecordId, out var destExtractionRecord);
+                var destPromotedId = destExtractionRecord?.PromotedId;
+
+                if (originPromotedId == null || !RecordSatisfied(edge.OriginRecordId))
+                {
+                    missing.Add(originExtractionRecord != null
+                        ? $"origin record '{originExtractionRecord.Name}' (extraction id {edge.OriginRecordId})"
+                        : $"origin record (extraction id {edge.OriginRecordId})");
+                }
+
+                if (destPromotedId == null || !RecordSatisfied(edge.DestinationRecordId))
+                {
+                    missing.Add(destExtractionRecord != null
+                        ? $"destination record '{destExtractionRecord.Name}' (extraction id {edge.DestinationRecordId})"
+                        : $"destination record (extraction id {edge.DestinationRecordId})");
+                }
+
+                if (!RelSatisfied(edge.ExtractionRelationshipId)) missing.Add("relationship");
+
+                if (missing.Count > 0)
+                    errors.Add($"Edge (id {id}) requires its {string.Join(", ", missing)} to be approved or already promoted.");
+            }
+
+            var promotedRecordIds = stagingRecords
+                .Where(r => r.PromotedId.HasValue)
+                .Select(r => r.PromotedId!.Value)
+                .ToHashSet();
+
+            var existingRecords = await _context.Records
+                .Where(r => promotedRecordIds.Contains(r.Id))
+                .Select(r => new { r.Id, r.Name })
+                .ToListAsync();
+
+            var existingRecordIds = existingRecords.Select(r => r.Id).ToHashSet();
+
+            var missingRecordIds = promotedRecordIds.Except(existingRecordIds).ToList();
+
+            if (missingRecordIds.Any())
+            {
+                var missingDetails = missingRecordIds.Select(id =>
+                {
+                    var rec = existingRecords.FirstOrDefault(r => r.Id == id);
+                    return rec != null ? $"'{rec.Name}' (id {id})" : $"(id {id})";
+                });
+                errors.Add($"Missing promoted records in database: {string.Join(", ", missingDetails)}");
+            }
+
+            if (errors.Count > 0)
+                throw new InvalidOperationException(
+                    "Cannot promote the selected items because some dependencies were not included:\n" +
+                    string.Join("\n", errors));
+        }
+        catch (InvalidOperationException)
         {
-            return recordById.TryGetValue(id, out var r) && !r.Rejected &&
-                   (r.PromotedId.HasValue || selectedRecordIds.Contains(id));
+            throw;
         }
-
-        bool RelSatisfied(long id)
+        catch (Exception ex)
         {
-            return relById.TryGetValue(id, out var r) && !r.Rejected &&
-                   (r.OntologyRelationshipId.HasValue || r.PromotedId.HasValue || selectedRelIds.Contains(id));
+            _logger.LogError(ex, "Unexpected error during dependency validation.");
+            throw new InvalidOperationException("An unexpected error occurred during dependency validation.", ex);
         }
-
-        var errors = new List<string>();
-
-        foreach (var id in selectedRecordIds)
-            if (recordById.TryGetValue(id, out var r) && !ClassSatisfied(r.ExtractionClassId))
-                errors.Add($"Record '{r.Name}' (id {id}) requires its class to be approved or already promoted.");
-
-        foreach (var id in selectedRelIds)
-            if (relById.TryGetValue(id, out var rel) &&
-                (!ClassSatisfied(rel.OriginClassId) || !ClassSatisfied(rel.DestinationClassId)))
-                errors.Add($"Relationship '{rel.Name}' (id {id}) requires its origin and destination " +
-                           "classes to be approved or already promoted.");
-
-        foreach (var id in selectedEdgeIds)
-        {
-            if (!edgeById.TryGetValue(id, out var edge)) continue;
-            var missing = new List<string>();
-            if (!RecordSatisfied(edge.OriginRecordId)) missing.Add("origin record");
-            if (!RecordSatisfied(edge.DestinationRecordId)) missing.Add("destination record");
-            if (!RelSatisfied(edge.ExtractionRelationshipId)) missing.Add("relationship");
-            if (missing.Count > 0)
-                errors.Add(
-                    $"Edge (id {id}) requires its {string.Join(", ", missing)} to be approved or already promoted.");
-        }
-
-        if (errors.Count > 0)
-            throw new InvalidOperationException(
-                "Cannot promote the selected items because some dependencies were not included:\n" +
-                string.Join("\n", errors));
     }
 
     /// <summary>
@@ -389,49 +446,36 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     }
 
     /// <summary>
-    ///     Promotes novel_discovery and invalid_schema relationships that have no existing ontology match into
-    ///     deeplynx.relationships.
-    ///     Valid relationships already exist in the ontology and are not re-created.
-    ///     Returns a map of ExtractionRelationship.Id → deeplynx Relationship id for use in edge promotion.
+    /// Promotes novel_discovery and invalid_schema relationships that have no existing ontology match
+    /// into deeplynx.relationships. Valid relationships already exist in the ontology and are not re-created.
+    /// Returns a map of ExtractionRelationship.Id → deeplynx Relationship id for use in edge promotion.
     /// </summary>
     private async Task<Dictionary<long, long?>> PromoteRelationships(
-        List<ExtractionRelationship> stagingRelationships,
-        HashSet<long> selectedRelIds,
-        Dictionary<long, long?> classIdMap,
-        long organizationId, long projectId, long extractionId,
-        long currentUserId, DateTime now)
+    List<ExtractionRelationship> stagingRelationships,
+    HashSet<long> selectedRelIds,
+    Dictionary<long, long?> classIdMap,
+    long organizationId, long projectId, long extractionId,
+    long currentUserId, DateTime now)
     {
-        var pendingRelIds = stagingRelationships
-            .Where(r => r.PromotedId.HasValue && r.OntologyRelationshipId == null)
-            .Select(r => r.PromotedId!.Value)
-            .ToList();
+        var existingRelationships = await _context.Relationships
+            .Where(r => r.ProjectId == projectId)
+            .Select(r => new
+            {
+                r.Id,
+                r.Name,
+                r.OriginId,
+                r.DestinationId,
+                OriginClassName = _context.Classes.Where(c => c.Id == r.OriginId).Select(c => c.Name).FirstOrDefault(),
+                DestinationClassName = _context.Classes.Where(c => c.Id == r.DestinationId).Select(c => c.Name).FirstOrDefault()
+            })
+            .ToListAsync();
 
-        if (pendingRelIds.Count > 0)
-        {
-            var validRelIds = (await _context.Relationships
-                .Where(r => pendingRelIds.Contains(r.Id))
-                .Select(r => r.Id)
-                .ToListAsync()).ToHashSet();
-            foreach (var sr in stagingRelationships.Where(r =>
-                         r.PromotedId.HasValue && !validRelIds.Contains(r.PromotedId!.Value)))
-                sr.PromotedId = null;
-        }
 
-        var relNamesToCreate = stagingRelationships
-            .Where(r => (r.ValidationStatus == ExtractionValidationStatus.NovelDiscovery ||
-                         r.ValidationStatus == ExtractionValidationStatus.InvalidSchema) &&
-                        r.OntologyRelationshipId == null && r.PromotedId == null)
-            .Select(r => r.Name)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var existingRelByKey = existingRelationships.ToDictionary(
+            r => $"{r.Name.ToLower()}|{(r.OriginClassName ?? string.Empty).ToLower()}|{(r.DestinationClassName ?? string.Empty).ToLower()}",
+            r => r.Id
+        );
 
-        var existingRelByName = relNamesToCreate.Count > 0
-            ? (await _context.Relationships
-                .Where(r => r.ProjectId == projectId && relNamesToCreate.Contains(r.Name))
-                .Select(r => new { r.Id, r.Name })
-                .ToListAsync())
-            .ToDictionary(r => r.Name, r => r.Id, StringComparer.OrdinalIgnoreCase)
-            : new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
         var toProcessRels = stagingRelationships.Where(r =>
             selectedRelIds.Contains(r.Id) &&
@@ -440,15 +484,18 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             r.OntologyRelationshipId == null &&
             r.PromotedId == null).ToList();
 
-        // Assign IDs for relationships that already exist in the project
-        foreach (var sr in toProcessRels.Where(sr => existingRelByName.ContainsKey(sr.Name)))
-            sr.PromotedId = existingRelByName[sr.Name];
+        foreach (var sr in toProcessRels)
+        {
+            var key = $"{sr.Name.ToLower()}|{sr.OriginClass!.Name.ToLower()}|{sr.DestinationClass!.Name.ToLower()}";
+            if (existingRelByKey.TryGetValue(key, out var existingRelId))
+            {
+                sr.PromotedId = existingRelId;
+            }
+        }
 
-        // Batch-create remaining new relationships, deduplicated by name.
-        // First occurrence of each name determines the origin/destination classes.
         var newRels = toProcessRels
             .Where(sr => !sr.PromotedId.HasValue)
-            .GroupBy(sr => sr.Name, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(sr => $"{sr.Name.ToLower()}|{sr.OriginClass!.Name.ToLower()}|{sr.DestinationClass!.Name.ToLower()}")
             .Select(g =>
             {
                 var first = g.First();
@@ -456,7 +503,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 classIdMap.TryGetValue(first.DestinationClassId, out var destClassId);
                 return new Relationship
                 {
-                    Name = g.Key,
+                    Name = first.Name,
                     OriginId = originClassId,
                     DestinationId = destClassId,
                     OrganizationId = organizationId,
@@ -474,10 +521,42 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             _context.Relationships.AddRange(newRels);
             await _context.SaveChangesAsync();
 
-            var nameToNewRelId = newRels.ToDictionary(r => r.Name, r => r.Id, StringComparer.OrdinalIgnoreCase);
+            var newlyAddedRelationships = await _context.Relationships
+                .Where(r => r.ProjectId == projectId &&
+                            newRels.Select(nr => nr.Name.ToLower()).Contains(r.Name.ToLower()) &&
+                            newRels.Select(nr => nr.OriginId).Contains(r.OriginId) &&
+                            newRels.Select(nr => nr.DestinationId).Contains(r.DestinationId))
+                .Select(r => new
+                {
+                    r.Id,
+                    r.Name,
+                    r.OriginId,
+                    r.DestinationId,
+                    OriginClassName = _context.Classes.Where(c => c.Id == r.OriginId).Select(c => c.Name).FirstOrDefault(),
+                    DestinationClassName = _context.Classes.Where(c => c.Id == r.DestinationId).Select(c => c.Name).FirstOrDefault()
+                })
+                .ToListAsync();
+
+            var nameToNewRelId = newlyAddedRelationships.ToDictionary(
+                r => $"{r.Name.ToLower()}|{(r.OriginClassName ?? string.Empty).ToLower()}|{(r.DestinationClassName ?? string.Empty).ToLower()}",
+                r => r.Id
+            );
+
             foreach (var sr in toProcessRels.Where(sr => !sr.PromotedId.HasValue))
-                sr.PromotedId = nameToNewRelId[sr.Name];
+            {
+                var key = $"{sr.Name.ToLower()}|{sr.OriginClass!.Name.ToLower()}|{sr.DestinationClass!.Name.ToLower()}";
+                if (nameToNewRelId.TryGetValue(key, out var newRelId))
+                {
+                    sr.PromotedId = newRelId;
+                }
+            }
         }
+
+        foreach (var sr in stagingRelationships.Where(r => r.PromotedId.HasValue))
+        {
+            _latticeContext.Entry(sr).State = EntityState.Modified;
+        }
+        await _context.SaveChangesAsync();
 
         await _latticeContext.SaveChangesAsync();
 

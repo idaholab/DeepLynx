@@ -569,7 +569,7 @@ export function useCollectionDetails({
     setPendingRecordChanges({ added: [], removed: [] });
     setSelectedCollectionDraft({
       ...selectedCollection,
-      labels: [...(selectedCollection.labels ?? [])],
+      sensitivityLabels: [...(selectedCollection.sensitivityLabels ?? [])],
       tags: [...(selectedCollection.tags ?? [])],
     });
     setSelectedCollectionLabelSearchTerm("");
@@ -630,10 +630,10 @@ export function useCollectionDetails({
     setSaving(true);
     try {
       const originalLabelIds = new Set(
-        selectedCollection.labels?.map((label) => label.id) ?? [],
+        selectedCollection.sensitivityLabels?.map((label) => label.id) ?? [],
       );
       const draftLabelIds = new Set(
-        selectedCollectionDraft.labels?.map((label) => label.id) ?? [],
+        selectedCollectionDraft.sensitivityLabels?.map((label) => label.id) ?? [],
       );
       const originalTagIds = new Set(
         selectedCollection.tags?.map((tag) => tag.id) ?? [],
@@ -698,7 +698,7 @@ export function useCollectionDetails({
       ];
 
       const labelAndTagMutationOperations = [
-        ...(selectedCollectionDraft.labels ?? [])
+        ...(selectedCollectionDraft.sensitivityLabels ?? [])
           .filter((label) => !originalLabelIds.has(label.id))
           .map((label) => ({
             description:
@@ -714,7 +714,7 @@ export function useCollectionDetails({
                 label.id,
               ),
           })),
-        ...(selectedCollection.labels ?? [])
+        ...(selectedCollection.sensitivityLabels ?? [])
           .filter((label) => !draftLabelIds.has(label.id))
           .map((label) => ({
             description:
@@ -852,7 +852,7 @@ export function useCollectionDetails({
 
     setSelectedCollectionDraft({
       ...selectedCollectionDraft,
-      labels: selectedCollectionDraft.labels?.filter(
+      sensitivityLabels: selectedCollectionDraft.sensitivityLabels?.filter(
         (label) => label.id !== labelId,
       ),
     });
@@ -872,11 +872,11 @@ export function useCollectionDetails({
 
     setSelectedCollectionDraft({
       ...selectedCollectionDraft,
-      labels: (selectedCollectionDraft.labels ?? []).some(
+      sensitivityLabels: (selectedCollectionDraft.sensitivityLabels ?? []).some(
         (item) => item.id === label.id,
       )
-        ? selectedCollectionDraft.labels
-        : [...(selectedCollectionDraft.labels ?? []), label],
+        ? selectedCollectionDraft.sensitivityLabels
+        : [...(selectedCollectionDraft.sensitivityLabels ?? []), label],
     });
     setSelectedCollectionLabelSearchTerm("");
   };
