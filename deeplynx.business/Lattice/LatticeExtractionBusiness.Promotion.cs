@@ -4,6 +4,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
 
@@ -164,7 +165,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     ///     An ancestor is "satisfied" if it matched an existing ontology entity, was promoted in a
     ///     prior round, or is being promoted in this same round.
     /// </summary>
-    private static void ValidateDependencies(
+    private async Task ValidateDependencies(
         List<ExtractionClass> stagingClasses,
         List<ExtractionRecord> stagingRecords,
         List<ExtractionRelationship> stagingRelationships,
@@ -174,57 +175,112 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         HashSet<long> selectedRelIds,
         HashSet<long> selectedEdgeIds)
     {
-        var classById = stagingClasses.ToDictionary(c => c.Id);
-        var recordById = stagingRecords.ToDictionary(r => r.Id);
-        var relById = stagingRelationships.ToDictionary(r => r.Id);
-        var edgeById = stagingEdges.ToDictionary(e => e.Id);
-
-        bool ClassSatisfied(long id)
+        try
         {
-            return classById.TryGetValue(id, out var c) && !c.Rejected &&
-                   (c.OntologyClassId.HasValue || c.PromotedId.HasValue || selectedClassIds.Contains(id));
-        }
+            var classById = stagingClasses.ToDictionary(c => c.Id);
+            var recordById = stagingRecords.ToDictionary(r => r.Id);
+            var relById = stagingRelationships.ToDictionary(r => r.Id);
+            var edgeById = stagingEdges.ToDictionary(e => e.Id);
 
-        bool RecordSatisfied(long id)
+            bool ClassSatisfied(long id)
+            {
+                return classById.TryGetValue(id, out var c) && !c.Rejected &&
+                    (c.OntologyClassId.HasValue || c.PromotedId.HasValue || selectedClassIds.Contains(id));
+            }
+
+            bool RecordSatisfied(long id)
+            {
+                return recordById.TryGetValue(id, out var r) && !r.Rejected &&
+                    (r.PromotedId.HasValue || selectedRecordIds.Contains(id));
+            }
+
+            bool RelSatisfied(long id)
+            {
+                return relById.TryGetValue(id, out var r) && !r.Rejected &&
+                    (r.OntologyRelationshipId.HasValue || r.PromotedId.HasValue || selectedRelIds.Contains(id));
+            }
+
+            var errors = new List<string>();
+
+            foreach (var id in selectedRecordIds)
+                if (recordById.TryGetValue(id, out var r) && !ClassSatisfied(r.ExtractionClassId))
+                    errors.Add($"Record '{r.Name}' (id {id}) requires its class to be approved or already promoted.");
+
+            foreach (var id in selectedRelIds)
+                if (relById.TryGetValue(id, out var rel) &&
+                    (!ClassSatisfied(rel.OriginClassId) || !ClassSatisfied(rel.DestinationClassId)))
+                    errors.Add($"Relationship '{rel.Name}' (id {id}) requires its origin and destination classes to be approved or already promoted.");
+
+            foreach (var id in selectedEdgeIds)
+            {
+                if (!edgeById.TryGetValue(id, out var edge)) continue;
+
+                var missing = new List<string>();
+
+                recordById.TryGetValue(edge.OriginRecordId, out var originExtractionRecord);
+                var originPromotedId = originExtractionRecord?.PromotedId;
+
+                recordById.TryGetValue(edge.DestinationRecordId, out var destExtractionRecord);
+                var destPromotedId = destExtractionRecord?.PromotedId;
+
+                if (originPromotedId == null || !RecordSatisfied(edge.OriginRecordId))
+                {
+                    missing.Add(originExtractionRecord != null
+                        ? $"origin record '{originExtractionRecord.Name}' (extraction id {edge.OriginRecordId})"
+                        : $"origin record (extraction id {edge.OriginRecordId})");
+                }
+
+                if (destPromotedId == null || !RecordSatisfied(edge.DestinationRecordId))
+                {
+                    missing.Add(destExtractionRecord != null
+                        ? $"destination record '{destExtractionRecord.Name}' (extraction id {edge.DestinationRecordId})"
+                        : $"destination record (extraction id {edge.DestinationRecordId})");
+                }
+
+                if (!RelSatisfied(edge.ExtractionRelationshipId)) missing.Add("relationship");
+
+                if (missing.Count > 0)
+                    errors.Add($"Edge (id {id}) requires its {string.Join(", ", missing)} to be approved or already promoted.");
+            }
+
+            var promotedRecordIds = stagingRecords
+                .Where(r => r.PromotedId.HasValue)
+                .Select(r => r.PromotedId!.Value)
+                .ToHashSet();
+
+            var existingRecords = await _context.Records
+                .Where(r => promotedRecordIds.Contains(r.Id))
+                .Select(r => new { r.Id, r.Name })
+                .ToListAsync();
+
+            var existingRecordIds = existingRecords.Select(r => r.Id).ToHashSet();
+
+            var missingRecordIds = promotedRecordIds.Except(existingRecordIds).ToList();
+
+            if (missingRecordIds.Any())
+            {
+                var missingDetails = missingRecordIds.Select(id =>
+                {
+                    var rec = existingRecords.FirstOrDefault(r => r.Id == id);
+                    return rec != null ? $"'{rec.Name}' (id {id})" : $"(id {id})";
+                });
+                errors.Add($"Missing promoted records in database: {string.Join(", ", missingDetails)}");
+            }
+
+            if (errors.Count > 0)
+                throw new InvalidOperationException(
+                    "Cannot promote the selected items because some dependencies were not included:\n" +
+                    string.Join("\n", errors));
+        }
+        catch (InvalidOperationException)
         {
-            return recordById.TryGetValue(id, out var r) && !r.Rejected &&
-                   (r.PromotedId.HasValue || selectedRecordIds.Contains(id));
+            throw;
         }
-
-        bool RelSatisfied(long id)
+        catch (Exception ex)
         {
-            return relById.TryGetValue(id, out var r) && !r.Rejected &&
-                   (r.OntologyRelationshipId.HasValue || r.PromotedId.HasValue || selectedRelIds.Contains(id));
+            _logger.LogError(ex, "Unexpected error during dependency validation.");
+            throw new InvalidOperationException("An unexpected error occurred during dependency validation.", ex);
         }
-
-        var errors = new List<string>();
-
-        foreach (var id in selectedRecordIds)
-            if (recordById.TryGetValue(id, out var r) && !ClassSatisfied(r.ExtractionClassId))
-                errors.Add($"Record '{r.Name}' (id {id}) requires its class to be approved or already promoted.");
-
-        foreach (var id in selectedRelIds)
-            if (relById.TryGetValue(id, out var rel) &&
-                (!ClassSatisfied(rel.OriginClassId) || !ClassSatisfied(rel.DestinationClassId)))
-                errors.Add($"Relationship '{rel.Name}' (id {id}) requires its origin and destination " +
-                           "classes to be approved or already promoted.");
-
-        foreach (var id in selectedEdgeIds)
-        {
-            if (!edgeById.TryGetValue(id, out var edge)) continue;
-            var missing = new List<string>();
-            if (!RecordSatisfied(edge.OriginRecordId)) missing.Add("origin record");
-            if (!RecordSatisfied(edge.DestinationRecordId)) missing.Add("destination record");
-            if (!RelSatisfied(edge.ExtractionRelationshipId)) missing.Add("relationship");
-            if (missing.Count > 0)
-                errors.Add(
-                    $"Edge (id {id}) requires its {string.Join(", ", missing)} to be approved or already promoted.");
-        }
-
-        if (errors.Count > 0)
-            throw new InvalidOperationException(
-                "Cannot promote the selected items because some dependencies were not included:\n" +
-                string.Join("\n", errors));
     }
 
     /// <summary>
