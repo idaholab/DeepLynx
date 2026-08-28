@@ -354,6 +354,18 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - shell: bash
+        name: Create Certificate ConfigMap
+        env:
+          TRUSTED_CA_BUNDLE: ${{ secrets.TRUSTED_CA_BUNDLE }}
+        run: |
+          echo "secret length: ${#TRUSTED_CA_BUNDLE}"
+          echo "$TRUSTED_CA_BUNDLE" > /tmp/sectigo-root-r46.pem
+          kubectl create configmap sectigo-root-ca \
+            --from-file=sectigo-root-r46.pem=/tmp/sectigo-root-r46.pem \
+            --namespace=deeplynx-test \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - shell: bash
         name: Manifest env substitute
         env:
           AWS_S3_CONNECTION_STRING: ${{ secrets.AWS_S3_CONNECTION_STRING }}
