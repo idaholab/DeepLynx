@@ -88,7 +88,12 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<PaginatedResponse<RecordResponseDtoV2>>(result.Value);
+        Assert.Equal(2, actual.Items.Count);
+        Assert.Equal(1, actual.Items[0].Id);
+        Assert.Equal("Record 1", actual.Items[0].Name);
+        Assert.Equal(2, actual.Items[1].Id);
+        Assert.Equal("Record 2", actual.Items[1].Name);
     }
 
     [Fact]
@@ -110,7 +115,7 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<PaginatedResponse<RecordResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<RecordResponseDtoV2>>(result.Value);
     }
 
     [Fact]
@@ -232,7 +237,10 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<PaginatedResponse<RecordResponseDtoV2>>(result.Value);
+        Assert.Single(actual.Items);
+        Assert.Equal(1, actual.Items[0].Id);
+        Assert.Equal("Tagged", actual.Items[0].Name);
     }
 
     [Fact]
@@ -309,7 +317,10 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<List<RecordResponseDtoV2>>(result.Value);
+        Assert.Single(actual);
+        Assert.Equal(1, actual[0].Id);
+        Assert.Equal("og-1", actual[0].OriginalId);
     }
 
     [Fact]
@@ -384,7 +395,9 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<RecordResponseDtoV2>(result.Value);
+        Assert.Equal(RecordIdConst, actual.Id);
+        Assert.Equal("Test Record", actual.Name);
     }
 
     [Fact]
@@ -483,7 +496,9 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<RecordResponseDtoV2>(result.Value);
+        Assert.Equal(RecordIdConst, actual.Id);
+        Assert.Equal("New Record", actual.Name);
     }
 
     [Fact]
@@ -573,7 +588,12 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<List<RecordResponseDtoV2>>(result.Value);
+        Assert.Equal(2, actual.Count);
+        Assert.Equal(1, actual[0].Id);
+        Assert.Equal("A", actual[0].Name);
+        Assert.Equal(2, actual[1].Id);
+        Assert.Equal("B", actual[1].Name);
     }
 
     [Fact]
@@ -623,7 +643,9 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<RecordResponseDtoV2>(result.Value);
+        Assert.Equal(RecordIdConst, actual.Id);
+        Assert.Equal("Updated", actual.Name);
     }
 
     [Fact]
@@ -1272,7 +1294,12 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<PaginatedResponse<RecordResponseDtoV2>>(result.Value);
+        Assert.Equal(2, actual.Items.Count);
+        Assert.Equal(1, actual.Items[0].Id);
+        Assert.Equal("Record 1", actual.Items[0].Name);
+        Assert.Equal(2, actual.Items[1].Id);
+        Assert.Equal("Record 2", actual.Items[1].Name);
     }
 
     [Fact]
@@ -1291,7 +1318,7 @@ public class RecordControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(0, (result.Value as PaginatedResponse<RecordResponseDto>)!.TotalCount);
+        Assert.Equal(0, (result.Value as PaginatedResponse<RecordResponseDtoV2>)!.TotalCount);
     }
 
     [Fact]
