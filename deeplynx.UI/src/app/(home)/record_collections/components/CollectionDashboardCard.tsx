@@ -30,7 +30,7 @@ export default function CollectionDashboardCard({
   showBadges = true,
 }: Props) {
   const { t } = useLanguage();
-  const collectionLabels = collection.labels ?? [];
+  const collectionLabels = collection.sensitivityLabels ?? [];
   const collectionTags = collection.tags ?? [];
   const visibleLabels = labelsExpanded
     ? collectionLabels

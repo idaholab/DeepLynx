@@ -17,7 +17,7 @@ export type ProjectInsightRecord = {
   dataSourceId: number | null;
   dataSourceName: string;
   tags: NamedInsightOption[];
-  labels: NamedInsightOption[];
+  sensitivityLabels: NamedInsightOption[];
   lastUpdatedAt: string | null;
   isArchived: boolean;
   isInsightSupported: boolean;

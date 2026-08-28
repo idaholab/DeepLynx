@@ -35,10 +35,14 @@ public class InternalServerErrorExceptionHandler : IExceptionHandler
 
         httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
 
+        var path = httpContext.Request.Path.Value ?? string.Empty;
+
         // For security purposes, sanitize the error message returned in production environments
-        var detail = _hostEnvironment.IsDevelopment()
+        var detail = path.Contains("/promote") && path.Contains("/extractions")
+        ? exception.Message
+        : (_hostEnvironment.IsDevelopment()
             ? exception.Message
-            : "An unexpected error occurred.";
+            : "An unexpected error occurred.");
 
         await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {

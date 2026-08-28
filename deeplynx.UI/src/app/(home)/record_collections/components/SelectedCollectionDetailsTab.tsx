@@ -389,7 +389,7 @@ export default function SelectedCollectionDetailsTab({
                 <div className="mt-1 space-y-3 text-sm text-base-content/80">
                   <CollectionEntitySelector
                     title={t.translations.RECORD_COLLECTIONS_LABELS}
-                    selectedItems={editableSelectedCollection.labels ?? []}
+                    selectedItems={editableSelectedCollection.sensitivityLabels ?? []}
                     searchTerm={selectedCollectionLabelSearchTerm}
                     setSearchTerm={setSelectedCollectionLabelSearchTerm}
                     searchPlaceholder={

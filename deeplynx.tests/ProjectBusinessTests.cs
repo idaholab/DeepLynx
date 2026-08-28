@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
@@ -1563,6 +1564,88 @@ public class ProjectBusinessTests : IntegrationTestBase
     #region AddMemberToProject Tests
 
     [Fact]
+    public async Task AddProjectAdminUser_UpdatesProjectAdminCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid3);
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.AddMemberToProject(
+            pid3,
+            null,
+            uid,
+            null,
+            makeProjectAdmin: true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
+
+    [Fact]
+    public async Task AddMemberToProject_ForGroup_UpdatesEveryGroupUsersCache()
+    {
+        // Arrange
+        var group = await Context.Groups
+            .Include(g => g.Users)
+            .SingleAsync(g => g.Id == gid);
+        var firstUser = await Context.Users.SingleAsync(u => u.Id == uid);
+        var secondUser = await Context.Users.SingleAsync(u => u.Id == uid3);
+
+        group.Users.Add(firstUser);
+        group.Users.Add(secondUser);
+        await Context.SaveChangesAsync();
+
+        var firstKey = CacheKeys.ProjectAdmin(uid, pid3);
+        var secondKey = CacheKeys.ProjectAdmin(uid3, pid3);
+        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid3);
+
+        await CacheService.Instance.SetAsync(
+            firstKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            secondKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            unrelatedKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.AddMemberToProject(
+            pid3,
+            null,
+            null,
+            gid,
+            makeProjectAdmin: true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(firstKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(secondKey));
+        Assert.Equal(
+            false,
+            await CacheService.Instance.GetAsync<bool?>(unrelatedKey));
+
+        await CacheService.Instance.DeleteAsync(firstKey);
+        await CacheService.Instance.DeleteAsync(secondKey);
+        await CacheService.Instance.DeleteAsync(unrelatedKey);
+    }
+
+    [Fact]
     public async Task AddMemberToProject_CanAddUserToProject_WithoutRole()
     {
         // Act
@@ -1697,6 +1780,53 @@ public class ProjectBusinessTests : IntegrationTestBase
     #endregion
 
     #region UpdateProjectMemberRole Tests
+
+    [Fact]
+    public async Task UpdateProjectMemberRole_WithAdminStatus_UpdatesProjectAdminCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.UpdateProjectMemberRole(
+            pid,
+            rid,
+            uid,
+            null,
+            isProjectAdmin: true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
+
+    [Fact]
+    public async Task UpdateProjectMemberRole_WithoutAdminStatus_DoesNotInvalidateProjectAdminCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
+        await CacheService.Instance.SetAsync(cacheKey, false, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.UpdateProjectMemberRole(
+            pid,
+            rid,
+            uid,
+            null);
+
+        // Assert
+        Assert.True(result);
+        Assert.False(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        await CacheService.Instance.DeleteAsync(cacheKey);
+    }
 
     [Fact]
     public async Task UpdateProjectMemberRole_CanUpdateUserRole()
@@ -1845,7 +1975,139 @@ public class ProjectBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region SetProjectAdminStatus Cache Tests
+
+    [Fact]
+    public async Task SetProjectAdminStatus_ForUser_UpdatesProjectAdminCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.SetProjectAdminStatus(
+            pid,
+            uid,
+            null,
+            true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
+
+    [Fact]
+    public async Task SetProjectAdminStatus_ForGroup_UpdatesEveryGroupUsersCache()
+    {
+        // Arrange
+        var group = await Context.Groups
+            .Include(g => g.Users)
+            .SingleAsync(g => g.Id == gid);
+        var firstUser = await Context.Users.SingleAsync(u => u.Id == uid);
+        var secondUser = await Context.Users.SingleAsync(u => u.Id == uid3);
+
+        group.Users.Add(firstUser);
+        group.Users.Add(secondUser);
+        await Context.SaveChangesAsync();
+
+        var firstKey = CacheKeys.ProjectAdmin(uid, pid5);
+        var secondKey = CacheKeys.ProjectAdmin(uid3, pid5);
+        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid5);
+
+        await CacheService.Instance.SetAsync(
+            firstKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            secondKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            unrelatedKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.SetProjectAdminStatus(
+            pid5,
+            null,
+            gid,
+            true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(firstKey));
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(secondKey));
+        Assert.Equal(
+            false,
+            await CacheService.Instance.GetAsync<bool?>(unrelatedKey));
+
+        await CacheService.Instance.DeleteAsync(firstKey);
+        await CacheService.Instance.DeleteAsync(secondKey);
+        await CacheService.Instance.DeleteAsync(unrelatedKey);
+    }
+
+    #endregion
+
     #region RemoveMemberFromProject Tests
+
+    [Fact]
+    public async Task RemoveMemberFromProject_InvalidatesProjectAdminCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAdmin(uid, pid);
+        await CacheService.Instance.SetAsync(cacheKey, true, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.RemoveMemberFromProject(pid, uid, null, null);
+
+        // Assert
+        Assert.True(result);
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+    }
+
+    [Fact]
+    public async Task RemoveMemberFromProject_ForGroup_InvalidatesEveryGroupUsersCache()
+    {
+        // Arrange - pid5's ProjectMember row already grants access via GroupId = gid (see SeedTestDataAsync)
+        var group = await Context.Groups
+            .Include(g => g.Users)
+            .SingleAsync(g => g.Id == gid);
+        var firstUser = await Context.Users.SingleAsync(u => u.Id == uid);
+        var secondUser = await Context.Users.SingleAsync(u => u.Id == uid3);
+
+        group.Users.Add(firstUser);
+        group.Users.Add(secondUser);
+        await Context.SaveChangesAsync();
+
+        var firstKey = CacheKeys.ProjectAdmin(uid, pid5);
+        var secondKey = CacheKeys.ProjectAdmin(uid3, pid5);
+        var unrelatedKey = CacheKeys.ProjectAdmin(uid2, pid5);
+
+        await CacheService.Instance.SetAsync(firstKey, true, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(secondKey, true, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(unrelatedKey, true, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.RemoveMemberFromProject(pid5, null, gid, null);
+
+        // Assert
+        Assert.True(result);
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(firstKey));
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(secondKey));
+        Assert.True(await CacheService.Instance.GetAsync<bool?>(unrelatedKey));
+
+        await CacheService.Instance.DeleteAsync(unrelatedKey);
+    }
 
     [Fact]
     public async Task RemoveMemberFromProject_CanRemoveUser()

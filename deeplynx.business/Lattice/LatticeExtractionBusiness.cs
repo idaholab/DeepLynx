@@ -87,7 +87,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             CreatedBy = currentUserId,
             Status = ExtractionStatus.Pending,
             Mode = mode,
-            ProjectId = projectId
+            ProjectId = projectId,
+            SourceRecordId = recordId
         };
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
@@ -494,7 +495,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         ValidateRejectedNotSelected(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
             selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
 
-        ValidateDependencies(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
+        await ValidateDependencies(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
             selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
 
         var classesPromotedBefore = stagingClasses.Where(c => c.PromotedId.HasValue).Select(c => c.Id).ToHashSet();
@@ -763,6 +764,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             Mode = extraction.Mode,
             CreatedBy = extraction.CreatedBy,
             FailureMessage = GetExtractionFailureMessage(extraction.Properties),
+            RecordId = extraction.SourceRecordId,
             Classes = classes.Select(c => new StagedClassDto
             {
                 Id = c.Id,
@@ -1059,7 +1061,24 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var properties = GetExtractionProperties(extraction.Properties);
         properties["failure_stage"] = stage;
-        properties["failure_message"] = message;
+
+        HashSet<string> failureMessages;
+        if (properties.ContainsKey("failure_message"))
+        {
+            var failureMessageValue = properties["failure_message"]?.ToString();
+            failureMessages = failureMessageValue != null
+            ? [.. failureMessageValue.Split(" | ", StringSplitOptions.RemoveEmptyEntries)]
+            : [];
+        }
+        else
+        {
+            failureMessages = [];
+        }
+
+        failureMessages.Add(message);
+
+        properties["failure_message"] = string.Join(" | ", failureMessages);
+
         properties["failed_at"] = DateTimeOffset.UtcNow.ToString("O");
         extraction.Properties = properties.ToJsonString();
     }
@@ -1145,6 +1164,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             Mode = e.Mode,
             CreatedBy = e.CreatedBy,
             ProjectId = e.ProjectId,
+            SourceRecordId = e.SourceRecordId,
             FailureMessage = GetExtractionFailureMessage(e.Properties)
         };
     }

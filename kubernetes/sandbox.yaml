@@ -109,6 +109,8 @@ spec:
           env:
             - name: NODE_ENV
               value: "production"
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/ssl/custom-certs/sectigo-root-r46.pem              
             - name: AWS_S3_CONNECTION_STRING
               value: ${AWS_S3_CONNECTION_STRING}
             - name: AZURE_OBJECT_CONNECTION_STRING
@@ -240,10 +242,16 @@ spec:
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
+            - name: sectigo-ca
+              readOnly: true
+              mountPath: /etc/ssl/custom-certs                
       volumes:
         - name: duckdb-storage
           persistentVolumeClaim:
             claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: sectigo-ca
+          configMap:
+            name: sectigo-root-ca             
 
 ---
 apiVersion: apps/v1
@@ -908,7 +916,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   rules:
-    - host: deeplynx-test.dev.inl.gov
+    - host: deeplynx-test.zba.inl.gov
       http:
         paths:
           - path: /

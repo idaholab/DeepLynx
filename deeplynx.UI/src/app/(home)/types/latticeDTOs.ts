@@ -54,12 +54,15 @@ export interface ExtractionListItemDTO {
   mode: string | null;
   created_by: number | null;
   project_id: number | null;
+  source_record_id: number | null;
 }
 
 export interface ExtractionStagingResponseDTO {
   id: number;
   status: string;
   mode: string | null;
+  failure_message: string | null;
+  record_id: number | null;
   created_by: number | null;
   classes: StagedClassDTO[];
   records: StagedRecordDTO[];

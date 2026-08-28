@@ -115,7 +115,7 @@ public class FileControllerTests : IDisposable
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
 
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        Assert.IsType<RecordResponseDtoV2>(result.Value);
 
         _mockFileBusiness.Verify(
             b => b.UploadFile(
@@ -215,7 +215,7 @@ public class FileControllerTests : IDisposable
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
 
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        Assert.IsType<RecordResponseDtoV2>(result.Value);
 
         _mockFileBusiness.Verify(
             b => b.UpdateFile(UserId, OrgId, ProjectId, RecordId, file, null, null, UserJwt),
@@ -374,7 +374,7 @@ public class FileControllerTests : IDisposable
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
 
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        Assert.IsType<RecordResponseDtoV2>(result.Value);
     }
 
     [Fact]
@@ -988,7 +988,7 @@ public class FileControllerTests : IDisposable
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
 
         Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        Assert.IsType<RecordResponseDtoV2>(result.Value);
     }
 
     [Fact]

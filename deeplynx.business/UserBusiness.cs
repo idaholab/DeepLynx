@@ -1,8 +1,10 @@
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace deeplynx.business;
@@ -10,14 +12,17 @@ namespace deeplynx.business;
 public class UserBusiness : IUserBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly ILogger<UserBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="UserBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context used for the user operations.</param>
-    public UserBusiness(DeeplynxContext context)
+    /// <param name="logger">Used for uniformity in logging</param>
+    public UserBusiness(DeeplynxContext context, ILogger<UserBusiness>? logger = null)
     {
         _context = context;
+        _logger = logger;
     }
 
     /// <summary>
@@ -352,6 +357,10 @@ public class UserBusiness : IUserBusiness
 
         await ExistenceHelper.SetUserDeletedCache(userId);
 
+
+        // invalidate the cached admin/user info for the deleted user
+        await InvalidateUserCache(userId);
+
         return true;
     }
 
@@ -439,6 +448,17 @@ public class UserBusiness : IUserBusiness
 
         _context.Users.Update(candidate);
         await _context.SaveChangesAsync();
+
+        // overwrite the cached admin flag now that it's changed
+        try
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.SysAdmin(candidateId), userIsAdmin, (TimeSpan?)null);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache overwrite failed for user {UserId}", candidateId);
+        }
+
         return true;
     }
 
@@ -654,5 +674,34 @@ public class UserBusiness : IUserBusiness
             IsActive = u.IsActive,
             LastLogin = u.LastLogin
         };
+    }
+
+    /// <summary>
+    ///     Removes all cached user/admin info keys associated with a user.
+    /// </summary>
+    /// <param name="userId">user id</param>
+    private async Task InvalidateUserCache(long userId)
+    {
+        try
+        {
+            // The sysadmin key has no suffix, so we can delete it directly
+            await CacheService.Instance.DeleteAsync(CacheKeys.SysAdmin(userId));
+
+            string[] keyPrefixes = 
+            { 
+                $"orgadmin:{userId}:", 
+                $"orgmember:{userId}:", 
+                $"projectadmin:{userId}:" 
+            };
+            
+            foreach (string prefix in keyPrefixes)
+            {
+                await CacheService.Instance.DeleteByPrefixAsync(prefix);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache invalidation failed for deleted user {UserId}", userId);
+        }
     }
 }

@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ArrowRightIcon,
+  ArrowTopRightOnSquareIcon,
   CheckCircleIcon,
   ChevronDownIcon,
   ChevronUpIcon,
@@ -16,7 +17,8 @@ import {
   getExtractionStaging,
   listExtractions,
   promoteExtraction,
-  rejectExtraction
+  rejectExtraction,
+  triggerLatticeExtraction
 } from "@/app/lib/client_service/lattice_services.client";
 import {
   ExtractionListItemDTO,
@@ -32,6 +34,8 @@ import { BetaBadge } from "@/app/(home)/components/BetaBadge";
 import { isInsightHidden } from "@/app/lib/feature_flags";
 import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 import PaginationControls from "../../components/PaginationControls";
+import { getRecord } from "@/app/lib/client_service/record_services.client";
+import { TriggerLatticeExtractionMode } from "../../types/requestDTOs";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
@@ -371,11 +375,13 @@ function RelationshipCard({ rel, isApproved,
 
 function ExtractionDetailPanel({
   extractionId,
+  extractionName,
   organizationId,
   projectId,
   onStatusChange,
 }: {
   extractionId: number;
+  extractionName: string;
   organizationId: number;
   projectId: number;
   onStatusChange?: () => void;
@@ -383,6 +389,7 @@ function ExtractionDetailPanel({
   const [staging, setStaging] = useState<ExtractionStagingResponseDTO | null>(
     null,
   );
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState(false);
@@ -449,10 +456,21 @@ function ExtractionDetailPanel({
 
   const fetchStaging = useCallback(async () => {
     const myRequestId = ++requestIdRef.current;
+
     try {
-      const data = await getExtractionStaging(organizationId, projectId, extractionId);
-      if (requestIdRef.current !== myRequestId) return; // stale — drop it
+      const data = await getExtractionStaging(
+        organizationId,
+        projectId,
+        extractionId,
+      );
+
+      if (requestIdRef.current !== myRequestId) return;
+
       setStaging(data);
+
+      if (NOT_RUNNING_STATUSES.includes(data.status)) {
+        onStatusChange?.();
+      }
       setApproved((prev) => ({
         records: new Set([...prev.records].filter((id) =>
           data.records.some((r) => r.id === id && !r.promoted_id && !r.rejected),
@@ -493,6 +511,7 @@ function ExtractionDetailPanel({
     organizationId,
     projectId,
     extractionId,
+    onStatusChange,
     t.translations.LATTICE_FAILED_LOAD_EXTRACTION,
   ]);
 
@@ -523,13 +542,77 @@ function ExtractionDetailPanel({
   }, [fetchStaging]);
 
   useEffect(() => {
-    if (!staging || staging.status !== "running") return;
+    if (!staging || NOT_RUNNING_STATUSES.includes(staging.status)) {
+      return;
+    }
 
-    const timeoutId = window.setTimeout(() => {
-      void fetchStaging();
-    }, 3000);
+    let cancelled = false;
 
-    return () => window.clearTimeout(timeoutId);
+    const poll = async () => {
+      await fetchStaging();
+
+      if (!cancelled) {
+        timeoutId = window.setTimeout(poll, 3000);
+      }
+    };
+
+    let timeoutId = window.setTimeout(poll, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [staging?.status, fetchStaging]);
+
+  const handleTriggerLatticeExtraction = useCallback(async (staging: ExtractionStagingResponseDTO) => {
+    try {
+
+      const extraction = await getExtractionStaging(organizationId, projectId, staging.id);
+
+      const record = await getRecord(organizationId, projectId, extraction.record_id as number, true);
+
+      const newExtractionId = await triggerLatticeExtraction(
+        organizationId as number,
+        projectId,
+        extraction.record_id as number,
+        {
+          data_source_id: record.dataSourceId as number,
+          mode: staging!.mode as TriggerLatticeExtractionMode,
+        },
+      );
+
+      if (newExtractionId) {
+        router.replace(`/lattice/decisions?extractionId=${newExtractionId}`);
+      } else {
+        router.replace(`/lattice/decisions?extractionId=${staging.id}`);
+      }
+
+      onStatusChange?.();
+    } catch (error: any) {
+      if (error?.response?.status === 400) {
+        toast(t.translations.LATTICE_EMBEDDINGS_GENERATING, { icon: "⏳" });
+      } else {
+        console.error("Error triggering Lattice extraction:", error);
+        toast.error(t.translations.LATTICE_FAILED_TO_START_ANALYSIS);
+      }
+    }
+  }, [
+    organizationId,
+    projectId,
+    onStatusChange,
+    t.translations,
+  ]);
+
+  useEffect(() => {
+    if (staging?.status === "failed") {
+      const timeoutId = window.setTimeout(() => {
+        fetchStaging();
+      }, 3000);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
+    }
   }, [staging?.status, fetchStaging]);
 
   const handleSave = async () => {
@@ -658,6 +741,7 @@ function ExtractionDetailPanel({
         <h2 className="text-lg font-bold">
           {t.translations.LATTICE_EXTRACTION_NUMBER}
           {staging.id}
+          {extractionName ? ` -  ${extractionName}` : ""}
         </h2>
 
         {/* Row 1: status + mode on left, buttons on right */}
@@ -686,15 +770,39 @@ function ExtractionDetailPanel({
         {/* Row 2: description on left, note on right */}
         <div className="flex flex-wrap items-start justify-between gap-2">
           <p className="text-sm text-base-content/70">
-            {isRunning
-              ? t.translations.LATTICE_EXTRACTION_RUNNING
-              : canDecide
-                ? t.translations.LATTICE_EXTRACTION_REVIEW
-                : staging.status === "failed"
-                  ? t.translations.LATTICE_EXTRACTION_FAILED_MSG
-                  : staging.status === "rejected"
-                    ? t.translations.LATTICE_EXTRACTION_REJECTED_MSG
-                    : `${t.translations.LATTICE_EXTRACTION_BEEN} ${statusLabel(staging.status, t.translations)}.`}
+            {isRunning ? (
+              <span>{t.translations.LATTICE_EXTRACTION_RUNNING}</span>
+            ) : canDecide ? (
+              <span>{t.translations.LATTICE_EXTRACTION_REVIEW}</span>
+            ) : staging.status === "failed" ? (
+              <>
+                <p className="text-sm text-red-600 font-bold">
+                  {t.translations.LATTICE_EXTRACTION_FAILED_MSG}
+                </p>
+                <div className="mt-4 p-3 bg-red-100 text-red-600 rounded-lg">
+                  <p className="font-bold">{t.translations.ERROR_DETAILS}</p>
+                  <p>{staging.failure_message}</p>
+                </div>
+                {/* Retry Extraction Button */}
+                {staging.record_id && (
+                  <button
+                    className="btn btn-error btn-sm mt-4"
+                    onClick={() => handleTriggerLatticeExtraction(staging)}
+                  >
+                    {t.translations.RETRY} {t.translations.LATTICE_EXTRACTION_NUMBER}{staging.id}
+                  </button>
+                )}
+              </>
+            ) : staging.status === "rejected" ? (
+              <span>{t.translations.LATTICE_EXTRACTION_REJECTED_MSG}</span>
+            ) : (
+              <>
+                <span>{t.translations.LATTICE_EXTRACTION_BEEN}</span>{" "}
+                <span>{statusLabel(staging.status, t.translations)}.</span>
+                <ArrowTopRightOnSquareIcon className="size-4" />
+              </>
+            )}
+
           </p>
           {canDecide && (
             <div className="flex flex-wrap gap-2">
@@ -840,18 +948,16 @@ function storageKey(projId: number) {
 
 export default function LatticeDecisionsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
   const { project } = useProjectSession();
 
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
   const [items, setItems] = useState<ExtractionListItemDTO[]>([]);
   const [isListLoading, setIsListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
-
-  const selectedId = searchParams.get("extractionId")
-    ? Number(searchParams.get("extractionId"))
-    : null;
+  const [names, setNames] = useState<Record<string, string>>({});
 
   const orgId = organization?.organizationId as number | undefined;
   const projId = project?.projectId as number | undefined;
@@ -863,6 +969,15 @@ export default function LatticeDecisionsPage() {
       .then((response) => {
         if (response?.items) {
           setItems(response.items);
+
+
+          const latestExtraction = response.items.reduce((prev, current) =>
+            current.id > prev.id ? current : prev,
+            response.items[0]);
+
+          if (latestExtraction && !selectedId) {
+            router.replace(`/lattice/decisions?extractionId=${latestExtraction.id}`, { scroll: false });
+          }
         } else {
           setItems([]);
         }
@@ -870,7 +985,7 @@ export default function LatticeDecisionsPage() {
       .catch(() =>
         setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS),
       );
-  }, [orgId, projId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS]);
+  }, [orgId, projId, selectedId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS, router]);
 
   useEffect(() => {
     if (insightHidden) {
@@ -907,40 +1022,59 @@ export default function LatticeDecisionsPage() {
 
   // Restore last selected extraction when arriving without a query param
   useEffect(() => {
-    if (insightHidden) return;
-    if (!projId || selectedId) return;
-    const saved = localStorage.getItem(storageKey(projId));
-    if (saved) router.replace(`/lattice/decisions?extractionId=${saved}`);
-  }, [insightHidden, projId, selectedId, router]);
-
-  const [pendingId, setPendingId] = useState<number | null>(null);
+    if (!selectedId && projId) {
+      const saved = localStorage.getItem(storageKey(projId));
+      if (saved) setSelectedId(Number(saved));
+    }
+  }, [projId, selectedId]);
 
   const handleSelect = (id: number) => {
-    setPendingId(id);
+    setSelectedId(id);
     if (projId) localStorage.setItem(storageKey(projId), String(id));
-    router.replace(`/lattice/decisions?extractionId=${id}`);
   };
 
   if (insightHidden) {
     return null;
   }
 
-    const {
-      currentPage: extractionPage,
-      pageSize: extractionPageSize,
-      paginatedItems: paginatedExtractions,
-      resetPagination: resetExtractionPagination,
-      setCurrentPage: setExtractionPage,
-      setPageSize: setExtractionPageSize,
-      totalPages: extractionTotalPages,
-    } = useLocalPagination({
-      items: items,
-      initialPageSize: 5,
-    });
+  const {
+    currentPage: extractionPage,
+    pageSize: extractionPageSize,
+    paginatedItems: paginatedExtractions,
+    resetPagination: resetExtractionPagination,
+    setCurrentPage: setExtractionPage,
+    setPageSize: setExtractionPageSize,
+    totalPages: extractionTotalPages,
+  } = useLocalPagination({
+    items: items,
+    initialPageSize: 5,
+  });
 
-    useEffect(() => {
-      resetExtractionPagination();
-    }, [resetExtractionPagination]);
+  useEffect(() => {
+    resetExtractionPagination();
+  }, [resetExtractionPagination]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadNames() {
+      const entries = await Promise.all(
+        paginatedExtractions.map(async (item) => {
+          let res = null;
+          if (item.source_record_id == null) return null;
+          res = await getRecord(Number(orgId), Number(projId), item.source_record_id);
+          return [item.id, res.name] as const;
+        })
+      );
+      const validEntries = entries.filter(
+        (entry): entry is readonly [number, string] => entry !== null
+      );
+      if (!cancelled) {
+        setNames(Object.fromEntries(validEntries));
+      }
+    }
+    loadNames();
+    return () => { cancelled = true };
+  }, [paginatedExtractions, orgId, projId])
 
   return (
     <main className="min-h-screen bg-base-200/30">
@@ -1014,6 +1148,7 @@ export default function LatticeDecisionsPage() {
                           {t.translations.LATTICE_EXTRACTION_NUMBER}
                           {item.id}
                         </p>
+                        <p className="truncate text-sm">{names[item.id] ? names[item.id] : ""}</p>
                         <div className="mt-2 grid grid-cols-2 gap-x-2">
                           <div>
                             <p
@@ -1074,6 +1209,7 @@ export default function LatticeDecisionsPage() {
               <ExtractionDetailPanel
                 key={selectedId}
                 extractionId={selectedId}
+                extractionName={names[selectedId]}
                 organizationId={orgId}
                 projectId={projId}
                 onStatusChange={refreshList}
