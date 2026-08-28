@@ -151,8 +151,8 @@ export function countFacet(values: string[]) {
 export function getSelectedRecordLabelNames(
   record: NewCollectionSelectedRecord,
 ) {
-  if (record.fullRecord?.labels?.length) {
-    return record.fullRecord.labels.map((label) => label.name);
+  if (record.fullRecord?.sensitivityLabels?.length) {
+    return record.fullRecord.sensitivityLabels.map((label) => label.name);
   }
   return parseRecordTags(record.labels);
 }
@@ -196,7 +196,7 @@ export function getMetadataRows(properties?: string | null): MetadataRow[] {
 }
 
 export function getSensitivity(collection: RecordCollectionResponseDto) {
-  return collection.labels?.[0]?.name ?? "Unlabeled";
+  return collection.sensitivityLabels?.[0]?.name ?? "Unlabeled";
 }
 
 export function getSensitivityClass(label: string) {
@@ -258,7 +258,7 @@ export function deriveSelectedRecordMetadata(params: {
   const selectedRecordLabelNames = new Set<string>();
 
   selectedRecords.forEach((record) => {
-    record.fullRecord?.labels?.forEach((label) => {
+    record.fullRecord?.sensitivityLabels?.forEach((label) => {
       if (label.id !== null) selectedRecordLabelIds.add(label.id);
       selectedRecordLabelNames.add(label.name.toLowerCase());
     });

@@ -61,6 +61,16 @@ public class CacheKeys
         return $"projectadmin:{userId}:{projectId}";
     }
 
+    public static string OrganizationDefaultObjectStorage(long organizationId)
+    {
+        return $"orgdefaultobjectstorage:{organizationId}";
+    }
+
+    public static string ProjectDefaultObjectStorage(long projectId)
+    {
+        return $"projectdefaultobjectstorage:{projectId}";
+    }
+
     public static string OrganizationDefaultDataSource(long organizationId)
     {
         return $"orgdefaultdatasource:{organizationId}";

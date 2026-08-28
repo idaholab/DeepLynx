@@ -1081,8 +1081,12 @@ public class ProjectBusiness : IProjectBusiness
     /// </summary>
     /// <param name="projectId">ID of the project to get members for</param>
     /// <returns></returns>
-    public async Task<IEnumerable<ProjectMemberResponseDto>> GetProjectMembers(long projectId)
-    {
+    public async Task<PaginatedResponse<ProjectMemberResponseDto>> GetProjectMembersPaginated(
+        long projectId,
+        PaginatedRequestDto paginatedRequestDto
+    )
+    {   
+        var returnAll = paginatedRequestDto.PageSize == -1;
         var users = _context.ProjectMembers
             .Where(pm => pm.ProjectId == projectId && pm.UserId != null)
             .Select(pm => new ProjectMemberResponseDto
@@ -1109,7 +1113,9 @@ public class ProjectBusiness : IProjectBusiness
                 IsProjectAdmin = pm.IsProjectAdmin
             });
 
-        return await users.Union(groups).ToListAsync();
+        var combined = users.Union(groups);
+
+        return await combined.ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -1439,6 +1445,49 @@ public class ProjectBusiness : IProjectBusiness
             dto: newObjectStorageDto,
             createContainer: false);
     }
+
+    #region Deprecated
+
+     /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all classes without pagination.
+    ///     Superseded by <see cref="GetProjectMembersPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 class controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="projectId">ID of the project to get members for</param>
+    /// <returns></returns>
+    public async Task<IEnumerable<ProjectMemberResponseDto>> GetProjectMembers(long projectId)
+    {
+        var users = _context.ProjectMembers
+            .Where(pm => pm.ProjectId == projectId && pm.UserId != null)
+            .Select(pm => new ProjectMemberResponseDto
+            {
+                Name = pm.User.Name,
+                MemberId = pm.UserId,
+                Email = pm.User.Email,
+                Role = pm.Role.Name,
+                Type = "user",
+                RoleId = pm.Role.Id,
+                IsProjectAdmin = pm.IsProjectAdmin
+            });
+
+        var groups = _context.ProjectMembers
+            .Where(pm => pm.ProjectId == projectId && pm.GroupId != null)
+            .Select(pm => new ProjectMemberResponseDto
+            {
+                Name = pm.Group.Name,
+                MemberId = pm.GroupId,
+                Email = string.Empty,
+                Role = pm.Role.Name,
+                Type = "group",
+                RoleId = pm.Role.Id,
+                IsProjectAdmin = pm.IsProjectAdmin
+            });
+
+        return await users.Union(groups).ToListAsync();
+    }
+
+    #endregion
 
     // PRIVATE HELPER FUNCTIONS //
     private async Task<bool> RefreshProjectsCache()

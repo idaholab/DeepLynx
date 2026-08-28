@@ -83,7 +83,7 @@ export function mapProjectInsightRecords(
             ? dataSourceMap.get(Number(record.dataSourceId))
             : null) ?? "",
         tags: normalizeNamedOptions(record.tags),
-        labels: normalizeNamedOptions(record.labels),
+        sensitivityLabels: normalizeNamedOptions(record.sensitivityLabels),
         lastUpdatedAt: record.lastUpdatedAt ?? null,
         isArchived: Boolean(record.isArchived),
         isInsightSupported: isInsightSupportedFileType(
