@@ -77,6 +77,7 @@ import { EmbeddingStatusResponseDTO } from "@/app/(home)/types/latticeDTOs";
 import {
   fetchInsightEndpointHealth,
   fetchInsightIngestionStatus,
+  fetchInsightPipelineStatus,
   queueInsightUpload,
   type InsightEndpointHealthByRole,
   type InsightModelHealthState,
@@ -209,6 +210,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
   const [isCheckingLatticeReadiness, setIsCheckingLatticeReadiness] =
     useState(false);
   const [isRecordInsightEmbedded, setIsRecordInsightEmbedded] = useState(false);
+  const [isRecordInsightEmbedding, setIsRecordInsightEmbedding] = useState(false);
   const [endpointHealth, setEndpointHealth] = useState<InsightEndpointHealthByRole>(EMPTY_ENDPOINT_HEALTH);
   const isQueryModelUnavailable =
     endpointHealth.query.response !== null
@@ -866,6 +868,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
         embeddingModelConfigId: selectedInsightModels.embeddingModelConfigId ?? undefined,
       });
       toast.success(t.translations.LATTICE_QUEUED_SUCCESS);
+      setIsRecordInsightEmbedding(true);
     } catch {
       toast.error(t.translations.LATTICE_QUEUE_FAILED);
     } finally {
@@ -1013,12 +1016,33 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
           fileId: recordId,
         });
 
+        try {
+          const pipelineStatus = await fetchInsightPipelineStatus({
+            organizationId: organization.organizationId as number,
+            projectId,
+            fileId: recordId
+          });
+          if (pipelineStatus.status == "in_progress") {
+            setIsRecordInsightEmbedding(true);
+          } else if (pipelineStatus.status == "completed") {
+            setIsRecordInsightEmbedding(false);
+          } else if (pipelineStatus.status == "No pipeline status exists for this record yet.") {
+            setIsRecordInsightEmbedding(false);
+          }
+        } catch (error) {
+          console.log("No pipeline status exists for this record yet.")
+        }
+
         if (cancelled) return;
 
         setHasCheckedInsightHealth(true);
         setIsRecordInsightEmbedded(status.indexed);
 
         if (status.indexed) {
+          if (!isInitial) {
+            toast.success(t.translations.EMBEDDED_SUCCESSFULLY)
+          }
+
           if (recordEmbedPollRef.current) {
             clearInterval(recordEmbedPollRef.current);
             recordEmbedPollRef.current = null;
@@ -1376,9 +1400,19 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                     </span>
                   </div>
                 ) : (
-                  <>
+                  <> 
                     {!isRecordInsightEmbedded &&
-                      !isCheckingLatticeReadiness && (
+                        isRecordInsightEmbedding && (
+                          <div className="alert alert-warning">
+                            <span className="flex-1 text-sm">
+                              <span className="loading loading-spinner loading-sm" />
+                              {t.translations.PROJECT_INSIGHT_STATUS_PROCESSING}
+                            </span>
+                          </div>
+                        )}
+                    {!isRecordInsightEmbedded &&
+                      !isCheckingLatticeReadiness &&
+                      !isRecordInsightEmbedding && (
                         <div className="alert alert-warning">
                           <span className="flex-1 text-sm">
                             {t.translations.LATTICE_NOT_EMBEDDED_WARNING}
