@@ -369,6 +369,8 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
         try
         {
+            var isFirstOfType = !await HasExistingConfigOfType(organizationId, projectId, dto.ModelType.ToLower());
+
             var newConfig = new AiModelConfig
             {
                 OrganizationId = organizationId,
@@ -378,7 +380,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 ModelName = dto.ModelName,
                 ModelType = dto.ModelType.ToLower(),
                 RequiresToken = dto.RequiresToken,
-                Default = dto.Default,
+                Default = dto.Default || isFirstOfType,
                 IsArchived = false,
                 LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                 LastUpdatedBy = currentUserId
@@ -387,7 +389,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             _context.AiModelConfigs.Add(newConfig);
             await _context.SaveChangesAsync();
 
-            if (dto.Default)
+            if (newConfig.Default)
             {
                 if (projectId.HasValue)
                     await ResetProjectDefaults(projectId.Value, newConfig.Id, newConfig.ModelType);
@@ -433,6 +435,14 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         long? projectId, long aiModelConfigId, UpdateAiModelConfigDto dto)
     {
         ValidationHelper.ValidateModel(dto);
+
+        if (dto.ModelType != null)
+        {
+            if (!ModelTypeList.Contains(dto.ModelType.ToLower()))
+                throw new ArgumentException("Unknown ModelType");
+
+            dto.ModelType = dto.ModelType.ToLower();
+        }
 
         var query = _context.AiModelConfigs
             .Where(x => x.OrganizationId == organizationId && x.Id == aiModelConfigId)
@@ -505,6 +515,19 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
             try
             {
+                if (returnedModelConfig.Default && dto.ModelType != null &&
+                    !string.Equals(dto.ModelType, returnedModelConfig.ModelType, StringComparison.OrdinalIgnoreCase) &&
+                    (dto.Default ?? true))
+                {
+                    throw new InvalidOperationException(
+                        "Must assign another AI Model Configuration as the default for this Model Type before changing this one's Model Type.");
+                }
+
+                var effectiveModelType = dto.ModelType ?? returnedModelConfig.ModelType;
+                var isOnlyOfType = dto.ModelType != null &&
+                    !string.Equals(dto.ModelType, returnedModelConfig.ModelType, StringComparison.OrdinalIgnoreCase) &&
+                    !await HasExistingConfigOfType(organizationId, projectId, effectiveModelType);
+
                 if (dto.Default != null)
                 {
                     if (returnedModelConfig.Default && !dto.Default.Value)
@@ -513,22 +536,27 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                             "Must assign another AI Model Configuration to be the new default before unassigning.");
                     }
 
-                    if (!returnedModelConfig.Default && dto.Default.Value)
+                    if (!returnedModelConfig.Default && (dto.Default.Value || isOnlyOfType))
                     {
-                        var modelType = dto.ModelType ?? returnedModelConfig.ModelType;
-
                         if (projectId.HasValue)
-                            await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id, modelType);
+                            await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id, effectiveModelType);
                         else
-                            await ResetOrganizationDefaults(organizationId, returnedModelConfig.Id, modelType);
+                            await ResetOrganizationDefaults(organizationId, returnedModelConfig.Id, effectiveModelType);
                     }
+                }
+                else if (!returnedModelConfig.Default && isOnlyOfType)
+                {
+                    if (projectId.HasValue)
+                        await ResetProjectDefaults(projectId.Value, returnedModelConfig.Id, effectiveModelType);
+                    else
+                        await ResetOrganizationDefaults(organizationId, returnedModelConfig.Id, effectiveModelType);
                 }
 
                 returnedModelConfig.ModelName = dto.ModelName ?? returnedModelConfig.ModelName;
                 returnedModelConfig.ModelType = dto.ModelType ?? returnedModelConfig.ModelType;
                 returnedModelConfig.ServerUrl = dto.ServerUrl ?? returnedModelConfig.ServerUrl;
                 returnedModelConfig.RequiresToken = dto.RequiresToken ?? returnedModelConfig.RequiresToken;
-                returnedModelConfig.Default = dto.Default ?? returnedModelConfig.Default;
+                returnedModelConfig.Default = (dto.Default ?? returnedModelConfig.Default) || isOnlyOfType;
 
                 returnedModelConfig.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
                 returnedModelConfig.LastUpdatedBy = currentUserId;
@@ -699,5 +727,22 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         await _context.AiModelConfigs
             .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId && os.ModelType == modelType)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
+    }
+
+    /// <summary>
+    ///     Checks whether any config of the given type already exists in the given scope (org- or project-level).
+    ///     Used to auto-promote the first config of a type to be its default.
+    /// </summary>
+    private async Task<bool> HasExistingConfigOfType(long organizationId, long? projectId, string modelType)
+    {
+        var query = _context.AiModelConfigs
+            .Where(x => x.OrganizationId == organizationId && x.ModelType == modelType && !x.IsArchived)
+            .AsQueryable();
+
+        query = projectId.HasValue
+            ? query.Where(x => x.ProjectId == projectId)
+            : query.Where(x => x.ProjectId == null);
+
+        return await query.AnyAsync();
     }
 }
