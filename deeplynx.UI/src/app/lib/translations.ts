@@ -850,6 +850,7 @@ export const translations = {
       LAST_UPDATED: "Last Updated:",
       LAST_UPDATED_AT: "Last Updated At",
       LATTICE_ANALYSIS_STARTED: "Record analysis started. Extraction ID:",
+      LATTICE_ALREADY_IN_PROJECT: "Already in project",
       LATTICE_FAILED_TO_START_ANALYSIS: "Failed to start record analysis.",
       LATTICE_GO_TO_SLIDE: "Go to slide",
       LATTICE_TRIGGER: "Trigger Lattice",
@@ -920,7 +921,7 @@ export const translations = {
       LATTICE_VALID_LABEL: "Valid",
       LATTICE_VALID_DESCRIPTION:
         "items matched an existing ontology class or relationship.",
-      LATTICE_NOVEL_DISCOVERY_LABEL: "Novel discovery",
+      LATTICE_NOVEL_DISCOVERY_LABEL: "Novel Discovery",
       LATTICE_NOVEL_DISCOVERY_DESCRIPTION:
         "items involve known classes and relationships but in an unrecognized pattern.",
       LATTICE_INVALID_SCHEMA_LABEL: "Invalid schema",
@@ -3160,6 +3161,8 @@ export const translations = {
       LAST_UPDATED_AT: "Última Actualización en",
       LATTICE_ANALYSIS_STARTED:
         "Análisis del registro iniciado. ID de extracción:",
+      LATTICE_ALREADY_IN_PROJECT:
+        "Ya en el proyecto",
       LATTICE_FAILED_TO_START_ANALYSIS:
         "No se pudo iniciar el análisis del registro.",
       LATTICE_GO_TO_SLIDE: "Ir a la diapositiva",
@@ -3238,7 +3241,7 @@ export const translations = {
       LATTICE_VALID_LABEL: "Válido",
       LATTICE_VALID_DESCRIPTION:
         "los elementos coincidieron con una clase u relación de ontología existente.",
-      LATTICE_NOVEL_DISCOVERY_LABEL: "Descubrimiento novedoso",
+      LATTICE_NOVEL_DISCOVERY_LABEL: "Descubrimiento Novedoso",
       LATTICE_NOVEL_DISCOVERY_DESCRIPTION:
         "los elementos involucran clases y relaciones conocidas pero en un patrón no reconocido.",
       LATTICE_INVALID_SCHEMA_LABEL: "Esquema inválido",

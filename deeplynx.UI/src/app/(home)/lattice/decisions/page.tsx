@@ -153,6 +153,8 @@ function RecordCard({ record, isApproved, isRejected, onToggle, locked }:
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-lg font-semibold break-words">{record.name}</p>
 
+              <span className="badge badge-outline">{t.translations.ID_LABEL}{record.id}</span>
+
               {record.class_name && (
                 <span className="badge badge-outline">{record.class_name}</span>
               )}
@@ -218,6 +220,8 @@ function ClassCard({ cls, isApproved, isRejected, onToggle, locked }:
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold break-words">{cls.name}</p>
 
+            <span className="badge badge-outline">{t.translations.ID_LABEL}{cls.id}</span>
+
             {cls.validation_status && (
               <span className={`badge ${validationBadgeClass(cls.validation_status)}`}>
                 {cls.validation_status}
@@ -235,7 +239,7 @@ function ClassCard({ cls, isApproved, isRejected, onToggle, locked }:
         <div className="flex justify-end sm:ml-4 shrink-0">
           {cls.ontology_class_id ? (
             <span className="badge badge-info badge-outline">
-              Already in project
+              {t.translations.LATTICE_ALREADY_IN_PROJECT}
             </span>
           ) : (
             <DecisionButtons
@@ -269,6 +273,8 @@ function EdgeCard({ edge, isApproved,
               {edge.origin_record_name ?? "?"} → {edge.relationship_name ?? "?"} →{" "}
               {edge.destination_record_name ?? "?"}
             </p>
+
+            <span className="badge badge-outline">{t.translations.ID_LABEL}{edge.id}</span>
 
             {edge.validation_status && (
               <span className={`badge ${validationBadgeClass(edge.validation_status)}`}>
@@ -317,6 +323,8 @@ function RelationshipCard({ rel, isApproved,
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold break-words">{rel.name}</p>
 
+            <span className="badge badge-outline">{t.translations.ID_LABEL}{rel.id}</span>
+
             {rel.validation_status && (
               <span className={`badge ${validationBadgeClass(rel.validation_status)}`}>
                 {rel.validation_status}
@@ -358,7 +366,7 @@ function RelationshipCard({ rel, isApproved,
         <div className="flex justify-end sm:ml-4 shrink-0">
           {rel.ontology_relationship_id ? (
             <span className="badge badge-info badge-outline">
-              Already in project
+              {t.translations.LATTICE_ALREADY_IN_PROJECT}
             </span>
           ) : (
             <DecisionButtons
@@ -405,52 +413,100 @@ function ExtractionDetailPanel({
     records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set(),
   });
 
-  const approveByStatus = (status: string) => {
-    setApproved((prev) => ({
-      records: new Set([
-        ...prev.records,
-        ...visibleRecords
-          .filter((record) => record.validation_status === status)
-          .map((record) => record.id),
-      ]),
-      classes: new Set([
-        ...prev.classes,
-        ...visibleClasses
-          .filter((cls) => !cls.ontology_class_id && cls.validation_status === status)
-          .map((cls) => cls.id),
-      ]),
-      edges: new Set([
-        ...prev.edges,
-        ...visibleEdges
-          .filter((edge) => edge.validation_status === status)
-          .map((edge) => edge.id),
-      ]),
-      relationships: new Set([
-        ...prev.relationships,
-        ...visibleRelationships
-          .filter(
-            (rel) =>
-              !rel.ontology_relationship_id &&
-              rel.validation_status === status
-          )
-          .map((rel) => rel.id),
-      ]),
-    }));
+  const toggleApproveByStatus = (status: string) => {
+    const statuses = status === "valid_novel" ? ["valid", "novel_discovery"] : [status];
 
-    setRejected((prev) => ({
-      records: new Set([...prev.records].filter(
-        (id) => !visibleRecords.some((record) => record.id === id && record.validation_status === status),
-      )),
-      classes: new Set([...prev.classes].filter(
-        (id) => !visibleClasses.some((cls) => cls.id === id && cls.validation_status === status),
-      )),
-      edges: new Set([...prev.edges].filter(
-        (id) => !visibleEdges.some((edge) => edge.id === id && edge.validation_status === status),
-      )),
-      relationships: new Set([...prev.relationships].filter(
-        (id) => !visibleRelationships.some((rel) => rel.id === id && rel.validation_status === status),
-      )),
-    }));
+    const recordIds = visibleRecords
+      .filter((r) => statuses.includes(r.validation_status as string))
+      .map((r) => r.id);
+    const classIds = visibleClasses
+      .filter((c) => !c.ontology_class_id && statuses.includes(c.validation_status as string))
+      .map((c) => c.id);
+    const edgeIds = visibleEdges
+      .filter((e) => statuses.includes(e.validation_status as string))
+      .map((e) => e.id);
+    const relationshipIds = visibleRelationships
+      .filter((rel) => !rel.ontology_relationship_id && statuses.includes(rel.validation_status as string))
+      .map((rel) => rel.id);
+
+    const allApproved =
+      recordIds.every((id) => approved.records.has(id)) &&
+      classIds.every((id) => approved.classes.has(id)) &&
+      edgeIds.every((id) => approved.edges.has(id)) &&
+      relationshipIds.every((id) => approved.relationships.has(id));
+
+    if (allApproved) {
+      setApproved((prev) => ({
+        records: new Set([...prev.records].filter((id) => !recordIds.includes(id))),
+        classes: new Set([...prev.classes].filter((id) => !classIds.includes(id))),
+        edges: new Set([...prev.edges].filter((id) => !edgeIds.includes(id))),
+        relationships: new Set([...prev.relationships].filter((id) => !relationshipIds.includes(id))),
+      }));
+
+    } else {
+      setApproved((prev) => ({
+        records: new Set([...prev.records, ...recordIds]),
+        classes: new Set([...prev.classes, ...classIds]),
+        edges: new Set([...prev.edges, ...edgeIds]),
+        relationships: new Set([...prev.relationships, ...relationshipIds]),
+      }));
+
+      setRejected((prev) => ({
+        records: new Set([...prev.records].filter((id) => !recordIds.includes(id))),
+        classes: new Set([...prev.classes].filter((id) => !classIds.includes(id))),
+        edges: new Set([...prev.edges].filter((id) => !edgeIds.includes(id))),
+        relationships: new Set([...prev.relationships].filter((id) => !relationshipIds.includes(id))),
+      }));
+    }
+
+  };
+
+  const isAllApproved = (status: string): boolean => {
+    const statuses = status === "valid_novel" ? ["valid", "novel_discovery"] : [status];
+
+    const recordIds = visibleRecords
+      .filter(r => statuses.includes(r.validation_status as string))
+      .map(r => r.id);
+    const classIds = visibleClasses
+      .filter(c => !c.ontology_class_id && statuses.includes(c.validation_status as string))
+      .map(c => c.id);
+    const edgeIds = visibleEdges
+      .filter(e => statuses.includes(e.validation_status as string))
+      .map(e => e.id);
+    const relationshipIds = visibleRelationships
+      .filter(rel => !rel.ontology_relationship_id && statuses.includes(rel.validation_status as string))
+      .map(rel => rel.id);
+
+
+    const nonEmptyCategories = [recordIds, classIds, edgeIds, relationshipIds].filter(arr => arr.length > 0).length;
+
+    if (nonEmptyCategories === 0) {
+      return false;
+    }
+
+    const allRecordsApproved = recordIds.length === 0 || recordIds.every(id => {
+      const has = approved.records.has(id);
+      return has;
+    });
+
+    const allClassesApproved = classIds.length === 0 || classIds.every(id => {
+      const has = approved.classes.has(id);
+      return has;
+    });
+
+    const allEdgesApproved = edgeIds.length === 0 || edgeIds.every(id => {
+      const has = approved.edges.has(id);
+      return has;
+    });
+
+    const allRelationshipsApproved = relationshipIds.length === 0 || relationshipIds.every(id => {
+      const has = approved.relationships.has(id);
+      return has;
+    });
+
+    const result = allRecordsApproved && allClassesApproved && allEdgesApproved && allRelationshipsApproved;
+
+    return result;
   };
   const requestIdRef = useRef(0);
 
@@ -808,22 +864,32 @@ function ExtractionDetailPanel({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="btn btn-outline btn-success btn-sm"
-                onClick={() => approveByStatus("valid")}
+                className={`btn btn-outline btn-success btn-sm ${isAllApproved("valid") ? "bg-green-500 text-white border-green-600" : ""}`}
+                onClick={() => toggleApproveByStatus("valid")}
                 disabled={isPromoting || validCount === 0}
               >
                 <CheckCircleIcon className="size-4" />
-                Approve valid ({validCount})
+                {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.VALID_LABEL} ({validCount})
               </button>
 
               <button
                 type="button"
-                className="btn btn-outline btn-warning btn-sm"
-                onClick={() => approveByStatus("novel_discovery")}
+                className={`btn btn-outline btn-warning btn-sm ${isAllApproved("novel_discovery") ? "bg-yellow-400 text-white border-yellow-500" : ""}`}
+                onClick={() => toggleApproveByStatus("novel_discovery")}
                 disabled={isPromoting || novelDiscoveryCount === 0}
               >
                 <CheckCircleIcon className="size-4" />
-                Approve novel discoveries ({novelDiscoveryCount})
+                {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.LATTICE_NOVEL_DISCOVERY_LABEL} ({novelDiscoveryCount})
+              </button>
+
+              <button
+                type="button"
+                className={`btn btn-outline btn-primary btn-sm ${isAllApproved("valid_novel") ? "bg-blue-600 text-white border-blue-700" : ""}`}
+                onClick={() => toggleApproveByStatus("valid_novel")}
+                disabled={isPromoting || (validCount + novelDiscoveryCount === 0)}
+              >
+                <CheckCircleIcon className="size-4" />
+                {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.LATTICE_APPROVE_ALL} ({validCount + novelDiscoveryCount})
               </button>
 
               <button
@@ -833,7 +899,7 @@ function ExtractionDetailPanel({
                 disabled={isPromoting || !hasPendingDecisions}
               >
                 {isPromoting ? <span className="loading loading-spinner loading-xs" /> : null}
-                Save
+                {t.translations.SAVE}
               </button>
             </div>
           )}
@@ -1112,7 +1178,7 @@ export default function LatticeDecisionsPage() {
       </section>
 
       <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
-        <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[410px_1fr]">
           {/* Left: extraction list */}
           <aside className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden self-start">
             <div className="border-b border-base-300 px-4 py-3">
