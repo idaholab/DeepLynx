@@ -60,4 +60,19 @@ public class CacheKeys
     {
         return $"projectadmin:{userId}:{projectId}";
     }
+
+    public static string OrgPermission(long userId, long organizationId, string action, string resource)
+    {
+        return $"orgpermission:{userId}:{organizationId}:{action}:{resource}";
+    }
+
+    public static string ProjectPermission(long userId, long projectId, string action, string resource)
+    {
+        return $"projectpermission:{userId}:{projectId}:{action}:{resource}";
+    }
+
+    public static string ProjectPermittedIds(long userId, string action, string resource)
+    {
+        return $"projectpermittedids:{userId}:{action}:{resource}";
+    }
 }
