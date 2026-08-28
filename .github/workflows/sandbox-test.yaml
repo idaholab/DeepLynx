@@ -356,7 +356,7 @@ jobs:
       - shell: bash
         name: Create Certificate ConfigMap
         env:
-          TRUSTED_CA_BUNDLE_B64: ${{ secrets.TRUSTED_CA_BUNDLE_B64 }}
+          TRUSTED_CA_BUNDLE_B64: ${{ secrets.TRUSTED_CA_BUNDLE }}
         run: |
           echo "$TRUSTED_CA_BUNDLE_B64" | base64 -d > /tmp/sectigo-root-r46.pem
           kubectl create configmap sectigo-root-ca \
