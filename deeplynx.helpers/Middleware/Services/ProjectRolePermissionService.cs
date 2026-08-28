@@ -1,4 +1,5 @@
 using deeplynx.datalayer.Models;
+using deeplynx.helpers.Cache;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -32,31 +33,47 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
         string action,
         string resource)
     {
+
+        bool hasPermission;
+        
         _logger.LogInformation(
             "Checking permission - User: {UserId}, Project: {ProjectId}, Action: {Action}, Resource: {Resource}",
             userId, projectId, action, resource);
 
-        //check for whether a user has permission to an action/resource within a project through group membership
-        var hasPermission = _dbContext.Database
-            .SqlQuery<bool>($@"
-               SELECT EXISTS (
-                    SELECT 1
-                    FROM deeplynx.users u
-                    LEFT JOIN deeplynx.group_users gu ON gu.user_id = u.id
-                    LEFT JOIN deeplynx.groups g ON gu.group_id = g.id
-                    LEFT JOIN deeplynx.project_members pm ON (pm.user_id = u.id OR pm.group_id = g.id)
-                    LEFT JOIN deeplynx.roles r ON r.id = pm.role_id
-                    LEFT JOIN deeplynx.role_permissions rp ON rp.role_id = pm.role_id
-                    LEFT JOIN deeplynx.permissions perm ON rp.permission_id = perm.id
-                    WHERE u.id = {userId}
-                      AND pm.project_id = {projectId}
-                      AND perm.resource = {resource}
-                      AND perm.action = {action}
-                      AND r.is_archived = false
-                      AND perm.is_archived = false
-                ) AS has_permission")
-            .AsEnumerable()
-            .FirstOrDefault();
+        // Check the cache before querying the db
+        var cacheKey = CacheKeys.ProjectPermission(userId, projectId, action, resource);
+        var cached = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+        if (cached.HasValue)
+        {
+            hasPermission = cached.Value;
+        }
+        else
+        {
+            //check for whether a user has permission to an action/resource within a project through group membership
+            hasPermission = _dbContext.Database
+                .SqlQuery<bool>($@"
+                    SELECT EXISTS (
+                            SELECT 1
+                            FROM deeplynx.users u
+                            LEFT JOIN deeplynx.group_users gu ON gu.user_id = u.id
+                            LEFT JOIN deeplynx.groups g ON gu.group_id = g.id
+                            LEFT JOIN deeplynx.project_members pm ON (pm.user_id = u.id OR pm.group_id = g.id)
+                            LEFT JOIN deeplynx.roles r ON r.id = pm.role_id
+                            LEFT JOIN deeplynx.role_permissions rp ON rp.role_id = pm.role_id
+                            LEFT JOIN deeplynx.permissions perm ON rp.permission_id = perm.id
+                            WHERE u.id = {userId}
+                            AND pm.project_id = {projectId}
+                            AND perm.resource = {resource}
+                            AND perm.action = {action}
+                            AND r.is_archived = false
+                            AND perm.is_archived = false
+                        ) AS has_permission")
+                    .AsEnumerable()
+                    .FirstOrDefault();
+
+            // Populate cache on miss
+            await CacheService.Instance.SetAsync(cacheKey, hasPermission, (TimeSpan?)null);
+        }
 
         if (hasPermission)
         {
@@ -87,6 +104,29 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
         if (projectIds == null || projectIds.Length == 0)
             return new List<long>();
 
+        var result = new List<long>();
+        var uncachedIds = new List<long>();
+
+        // Check cache for each projectId before querying the db
+        foreach (var projectId in projectIds)
+        {
+            var cacheKey = CacheKeys.ProjectPermission(userId, projectId, action, resource);
+            var cached = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+            if (cached.HasValue)
+            {
+                if (cached.Value) result.Add(projectId);
+            }
+            else
+            {
+                uncachedIds.Add(projectId);
+            }
+        }
+
+        if (uncachedIds.Count == 0)
+        {
+            return result;
+        }
+
         var sql = @"
         SELECT DISTINCT pm.project_id
         FROM deeplynx.users u
@@ -104,19 +144,35 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
           AND perm.is_archived = false";
 
         var userIdParam = new NpgsqlParameter("userId", userId);
-        var projectIdsParam = new NpgsqlParameter("projectIds", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Bigint) { Value = projectIds };
+        var projectIdsParam = new NpgsqlParameter("projectIds", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Bigint)
+        {
+            Value = uncachedIds.ToArray()
+        };
         var resourceParam = new NpgsqlParameter("resource", resource);
         var actionParam = new NpgsqlParameter("action", action);
 
-        var projectIdResults = await _dbContext.Database
+        // Search the database for every authorized projectId that wasn't found in the cache
+        var authorizedIds = await _dbContext.Database
             .SqlQueryRaw<long>(sql, userIdParam, projectIdsParam, resourceParam, actionParam)
             .ToListAsync();
 
+        var authorizedSet = new HashSet<long>(authorizedIds);
+
+        // Populate cache with all uncachedIds, marking them as authorized or not based on db query
+        foreach (var projectId in uncachedIds)
+        {
+            var isAuthorized = authorizedSet.Contains(projectId);
+            await CacheService.Instance.SetAsync(
+                CacheKeys.ProjectPermission(userId, projectId, action, resource),
+                isAuthorized,
+                (TimeSpan?)null);
+        }
+
         _logger.LogInformation(
             "Bulk permission check result - User: {UserId}, Authorized Projects: {AuthorizedProjects}",
-            userId, string.Join(',', projectIdResults));
+            userId, string.Join(',', authorizedIds));
 
-        return projectIdResults;
+        return authorizedIds;
     }
 
     public async Task<List<long>> GetPermittedProjectIdsAsync(long userId, string action, string resource)
