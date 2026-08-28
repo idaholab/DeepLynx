@@ -7,11 +7,12 @@ using Microsoft.Extensions.Logging;
 namespace deeplynx.helpers.ExceptionHandlers;
 
 /// <summary>
-/// <see cref="IExceptionHandler"/> implementation acting as the global fallback for any uncaught
-/// <see cref="Exception"/> not matched by a more specific handler, returning a consistent status
-/// code <see cref="StatusCodes.Status500InternalServerError"/> and a standard response body
-/// <see cref="ProblemDetails"/> (<see href="https://www.rfc-editor.org/rfc/rfc7807.html" />).
-/// In non-Development environments the response detail is sanitized to avoid leaking internal exception messages.
+/// Global fallback handler for uncaught exceptions that were not handled by a more specific
+/// <see cref="IExceptionHandler"/>.
+///
+/// By default, uncaught exceptions are returned as HTTP 500 responses with sanitized details
+/// outside Development. Insight service exceptions preserve their upstream HTTP status code
+/// and message so more meaningful model/service errors are returned to clients.
 /// </summary>
 public class InternalServerErrorExceptionHandler : IExceptionHandler
 {
@@ -29,20 +30,49 @@ public class InternalServerErrorExceptionHandler : IExceptionHandler
         _logger = logger;
     }
 
-    public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
+    public async ValueTask<bool> TryHandleAsync(
+        HttpContext httpContext,
+        Exception exception,
+        CancellationToken cancellationToken)
     {
-        _logger.LogError(exception, "Unhandled exception on {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
+        _logger.LogError(
+            exception,
+            "Unhandled exception on {Method} {Path}",
+            httpContext.Request.Method,
+            httpContext.Request.Path);
 
-        httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        var statusCode = StatusCodes.Status500InternalServerError;
+        var title = "Internal Server Error";
+        string detail;
 
-        var path = httpContext.Request.Path.Value ?? string.Empty;
+        if (exception is InsightServiceException insightException)
+        {
+            statusCode = insightException.StatusCode.HasValue
+                ? (int)insightException.StatusCode.Value
+                : StatusCodes.Status502BadGateway;
 
-        // For security purposes, sanitize the error message returned in production environments
-        var detail = path.Contains("/promote") && path.Contains("/extractions")
-        ? exception.Message
-        : (_hostEnvironment.IsDevelopment()
-            ? exception.Message
-            : "An unexpected error occurred.");
+            title = "Insight Service Error";
+            detail = insightException.Message;
+        }
+        else
+        {
+            var path = httpContext.Request.Path.Value ?? string.Empty;
+
+            if (path.Contains("/promote") && path.Contains("/extractions"))
+            {
+                detail = exception.Message;
+            }
+            else if (_hostEnvironment.IsDevelopment())
+            {
+                detail = exception.Message;
+            }
+            else
+            {
+                detail = "An unexpected error occurred.";
+            }
+        }
+
+        httpContext.Response.StatusCode = statusCode;
 
         await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
@@ -51,8 +81,8 @@ public class InternalServerErrorExceptionHandler : IExceptionHandler
             ProblemDetails = new ProblemDetails
             {
                 Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
-                Title = "Internal Server Error",
-                Status = StatusCodes.Status500InternalServerError,
+                Title = title,
+                Status = statusCode,
                 Detail = detail
             }
         });
