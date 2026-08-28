@@ -32,10 +32,10 @@ export function useSelectedCollectionEditDerived({
 }: Params) {
   const unattachedLabels = useMemo(() => {
     const attachedIds = new Set(
-      selectedCollectionDraft?.labels?.map((label) => label.id) ?? [],
+      selectedCollectionDraft?.sensitivityLabels?.map((label) => label.id) ?? [],
     );
     return availableLabels.filter((label) => !attachedIds.has(label.id));
-  }, [availableLabels, selectedCollectionDraft?.labels]);
+  }, [availableLabels, selectedCollectionDraft?.sensitivityLabels]);
 
   const unattachedTags = useMemo(() => {
     const attachedIds = new Set(selectedCollectionDraft?.tags?.map((tag) => tag.id) ?? []);
@@ -56,7 +56,7 @@ export function useSelectedCollectionEditDerived({
 
   const canAddTypedSelectedCollectionLabel =
     selectedCollectionLabelSearchTerm.trim().length > 0 &&
-    !(selectedCollectionDraft?.labels ?? []).some(
+    !(selectedCollectionDraft?.sensitivityLabels ?? []).some(
       (label) =>
         label.name.toLowerCase() ===
         selectedCollectionLabelSearchTerm.trim().toLowerCase(),

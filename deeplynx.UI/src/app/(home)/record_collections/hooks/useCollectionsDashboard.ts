@@ -206,7 +206,7 @@ export function useCollectionsDashboard({
     const collections = pageData.items ?? [];
 
     collections.forEach((collection) => {
-      collection.labels?.forEach((label) => {
+      collection.sensitivityLabels?.forEach((label) => {
         counts.set(label.id, (counts.get(label.id) ?? 0) + 1);
       });
     });

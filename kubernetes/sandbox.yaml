@@ -908,7 +908,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   rules:
-    - host: deeplynx-test.dev.inl.gov
+    - host: deeplynx-test.zba.inl.gov
       http:
         paths:
           - path: /

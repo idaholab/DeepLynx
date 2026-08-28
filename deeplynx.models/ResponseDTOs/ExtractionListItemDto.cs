@@ -11,6 +11,7 @@ public class ExtractionListItemDto
     [JsonPropertyName("failure_message")] public string? FailureMessage { get; set; }
 
     [JsonPropertyName("project_id")] public long? ProjectId { get; set; }
+    [JsonPropertyName("source_record_id")] public long? SourceRecordId { get; set; }
     [JsonPropertyName("total_count")] public int TotalCount { get; set; }
     [JsonPropertyName("promoted_count")] public int PromotedCount { get; set; }
 }

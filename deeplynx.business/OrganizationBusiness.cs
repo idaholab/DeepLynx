@@ -1,6 +1,7 @@
 using System.Text.Json;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.Configuration;
@@ -41,8 +42,8 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context = context;
         _eventBusiness = eventBusiness;
         _roleBusiness = roleBusiness;
-        _logger = logger;
         _objectStorageBusiness = objectStorageBusiness;
+        _logger = logger;
     }
 
     /// <summary>
@@ -201,6 +202,8 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         _context.Organizations.Add(organization);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetOrganizationArchivedStatusCache(organization.Id, organization.IsArchived);
 
         var orgUser = new OrganizationUser
         {
@@ -368,6 +371,8 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.Organizations.Update(organization);
         await _context.SaveChangesAsync();
 
+        await ExistenceHelper.SetOrganizationArchivedStatusCache(organizationId, true);
+
         // Log organization archive event
         await _eventBusiness.CreateEvent(
             currentUserId,
@@ -405,6 +410,8 @@ public class OrganizationBusiness : IOrganizationBusiness
         organization.LastUpdatedBy = currentUserId;
         await _context.SaveChangesAsync();
 
+        await ExistenceHelper.SetOrganizationArchivedStatusCache(organizationId, false);
+
         // Log organization archive event
         await _eventBusiness.CreateEvent(
             currentUserId,
@@ -437,6 +444,8 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         _context.Organizations.Remove(organization);
         await _context.SaveChangesAsync();
+
+        await ExistenceHelper.SetOrganizationDeletedCache(organizationId);
 
         return true;
     }
@@ -482,6 +491,17 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Add(orgUser);
         await _context.SaveChangesAsync();
 
+        // overwrite the cached member and admin flags now that they've changed
+        try
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.OrgMember(userId, organizationId), true, (TimeSpan?)null);
+            await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, (TimeSpan?)null);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache overwrite failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+        }
+
         return true;
     }
 
@@ -504,7 +524,7 @@ public class OrganizationBusiness : IOrganizationBusiness
             var defaultStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, null);
             objectStorageId = defaultStorage.Id;
         }
-        
+
         var objectStorage = await _objectStorageBusiness.GetDecryptedObjectStorage(objectStorageId);
 
         if (objectStorage.Config.MountPath != null)
@@ -895,6 +915,17 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Update(existingOrgUser);
         await _context.SaveChangesAsync();
 
+        // overwrite the cached admin flag now that it's changed
+        try
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, (TimeSpan?)null);
+
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache overwrite failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+        }
+
         return true;
     }
 
@@ -916,6 +947,17 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         _context.OrganizationUsers.Remove(existingOrgUser);
         await _context.SaveChangesAsync();
+
+        // invalidate the cached admin flag now that it's changed
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrgMember(userId, organizationId));
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrgAdmin(userId, organizationId));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache invalidation failed for user {UserId}, organization {OrganizationId}", userId, organizationId);
+        }
 
         return true;
     }

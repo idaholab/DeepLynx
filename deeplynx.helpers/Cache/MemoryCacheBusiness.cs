@@ -105,6 +105,28 @@ namespace deeplynx.business
             _keys.TryRemove(key, out _);
             return Task.FromResult(true);
         }
+
+        /// <summary>
+        /// Deletes all cache entries whose keys begin with the provided prefix.
+        /// </summary>
+        /// <param name="prefix">The key prefix to match.</param>
+        /// <returns>bool based on prefix delete success</returns>
+        public Task<bool> DeleteByPrefixAsync(string prefix)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
+
+            var matchingKeys = _keys.Keys
+                .Where(key => key.StartsWith(prefix, StringComparison.Ordinal))
+                .ToArray();
+
+            foreach (var key in matchingKeys)
+            {
+                _cache.Remove(key);
+                _keys.TryRemove(key, out _);
+            }
+
+            return Task.FromResult(true);
+        }
     
         /// <summary>
         /// Operation to flush all existing data

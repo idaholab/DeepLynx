@@ -216,7 +216,7 @@ public class ProjectController : ControllerBase
 
 
     /// <summary>
-    ///     Get Project Members
+    ///     Get Project Members Paginated
     /// </summary>
     /// <param name="organizationId">ID of the organization to which the project belongs</param>
     /// <param name="projectId">(Optional)ID of the project</param>
@@ -225,9 +225,14 @@ public class ProjectController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "project")]
     [Auth("read", "user")]
-    public async Task<ActionResult<IEnumerable<ProjectMemberResponseDto>>> GetProjectMembers(long organizationId, long projectId)
+    public async Task<ActionResult<PaginatedResponse<ProjectMemberResponseDto>>> GetProjectMembers(
+        long organizationId, 
+        long projectId,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null
+        )
     {
-        var members = await _projectBusiness.GetProjectMembers(projectId);
+        paginatedRequestDto ??= new PaginatedRequestDto();
+        var members = await _projectBusiness.GetProjectMembersPaginated(projectId, paginatedRequestDto);
         return Ok(members);
     }
 
