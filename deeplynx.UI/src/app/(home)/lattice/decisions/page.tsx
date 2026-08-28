@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ArrowRightIcon,
   CheckCircleIcon,
@@ -869,19 +869,16 @@ function storageKey(projId: number) {
 
 export default function LatticeDecisionsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
   const { project } = useProjectSession();
+
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const [items, setItems] = useState<ExtractionListItemDTO[]>([]);
   const [isListLoading, setIsListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
-
-  const selectedId = searchParams.get("extractionId")
-    ? Number(searchParams.get("extractionId"))
-    : null;
 
   const orgId = organization?.organizationId as number | undefined;
   const projId = project?.projectId as number | undefined;
@@ -937,18 +934,15 @@ export default function LatticeDecisionsPage() {
 
   // Restore last selected extraction when arriving without a query param
   useEffect(() => {
-    if (insightHidden) return;
-    if (!projId || selectedId) return;
-    const saved = localStorage.getItem(storageKey(projId));
-    if (saved) router.replace(`/lattice/decisions?extractionId=${saved}`);
-  }, [insightHidden, projId, selectedId, router]);
-
-  const [pendingId, setPendingId] = useState<number | null>(null);
+    if (!selectedId && projId) {
+      const saved = localStorage.getItem(storageKey(projId));
+      if (saved) setSelectedId(Number(saved));
+    }
+  }, [projId, selectedId]);
 
   const handleSelect = (id: number) => {
-    setPendingId(id);
+    setSelectedId(id);
     if (projId) localStorage.setItem(storageKey(projId), String(id));
-    router.replace(`/lattice/decisions?extractionId=${id}`);
   };
 
   if (insightHidden) {
