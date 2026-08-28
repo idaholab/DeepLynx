@@ -206,8 +206,8 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
     /// <param name="isProjectAdmin">Optional param determining if the requesting user is a project admin</param>
     /// <returns>An array of records</returns>
     public async Task<IEnumerable<HistoricalRecordResponseDto>> GetAllHistoricalRecords(
-    long currentUserId, long projectId, long organizationId, long? dataSourceId = null, DateTime? pointInTime = null,
-    bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
+        long currentUserId, long projectId, long organizationId, long? dataSourceId = null, DateTime? pointInTime = null,
+        bool hideArchived = true, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         var (canReadClass, canReadTags) = await GetHistoricalFieldPermissions(
             currentUserId, projectId, isSysAdmin, isOrgAdmin, isProjectAdmin);
@@ -254,9 +254,12 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             })
             .ToList();
 
+        // need to check for archived after DB retrieval since filtering before querying could
+        // result in inaccurate "most recent" results if a record has been archived
         if (hideArchived && records.Count > 0)
             records = records.Where(r => !r.IsArchived).ToList();
 
+        // if user is not admin, filter out unauthorized labels    
         var recordIds = records.Select(r => r.RecordId).ToList();
 
         if (!isSysAdmin && !isOrgAdmin && !isProjectAdmin)
