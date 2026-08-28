@@ -492,7 +492,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
         setRecordFileType(liveRecord.fileType ?? null);
         setSelectedIds(mapSelectedIds(liveRecord.tags ?? []));
-        setSelectedLabelIds(mapSelectedIds(liveRecord.labels ?? []));
+        setSelectedLabelIds(mapSelectedIds(liveRecord.sensitivityLabels ?? []));
       } catch (error) {
         console.error("Error fetching record:", error);
         toast.error(t.translations.FAILED_TO_FETCH_RECORD);

@@ -32,6 +32,7 @@ import { BetaBadge } from "@/app/(home)/components/BetaBadge";
 import { isInsightHidden } from "@/app/lib/feature_flags";
 import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 import PaginationControls from "../../components/PaginationControls";
+import { getRecord } from "@/app/lib/client_service/record_services.client";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
@@ -388,11 +389,13 @@ function RelationshipCard({ rel, isApproved,
 
 function ExtractionDetailPanel({
   extractionId,
+  extractionName,
   organizationId,
   projectId,
   onStatusChange,
 }: {
   extractionId: number;
+  extractionName: string;
   organizationId: number;
   projectId: number;
   onStatusChange?: () => void;
@@ -466,10 +469,21 @@ function ExtractionDetailPanel({
 
   const fetchStaging = useCallback(async () => {
     const myRequestId = ++requestIdRef.current;
+
     try {
-      const data = await getExtractionStaging(organizationId, projectId, extractionId);
-      if (requestIdRef.current !== myRequestId) return; // stale — drop it
+      const data = await getExtractionStaging(
+        organizationId,
+        projectId,
+        extractionId,
+      );
+
+      if (requestIdRef.current !== myRequestId) return;
+
       setStaging(data);
+
+      if (NOT_RUNNING_STATUSES.includes(data.status)) {
+        onStatusChange?.();
+      }
       setApproved((prev) => ({
         records: new Set([...prev.records].filter((id) =>
           data.records.some((r) => r.id === id && !r.promoted_id && !r.rejected),
@@ -510,6 +524,7 @@ function ExtractionDetailPanel({
     organizationId,
     projectId,
     extractionId,
+    onStatusChange,
     t.translations.LATTICE_FAILED_LOAD_EXTRACTION,
   ]);
 
@@ -540,13 +555,26 @@ function ExtractionDetailPanel({
   }, [fetchStaging]);
 
   useEffect(() => {
-    if (!staging || staging.status !== "running") return;
+    if (!staging || NOT_RUNNING_STATUSES.includes(staging.status)) {
+      return;
+    }
 
-    const timeoutId = window.setTimeout(() => {
-      void fetchStaging();
-    }, 3000);
+    let cancelled = false;
 
-    return () => window.clearTimeout(timeoutId);
+    const poll = async () => {
+      await fetchStaging();
+
+      if (!cancelled) {
+        timeoutId = window.setTimeout(poll, 3000);
+      }
+    };
+
+    let timeoutId = window.setTimeout(poll, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
   }, [staging?.status, fetchStaging]);
 
   const handleSave = async () => {
@@ -675,6 +703,7 @@ function ExtractionDetailPanel({
         <h2 className="text-lg font-bold">
           {t.translations.LATTICE_EXTRACTION_NUMBER}
           {staging.id}
+          {extractionName ? ` -  ${extractionName}` : ""}
         </h2>
 
         {/* Row 1: status + mode on left, buttons on right */}
@@ -865,6 +894,7 @@ export default function LatticeDecisionsPage() {
   const [items, setItems] = useState<ExtractionListItemDTO[]>([]);
   const [isListLoading, setIsListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+  const [names, setNames] = useState<Record<string, string>>({});
 
   const selectedId = searchParams.get("extractionId")
     ? Number(searchParams.get("extractionId"))
@@ -942,22 +972,45 @@ export default function LatticeDecisionsPage() {
     return null;
   }
 
-    const {
-      currentPage: extractionPage,
-      pageSize: extractionPageSize,
-      paginatedItems: paginatedExtractions,
-      resetPagination: resetExtractionPagination,
-      setCurrentPage: setExtractionPage,
-      setPageSize: setExtractionPageSize,
-      totalPages: extractionTotalPages,
-    } = useLocalPagination({
-      items: items,
-      initialPageSize: 5,
-    });
+  const {
+    currentPage: extractionPage,
+    pageSize: extractionPageSize,
+    paginatedItems: paginatedExtractions,
+    resetPagination: resetExtractionPagination,
+    setCurrentPage: setExtractionPage,
+    setPageSize: setExtractionPageSize,
+    totalPages: extractionTotalPages,
+  } = useLocalPagination({
+    items: items,
+    initialPageSize: 5,
+  });
 
-    useEffect(() => {
-      resetExtractionPagination();
-    }, [resetExtractionPagination]);
+  useEffect(() => {
+    resetExtractionPagination();
+  }, [resetExtractionPagination]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadNames() {
+      const entries = await Promise.all(
+        paginatedExtractions.map(async (item) => {
+          let res = null;
+          if (item.source_record_id == null) return null;
+          res = await getRecord(Number(orgId), Number(projId), item.source_record_id);
+          return [item.id, res.name] as const;
+        })
+      );
+      const validEntries = entries.filter(
+        (entry): entry is readonly [number, string] => entry !== null
+      );
+      if (!cancelled) {
+        console.log(validEntries);
+        setNames(Object.fromEntries(validEntries));
+      }
+    }
+    loadNames();
+    return () => { cancelled = true };
+  }, [paginatedExtractions, orgId, projId])
 
   return (
     <main className="min-h-screen bg-base-200/30">
@@ -1031,6 +1084,7 @@ export default function LatticeDecisionsPage() {
                           {t.translations.LATTICE_EXTRACTION_NUMBER}
                           {item.id}
                         </p>
+                        <p className="truncate text-sm">{names[item.id] ? names[item.id] : ""}</p>
                         <div className="mt-2 grid grid-cols-2 gap-x-2">
                           <div>
                             <p
@@ -1091,6 +1145,7 @@ export default function LatticeDecisionsPage() {
               <ExtractionDetailPanel
                 key={selectedId}
                 extractionId={selectedId}
+                extractionName={names[selectedId]}
                 organizationId={orgId}
                 projectId={projId}
                 onStatusChange={refreshList}

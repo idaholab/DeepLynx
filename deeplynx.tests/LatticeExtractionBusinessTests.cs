@@ -445,6 +445,47 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         Assert.Equal(17, result.TotalCount);
         Assert.Equal(7, result.Items.Count);
     }
+
+    [Fact]
+    public async Task ListExtractionsByProjectPaginated_ReturnsSourceRecordId()
+    {
+        // Arrange
+        var record = new DlRecord
+        {
+            Name = "New Test Record",
+            ProjectId = pid,
+            OrganizationId = oid,
+            DataSourceId = dsid,
+            OriginalId = "rec-002",
+            Description = "",
+            Properties = "{}",
+            IsArchived = false,
+            LastUpdatedAt = UnspecifiedNow(),
+            LastUpdatedBy = uid,
+            Uri = "/usr/src/app"
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+        var recordId = record.Id;
+        
+        var extraction = new Extraction
+        {
+            ProjectId = pid,
+            SourceRecordId = recordId
+        };
+        Context.Extractions.Add(extraction);
+        await Context.SaveChangesAsync();
+        
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _business.ListExtractionsByProjectPaginated(pid, paginatedRequest);
+
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+        var returnedExtraction = Assert.Single(result.Items, e => e.Id == extraction.Id);
+        Assert.Equal(recordId, returnedExtraction.SourceRecordId);
+    }
     #endregion
 
     // =========================================================================

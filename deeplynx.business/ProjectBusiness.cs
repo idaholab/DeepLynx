@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Azure.Storage.Blobs;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Context;
 using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
@@ -1080,8 +1081,12 @@ public class ProjectBusiness : IProjectBusiness
     /// </summary>
     /// <param name="projectId">ID of the project to get members for</param>
     /// <returns></returns>
-    public async Task<IEnumerable<ProjectMemberResponseDto>> GetProjectMembers(long projectId)
-    {
+    public async Task<PaginatedResponse<ProjectMemberResponseDto>> GetProjectMembersPaginated(
+        long projectId,
+        PaginatedRequestDto paginatedRequestDto
+    )
+    {   
+        var returnAll = paginatedRequestDto.PageSize == -1;
         var users = _context.ProjectMembers
             .Where(pm => pm.ProjectId == projectId && pm.UserId != null)
             .Select(pm => new ProjectMemberResponseDto
@@ -1108,7 +1113,9 @@ public class ProjectBusiness : IProjectBusiness
                 IsProjectAdmin = pm.IsProjectAdmin
             });
 
-        return await users.Union(groups).ToListAsync();
+        var combined = users.Union(groups);
+
+        return await combined.ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -1176,6 +1183,12 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Add(projMember);
         await _context.SaveChangesAsync();
 
+        // overwrite the cached admin flag now that it's changed
+        if (makeProjectAdmin)
+        {
+            await OverwriteProjectAdminCache(projectId, userId, groupId, makeProjectAdmin);
+        }
+
         if (userId.HasValue && userId != UserContextStorage.UserId)
         {
             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -1241,6 +1254,12 @@ public class ProjectBusiness : IProjectBusiness
         _context.ProjectMembers.Update(existingProjectMember);
         await _context.SaveChangesAsync();
 
+        // overwrite the cached admin flag, but only if it was actually touched
+        if (isProjectAdmin.HasValue)
+        {
+            await OverwriteProjectAdminCache(projectId, userId, groupId, isProjectAdmin.Value);
+        }
+
         return true;
     }
 
@@ -1279,6 +1298,9 @@ public class ProjectBusiness : IProjectBusiness
         existingProjectMember.IsProjectAdmin = isAdmin;
         _context.ProjectMembers.Update(existingProjectMember);
         await _context.SaveChangesAsync();
+
+        // overwrite the cached admin flag now that it's changed
+        await OverwriteProjectAdminCache(projectId, userId, groupId, isAdmin);
 
         return true;
     }
@@ -1331,6 +1353,9 @@ public class ProjectBusiness : IProjectBusiness
         // remove project member
         _context.ProjectMembers.Remove(existingProjectMember);
         await _context.SaveChangesAsync();
+
+        // delete the cached admin flag now that it's changed
+        await OverwriteProjectAdminCache(projectId, userId, groupId, isAdmin: false, deleting: true);
 
         return true;
     }
@@ -1421,6 +1446,49 @@ public class ProjectBusiness : IProjectBusiness
             createContainer: false);
     }
 
+    #region Deprecated
+
+     /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all classes without pagination.
+    ///     Superseded by <see cref="GetProjectMembersPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 class controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
+    /// </summary>
+    /// <param name="projectId">ID of the project to get members for</param>
+    /// <returns></returns>
+    public async Task<IEnumerable<ProjectMemberResponseDto>> GetProjectMembers(long projectId)
+    {
+        var users = _context.ProjectMembers
+            .Where(pm => pm.ProjectId == projectId && pm.UserId != null)
+            .Select(pm => new ProjectMemberResponseDto
+            {
+                Name = pm.User.Name,
+                MemberId = pm.UserId,
+                Email = pm.User.Email,
+                Role = pm.Role.Name,
+                Type = "user",
+                RoleId = pm.Role.Id,
+                IsProjectAdmin = pm.IsProjectAdmin
+            });
+
+        var groups = _context.ProjectMembers
+            .Where(pm => pm.ProjectId == projectId && pm.GroupId != null)
+            .Select(pm => new ProjectMemberResponseDto
+            {
+                Name = pm.Group.Name,
+                MemberId = pm.GroupId,
+                Email = string.Empty,
+                Role = pm.Role.Name,
+                Type = "group",
+                RoleId = pm.Role.Id,
+                IsProjectAdmin = pm.IsProjectAdmin
+            });
+
+        return await users.Union(groups).ToListAsync();
+    }
+
+    #endregion
+
     // PRIVATE HELPER FUNCTIONS //
     private async Task<bool> RefreshProjectsCache()
     {
@@ -1487,5 +1555,56 @@ public class ProjectBusiness : IProjectBusiness
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(organizationId, projectId)
             ?? throw new KeyNotFoundException("Default object storage not found");
         return defaultObjectStorage.Id;
+    }
+
+    /// <summary>
+    /// Overwrite or delete the cached ProjectAdmin flag for whichever member(s) a project-admin-affecting mutation just touched.
+    /// </summary>
+    private async Task OverwriteProjectAdminCache(long projectId, long? userId, long? groupId, bool isAdmin, bool deleting = false)
+    {
+        if (userId.HasValue)
+        {
+            try
+            {
+                if (deleting)
+                {
+                    await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(userId.Value, projectId));
+                }
+                else
+                {
+                    await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(userId.Value, projectId), isAdmin, (TimeSpan?)null);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Cache overwrite failed for user {UserId}, project {ProjectId}", userId.Value, projectId);
+            }
+        }
+        else if (groupId.HasValue)
+        {
+            var memberUserIds = await _context.Groups
+                .Where(g => g.Id == groupId.Value)
+                .SelectMany(g => g.Users.Select(u => u.Id))
+                .ToListAsync();
+
+            foreach (var memberId in memberUserIds)
+            {
+                try
+                {
+                    if (deleting)
+                    {
+                        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectAdmin(memberId, projectId));
+                    }
+                    else
+                    {
+                        await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(memberId, projectId), isAdmin, (TimeSpan?)null);
+                    }  
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Cache overwrite failed for user {UserId}, project {ProjectId}", memberId, projectId);
+                }
+            }
+        }
     }
 }

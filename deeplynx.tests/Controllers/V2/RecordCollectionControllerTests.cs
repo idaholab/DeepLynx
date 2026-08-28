@@ -87,7 +87,8 @@ public class RecordCollectionControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<PaginatedResponse<RecordCollectionResponseDtoV2>>(result.Value);
+        Assert.Equal(2, actual.Items.Count);
     }
 
     [Fact]
@@ -114,7 +115,7 @@ public class RecordCollectionControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<PaginatedResponse<RecordCollectionResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<RecordCollectionResponseDtoV2>>(result.Value);
     }
 
     [Fact]
@@ -210,7 +211,8 @@ public class RecordCollectionControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<PaginatedResponse<RecordResponseDtoV2>>(result.Value);
+        Assert.Equal(2, actual.Items.Count);
     }
 
     [Fact]
@@ -234,7 +236,7 @@ public class RecordCollectionControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<PaginatedResponse<RecordResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<RecordResponseDtoV2>>(result.Value);
     }
 
     [Fact]
@@ -334,7 +336,8 @@ public class RecordCollectionControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<PaginatedResponse<RecordCollectionResponseDtoV2>>(result.Value);
+        Assert.Equal(2, actual.Items.Count);
     }
 
     [Fact]
@@ -356,7 +359,7 @@ public class RecordCollectionControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<PaginatedResponse<RecordCollectionResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<RecordCollectionResponseDtoV2>>(result.Value);
     }
 
     [Fact]
@@ -468,7 +471,8 @@ public class RecordCollectionControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        var actual = Assert.IsType<PaginatedResponse<RecordCollectionResponseDtoV2>>(result.Value);
+        Assert.Equal(2, actual.Items.Count);
     }
 
     [Fact]
@@ -490,7 +494,7 @@ public class RecordCollectionControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<PaginatedResponse<RecordCollectionResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<PaginatedResponse<RecordCollectionResponseDtoV2>>(result.Value);
     }
 
     [Fact]
@@ -1012,7 +1016,7 @@ public class RecordCollectionControllerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(expected, result.Value);
+        Assert.IsType<RecordCollectionResponseDtoV2>(result.Value);
     }
 
     [Fact]

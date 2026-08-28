@@ -89,7 +89,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             CreatedBy = currentUserId,
             Status = ExtractionStatus.Pending,
             Mode = mode,
-            ProjectId = projectId
+            ProjectId = projectId,
+            SourceRecordId = recordId
         };
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
@@ -1147,6 +1148,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             Mode = e.Mode,
             CreatedBy = e.CreatedBy,
             ProjectId = e.ProjectId,
+            SourceRecordId = e.SourceRecordId,
             FailureMessage = GetExtractionFailureMessage(e.Properties)
         };
     }
