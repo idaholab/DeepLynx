@@ -85,6 +85,7 @@ public class UserBusiness : IUserBusiness
     /// <param name="includeServiceAccounts">Whether to include service accounts</param>
     /// <param name="includeTestAccounts">Whether to include test accounts</param>
     /// <param name="activeOnly">Whether to only include users where IsActive is true</param>
+    /// <param name="recentLoginOnly">Whether to return only users who have logged in in the last 30 days</param>
     /// <returns>Paginated list of users</returns>
     public async Task<PaginatedResponse<UserResponseDto>> GetAllUsersPaginated(
         PaginatedRequestDto dto,
