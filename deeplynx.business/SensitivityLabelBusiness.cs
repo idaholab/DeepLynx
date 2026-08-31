@@ -39,35 +39,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         ("update file", "Permission to update {0} labeled files"),
         ("delete file", "Permission to delete {0} labeled files")
     };
-
-    /// <summary>
-    ///     Builds a new SensitivityLabelPermission for the given flat action string (e.g. "read record"),
-    ///     using the known description template if it's one of the default actions, or a generic
-    ///     generated description otherwise.
-    /// </summary>
-    private static SensitivityLabelPermission BuildPermission(string action, string labelName,
-        long labelId, long currentUserId, DateTime now)
-    {
-        var trimmed = action.Trim();
-        var parts = trimmed.Split(' ', 2);
-        var verb = parts[0];
-        var resource = parts.Length > 1 ? parts[1] : "";
-
-        var template = DefaultPermissionActions
-            .FirstOrDefault(p => p.Action == trimmed).DescriptionTemplate
-            ?? $"Permission to {verb} {{0}} labeled {resource}(s)";
-
-        return new SensitivityLabelPermission
-        {
-            Name = labelName,
-            Description = string.Format(template, labelName),
-            Action = trimmed,
-            LabelId = labelId,
-            LastUpdatedAt = now,
-            LastUpdatedBy = currentUserId
-        };
-    }
-
+    
      /// <summary>
     ///     Get all sensitivity labels for a given project and/or organization
     /// </summary>
@@ -775,4 +747,31 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         }
     }
     
+    /// <summary>
+    ///     Builds a new SensitivityLabelPermission for the given flat action string (e.g. "read record"),
+    ///     using the known description template if it's one of the default actions, or a generic
+    ///     generated description otherwise.
+    /// </summary>
+    private static SensitivityLabelPermission BuildPermission(string action, string labelName,
+        long labelId, long currentUserId, DateTime now)
+    {
+        var trimmed = action.Trim();
+        var parts = trimmed.Split(' ', 2);
+        var verb = parts[0];
+        var resource = parts.Length > 1 ? parts[1] : "";
+
+        var template = DefaultPermissionActions
+                           .FirstOrDefault(p => p.Action == trimmed).DescriptionTemplate
+                       ?? $"Permission to {verb} {{0}} labeled {resource}(s)";
+
+        return new SensitivityLabelPermission
+        {
+            Name = labelName,
+            Description = string.Format(template, labelName),
+            Action = trimmed,
+            LabelId = labelId,
+            LastUpdatedAt = now,
+            LastUpdatedBy = currentUserId
+        };
+    }
 }
