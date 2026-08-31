@@ -243,11 +243,12 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 _logger?.LogWarning(ex, "Cache read failed for default-ai-model-config key {CacheKey}", projectCacheKey);
             }
 
-            // Check the cache before querying the db
-            if (cachedProjectId.HasValue)
+            bool projectCacheHit = cachedProjectId.HasValue;
+
+            if (projectCacheHit)
             {
                 modelConfig = await _context.AiModelConfigs
-                    .Where(c => c.Id == cachedProjectId.Value && c.ModelType == modelType && !c.IsArchived)
+                    .Where(c => c.Id == cachedProjectId!.Value && c.ModelType == modelType && c.Default && !c.IsArchived)
                     .FirstOrDefaultAsync();
             }
 
@@ -261,7 +262,6 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                         c.Default == true &&
                         !c.IsArchived);
 
-                // Repopulate cache on miss for subsequent reads
                 if (modelConfig != null)
                 {
                     try
@@ -291,11 +291,12 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 _logger?.LogWarning(ex, "Cache read failed for default-ai-model-config key {CacheKey}", organizationCacheKey);
             }
 
-            // Check the cache before querying the db
-            if (cachedOrganizationId.HasValue)
+            bool organizationCacheHit = cachedOrganizationId.HasValue;
+
+            if (organizationCacheHit)
             {
                 modelConfig = await _context.AiModelConfigs
-                    .Where(c => c.Id == cachedOrganizationId.Value && c.ModelType == modelType && !c.IsArchived)
+                    .Where(c => c.Id == cachedOrganizationId!.Value && c.ModelType == modelType && c.Default && !c.IsArchived)
                     .FirstOrDefaultAsync();
             }
 
@@ -309,7 +310,6 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                         c.Default == true &&
                         !c.IsArchived);
 
-                // Repopulate cache on miss for subsequent reads
                 if (modelConfig != null)
                 {
                     try
@@ -382,11 +382,12 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 _logger?.LogWarning(ex, "Cache read failed for default-ai-model-config key {CacheKey}", projectCacheKey);
             }
 
-            // Check the cache before querying the db
-            if (cachedProjectId.HasValue)
+            bool projectCacheHit = cachedProjectId.HasValue;
+
+            if (projectCacheHit)
             {
                 modelConfig = await _context.AiModelConfigs
-                    .Where(c => c.Id == cachedProjectId.Value && c.ModelType == modelType && !c.IsArchived)
+                    .Where(c => c.Id == cachedProjectId!.Value && c.ModelType == modelType && c.Default && !c.IsArchived)
                     .FirstOrDefaultAsync();
             }
 
@@ -400,7 +401,6 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                         c.Default == true &&
                         !c.IsArchived);
 
-                // Repopulate cache on miss for subsequent reads
                 if (modelConfig != null)
                 {
                     try
@@ -429,11 +429,12 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                 _logger?.LogWarning(ex, "Cache read failed for default-ai-model-config key {CacheKey}", organizationCacheKey);
             }
 
-            // Check the cache before querying the db
-            if (cachedOrganizationId.HasValue)
+            bool organizationCacheHit = cachedOrganizationId.HasValue;
+
+            if (organizationCacheHit)
             {
                 modelConfig = await _context.AiModelConfigs
-                    .Where(c => c.Id == cachedOrganizationId.Value && c.ModelType == modelType && !c.IsArchived)
+                    .Where(c => c.Id == cachedOrganizationId!.Value && c.ModelType == modelType && c.Default && !c.IsArchived)
                     .FirstOrDefaultAsync();
             }
 
@@ -447,7 +448,6 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
                         c.Default == true &&
                         !c.IsArchived);
 
-                // Repopulate cache on miss for subsequent reads
                 if (modelConfig != null)
                 {
                     try
@@ -557,7 +557,7 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
             await transaction.CommitAsync();
 
             // Update cached default AI model config
-            if (dto.Default)
+            if (newConfig.Default)
             {
                 await UpdateDefaultAiModelConfigCache(newConfig.Id, organizationId, projectId, newConfig.ModelType);
             }
@@ -684,10 +684,6 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
             try
             {
-                // Capture before mutation for caching 
-                bool wasDefault = returnedModelConfig.Default;
-                string previousModelType = returnedModelConfig.ModelType;
-
                 if (returnedModelConfig.Default && dto.ModelType != null &&
                     !string.Equals(dto.ModelType, returnedModelConfig.ModelType, StringComparison.OrdinalIgnoreCase) &&
                     (dto.Default ?? true))
@@ -738,15 +734,9 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
 
                 await transaction.CommitAsync();
 
+                // Update cached default AI model config
                 if (returnedModelConfig.Default)
                 {
-                    if (wasDefault && previousModelType != returnedModelConfig.ModelType)
-                    {
-                        // This config was the default and the model type changed, invalidate the old key
-                        await UpdateDefaultAiModelConfigCache(returnedModelConfig.Id, organizationId, projectId, previousModelType, invalidateKey: true);
-                    }
-
-                    // Update cached default AI model config
                     await UpdateDefaultAiModelConfigCache(returnedModelConfig.Id, organizationId, projectId, returnedModelConfig.ModelType);
                 }
 
@@ -950,33 +940,26 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         return true;
     }
 
-    private async Task UpdateDefaultAiModelConfigCache(long aiModelConfigId, long organizationId, long? projectId, string modelType, bool invalidateKey = false)
+    private async Task UpdateDefaultAiModelConfigCache(
+        long aiModelConfigId,
+        long organizationId,
+        long? projectId,
+        string modelType)
     {
         var key = projectId.HasValue
             ? CacheKeys.ProjectDefaultAiModelConfig(projectId.Value, modelType)
             : CacheKeys.OrganizationDefaultAiModelConfig(organizationId, modelType);
 
-        if (invalidateKey)
+        try
         {
-            try
-            {
-                await CacheService.Instance.DeleteAsync(key);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Default AI model config cache invalidation failed for key {CacheKey}", key);
-            }
+            await CacheService.Instance.SetAsync(
+                key,
+                aiModelConfigId,
+                AiModelConfigCacheTtl);
         }
-        else
+        catch (Exception ex)
         {
-            try
-            {
-                await CacheService.Instance.SetAsync(key, aiModelConfigId, AiModelConfigCacheTtl);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Default AI model config cache update failed for key {CacheKey}", key);
-            }
+            _logger?.LogWarning(ex, "Default AI model config cache update failed for key {CacheKey}", key);
         }
     }
 }
