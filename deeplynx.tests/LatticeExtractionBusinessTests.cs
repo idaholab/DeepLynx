@@ -1,6 +1,7 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.BigData;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -21,13 +22,24 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
 
     private LatticeExtractionBusiness _business = null!;
     private LatticeContext _latticeCtx = null!;
+    private EncryptionHelper _encryptionHelper;
     private Mock<IInsightBusiness> _mockInsight = null!;
     private Mock<HttpMessageHandler> _mockHandler = null!;
     private InsightServiceClient _client = null!;
     private Mock<IProvenanceBusiness> _mockProvenance = null!;
+    private Mock<IFileBusiness> _mockFileAzureBusiness;
     private Mock<IEventBusiness> _mockEventBusiness;
     private Mock<IAdminService> _mockAdminService;
     private Mock<IProjectRolePermissionService> _mockPermissionService;
+    private UserBusiness _userBusiness;
+    private SensitivityLabelService _sensitivityLabelService;
+    private Mock<IFileBusinessFactory> _fileBusinessFactory;
+    private ObjectStorageBusiness _objectStorageBusiness;
+    private SensitivityLabelBusiness _sensitivityLabelBusiness;
+    private Mock<IProvenanceBusiness> _provenanceBusiness;
+    private Mock<ILogger<RecordBusiness>> _mockRecordLogger;
+    private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor;
+    private RecordBusiness _recordBusiness;
     private TagBusiness _tagBusiness;
     private Mock<ILogger<LatticeExtractionBusiness>> _mockLogger = null!;
 
@@ -58,15 +70,34 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         // Chain to base so CleanDatabaseAsync + SeedTestDataAsync run as normal.
         await base.InitializeAsync();
 
+        _encryptionHelper = new EncryptionHelper();
         _mockInsight = new Mock<IInsightBusiness>();
         _mockHandler = new Mock<HttpMessageHandler>();
         Environment.SetEnvironmentVariable("INSIGHT_FASTAPI_URL", "http://localhost:5000");
         _client = new InsightServiceClient(new HttpClient(_mockHandler.Object));
         _mockLogger = new Mock<ILogger<LatticeExtractionBusiness>>();
         _mockProvenance = new Mock<IProvenanceBusiness>();
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _mockEventBusiness = new Mock<IEventBusiness>();
         _mockAdminService = new Mock<IAdminService>();
         _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _userBusiness = new UserBusiness(Context);
+        _sensitivityLabelService = new SensitivityLabelService(Context);
+        _fileBusinessFactory = new Mock<IFileBusinessFactory>();
+        _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
+        _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _mockEventBusiness.Object, _userBusiness);
+        _provenanceBusiness = new Mock<IProvenanceBusiness>();
+        _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
+        _mockBulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
+        _recordBusiness = new RecordBusiness(
+            Context,
+            _mockEventBusiness.Object,
+            _mockBulkCopyUpsertExecutor,
+            _tagBusiness,
+            _sensitivityLabelBusiness,
+            _sensitivityLabelService,
+            _provenanceBusiness.Object,
+            _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
         _tagBusiness = new TagBusiness(
             Context,
             _mockEventBusiness.Object,
@@ -75,7 +106,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
 
         _business = new LatticeExtractionBusiness(
             Context, _latticeCtx,
-            _mockInsight.Object, _client, _mockProvenance.Object, _mockLogger.Object, _tagBusiness);
+            _mockInsight.Object, _client, _mockProvenance.Object, _mockLogger.Object, _tagBusiness, _recordBusiness);
     }
 
     public override async Task DisposeAsync()
@@ -952,7 +983,7 @@ public class LatticeExtractionBusinessTests : IntegrationTestBase
         // Arrange
         await SeedStagingAsync(completeExtractionId, ExtractionValidationStatus.Valid);
 
-         var sc = new ExtractionClass
+        var sc = new ExtractionClass
         {
             ExtractionId = completeExtractionId,
             Name = "Military Organization",
