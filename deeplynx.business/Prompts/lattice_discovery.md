@@ -40,6 +40,9 @@ ATTRIBUTE EXTRACTION RULES:
    commander).
 5. Omit uncertain attributes entirely.
 6. Keep values short and literal (no long paraphrases).
+7. In addition to other attributes, extract any tags from the document text associated with each entity.
+8. Represent tags as a list of strings under the attribute key "tags".
+9. Example: "attributes": { ..., "tags": ["high-priority", "classified"] }
 
 DISCOVERY GUIDELINES:
 
@@ -53,7 +56,7 @@ OUTPUT FORMAT: Return ONLY valid JSON (no markdown, no explanations), exactly th
 
 {
 "classes": [
-{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "record_id": 1, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing"}},
+{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "record_id": 1, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing", "tags": ["strategic", "critical infrastructure"]}},
 {"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "record_id": 1, "attributes": {"role": "command and control", "location": "operations center"}}
 ],
 "relationships": [
