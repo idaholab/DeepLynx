@@ -4,7 +4,9 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.Cache;
 using deeplynx.helpers.Context;
+using deeplynx.interfaces;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -3373,6 +3375,243 @@ public class AuthMiddlewareTests : IntegrationTestBase
 
         // Assert
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+    }
+
+    #endregion
+
+    #region Real Permission-Cache Integration Tests
+
+    private async Task<(long roleId, long permissionId)> SeedOrgRoleWithPermissionAsync(
+        long organizationId, string action, string resource)
+    {
+        var role = new Role { Name = $"Cache Test Role {Guid.NewGuid()}", OrganizationId = organizationId };
+        Context.Roles.Add(role);
+        await Context.SaveChangesAsync();
+
+        var permission = new Permission
+        {
+            Name = $"Cache Test Permission {Guid.NewGuid()}",
+            Action = action,
+            Resource = resource,
+            OrganizationId = organizationId
+        };
+        Context.Permissions.Add(permission);
+        await Context.SaveChangesAsync();
+
+        role.Permissions.Add(permission);
+        await Context.SaveChangesAsync();
+
+        return (role.Id, permission.Id);
+    }
+
+    [Fact]
+    public async Task AuthMiddleware_OrgPermissionCache_ReflectsUpdate_AfterAdminStatusChange()
+    {
+        var realOrgService = new OrgRolePermissionService(Context, _orgLoggerMock.Object);
+        var eventBusiness = new EventBusiness(
+            Context,
+            Mock.Of<INotificationBusiness>(),
+            Mock.Of<IBulkCopyUpsertExecutor>());
+        var organizationBusiness = new OrganizationBusiness(
+            Context, eventBusiness,
+            new RoleBusiness(Context, eventBusiness, Mock.Of<ILogger<RoleBusiness>>()),
+            Mock.Of<ILogger<OrganizationBusiness>>(),
+            Mock.Of<IObjectStorageBusiness>());
+
+        var orgId = organizationId1;
+        var cacheKey = CacheKeys.OrgPermission(userId1, orgId, "update", "organization");
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        // userId1 joins as a non-admin member — PermissionInOrg should compute/cache "false"
+        // for "update" (per the service's SQL, only org admins or "read" pass).
+        await organizationBusiness.AddUserToOrganization(orgId, userId1, isAdmin: false);
+
+        var context = CreateHttpContextWithAuth("update", "organization");
+        SetAuthenticatedUser(context, userId1);
+        context.Request.RouteValues["organizationId"] = orgId.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(null, orgId, false))
+            .ReturnsAsync(orgId);
+
+        RequestDelegate next = _ => Task.CompletedTask;
+        var middleware = new AuthMiddleware(next);
+
+        // Act 1: cache miss -> DB query -> caches "false"
+        await middleware.InvokeAsync(context, realOrgService, _projectRolePermissionServiceMock.Object,
+            _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+        Assert.Equal(false, await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        // Act 2: promote to org admin — this must invalidate the OrgPermission cache entry
+        await organizationBusiness.SetOrganizationAdminStatus(orgId, userId1, isAdmin: true);
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        // Act 3: a fresh request through the middleware must reflect the new (true) result,
+        // not the stale cached "false"
+        var context2 = CreateHttpContextWithAuth("update", "organization");
+        SetAuthenticatedUser(context2, userId1);
+        context2.Request.RouteValues["organizationId"] = orgId.ToString();
+
+        var nextCalled = false;
+        RequestDelegate next2 = _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+        var middleware2 = new AuthMiddleware(next2);
+
+        await middleware2.InvokeAsync(context2, realOrgService, _projectRolePermissionServiceMock.Object,
+            _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        Assert.True(nextCalled);
+        Assert.Equal(true, await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        // cleanup
+        await CacheService.Instance.DeleteAsync(cacheKey);
+    }
+
+    [Fact]
+    public async Task AuthMiddleware_ProjectPermissionCache_ReflectsUpdate_AfterRolePermissionGranted()
+    {
+        var realProjectService = new ProjectRolePermissionService(Context, _projectLoggerMock.Object);
+        var eventBusiness = new EventBusiness(
+            Context,
+            Mock.Of<INotificationBusiness>(),
+            Mock.Of<IBulkCopyUpsertExecutor>());
+        var roleBusiness = new RoleBusiness(Context, eventBusiness, Mock.Of<ILogger<RoleBusiness>>());
+
+        var (roleId, permissionId) = await SeedOrgRoleWithPermissionAsync(organizationId1, "write", "widgets");
+
+        // Convert the seeded org-level role into a project-scoped assignment for userId1.
+        Context.ProjectMembers.Add(new ProjectMember { ProjectId = projectId1, UserId = userId1, RoleId = roleId });
+        await Context.SaveChangesAsync();
+
+        // Start with the permission NOT yet on the role, so the first check is a real "false".
+        var role = await Context.Roles.Include(r => r.Permissions).FirstAsync(r => r.Id == roleId);
+        var permission = role.Permissions.First(p => p.Id == permissionId);
+        role.Permissions.Remove(permission);
+        await Context.SaveChangesAsync();
+
+        var cacheKey = CacheKeys.ProjectPermission(userId1, projectId1, "write", "widgets");
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        var context = CreateHttpContextWithAuth("write", "widgets");
+        SetAuthenticatedUser(context, userId1);
+        context.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(), false))
+            .ReturnsAsync(organizationId1);
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(projectId1, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
+        RequestDelegate next = _ => Task.CompletedTask;
+        var middleware = new AuthMiddleware(next);
+
+        // Act 1: cache miss -> DB query -> caches "false" (permission not yet granted)
+        await middleware.InvokeAsync(context, _orgRolePermissionServiceMock.Object, realProjectService,
+            _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+        Assert.Equal(false, await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        // Act 2: grant the permission via the role — must invalidate the cached "false"
+        // for every project member holding roleId, including userId1.
+        await roleBusiness.AddPermissionToRole(roleId, permissionId, organizationId1, null);
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        // Act 3: next request through the middleware reflects the newly granted permission
+        var context2 = CreateHttpContextWithAuth("write", "widgets");
+        SetAuthenticatedUser(context2, userId1);
+        context2.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        var nextCalled = false;
+        RequestDelegate next2 = _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+        var middleware2 = new AuthMiddleware(next2);
+
+        await middleware2.InvokeAsync(context2, _orgRolePermissionServiceMock.Object, realProjectService,
+            _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        Assert.True(nextCalled);
+        Assert.Equal(true, await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        // cleanup
+        await CacheService.Instance.DeleteAsync(cacheKey);
+    }
+
+    [Fact]
+    public async Task AuthMiddleware_ProjectPermissionCache_ReflectsRevocation_AfterRolePermissionRemoved()
+    {
+        var realProjectService = new ProjectRolePermissionService(Context, _projectLoggerMock.Object);
+        var eventBusiness = new EventBusiness(
+            Context,
+            Mock.Of<INotificationBusiness>(),
+            Mock.Of<IBulkCopyUpsertExecutor>());
+        var roleBusiness = new RoleBusiness(Context, eventBusiness, Mock.Of<ILogger<RoleBusiness>>());
+
+        var (roleId, permissionId) = await SeedOrgRoleWithPermissionAsync(organizationId1, "delete", "widgets");
+        Context.ProjectMembers.Add(new ProjectMember { ProjectId = projectId1, UserId = userId1, RoleId = roleId });
+        await Context.SaveChangesAsync();
+
+        var cacheKey = CacheKeys.ProjectPermission(userId1, projectId1, "delete", "widgets");
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        var context = CreateHttpContextWithAuth("delete", "widgets");
+        SetAuthenticatedUser(context, userId1);
+        context.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        _organizationServiceMock
+            .Setup(x => x.ResolveOrganizationIdFromProjectsAsync(
+                It.Is<IEnumerable<long>>(ids => ids.SequenceEqual(new[] { projectId1 })),
+                It.IsAny<long?>(), false))
+            .ReturnsAsync(organizationId1);
+        _organizationServiceMock
+            .Setup(x => x.CheckExistence(projectId1, organizationId1, false))
+            .ReturnsAsync(organizationId1);
+
+        RequestDelegate next = _ => Task.CompletedTask;
+        var middleware = new AuthMiddleware(next);
+
+        // Act 1: permission is currently granted — cache miss caches "true"
+        var nextCalled = false;
+        RequestDelegate nextTrue = _ => { nextCalled = true; return Task.CompletedTask; };
+        var middlewareTrue = new AuthMiddleware(nextTrue);
+
+        await middlewareTrue.InvokeAsync(context, _orgRolePermissionServiceMock.Object, realProjectService,
+            _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        Assert.True(nextCalled);
+        Assert.Equal(true, await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        // Act 2: revoke via RemovePermissionFromRole — must invalidate the cached "true"
+        await roleBusiness.RemovePermissionFromRole(roleId, permissionId, organizationId1, null);
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        // Act 3: next request reflects the revocation
+        var context2 = CreateHttpContextWithAuth("delete", "widgets");
+        SetAuthenticatedUser(context2, userId1);
+        context2.Request.RouteValues["projectId"] = projectId1.ToString();
+
+        RequestDelegate next2 = _ => Task.CompletedTask;
+        var middleware2 = new AuthMiddleware(next2);
+
+        await middleware2.InvokeAsync(context2, _orgRolePermissionServiceMock.Object, realProjectService,
+            _adminServiceMock.Object, _organizationServiceMock.Object);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, context2.Response.StatusCode);
+        Assert.Equal(false, await CacheService.Instance.GetAsync<bool?>(cacheKey));
+
+        // cleanup
+        await CacheService.Instance.DeleteAsync(cacheKey);
     }
 
     #endregion

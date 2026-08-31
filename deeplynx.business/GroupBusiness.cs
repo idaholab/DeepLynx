@@ -20,7 +20,7 @@ public class GroupBusiness : IGroupBusiness
     /// <param name="context">Database context used for group CRUD operations</param>
     /// <param name="eventBusiness">Used for logging events during CRUD operations</param>
     /// <param name="logger">Used for uniformity in logging</param>
-    public GroupBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ILogger<GroupBusiness>? logger)
+    public GroupBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ILogger<GroupBusiness>? logger = null)
     {
         _context = context;
         _eventBusiness = eventBusiness;

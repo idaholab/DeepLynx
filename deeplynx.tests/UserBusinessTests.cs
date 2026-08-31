@@ -2318,6 +2318,24 @@ public class UserBusinessTests : IntegrationTestBase
         Assert.Contains($"User with id {uid3} not found", exception.Message);
     }
 
+    [Fact]
+    public async Task DeleteUser_InvalidatesOrgAndProjectPermissionCaches()
+    {
+        var orgPermKey = CacheKeys.OrgPermission(uid1, oid, "read", "organization");
+        var projectPermKey = CacheKeys.ProjectPermission(uid1, pid, "read", "test");
+        var permittedIdsKey = CacheKeys.ProjectPermittedIds(uid1, "read", "test");
+
+        await CacheService.Instance.SetAsync(orgPermKey, true, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(projectPermKey, true, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(permittedIdsKey, new List<long> { pid }, (TimeSpan?)null);
+
+        await _userBusiness.DeleteUser(uid1);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(orgPermKey));
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(projectPermKey));
+        Assert.Null(await CacheService.Instance.GetAsync<List<long>>(permittedIdsKey));
+    }
+
     #endregion
 
     #region ArchiveUser Tests

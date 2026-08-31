@@ -22,7 +22,7 @@ public class RoleBusiness : IRoleBusiness
     /// <param name="context">The database context to be used for role operations</param>
     /// <param name="eventBusiness">Used for logging events during CRUD operations</param>
     /// <param name="logger">Used for uniformity in logging</param>
-    public RoleBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ILogger<RoleBusiness> logger)
+    public RoleBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ILogger<RoleBusiness>? logger = null)
     {
         _context = context;
         _eventBusiness = eventBusiness;

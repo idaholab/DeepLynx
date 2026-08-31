@@ -27,7 +27,7 @@ public class PermissionBusiness : IPermissionBusiness
     /// </summary>
     /// <param name="context">The database context to be used for permission operations</param>
     /// <param name="logger">Used for uniformity in logging</param>
-    public PermissionBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ILogger<PermissionBusiness>? logger)
+    public PermissionBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ILogger<PermissionBusiness>? logger = null)
     {
         _context = context;
         _eventBusiness = eventBusiness;
