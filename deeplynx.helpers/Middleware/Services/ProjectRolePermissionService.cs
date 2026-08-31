@@ -166,13 +166,18 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
                 CacheKeys.ProjectPermission(userId, projectId, action, resource),
                 isAuthorized,
                 (TimeSpan?)null);
+
+            if (isAuthorized)
+            {
+                result.Add(projectId);
+            }
         }
 
         _logger.LogInformation(
             "Bulk permission check result - User: {UserId}, Authorized Projects: {AuthorizedProjects}",
-            userId, string.Join(',', authorizedIds));
+            userId, string.Join(',', result));
 
-        return authorizedIds;
+        return result;
     }
 
     public async Task<List<long>> GetPermittedProjectIdsAsync(long userId, string action, string resource)
