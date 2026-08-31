@@ -4,6 +4,7 @@ using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
 
@@ -11,16 +12,19 @@ public class GroupBusiness : IGroupBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
+    private readonly ILogger<GroupBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="GroupBusiness" /> class.
     /// </summary>
     /// <param name="context">Database context used for group CRUD operations</param>
     /// <param name="eventBusiness">Used for logging events during CRUD operations</param>
-    public GroupBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
+    /// <param name="logger">Used for uniformity in logging</param>
+    public GroupBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ILogger<GroupBusiness>? logger)
     {
         _context = context;
         _eventBusiness = eventBusiness;
+        _logger = logger;
     }
 
     /// <summary>
@@ -347,6 +351,25 @@ public class GroupBusiness : IGroupBusiness
         group.Users.Add(user);
         await _context.SaveChangesAsync();
 
+        // invalidate cached permissions
+        var affectedProjectIds = await _context.ProjectMembers
+            .Where(pm => pm.GroupId == groupId)
+            .Select(pm => pm.ProjectId)
+            .ToListAsync();
+
+        foreach (var projectId in affectedProjectIds)
+        {
+            try
+            {
+                await CacheService.Instance.DeleteByPrefixAsync($"projectpermission:{userId}:{projectId}:");
+                await CacheService.Instance.DeleteByPrefixAsync($"projectpermittedids:{userId}:");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Cache overwrite for permissions failed for user {UserId}, project {ProjectId}", userId, projectId);
+            }
+        }
+
         return true;
     }
 
@@ -377,6 +400,25 @@ public class GroupBusiness : IGroupBusiness
 
         group.Users.Remove(user);
         await _context.SaveChangesAsync();
+
+        // invalidate cached permissions
+        var affectedProjectIds = await _context.ProjectMembers
+            .Where(pm => pm.GroupId == groupId)
+            .Select(pm => pm.ProjectId)
+            .ToListAsync();
+
+        foreach (var projectId in affectedProjectIds)
+        {
+            try
+            {
+                await CacheService.Instance.DeleteByPrefixAsync($"projectpermission:{userId}:{projectId}:");
+                await CacheService.Instance.DeleteByPrefixAsync($"projectpermittedids:{userId}:");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Cache overwrite for permissions failed for user {UserId}, project {ProjectId}", userId, projectId);
+            }
+        }
 
         return true;
     }

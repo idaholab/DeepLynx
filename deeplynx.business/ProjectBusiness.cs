@@ -1085,6 +1085,9 @@ public class ProjectBusiness : IProjectBusiness
             await OverwriteProjectAdminCache(projectId, userId, groupId, makeProjectAdmin);
         }
 
+        // invalidate the project permissions cache
+        await InvalidateProjectPermissionsCache(userId, groupId, projectId);
+
         if (userId.HasValue && userId != UserContextStorage.UserId)
         {
             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -1155,6 +1158,9 @@ public class ProjectBusiness : IProjectBusiness
         {
             await OverwriteProjectAdminCache(projectId, userId, groupId, isProjectAdmin.Value);
         }
+
+        // invalidate the project permissions cache
+        await InvalidateProjectPermissionsCache(userId, groupId, projectId);
 
         return true;
     }
@@ -1252,6 +1258,9 @@ public class ProjectBusiness : IProjectBusiness
 
         // delete the cached admin flag now that it's changed
         await OverwriteProjectAdminCache(projectId, userId, groupId, isAdmin: false, deleting: true);
+
+        // invalidate the project permissions cache
+        await InvalidateProjectPermissionsCache(userId, groupId, projectId);
 
         return true;
     }
@@ -1477,6 +1486,45 @@ public class ProjectBusiness : IProjectBusiness
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Cache overwrite failed for user {UserId}, project {ProjectId}", memberId, projectId);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Invalidate the cached project permissions for a user.
+    /// </summary>
+    public async Task InvalidateProjectPermissionsCache(long? userId, long? groupId, long projectId)
+    {
+        if (userId.HasValue)
+        {
+            try
+            {
+                await CacheService.Instance.DeleteByPrefixAsync($"projectpermission:{userId}:{projectId}:");
+                await CacheService.Instance.DeleteByPrefixAsync($"projectpermittedids:{userId}:");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Cache overwrite for permissions failed for user {UserId}, project {ProjectId}", userId, projectId);
+            }
+        }
+        else if (groupId.HasValue)
+        {
+            var memberUserIds = await _context.Groups
+                .Where(g => g.Id == groupId.Value)
+                .SelectMany(g => g.Users.Select(u => u.Id))
+                .ToListAsync();
+
+            foreach (var memberId in memberUserIds)
+            {
+                try
+                {
+                    await CacheService.Instance.DeleteByPrefixAsync($"projectpermission:{memberId}:{projectId}:");
+                    await CacheService.Instance.DeleteByPrefixAsync($"projectpermittedids:{memberId}:");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Cache overwrite for permissions failed for user {MemberId}, project {ProjectId}", memberId, projectId);
                 }
             }
         }

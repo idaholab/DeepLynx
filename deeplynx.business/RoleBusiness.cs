@@ -5,6 +5,7 @@ using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace deeplynx.business;
@@ -13,16 +14,19 @@ public class RoleBusiness : IRoleBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
+    private readonly ILogger<RoleBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="RoleBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for role operations</param>
     /// <param name="eventBusiness">Used for logging events during CRUD operations</param>
-    public RoleBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
+    /// <param name="logger">Used for uniformity in logging</param>
+    public RoleBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ILogger<RoleBusiness> logger)
     {
         _context = context;
         _eventBusiness = eventBusiness;
+        _logger = logger;
     }
 
     /// <summary>
@@ -533,6 +537,11 @@ public class RoleBusiness : IRoleBusiness
         // set lastUpdatedAt timestamp
         var lastUpdatedAt = DateTime.UtcNow;
 
+        var affectedMembers = await _context.ProjectMembers
+        .Where(pm => pm.RoleId == roleId)
+        .Select(pm => new { pm.ProjectId, pm.UserId, pm.GroupId })
+        .ToListAsync();
+
         // run archive procedure in a transaction to roll back any errors
         using (var transaction = await _context.Database.BeginTransactionAsync())
         {
@@ -550,6 +559,27 @@ public class RoleBusiness : IRoleBusiness
                         $"Unable to archive role {roleId} or its downstream dependents.");
 
                 await transaction.CommitAsync();
+
+                // invalidate project permissions cache for each affected member
+                foreach (var member in affectedMembers)
+                {
+                    if (member.UserId.HasValue)
+                    {
+                        await InvalidateProjectPermissionsCache(member.UserId.Value, member.ProjectId);
+                    }
+                    else if (member.GroupId.HasValue)
+                    {
+                        var memberUserIds = await _context.Groups
+                            .Where(g => g.Id == member.GroupId.Value)
+                            .SelectMany(g => g.Users.Select(u => u.Id))
+                            .ToListAsync();
+
+                        foreach (var uid in memberUserIds)
+                        {
+                            await InvalidateProjectPermissionsCache(uid, member.ProjectId);
+                        }
+                    }
+                }
             }
             catch (Exception exc)
             {
@@ -684,8 +714,31 @@ public class RoleBusiness : IRoleBusiness
             throw new InvalidOperationException("Organization roles cannot be updated from the child projects.");
         }
 
+        var affectedMembersForDelete = await _context.ProjectMembers
+            .Where(pm => pm.RoleId == roleId)
+            .Select(pm => new { pm.ProjectId, pm.UserId, pm.GroupId })
+            .ToListAsync();
+
         _context.Roles.Remove(role);
         await _context.SaveChangesAsync();
+
+        foreach (var member in affectedMembersForDelete)
+        {
+            if (member.UserId.HasValue)
+            {
+                await InvalidateProjectPermissionsCache(member.UserId.Value, member.ProjectId);
+            }
+            else if (member.GroupId.HasValue)
+            {
+                var memberUserIds = await _context.Groups
+                    .Where(g => g.Id == member.GroupId.Value)
+                    .SelectMany(g => g.Users.Select(u => u.Id))
+                    .ToListAsync();
+
+                foreach (var uid in memberUserIds)
+                    await InvalidateProjectPermissionsCache(uid, member.ProjectId);
+            }
+        }
 
         // Log archive Role event
         var eventLog = new CreateEventRequestDto
@@ -807,6 +860,10 @@ public class RoleBusiness : IRoleBusiness
 
         role.Permissions.Add(permission);
         await _context.SaveChangesAsync();
+
+        // invalidate cached permissions for this role
+        await InvalidatePermissionCacheForRole(roleId);
+
         return true;
     }
 
@@ -856,6 +913,10 @@ public class RoleBusiness : IRoleBusiness
 
         role.Permissions.Remove(permission);
         await _context.SaveChangesAsync();
+
+        // invalidate cached permissions for this role
+        await InvalidatePermissionCacheForRole(roleId);
+
         return true;
     }
 
@@ -915,6 +976,10 @@ public class RoleBusiness : IRoleBusiness
             role.Permissions.Add(permission);
 
         await _context.SaveChangesAsync();
+
+        // invalidate cached permissions for this role
+        await InvalidatePermissionCacheForRole(roleId);
+
         return true;
     }
 
@@ -978,6 +1043,57 @@ public class RoleBusiness : IRoleBusiness
             role.Permissions.Add(permission);
 
         await _context.SaveChangesAsync();
+
+        // invalidate cached permissions for this role
+        await InvalidatePermissionCacheForRole(roleId);
+
         return true;
+    }
+
+    /// <summary>
+    ///     Finds every (user/group, project) pair currently holding this role and invalidates their cached project permissions. 
+    /// </summary>
+    private async Task InvalidatePermissionCacheForRole(long roleId)
+    {
+        var affectedMembers = await _context.ProjectMembers
+            .Where(pm => pm.RoleId == roleId)
+            .Select(pm => new { pm.ProjectId, pm.UserId, pm.GroupId })
+            .ToListAsync();
+
+        foreach (var member in affectedMembers)
+        {
+            if (member.UserId.HasValue)
+            {
+                await InvalidateProjectPermissionsCache(member.UserId.Value, member.ProjectId);
+            }
+            else if (member.GroupId.HasValue)
+            {
+                var memberUserIds = await _context.Groups
+                    .Where(g => g.Id == member.GroupId.Value)
+                    .SelectMany(g => g.Users.Select(u => u.Id))
+                    .ToListAsync();
+
+                foreach (var uid in memberUserIds)
+                {
+                    await InvalidateProjectPermissionsCache(uid, member.ProjectId);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Invalidate the cached project permissions for a user.
+    /// </summary>
+    public async Task InvalidateProjectPermissionsCache(long userId, long projectId)
+    {
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync($"projectpermission:{userId}:{projectId}:");
+            await CacheService.Instance.DeleteByPrefixAsync($"projectpermittedids:{userId}:");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache overwrite for permissions failed for user {UserId}, project {ProjectId}", userId, projectId);
+        }
     }
 }
