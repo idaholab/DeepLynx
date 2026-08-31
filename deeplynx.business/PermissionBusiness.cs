@@ -414,7 +414,7 @@ public class PermissionBusiness : IPermissionBusiness
     }
 
     /// <summary>
-    /// Finds every project member whose role currently includes this permission.
+    ///     Finds every project member whose role currently includes this permission.
     /// </summary>
     private async Task<List<(long ProjectId, long? UserId, long? GroupId)>> GetAffectedProjectMembersForPermission(long permissionId)
     {

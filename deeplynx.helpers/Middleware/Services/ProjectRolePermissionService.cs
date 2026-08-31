@@ -33,7 +33,6 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
         string action,
         string resource)
     {
-
         bool hasPermission;
         
         _logger.LogInformation(

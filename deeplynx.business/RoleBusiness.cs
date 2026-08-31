@@ -538,9 +538,9 @@ public class RoleBusiness : IRoleBusiness
         var lastUpdatedAt = DateTime.UtcNow;
 
         var affectedMembers = await _context.ProjectMembers
-        .Where(pm => pm.RoleId == roleId)
-        .Select(pm => new { pm.ProjectId, pm.UserId, pm.GroupId })
-        .ToListAsync();
+            .Where(pm => pm.RoleId == roleId)
+            .Select(pm => new { pm.ProjectId, pm.UserId, pm.GroupId })
+            .ToListAsync();
 
         // run archive procedure in a transaction to roll back any errors
         using (var transaction = await _context.Database.BeginTransactionAsync())
