@@ -414,7 +414,7 @@ function ExtractionDetailPanel({
   });
 
   const toggleApproveByStatus = (status: string) => {
-    const statuses = status === "valid_novel" ? ["valid", "novel_discovery"] : [status];
+    const statuses = status === "valid_novel_invalid" ? ["valid", "novel_discovery", "invalid_schema"] : [status];
 
     const recordIds = visibleRecords
       .filter((r) => statuses.includes(r.validation_status as string))
@@ -462,7 +462,7 @@ function ExtractionDetailPanel({
   };
 
   const isAllApproved = (status: string): boolean => {
-    const statuses = status === "valid_novel" ? ["valid", "novel_discovery"] : [status];
+    const statuses = status === "valid_novel_invalid" ? ["valid", "novel_discovery", "invalid_schema"] : [status];
 
     const recordIds = visibleRecords
       .filter(r => statuses.includes(r.validation_status as string))
@@ -783,6 +783,7 @@ function ExtractionDetailPanel({
 
   const validCount = countByStatus("valid");
   const novelDiscoveryCount = countByStatus("novel_discovery");
+  const invalidSchemaCount = countByStatus("invalid_schema");
 
   const hasPendingDecisions = (
     ["records", "classes", "edges", "relationships"] as ItemType[]
@@ -884,12 +885,12 @@ function ExtractionDetailPanel({
 
               <button
                 type="button"
-                className={`btn btn-outline btn-primary btn-sm ${isAllApproved("valid_novel") ? "bg-blue-600 text-white border-blue-700" : ""}`}
-                onClick={() => toggleApproveByStatus("valid_novel")}
-                disabled={isPromoting || (validCount + novelDiscoveryCount === 0)}
+                className={`btn btn-outline btn-primary btn-sm ${isAllApproved("valid_novel_invalid") ? "bg-blue-600 text-white border-blue-700" : ""}`}
+                onClick={() => toggleApproveByStatus("valid_novel_invalid")}
+                disabled={isPromoting || (validCount + novelDiscoveryCount + invalidSchemaCount === 0)}
               >
                 <CheckCircleIcon className="size-4" />
-                {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.LATTICE_APPROVE_ALL} ({validCount + novelDiscoveryCount})
+                {t.translations.LATTICE_APPROVE_ALL} ({validCount + novelDiscoveryCount + invalidSchemaCount})
               </button>
 
               <button
