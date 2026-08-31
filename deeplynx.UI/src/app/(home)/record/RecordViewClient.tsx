@@ -242,6 +242,8 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     useState(false);
   const [ontologyPollTrigger, setOntologyPollTrigger] = useState(0);
   const ontologyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
 
   const {
     originPage,
@@ -850,6 +852,17 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
     router,
   ]);
 
+  const onClickTriggerExtraction = async () => {
+
+    var originalRecord = await getRecord(organizationId as number, projectId, record?.recordId as number)
+
+    if (originalRecord?.extractionId != null) {
+      setShowConfirmDialog(true);
+    } else {
+      handleTriggerLatticeExtraction();
+    }
+  };
+
   const handleSelect = (id: number) => {
     setSelectedId(id);
     if (projectId) localStorage.setItem(storageKey(projectId), String(id));
@@ -1406,16 +1419,16 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                     </span>
                   </div>
                 ) : (
-                  <> 
+                  <>
                     {!isRecordInsightEmbedded &&
-                        isRecordInsightEmbedding && (
-                          <div className="alert alert-warning">
-                            <span className="flex-1 text-sm">
-                              <span className="loading loading-spinner loading-sm" />
-                              {t.translations.PROJECT_INSIGHT_STATUS_PROCESSING}
-                            </span>
-                          </div>
-                        )}
+                      isRecordInsightEmbedding && (
+                        <div className="alert alert-warning">
+                          <span className="flex-1 text-sm">
+                            <span className="loading loading-spinner loading-sm" />
+                            {t.translations.PROJECT_INSIGHT_STATUS_PROCESSING}
+                          </span>
+                        </div>
+                      )}
                     {!isRecordInsightEmbedded &&
                       !isCheckingLatticeReadiness &&
                       !isRecordInsightEmbedding && (
@@ -1588,7 +1601,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
-                        onClick={handleTriggerLatticeExtraction}
+                        onClick={onClickTriggerExtraction}
                         disabled={
                           isTriggeringLatticeExtraction ||
                           isCheckingLatticeReadiness ||
@@ -1613,13 +1626,49 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
                         )}
                       </button>
                       <Link
-                        href={`/lattice/decisions?projectId=${projectId}&organizationId=${organization.organizationId}`}
+                        href={`/lattice/decisions`}
                         className="btn btn-ghost btn-sm"
                       >
                         {t.translations.LATTICE_VIEW_EXTRACTIONS}
                         <ArrowTopRightOnSquareIcon className="size-4" />
                       </Link>
                     </div>
+
+                    {showConfirmDialog && (
+                      <div
+                        className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-10 z-50"
+                        style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}
+                      >
+                        <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-lg">
+                          <h3 className="text-lg font-semibold mb-4">
+                            {t.translations.CONFIRM_EXTRACTION}
+                          </h3>
+                          <p className="mb-6">
+                            {t.translations.CONFIRM_OVERWRITE_PREVIOUS_EXTRACTION}
+                          </p>
+                          <div className="flex justify-end gap-3">
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={async () => {
+                                setShowConfirmDialog(false);
+                                await handleTriggerLatticeExtraction();
+                              }}
+                            >
+                              {t.translations.YES}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => setShowConfirmDialog(false)}
+                            >
+                              {t.translations.NO}
+                            </button>
+
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

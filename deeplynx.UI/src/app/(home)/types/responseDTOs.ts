@@ -57,6 +57,7 @@ export type GroupResponseDto = {
 
 export interface HistoricalRecordResponseDto {
   id: number;
+  recordId?: number;
   uri?: string | null;
   properties?: string | null;
   originalId?: string | null;
@@ -92,6 +93,7 @@ export type RecordResponseDto = {
   dataSourceId?: number | null;
   dataSourceName?: string | null;
   projectId?: number | null;
+  extractionId?: number | null;
   lastUpdatedAt?: string;
   lastUpdatedBy?: string | null;
   isArchived?: boolean;

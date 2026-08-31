@@ -11,6 +11,7 @@ public class HistoricalRecordResponseDto
     public long? ClassId { get; set; }
     public string? ClassName { get; set; }
     public long DataSourceId { get; set; }
+    public long? RecordId { get; set; }
     public string DataSourceName { get; set; }
     public long? ObjectStorageId { get; set; }
     public string? ObjectStorageName { get; set; }
