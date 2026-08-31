@@ -59,7 +59,7 @@ public class RecordController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> GetAllRecords(
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDtoV2>>> GetAllRecords(
         long organizationId,
         long projectId,
         [FromQuery] long? dataSourceId = null,
@@ -85,7 +85,7 @@ public class RecordController : ControllerBase
             isOrgAdmin,
             isProjectAdmin,
             isInsightEligible);
-        return Ok(records);
+        return Ok(ToV2Page(records));
     }
     
     
@@ -118,7 +118,43 @@ public class RecordController : ControllerBase
         var records =
             await _recordBusiness.SearchPaginated(currentUserId, organizationId, projectId, search, paginated,
                 isSysAdmin, isOrgAdmin, isProjectAdmin);
-        return Ok(records);
+        return Ok(ToV2Page(records));
+    }
+
+    /// <summary>
+    ///     Full text records search
+    /// </summary>
+    /// <remarks>
+    ///     Embedding must be one of: any, embedded, pending
+    /// </remarks>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the records belongs</param>
+    /// <param name="search">Search parameters</param>
+    /// <returns>List of record response dtos from the query view that match provided query parameters</returns>
+    [HttpGet("search", Name = "api_record_search")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<List<RecordResponseDto>>> Search(
+        long organizationId,
+        long projectId,
+        [FromQuery] RecordSearchRequestDto search)
+    {
+        try
+        {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records =
+                await _recordBusiness.Search(currentUserId, organizationId, projectId, search,
+                    isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while searching records: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
     }
 
 
@@ -137,7 +173,7 @@ public class RecordController : ControllerBase
     [Auth("read", "record")]
     [Auth("read", "tag")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetRecordsByTags(
+    public async Task<ActionResult<IEnumerable<RecordResponseDtoV2>>> GetRecordsByTags(
         long organizationId,
         long projectId,
         [FromQuery] long[] tagIds,
@@ -150,7 +186,7 @@ public class RecordController : ControllerBase
             var isOrgAdmin = UserContextStorage.IsOrgAdmin;
             var isProjectAdmin = UserContextStorage.IsProjectAdmin;
             var records = await _recordBusiness.GetRecordsByTagsPaginated(currentUserId, organizationId, projectId, tagIds, hideArchived, paginatedRequestDto, isSysAdmin, isOrgAdmin, isProjectAdmin);
-            return Ok(records);
+            return Ok(ToV2Page(records));
     }
 
 
@@ -168,7 +204,7 @@ public class RecordController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<IEnumerable<RecordResponseDto>>> GetRecordsByOriginalId(
+    public async Task<ActionResult<IEnumerable<RecordResponseDtoV2>>> GetRecordsByOriginalId(
         long organizationId,
         long projectId,
         [FromQuery] long dataSourceId,
@@ -181,7 +217,7 @@ public class RecordController : ControllerBase
         var isProjectAdmin = UserContextStorage.IsProjectAdmin;
         var records = await _recordBusiness.GetRecordsByOriginalId(
             currentUserId, organizationId, projectId, dataSourceId, originalIds, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
-        return Ok(records);
+        return Ok(records.Select(r => r.ToV2()).ToList());
     }
 
 
@@ -198,7 +234,7 @@ public class RecordController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
     [Sensitivity("read record")]
-    public async Task<ActionResult<RecordResponseDto>> GetRecord(
+    public async Task<ActionResult<RecordResponseDtoV2>> GetRecord(
         long organizationId,
         long projectId,
         long recordId,
@@ -219,7 +255,7 @@ public class RecordController : ControllerBase
             isOrgAdmin,
             isProjectAdmin);
 
-        return Ok(record);
+        return Ok(record.ToV2());
     }
 
 
@@ -263,7 +299,7 @@ public class RecordController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "record")]
     [Sensitivity("write record")]
-    public async Task<ActionResult<RecordResponseDto>> CreateRecord(
+    public async Task<ActionResult<RecordResponseDtoV2>> CreateRecord(
         long organizationId,
         long projectId,
         [FromQuery] long dataSourceId,
@@ -285,7 +321,7 @@ public class RecordController : ControllerBase
             isSysAdmin,
             isOrgAdmin,
             isProjectAdmin);
-        return Ok(record);
+        return Ok(record.ToV2());
     }
 
 
@@ -303,7 +339,7 @@ public class RecordController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "record")]
     [Sensitivity("write record")]
-    public async Task<ActionResult<List<RecordResponseDto>>> BulkCreateRecords(
+    public async Task<ActionResult<List<RecordResponseDtoV2>>> BulkCreateRecords(
         long organizationId,
         long projectId,
         [FromQuery] long dataSourceId,
@@ -325,7 +361,7 @@ public class RecordController : ControllerBase
             isSysAdmin,
             isOrgAdmin,
             isProjectAdmin);
-        return Ok(newRecords);
+        return Ok(newRecords.Select(r => r.ToV2()).ToList());
     }
 
 
@@ -342,7 +378,7 @@ public class RecordController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "record")]
     [Sensitivity("update record")]
-    public async Task<ActionResult<RecordResponseDto>> UpdateRecord(
+    public async Task<ActionResult<RecordResponseDtoV2>> UpdateRecord(
         long organizationId,
         long projectId,
         long recordId,
@@ -355,7 +391,7 @@ public class RecordController : ControllerBase
         var updated = await _recordBusiness.UpdateRecord(currentUserId, organizationId, projectId, recordId, dto, isSysAdmin,
             isOrgAdmin,
             isProjectAdmin);
-        return Ok(updated);
+        return Ok(updated.ToV2());
     }
 
 
@@ -645,5 +681,17 @@ public class RecordController : ControllerBase
         var edges = await _graphBusiness.GetGraphDataForRecord(
             organizationId, projectId, recordId, UserContextStorage.UserId, depth, isAdmin);
         return Ok(edges);
+    }
+
+    // Maps a page of V1 records to V2, page metadata unchanged.
+    private static PaginatedResponse<RecordResponseDtoV2> ToV2Page(PaginatedResponse<RecordResponseDto> page)
+    {
+        return new PaginatedResponse<RecordResponseDtoV2>
+        {
+            Items = page.Items?.Select(r => r.ToV2()).ToList() ?? new List<RecordResponseDtoV2>(),
+            PageNumber = page.PageNumber,
+            PageSize = page.PageSize,
+            TotalCount = page.TotalCount
+        };
     }
 }

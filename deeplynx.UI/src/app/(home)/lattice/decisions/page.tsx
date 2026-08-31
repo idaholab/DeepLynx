@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ArrowRightIcon,
+  ArrowTopRightOnSquareIcon,
   CheckCircleIcon,
   ChevronDownIcon,
   ChevronUpIcon,
@@ -16,7 +17,8 @@ import {
   getExtractionStaging,
   listExtractions,
   promoteExtraction,
-  rejectExtraction
+  rejectExtraction,
+  triggerLatticeExtraction
 } from "@/app/lib/client_service/lattice_services.client";
 import {
   ExtractionListItemDTO,
@@ -33,6 +35,7 @@ import { isInsightHidden } from "@/app/lib/feature_flags";
 import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 import PaginationControls from "../../components/PaginationControls";
 import { getRecord } from "@/app/lib/client_service/record_services.client";
+import { TriggerLatticeExtractionMode } from "../../types/requestDTOs";
 
 type DetailTab = "records" | "classes" | "edges" | "relationships";
 
@@ -81,17 +84,19 @@ function parseAttributes(raw: string | null): Record<string, unknown> | null {
 function parseNestedRows(
   obj: Record<string, unknown>,
 ): { label: string; value: React.ReactNode }[] {
-  return Object.entries(obj).map(([key, value]) => {
-    const label = key
-      .split("_")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-    return {
-      label,
-      value:
-        typeof value === "object" ? JSON.stringify(value) : String(value ?? ""),
-    };
-  });
+  return Object.entries(obj)
+    .filter(([key]) => key.toLowerCase() !== "tags")
+    .map(([key, value]) => {
+      const label = key
+        .split("_")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+      return {
+        label,
+        value:
+          typeof value === "object" ? JSON.stringify(value) : String(value ?? ""),
+      };
+    });
 }
 
 function DecisionButtons({
@@ -150,6 +155,8 @@ function RecordCard({ record, isApproved, isRejected, onToggle, locked }:
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-lg font-semibold break-words">{record.name}</p>
 
+              <span className="badge badge-outline">{t.translations.ID_LABEL}{record.id}</span>
+
               {record.class_name && (
                 <span className="badge badge-outline">{record.class_name}</span>
               )}
@@ -194,6 +201,21 @@ function RecordCard({ record, isApproved, isRejected, onToggle, locked }:
             title={t.translations.LATTICE_PROPERTIES_TITLE}
             rows={parseNestedRows(attrs)}
           />
+          {attrs.tags !== undefined && Array.isArray(attrs.tags) && (
+            <div className="border-t border-base-300 px-4 py-5 mt-4">
+              <h3 className="text-lg font-bold">{t.translations.TAGS}</h3>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {attrs.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
     </section>
@@ -215,6 +237,8 @@ function ClassCard({ cls, isApproved, isRejected, onToggle, locked }:
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold break-words">{cls.name}</p>
 
+            <span className="badge badge-outline">{t.translations.ID_LABEL}{cls.id}</span>
+
             {cls.validation_status && (
               <span className={`badge ${validationBadgeClass(cls.validation_status)}`}>
                 {cls.validation_status}
@@ -232,7 +256,7 @@ function ClassCard({ cls, isApproved, isRejected, onToggle, locked }:
         <div className="flex justify-end sm:ml-4 shrink-0">
           {cls.ontology_class_id ? (
             <span className="badge badge-info badge-outline">
-              Already in project
+              {t.translations.LATTICE_ALREADY_IN_PROJECT}
             </span>
           ) : (
             <DecisionButtons
@@ -266,6 +290,8 @@ function EdgeCard({ edge, isApproved,
               {edge.origin_record_name ?? "?"} → {edge.relationship_name ?? "?"} →{" "}
               {edge.destination_record_name ?? "?"}
             </p>
+
+            <span className="badge badge-outline">{t.translations.ID_LABEL}{edge.id}</span>
 
             {edge.validation_status && (
               <span className={`badge ${validationBadgeClass(edge.validation_status)}`}>
@@ -314,6 +340,8 @@ function RelationshipCard({ rel, isApproved,
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold break-words">{rel.name}</p>
 
+            <span className="badge badge-outline">{t.translations.ID_LABEL}{rel.id}</span>
+
             {rel.validation_status && (
               <span className={`badge ${validationBadgeClass(rel.validation_status)}`}>
                 {rel.validation_status}
@@ -355,7 +383,7 @@ function RelationshipCard({ rel, isApproved,
         <div className="flex justify-end sm:ml-4 shrink-0">
           {rel.ontology_relationship_id ? (
             <span className="badge badge-info badge-outline">
-              Already in project
+              {t.translations.LATTICE_ALREADY_IN_PROJECT}
             </span>
           ) : (
             <DecisionButtons
@@ -386,6 +414,7 @@ function ExtractionDetailPanel({
   const [staging, setStaging] = useState<ExtractionStagingResponseDTO | null>(
     null,
   );
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState(false);
@@ -401,52 +430,100 @@ function ExtractionDetailPanel({
     records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set(),
   });
 
-  const approveByStatus = (status: string) => {
-    setApproved((prev) => ({
-      records: new Set([
-        ...prev.records,
-        ...visibleRecords
-          .filter((record) => record.validation_status === status)
-          .map((record) => record.id),
-      ]),
-      classes: new Set([
-        ...prev.classes,
-        ...visibleClasses
-          .filter((cls) => !cls.ontology_class_id && cls.validation_status === status)
-          .map((cls) => cls.id),
-      ]),
-      edges: new Set([
-        ...prev.edges,
-        ...visibleEdges
-          .filter((edge) => edge.validation_status === status)
-          .map((edge) => edge.id),
-      ]),
-      relationships: new Set([
-        ...prev.relationships,
-        ...visibleRelationships
-          .filter(
-            (rel) =>
-              !rel.ontology_relationship_id &&
-              rel.validation_status === status
-          )
-          .map((rel) => rel.id),
-      ]),
-    }));
+  const toggleApproveByStatus = (status: string) => {
+    const statuses = status === "valid_novel_invalid" ? ["valid", "novel_discovery", "invalid_schema"] : [status];
 
-    setRejected((prev) => ({
-      records: new Set([...prev.records].filter(
-        (id) => !visibleRecords.some((record) => record.id === id && record.validation_status === status),
-      )),
-      classes: new Set([...prev.classes].filter(
-        (id) => !visibleClasses.some((cls) => cls.id === id && cls.validation_status === status),
-      )),
-      edges: new Set([...prev.edges].filter(
-        (id) => !visibleEdges.some((edge) => edge.id === id && edge.validation_status === status),
-      )),
-      relationships: new Set([...prev.relationships].filter(
-        (id) => !visibleRelationships.some((rel) => rel.id === id && rel.validation_status === status),
-      )),
-    }));
+    const recordIds = visibleRecords
+      .filter((r) => statuses.includes(r.validation_status as string))
+      .map((r) => r.id);
+    const classIds = visibleClasses
+      .filter((c) => !c.ontology_class_id && statuses.includes(c.validation_status as string))
+      .map((c) => c.id);
+    const edgeIds = visibleEdges
+      .filter((e) => statuses.includes(e.validation_status as string))
+      .map((e) => e.id);
+    const relationshipIds = visibleRelationships
+      .filter((rel) => !rel.ontology_relationship_id && statuses.includes(rel.validation_status as string))
+      .map((rel) => rel.id);
+
+    const allApproved =
+      recordIds.every((id) => approved.records.has(id)) &&
+      classIds.every((id) => approved.classes.has(id)) &&
+      edgeIds.every((id) => approved.edges.has(id)) &&
+      relationshipIds.every((id) => approved.relationships.has(id));
+
+    if (allApproved) {
+      setApproved((prev) => ({
+        records: new Set([...prev.records].filter((id) => !recordIds.includes(id))),
+        classes: new Set([...prev.classes].filter((id) => !classIds.includes(id))),
+        edges: new Set([...prev.edges].filter((id) => !edgeIds.includes(id))),
+        relationships: new Set([...prev.relationships].filter((id) => !relationshipIds.includes(id))),
+      }));
+
+    } else {
+      setApproved((prev) => ({
+        records: new Set([...prev.records, ...recordIds]),
+        classes: new Set([...prev.classes, ...classIds]),
+        edges: new Set([...prev.edges, ...edgeIds]),
+        relationships: new Set([...prev.relationships, ...relationshipIds]),
+      }));
+
+      setRejected((prev) => ({
+        records: new Set([...prev.records].filter((id) => !recordIds.includes(id))),
+        classes: new Set([...prev.classes].filter((id) => !classIds.includes(id))),
+        edges: new Set([...prev.edges].filter((id) => !edgeIds.includes(id))),
+        relationships: new Set([...prev.relationships].filter((id) => !relationshipIds.includes(id))),
+      }));
+    }
+
+  };
+
+  const isAllApproved = (status: string): boolean => {
+    const statuses = status === "valid_novel_invalid" ? ["valid", "novel_discovery", "invalid_schema"] : [status];
+
+    const recordIds = visibleRecords
+      .filter(r => statuses.includes(r.validation_status as string))
+      .map(r => r.id);
+    const classIds = visibleClasses
+      .filter(c => !c.ontology_class_id && statuses.includes(c.validation_status as string))
+      .map(c => c.id);
+    const edgeIds = visibleEdges
+      .filter(e => statuses.includes(e.validation_status as string))
+      .map(e => e.id);
+    const relationshipIds = visibleRelationships
+      .filter(rel => !rel.ontology_relationship_id && statuses.includes(rel.validation_status as string))
+      .map(rel => rel.id);
+
+
+    const nonEmptyCategories = [recordIds, classIds, edgeIds, relationshipIds].filter(arr => arr.length > 0).length;
+
+    if (nonEmptyCategories === 0) {
+      return false;
+    }
+
+    const allRecordsApproved = recordIds.length === 0 || recordIds.every(id => {
+      const has = approved.records.has(id);
+      return has;
+    });
+
+    const allClassesApproved = classIds.length === 0 || classIds.every(id => {
+      const has = approved.classes.has(id);
+      return has;
+    });
+
+    const allEdgesApproved = edgeIds.length === 0 || edgeIds.every(id => {
+      const has = approved.edges.has(id);
+      return has;
+    });
+
+    const allRelationshipsApproved = relationshipIds.length === 0 || relationshipIds.every(id => {
+      const has = approved.relationships.has(id);
+      return has;
+    });
+
+    const result = allRecordsApproved && allClassesApproved && allEdgesApproved && allRelationshipsApproved;
+
+    return result;
   };
   const requestIdRef = useRef(0);
 
@@ -558,6 +635,57 @@ function ExtractionDetailPanel({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
+  }, [staging?.status, fetchStaging]);
+
+  const handleTriggerLatticeExtraction = useCallback(async (staging: ExtractionStagingResponseDTO) => {
+    try {
+
+      const extraction = await getExtractionStaging(organizationId, projectId, staging.id);
+
+      const record = await getRecord(organizationId, projectId, extraction.record_id as number, true);
+
+      const newExtractionId = await triggerLatticeExtraction(
+        organizationId as number,
+        projectId,
+        extraction.record_id as number,
+        {
+          data_source_id: record.dataSourceId as number,
+          mode: staging!.mode as TriggerLatticeExtractionMode,
+        },
+      );
+
+      if (newExtractionId) {
+        router.replace(`/lattice/decisions?extractionId=${newExtractionId}`);
+      } else {
+        router.replace(`/lattice/decisions?extractionId=${staging.id}`);
+      }
+
+      onStatusChange?.();
+    } catch (error: any) {
+      if (error?.response?.status === 400) {
+        toast(t.translations.LATTICE_EMBEDDINGS_GENERATING, { icon: "⏳" });
+      } else {
+        console.error("Error triggering Lattice extraction:", error);
+        toast.error(t.translations.LATTICE_FAILED_TO_START_ANALYSIS);
+      }
+    }
+  }, [
+    organizationId,
+    projectId,
+    onStatusChange,
+    t.translations,
+  ]);
+
+  useEffect(() => {
+    if (staging?.status === "failed") {
+      const timeoutId = window.setTimeout(() => {
+        fetchStaging();
+      }, 3000);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
+    }
   }, [staging?.status, fetchStaging]);
 
   const handleSave = async () => {
@@ -672,6 +800,7 @@ function ExtractionDetailPanel({
 
   const validCount = countByStatus("valid");
   const novelDiscoveryCount = countByStatus("novel_discovery");
+  const invalidSchemaCount = countByStatus("invalid_schema");
 
   const hasPendingDecisions = (
     ["records", "classes", "edges", "relationships"] as ItemType[]
@@ -715,36 +844,81 @@ function ExtractionDetailPanel({
         {/* Row 2: description on left, note on right */}
         <div className="flex flex-wrap items-start justify-between gap-2">
           <p className="text-sm text-base-content/70">
-            {isRunning
-              ? t.translations.LATTICE_EXTRACTION_RUNNING
-              : canDecide
-                ? t.translations.LATTICE_EXTRACTION_REVIEW
-                : staging.status === "failed"
-                  ? t.translations.LATTICE_EXTRACTION_FAILED_MSG
-                  : staging.status === "rejected"
-                    ? t.translations.LATTICE_EXTRACTION_REJECTED_MSG
-                    : `${t.translations.LATTICE_EXTRACTION_BEEN} ${statusLabel(staging.status, t.translations)}.`}
+            {isRunning ? (
+              <span>{t.translations.LATTICE_EXTRACTION_RUNNING}</span>
+            ) : canDecide ? (
+              <span>{t.translations.LATTICE_EXTRACTION_REVIEW}</span>
+            ) : staging.status === "failed" ? (
+              <>
+                <p className="text-sm text-red-600 font-bold">
+                  {t.translations.LATTICE_EXTRACTION_FAILED_MSG}
+                </p>
+                <div className="mt-4 p-3 bg-red-100 text-red-600 rounded-lg">
+                  <p className="font-bold">{t.translations.ERROR_DETAILS}</p>
+                  <p>{staging.failure_message}</p>
+                </div>
+                {/* Retry Extraction Button */}
+                {staging.record_id && (
+                  <button
+                    className="btn btn-error btn-sm mt-4"
+                    onClick={() => handleTriggerLatticeExtraction(staging)}
+                  >
+                    {t.translations.RETRY} {t.translations.LATTICE_EXTRACTION_NUMBER}{staging.id}
+                  </button>
+                )}
+              </>
+            ) : staging.status === "rejected" ? (
+              <span>{t.translations.LATTICE_EXTRACTION_REJECTED_MSG}</span>
+            ) : (
+              <>
+                <span>{t.translations.LATTICE_EXTRACTION_BEEN}</span>{" "}
+                <span>{statusLabel(staging.status, t.translations)}.</span>
+                <ArrowTopRightOnSquareIcon className="size-4" />
+              </>
+            )}
+
           </p>
           {canDecide && (
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="btn btn-outline btn-success btn-sm"
-                onClick={() => approveByStatus("valid")}
+                className={`btn btn-outline btn-success btn-sm ${isAllApproved("valid") ? "bg-green-500 text-white border-green-600" : ""}`}
+                onClick={() => toggleApproveByStatus("valid")}
                 disabled={isPromoting || validCount === 0}
               >
                 <CheckCircleIcon className="size-4" />
-                Approve valid ({validCount})
+                {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.VALID_LABEL} ({validCount})
               </button>
 
               <button
                 type="button"
-                className="btn btn-outline btn-warning btn-sm"
-                onClick={() => approveByStatus("novel_discovery")}
+                className={`btn btn-outline btn-warning btn-sm ${isAllApproved("novel_discovery") ? "bg-yellow-400 text-white border-yellow-500" : ""}`}
+                onClick={() => toggleApproveByStatus("novel_discovery")}
                 disabled={isPromoting || novelDiscoveryCount === 0}
               >
                 <CheckCircleIcon className="size-4" />
-                Approve novel discoveries ({novelDiscoveryCount})
+                {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.LATTICE_NOVEL_DISCOVERY_LABEL} ({novelDiscoveryCount})
+              </button>
+
+
+              <button
+                type="button"
+                className={`btn btn-outline btn-error btn-sm ${isAllApproved("invalid_schema") ? "bg-red-400 text-white border-red-400" : ""}`}
+                onClick={() => toggleApproveByStatus("invalid_schema")}
+                disabled={isPromoting || invalidSchemaCount === 0}
+              >
+                <CheckCircleIcon className="size-4" />
+                {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.LATTICE_INVALID_SCHEMA_ITEMS} ({invalidSchemaCount})
+              </button>
+
+              <button
+                type="button"
+                className={`btn btn-outline btn-primary btn-sm ${isAllApproved("valid_novel_invalid") ? "bg-blue-600 text-white border-blue-700" : ""}`}
+                onClick={() => toggleApproveByStatus("valid_novel_invalid")}
+                disabled={isPromoting || (validCount + novelDiscoveryCount + invalidSchemaCount === 0)}
+              >
+                <CheckCircleIcon className="size-4" />
+                {t.translations.LATTICE_APPROVE_ALL} ({validCount + novelDiscoveryCount + invalidSchemaCount})
               </button>
 
               <button
@@ -754,7 +928,7 @@ function ExtractionDetailPanel({
                 disabled={isPromoting || !hasPendingDecisions}
               >
                 {isPromoting ? <span className="loading loading-spinner loading-xs" /> : null}
-                Save
+                {t.translations.SAVE}
               </button>
             </div>
           )}
@@ -869,19 +1043,16 @@ function storageKey(projId: number) {
 
 export default function LatticeDecisionsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
   const { project } = useProjectSession();
+
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const [items, setItems] = useState<ExtractionListItemDTO[]>([]);
   const [isListLoading, setIsListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
-
-  const selectedId = searchParams.get("extractionId")
-    ? Number(searchParams.get("extractionId"))
-    : null;
 
   const orgId = organization?.organizationId as number | undefined;
   const projId = project?.projectId as number | undefined;
@@ -893,6 +1064,15 @@ export default function LatticeDecisionsPage() {
       .then((response) => {
         if (response?.items) {
           setItems(response.items);
+
+
+          const latestExtraction = response.items.reduce((prev, current) =>
+            current.id > prev.id ? current : prev,
+            response.items[0]);
+
+          if (latestExtraction && !selectedId) {
+            router.replace(`/lattice/decisions?extractionId=${latestExtraction.id}`, { scroll: false });
+          }
         } else {
           setItems([]);
         }
@@ -900,7 +1080,7 @@ export default function LatticeDecisionsPage() {
       .catch(() =>
         setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS),
       );
-  }, [orgId, projId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS]);
+  }, [orgId, projId, selectedId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS, router]);
 
   useEffect(() => {
     if (insightHidden) {
@@ -937,18 +1117,15 @@ export default function LatticeDecisionsPage() {
 
   // Restore last selected extraction when arriving without a query param
   useEffect(() => {
-    if (insightHidden) return;
-    if (!projId || selectedId) return;
-    const saved = localStorage.getItem(storageKey(projId));
-    if (saved) router.replace(`/lattice/decisions?extractionId=${saved}`);
-  }, [insightHidden, projId, selectedId, router]);
-
-  const [pendingId, setPendingId] = useState<number | null>(null);
+    if (!selectedId && projId) {
+      const saved = localStorage.getItem(storageKey(projId));
+      if (saved) setSelectedId(Number(saved));
+    }
+  }, [projId, selectedId]);
 
   const handleSelect = (id: number) => {
-    setPendingId(id);
+    setSelectedId(id);
     if (projId) localStorage.setItem(storageKey(projId), String(id));
-    router.replace(`/lattice/decisions?extractionId=${id}`);
   };
 
   if (insightHidden) {
@@ -987,7 +1164,6 @@ export default function LatticeDecisionsPage() {
         (entry): entry is readonly [number, string] => entry !== null
       );
       if (!cancelled) {
-        console.log(validEntries);
         setNames(Object.fromEntries(validEntries));
       }
     }
@@ -1031,7 +1207,7 @@ export default function LatticeDecisionsPage() {
       </section>
 
       <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
-        <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[410px_1fr]">
           {/* Left: extraction list */}
           <aside className="rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden self-start">
             <div className="border-b border-base-300 px-4 py-3">
