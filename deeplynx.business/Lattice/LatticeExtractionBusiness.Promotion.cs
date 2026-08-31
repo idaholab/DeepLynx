@@ -202,58 +202,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             var errors = new List<string>();
 
-            foreach (var edgeId in selectedEdgeIds)
-            {
-                if (!edgeById.TryGetValue(edgeId, out var edge)) continue;
-
-                if (edge.OriginRecordId == edge.DestinationRecordId)
-                {
-                    edge.PromotedId = -1;
-                    continue;
-                }
-
-                var originRecord = recordById.TryGetValue(edge.OriginRecordId, out var oRec) ? oRec : null;
-                var destRecord = recordById.TryGetValue(edge.DestinationRecordId, out var dRec) ? dRec : null;
-                var relationship = relById.TryGetValue(edge.ExtractionRelationshipId, out var rel) ? rel : null;
-
-                var originPromotedId = originRecord?.PromotedId;
-                var destPromotedId = destRecord?.PromotedId;
-                var relPromotedId = relationship?.PromotedId;
-                var relOntologyRelationshipId = relationship?.OntologyRelationshipId;
-
-                if (originPromotedId == null || destPromotedId == null || (relPromotedId == null && relOntologyRelationshipId == null))
-                    continue;
-
-                var query = _context.Edges.Where(e =>
-                    e.ProjectId == edge.ProjectId &&
-                    e.OriginId == originPromotedId.Value &&
-                    e.DestinationId == destPromotedId.Value);
-
-                if (relPromotedId.HasValue && relOntologyRelationshipId.HasValue)
-                {
-                    query = query.Where(e => e.RelationshipId == relPromotedId.Value || e.RelationshipId == relOntologyRelationshipId.Value);
-                }
-                else if (relPromotedId.HasValue)
-                {
-                    query = query.Where(e => e.RelationshipId == relPromotedId.Value);
-                }
-                else if (relOntologyRelationshipId.HasValue)
-                {
-                    query = query.Where(e => e.RelationshipId == relOntologyRelationshipId.Value);
-                }
-                else
-                {
-                    continue;
-                }
-
-                var existingEdge = await query.FirstOrDefaultAsync();
-
-
-                if (existingEdge != null)
-                {
-                    edge.PromotedId = existingEdge.Id;
-                }
-            }
+            await ValidateEdgesAsync(stagingEdges, recordById, relById, selectedEdgeIds, errors);
 
             foreach (var id in selectedRecordIds)
                 if (recordById.TryGetValue(id, out var r) && !ClassSatisfied(r.ExtractionClassId))
@@ -316,21 +265,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             var existingRecordIds = existingRecords.Select(r => r.Id).ToHashSet();
 
-            var missingRecordIds = promotedRecordIds.Except(existingRecordIds).ToList();
-
-            var missingSelectedRecordIds = missingRecordIds
-                .Where(id => selectedRecordIds.Contains(stagingRecords.FirstOrDefault(sr => sr.PromotedId == id)?.Id ?? 0))
-                .ToList();
-
-            if (missingSelectedRecordIds.Count != 0)
-            {
-                var missingDetails = missingSelectedRecordIds.Select(id =>
-                {
-                    var rec = existingRecords.FirstOrDefault(r => r.Id == id);
-                    return rec != null ? $"'{rec.Name}' (id {id})" : $"(id {id})";
-                });
-                errors.Add($"Missing promoted records in database: {string.Join(", ", missingDetails)}");
-            }
+            ValidateMissingRecords(promotedRecordIds, existingRecordIds, selectedRecordIds, stagingRecords, errors);
 
             var promotedRecordIdsUsedByEdges = stagingEdges
                 .Where(e => selectedEdgeIds.Contains(e.Id))
@@ -386,32 +321,14 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             var existingRelationshipIds = existingRelationships.Select(r => r.Id).ToHashSet();
 
-            var missingRelationshipIds = promotedRelIdsUsedByEdges.Except(existingRelationshipIds).ToList();
-
-            if (missingRelationshipIds.Count != 0)
-            {
-                foreach (var missingRelId in missingRelationshipIds)
-                {
-                    var missingRel = existingRelationships.FirstOrDefault(r => r.Id == missingRelId);
-                    var stagedRel = stagingRelationships.FirstOrDefault(r => r.PromotedId == missingRelId);
-                    var missingRelName = stagedRel?.Name ?? "(unknown)";
-                    var stagedRelId = stagedRel?.Id ?? 0;
-
-                    var referencingEdges = stagingEdges
-                        .Where(e => selectedEdgeIds.Contains(e.Id) && e.ExtractionRelationshipId == stagedRelId)
-                        .ToList();
-
-                    foreach (var edge in referencingEdges)
-                    {
-                        var originName = recordById.TryGetValue(edge.OriginRecordId, out var oRec) ? oRec?.Name : "(unknown)";
-                        var destName = recordById.TryGetValue(edge.DestinationRecordId, out var dRec) ? dRec?.Name : "(unknown)";
-                        var relName = relById.TryGetValue(edge.ExtractionRelationshipId, out var rel) ? rel?.Name : "(unknown)";
-
-                        errors.Add(
-                            $"Edge (id {edge.Id}) references relationship '{missingRelName}' (id {missingRelId}) that is not in the database.");
-                    }
-                }
-            }
+            ValidateMissingRelationships(
+             promotedRecordIdsUsedByEdges,
+             existingRelationshipIds,
+             stagingRelationships,
+             stagingEdges,
+             selectedEdgeIds,
+             recordById,
+             errors);
 
             if (errors.Count > 0)
                 throw new InvalidOperationException(
@@ -426,6 +343,130 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         {
             _logger.LogError(ex, "Unexpected error during dependency validation.");
             throw new InvalidOperationException("An unexpected error occurred during dependency validation.", ex);
+        }
+    }
+
+    private static void ValidateMissingRelationships(
+        HashSet<long> promotedRelIdsUsedByEdges,
+        HashSet<long> existingRelationshipIds,
+        List<ExtractionRelationship> stagingRelationships,
+        List<ExtractionEdge> stagingEdges,
+        HashSet<long> selectedEdgeIds,
+        Dictionary<long, ExtractionRecord> recordById,
+        List<string> errors)
+    {
+        var missingRelationshipIds = promotedRelIdsUsedByEdges.Except(existingRelationshipIds).ToList();
+
+        if (missingRelationshipIds.Count > 0)
+        {
+            foreach (var missingRelId in missingRelationshipIds)
+            {
+                var stagedRel = stagingRelationships.FirstOrDefault(r => r.PromotedId == missingRelId);
+                var stagedRelId = stagedRel?.Id ?? 0;
+
+                var referencingEdges = stagingEdges
+                    .Where(e => selectedEdgeIds.Contains(e.Id) && e.ExtractionRelationshipId == stagedRelId)
+                    .ToList();
+
+                foreach (var edge in referencingEdges)
+                {
+                    var originName = recordById.TryGetValue(edge.OriginRecordId, out var oRec) ? oRec?.Name : "(unknown)";
+                    var destName = recordById.TryGetValue(edge.DestinationRecordId, out var dRec) ? dRec?.Name : "(unknown)";
+
+                    errors.Add(
+                        $"Edge (id {edge.Id}) references relationship '{stagedRel?.Name ?? "(unknown)"}' (id {missingRelId}) that is not in the database.");
+                }
+            }
+        }
+    }
+
+    private static void ValidateMissingRecords(
+        HashSet<long> promotedRecordIds,
+        HashSet<long> existingRecordIds,
+        HashSet<long> selectedRecordIds,
+        List<ExtractionRecord> stagingRecords,
+        List<string> errors)
+    {
+        var missingRecordIds = promotedRecordIds.Except(existingRecordIds).ToList();
+
+        var missingSelectedRecordIds = missingRecordIds
+            .Where(id => selectedRecordIds.Contains(stagingRecords.FirstOrDefault(sr => sr.PromotedId == id)?.Id ?? 0))
+            .ToList();
+
+        if (missingSelectedRecordIds.Count > 0)
+        {
+            var missingDetails = missingSelectedRecordIds.Select(id =>
+            {
+                var rec = stagingRecords.FirstOrDefault(r => r.PromotedId == id);
+                return rec != null ? $"'{rec.Name}' (id {id})" : $"(id {id})";
+            });
+
+            errors.Add($"Missing promoted records in database: {string.Join(", ", missingDetails)}");
+        }
+    }
+
+    private async Task ValidateEdgesAsync(
+        List<ExtractionEdge> stagingEdges,
+        Dictionary<long, ExtractionRecord> recordById,
+        Dictionary<long, ExtractionRelationship> relById,
+        HashSet<long> selectedEdgeIds,
+        List<string> errors)
+    {
+        var edgeById = stagingEdges.ToDictionary(e => e.Id);
+
+        foreach (var edgeId in selectedEdgeIds)
+        {
+            if (!edgeById.TryGetValue(edgeId, out var edge)) continue;
+
+            if (edge.OriginRecordId == edge.DestinationRecordId)
+            {
+                edge.PromotedId = -1;
+                continue;
+            }
+
+            var originRecord = recordById.TryGetValue(edge.OriginRecordId, out var oRec) ? oRec : null;
+            var destRecord = recordById.TryGetValue(edge.DestinationRecordId, out var dRec) ? dRec : null;
+            var relationship = relById.TryGetValue(edge.ExtractionRelationshipId, out var rel) ? rel : null;
+
+            var originPromotedId = originRecord?.PromotedId;
+            var destPromotedId = destRecord?.PromotedId;
+            var relPromotedId = relationship?.PromotedId;
+            var relOntologyRelationshipId = relationship?.OntologyRelationshipId;
+
+            if (originPromotedId == null || destPromotedId == null ||
+                (relPromotedId == null && relOntologyRelationshipId == null))
+                continue;
+
+            var query = _context.Edges.Where(e =>
+                e.ProjectId == edge.ProjectId &&
+                e.OriginId == originPromotedId.Value &&
+                e.DestinationId == destPromotedId.Value);
+
+            if (relPromotedId.HasValue && relOntologyRelationshipId.HasValue)
+            {
+                query = query.Where(e =>
+                    e.RelationshipId == relPromotedId.Value ||
+                    e.RelationshipId == relOntologyRelationshipId.Value);
+            }
+            else if (relPromotedId.HasValue)
+            {
+                query = query.Where(e => e.RelationshipId == relPromotedId.Value);
+            }
+            else if (relOntologyRelationshipId.HasValue)
+            {
+                query = query.Where(e => e.RelationshipId == relOntologyRelationshipId.Value);
+            }
+            else
+            {
+                continue;
+            }
+
+            var existingEdge = await query.FirstOrDefaultAsync();
+
+            if (existingEdge != null)
+            {
+                edge.PromotedId = existingEdge.Id;
+            }
         }
     }
 
