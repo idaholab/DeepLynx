@@ -1,13 +1,12 @@
 import type {
   ClassResponseDto,
   DataSourceResponseDto,
-  RecordResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { searchRecords } from "@/app/lib/client_service/record_services.client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ProjectInsightRecord,
@@ -19,176 +18,29 @@ import {
 } from "../components/projectInsight.view-utils";
 import { mapProjectInsightRecords } from "../components/projectInsight.utils";
 
-// ============================== NON-PAGINATED RECORD SEARCH ==============================
+// ============================== HYBRID RECORD SEARCH ==============================
+//
+// Browse mode (no search query): records are paginated server-side, one page per
+// request — mirrors a normal paginated table.
+//
+// Search mode (a submitted search query): the full matching set is fetched exactly
+// once per committed query/filter combo, then paginated on the frontend. Turning
+// pages while a search is active never re-hits the (potentially ~40s) search
+// endpoint — it only re-slices data already in memory.
 
 /**
- *
- * @param embedding The record Insight embedding status
- * @param classes Required record classes
- * @param sources Required
- * @returns
+ * @param initialPageSize Records per page in browse mode
+ * @param embedding The record Insight embedding status this tab shows
+ * @param classes Required record classes (used to resolve display names)
+ * @param sources Required record data sources (used to resolve display names)
  */
-export function useRecordSearch(
-  embedding: "embedded" | "pending",
-  classes: ClassResponseDto[] | null,
-  sources: DataSourceResponseDto[] | null,
-) {
-  const { t } = useLanguage();
-
-  const [total, setTotal] = useState(0);
-  const [found, setFound] = useState(0);
-
-  function reset() {
-    setTotal(0);
-  }
-
-  const fetchRecords = useCallback(
-    async (
-      organizationId: number,
-      projectId: number,
-      filters: TabFilterState,
-      embedding: "embedded" | "pending",
-      cancel: () => boolean,
-    ) => {
-      const recordDtos = await searchRecords(organizationId, projectId, {
-        userQuery: filters.searchQuery,
-        tagIds: filters.tagIds,
-        classIds: filters.classIds,
-        embedding,
-        isInsightEligible: true,
-        hideArchived: true,
-      });
-      if (cancel()) return [];
-
-      // for first time loading. This is a hacky solution to find the total number of records with the initial empty filter search
-      setTotal((t) => Math.max(t, recordDtos.totalCount));
-      setFound(recordDtos.totalCount);
-
-      return recordDtos.items;
-    },
-    [t],
-  );
-
-  const search = useRecordSearchGeneric(
-    embedding,
-    classes,
-    sources,
-    fetchRecords,
-    reset,
-  );
-
-  return {
-    ...search,
-    total,
-    found,
-  };
-}
-
-// ============================== PAGINATED RECORD SEARCH ==============================
-
-export function useRecordSearchPaginated(
+export function useRecordSearchHybrid(
   initialPageSize: number,
   embedding: "embedded" | "pending",
   classes: ClassResponseDto[] | null,
   sources: DataSourceResponseDto[] | null,
 ) {
   const { t } = useLanguage();
-
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [found, setFound] = useState(0);
-  const [pageSize, setPageSize] = useState(initialPageSize);
-
-  const prePageSize = useRef(initialPageSize);
-  const preFilters = useRef(EMPTY_TAB_FILTER_STATE);
-
-  function reset() {
-    setFound(0);
-    setTotal(0);
-    setTotalPages(0);
-    setPage(1);
-  }
-
-  const fetchRecords = useCallback(
-    async (
-      organizationId: number,
-      projectId: number,
-      filters: TabFilterState,
-      embedding: "embedded" | "pending",
-      cancel: () => boolean,
-    ) => {
-      const recordDtos = await searchRecords(
-        organizationId,
-        projectId,
-        {
-          userQuery: filters.searchQuery,
-          tagIds: filters.tagIds,
-          classIds: filters.classIds,
-          embedding,
-          isInsightEligible: true,
-          hideArchived: true,
-        },
-        {
-          pageSize,
-          pageNumber: prePageSize.current !== pageSize ? 1 : page,
-        },
-      );
-      if (cancel()) return [];
-
-      // avoids trying to load a page out of bounds
-      if (prePageSize.current !== pageSize || preFilters.current !== filters)
-        setPage(1);
-      prePageSize.current = pageSize;
-      preFilters.current = filters;
-
-      setFound(recordDtos.totalCount);
-      // for first time loading. This is a hacky solution to find the total number of records with the initial empty filter search
-      setTotal((t) => Math.max(t, recordDtos.totalCount));
-      setTotalPages(recordDtos.totalPages);
-
-      return recordDtos.items;
-    },
-    [t, page, pageSize],
-  );
-
-  const search = useRecordSearchGeneric(
-    embedding,
-    classes,
-    sources,
-    fetchRecords,
-    reset,
-  );
-
-  return {
-    ...search,
-    page,
-    setPage,
-    pageSize,
-    setPageSize,
-    totalPages,
-    total,
-    found,
-  };
-}
-
-// ============================== GENERIC RECORD SEARCH ==============================
-
-function useRecordSearchGeneric(
-  embedding: "embedded" | "pending",
-  classes: ClassResponseDto[] | null,
-  sources: DataSourceResponseDto[] | null,
-  fetchRecords: (
-    organizationId: number,
-    projectId: number,
-    filters: TabFilterState,
-    embedding: "embedded" | "pending",
-    cancel: () => boolean,
-  ) => Promise<RecordResponseDto[]>,
-  resetState: () => void,
-) {
-  const { t } = useLanguage();
-
   const { project, hasLoaded: hasProjectLoaded } = useProjectSession();
   const { organization, hasLoaded: hasOrganizationLoaded } =
     useOrganizationSession();
@@ -200,94 +52,233 @@ function useRecordSearchGeneric(
       ? Number(organization.organizationId)
       : null;
 
-  const [filters, setFilters] = useState<TabFilterState>(
-    EMPTY_TAB_FILTER_STATE,
-  );
-  const [records, setRecords] = useState<ProjectInsightRecord[]>([]);
-  const [status, setStatus] = useState<Record<number, ProjectInsightStatus>>(
-    {},
-  );
+  const [filters, setFilters] = useState<TabFilterState>(EMPTY_TAB_FILTER_STATE);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
 
+  const isSearchMode = filters.searchQuery.trim().length > 0;
+
+  // Browse mode: exactly the current server page.
+  const [browseRecords, setBrowseRecords] = useState<ProjectInsightRecord[]>([]);
+  const [browseTotalPages, setBrowseTotalPages] = useState(0);
+  const [browseTotalCount, setBrowseTotalCount] = useState(0);
+
+  // Search mode: the full matching set. Paginated on the frontend (see the
+  // derivation below).
+  const [searchMatches, setSearchMatches] = useState<ProjectInsightRecord[]>([]);
+
+  const [status, setStatus] = useState<Record<number, ProjectInsightStatus>>({});
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [total, setTotal] = useState(0);
 
-  function reset() {
-    setRecords([]);
+  const prePageSize = useRef(initialPageSize);
+  const preFilters = useRef(EMPTY_TAB_FILTER_STATE);
+
+  const canLoad =
+    hasProjectLoaded &&
+    hasOrganizationLoaded &&
+    !!projectId &&
+    !!organizationId &&
+    !!classes &&
+    !!sources;
+
+  function resetAll() {
+    setBrowseRecords([]);
+    setBrowseTotalPages(0);
+    setBrowseTotalCount(0);
+    setSearchMatches([]);
     setStatus({});
     setError("");
-    resetState();
+    setTotal(0);
+    setPage(1);
   }
 
+  function applyStatusDefaults(records: ProjectInsightRecord[]) {
+    setStatus((previous) =>
+      updateStatusKeepQueuedOrProcessing(
+        previous,
+        records.map((record) => [
+          record.id,
+          { state: embedding === "embedded" ? "embedded" : "not_embedded" },
+        ]),
+      ),
+    );
+  }
+
+  // Effect A — browse mode: fetch one server page whenever filters, page, or
+  // pageSize change. No-ops while a search query is active.
   useEffect(() => {
-    let cancel = false;
+    if (isSearchMode) return;
 
-    async function loadRecordsPage() {
-      if (!hasProjectLoaded || !hasOrganizationLoaded) return;
-
-      if (!projectId || !organizationId || !classes || !sources) {
-        reset();
-        return;
-      }
-
-      setError("");
-
-      try {
-        const recordDtos = await fetchRecords(
-          organizationId,
-          projectId,
-          filters,
-          embedding,
-          () => cancel,
-        );
-        if (cancel) return;
-
-        // append records
-        const newRecords = mapProjectInsightRecords(
-          recordDtos,
-          classes,
-          sources,
-        );
-        setRecords(newRecords);
-
-        setStatus((previous) =>
-          updateStatusKeepQueuedOrProcessing(
-            previous,
-            newRecords.map((record) => [
-              record.id,
-              { state: embedding == "embedded" ? "embedded" : "not_embedded" },
-            ]),
-          ),
-        );
-      } catch (error) {
-        reset();
-        console.error("Failed to load project Insight records:", error);
-        toast.error(t.translations.PROJECT_INSIGHT_LOADING_RECORDS);
-        setError(t.translations.FAILED_TO_SEARCH_RECORDS);
-      }
+    if (!canLoad) {
+      resetAll();
+      return;
     }
 
-    loadRecordsPage();
+    // A new filter/class/tag combo (as opposed to just turning pages) lands
+    // back on page 1 — and must not double-fetch once setPage(1) re-triggers
+    // this same effect.
+    const filtersChanged = preFilters.current !== filters;
+    const pageSizeChanged = prePageSize.current !== pageSize;
+    const targetPage = filtersChanged || pageSizeChanged ? 1 : page;
+
+    preFilters.current = filters;
+    prePageSize.current = pageSize;
+
+    if (targetPage !== page) {
+      setPage(targetPage);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+    setError("");
+
+    (async () => {
+      try {
+        const response = await searchRecords(
+          organizationId!,
+          projectId!,
+          {
+            userQuery: filters.searchQuery,
+            tagIds: filters.tagIds,
+            classIds: filters.classIds,
+            embedding,
+            isInsightEligible: true,
+            hideArchived: true,
+          },
+          { pageSize, pageNumber: page },
+        );
+        if (cancelled) return;
+
+        const mapped = mapProjectInsightRecords(response.items, classes!, sources!);
+        setBrowseRecords(mapped);
+        setBrowseTotalPages(response.totalPages);
+        setBrowseTotalCount(response.totalCount);
+        setTotal((current) => Math.max(current, response.totalCount));
+        applyStatusDefaults(mapped);
+      } catch (fetchError) {
+        if (cancelled) return;
+        console.error("Failed to load project Insight records:", fetchError);
+        toast.error(t.translations.PROJECT_INSIGHT_LOADING_RECORDS);
+        setError(t.translations.FAILED_TO_SEARCH_RECORDS);
+        setBrowseRecords([]);
+        setBrowseTotalPages(0);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
 
     return () => {
-      cancel = true;
+      cancelled = true;
     };
   }, [
-    t,
-    hasProjectLoaded,
-    hasOrganizationLoaded,
-    projectId,
-    organizationId,
+    isSearchMode,
+    canLoad,
+    filters,
+    page,
+    pageSize,
+    embedding,
     classes,
     sources,
-    filters,
-    fetchRecords,
+    organizationId,
+    projectId,
+    t,
   ]);
+
+  // Effect B — search mode: fetch the full matching set once per submitted
+  // query/filters combo. Deliberately excludes page/pageSize from its deps —
+  // turning pages must not trigger another fetch.
+  useEffect(() => {
+    if (!isSearchMode) return;
+
+    if (!canLoad) {
+      resetAll();
+      return;
+    }
+
+    setPage(1);
+
+    let cancelled = false;
+    setIsLoading(true);
+    setError("");
+
+    (async () => {
+      try {
+        const response = await searchRecords(organizationId!, projectId!, {
+          userQuery: filters.searchQuery,
+          tagIds: filters.tagIds,
+          classIds: filters.classIds,
+          embedding,
+          isInsightEligible: true,
+          hideArchived: true,
+        });
+        if (cancelled) return;
+
+        const mapped = mapProjectInsightRecords(response.items, classes!, sources!);
+        setSearchMatches(mapped);
+        setTotal((current) => Math.max(current, response.totalCount));
+        applyStatusDefaults(mapped);
+      } catch (fetchError) {
+        if (cancelled) return;
+        console.error("Failed to search project Insight records:", fetchError);
+        toast.error(t.translations.PROJECT_INSIGHT_LOADING_RECORDS);
+        setError(t.translations.FAILED_TO_SEARCH_RECORDS);
+        setSearchMatches([]);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSearchMode, canLoad, filters, embedding, classes, sources, organizationId, projectId, t]);
+
+  // Derive what's actually shown for the current page.
+  //
+  // Browse mode: `browseRecords` is already just the current page (server
+  // paginated), with `browseTotalPages` / `browseTotalCount` from the server.
+  // Search mode: `searchMatches` is the FULL matching set — nothing has been
+  // paginated yet, so `page`/`pageSize` need to be applied locally here.
+  const { records, totalPages, found } = useMemo(() => {
+    if (isSearchMode) {
+      const found = searchMatches.length;
+      const totalPages = Math.ceil(found / pageSize);
+
+      // `page` can be stale (e.g. left on page 3 of 10-per-page, then the
+      // page size grew and there's now only 1 page) — clamp so the slice
+      // below is always sane, mirroring how PaginationControls itself
+      // clamps `currentPage` for display via Math.max(1, totalPages).
+      const safePage = Math.min(Math.max(page, 1), Math.max(totalPages, 1));
+      const start = (safePage - 1) * pageSize;
+      const records = searchMatches.slice(start, start + pageSize);
+
+      return { records, totalPages, found };
+    }
+
+    return {
+      records: browseRecords,
+      totalPages: browseTotalPages,
+      found: browseTotalCount,
+    };
+  }, [isSearchMode, page, pageSize, searchMatches, browseRecords, browseTotalPages, browseTotalCount]);
 
   return {
     filters,
     setFilters,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalPages,
     records,
     status,
     error,
+    isLoading,
+    total,
+    found,
   };
 }
 
