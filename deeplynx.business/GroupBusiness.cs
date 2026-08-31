@@ -409,15 +409,7 @@ public class GroupBusiness : IGroupBusiness
 
         foreach (var projectId in affectedProjectIds)
         {
-            try
-            {
-                await CacheService.Instance.DeleteByPrefixAsync($"projectpermission:{userId}:{projectId}:");
-                await CacheService.Instance.DeleteByPrefixAsync($"projectpermittedids:{userId}:");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Cache overwrite for permissions failed for user {UserId}, project {ProjectId}", userId, projectId);
-            }
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(userId, projectId, _logger);
         }
 
         return true;

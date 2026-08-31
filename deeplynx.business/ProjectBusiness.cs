@@ -1498,15 +1498,7 @@ public class ProjectBusiness : IProjectBusiness
     {
         if (userId.HasValue)
         {
-            try
-            {
-                await CacheService.Instance.DeleteByPrefixAsync($"projectpermission:{userId}:{projectId}:");
-                await CacheService.Instance.DeleteByPrefixAsync($"projectpermittedids:{userId}:");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Cache overwrite for permissions failed for user {UserId}, project {ProjectId}", userId, projectId);
-            }
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(userId.Value, projectId, _logger);
         }
         else if (groupId.HasValue)
         {
@@ -1517,15 +1509,7 @@ public class ProjectBusiness : IProjectBusiness
 
             foreach (var memberId in memberUserIds)
             {
-                try
-                {
-                    await CacheService.Instance.DeleteByPrefixAsync($"projectpermission:{memberId}:{projectId}:");
-                    await CacheService.Instance.DeleteByPrefixAsync($"projectpermittedids:{memberId}:");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Cache overwrite for permissions failed for user {MemberId}, project {ProjectId}", memberId, projectId);
-                }
+                await PermissionCachingHelper.InvalidateProjectPermissionsCache(memberId, projectId, _logger);
             }
         }
     }

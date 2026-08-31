@@ -442,7 +442,7 @@ public class PermissionBusiness : IPermissionBusiness
         {
             if (member.UserId.HasValue)
             {
-                await InvalidateProjectPermissionsCache(member.UserId.Value, member.ProjectId);
+                await PermissionCachingHelper.InvalidateProjectPermissionsCache(member.UserId.Value, member.ProjectId, _logger);
             }
             else if (member.GroupId.HasValue)
             {
@@ -452,24 +452,8 @@ public class PermissionBusiness : IPermissionBusiness
                     .ToListAsync();
 
                 foreach (var uid in memberUserIds)
-                    await InvalidateProjectPermissionsCache(uid, member.ProjectId);
+                    await PermissionCachingHelper.InvalidateProjectPermissionsCache(uid, member.ProjectId, _logger);
             }
-        }
-    }
-
-    /// <summary>
-    ///     Invalidate the cached project permissions for a user.
-    /// </summary>
-    private async Task InvalidateProjectPermissionsCache(long userId, long projectId)
-    {
-        try
-        {
-            await CacheService.Instance.DeleteByPrefixAsync($"projectpermission:{userId}:{projectId}:");
-            await CacheService.Instance.DeleteByPrefixAsync($"projectpermittedids:{userId}:");
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "Cache overwrite for permissions failed for user {UserId}, project {ProjectId}", userId, projectId);
         }
     }
 }
