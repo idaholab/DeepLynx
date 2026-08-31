@@ -6,6 +6,7 @@ using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
 
@@ -19,6 +20,8 @@ public class DataSourceBusiness : IDataSourceBusiness
     private readonly IAdminService _adminService;
     private readonly IEventBusiness _eventBusiness;
     private readonly IRecordBusiness _recordBusiness;
+    private readonly ILogger<DataSourceBusiness>? _logger;
+    private static readonly TimeSpan DataSourceCacheTtl = TimeSpan.FromHours(1);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="DataSourceBusiness" /> class.
@@ -29,13 +32,15 @@ public class DataSourceBusiness : IDataSourceBusiness
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
     /// <param name="projectRolePermissionService">Used to get permissions allowed for a user</param>
     /// <param name="adminService">Used to check level the user is</param>
+    /// <param name="logger">Optional logger used for cache read/write/invalidation warnings.</param>
     public DataSourceBusiness(
         DeeplynxContext context,
         IEdgeBusiness edgeBusiness,
         IRecordBusiness recordBusiness,
         IEventBusiness eventBusiness,
         IProjectRolePermissionService projectRolePermissionService,
-        IAdminService adminService
+        IAdminService adminService,
+        ILogger<DataSourceBusiness>? logger = null
     )
     {
         _context = context;
@@ -44,6 +49,7 @@ public class DataSourceBusiness : IDataSourceBusiness
         _eventBusiness = eventBusiness;
         _projectRolePermissionService = projectRolePermissionService;
         _adminService = adminService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -201,41 +207,91 @@ public class DataSourceBusiness : IDataSourceBusiness
     /// <param name="organizationId">The ID of the organization for which the data source belongs to</param>
     /// <param name="projectId">The ID of the project to which the data source belongs</param>
     /// <returns>The data source in question</returns>
-    /// <exception cref="KeyNotFoundException">Returned if the data source is not found or is archived</exception>
+    /// <exception cref="KeyNotFoundException">Returned if the default data source is not found or is archived</exception>
     public async Task<DataSourceResponseDto> GetDefaultDataSource(long organizationId, long? projectId)
     {
-        var dsQuery = _context.DataSources
-            .Where(d => d.OrganizationId == organizationId && d.Default == true && !d.IsArchived);
+        long? defaultDataSourceId = null;
 
-        // If project id supplied, inherit org level data sources too
-        if (projectId.HasValue)
-            dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+        string cacheKey = projectId.HasValue
+            ? CacheKeys.ProjectDefaultDataSource(projectId.Value)
+            : CacheKeys.OrganizationDefaultDataSource(organizationId);
+
+        long? cachedId = null;
+        try
+        {
+            cachedId = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache read failed for default-data-source key {CacheKey}", cacheKey);
+        }
+
+        bool cacheHit = cachedId.HasValue;
+
+        // Check the cache before querying the db
+        if (cacheHit)
+        {
+            defaultDataSourceId = cachedId;
+        }
         else
-            // If no project id, only org-level data sources
-            dsQuery = dsQuery.Where(d => d.ProjectId == null);
+        {
+            var dsQuery = _context.DataSources
+                .Where(d => d.OrganizationId == organizationId && d.Default == true && !d.IsArchived);
 
-        var dataSource = await dsQuery.FirstOrDefaultAsync();
+            // If project id supplied, inherit org level data sources too
+            if (projectId.HasValue)
+                dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+            else
+                // If no project id, only org-level data sources
+                dsQuery = dsQuery.Where(d => d.ProjectId == null);
 
-        if (dataSource == null)
+            var dataSourceLookup = await dsQuery.Select(d => new { d.Id }).FirstOrDefaultAsync();
+
+            if (dataSourceLookup == null)
+                throw new KeyNotFoundException(
+                    "Default data source not found for the specified organization/project context");
+
+            defaultDataSourceId = dataSourceLookup.Id;
+        }
+
+        var returnedDataSource = await _context.DataSources
+            .Where(d => d.Id == defaultDataSourceId && !d.IsArchived)
+            .FirstOrDefaultAsync();
+
+        if (returnedDataSource == null)
             throw new KeyNotFoundException(
                 "Default data source not found for the specified organization/project context");
 
+        // Repopulate cache on miss for subsequent reads
+        if (!cacheHit)
+        {
+            try
+            {
+                await CacheService.Instance.SetAsync(cacheKey, returnedDataSource.Id, DataSourceCacheTtl);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Cache population failed for default-data-source key {CacheKey}", cacheKey);
+            }
+        }
+
         return new DataSourceResponseDto
         {
-            Id = dataSource.Id,
-            Name = dataSource.Name,
-            Description = dataSource.Description,
-            Default = dataSource.Default,
-            Abbreviation = dataSource.Abbreviation,
-            Type = dataSource.Type,
-            BaseUri = dataSource.BaseUri,
-            Config = string.IsNullOrEmpty(dataSource.Config)
+            Id = returnedDataSource.Id,
+            Name = returnedDataSource.Name,
+            Description = returnedDataSource.Description,
+            Default = true,
+            Abbreviation = returnedDataSource.Abbreviation,
+            Type = returnedDataSource.Type,
+            BaseUri = returnedDataSource.BaseUri,
+            Config = string.IsNullOrEmpty(returnedDataSource.Config)
                 ? null
-                : JsonNode.Parse(dataSource.Config) as JsonObject,
-            ProjectId = dataSource.ProjectId,
-            LastUpdatedAt = dataSource.LastUpdatedAt,
-            LastUpdatedBy = dataSource.LastUpdatedBy,
-            IsArchived = dataSource.IsArchived
+                : JsonNode.Parse(returnedDataSource.Config) as JsonObject,
+            OrganizationId = returnedDataSource.OrganizationId,
+            ProjectId = returnedDataSource.ProjectId,
+            LastUpdatedAt = returnedDataSource.LastUpdatedAt,
+            LastUpdatedBy = returnedDataSource.LastUpdatedBy,
+            IsArchived = returnedDataSource.IsArchived
         };
     }
 
@@ -279,6 +335,12 @@ public class DataSourceBusiness : IDataSourceBusiness
                 await ResetOrganizationDefaults(organizationId, dataSource.Id);
 
         await _context.SaveChangesAsync();
+
+        // Update cached default data source
+        if (dto.Default)
+        {
+            await UpdateDefaultDataSourceCache(dataSource.Id, organizationId, projectId);
+        }
 
         await InvalidateDataSourceCountCaches(organizationId, projectId);
 
@@ -437,6 +499,12 @@ public class DataSourceBusiness : IDataSourceBusiness
         _context.DataSources.Remove(dataSource);
         await _context.SaveChangesAsync();
 
+        // Invalidate cached default data source
+        if (dataSource.Default)
+        {
+            await UpdateDefaultDataSourceCache(dataSourceId, dataSource.OrganizationId, dataSource.ProjectId, invalidateKey: true);
+        }
+
         await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
 
         return true;
@@ -480,6 +548,12 @@ public class DataSourceBusiness : IDataSourceBusiness
         dataSource.LastUpdatedBy = currentUserId;
 
         await _context.SaveChangesAsync();
+
+        // Invalidate cached default data source
+        if (dataSource.Default)
+        {
+            await UpdateDefaultDataSourceCache(dataSourceId, dataSource.OrganizationId, dataSource.ProjectId, invalidateKey: true);
+        }
 
         await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
 
@@ -535,6 +609,12 @@ public class DataSourceBusiness : IDataSourceBusiness
         dataSource.LastUpdatedBy = currentUserId;
         _context.DataSources.Update(dataSource);
         await _context.SaveChangesAsync();
+
+        // If this data source is flagged as default, repopulate the cache 
+        if (dataSource.Default)
+        {
+            await UpdateDefaultDataSourceCache(dataSource.Id, dataSource.OrganizationId, dataSource.ProjectId);
+        }
 
         await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
 
@@ -620,6 +700,9 @@ public class DataSourceBusiness : IDataSourceBusiness
                 await transaction.RollbackAsync();
                 throw new Exception("Unable to set data source to default");
             }
+
+            // Update cached default data source
+            await UpdateDefaultDataSourceCache(dataSource.Id, organizationId, projectId);
         }
 
         return new DataSourceResponseDto
@@ -675,5 +758,36 @@ public class DataSourceBusiness : IDataSourceBusiness
         }
 
         return Task.WhenAll(keys.Select(CacheService.Instance.DeleteAsync));
+    }
+
+    private async Task UpdateDefaultDataSourceCache(long dataSourceId, long organizationId, long? projectId, bool invalidateKey = false)
+    {
+        var key = projectId.HasValue
+            ? CacheKeys.ProjectDefaultDataSource(projectId.Value)
+            : CacheKeys.OrganizationDefaultDataSource(organizationId);
+
+        if (invalidateKey)
+        {
+            try
+            {
+                await CacheService.Instance.DeleteAsync(key);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Default data source cache invalidation failed for key {CacheKey}", key);
+            }
+        }
+        else
+        {
+            try
+            {
+                await CacheService.Instance.SetAsync(key, dataSourceId, DataSourceCacheTtl);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Default data source cache update failed for key {CacheKey}", key);
+            }
+        }
+            
     }
 }

@@ -40,6 +40,8 @@ public class UserController : ControllerBase
     /// <param name="includeArchived">(Optional) Boolean determining if archived accounts will be included (default: false)</param>
     /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
     /// <param name="includeTestAccounts">(Optional) Boolean determining if test accounts will be included (default: false)</param>
+    /// <param name="activeOnly">(Optional) Boolean determining if only users where IsActive is true will be included (default: false)</param>
+    /// <param name="recentLoginOnly">(Optional) Boolean determining if only users who have logged in within the last 30 days will be included (default: false)</param>
     /// <param name="paginatedRequestDto">Pagination parameters</param>
     /// <returns>A list of users matching the requested filters.</returns>
     [HttpGet(Name = "api_get_all_users")]
@@ -50,6 +52,8 @@ public class UserController : ControllerBase
         [FromQuery] bool includeArchived = false,
         [FromQuery] bool includeServiceAccounts = false,
         [FromQuery] bool includeTestAccounts = false,
+        [FromQuery] bool activeOnly = false,
+        [FromQuery] bool recentLoginOnly = false,
         [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
         paginatedRequestDto ??= new PaginatedRequestDto();
@@ -59,7 +63,9 @@ public class UserController : ControllerBase
             organizationId,
             includeArchived,
             includeServiceAccounts,
-            includeTestAccounts);
+            includeTestAccounts,
+            activeOnly,
+            recentLoginOnly);
         return Ok(users);
     }
 
@@ -266,23 +272,4 @@ public class UserController : ControllerBase
         return Ok(counts);
     }
 
-
-
-    /// <summary>
-    ///     Get rolling active user counts and active user details
-    /// </summary>
-    /// <param name="projectId">(Optional) ID of project that users are associated with</param>
-    /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
-    /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
-    /// <returns>Active user counts and users active in the 30-day window.</returns>
-    [HttpGet("active-users", Name = "api_get_active_users")]
-    [Badge("V2", BadgePosition.Before, "#72e6a1")]
-    public async Task<ActionResult<UserActivityUsersDto>> GetActiveUsers(
-        [FromQuery] long? projectId,
-        [FromQuery] long? organizationId,
-        [FromQuery] bool includeServiceAccounts = false)
-    {
-        var activity = await _userBusiness.GetActiveUsers(projectId, organizationId, includeServiceAccounts);
-        return Ok(activity);
-    }
 }

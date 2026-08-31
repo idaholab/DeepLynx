@@ -20,6 +20,7 @@ using Record = deeplynx.datalayer.Models.Record;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.tests;
 
@@ -2562,6 +2563,271 @@ public class ProjectBusinessTests : IntegrationTestBase
         {
             File.Delete(metadataFilePath);
         }
+    }
+
+    #endregion
+
+    #region ProjectExists Cache Tests
+
+    // Model under test (mirrors UserExists/OrganizationExists caching - see ExistenceHelper.cs):
+    //   - One cache entry per project: CacheKeys.ProjectArchivedStatus(projectId) -> bool.
+    //     hideArchived is a filter applied to the cached/DB value at call time, NOT part of the key.
+    //   - Existing projects (archived or not) are cached with NO TTL - only explicit mutations
+    //     change them.
+    //   - Non-existent projects are NEVER cached.
+    //   - Deleted projects get a short-TTL CacheKeys.ProjectDeleted(projectId) marker, and the
+    //     permanent ProjectArchivedStatus entry is cleared at the same time.
+    //   - CreateProject populates the archived-status cache immediately (as not archived).
+    //   - ArchiveProject / UnarchiveProject update the archived-status cache directly to the new
+    //     value (read after the stored-proc reload, though the value is guaranteed to match what was
+    //     requested since the transaction rolls back and throws otherwise).
+    //   - UpdateProject has NO cache hook: UpdateProjectRequestDto has no IsArchived field and the
+    //     method never assigns project.IsArchived.
+    //   - EnsureProjectExistsAsync is boolean/void (throw-or-not), fully cache-satisfiable.
+    //   - GetProjectExistsAsync returns the full ProjectResponseDto and always hits the DB, but
+    //     opportunistically warms the same archived-status cache entry EnsureProjectExistsAsync reads.
+    //
+    // Fixtures (from SeedTestDataAsync): pid = not archived, pid4 = archived. 999999 is used
+    // throughout this test class as a guaranteed-nonexistent id, matching existing convention.
+
+    [Fact]
+    public async Task EnsureProjectExistsAsync_CacheMiss_FallsBackToDatabase_AndSucceeds()
+    {
+        // Arrange - pid exists in the DB; nothing has populated the cache for it yet
+        var cacheKey = CacheKeys.ProjectArchivedStatus(pid);
+        var precheck = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+        Assert.Null(precheck);
+
+        // Act & Assert - falls through to DB, finds the project (not archived), does not throw
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task EnsureProjectExistsAsync_CacheMiss_FallsBackToDatabase_AndThrowsForMissingProject()
+    {
+        // Arrange - 999999 does not exist; nothing cached for it (and never will be)
+        var cacheKey = CacheKeys.ProjectArchivedStatus(999999);
+        var precheck = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+        Assert.Null(precheck);
+
+        // Act & Assert - falls through to DB, finds nothing, throws
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureProjectExistsAsync(Context, 999999, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task EnsureProjectExistsAsync_CacheMiss_PopulatesCache_WithCorrectArchivedStatus()
+    {
+        // Arrange - confirm nothing cached yet for pid (not archived) and pid4 (archived)
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid)));
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid4)));
+
+        // Act - first calls are cache misses; hideArchived:false so the archived pid4 doesn't throw
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid, hideArchived: false);
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid4, hideArchived: false);
+
+        // Assert - cache now holds the correct DB-backed archived flag for each
+        var cachedPid = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid));
+        var cachedPid4 = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid4));
+        Assert.NotNull(cachedPid);
+        Assert.False(cachedPid.Value); // pid is not archived
+        Assert.NotNull(cachedPid4);
+        Assert.True(cachedPid4.Value); // pid4 is archived
+    }
+
+    [Fact]
+    public async Task EnsureProjectExistsAsync_NonExistentProject_IsNeverCached()
+    {
+        // Arrange/Act - call for a missing project twice
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureProjectExistsAsync(Context, 999999, hideArchived: true));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureProjectExistsAsync(Context, 999999, hideArchived: true));
+
+        // Assert - still nothing cached for this id, proving negative results are never written
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(999999));
+        Assert.Null(cached);
+    }
+
+    [Fact]
+    public async Task EnsureProjectExistsAsync_CacheHit_ReturnsCachedArchivedStatus_WithoutQueryingDatabase()
+    {
+        // Arrange - pid is genuinely NOT archived in the DB. Poison the cache with "true" (archived),
+        // a value the DB would never produce for pid. If the method reads from cache, hideArchived:true
+        // will (incorrectly, by design of this test) throw; if it ignores the cache and hits the DB, it
+        // will not throw.
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectArchivedStatus(pid), true, (TimeSpan?)null);
+
+        // Act & Assert - the poisoned cached value wins, proving the DB was not consulted
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureProjectExistsAsync(Context, pid, hideArchived: true));
+
+        // hideArchived:false should still succeed even with the (wrongly) cached archived=true,
+        // confirming hideArchived is applied as a post-cache-read filter, not baked into the cache key
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task EnsureProjectExistsAsync_HideArchivedFilter_AppliesToSingleCachedEntry()
+    {
+        // Arrange - pid4 is archived in the DB; prime the cache once via a hideArchived:false call
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid4, hideArchived: false);
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid4));
+        Assert.NotNull(cached);
+        Assert.True(cached.Value);
+
+        // Act & Assert - the SAME cache entry now correctly serves both filter variants without
+        // re-querying the DB or requiring a second cache key
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid4, hideArchived: false); // should not throw
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureProjectExistsAsync(Context, pid4, hideArchived: true)); // archived excluded
+    }
+
+    [Fact]
+    public async Task CreateProject_PopulatesArchivedStatusCache_Immediately()
+    {
+        // Arrange
+        var dto = new CreateProjectRequestDto
+        {
+            Name = $"Cache Test Project {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Created to verify cache population on create"
+        };
+
+        // Act
+        var created = await _projectBusiness.CreateProject(uid, oid, dto);
+
+        // Assert - cache is already populated with "not archived", without needing a read first
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(created.Id));
+        Assert.NotNull(cached);
+        Assert.False(cached.Value);
+
+        // And a subsequent existence check should not need to touch the DB to succeed
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, created.Id, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task DeleteProject_SetsShortTtlDeletedMarker_AndClearsArchivedStatusCache()
+    {
+        // Arrange - prime the archived-status cache for pid (not archived) before deleting
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid, hideArchived: true);
+        var primedCache = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid));
+        Assert.NotNull(primedCache);
+
+        // Act
+        await _projectBusiness.DeleteProject(uid, oid, pid);
+
+        // Assert - the old no-TTL archived-status entry is gone
+        var staleCache = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid));
+        Assert.Null(staleCache);
+
+        // Assert - the short-TTL deleted marker is set
+        var deletedMarker = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectDeleted(pid));
+        Assert.NotNull(deletedMarker);
+        Assert.True(deletedMarker.Value);
+
+        // Assert - existence check now correctly throws, served by the deleted marker rather than the DB
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureProjectExistsAsync(Context, pid, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task ArchiveProject_UpdatesArchivedStatusCache_ToTrue_WithoutClearingIt()
+    {
+        // Arrange - prime the cache with "not archived" (the correct pre-archive state)
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid, hideArchived: false);
+        var before = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid));
+        Assert.NotNull(before);
+        Assert.False(before.Value);
+
+        // Act
+        await _projectBusiness.ArchiveProject(uid, oid, pid);
+
+        // Assert - cache entry still exists (not cleared) but now reflects archived=true directly
+        var after = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid));
+        Assert.NotNull(after);
+        Assert.True(after.Value);
+
+        // hideArchived:true now correctly excludes the archived project; hideArchived:false still finds it
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureProjectExistsAsync(Context, pid, hideArchived: true));
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UnarchiveProject_UpdatesArchivedStatusCache_ToFalse_WithoutClearingIt()
+    {
+        // Arrange - pid4 starts archived; prime the cache with that correct state
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid4, hideArchived: false);
+        var before = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid4));
+        Assert.NotNull(before);
+        Assert.True(before.Value);
+
+        // Act
+        await _projectBusiness.UnarchiveProject(uid, oid, pid4);
+
+        // Assert - cache entry still exists but now reflects archived=false directly
+        var after = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid4));
+        Assert.NotNull(after);
+        Assert.False(after.Value);
+
+        // Both filter variants now succeed since the project is no longer archived
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid4, hideArchived: true);
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid4, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task GetProjectExistsAsync_ReturnsFullDto_AndWarmsArchivedStatusCache()
+    {
+        // Arrange - confirm nothing cached yet for pid
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid)));
+
+        // Act
+        var result = await ExistenceHelper.GetProjectExistsAsync(Context, pid, hideArchived: true);
+
+        // Assert - DTO is correctly populated
+        Assert.Equal(pid, result.Id);
+        Assert.Equal(oid, result.OrganizationId);
+        Assert.False(result.IsArchived);
+
+        // Assert - cache was opportunistically warmed
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid));
+        Assert.NotNull(cached);
+        Assert.False(cached.Value);
+
+        // A subsequent EnsureProjectExistsAsync call benefits from that warmed cache
+        await ExistenceHelper.EnsureProjectExistsAsync(Context, pid, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task GetProjectExistsAsync_DoesNotOverwrite_AlreadyCachedArchivedStatus()
+    {
+        // Arrange - poison the cache with an impossible value; if GetProjectExistsAsync
+        // unconditionally overwrote it, this poisoned value would disappear even though it was
+        // already present. The method should only fill in a MISSING cache entry, not overwrite one.
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectArchivedStatus(pid), true, (TimeSpan?)null);
+
+        // Act
+        var result = await ExistenceHelper.GetProjectExistsAsync(Context, pid, hideArchived: false);
+
+        // Assert - DTO still reflects the true DB state (not archived), since GetProjectExistsAsync
+        // always fetches from the DB regardless of cache state
+        Assert.False(result.IsArchived);
+
+        // Assert - but the poisoned cache entry was left untouched (opportunistic-fill-if-missing only)
+        var stillPoisoned = await CacheService.Instance.GetAsync<bool?>(CacheKeys.ProjectArchivedStatus(pid));
+        Assert.NotNull(stillPoisoned);
+        Assert.True(stillPoisoned.Value);
+    }
+
+    [Fact]
+    public async Task GetProjectExistsAsync_Throws_ForDeletedProject_ViaDeletedMarker()
+    {
+        // Arrange
+        await _projectBusiness.DeleteProject(uid, oid, pid);
+
+        // Act & Assert - GetProjectExistsAsync checks the same short-TTL deleted marker
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.GetProjectExistsAsync(Context, pid, hideArchived: true));
     }
 
     #endregion
