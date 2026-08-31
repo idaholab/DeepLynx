@@ -42,20 +42,30 @@ public class CacheKeys
         return $"organization:{organizationId}:deleted";
     }
 
-    public static string SysAdmin(long userId) {
+    public static string ProjectArchivedStatus(long projectId)
+    {
+        return $"project:{projectId}:archived_status";
+    }
+
+    public static string ProjectDeleted(long projectId)
+    {
+        return $"project:{projectId}:deleted";
+    }
+    public static string SysAdmin(long userId)
+    {
         return $"sysadmin:{userId}";
     }
 
-    public static string OrgAdmin(long userId, long organizationId) 
+    public static string OrgAdmin(long userId, long organizationId)
     {
-        return $"orgadmin:{userId}:{organizationId}";  
+        return $"orgadmin:{userId}:{organizationId}";
     }
 
-    public static string OrgMember(long userId, long organizationId) 
+    public static string OrgMember(long userId, long organizationId)
     {
         return $"orgmember:{userId}:{organizationId}";
     }
-    
+
     public static string ProjectAdmin(long userId, long projectId)
     {
         return $"projectadmin:{userId}:{projectId}";

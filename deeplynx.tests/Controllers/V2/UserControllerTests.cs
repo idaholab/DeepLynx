@@ -270,25 +270,6 @@ public class UserControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task GetActiveUsers_ReturnsActivityAndForwardsFilters()
-    {
-        var expected = new UserActivityUsersDto();
-        _mockUserBusiness
-            .Setup(business => business.GetActiveUsers(ProjectId, OrganizationId, true))
-            .ReturnsAsync(expected);
-
-        var result = (await _controller.GetActiveUsers(
-            ProjectId,
-            OrganizationId,
-            includeServiceAccounts: true)).Result;
-
-        AssertOkObject(result, expected);
-        _mockUserBusiness.Verify(
-            business => business.GetActiveUsers(ProjectId, OrganizationId, true),
-            Times.Once);
-    }
-
-    [Fact]
     public async Task V2ReadAction_DoesNotConvertBusinessExceptionToLegacy500Response()
     {
         var expected = new InvalidOperationException("database failure");
@@ -325,8 +306,7 @@ public class UserControllerTests : IDisposable
         { nameof(UserController.SetSysAdmin) },
         { nameof(UserController.GetDataOverview) },
         { nameof(UserController.GetCurrentUser) },
-        { nameof(UserController.GetActiveUserCounts) },
-        { nameof(UserController.GetActiveUsers) }
+        { nameof(UserController.GetActiveUserCounts) }
     };
 
     [Theory]
