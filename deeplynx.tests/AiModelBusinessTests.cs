@@ -943,7 +943,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
     #region DefaultAiModelConfig Caching Tests
 
     [Fact]
-    public async Task Create_WithDefaultTrue_InOrganization_CachesId()
+    public async Task Create_WithDefaultTrue_InOrganization_CachesDto()
     {
         // Arrange - no org-level default embedding config exists yet
         var dto = new CreateAiModelConfigDto
@@ -961,17 +961,21 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
 
         // Assert
         var cacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, "embedding");
-        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
         Assert.NotNull(cached);
-        Assert.Equal(created.Id, cached.Value);
+        Assert.Equal(created.Id, cached.Id);
+        Assert.Equal(created.ServerUrl, cached.ServerUrl);
+        Assert.Equal(created.ModelName, cached.ModelName);
+        Assert.True(cached.Default);
     }
 
     [Fact]
-    public async Task Create_FirstOfType_InOrganization_AutoDefaults_AndCachesId()
+    public async Task Create_FirstOfType_InOrganization_AutoDefaults_AndCachesDto()
     {
         // Arrange - dto explicitly says Default = false, but this is the first-ever
         // config of this type at the org level, so ShouldAutoDefault should force it
-        // to true and the cache should reflect the persisted state, not the request.
+        // to true and the cached snapshot should reflect the persisted state, not
+        // the request.
         var dto = new CreateAiModelConfigDto
         {
             ServerUrl = "https://auto-default.api.com",
@@ -988,8 +992,10 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         // Assert
         Assert.True(created.Default);
         var cacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, created.ModelType);
-        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
-        Assert.Equal(created.Id, cached);
+        var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(created.Id, cached.Id);
+        Assert.True(cached.Default);
     }
 
     [Fact]
@@ -1018,7 +1024,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
 
             // Assert
             Assert.False(created.Default);
-            Assert.Null(await CacheService.Instance.GetAsync<long?>(cacheKey));
+            Assert.Null(await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey));
         }
         finally
         {
@@ -1050,7 +1056,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             await _aiModelConfigBusiness.CreateAiModelConfig(uid, oid, null, dto);
 
             // Assert
-            Assert.Null(await CacheService.Instance.GetAsync<long?>(cacheKey));
+            Assert.Null(await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey));
         }
         finally
         {
@@ -1071,9 +1077,11 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, pid, "llm");
 
             // Assert
-            var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+            var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
             Assert.Equal(mcid1, result.Id);
-            Assert.Equal(mcid1, cached);
+            Assert.NotNull(cached);
+            Assert.Equal(mcid1, cached.Id);
+            Assert.Equal(result.ServerUrl, cached.ServerUrl);
         }
         finally
         {
@@ -1094,9 +1102,10 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
             var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, null, "llm");
 
             // Assert
-            var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+            var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
             Assert.Equal(mcid2, result.Id);
-            Assert.Equal(mcid2, cached);
+            Assert.NotNull(cached);
+            Assert.Equal(mcid2, cached.Id);
         }
         finally
         {
@@ -1105,12 +1114,19 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetDefault_InProject_StaleCacheEntry_SelfHeals()
+    public async Task GetDefault_InProject_StaleCacheEntry_IsTrustedAsIs()
     {
         // Arrange - config1 (mcid1) is the real DB default llm for pid. Create a
-        // second, non-default llm config and deliberately cache its id, simulating
-        // a stale entry left over after the real default changed. The read path
-        // must reject it (it is no longer Default == true) and fall back to the DB.
+        // second, non-default llm config and deliberately cache a DTO snapshot for
+        // it under the project's default key, simulating a stale entry left over
+        // after the real default changed elsewhere without going through this
+        // business layer's cache-update helper.
+        //
+        // Under DTO caching there is no cheap way to revalidate a hit against the
+        // DB (that's the whole point - it avoids the query), so the read path
+        // trusts whatever snapshot is stored, even though it no longer matches
+        // reality. This test documents that tradeoff rather than hiding it: it is
+        // the mirror image of the old ID-cache self-healing test.
         var staleConfig = new AiModelConfig
         {
             OrganizationId = oid,
@@ -1128,19 +1144,40 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         Context.AiModelConfigs.Add(staleConfig);
         await Context.SaveChangesAsync();
 
+        var staleSnapshot = new AiModelConfigResponseDto
+        {
+            Id = staleConfig.Id,
+            OrganizationId = staleConfig.OrganizationId,
+            ProjectId = staleConfig.ProjectId,
+            ServerUrl = staleConfig.ServerUrl,
+            ModelProvider = staleConfig.ModelProvider,
+            ModelName = staleConfig.ModelName,
+            ModelType = staleConfig.ModelType,
+            RequiresToken = staleConfig.RequiresToken,
+            // Deliberately stamped Default = true in the cached snapshot, even
+            // though the underlying row is not the default - this is exactly the
+            // kind of drift that can occur if a write path forgets to refresh the
+            // cache, or if the row changes via a path outside this business layer.
+            Default = true,
+            IsArchived = staleConfig.IsArchived,
+            LastUpdatedAt = staleConfig.LastUpdatedAt,
+            LastUpdatedBy = staleConfig.LastUpdatedBy
+        };
+
         var cacheKey = CacheKeys.ProjectDefaultAiModelConfig(pid, "llm");
-        await CacheService.Instance.SetAsync(cacheKey, staleConfig.Id, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(cacheKey, staleSnapshot, TimeSpan.FromMinutes(2));
 
         try
         {
             // Act
             var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, pid, "llm");
 
-            // Assert - the stale, non-default id is rejected; the real default wins
-            // and the cache is repopulated to point at it
-            Assert.Equal(mcid1, result.Id);
-            var repopulated = await CacheService.Instance.GetAsync<long?>(cacheKey);
-            Assert.Equal(mcid1, repopulated);
+            // Assert - the stale snapshot is returned as-is; the real DB default
+            // (mcid1) is never consulted because the cache hit short-circuits the
+            // read entirely.
+            Assert.Equal(staleConfig.Id, result.Id);
+            Assert.NotEqual(mcid1, result.Id);
+            Assert.Equal("stale-llm", result.ModelName);
         }
         finally
         {
@@ -1182,12 +1219,13 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
 
             // Assert - falls back to, and caches, the org-level default
             Assert.Equal(orgDefaultEmbedding.Id, result.Id);
-            var cachedOrganizationId = await CacheService.Instance.GetAsync<long?>(organizationCacheKey);
-            Assert.Equal(orgDefaultEmbedding.Id, cachedOrganizationId);
+            var cachedOrganization = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(organizationCacheKey);
+            Assert.NotNull(cachedOrganization);
+            Assert.Equal(orgDefaultEmbedding.Id, cachedOrganization.Id);
 
             // The project-level cache key should remain unpopulated - the fallback
             // was resolved and cached at the org level, not the project level
-            Assert.Null(await CacheService.Instance.GetAsync<long?>(projectCacheKey));
+            Assert.Null(await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(projectCacheKey));
         }
         finally
         {
@@ -1197,7 +1235,7 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Update_PromotingToDefault_InProject_CachesId()
+    public async Task Update_PromotingToDefault_InProject_CachesDto()
     {
         // Arrange - create a non-default llm config in pid2 (which has no llm default at all yet)
         var newConfig = new AiModelConfig
@@ -1227,8 +1265,10 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
 
             // Assert
             Assert.True(result.Default);
-            var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
-            Assert.Equal(newConfig.Id, cached);
+            var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+            Assert.NotNull(cached);
+            Assert.Equal(newConfig.Id, cached.Id);
+            Assert.True(cached.Default);
         }
         finally
         {
@@ -1237,17 +1277,19 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Update_PromotingAnotherConfig_SupersedesStaleCacheEntry()
+    public async Task Update_PromotingAnotherConfig_SupersedesCacheEntry()
     {
         // Arrange - config2 (mcid2) is the current org "llm" default and is cached.
-        // Create a second llm config, then promote IT to default instead. The
-        // old cache entry (pointing at mcid2) should be superseded by the new
-        // write - no explicit invalidation needed, since the write overwrites
-        // the single (scope, type) key, and even if it didn't, mcid2 no longer
-        // satisfies Default == true and would self-heal on next read.
+        // Create a second llm config, then promote IT to default instead. The old
+        // cache entry (a snapshot of mcid2) must be overwritten by the new write -
+        // under DTO caching there is no self-healing fallback if this overwrite
+        // didn't happen, so this test is the only guardrail against a promotion
+        // leaving a stale snapshot behind.
         await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, null, "llm"); // warm cache -> mcid2
         var cacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, "llm");
-        Assert.Equal(mcid2, await CacheService.Instance.GetAsync<long?>(cacheKey));
+        var warmed = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+        Assert.NotNull(warmed);
+        Assert.Equal(mcid2, warmed.Id);
 
         var challenger = new AiModelConfig
         {
@@ -1274,8 +1316,10 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
 
             // Assert - cache now points at the challenger, not mcid2
             Assert.True(result.Default);
-            var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
-            Assert.Equal(challenger.Id, cached);
+            var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+            Assert.NotNull(cached);
+            Assert.Equal(challenger.Id, cached.Id);
+            Assert.Equal("challenger-llm", cached.ModelName);
         }
         finally
         {
@@ -1302,7 +1346,9 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         await CacheService.Instance.DeleteAsync(newCacheKey);
 
         await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, null, "llm"); // warm cache
-        Assert.Equal(mcid2, await CacheService.Instance.GetAsync<long?>(oldCacheKey));
+        var warmed = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(oldCacheKey);
+        Assert.NotNull(warmed);
+        Assert.Equal(mcid2, warmed.Id);
 
         try
         {
@@ -1312,8 +1358,10 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
                 _aiModelConfigBusiness.UpdateAiModelConfig(uid, oid, null, mcid2, dto));
 
             // The original cache entry is untouched, and no new key was created
-            Assert.Equal(mcid2, await CacheService.Instance.GetAsync<long?>(oldCacheKey));
-            Assert.Null(await CacheService.Instance.GetAsync<long?>(newCacheKey));
+            var stillCached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(oldCacheKey);
+            Assert.NotNull(stillCached);
+            Assert.Equal(mcid2, stillCached.Id);
+            Assert.Null(await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(newCacheKey));
         }
         finally
         {
