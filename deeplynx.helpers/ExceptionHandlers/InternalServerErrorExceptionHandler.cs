@@ -68,7 +68,7 @@ public class InternalServerErrorExceptionHandler : IExceptionHandler
             }
             else
             {
-                detail = "An unexpected error occurred.";
+                detail = exception.Message;
             }
         }
 
