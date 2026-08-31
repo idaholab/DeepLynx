@@ -84,17 +84,19 @@ function parseAttributes(raw: string | null): Record<string, unknown> | null {
 function parseNestedRows(
   obj: Record<string, unknown>,
 ): { label: string; value: React.ReactNode }[] {
-  return Object.entries(obj).map(([key, value]) => {
-    const label = key
-      .split("_")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-    return {
-      label,
-      value:
-        typeof value === "object" ? JSON.stringify(value) : String(value ?? ""),
-    };
-  });
+  return Object.entries(obj)
+    .filter(([key]) => key.toLowerCase() !== "tags")
+    .map(([key, value]) => {
+      const label = key
+        .split("_")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+      return {
+        label,
+        value:
+          typeof value === "object" ? JSON.stringify(value) : String(value ?? ""),
+      };
+    });
 }
 
 function DecisionButtons({
@@ -199,6 +201,21 @@ function RecordCard({ record, isApproved, isRejected, onToggle, locked }:
             title={t.translations.LATTICE_PROPERTIES_TITLE}
             rows={parseNestedRows(attrs)}
           />
+          {attrs.tags !== undefined && Array.isArray(attrs.tags) && (
+            <div className="border-t border-base-300 px-4 py-5 mt-4">
+              <h3 className="text-lg font-bold">{t.translations.TAGS}</h3>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {attrs.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
     </section>
