@@ -54,8 +54,8 @@ public class MetricsBusiness : IMetricsBusiness
         }
 
         var totalBytes = await query.SumAsync(r => r.FileSize ?? 0);
-        
-        return new StorageSizeDto{ Bytes = totalBytes };
+
+        return new StorageSizeDto { Bytes = totalBytes };
     }
 
     /// <summary>
@@ -70,14 +70,14 @@ public class MetricsBusiness : IMetricsBusiness
     {
         // validate org and project exist and match
         await ExistenceHelper.EnsureOrganizationExistsAsync(_context, organizationId);
-        var project = await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId);
-        
+        var project = await ExistenceHelper.GetProjectExistsAsync(_context, projectId);
+
         if (project.OrganizationId != organizationId)
             throw new InvalidOperationException($"Project {projectId} does not belong to organization {organizationId}");
-        
+
         var totalBytes = await GetProjectStorageSizeBytes(projectId);
-        
-        return new StorageSizeDto{ Bytes = totalBytes };
+
+        return new StorageSizeDto { Bytes = totalBytes };
     }
 
     /// <summary>
@@ -101,8 +101,8 @@ public class MetricsBusiness : IMetricsBusiness
         {
             totalBytes += await GetProjectStorageSizeBytes(projectId);
         }
-        
-        return new StorageSizeDto{ Bytes = totalBytes };
+
+        return new StorageSizeDto { Bytes = totalBytes };
     }
 
     /// <summary>
@@ -115,15 +115,15 @@ public class MetricsBusiness : IMetricsBusiness
             .Where(p => !p.IsArchived)
             .Select(p => p.Id)
             .ToListAsync();
-        
+
         long totalBytes = 0;
 
         foreach (var projectId in projectIds)
         {
             totalBytes += await GetProjectStorageSizeBytes(projectId);
         }
-        
-        return new StorageSizeDto{ Bytes = totalBytes };
+
+        return new StorageSizeDto { Bytes = totalBytes };
     }
 
     /// <summary>
@@ -209,7 +209,7 @@ public class MetricsBusiness : IMetricsBusiness
 
         return await filteredQuery.CountAsync();
     }
-    
+
     /// <summary>
     /// Gets the number of unique data modalities in the organization's records
     /// </summary>
@@ -255,7 +255,7 @@ public class MetricsBusiness : IMetricsBusiness
 
         return count;
     }
-    
+
     /// <summary>
     ///     Get record count for a scope
     /// </summary>
@@ -268,7 +268,7 @@ public class MetricsBusiness : IMetricsBusiness
         var projectIds = projectId.HasValue ? new[] { projectId.Value } : null;
         return await GetRecordCount(organizationId, projectIds, hideArchived);
     }
-    
+
     /// <summary>
     ///     Get record count for a scope
     /// </summary>
@@ -279,14 +279,14 @@ public class MetricsBusiness : IMetricsBusiness
     public async Task<int> GetRecordCount(long? organizationId, long[]? projectIds, bool hideArchived)
     {
         var recordQuery = _context.Records.AsQueryable();
-        
+
         if (organizationId != null) recordQuery = recordQuery.Where(r => r.OrganizationId == organizationId);
 
         if (projectIds is { Length: > 0 })
             recordQuery = recordQuery.Where(r => projectIds.Contains(r.ProjectId));
-        
+
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
-        
+
         return await recordQuery.CountAsync();
     }
 
@@ -302,7 +302,7 @@ public class MetricsBusiness : IMetricsBusiness
         var projectIds = projectId.HasValue ? new[] { projectId.Value } : null;
         return await GetFileCount(organizationId, projectIds, hideArchived);
     }
-    
+
     /// <summary>
     ///     Get Files Count
     /// </summary>
@@ -315,14 +315,14 @@ public class MetricsBusiness : IMetricsBusiness
         var fileQuery = _context.Records
             .Where(r => r.Uri != null)
             .AsQueryable();
-        
+
         if (organizationId != null) fileQuery = fileQuery.Where(r => r.OrganizationId == organizationId);
 
         if (projectIds is { Length: > 0 })
             fileQuery = fileQuery.Where(r => projectIds.Contains(r.ProjectId));
-        
+
         if (hideArchived) fileQuery = fileQuery.Where(r => !r.IsArchived);
-        
+
         return await fileQuery.CountAsync();
     }
 
@@ -335,14 +335,14 @@ public class MetricsBusiness : IMetricsBusiness
         {
             return cachedSize.Value;
         }
-        
+
         var totalSize = await _context.Records
             .Where(r =>
                 r.ProjectId == projectId &&
                 !r.IsArchived &&
                 r.FileSize != null)
             .SumAsync(r => r.FileSize ?? 0);
-        
+
         await CacheService.Instance.SetAsync(cacheKey, totalSize, _storageSizeCacheTtl);
 
         return totalSize;

@@ -359,32 +359,4 @@ public class UserController : ControllerBase
     }
 
 
-
-    /// <summary>
-    ///     Get rolling active user counts and active user details
-    /// </summary>
-    /// <param name="projectId">(Optional) ID of project that users are associated with</param>
-    /// <param name="organizationId">(Optional) ID of organization that users are associated with</param>
-    /// <param name="includeServiceAccounts">(Optional) Boolean determining if service accounts will be included (default: false)</param>
-    /// <returns>Active user counts and users active in the 30-day window</returns>
-    [HttpGet("active-users", Name = "api_get_active_users")]
-    public async Task<ActionResult<UserActivityUsersDto>> GetActiveUsers(
-        [FromQuery] long? projectId,
-        [FromQuery] long? organizationId,
-        [FromQuery] bool includeServiceAccounts = false)
-    {
-        try
-        {
-            var activity = await _userBusiness.GetActiveUsers(projectId, organizationId, includeServiceAccounts);
-            return Ok(activity);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An unexpected error occurred while fetching active users.: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-
 }
