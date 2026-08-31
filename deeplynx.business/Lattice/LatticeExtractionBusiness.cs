@@ -1069,6 +1069,11 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         string stage,
         string message)
     {
+        if (message != null && message.Contains("Unclosed JSON object in LLM output", StringComparison.OrdinalIgnoreCase))
+        {
+            message = "The document is too large for Lattice to process";
+        }
+
         var properties = GetExtractionProperties(extraction.Properties);
         properties["failure_stage"] = stage;
 
