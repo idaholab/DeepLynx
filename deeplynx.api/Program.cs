@@ -340,11 +340,11 @@ try
     if (isRuntimeStartup)
     {
         app.UseAuthentication(); // Must be first
-        app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email
-        app.UseMiddleware<AuthMiddleware>(); // Third - sets OrganizationId
+        app.UseMiddleware<UserContextMiddleware>(); // Second - sets UserId/Email/OrganizationId
         app.UseMiddleware<FeatureFlagMiddleware>();
-        app.UseMiddleware<SensitivityMiddleware>();
-        app.UseAuthorization(); // Fourth
+        app.UseMiddleware<SensitivityMiddleware>(); // Third - sensitivity labels take precedence over RBAC
+        app.UseMiddleware<AuthMiddleware>(); // Fourth
+        app.UseAuthorization(); // Fifth
     }
 
     app.MapControllers(); // Last

@@ -57,7 +57,7 @@ public class FileController : ControllerBase
     [Auth("write", "file")]
     [Auth("write", "record")]
     [Sensitivity("upload file")]
-    public async Task<ActionResult<RecordResponseDto>> UploadFile(
+    public async Task<ActionResult<RecordResponseDtoV2>> UploadFile(
         long organizationId,
         long projectId,
         [FromQuery] long? dataSourceId,
@@ -77,7 +77,7 @@ public class FileController : ControllerBase
         var fileUploadInfo =
             await _fileBusiness.UploadFile(currentUserId, organizationId, projectId, dataSourceId, objectStorageId,
                 file, sensitivityLabelIds, metadata, embed, vlmConfigId, embeddingModelConfigId, userJwt, isSysAdmin, isOrgAdmin, isProjectAdmin);
-        return Ok(fileUploadInfo);
+        return Ok(fileUploadInfo.ToV2());
     }
 
 
@@ -98,7 +98,7 @@ public class FileController : ControllerBase
     [Auth("update", "file")]
     [Auth("update", "record")]
     [Sensitivity("update file")]
-    public async Task<ActionResult<RecordResponseDto>> UpdateFile(
+    public async Task<ActionResult<RecordResponseDtoV2>> UpdateFile(
         long organizationId,
         long projectId,
         long recordId,
@@ -111,7 +111,7 @@ public class FileController : ControllerBase
         var userJwt = UserContextStorage.Token;
         var updatedFileInfo =
             await _fileBusiness.UpdateFile(currentUserId, organizationId, projectId, recordId, file, vlmConfigId, embeddingModelConfigId, userJwt, metadataFile);
-        return Ok(updatedFileInfo);
+        return Ok(updatedFileInfo.ToV2());
     }
 
 
@@ -157,7 +157,7 @@ public class FileController : ControllerBase
     [Auth("update", "file")]
     [Auth("update", "record")]
     [Sensitivity("update file")]
-    public async Task<ActionResult<RecordResponseDto>> CompleteUpdateUpload(
+    public async Task<ActionResult<RecordResponseDtoV2>> CompleteUpdateUpload(
         long organizationId,
         long projectId,
         long recordId,
@@ -170,7 +170,7 @@ public class FileController : ControllerBase
         var updatedFileInfo = await _fileBusiness.CompleteUpdateUpload(
             currentUserId, organizationId, projectId, recordId, request, vlmConfigId, embeddingModelConfigId,
             userJwt, request.Metadata);
-        return Ok(updatedFileInfo);
+        return Ok(updatedFileInfo.ToV2());
     }
 
 
@@ -205,7 +205,7 @@ public class FileController : ControllerBase
     [HttpPut("{recordId:long}/hash", Name = "api_update_hash")]
     [Auth("update", "file")]
     [Auth("update", "record")]
-    public async Task<ActionResult<RecordResponseDto>> UpdateFileContentHash(
+    public async Task<ActionResult<RecordResponseDtoV2>> UpdateFileContentHash(
         long organizationId,
         long projectId,
         long recordId,
@@ -220,7 +220,7 @@ public class FileController : ControllerBase
                 recordId,
                 request);
 
-            return Ok(response);
+            return Ok(response.ToV2());
         }
         catch (ArgumentException ex)
         {
@@ -459,7 +459,7 @@ public class FileController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("write", "file")]
     [Sensitivity("upload file")]
-    public async Task<ActionResult<RecordResponseDto>> CompleteUpload(
+    public async Task<ActionResult<RecordResponseDtoV2>> CompleteUpload(
         long organizationId,
         long projectId,
         [FromQuery] long? dataSourceId,
@@ -474,7 +474,7 @@ public class FileController : ControllerBase
         var fileRecord = await _fileBusiness.CompleteUpload(
             currentUserId, organizationId, projectId, dataSourceId, objectStorageId, request, sensitivityLabelIds,
             request.Metadata, embed, vlmConfigId, embeddingModelConfigId);
-        return Ok(fileRecord);
+        return Ok(fileRecord.ToV2());
     }
 
 
