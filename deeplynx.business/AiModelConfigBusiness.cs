@@ -772,6 +772,13 @@ public class AiModelConfigBusiness : IAiModelConfigBusiness
         return true;
     }
 
+    /// <summary>
+    ///     Updates the default AI model config cache for the scope.
+    /// </summary>
+    /// <param name="aiModelConfigId">The ID of the AI model config to set as default in the cache.</param>
+    /// <param name="organizationId">Organization containing the configuration.</param>
+    /// <param name="projectId">Project scope, or null for the organization scope.</param>
+    /// <param name="modelType">Normalized model type.</param>
     private async Task UpdateDefaultAiModelConfigCache(
         long aiModelConfigId,
         long organizationId,
