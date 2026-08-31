@@ -25,8 +25,7 @@ import { mapProjectInsightRecords } from "../components/projectInsight.utils";
 //
 // Search mode (a submitted search query): the full matching set is fetched exactly
 // once per committed query/filter combo, then paginated on the frontend. Turning
-// pages while a search is active never re-hits the (potentially ~40s) search
-// endpoint — it only re-slices data already in memory.
+// pages while a search is active never re-hits the search records endpoint.
 
 /**
  * @param initialPageSize Records per page in browse mode
@@ -106,8 +105,6 @@ export function useRecordSearchHybrid(
     );
   }
 
-  // Effect A — browse mode: fetch one server page whenever filters, page, or
-  // pageSize change. No-ops while a search query is active.
   useEffect(() => {
     if (isSearchMode) return;
 
@@ -187,7 +184,7 @@ export function useRecordSearchHybrid(
     t,
   ]);
 
-  // Effect B — search mode: fetch the full matching set once per submitted
+  // search mode: fetch the full matching set once per submitted
   // query/filters combo. Deliberately excludes page/pageSize from its deps —
   // turning pages must not trigger another fetch.
   useEffect(() => {
@@ -236,10 +233,9 @@ export function useRecordSearchHybrid(
     };
   }, [isSearchMode, canLoad, filters, embedding, classes, sources, organizationId, projectId, t]);
 
-  // Derive what's actually shown for the current page.
-  //
   // Browse mode: `browseRecords` is already just the current page (server
   // paginated), with `browseTotalPages` / `browseTotalCount` from the server.
+  //
   // Search mode: `searchMatches` is the FULL matching set — nothing has been
   // paginated yet, so `page`/`pageSize` need to be applied locally here.
   const { records, totalPages, found } = useMemo(() => {
@@ -247,9 +243,7 @@ export function useRecordSearchHybrid(
       const found = searchMatches.length;
       const totalPages = Math.ceil(found / pageSize);
 
-      // `page` can be stale (e.g. left on page 3 of 10-per-page, then the
-      // page size grew and there's now only 1 page) — clamp so the slice
-      // below is always sane, mirroring how PaginationControls itself
+      // Accounts for page changing based on page size, mirroring how PaginationControls itself
       // clamps `currentPage` for display via Math.max(1, totalPages).
       const safePage = Math.min(Math.max(page, 1), Math.max(totalPages, 1));
       const start = (safePage - 1) * pageSize;
