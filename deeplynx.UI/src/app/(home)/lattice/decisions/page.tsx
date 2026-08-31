@@ -834,7 +834,7 @@ function ExtractionDetailPanel({
                 disabled={isPromoting || invalidSchemaCount === 0}
               >
                 <CheckCircleIcon className="size-4" />
-                Approve invalid schemas ({invalidSchemaCount})
+                {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.LATTICE_INVALID_SCHEMA_ITEMS} ({invalidSchemaCount})
               </button>
 
               <button
