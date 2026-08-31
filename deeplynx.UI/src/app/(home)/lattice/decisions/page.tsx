@@ -727,6 +727,7 @@ function ExtractionDetailPanel({
 
   const validCount = countByStatus("valid");
   const novelDiscoveryCount = countByStatus("novel_discovery");
+  const invalidSchemaCount = countByStatus("invalid_schema");
 
   const hasPendingDecisions = (
     ["records", "classes", "edges", "relationships"] as ItemType[]
@@ -824,6 +825,16 @@ function ExtractionDetailPanel({
               >
                 <CheckCircleIcon className="size-4" />
                 Approve novel discoveries ({novelDiscoveryCount})
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-outline btn-danger btn-sm"
+                onClick={() => approveByStatus("invalid_schema")}
+                disabled={isPromoting || invalidSchemaCount === 0}
+              >
+                <CheckCircleIcon className="size-4" />
+                Approve invalid schemas ({invalidSchemaCount})
               </button>
 
               <button
