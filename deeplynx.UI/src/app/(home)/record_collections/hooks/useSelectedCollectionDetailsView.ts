@@ -90,7 +90,7 @@ export function useSelectedCollectionDetailsView({
   }, [collectionDetailRecordSearchTerm, collectionRecords.length]);
 
   const editableSelectedCollection = selectedCollectionDraft ?? selectedCollection;
-  const selectedCollectionLabels = selectedCollection?.labels ?? [];
+  const selectedCollectionLabels = selectedCollection?.sensitivityLabels ?? [];
   const selectedCollectionTags = selectedCollection?.tags ?? [];
   const visibleSelectedCollectionLabels = selectedLabelsExpanded
     ? selectedCollectionLabels

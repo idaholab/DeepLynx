@@ -495,7 +495,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         ValidateRejectedNotSelected(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
             selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
 
-        ValidateDependencies(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
+        await ValidateDependencies(stagingClasses, stagingRecords, stagingRelationships, stagingEdges,
             selectedClassIds, selectedRecordIds, selectedRelIds, selectedEdgeIds);
 
         var classesPromotedBefore = stagingClasses.Where(c => c.PromotedId.HasValue).Select(c => c.Id).ToHashSet();
@@ -503,20 +503,24 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var relsPromotedBefore = stagingRelationships.Where(r => r.PromotedId.HasValue).Select(r => r.Id).ToHashSet();
         var edgesPromotedBefore = stagingEdges.Where(e => e.PromotedId.HasValue).Select(e => e.Id).ToHashSet();
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var deepLynxTransaction = await _context.Database.BeginTransactionAsync();
+        await using var latticeTransaction = await _latticeContext.Database.BeginTransactionAsync();
+
         try
         {
             var classIdMap = await PromoteClasses(stagingClasses, selectedClassIds, organizationId, projectId,
                 extractionId, currentUserId, now);
             var relIdMap = await PromoteRelationships(stagingRelationships, selectedRelIds, classIdMap, organizationId,
                 projectId, extractionId, currentUserId, now);
-            var recordIdMap = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
+            var (RecordIdMap, NewRecordCount) = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
                 projectId, extractionId, currentUserId, now);
-            await PromoteEdges(stagingEdges, selectedEdgeIds, recordIdMap.RecordIdMap, relIdMap, organizationId,
+            await PromoteEdges(stagingEdges, selectedEdgeIds, RecordIdMap, relIdMap, organizationId,
                 projectId,
                 extractionId, currentUserId, now);
 
-            await transaction.CommitAsync();
+            await deepLynxTransaction.CommitAsync();
+            await latticeTransaction.CommitAsync();
+
             extraction.Status = ComputeExtractionStatus(
                 stagingClasses, stagingRecords, stagingRelationships, stagingEdges, extraction.Status);
             await _context.SaveChangesAsync();
@@ -525,15 +529,16 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             {
                 Id = extractionId,
                 CreatedBy = extraction.CreatedBy,
-                ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue && !classesPromotedBefore.Contains(c.Id)),
-                RecordCount = stagingRecords.Count(r => r.PromotedId.HasValue && !recordsPromotedBefore.Contains(r.Id)),
-                RelationshipCount = stagingRelationships.Count(r => r.PromotedId.HasValue && !relsPromotedBefore.Contains(r.Id)),
-                EdgeCount = stagingEdges.Count(e => e.PromotedId.HasValue && !edgesPromotedBefore.Contains(e.Id))
+                ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue),
+                RecordCount = stagingRecords.Count(r => r.PromotedId.HasValue),
+                RelationshipCount = stagingRelationships.Count(r => r.PromotedId.HasValue),
+                EdgeCount = stagingEdges.Count(e => e.PromotedId.HasValue)
             };
         }
         catch
         {
-            await transaction.RollbackAsync();
+            await deepLynxTransaction.RollbackAsync();
+            await latticeTransaction.RollbackAsync();
             throw;
         }
     }
@@ -764,6 +769,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             Mode = extraction.Mode,
             CreatedBy = extraction.CreatedBy,
             FailureMessage = GetExtractionFailureMessage(extraction.Properties),
+            RecordId = extraction.SourceRecordId,
             Classes = classes.Select(c => new StagedClassDto
             {
                 Id = c.Id,
@@ -1060,7 +1066,24 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         var properties = GetExtractionProperties(extraction.Properties);
         properties["failure_stage"] = stage;
-        properties["failure_message"] = message;
+
+        HashSet<string> failureMessages;
+        if (properties.ContainsKey("failure_message"))
+        {
+            var failureMessageValue = properties["failure_message"]?.ToString();
+            failureMessages = failureMessageValue != null
+            ? [.. failureMessageValue.Split(" | ", StringSplitOptions.RemoveEmptyEntries)]
+            : [];
+        }
+        else
+        {
+            failureMessages = [];
+        }
+
+        failureMessages.Add(message);
+
+        properties["failure_message"] = string.Join(" | ", failureMessages);
+
         properties["failed_at"] = DateTimeOffset.UtcNow.ToString("O");
         extraction.Properties = properties.ToJsonString();
     }
