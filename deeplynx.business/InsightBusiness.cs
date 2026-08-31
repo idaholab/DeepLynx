@@ -87,14 +87,7 @@ public class InsightBusiness : IInsightBusiness
             .ToList();
 
         if (authorizedFileInfo.Count == 0)
-        {
-            throw new InvalidOperationException(
-                $"No authorized documents were available to queue for Insight indexing. " +
-                $"Requested record IDs: [{string.Join(", ", recordIds)}]. " +
-                $"Authorized record IDs: [{string.Join(", ", authorizedIds)}]. " +
-                $"Payload file IDs: [{string.Join(", ", payload.FileInfo.Select(f => f.FileId))}]. " +
-                $"User: {currentUserId}, Organization: {organizationId}, Project: {projectId}.");
-        }
+            throw new InvalidOperationException("No authorized documents were available to queue for Insight indexing.");
 
         var request = new InsightUploadRequestDto
         {
