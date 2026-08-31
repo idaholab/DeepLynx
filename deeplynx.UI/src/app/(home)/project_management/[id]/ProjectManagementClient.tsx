@@ -19,6 +19,7 @@ import ProjectUsersTable from "./users/ProjectUsersTable";
 import ProjectRolesAndPermissions from "./roles_and_permissions/ProjectRolesAndPermissions";
 import DataSources from "./data_source/DataSourcesClient";
 import ProjectTagAndLabelManagementClient from "./tag_management/ProjectTagAndLabelManagementClient";
+import ProjectSensitivityLabelsClient from "./sensitivity_labels/ProjectSensitivityLabelsClient";
 import ProjectSettings from "./settings/ProjectSettings";
 import { getAllPermissions } from "@/app/lib/client_service/permission_services.client";
 import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
@@ -106,6 +107,20 @@ const ProjectManagementClient = ({
           initialRoles={projectRoles}
           initialPermissions={permissions}
           projectId={editingProject?.id as number}
+        />
+      ),
+    },
+    {
+      label: t.translations.SENSITIVITY_LABELS,
+      content: (
+        <ProjectSensitivityLabelsClient
+          labels={labels}
+          projectId={editingProject?.id as number}
+          organizationId={Number(editingProject?.organizationId)}
+          orgLabelsLocked={false}
+          refreshLabels={refreshLabels}
+          projectMembers={projectMembers}
+          projectGroups={projectGroups}
         />
       ),
     },
