@@ -883,6 +883,17 @@ function ExtractionDetailPanel({
                 {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.LATTICE_NOVEL_DISCOVERY_LABEL} ({novelDiscoveryCount})
               </button>
 
+
+              <button
+                type="button"
+                className={`btn btn-outline btn-error btn-sm ${isAllApproved("invalid_schema") ? "bg-red-400 text-white border-red-400" : ""}`}
+                onClick={() => toggleApproveByStatus("invalid_schema")}
+                disabled={isPromoting || invalidSchemaCount === 0}
+              >
+                <CheckCircleIcon className="size-4" />
+                {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.LATTICE_INVALID_SCHEMA_ITEMS} ({invalidSchemaCount})
+              </button>
+
               <button
                 type="button"
                 className={`btn btn-outline btn-primary btn-sm ${isAllApproved("valid_novel_invalid") ? "bg-blue-600 text-white border-blue-700" : ""}`}
@@ -891,16 +902,6 @@ function ExtractionDetailPanel({
               >
                 <CheckCircleIcon className="size-4" />
                 {t.translations.LATTICE_APPROVE_ALL} ({validCount + novelDiscoveryCount + invalidSchemaCount})
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-outline btn-danger btn-sm"
-                onClick={() => approveByStatus("invalid_schema")}
-                disabled={isPromoting || invalidSchemaCount === 0}
-              >
-                <CheckCircleIcon className="size-4" />
-                {t.translations.OAUTH_DEVICE_APPROVE} {t.translations.LATTICE_INVALID_SCHEMA_ITEMS} ({invalidSchemaCount})
               </button>
 
               <button
