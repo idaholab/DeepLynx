@@ -1062,22 +1062,7 @@ public class RoleBusiness : IRoleBusiness
 
         foreach (var member in affectedMembers)
         {
-            if (member.UserId.HasValue)
-            {
-                await PermissionCachingHelper.InvalidateProjectPermissionsCache(member.UserId.Value, member.ProjectId, _logger);
-            }
-            else if (member.GroupId.HasValue)
-            {
-                var memberUserIds = await _context.Groups
-                    .Where(g => g.Id == member.GroupId.Value)
-                    .SelectMany(g => g.Users.Select(u => u.Id))
-                    .ToListAsync();
-
-                foreach (var uid in memberUserIds)
-                {
-                    await PermissionCachingHelper.InvalidateProjectPermissionsCache(uid, member.ProjectId, _logger);
-                }
-            }
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
         }
     }
 }

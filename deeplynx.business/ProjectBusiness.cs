@@ -1086,7 +1086,7 @@ public class ProjectBusiness : IProjectBusiness
         }
 
         // invalidate the project permissions cache
-        await InvalidateProjectPermissionsCache(userId, groupId, projectId);
+        await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, projectId, userId, groupId, _logger);
 
         if (userId.HasValue && userId != UserContextStorage.UserId)
         {
@@ -1160,7 +1160,7 @@ public class ProjectBusiness : IProjectBusiness
         }
 
         // invalidate the project permissions cache
-        await InvalidateProjectPermissionsCache(userId, groupId, projectId);
+        await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, projectId, userId, groupId, _logger);
 
         return true;
     }
@@ -1260,7 +1260,7 @@ public class ProjectBusiness : IProjectBusiness
         await OverwriteProjectAdminCache(projectId, userId, groupId, isAdmin: false, deleting: true);
 
         // invalidate the project permissions cache
-        await InvalidateProjectPermissionsCache(userId, groupId, projectId);
+        await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, projectId, userId, groupId, _logger);
 
         return true;
     }
@@ -1487,29 +1487,6 @@ public class ProjectBusiness : IProjectBusiness
                 {
                     _logger.LogWarning(ex, "Cache overwrite failed for user {UserId}, project {ProjectId}", memberId, projectId);
                 }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Invalidate the cached project permissions for a user.
-    /// </summary>
-    public async Task InvalidateProjectPermissionsCache(long? userId, long? groupId, long projectId)
-    {
-        if (userId.HasValue)
-        {
-            await PermissionCachingHelper.InvalidateProjectPermissionsCache(userId.Value, projectId, _logger);
-        }
-        else if (groupId.HasValue)
-        {
-            var memberUserIds = await _context.Groups
-                .Where(g => g.Id == groupId.Value)
-                .SelectMany(g => g.Users.Select(u => u.Id))
-                .ToListAsync();
-
-            foreach (var memberId in memberUserIds)
-            {
-                await PermissionCachingHelper.InvalidateProjectPermissionsCache(memberId, projectId, _logger);
             }
         }
     }
