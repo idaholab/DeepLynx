@@ -1549,12 +1549,12 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // call (pid3). The cached entry must reflect the entity's real scope (org-wide / ProjectId == null),
         // not the pid3 the caller passed in to reach it through inheritance.
         var organization = Context.Organizations.First(o => o.Id == oid2);
-        organization.DefaultObjectStorageId = (int?)os10;
+        organization.DefaultObjectStorageId = os10;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
         var project = Context.Projects.First(p => p.Id == pid3);
-        project.DefaultObjectStorageId = (int?)os10;
+        project.DefaultObjectStorageId = os10;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
