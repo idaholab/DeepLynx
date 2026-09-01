@@ -6,6 +6,13 @@ namespace deeplynx.helpers
 {
     public static class PermissionCachingHelper
     {
+        /// <summary>
+        ///     Used for removing cached project permissions on mutation. 
+        /// </summary>
+        /// <param name="userId">ID of the user</param>
+        /// <param name="projectId">ID of the project</param>
+        /// <param name="logger">Logger for warnings on cache operation exceptions</param>
+        /// <returns></returns>
         public static async Task InvalidateProjectPermissionsCache(long userId, long projectId, ILogger? logger = null)
         {
             try
@@ -19,6 +26,15 @@ namespace deeplynx.helpers
             }
         }
 
+        /// <summary>
+        ///     Used for removing cached project permissions on mutation. 
+        /// </summary>
+        /// <param name="context">DB context</param>
+        /// <param name="projectId">ID of the project</param>
+        /// <param name="userId">ID of the user</param>
+        /// <param name="groupId">ID of the group</param>
+        /// <param name="logger">Logger for warnings on cache operation exceptions</param>
+        /// <returns></returns>
         public static async Task InvalidateProjectPermissionsCache(
             DeeplynxContext context,
             long projectId,
