@@ -206,8 +206,16 @@ public class FileAzureBusiness : IFileBusiness
         }
         else
         {
+            var organization = await _context.Organizations
+                .Where(o => o.Id == organizationId)
+                .Select(o => new { o.DefaultObjectStorageId })
+                .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Organization with id {organizationId} not found");
+
+            if (organization.DefaultObjectStorageId == null)
+                throw new KeyNotFoundException("No default object storage ID set for the organization.");
+
             var defaultObjectStorage = await _context.ObjectStorages
-                .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Default && os.Type == "azure_object")
+                .Where(os => os.Id == organization.DefaultObjectStorageId && os.OrganizationId == organizationId && os.ProjectId == null && os.Type == "azure_object")
                 .FirstOrDefaultAsync() ?? throw new KeyNotFoundException("No default Azure object storage found for the organization.");
 
             var azureConfig = DeserializeAndDecryptConfig(defaultObjectStorage.ConfigEncrypted);
