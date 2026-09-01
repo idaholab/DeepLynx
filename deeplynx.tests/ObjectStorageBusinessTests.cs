@@ -170,7 +170,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
-            Default = true
         };
 
         var os2Config = new JsonObject();
@@ -226,7 +225,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             Type = "filesystem",
             OrganizationId = organizationId,
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os6Config),
-            Default = true,
             IsArchived = false
         };
 
@@ -272,7 +270,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = oid2,
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os10Config),
             IsArchived = false,
-            Default = true
         };
 
         Context.ObjectStorages.Add(objectStorage);
@@ -296,6 +293,10 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         os9 = objectStorage9.Id;
         os10 = objectStorage10.Id;
         archivedOs = objectStorage5.Id;
+
+        organization.DefaultObjectStorageId = objectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
     }
 
     #region Edge Cases
@@ -419,12 +420,12 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Act
 
         var organization = Context.Organizations.First(o => o.Id == organizationId);
-        organization.DefaultObjectStorageId = (int?)os2;
+        organization.DefaultObjectStorageId = os2;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
         var project = Context.Projects.First(o => o.Id == pid);
-        project.DefaultObjectStorageId = (int?)os2;
+        project.DefaultObjectStorageId = os2;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
@@ -742,7 +743,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         var exception =
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _objectStorageBusiness.DeleteObjectStorage(uid, organizationId, pid, os1));
-        Assert.Contains("Default object storage cannot be deleted. Please assign new default storage before deleting.",
+        Assert.Contains("Object storage is set as the default and cannot be deleted.",
             exception.Message);
     }
 
@@ -779,7 +780,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Assert.Equal("Test Object Storage 2", archivedObjectStorage.Name);
         Assert.Equal("filesystem", archivedObjectStorage.Type);
         Assert.Equal(pid, archivedObjectStorage.ProjectId);
-        Assert.False(archivedObjectStorage.Default);
         Assert.NotNull(archivedObjectStorage.ConfigEncrypted);
         Assert.True(archivedObjectStorage.LastUpdatedAt >= now);
         Assert.Equal(uid, archivedObjectStorage.LastUpdatedBy);
@@ -814,12 +814,12 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     {
         // Act & Assert
         var organization = Context.Organizations.First(o => o.Id == organizationId);
-        organization.DefaultObjectStorageId = (int?)os1;
+        organization.DefaultObjectStorageId = os1;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
         var project = Context.Projects.First(o => o.Id == pid);
-        project.DefaultObjectStorageId = (int?)os1;
+        project.DefaultObjectStorageId = os1;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
@@ -873,7 +873,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Assert.Equal("filesystem", unarchivedObjectStorage.Type);
         Assert.Equal(pid, unarchivedObjectStorage.ProjectId);
         Assert.Equal(organizationId, unarchivedObjectStorage.OrganizationId);
-        Assert.False(unarchivedObjectStorage.Default);
         Assert.True(unarchivedObjectStorage.LastUpdatedAt >= now);
         Assert.Equal(uid, unarchivedObjectStorage.LastUpdatedBy);
     }
@@ -923,12 +922,12 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Act
 
         var organization = Context.Organizations.First(o => o.Id == organizationId);
-        organization.DefaultObjectStorageId = (int?)os1;
+        organization.DefaultObjectStorageId = os1;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
         var project = Context.Projects.First(o => o.Id == pid);
-        project.DefaultObjectStorageId = (int?)os1;
+        project.DefaultObjectStorageId = os1;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
@@ -946,7 +945,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Act
 
         var organization = Context.Organizations.First(o => o.Id == organizationId);
-        organization.DefaultObjectStorageId = (int?)os6;
+        organization.DefaultObjectStorageId = os6;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
@@ -965,7 +964,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _objectStorageBusiness.GetDefaultObjectStorage(oid3, null));
-        Assert.Contains("Default object storage not set", exception.Message);
+        Assert.Contains("Default object storage not found", exception.Message);
     }
 
     [Fact]
@@ -973,12 +972,12 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     {
         // Act
         var organization = Context.Organizations.First(o => o.Id == oid2);
-        organization.DefaultObjectStorageId = (int?)os10;
+        organization.DefaultObjectStorageId = os10;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
         var project = Context.Projects.First(o => o.Id == pid3);
-        project.DefaultObjectStorageId = (int?)os10;
+        project.DefaultObjectStorageId = os10;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
@@ -1045,7 +1044,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
-            Default = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
@@ -1073,7 +1071,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
-            Default = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
@@ -1106,7 +1103,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
-            Default = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = null
         };
@@ -1140,7 +1136,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
-            Default = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = null
         };
@@ -1202,7 +1197,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig1,
-            Default = false,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1215,7 +1209,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig2,
-            Default = false,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1228,7 +1221,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig3,
-            Default = false,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1265,7 +1257,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig,
-            Default = true,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1298,7 +1289,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig,
-            Default = false,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1335,7 +1325,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig,
-            Default = false,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
