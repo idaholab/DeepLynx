@@ -243,7 +243,10 @@ public class PermissionBusiness : IPermissionBusiness
         await _context.SaveChangesAsync();
 
         // Invalidate cached permissions
-        await InvalidateProjectPermissionsForMembers(affectedMembers);
+        foreach (var member in affectedMembers)
+        {
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+        }
 
         // Log update Permission event
         await _eventBusiness.CreateEvent(
@@ -307,7 +310,10 @@ public class PermissionBusiness : IPermissionBusiness
         await _context.SaveChangesAsync();
 
         // Invalidate cached permissions
-        await InvalidateProjectPermissionsForMembers(affectedMembers);
+        foreach (var member in affectedMembers)
+        {
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+        }
 
         // Log archive Permission event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -354,7 +360,10 @@ public class PermissionBusiness : IPermissionBusiness
         await _context.SaveChangesAsync();
 
         // Invalidate cached permissions
-        await InvalidateProjectPermissionsForMembers(affectedMembers);
+        foreach (var member in affectedMembers)
+        {
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+        }
 
         // Log unarchive Permission event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -398,7 +407,10 @@ public class PermissionBusiness : IPermissionBusiness
         await _context.SaveChangesAsync();
 
         // Invalidate cached permissions
-        await InvalidateProjectPermissionsForMembers(affectedMembers);
+        foreach (var member in affectedMembers)
+        {
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+        }
 
         // Log delete Permission event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -431,16 +443,5 @@ public class PermissionBusiness : IPermissionBusiness
             .Select(pm => new { pm.ProjectId, pm.UserId, pm.GroupId })
             .ToListAsync()
             .ContinueWith(t => t.Result.Select(m => (m.ProjectId, m.UserId, m.GroupId)).ToList());
-    }
-
-    /// <summary>
-    ///     Invalidates cached project permissions for a set of affected users.
-    /// </summary>
-    private async Task InvalidateProjectPermissionsForMembers(List<(long ProjectId, long? UserId, long? GroupId)> members)
-    {
-        foreach (var member in members)
-        {
-            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
-        }
     }
 }
