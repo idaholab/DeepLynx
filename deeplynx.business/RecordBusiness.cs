@@ -30,6 +30,8 @@ public class RecordBusiness : IRecordBusiness
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly IFileBusinessFactory _fileBusinessFactory;
 
+    private readonly TimeSpan _recordCountByDataSource = TimeSpan.FromHours(1);
+
     /// <summary>
     ///     Initializes a new instance of the <see cref="RecordBusiness" /> class.
     /// </summary>
@@ -1175,6 +1177,16 @@ public class RecordBusiness : IRecordBusiness
         if (!await _provenanceBusiness.CreateProvenanceRecord(response.Id, "create-record", currentUserId, null))
             _logger.LogWarning("Failed to create provenance record for record creation, record {RecordId}", response.Id);
 
+        // update cache
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync("recordcountbydatasource");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource");
+        }    
+
         return response;
     }
 
@@ -1515,6 +1527,15 @@ public class RecordBusiness : IRecordBusiness
             _logger.LogWarning("Failed to create provenance records for bulk record creation, records {RecordIds}",
                 string.Join(", ", insertedRecordIds));
 
+        // update cache
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync("recordcountbydatasource");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource");
+        }
 
         return inserted;
     }
@@ -1960,15 +1981,42 @@ public class RecordBusiness : IRecordBusiness
     public async Task<int> GetRecordsCountByDataSource(
         long organizationId, long projectId, long dataSourceId, bool hideArchived)
     {
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId,
-            hideArchived);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(
+            _context, dataSourceId, projectId, organizationId, hideArchived);
+
+        // check cache before hitting db
+        var cacheKey = CacheKeys.RecordCountByDataSource(projectId, dataSourceId, hideArchived);
+        int? cache = null;
+        try
+        {
+            cache = await CacheService.Instance.GetAsync<int>(cacheKey);
+            if (cache is not null)
+                return cache.Value;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch cache for record count by data source metric: {cacheKey}", cacheKey);
+        }
+
         var recordQuery = _context.Records
             .Where(r => r.OrganizationId == organizationId && r.ProjectId == projectId &&
                         r.DataSourceId == dataSourceId);
 
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
 
-        return await recordQuery.CountAsync();
+        var count = await recordQuery.CountAsync();
+
+        // update cache
+        try
+        {
+            await CacheService.Instance.SetAsync(cacheKey, count, _recordCountByDataSource);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Update cache failed for metric record count by datasource: {cacheKey}", cacheKey);
+        }
+
+        return count;
     }
 
     /// <summary>
