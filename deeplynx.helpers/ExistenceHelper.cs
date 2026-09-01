@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using deeplynx.helpers.Cache;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.helpers
 {
@@ -314,10 +315,20 @@ namespace deeplynx.helpers
             long organizationId,
             long projectId,
             long objectStorageId,
-            bool hideArchived = true)
+            bool hideArchived = true,
+            ILogger? logger = null)
         {
             var cacheKey = CacheKeys.ObjectStorageStatus(objectStorageId);
-            var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+            ObjectStorageCacheEntry? cached = null;
+
+            try
+            {
+                cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+            } 
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Object Storage existence cache check failed for key: {CacheKey}", cacheKey);
+            }
 
             ObjectStorageCacheEntry entry;
 

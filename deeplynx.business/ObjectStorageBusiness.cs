@@ -848,15 +848,25 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
     private async Task SetObjectStorageStatusCache(ObjectStorage os, ObjectStorageStatus status)
     {
-        await CacheService.Instance.SetAsync(
-            CacheKeys.ObjectStorageStatus(os.Id), 
-            new ObjectStorageCacheEntry
-            {
-                OrganizationId = os.OrganizationId,
-                ProjectId = os.ProjectId,
-                Status = status
-            },
-            _objectStorageStatusCache);   
+        var cacheKey = CacheKeys.ObjectStorageStatus(os.Id);
+
+        try
+        {
+            await CacheService.Instance.SetAsync(
+                cacheKey,
+                new ObjectStorageCacheEntry
+                {
+                    OrganizationId = os.OrganizationId,
+                    ProjectId = os.ProjectId,
+                    Status = status
+                },
+                _objectStorageStatusCache
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Object Storage existence cache update failed for key: {CacheKey}", cacheKey);
+        }
     }
 
     private async Task UpdateDefaultObjectStorageCache(
