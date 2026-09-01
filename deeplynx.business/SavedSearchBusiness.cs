@@ -66,7 +66,6 @@ public class SavedSearchBusiness : ISavedSearchBusiness
     /// <returns>List of saved searches for the user</returns>
     public async Task<PaginatedResponse<SavedSearchResponseDto>> GetSavedSearches(long userId, SavedSearchRequestDtos.FilterSavedQueryRequestDto? searchFilters = null)
 {
-    // Start from raw SQL ONLY if TextSearch is present — otherwise just use normal LINQ
     IQueryable<SavedSearch> query;
 
     if (!string.IsNullOrWhiteSpace(searchFilters?.TextSearch))
@@ -80,7 +79,6 @@ public class SavedSearchBusiness : ISavedSearchBusiness
         query = _context.SavedSearches;
     }
 
-    // Everything else stays as normal, composable LINQ — same as before
     query = query.Where(s => s.UserId == userId);
 
     if (searchFilters != null)
@@ -97,16 +95,13 @@ public class SavedSearchBusiness : ISavedSearchBusiness
 
     var orderedQuery = query.OrderByDescending(s => s.LastUpdatedAt);
 
-    // Now pagination works on a fully-filtered IQueryable, exactly like every other method
     var pageResult = await orderedQuery.ToPaginatedAsync(
         new PaginatedRequestDto
         {
             PageNumber = searchFilters?.PageNumber ?? 1,
-            PageSize = searchFilters?.GetValidatedPageSize() ?? 25,
+            PageSize = searchFilters?.GetValidatedPageSize() ?? 10,
         });
 
-    // Deserialize AFTER pagination — this part is unavoidable regardless of approach,
-    // since mapping to the response DTO always requires parsing the JSON
     var items = pageResult.Items
         .Select(s =>
         {
@@ -131,62 +126,6 @@ public class SavedSearchBusiness : ISavedSearchBusiness
         PageSize = pageResult.PageSize,
     };
 }
-    // public async Task<PaginatedResponse<SavedSearchResponseDto>> GetSavedSearches(long userId, SavedSearchRequestDtos.FilterSavedQueryRequestDto? searchFilters = null)
-    // {
-    //     var query = _context.SavedSearches
-    //         .Where(s => s.UserId == userId);
-
-    //     if (searchFilters != null)
-    //     {
-    //         if (!string.IsNullOrWhiteSpace(searchFilters.Name))
-    //             query = query.Where(s => s.Name.ToLower().Contains(searchFilters.Name.ToLower()));
-
-    //         if (searchFilters.LastUpdatedBefore != null)
-    //             query = query.Where(s => s.LastUpdatedAt <= searchFilters.LastUpdatedBefore);
-
-    //         if (searchFilters.LastUpdatedAfter != null)
-    //             query = query.Where(s => s.LastUpdatedAt >= searchFilters.LastUpdatedAfter);
-    //     }
-
-    //     var pageNumber = searchFilters?.PageNumber ?? 1;
-    //     var pageSize = searchFilters?.GetValidatedPageSize() ?? 25;
-
-    //     var totalCount = await query.CountAsync();
-
-    //     var savedSearches = await query
-    //         .OrderByDescending(s => s.LastUpdatedAt)
-    //         .Skip((pageNumber - 1) * pageSize)
-    //         .Take(pageSize)
-    //         .ToListAsync();
-
-    //     var results = savedSearches
-    //         .Select(s =>
-    //         {
-    //             var customQuery = JsonSerializer.Deserialize<CustomQueryDtos.CustomQueryResponseDto>(
-    //                 s.Search, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-    //             if (customQuery == null) return null;
-    //             return new SavedSearchResponseDto
-    //             {
-    //                 Id = s.Id,
-    //                 Name = s.Name,
-    //                 LastUpdatedAt = s.LastUpdatedAt,
-    //                 Query = customQuery
-    //             };
-    //         })
-    //         .Where(s => s != null)
-    //         .Where(s => string.IsNullOrWhiteSpace(searchFilters?.TextSearch) ||
-    //             (s!.Query.TextSearch != null &&
-    //              s.Query.TextSearch.Contains(searchFilters.TextSearch, StringComparison.OrdinalIgnoreCase)))
-    //         .ToList()!;
-
-    //     return new PaginatedResponse<SavedSearchResponseDto>
-    //     {
-    //         Items = results!,
-    //         TotalCount = totalCount,
-    //         PageNumber = pageNumber,
-    //         PageSize = pageSize,
-    //     };
-    // }
 
     /// <summary>
     ///     Get a saved search by ID
