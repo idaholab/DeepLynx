@@ -17,7 +17,6 @@ namespace deeplynx.helpers.ExceptionHandlers;
 public class InternalServerErrorExceptionHandler : IExceptionHandler
 {
     private readonly IProblemDetailsService _problemDetailsService;
-    private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<InternalServerErrorExceptionHandler> _logger;
 
     public InternalServerErrorExceptionHandler(
@@ -26,14 +25,13 @@ public class InternalServerErrorExceptionHandler : IExceptionHandler
         ILogger<InternalServerErrorExceptionHandler> logger)
     {
         _problemDetailsService = problemDetailsService;
-        _hostEnvironment = hostEnvironment;
         _logger = logger;
     }
 
     public async ValueTask<bool> TryHandleAsync(
-        HttpContext httpContext,
-        Exception exception,
-        CancellationToken cancellationToken)
+       HttpContext httpContext,
+       Exception exception,
+       CancellationToken cancellationToken)
     {
         _logger.LogError(
             exception,
@@ -41,36 +39,9 @@ public class InternalServerErrorExceptionHandler : IExceptionHandler
             httpContext.Request.Method,
             httpContext.Request.Path);
 
-        var statusCode = StatusCodes.Status500InternalServerError;
-        var title = "Internal Server Error";
-        string detail;
-
-        if (exception is InsightServiceException insightException)
-        {
-            statusCode = insightException.StatusCode.HasValue
-                ? (int)insightException.StatusCode.Value
-                : StatusCodes.Status502BadGateway;
-
-            title = "Insight Service Error";
-            detail = insightException.Message;
-        }
-        else
-        {
-            var path = httpContext.Request.Path.Value ?? string.Empty;
-
-            if (path.Contains("/promote") && path.Contains("/extractions"))
-            {
-                detail = exception.Message;
-            }
-            else if (_hostEnvironment.IsDevelopment())
-            {
-                detail = exception.Message;
-            }
-            else
-            {
-                detail = exception.Message;
-            }
-        }
+        var (statusCode, title, detail) = exception is InsightServiceException insightException
+            ? GetInsightServiceErrorDetails(insightException)
+            : GetInternalServerErrorDetails(exception);
 
         httpContext.Response.StatusCode = statusCode;
 
@@ -88,5 +59,27 @@ public class InternalServerErrorExceptionHandler : IExceptionHandler
         });
 
         return true;
+    }
+
+    private static (int StatusCode, string Title, string Detail)
+        GetInsightServiceErrorDetails(InsightServiceException exception)
+    {
+        var statusCode = exception.StatusCode.HasValue
+            ? (int)exception.StatusCode.Value
+            : StatusCodes.Status502BadGateway;
+
+        return (
+            statusCode,
+            "Insight Service Error",
+            exception.Message);
+    }
+
+    private static (int StatusCode, string Title, string Detail)
+        GetInternalServerErrorDetails(Exception exception)
+    {
+        return (
+            StatusCodes.Status500InternalServerError,
+            "Internal Server Error",
+            exception.Message);
     }
 }
