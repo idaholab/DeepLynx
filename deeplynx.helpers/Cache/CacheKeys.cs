@@ -71,6 +71,11 @@ public class CacheKeys
         return $"projectadmin:{userId}:{projectId}";
     }
 
+    public static string ObjectStorageStatus(long objectStorageId)
+    {
+        return $"object_storage:{objectStorageId}:status";
+    }
+
     public static string OrganizationDefaultObjectStorage(long organizationId)
     {
         return $"orgdefaultobjectstorage:{organizationId}";

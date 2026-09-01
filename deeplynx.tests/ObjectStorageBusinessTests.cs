@@ -1357,6 +1357,239 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
     #endregion
 
+
+    #region ObjectStorage Cache Tests
+
+    [Fact]
+    public async Task GetObjectStorage_CacheMiss_PopulatesCache_WithCorrectEntry()
+    {
+        var cacheKey = CacheKeys.ObjectStorageStatus(os1);
+        var precheck = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+        Assert.Null(precheck);
+
+        await _objectStorageBusiness.GetObjectStorage(organizationId, pid, os1, true);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task GetObjectStorage_OrgLevelObjectStorage_CachesNullProjectId_NotCallerSuppliedProjectId()
+    {
+        // os6 is an organization-level object storage (ProjectId == null in the DB). It's reachable via a
+        // project-scoped call because the query allows ProjectId == null. The cached entry must reflect the
+        // entity's real ProjectId (null) - caching the caller's pid instead would wrongly make an org-wide
+        // object storage look scoped to a single project.
+        var cacheKey = CacheKeys.ObjectStorageStatus(os6);
+
+        await _objectStorageBusiness.GetObjectStorage(organizationId, pid, os6, true);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Null(cached.ProjectId);
+        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task EnsureObjectStorageExistsAsync_CacheMiss_FallsBackToDatabase_AndPopulatesCache()
+    {
+        var cacheKey = CacheKeys.ObjectStorageStatus(os2);
+        Assert.Null(await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey));
+
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os2);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task EnsureObjectStorageExistsAsync_NonExistentObjectStorage_IsNeverCached()
+    {
+        var missingId = os1 + 1000;
+        var cacheKey = CacheKeys.ObjectStorageStatus(missingId);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, missingId));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, missingId));
+
+        Assert.Null(await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey));
+    }
+
+    [Fact]
+    public async Task EnsureObjectStorageExistsAsync_CacheHit_UsesCachedEntry_WithoutQueryingDatabase()
+    {
+        // os1 is genuinely Active in the DB. Poison the cache with "Deleted" - a status the DB would never
+        // produce for os1 right now. If the method trusts the cache it throws; if it falls through to the
+        // DB instead, it will not.
+        await CacheService.Instance.SetAsync(
+            CacheKeys.ObjectStorageStatus(os1),
+            new ObjectStorageCacheEntry { OrganizationId = organizationId, ProjectId = pid, Status = ObjectStorageStatus.Deleted },
+            TimeSpan.FromHours(1));
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os1));
+    }
+
+    [Fact]
+    public async Task EnsureObjectStorageExistsAsync_ScopeMismatch_ThrowsEvenWhenCacheEntryExists()
+    {
+        // Prime a correct cache entry for os1 scoped to (organizationId, pid).
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os1);
+
+        // Same objectStorageId, wrong organization - must still be rejected. Proves the scope check is
+        // applied to the cached value on every call, not skipped just because the key was found.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, oid2, pid, os1));
+
+        // Same objectStorageId and organization, wrong project - must also be rejected.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid2, os1));
+    }
+
+    [Fact]
+    public async Task EnsureObjectStorageExistsAsync_HideArchivedFilter_AppliesToSingleCachedEntry()
+    {
+        // Prime the cache with the real (Archived) status via a hideArchived:false call.
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: false);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(archivedOs));
+        Assert.NotNull(cached);
+        Assert.Equal(ObjectStorageStatus.Archived, cached.Status);
+
+        // The SAME cache entry correctly serves both filter variants without a second key or a DB round-trip.
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: false);
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task DeleteObjectStorage_CachesStatusAsDeleted()
+    {
+        // Regression test: Delete must not derive Status from IsArchived (which is always false here,
+        // since delete is blocked on already-archived rows) - it must write Deleted explicitly.
+        await _objectStorageBusiness.DeleteObjectStorage(uid, organizationId, pid, os2);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
+        Assert.NotNull(cached);
+        Assert.Equal(ObjectStorageStatus.Deleted, cached.Status);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+    }
+
+    [Fact]
+    public async Task DeleteObjectStorage_DeletedCacheEntry_CausesExistenceCheckToThrow()
+    {
+        await _objectStorageBusiness.DeleteObjectStorage(uid, organizationId, null, os7);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os7));
+    }
+
+    [Fact]
+    public async Task ArchiveObjectStorage_UpdatesCacheStatus_ToArchived()
+    {
+        await _objectStorageBusiness.ArchiveObjectStorage(uid, organizationId, pid, os2);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
+        Assert.NotNull(cached);
+        Assert.Equal(ObjectStorageStatus.Archived, cached.Status);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os2, hideArchived: true));
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os2, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UnarchiveObjectStorage_UpdatesCacheStatus_ToActive()
+    {
+        await _objectStorageBusiness.UnarchiveObjectStorage(uid, organizationId, pid, archivedOs);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(archivedOs));
+        Assert.NotNull(cached);
+        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task CreateObjectStorage_PopulatesCache_Immediately()
+    {
+        var config = new ObjectStorageConfigDto { MountPath = "./cache-test-storage/" };
+        var dto = new CreateObjectStorageRequestDto { Name = "Cache Test", Config = config };
+
+        var created = await _objectStorageBusiness.CreateObjectStorage(uid, organizationId, pid, dto);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(created.Id));
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+
+        // A subsequent existence check should not need to touch the DB to succeed.
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, created.Id);
+    }
+
+    [Fact]
+    public async Task UpdateObjectStorage_RefreshesCache_WithEntityScope_NotCallerProjectIdParam()
+    {
+        // os7 is org-level (ProjectId == null); update it via an org-scoped call (projectId: null) and
+        // confirm the cache reflects that, not some stale/incorrect scope.
+        var dto = new UpdateObjectStorageRequestDto { Name = "Updated Via Cache Test" };
+
+        await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, null, os7, dto);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(os7));
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Null(cached.ProjectId);
+        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task GetDefaultObjectStorage_InheritedFromOrganization_CachesEntityScope_NotProjectParam()
+    {
+        // os10 is an org-wide default (ProjectId == null) under oid2, retrieved here via a project-scoped
+        // call (pid3). The cached entry must reflect the entity's real scope (org-wide / ProjectId == null),
+        // not the pid3 the caller passed in to reach it through inheritance.
+        var organization = Context.Organizations.First(o => o.Id == oid2);
+        organization.DefaultObjectStorageId = (int?)os10;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(p => p.Id == pid3);
+        project.DefaultObjectStorageId = (int?)os10;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
+        await _objectStorageBusiness.GetDefaultObjectStorage(oid2, pid3);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(os10));
+        Assert.NotNull(cached);
+        Assert.Equal(oid2, cached.OrganizationId);
+        Assert.Null(cached.ProjectId);
+    }
+
+    [Fact]
+    public async Task SetDefaultObjectStorage_PopulatesCache_WithEntityScope()
+    {
+        await _objectStorageBusiness.SetDefaultObjectStorage(uid, organizationId, pid, os2);
+
+        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+    }
+
+    #endregion
+
     #region DefaultObjectStorage Caching Tests
 
     [Fact]

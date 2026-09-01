@@ -17,6 +17,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     private readonly EncryptionHelper _encryptionHelper;
     private readonly ILogger<ObjectStorageBusiness>? _logger;
     private static readonly TimeSpan ObjectStorageCacheTtl = TimeSpan.FromHours(1);
+    private readonly TimeSpan _objectStorageStatusCache = TimeSpan.FromHours(1);
 
     public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper, 
         IFileBusiness fileAzureBusiness, ILogger<ObjectStorageBusiness>? logger = null)
@@ -92,6 +93,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (returnedObjectStorage is null)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status); 
 
         if (hideArchived && returnedObjectStorage.IsArchived)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} is archived");
@@ -245,6 +249,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
             await transaction.CommitAsync();
 
+            var status = newObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+            await SetObjectStorageStatusCache(newObjectStorage, status); 
+
             // Update cached default object storage
             if (dto.Default)
             {
@@ -351,6 +358,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
             await transaction.CommitAsync();
 
+            var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+            await SetObjectStorageStatusCache(returnedObjectStorage, status); 
+
             // Update cached default object storage
             if (dto.Default)
             {
@@ -417,6 +427,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         _context.ObjectStorages.Remove(returnedObjectStorage);
         await _context.SaveChangesAsync();
+
+        await SetObjectStorageStatusCache(returnedObjectStorage, ObjectStorageStatus.Deleted); 
+
         return true;
     }
 
@@ -483,6 +496,10 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         returnedObjectStorage.LastUpdatedBy = currentUserId;
         await _context.SaveChangesAsync();
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status); 
+
         return true;
     }
 
@@ -550,6 +567,10 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         returnedObjectStorage.LastUpdatedBy = currentUserId;
         await _context.SaveChangesAsync();
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status); 
+
         return true;
     }
 
@@ -623,6 +644,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (returnedObjectStorage == null)
             throw new KeyNotFoundException("Default object storage not found or is archived");
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status);  
 
         // Repopulate cache on miss for subsequent reads
         if (!cacheHit)
@@ -703,6 +727,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         await transaction.CommitAsync();
 
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status);
+
         await UpdateDefaultObjectStorageCache(objectStorageId, organizationId, projectId);
 
         return new ObjectStorageResponseDto
@@ -737,6 +764,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (returnedObjectStorage is null)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status);
 
         return new ObjectStorageDecryptedDto
         {
@@ -780,6 +810,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             query = query.Where(os => objectStorageIds.Contains(os.Id));
 
         var objectStorages = await query.ToListAsync();
+        
         return objectStorages
             .Select(os => new ObjectStorageDecryptedDto
             {
@@ -813,6 +844,29 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         await _context.ObjectStorages
             .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
             .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
+    }
+
+    private async Task SetObjectStorageStatusCache(ObjectStorage os, ObjectStorageStatus status)
+    {
+        var cacheKey = CacheKeys.ObjectStorageStatus(os.Id);
+
+        try
+        {
+            await CacheService.Instance.SetAsync(
+                cacheKey,
+                new ObjectStorageCacheEntry
+                {
+                    OrganizationId = os.OrganizationId,
+                    ProjectId = os.ProjectId,
+                    Status = status
+                },
+                _objectStorageStatusCache
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Object Storage existence cache update failed for key: {CacheKey}", cacheKey);
+        }
     }
 
     private async Task UpdateDefaultObjectStorageCache(
