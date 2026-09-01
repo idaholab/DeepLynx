@@ -854,7 +854,7 @@ export default function RecordViewClient({ projectId, recordId }: Props) {
 
   const onClickTriggerExtraction = async () => {
 
-    var originalRecord = await getRecord(organizationId as number, projectId, record?.recordId as number)
+    var originalRecord = await getRecord(organizationId as number, projectId, record?.id as number)
 
     if (originalRecord?.extractionId != null) {
       setShowConfirmDialog(true);

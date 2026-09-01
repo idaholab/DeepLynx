@@ -467,7 +467,6 @@ public class HistoricalRecordBusiness : IHistoricalRecordBusiness
             ClassName = canReadClass ? record.ClassName : null,
             DataSourceId = record.DataSourceId,
             DataSourceName = record.DataSourceName,
-            RecordId = record.RecordId,
             ObjectStorageId = record.ObjectStorageId,
             ObjectStorageName = record.ObjectStorageName,
             ProjectId = record.ProjectId,
