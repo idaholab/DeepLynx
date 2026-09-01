@@ -27,14 +27,19 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IProvenanceBusiness _provenanceBusiness;
     private readonly LatticeContext _latticeContext;
+    private readonly ITagBusiness _tagBusiness;
+    private readonly IRecordBusiness _recordBusiness;
     private readonly ILogger<LatticeExtractionBusiness> _logger;
 
     public LatticeExtractionBusiness(DeeplynxContext context, LatticeContext latticeContext,
         IInsightBusiness insightBusiness, InsightServiceClient insightServiceClient,
-        IProvenanceBusiness provenanceBusiness, ILogger<LatticeExtractionBusiness> logger)
+        IProvenanceBusiness provenanceBusiness, ILogger<LatticeExtractionBusiness> logger, ITagBusiness tagBusiness,
+        IRecordBusiness recordBusiness)
     {
         _context = context;
         _latticeContext = latticeContext;
+        _tagBusiness = tagBusiness;
+        _recordBusiness = recordBusiness;
         _insightBusiness = insightBusiness;
         _insightServiceClient = insightServiceClient;
         _provenanceBusiness = provenanceBusiness;

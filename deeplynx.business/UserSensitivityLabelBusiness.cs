@@ -80,7 +80,7 @@ public class UserSensitivityLabelBusiness : IUserSensitivityLabelBusiness
             UserId = userId,
             LabelId = labelId,
             GrantedBy = currentUserId,
-            GrantedAt = DateTime.UtcNow
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         };
 
         _context.UserSensitivityLabels.Add(grant);
@@ -162,7 +162,7 @@ public class UserSensitivityLabelBusiness : IUserSensitivityLabelBusiness
                 UserId = userId,
                 LabelId = labelId,
                 GrantedBy = currentUserId,
-                GrantedAt = DateTime.UtcNow
+                GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
             });
         }
 

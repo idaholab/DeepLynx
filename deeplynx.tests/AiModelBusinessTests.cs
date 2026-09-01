@@ -1,6 +1,7 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.models;
 
 namespace deeplynx.tests;
@@ -935,6 +936,438 @@ public class AiModelConfigBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
         var archived = await Context.AiModelConfigs.FindAsync(mcid2);
         Assert.True(archived.IsArchived);
+    }
+
+    #endregion
+
+    #region DefaultAiModelConfig Caching Tests
+
+    [Fact]
+    public async Task Create_WithDefaultTrue_InOrganization_CachesDto()
+    {
+        // Arrange - no org-level default embedding config exists yet
+        var dto = new CreateAiModelConfigDto
+        {
+            ServerUrl = "https://cache-test-org.api.com",
+            ModelProvider = "hpc",
+            ModelName = "cache-test-org-embed",
+            ModelType = "embedding",
+            RequiresToken = false,
+            Default = true
+        };
+
+        // Act
+        var created = await _aiModelConfigBusiness.CreateAiModelConfig(uid, oid, null, dto);
+
+        // Assert
+        var cacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, "embedding");
+        var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(created.Id, cached.Id);
+        Assert.Equal(created.ServerUrl, cached.ServerUrl);
+        Assert.Equal(created.ModelName, cached.ModelName);
+        Assert.True(cached.Default);
+    }
+
+    [Fact]
+    public async Task Create_FirstOfType_InOrganization_AutoDefaults_AndCachesDto()
+    {
+        // Arrange - dto explicitly says Default = false, but this is the first-ever
+        // config of this type at the org level, so ShouldAutoDefault should force it
+        // to true and the cached snapshot should reflect the persisted state, not
+        // the request.
+        var dto = new CreateAiModelConfigDto
+        {
+            ServerUrl = "https://auto-default.api.com",
+            ModelProvider = "hpc",
+            ModelName = "auto-default-vlm",
+            ModelType = "vlm",
+            RequiresToken = false,
+            Default = false
+        };
+
+        // Act
+        var created = await _aiModelConfigBusiness.CreateAiModelConfig(uid, oid, null, dto);
+
+        // Assert
+        Assert.True(created.Default);
+        var cacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, created.ModelType);
+        var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(created.Id, cached.Id);
+        Assert.True(cached.Default);
+    }
+
+    [Fact]
+    public async Task Create_FirstOfType_InProject_WithExistingOrgDefault_DoesNotAutoDefault_OrCache()
+    {
+        // Arrange - mcid2 is already the org-level "llm" default. Creating the first
+        // project-level "llm" config with Default = false should NOT auto-promote,
+        // since the org default is already reachable via fallback.
+        var cacheKey = CacheKeys.ProjectDefaultAiModelConfig(pid2, "llm");
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        var dto = new CreateAiModelConfigDto
+        {
+            ServerUrl = "https://no-auto-default.api.com",
+            ModelProvider = "hpc",
+            ModelName = "no-auto-default-llm",
+            ModelType = "llm",
+            RequiresToken = false,
+            Default = false
+        };
+
+        try
+        {
+            // Act
+            var created = await _aiModelConfigBusiness.CreateAiModelConfig(uid, oid, pid2, dto);
+
+            // Assert
+            Assert.False(created.Default);
+            Assert.Null(await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Create_WithDefaultFalse_AndExistingDefaultOfType_DoesNotWriteCache()
+    {
+        // Arrange - config2 (mcid2) is already the org-level "llm" default, so this
+        // create should not be auto-promoted and must not touch the cache.
+        var cacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, "llm");
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        var dto = new CreateAiModelConfigDto
+        {
+            ServerUrl = "https://nondefault.api.com",
+            ModelProvider = "anthropic",
+            ModelName = "nondefault-llm",
+            ModelType = "llm",
+            RequiresToken = true,
+            Default = false
+        };
+
+        try
+        {
+            // Act
+            await _aiModelConfigBusiness.CreateAiModelConfig(uid, oid, null, dto);
+
+            // Assert
+            Assert.Null(await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetDefault_InProject_CacheMiss_PopulatesCache()
+    {
+        // Arrange - config1 (mcid1) is the DB default llm for pid
+        var cacheKey = CacheKeys.ProjectDefaultAiModelConfig(pid, "llm");
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        try
+        {
+            // Act
+            var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, pid, "llm");
+
+            // Assert
+            var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+            Assert.Equal(mcid1, result.Id);
+            Assert.NotNull(cached);
+            Assert.Equal(mcid1, cached.Id);
+            Assert.Equal(result.ServerUrl, cached.ServerUrl);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetDefault_InOrganization_CacheMiss_PopulatesCache()
+    {
+        // Arrange - config2 (mcid2) is the DB default llm at the org level
+        var cacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, "llm");
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        try
+        {
+            // Act
+            var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, null, "llm");
+
+            // Assert
+            var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+            Assert.Equal(mcid2, result.Id);
+            Assert.NotNull(cached);
+            Assert.Equal(mcid2, cached.Id);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetDefault_InProject_StaleCacheEntry_IsTrustedAsIs()
+    {
+        // Arrange - config1 (mcid1) is the real DB default llm for pid. Create a
+        // second, non-default llm config and deliberately cache a DTO snapshot for
+        // it under the project's default key, simulating a stale entry left over
+        // after the real default changed elsewhere without going through this
+        // business layer's cache-update helper.
+        //
+        // Under DTO caching there is no cheap way to revalidate a hit against the
+        // DB (that's the whole point - it avoids the query), so the read path
+        // trusts whatever snapshot is stored, even though it no longer matches
+        // reality. This test documents that tradeoff rather than hiding it: it is
+        // the mirror image of the old ID-cache self-healing test.
+        var staleConfig = new AiModelConfig
+        {
+            OrganizationId = oid,
+            ProjectId = pid,
+            ServerUrl = "https://stale.api.com",
+            ModelProvider = "anthropic",
+            ModelName = "stale-llm",
+            ModelType = "llm",
+            RequiresToken = false,
+            Default = false,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.AiModelConfigs.Add(staleConfig);
+        await Context.SaveChangesAsync();
+
+        var staleSnapshot = new AiModelConfigResponseDto
+        {
+            Id = staleConfig.Id,
+            OrganizationId = staleConfig.OrganizationId,
+            ProjectId = staleConfig.ProjectId,
+            ServerUrl = staleConfig.ServerUrl,
+            ModelProvider = staleConfig.ModelProvider,
+            ModelName = staleConfig.ModelName,
+            ModelType = staleConfig.ModelType,
+            RequiresToken = staleConfig.RequiresToken,
+            // Deliberately stamped Default = true in the cached snapshot, even
+            // though the underlying row is not the default - this is exactly the
+            // kind of drift that can occur if a write path forgets to refresh the
+            // cache, or if the row changes via a path outside this business layer.
+            Default = true,
+            IsArchived = staleConfig.IsArchived,
+            LastUpdatedAt = staleConfig.LastUpdatedAt,
+            LastUpdatedBy = staleConfig.LastUpdatedBy
+        };
+
+        var cacheKey = CacheKeys.ProjectDefaultAiModelConfig(pid, "llm");
+        await CacheService.Instance.SetAsync(cacheKey, staleSnapshot, TimeSpan.FromMinutes(2));
+
+        try
+        {
+            // Act
+            var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, pid, "llm");
+
+            // Assert - the stale snapshot is returned as-is; the real DB default
+            // (mcid1) is never consulted because the cache hit short-circuits the
+            // read entirely.
+            Assert.Equal(staleConfig.Id, result.Id);
+            Assert.NotEqual(mcid1, result.Id);
+            Assert.Equal("stale-llm", result.ModelName);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetDefault_FallsBackToOrganizationCache_WhenNoProjectLevelDefault()
+    {
+        // Arrange - create an org-level default embedding config; pid has no
+        // project-level default embedding config
+        var orgDefaultEmbedding = new AiModelConfig
+        {
+            OrganizationId = oid,
+            ProjectId = null,
+            ServerUrl = "https://org-embed.api.com",
+            ModelProvider = "hpc",
+            ModelName = "org-default-embed",
+            ModelType = "embedding",
+            RequiresToken = false,
+            Default = true,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.AiModelConfigs.Add(orgDefaultEmbedding);
+        await Context.SaveChangesAsync();
+
+        var projectCacheKey = CacheKeys.ProjectDefaultAiModelConfig(pid, "embedding");
+        var organizationCacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, "embedding");
+        await CacheService.Instance.DeleteAsync(projectCacheKey);
+        await CacheService.Instance.DeleteAsync(organizationCacheKey);
+
+        try
+        {
+            // Act - request scoped to pid, which has no project-level embedding default
+            var result = await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, pid, "embedding");
+
+            // Assert - falls back to, and caches, the org-level default
+            Assert.Equal(orgDefaultEmbedding.Id, result.Id);
+            var cachedOrganization = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(organizationCacheKey);
+            Assert.NotNull(cachedOrganization);
+            Assert.Equal(orgDefaultEmbedding.Id, cachedOrganization.Id);
+
+            // The project-level cache key should remain unpopulated - the fallback
+            // was resolved and cached at the org level, not the project level
+            Assert.Null(await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(projectCacheKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(projectCacheKey);
+            await CacheService.Instance.DeleteAsync(organizationCacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Update_PromotingToDefault_InProject_CachesDto()
+    {
+        // Arrange - create a non-default llm config in pid2 (which has no llm default at all yet)
+        var newConfig = new AiModelConfig
+        {
+            OrganizationId = oid,
+            ProjectId = pid2,
+            ServerUrl = "https://promote-me.api.com",
+            ModelProvider = "hpc",
+            ModelName = "promote-me-llm",
+            ModelType = "llm",
+            RequiresToken = false,
+            Default = false,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.AiModelConfigs.Add(newConfig);
+        await Context.SaveChangesAsync();
+
+        var cacheKey = CacheKeys.ProjectDefaultAiModelConfig(pid2, "llm");
+
+        try
+        {
+            // Act
+            var dto = new UpdateAiModelConfigDto { Default = true };
+            var result = await _aiModelConfigBusiness.UpdateAiModelConfig(uid, oid, pid2, newConfig.Id, dto);
+
+            // Assert
+            Assert.True(result.Default);
+            var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+            Assert.NotNull(cached);
+            Assert.Equal(newConfig.Id, cached.Id);
+            Assert.True(cached.Default);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Update_PromotingAnotherConfig_SupersedesCacheEntry()
+    {
+        // Arrange - config2 (mcid2) is the current org "llm" default and is cached.
+        // Create a second llm config, then promote IT to default instead. The old
+        // cache entry (a snapshot of mcid2) must be overwritten by the new write -
+        // under DTO caching there is no self-healing fallback if this overwrite
+        // didn't happen, so this test is the only guardrail against a promotion
+        // leaving a stale snapshot behind.
+        await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, null, "llm"); // warm cache -> mcid2
+        var cacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, "llm");
+        var warmed = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+        Assert.NotNull(warmed);
+        Assert.Equal(mcid2, warmed.Id);
+
+        var challenger = new AiModelConfig
+        {
+            OrganizationId = oid,
+            ProjectId = null,
+            ServerUrl = "https://challenger.api.com",
+            ModelProvider = "anthropic",
+            ModelName = "challenger-llm",
+            ModelType = "llm",
+            RequiresToken = false,
+            Default = false,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid
+        };
+        Context.AiModelConfigs.Add(challenger);
+        await Context.SaveChangesAsync();
+
+        try
+        {
+            // Act
+            var dto = new UpdateAiModelConfigDto { Default = true };
+            var result = await _aiModelConfigBusiness.UpdateAiModelConfig(uid, oid, null, challenger.Id, dto);
+
+            // Assert - cache now points at the challenger, not mcid2
+            Assert.True(result.Default);
+            var cached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(cacheKey);
+            Assert.NotNull(cached);
+            Assert.Equal(challenger.Id, cached.Id);
+            Assert.Equal("challenger-llm", cached.ModelName);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+            // restore mcid2 as default for other tests relying on fixture state
+            var org = await Context.AiModelConfigs.FindAsync(mcid2);
+            var chal = await Context.AiModelConfigs.FindAsync(challenger.Id);
+            if (org != null) org.Default = true;
+            if (chal != null) chal.Default = false;
+            await Context.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Update_AlreadyDefault_ChangingModelType_ThrowsAndDoesNotTouchCache()
+    {
+        // Arrange - config2 (mcid2) is the org "llm" default. Attempting to change
+        // its ModelType while it remains the default is rejected by the business
+        // layer (the caller must reassign the default first), so the cache under
+        // the original key must be untouched and no key should be created for "vlm".
+        var oldCacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, "llm");
+        var newCacheKey = CacheKeys.OrganizationDefaultAiModelConfig(oid, "vlm");
+        await CacheService.Instance.DeleteAsync(oldCacheKey);
+        await CacheService.Instance.DeleteAsync(newCacheKey);
+
+        await _aiModelConfigBusiness.GetDefaultAiModelConfig(oid, null, "llm"); // warm cache
+        var warmed = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(oldCacheKey);
+        Assert.NotNull(warmed);
+        Assert.Equal(mcid2, warmed.Id);
+
+        try
+        {
+            // Act / Assert
+            var dto = new UpdateAiModelConfigDto { ModelType = "vlm" };
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _aiModelConfigBusiness.UpdateAiModelConfig(uid, oid, null, mcid2, dto));
+
+            // The original cache entry is untouched, and no new key was created
+            var stillCached = await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(oldCacheKey);
+            Assert.NotNull(stillCached);
+            Assert.Equal(mcid2, stillCached.Id);
+            Assert.Null(await CacheService.Instance.GetAsync<AiModelConfigResponseDto>(newCacheKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(oldCacheKey);
+            await CacheService.Instance.DeleteAsync(newCacheKey);
+        }
     }
 
     #endregion
