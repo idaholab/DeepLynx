@@ -4238,7 +4238,7 @@ public class FileBusinessTests : IntegrationTestBase
             _fileBusiness.StartUpload(oid, pid, did, null, request)
         );
 
-        Assert.Contains("Default object storage not set", exception.Message);
+        Assert.Contains("Default object storage not found", exception.Message);
     }
 
     #endregion
