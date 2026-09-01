@@ -90,4 +90,14 @@ public class CacheKeys
     {
         return $"projectdefaultdatasource:{projectId}";
     }
+
+    public static string OrganizationDefaultAiModelConfig(long organizationId, string modelType)
+    {
+        return $"orgdefaultaimodelconfig:{organizationId}:{modelType}";
+    }
+
+    public static string ProjectDefaultAiModelConfig(long projectId, string modelType)
+    {
+        return $"projectdefaultaimodelconfig:{projectId}:{modelType}";
+    }
 }

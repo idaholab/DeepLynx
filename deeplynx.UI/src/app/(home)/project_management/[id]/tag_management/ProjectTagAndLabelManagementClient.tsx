@@ -18,6 +18,7 @@ import type {
 import {
   archiveSensitivityLabelProject,
   createSensitivityLabelProject,
+  getPermissionsForLabelProject,
   updateSensitivityLabelProject,
 } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import {
@@ -29,7 +30,10 @@ import {
 
 import ConfirmArchiveLabelModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveLabelModal";
 import ConfirmArchiveTagModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveTagModal";
-import LabelEditModal from "@/app/(home)/organization_management/tag_management/LabelEditModal";
+import LabelEditModal, {
+  FILE_ACTIONS,
+  RECORD_ACTIONS,
+} from "@/app/(home)/organization_management/tag_management/LabelEditModal";
 import TagEditModal from "@/app/(home)/organization_management/tag_management/TagEditModal";
 import { useLanguage } from "@/app/contexts/Language";
 import { AxiosError } from "axios";
@@ -127,6 +131,10 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   const [labelNameInput, setLabelNameInput] = useState("");
   const [labelDescriptionInput, setLabelDescriptionInput] = useState("");
   const [savingLabel, setSavingLabel] = useState(false);
+  const [selectedActions, setSelectedActions] = useState<Set<string>>(
+    new Set([...RECORD_ACTIONS, ...FILE_ACTIONS]),
+  );
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
 
   const [showArchiveLabelModal, setShowArchiveLabelModal] = useState(false);
   const [labelToArchive, setLabelToArchive] =
@@ -147,6 +155,17 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
     setLabelNameInput("");
     setLabelDescriptionInput("");
     setSavingLabel(false);
+    setSelectedActions(new Set([...RECORD_ACTIONS, ...FILE_ACTIONS]));
+    setPermissionsLoading(false);
+  };
+
+  const toggleAction = (action: string) => {
+    setSelectedActions((current) => {
+      const next = new Set(current);
+      if (next.has(action)) next.delete(action);
+      else next.add(action);
+      return next;
+    });
   };
 
   const openCreateTagModal = () => {
@@ -182,11 +201,22 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
   const openEditLabelModal = (id: number) => {
     resetLabelModalState();
     const found = labels.find((l) => l.id === id) || null;
-    if (found) {
+    if (found && projectId) {
       setEditingLabel(found);
       setLabelNameInput(found.name);
       setLabelDescriptionInput(found.description ?? "");
       setIsLabelModalOpen(true);
+      setPermissionsLoading(true);
+      getPermissionsForLabelProject(projectId, found.id)
+        .then((perms) => {
+          setSelectedActions(
+            new Set(perms.filter((p) => !p.isArchived).map((p) => p.action)),
+          );
+        })
+        .catch((error) => {
+          console.error(`Failed to load permissions for label ${found.id}:`, error);
+        })
+        .finally(() => setPermissionsLoading(false));
     }
   };
 
@@ -334,6 +364,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
           {
             name: labelNameInput.trim(),
             description: labelDescriptionInput.trim() || null,
+            permissionActions: Array.from(selectedActions),
           },
         );
 
@@ -346,6 +377,7 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         const created = await createSensitivityLabelProject(projectId, {
           name: labelNameInput.trim(),
           description: labelDescriptionInput.trim() || null,
+          permissionActions: Array.from(selectedActions),
         });
 
         setLabels((prev) => [...prev, created]);
@@ -532,10 +564,13 @@ const ProjectTagAndLabelManagementClient: React.FC<Props> = ({
         editingLabel={!!editingLabel}
         nameInput={labelNameInput}
         descriptionInput={labelDescriptionInput}
+        selectedActions={selectedActions}
         onNameChange={setLabelNameInput}
         onDescriptionChange={setLabelDescriptionInput}
+        onToggleAction={toggleAction}
         onCancel={closeEditCreateLabelModal}
         onSave={handleSaveLabel}
+        permissionsLoading={permissionsLoading}
       />
 
       {/* Confirm Archive Modal */}
