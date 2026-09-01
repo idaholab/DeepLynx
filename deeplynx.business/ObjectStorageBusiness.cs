@@ -18,7 +18,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     private readonly ILogger<ObjectStorageBusiness>? _logger;
     private static readonly TimeSpan ObjectStorageCacheTtl = TimeSpan.FromHours(1);
 
-    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper, 
+    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper,
         IFileBusiness fileAzureBusiness, ILogger<ObjectStorageBusiness>? logger = null)
     {
         _encryptionHelper = encryptionHelper;
@@ -568,7 +568,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         string cacheKey = projectId.HasValue
             ? CacheKeys.ProjectDefaultObjectStorage(projectId.Value)
             : CacheKeys.OrganizationDefaultObjectStorage(organizationId);
-        
+
         long? cachedId = null;
         try
         {
@@ -593,36 +593,39 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 var project = await _context.Projects
                     .Where(p => p.Id == projectId.Value && p.OrganizationId == organizationId)
                     .Select(p => new { p.DefaultObjectStorageId })
-                    .FirstOrDefaultAsync();
-
-                if (project == null)
-                    throw new KeyNotFoundException($"Project with id {projectId.Value} not found");
-
+                    .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Project with id {projectId.Value} not found");
                 defaultObjectStorageId = project.DefaultObjectStorageId;
             }
-            else
+            if (defaultObjectStorageId == null)
             {
                 var organization = await _context.Organizations
                     .Where(o => o.Id == organizationId)
                     .Select(o => new { o.DefaultObjectStorageId })
-                    .FirstOrDefaultAsync();
-
-                if (organization == null)
-                    throw new KeyNotFoundException($"Organization with id {organizationId} not found");
-
+                    .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Organization with id {organizationId} not found");
                 defaultObjectStorageId = organization.DefaultObjectStorageId;
             }
         }
 
         if (defaultObjectStorageId == null)
-            throw new KeyNotFoundException("Default object storage not set");
+        {
+            var query = _context.ObjectStorages
+            .Where(os => os.Default && os.OrganizationId == organizationId);
+
+            if (projectId.HasValue)
+                query = query.Where(os => os.ProjectId == projectId || os.ProjectId == null)
+                    .OrderByDescending(os => os.ProjectId.HasValue);
+            else
+                query = query.Where(os => os.ProjectId == null);
+
+            var defaultObjectStorageDto = await query.FirstOrDefaultAsync();
+
+            defaultObjectStorageId = (defaultObjectStorageDto?.Id) ?? throw new KeyNotFoundException("Default object storage not found");
+        }
+
 
         var returnedObjectStorage = await _context.ObjectStorages
             .Where(os => os.Id == defaultObjectStorageId && !os.IsArchived)
-            .FirstOrDefaultAsync();
-
-        if (returnedObjectStorage == null)
-            throw new KeyNotFoundException("Default object storage not found or is archived");
+            .FirstOrDefaultAsync() ?? throw new KeyNotFoundException("Default object storage not found or is archived");
 
         // Repopulate cache on miss for subsequent reads
         if (!cacheHit)
