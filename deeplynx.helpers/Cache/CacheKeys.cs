@@ -115,4 +115,9 @@ public class CacheKeys
     {
         return $"projectpermittedids:{userId}:{action}:{resource}";
     }
+
+    public static string ProjectAuthorizedSensitivityLabels(long userId, long[] projectId)
+    {
+        return $"authorizedsensitivitylabels:{userId}:{projectId}";
+    }
 }

@@ -1,6 +1,8 @@
 using deeplynx.datalayer.Models;
+using deeplynx.helpers.Cache;
 using deeplynx.interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.helpers;
 
@@ -8,10 +10,12 @@ namespace deeplynx.helpers;
 public class SensitivityLabelService : ISensitivityLabelService
 {
     private readonly DeeplynxContext _context;
+    private readonly ILogger<SensitivityLabelService>? _logger;
 
-    public SensitivityLabelService(DeeplynxContext context)
+    public SensitivityLabelService(DeeplynxContext context, ILogger<SensitivityLabelService>? logger = null)
     {
         _context = context;
+        _logger = logger;
     }
 
     /// <summary>
@@ -55,6 +59,9 @@ public class SensitivityLabelService : ISensitivityLabelService
         if (projectIds == null || projectIds.Length == 0)
             return new List<long>();
 
+        // Check cache before querying db
+        var cachedLabels = await CacheService.Instance.GetAsync<List<long>>(CacheKeys.ProjectAuthorizedSensitivityLabels(currentUserId, projectIds));
+
         // Labels in scope for the given organization/projects (org-level labels inherit into every project)
         var relevantLabels = _context.SensitivityLabels
             .Where(l => l.OrganizationId == organizationId
@@ -77,6 +84,16 @@ public class SensitivityLabelService : ISensitivityLabelService
             .Select(l => l.Id)
             .Distinct()
             .ToListAsync();
+
+        // Update the cache 
+        try
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.ProjectAuthorizedSensitivityLabels(currentUserId, projectIds), authorizedLabelIds, (TimeSpan?)null);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache overwrite for sensitivity labels failed for user {UserId}, project(s) {ProjectIds}", currentUserId, projectIds);
+        }
 
         return authorizedLabelIds;
     }
