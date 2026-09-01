@@ -42,20 +42,4 @@ public class ProvenanceRecord
 
     [Column("created_at", TypeName = "timestamp without time zone")]
     public DateTime CreatedAt { get; set; }
-
-    [ForeignKey("RecordId")]
-    [InverseProperty("ProvenanceRecords")]
-    public virtual Record Record { get; set; } = null!;
-
-    [ForeignKey("HistoricalRecordId")]
-    [InverseProperty("ProvenanceRecords")]
-    public virtual HistoricalRecord HistoricalRecord { get; set; } = null!;
-
-    [ForeignKey("ProjectId")]
-    [InverseProperty("ProvenanceRecords")]
-    public virtual Project Project { get; set; } = null!;
-
-    [ForeignKey("OrganizationId")]
-    [InverseProperty("ProvenanceRecords")]
-    public virtual Organization Organization { get; set; } = null!;
 }

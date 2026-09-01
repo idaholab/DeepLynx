@@ -563,25 +563,10 @@ public partial class DeeplynxContext : DbContext
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            entity.HasOne(d => d.Record).WithMany(p => p.ProvenanceRecords)
-                .HasForeignKey(d => d.RecordId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("provenance_records_record_id_fkey");
-
-            entity.HasOne(d => d.Project).WithMany(p => p.ProvenanceRecords)
-                .HasForeignKey(d => d.ProjectId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("provenance_records_project_id_fkey");
-
-            entity.HasOne(d => d.Organization).WithMany(p => p.ProvenanceRecords)
-                .HasForeignKey(d => d.OrganizationId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("provenance_records_organization_id_fkey");
-
-            entity.HasOne(d => d.HistoricalRecord).WithMany(p => p.ProvenanceRecords)
-                .HasForeignKey(d => d.HistoricalRecordId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("provenance_records_historical_record_id_fkey");
+            // Intentionally no FK constraints on record_id/historical_record_id/project_id/organization_id:
+            // provenance_records is append-only audit history and must survive deletion of the rows it
+            // describes (see block_provenance_mutation trigger). A real FK would either cascade-delete
+            // provenance rows or block deletion of the parent.
         });
 
         modelBuilder.Entity<OauthApplication>(entity =>

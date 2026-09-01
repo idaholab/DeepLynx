@@ -107,7 +107,4 @@ public partial class Project
 
     [InverseProperty("Project")]
     public virtual ICollection<AiModelConfig> AiModelConfigs { get; set; } = new List<AiModelConfig>();
-
-    [InverseProperty("Project")]
-    public virtual ICollection<ProvenanceRecord> ProvenanceRecords { get; set; } = new List<ProvenanceRecord>();
 }
