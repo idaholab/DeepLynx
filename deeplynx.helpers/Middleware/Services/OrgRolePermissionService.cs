@@ -1,5 +1,4 @@
 using deeplynx.datalayer.Models;
-using deeplynx.helpers.Cache;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -36,14 +35,14 @@ public class OrgRolePermissionService : IOrgRolePermissionService
         
         var hasPermission = _dbContext.Database
             .SqlQuery<bool>($@"
-                SELECT EXISTS(
-                    SELECT 1
-                    FROM deeplynx.organization_users ou
-                    WHERE ou.user_id = {userId}
-                    AND ou.organization_id = {orgId}
-                    AND (ou.is_org_admin = true OR {action} = 'read')) as has_permission")
-                .AsEnumerable()
-                .FirstOrDefault();
+             SELECT EXISTS(
+                SELECT 1
+                FROM deeplynx.organization_users ou
+                WHERE ou.user_id = {userId}
+                  AND ou.organization_id = {orgId}
+                  AND ou.is_org_admin = true) as has_permission")
+            .AsEnumerable()
+            .FirstOrDefault();
 
         if (hasPermission)
         {
