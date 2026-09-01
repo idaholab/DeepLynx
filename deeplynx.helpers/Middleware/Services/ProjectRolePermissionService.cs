@@ -181,6 +181,14 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
 
     public async Task<List<long>> GetPermittedProjectIdsAsync(long userId, string action, string resource)
     {
+        // Check cache before querying the db
+        var cacheKey = CacheKeys.ProjectPermittedIds(userId, action, resource);
+        var cached = await CacheService.Instance.GetAsync<List<long>>(cacheKey);
+        if (cached != null)
+        {
+            return cached;
+        }
+        
         var permittedProjectIds = await _dbContext.ProjectMembers
             .FromSqlInterpolated($@"
                 SELECT DISTINCT pm.project_id
@@ -198,6 +206,9 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
                 AND perm.is_archived = false")
             .Select(pm => pm.ProjectId)
             .ToListAsync();
+
+        // Populate cache on miss
+        await CacheService.Instance.SetAsync(cacheKey, permittedProjectIds, (TimeSpan?)null);
 
         return permittedProjectIds;
     }
