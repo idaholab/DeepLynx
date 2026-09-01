@@ -43,7 +43,7 @@ public partial class Project
     public string? FilePath { get; set; }
 
     [Column("default_object_storage_id")]
-    public int? DefaultObjectStorageId { get; set; } = null;
+    public long DefaultObjectStorageId { get; set; }
     [Column("logo_object_storage_id")]
     public int? LogoObjectStorageId { get; set; } = null;
 

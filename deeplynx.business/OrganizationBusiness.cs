@@ -1,4 +1,3 @@
-using System.Text.Json;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.Cache;
@@ -11,7 +10,6 @@ using DotNetEnv;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 using Microsoft.AspNetCore.Http;
 using Azure.Storage.Blobs;
-using System.Text.RegularExpressions;
 
 
 namespace deeplynx.business;
@@ -302,7 +300,7 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         if (dto.DefaultObjectStorageId != null)
         {
-            organization.DefaultObjectStorageId = dto.DefaultObjectStorageId;
+            organization.DefaultObjectStorageId = dto.DefaultObjectStorageId.Value;
         }
 
         organization.Name = dto.Name ?? organization.Name;
@@ -1031,10 +1029,22 @@ public class OrganizationBusiness : IOrganizationBusiness
         {
             Name = "Instance Default",
             Config = configDto,
-            Default = true
         };
-        await _objectStorageBusiness.CreateObjectStorage(
+
+
+        var objectStorageResponse = await _objectStorageBusiness.CreateObjectStorage(
             currentUserId, organizationId, null, objectStorageRequestDto);
+
+        var organization = await _context.Organizations
+                .Where(o => o.Id == organizationId)
+                .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Organization with id {organizationId} not found");
+
+        organization.DefaultObjectStorageId = objectStorageResponse.Id;
+
+        _context.Organizations.Update(organization);
+
+        await _context.SaveChangesAsync();
+
 
         // ===============================
         // CREATE DEFAULT ROLES

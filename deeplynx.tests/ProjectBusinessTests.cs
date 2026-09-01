@@ -493,7 +493,6 @@ public class ProjectBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
-            Default = true
         };
 
         Context.ObjectStorages.Add(objectStorage);

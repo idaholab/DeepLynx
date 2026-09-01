@@ -71,6 +71,11 @@ public class CacheKeys
         return $"projectadmin:{userId}:{projectId}";
     }
 
+    public static string ObjectStorageStatus(long objectStorageId)
+    {
+        return $"object_storage:{objectStorageId}:status";
+    }
+
     public static string OrganizationDefaultObjectStorage(long organizationId)
     {
         return $"orgdefaultobjectstorage:{organizationId}";
@@ -89,6 +94,16 @@ public class CacheKeys
     public static string ProjectDefaultDataSource(long projectId)
     {
         return $"projectdefaultdatasource:{projectId}";
+    }
+
+    public static string OrganizationDefaultAiModelConfig(long organizationId, string modelType)
+    {
+        return $"orgdefaultaimodelconfig:{organizationId}:{modelType}";
+    }
+
+    public static string ProjectDefaultAiModelConfig(long projectId, string modelType)
+    {
+        return $"projectdefaultaimodelconfig:{projectId}:{modelType}";
     }
 
     public static string ProjectPermission(long userId, long projectId, string action, string resource)

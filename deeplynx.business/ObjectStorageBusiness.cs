@@ -17,8 +17,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     private readonly EncryptionHelper _encryptionHelper;
     private readonly ILogger<ObjectStorageBusiness>? _logger;
     private static readonly TimeSpan ObjectStorageCacheTtl = TimeSpan.FromHours(1);
+    private readonly TimeSpan _objectStorageStatusCache = TimeSpan.FromHours(1);
 
-    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper, 
+    public ObjectStorageBusiness(DeeplynxContext context, EncryptionHelper encryptionHelper,
         IFileBusiness fileAzureBusiness, ILogger<ObjectStorageBusiness>? logger = null)
     {
         _encryptionHelper = encryptionHelper;
@@ -58,7 +59,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Type = os.Type,
                 ProjectId = os.ProjectId,
                 OrganizationId = os.OrganizationId,
-                Default = os.Default,
                 LastUpdatedAt = os.LastUpdatedAt,
                 LastUpdatedBy = os.LastUpdatedBy,
                 FilesDeletable = os.FilesDeletable,
@@ -93,6 +93,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage is null)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
 
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status); 
+
         if (hideArchived && returnedObjectStorage.IsArchived)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} is archived");
 
@@ -103,7 +106,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             Type = returnedObjectStorage.Type,
             ProjectId = returnedObjectStorage.ProjectId,
             OrganizationId = returnedObjectStorage.OrganizationId,
-            Default = returnedObjectStorage.Default,
             LastUpdatedAt = returnedObjectStorage.LastUpdatedAt,
             LastUpdatedBy = returnedObjectStorage.LastUpdatedBy,
             FilesDeletable = returnedObjectStorage.FilesDeletable,
@@ -225,7 +227,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                         .Where(p => p.Id == projectId.Value && p.OrganizationId == organizationId)
                         .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Project with id {projectId.Value} not found");
 
-                    project.DefaultObjectStorageId = (int?)newObjectStorage.Id;
+                    project.DefaultObjectStorageId = newObjectStorage.Id;
                     project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
                     project.LastUpdatedBy = currentUserId;
                 }
@@ -235,7 +237,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                         .Where(o => o.Id == organizationId)
                         .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Organization with id {organizationId} not found");
 
-                    organization.DefaultObjectStorageId = (int?)newObjectStorage.Id;
+                    organization.DefaultObjectStorageId = newObjectStorage.Id;
                     organization.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
                     organization.LastUpdatedBy = currentUserId;
                 }
@@ -244,6 +246,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             }
 
             await transaction.CommitAsync();
+
+            var status = newObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+            await SetObjectStorageStatusCache(newObjectStorage, status); 
 
             // Update cached default object storage
             if (dto.Default)
@@ -322,7 +327,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                     if (project == null)
                         throw new KeyNotFoundException($"Project with id {projectId.Value} not found");
 
-                    project.DefaultObjectStorageId = (int?)returnedObjectStorage.Id;
+                    project.DefaultObjectStorageId = returnedObjectStorage.Id;
                     project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
                     project.LastUpdatedBy = currentUserId;
                 }
@@ -335,7 +340,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                     if (organization == null)
                         throw new KeyNotFoundException($"Organization with id {organizationId} not found");
 
-                    organization.DefaultObjectStorageId = (int?)returnedObjectStorage.Id;
+                    organization.DefaultObjectStorageId = returnedObjectStorage.Id;
                     organization.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
                     organization.LastUpdatedBy = currentUserId;
                 }
@@ -350,6 +355,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
+
+            var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+            await SetObjectStorageStatusCache(returnedObjectStorage, status); 
 
             // Update cached default object storage
             if (dto.Default)
@@ -406,9 +414,16 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage is null || returnedObjectStorage.IsArchived)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
 
-        if (returnedObjectStorage.Default)
-            throw new InvalidOperationException("Default object storage cannot be deleted." +
-                                                " Please assign new default storage before deleting.");
+        var isDefaultForOrganization = await _context.Organizations
+        .AnyAsync(o => o.Id == organizationId && o.DefaultObjectStorageId == objectStorageId);
+
+        var isDefaultForProject = projectId.HasValue && await _context.Projects
+                .AnyAsync(p => p.Id == projectId && p.DefaultObjectStorageId == objectStorageId);
+
+        if (isDefaultForOrganization || isDefaultForProject)
+            throw new InvalidOperationException(
+                "Object storage is set as the default and cannot be deleted." +
+                " Please reassign the default storage before deleting.");
 
         // Organization os cannot be updated from a project level
         if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
@@ -417,6 +432,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         _context.ObjectStorages.Remove(returnedObjectStorage);
         await _context.SaveChangesAsync();
+
+        await SetObjectStorageStatusCache(returnedObjectStorage, ObjectStorageStatus.Deleted); 
+
         return true;
     }
 
@@ -429,11 +447,12 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
     /// <param name="objectStorageId">ID of object storage</param>
     /// <exception cref="KeyNotFoundException"></exception>
     public async Task<bool> ArchiveObjectStorage(
-        long currentUserId,
-        long organizationId,
-        long? projectId,
-        long objectStorageId)
+    long currentUserId,
+    long organizationId,
+    long? projectId,
+    long objectStorageId)
     {
+        // Query for the object storage
         var query = _context.ObjectStorages
             .Where(os => os.Id == objectStorageId && os.OrganizationId == organizationId);
 
@@ -442,39 +461,23 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         else
             query = query.Where(os => os.ProjectId == null);
 
-        var returnedObjectStorage = await query.FirstOrDefaultAsync();
-        if (returnedObjectStorage is null)
-            throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
+        var returnedObjectStorage = await query.FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
 
         if (returnedObjectStorage.IsArchived)
             throw new InvalidOperationException($"Object storage with id {objectStorageId} is already archived");
 
-        long? defaultObjectStorageId = null;
-        if (projectId.HasValue)
-        {
-            var project = await _context.Projects
-                .Where(p => p.Id == projectId.Value && p.OrganizationId == organizationId)
-                .Select(p => new { p.DefaultObjectStorageId })
-                .FirstOrDefaultAsync();
+        var isDefaultForOrganization = await _context.Organizations
+            .AnyAsync(o => o.Id == organizationId && o.DefaultObjectStorageId == objectStorageId);
 
-            if (project != null)
-                defaultObjectStorageId = project.DefaultObjectStorageId;
-        }
-        else
-        {
-            var organization = await _context.Organizations
-                .Where(o => o.Id == organizationId)
-                .Select(o => new { o.DefaultObjectStorageId })
-                .FirstOrDefaultAsync();
+        var isDefaultForProject = projectId.HasValue
+            ? await _context.Projects
+                .AnyAsync(p => p.Id == projectId && p.DefaultObjectStorageId == objectStorageId)
+            : false;
 
-            if (organization != null)
-                defaultObjectStorageId = organization.DefaultObjectStorageId;
-        }
-
-        if (defaultObjectStorageId == objectStorageId)
+        if (isDefaultForOrganization || isDefaultForProject)
             throw new InvalidOperationException("Default object storage cannot be archived. Please assign new default storage before archiving.");
 
-        // Organization os cannot be updated from a project level
+        // Organization object storages cannot be updated from a project level
         if (projectId.HasValue && returnedObjectStorage.ProjectId == null)
             throw new InvalidOperationException(
                 "Organization object storages cannot be updated from the child projects.");
@@ -482,7 +485,12 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         returnedObjectStorage.IsArchived = true;
         returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         returnedObjectStorage.LastUpdatedBy = currentUserId;
+
         await _context.SaveChangesAsync();
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status); 
+
         return true;
     }
 
@@ -550,6 +558,10 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         returnedObjectStorage.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         returnedObjectStorage.LastUpdatedBy = currentUserId;
         await _context.SaveChangesAsync();
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status); 
+
         return true;
     }
 
@@ -568,7 +580,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         string cacheKey = projectId.HasValue
             ? CacheKeys.ProjectDefaultObjectStorage(projectId.Value)
             : CacheKeys.OrganizationDefaultObjectStorage(organizationId);
-        
+
         long? cachedId = null;
         try
         {
@@ -623,6 +635,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
 
         if (returnedObjectStorage == null)
             throw new KeyNotFoundException("Default object storage not found or is archived");
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status);  
 
         // Repopulate cache on miss for subsequent reads
         if (!cacheHit)
@@ -684,7 +699,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 .Where(p => p.Id == projectId.Value && p.OrganizationId == organizationId)
                 .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Project with id {projectId.Value} not found");
 
-            project.DefaultObjectStorageId = (int?)returnedObjectStorage.Id;
+            project.DefaultObjectStorageId = returnedObjectStorage.Id;
             project.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
             project.LastUpdatedBy = currentUserId;
         }
@@ -694,7 +709,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 .Where(o => o.Id == organizationId)
                 .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Organization with id {organizationId} not found");
 
-            organization.DefaultObjectStorageId = (int?)returnedObjectStorage.Id;
+            organization.DefaultObjectStorageId = returnedObjectStorage.Id;
             organization.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
             organization.LastUpdatedBy = currentUserId;
         }
@@ -702,6 +717,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         await _context.SaveChangesAsync();
 
         await transaction.CommitAsync();
+
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status);
 
         await UpdateDefaultObjectStorageCache(objectStorageId, organizationId, projectId);
 
@@ -712,7 +730,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             Type = returnedObjectStorage.Type,
             ProjectId = returnedObjectStorage.ProjectId,
             OrganizationId = returnedObjectStorage.OrganizationId,
-            Default = returnedObjectStorage.Default,
             LastUpdatedAt = returnedObjectStorage.LastUpdatedAt,
             LastUpdatedBy = returnedObjectStorage.LastUpdatedBy,
             FilesDeletable = returnedObjectStorage.FilesDeletable,
@@ -738,6 +755,9 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         if (returnedObjectStorage is null)
             throw new KeyNotFoundException($"Object storage with id {objectStorageId} not found");
 
+        var status = returnedObjectStorage.IsArchived ? ObjectStorageStatus.Archived : ObjectStorageStatus.Active;
+        await SetObjectStorageStatusCache(returnedObjectStorage, status);
+
         return new ObjectStorageDecryptedDto
         {
             Id = returnedObjectStorage.Id,
@@ -745,7 +765,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             Type = returnedObjectStorage.Type,
             ProjectId = returnedObjectStorage.ProjectId,
             OrganizationId = returnedObjectStorage.OrganizationId,
-            Default = returnedObjectStorage.Default,
             LastUpdatedAt = returnedObjectStorage.LastUpdatedAt,
             LastUpdatedBy = returnedObjectStorage.LastUpdatedBy,
             IsArchived = returnedObjectStorage.IsArchived,
@@ -780,6 +799,7 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
             query = query.Where(os => objectStorageIds.Contains(os.Id));
 
         var objectStorages = await query.ToListAsync();
+        
         return objectStorages
             .Select(os => new ObjectStorageDecryptedDto
             {
@@ -788,7 +808,6 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
                 Type = os.Type,
                 ProjectId = os.ProjectId,
                 OrganizationId = os.OrganizationId,
-                Default = os.Default,
                 LastUpdatedAt = os.LastUpdatedAt,
                 LastUpdatedBy = os.LastUpdatedBy,
                 IsArchived = os.IsArchived,
@@ -807,12 +826,28 @@ public class ObjectStorageBusiness : IObjectStorageBusiness
         return _encryptionHelper.DeserializeAndDecrypt<ObjectStorageConfigDto>(encryptedConfig);
     }
 
-    private async Task ResetOrganizationDefaults(long organizationId, long newDefaultId)
+
+    private async Task SetObjectStorageStatusCache(ObjectStorage os, ObjectStorageStatus status)
     {
-        // check for existing defaults at the org level and remove them from being default
-        await _context.ObjectStorages
-            .Where(os => os.OrganizationId == organizationId && os.ProjectId == null && os.Id != newDefaultId)
-            .ExecuteUpdateAsync(s => s.SetProperty(os => os.Default, false));
+        var cacheKey = CacheKeys.ObjectStorageStatus(os.Id);
+
+        try
+        {
+            await CacheService.Instance.SetAsync(
+                cacheKey,
+                new ObjectStorageCacheEntry
+                {
+                    OrganizationId = os.OrganizationId,
+                    ProjectId = os.ProjectId,
+                    Status = status
+                },
+                _objectStorageStatusCache
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Object Storage existence cache update failed for key: {CacheKey}", cacheKey);
+        }
     }
 
     private async Task UpdateDefaultObjectStorageCache(

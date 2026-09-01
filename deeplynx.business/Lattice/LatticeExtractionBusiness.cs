@@ -27,14 +27,19 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     private readonly InsightServiceClient _insightServiceClient;
     private readonly IProvenanceBusiness _provenanceBusiness;
     private readonly LatticeContext _latticeContext;
+    private readonly ITagBusiness _tagBusiness;
+    private readonly IRecordBusiness _recordBusiness;
     private readonly ILogger<LatticeExtractionBusiness> _logger;
 
     public LatticeExtractionBusiness(DeeplynxContext context, LatticeContext latticeContext,
         IInsightBusiness insightBusiness, InsightServiceClient insightServiceClient,
-        IProvenanceBusiness provenanceBusiness, ILogger<LatticeExtractionBusiness> logger)
+        IProvenanceBusiness provenanceBusiness, ILogger<LatticeExtractionBusiness> logger, ITagBusiness tagBusiness,
+        IRecordBusiness recordBusiness)
     {
         _context = context;
         _latticeContext = latticeContext;
+        _tagBusiness = tagBusiness;
+        _recordBusiness = recordBusiness;
         _insightBusiness = insightBusiness;
         _insightServiceClient = insightServiceClient;
         _provenanceBusiness = provenanceBusiness;
@@ -91,6 +96,22 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             SourceRecordId = recordId
         };
         _context.Extractions.Add(extraction);
+        await _context.SaveChangesAsync();
+
+        if (record.ExtractionId.HasValue)
+        {
+            var previousExtraction = await _context.Extractions
+                .FirstOrDefaultAsync(e => e.Id == record.ExtractionId.Value);
+
+            if (previousExtraction != null)
+            {
+                _context.Extractions.Remove(previousExtraction);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        record.ExtractionId = extraction.Id;
+        _context.Records.Update(record);
         await _context.SaveChangesAsync();
 
         try
@@ -503,20 +524,24 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var relsPromotedBefore = stagingRelationships.Where(r => r.PromotedId.HasValue).Select(r => r.Id).ToHashSet();
         var edgesPromotedBefore = stagingEdges.Where(e => e.PromotedId.HasValue).Select(e => e.Id).ToHashSet();
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var deepLynxTransaction = await _context.Database.BeginTransactionAsync();
+        await using var latticeTransaction = await _latticeContext.Database.BeginTransactionAsync();
+
         try
         {
             var classIdMap = await PromoteClasses(stagingClasses, selectedClassIds, organizationId, projectId,
                 extractionId, currentUserId, now);
             var relIdMap = await PromoteRelationships(stagingRelationships, selectedRelIds, classIdMap, organizationId,
                 projectId, extractionId, currentUserId, now);
-            var recordIdMap = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
+            var (RecordIdMap, NewRecordCount) = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
                 projectId, extractionId, currentUserId, now);
-            await PromoteEdges(stagingEdges, selectedEdgeIds, recordIdMap.RecordIdMap, relIdMap, organizationId,
+            await PromoteEdges(stagingEdges, selectedEdgeIds, RecordIdMap, relIdMap, organizationId,
                 projectId,
                 extractionId, currentUserId, now);
 
-            await transaction.CommitAsync();
+            await deepLynxTransaction.CommitAsync();
+            await latticeTransaction.CommitAsync();
+
             extraction.Status = ComputeExtractionStatus(
                 stagingClasses, stagingRecords, stagingRelationships, stagingEdges, extraction.Status);
             await _context.SaveChangesAsync();
@@ -525,15 +550,16 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             {
                 Id = extractionId,
                 CreatedBy = extraction.CreatedBy,
-                ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue && !classesPromotedBefore.Contains(c.Id)),
-                RecordCount = stagingRecords.Count(r => r.PromotedId.HasValue && !recordsPromotedBefore.Contains(r.Id)),
-                RelationshipCount = stagingRelationships.Count(r => r.PromotedId.HasValue && !relsPromotedBefore.Contains(r.Id)),
-                EdgeCount = stagingEdges.Count(e => e.PromotedId.HasValue && !edgesPromotedBefore.Contains(e.Id))
+                ClassCount = stagingClasses.Count(c => c.PromotedId.HasValue),
+                RecordCount = stagingRecords.Count(r => r.PromotedId.HasValue),
+                RelationshipCount = stagingRelationships.Count(r => r.PromotedId.HasValue),
+                EdgeCount = stagingEdges.Count(e => e.PromotedId.HasValue)
             };
         }
         catch
         {
-            await transaction.RollbackAsync();
+            await deepLynxTransaction.RollbackAsync();
+            await latticeTransaction.RollbackAsync();
             throw;
         }
     }
@@ -1059,6 +1085,11 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         string stage,
         string message)
     {
+        if (message != null && message.Contains("Unclosed JSON object in LLM output", StringComparison.OrdinalIgnoreCase))
+        {
+            message = "The document is too large for Lattice to process";
+        }
+
         var properties = GetExtractionProperties(extraction.Properties);
         properties["failure_stage"] = stage;
 

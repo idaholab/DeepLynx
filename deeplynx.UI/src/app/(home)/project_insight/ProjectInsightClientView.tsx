@@ -486,6 +486,12 @@ export default function ProjectInsightClientView() {
       );
     } catch (error) {
       console.error("Failed to queue project Insight uploads:", error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : t.translations.INSIGHT_ERROR_PREFIX;
+
       setStatusMap((current) => ({
         ...current,
         ...Object.fromEntries(
@@ -493,19 +499,13 @@ export default function ProjectInsightClientView() {
             file.fileId,
             {
               state: "error",
-              error:
-                error instanceof Error
-                  ? error.message
-                  : t.translations.INSIGHT_ERROR_PREFIX,
+              error: message,
             },
           ]),
         ),
       }));
-      toast.error(
-        withTokens(t.translations.PROJECT_INSIGHT_FAILED_SUMMARY, {
-          count: uploadFileInfo.length,
-        }),
-      );
+
+      toast.error(message);
     } finally {
       setSelectedPendingIds(new Map());
       setIsQueueing(false);
@@ -737,8 +737,8 @@ export default function ProjectInsightClientView() {
                 <button
                   type="button"
                   className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${activeTabKey === "library"
-                      ? "bg-base-100 text-base-content shadow-sm"
-                      : "text-base-content/70 hover:text-base-content"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70 hover:text-base-content"
                     }`}
                   onClick={() => setActiveTabKey("library")}
                 >
@@ -750,8 +750,8 @@ export default function ProjectInsightClientView() {
                 <button
                   type="button"
                   className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${activeTabKey === "pending"
-                      ? "bg-base-100 text-base-content shadow-sm"
-                      : "text-base-content/70 hover:text-base-content"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70 hover:text-base-content"
                     }`}
                   onClick={() => setActiveTabKey("pending")}
                 >
