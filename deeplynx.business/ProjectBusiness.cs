@@ -258,7 +258,7 @@ public class ProjectBusiness : IProjectBusiness
                 OrganizationId = objectStorageResponse.OrganizationId
             };
 
-            project.DefaultObjectStorageId = (int?)objectStorageResponse.Id;
+            project.DefaultObjectStorageId = objectStorageResponse.Id;
 
             _context.Projects.Update(project);
             await _context.SaveChangesAsync();
@@ -742,7 +742,7 @@ public class ProjectBusiness : IProjectBusiness
             project.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
 
         if (dto.DefaultObjectStorageId != null)
-            project.DefaultObjectStorageId = dto.DefaultObjectStorageId;
+            project.DefaultObjectStorageId = dto.DefaultObjectStorageId.Value;
 
         project.Name = dto.Name ?? project.Name;
         project.Description = dto.Description ?? project.Description;

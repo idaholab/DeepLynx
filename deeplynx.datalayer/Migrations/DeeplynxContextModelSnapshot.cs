@@ -1479,10 +1479,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("config_encrypted");
 
-                    b.Property<bool>("Default")
-                        .HasColumnType("boolean")
-                        .HasColumnName("default");
-
                     b.Property<bool>("FilesDeletable")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1606,8 +1602,8 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("create_container_per_project");
 
-                    b.Property<int?>("DefaultObjectStorageId")
-                        .HasColumnType("integer")
+                    b.Property<long>("DefaultObjectStorageId")
+                        .HasColumnType("bigint")
                         .HasColumnName("default_object_storage_id");
 
                     b.Property<bool>("DefaultOrg")
@@ -1818,8 +1814,8 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("banner");
 
-                    b.Property<int?>("DefaultObjectStorageId")
-                        .HasColumnType("integer")
+                    b.Property<long>("DefaultObjectStorageId")
+                        .HasColumnType("bigint")
                         .HasColumnName("default_object_storage_id");
 
                     b.Property<string>("Description")

@@ -300,7 +300,7 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         if (dto.DefaultObjectStorageId != null)
         {
-            organization.DefaultObjectStorageId = dto.DefaultObjectStorageId;
+            organization.DefaultObjectStorageId = dto.DefaultObjectStorageId.Value;
         }
 
         organization.Name = dto.Name ?? organization.Name;
@@ -1040,7 +1040,7 @@ public class OrganizationBusiness : IOrganizationBusiness
                 .Where(o => o.Id == organizationId)
                 .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Organization with id {organizationId} not found");
 
-        organization.DefaultObjectStorageId = (int?)objectStorageResponse.Id;
+        organization.DefaultObjectStorageId = objectStorageResponse.Id;
 
         _context.Organizations.Update(organization);
 
