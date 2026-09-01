@@ -661,7 +661,6 @@ public class UserBusiness : IUserBusiness
                 $"orgadmin:{userId}:", 
                 $"orgmember:{userId}:", 
                 $"projectadmin:{userId}:",
-                $"orgpermission:{userId}:",
                 $"projectpermission:{userId}:",
                 $"projectpermittedids:{userId}:"
             };

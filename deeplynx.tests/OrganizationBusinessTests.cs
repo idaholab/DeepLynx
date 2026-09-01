@@ -1305,21 +1305,6 @@ public class OrganizationBusinessTests : IntegrationTestBase
                 oid, serviceUser.Id, allowServiceAccounts: false));
     }
 
-    [Fact]
-    public async Task AddUserToOrganization_InvalidatesOrgPermissionCache()
-    {
-        var newUser = new User { Name = "Cache Test User", Email = "cachetest@test.com", Username = "cachetest", IsActive = true };
-        Context.Users.Add(newUser);
-        await Context.SaveChangesAsync();
-
-        var staleKey = CacheKeys.OrgPermission(newUser.Id, oid, "read", "organization");
-        await CacheService.Instance.SetAsync(staleKey, false, (TimeSpan?)null);
-
-        await _organizationBusiness.AddUserToOrganization(oid, newUser.Id, isAdmin: false);
-
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
-    }
-
     #endregion
 
     #region UpdateUserAdmin Tests
@@ -1387,20 +1372,6 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.Contains($"User with id {uid2} not found in Org with id {oid}", exception.Message);
     }
 
-    [Fact]
-    public async Task SetOrganizationAdminStatus_InvalidatesOrgPermissionCache()
-    {
-        // uid must already be an org member for SetOrganizationAdminStatus to find them
-        await _organizationBusiness.AddUserToOrganization(oid, uid, isAdmin: false);
-
-        var staleKey = CacheKeys.OrgPermission(uid, oid, "update", "organization");
-        await CacheService.Instance.SetAsync(staleKey, false, (TimeSpan?)null);
-
-        await _organizationBusiness.SetOrganizationAdminStatus(oid, uid, isAdmin: true);
-
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
-    }
-
     #endregion
 
     #region RemoveUser Tests
@@ -1447,19 +1418,6 @@ public class OrganizationBusinessTests : IntegrationTestBase
             () => _organizationBusiness.RemoveUserFromOrganization(oid, uid2));
 
         Assert.Contains($"User with id {uid2} not found in Org with id {oid}", exception.Message);
-    }
-
-    [Fact]
-    public async Task RemoveUserFromOrganization_InvalidatesOrgPermissionCache()
-    {
-        await _organizationBusiness.AddUserToOrganization(oid, uid, isAdmin: true);
-
-        var staleKey = CacheKeys.OrgPermission(uid, oid, "read", "organization");
-        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
-
-        await _organizationBusiness.RemoveUserFromOrganization(oid, uid);
-
-        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
     }
 
     #endregion

@@ -496,7 +496,6 @@ public class OrganizationBusiness : IOrganizationBusiness
         {
             await CacheService.Instance.SetAsync(CacheKeys.OrgMember(userId, organizationId), true, (TimeSpan?)null);
             await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, (TimeSpan?)null);
-            await CacheService.Instance.DeleteByPrefixAsync($"orgpermission:{userId}:{organizationId}:");
         }
         catch (Exception ex)
         {
@@ -920,7 +919,6 @@ public class OrganizationBusiness : IOrganizationBusiness
         try
         {
             await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, (TimeSpan?)null);
-            await CacheService.Instance.DeleteByPrefixAsync($"orgpermission:{userId}:{organizationId}:");
         }
         catch (Exception ex)
         {
@@ -954,7 +952,6 @@ public class OrganizationBusiness : IOrganizationBusiness
         {
             await CacheService.Instance.DeleteAsync(CacheKeys.OrgMember(userId, organizationId));
             await CacheService.Instance.DeleteAsync(CacheKeys.OrgAdmin(userId, organizationId));
-            await CacheService.Instance.DeleteByPrefixAsync($"orgpermission:{userId}:{organizationId}:");
         }
         catch (Exception ex)
         {

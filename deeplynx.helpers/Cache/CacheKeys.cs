@@ -91,11 +91,6 @@ public class CacheKeys
         return $"projectdefaultdatasource:{projectId}";
     }
 
-    public static string OrgPermission(long userId, long organizationId, string action, string resource)
-    {
-        return $"orgpermission:{userId}:{organizationId}:{action}:{resource}";
-    }
-
     public static string ProjectPermission(long userId, long projectId, string action, string resource)
     {
         return $"projectpermission:{userId}:{projectId}:{action}:{resource}";
