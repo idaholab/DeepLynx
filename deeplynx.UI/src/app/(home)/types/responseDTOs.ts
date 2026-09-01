@@ -268,6 +268,28 @@ export type SensitivityLabelsDto = {
   organizationId: number | null;
 };
 
+export type UserSensitivityLabelResponseDto = {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  labelId: number;
+  grantedBy: number | null;
+  grantedByName: string | null;
+  grantedAt: string;
+};
+
+export type SensitivityLabelPermissionResponseDto = {
+  id: number;
+  labelId: number;
+  action: string;
+  name: string;
+  description: string | null;
+  lastUpdatedAt: string;
+  lastUpdatedBy: number | null;
+  isArchived: boolean;
+};
+
 export type UserResponseDto = {
   id: number;
   name: string;

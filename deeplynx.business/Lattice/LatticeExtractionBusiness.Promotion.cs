@@ -4,6 +4,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
@@ -578,6 +579,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
         // Batch-create new records
         var toCreate = selected.Where(r => !r.DeeplynxRecordId.HasValue).ToList();
+        var extractedTags = new List<Tag>();
         if (toCreate.Count > 0)
         {
             var newRecords = toCreate.Select(sr =>
@@ -591,9 +593,26 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 if (sr.SourceRecordId.HasValue)
                 {
                     var jsonObj = string.IsNullOrWhiteSpace(sProperties)
-                        ? new JsonObject()
-                        : JsonNode.Parse(sProperties)?.AsObject() ?? new JsonObject();
+                        ? []
+                        : JsonNode.Parse(sProperties)?.AsObject() ?? [];
                     jsonObj["originId"] = sr.SourceRecordId.Value;
+                    var tagsNode = jsonObj["tags"];
+                    if (tagsNode is JsonArray tagsArray)
+                    {
+                        foreach (var tag in tagsArray)
+                        {
+                            extractedTags.Add(new Tag
+                            {
+                                Name = tag!.ToString(),
+                                ProjectId = projectId,
+                                OrganizationId = organizationId,
+                                LastUpdatedAt = now,
+                                LastUpdatedBy = currentUserId
+                            });
+                        }
+                        jsonObj.Remove("tags");
+                    }
+
                     sProperties = jsonObj.ToJsonString();
                 }
                 sProperties ??= "{}";
@@ -612,7 +631,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                     Embedded = false,
                     LastUpdatedAt = now,
                     LastUpdatedBy = currentUserId,
-                    ExtractionId = extractionId
+                    ExtractionId = extractionId,
                 });
             }).ToList();
 
@@ -621,6 +640,26 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             foreach (var (sr, newRecord) in newRecords)
                 sr.PromotedId = newRecord.Id;
+
+            var distinctTags = extractedTags.Distinct().ToList();
+            var tagsToInsert = distinctTags.Select(t => new CreateTagRequestDto { Name = t.Name }).ToList();
+
+            var tagMap = await BulkUpsertTags(organizationId, currentUserId, projectId, tagsToInsert);
+
+            foreach (var (_, newRecord) in newRecords)
+            {
+                var recordTags = distinctTags
+                    .Where(tag => tagMap.ContainsKey(tag.Name))
+                    .Select(tag => new RecordTagLinkDto
+                    {
+                        RecordId = newRecord.Id,
+                        TagId = tagMap[tag.Name].Id
+                    })
+                    .ToList();
+
+                if (recordTags.Any())
+                    await _recordBusiness.BulkInsertRecordTagLinks(recordTags);
+            }
         }
 
         await _latticeContext.SaveChangesAsync();
@@ -851,4 +890,37 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     {
         return !e.PromotedId.HasValue && !e.Rejected;
     }
+
+    private async Task<Dictionary<string, TagResponseDto>> BulkUpsertTags(
+        long organizationId,
+        long currentUserId,
+        long projectId,
+        List<CreateTagRequestDto> tags)
+    {
+        var tagNames = tags.Select(t => t.Name).ToList();
+        var existingTags = await _context.Tags
+            .Where(t => t.ProjectId == projectId && tagNames.Contains(t.Name))
+            .ToDictionaryAsync(t => t.Name, t => new TagResponseDto
+            {
+                Id = t.Id,
+                Name = t.Name
+            });
+
+        var tagsToCreate = tags
+            .Where(t => !existingTags.ContainsKey(t.Name))
+            .ToList();
+
+        if (tagsToCreate.Count != 0)
+        {
+            var inserted = await _tagBusiness.BulkCreateTags(organizationId, currentUserId, projectId, tagsToCreate);
+
+            foreach (var newTag in inserted)
+            {
+                existingTags[newTag.Name] = newTag;
+            }
+        }
+
+        return existingTags;
+    }
+
 }

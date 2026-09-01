@@ -284,11 +284,13 @@ export type UpdateTagRequestDto = {
 export type CreateSensitivityLabelDto = {
   name: string;
   description?: string | null;
+  permissionActions?: string[];
 };
 
 export type UpdateSensitivityLabelDto = {
   name?: string | null;
   description?: string | null;
+  permissionActions?: string[];
 };
 
 export type AiModelProvider = "openai" | "anthropic" | "hpc" | "ollama";
