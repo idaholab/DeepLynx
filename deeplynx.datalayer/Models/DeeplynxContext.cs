@@ -552,6 +552,14 @@ public partial class DeeplynxContext : DbContext
             entity.HasIndex(e => e.HistoricalRecordId)
                 .HasDatabaseName("idx_provenance_records_historical_record_id");
 
+            entity.HasIndex(e => new { e.RecordId, e.Id })
+                .HasDatabaseName("idx_provenance_records_record_id_id");
+
+            entity.HasIndex(e => new { e.RecordId, e.PreviousHash })
+                .IsUnique()
+                .HasDatabaseName("ux_provenance_records_record_id_previous_hash")
+                .HasFilter("previous_hash IS NOT NULL");
+
             entity.Property(e => e.Id).UseIdentityAlwaysColumn();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
