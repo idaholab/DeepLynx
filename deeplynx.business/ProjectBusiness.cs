@@ -1087,6 +1087,9 @@ public class ProjectBusiness : IProjectBusiness
             await OverwriteProjectAdminCache(projectId, userId, groupId, makeProjectAdmin);
         }
 
+        // invalidate the project permissions cache
+        await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, projectId, userId, groupId, _logger);
+
         if (userId.HasValue && userId != UserContextStorage.UserId)
         {
             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -1157,6 +1160,9 @@ public class ProjectBusiness : IProjectBusiness
         {
             await OverwriteProjectAdminCache(projectId, userId, groupId, isProjectAdmin.Value);
         }
+
+        // invalidate the project permissions cache
+        await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, projectId, userId, groupId, _logger);
 
         return true;
     }
@@ -1254,6 +1260,9 @@ public class ProjectBusiness : IProjectBusiness
 
         // delete the cached admin flag now that it's changed
         await OverwriteProjectAdminCache(projectId, userId, groupId, isAdmin: false, deleting: true);
+
+        // invalidate the project permissions cache
+        await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, projectId, userId, groupId, _logger);
 
         return true;
     }

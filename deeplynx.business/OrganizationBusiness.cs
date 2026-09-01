@@ -489,7 +489,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Add(orgUser);
         await _context.SaveChangesAsync();
 
-        // overwrite the cached member and admin flags now that they've changed
+        // overwrite the cached member/admin flags and permissions now that they've changed
         try
         {
             await CacheService.Instance.SetAsync(CacheKeys.OrgMember(userId, organizationId), true, (TimeSpan?)null);
@@ -913,11 +913,10 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Update(existingOrgUser);
         await _context.SaveChangesAsync();
 
-        // overwrite the cached admin flag now that it's changed
+        // overwrite the cached member/admin flags and permissions now that they've changed
         try
         {
             await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, (TimeSpan?)null);
-
         }
         catch (Exception ex)
         {
@@ -946,7 +945,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Remove(existingOrgUser);
         await _context.SaveChangesAsync();
 
-        // invalidate the cached admin flag now that it's changed
+        // overwrite the cached member/admin flags and permissions now that they've changed
         try
         {
             await CacheService.Instance.DeleteAsync(CacheKeys.OrgMember(userId, organizationId));

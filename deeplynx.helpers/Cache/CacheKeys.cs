@@ -105,4 +105,14 @@ public class CacheKeys
     {
         return $"projectdefaultaimodelconfig:{projectId}:{modelType}";
     }
+
+    public static string ProjectPermission(long userId, long projectId, string action, string resource)
+    {
+        return $"projectpermission:{userId}:{projectId}:{action}:{resource}";
+    }
+
+    public static string ProjectPermittedIds(long userId, string action, string resource)
+    {
+        return $"projectpermittedids:{userId}:{action}:{resource}";
+    }
 }
