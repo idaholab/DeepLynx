@@ -119,6 +119,23 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     resetPagination();
   }, [viewGroupMembersModal.members, resetPagination]);
 
+  const {
+  currentPage: membersPage,
+  pageSize: membersPageSize,
+  paginatedItems: paginatedMembers,
+  resetPagination: resetMembersPagination,
+  setCurrentPage: setMembersPage,
+  setPageSize: setMembersPageSize,
+  totalPages: membersTotalPages,
+} = useLocalPagination({
+  items: tableData,
+  initialPageSize: 10,
+});
+
+useEffect(() => {
+  resetMembersPagination();
+}, [tableData, resetMembersPagination]);
+
   /* ------------------------------------------------------------------------ */
   /*                        Confirm Remove / Future Use                       */
   /* ------------------------------------------------------------------------ */
@@ -566,7 +583,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
           />
 
           <ProjectUsersListTable
-            tableData={tableData}
+            tableData={paginatedMembers}
             loading={loading}
             onEditRole={handleOpenEditRoleModal}
             onViewGroupMembers={handleViewGroupMembers}
@@ -580,6 +597,16 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
               })
             }
           />
+
+<div className="mt-2 flex justify-end">
+  <PaginationControls
+    currentPage={membersPage}
+    pageSize={membersPageSize}
+    totalPages={membersTotalPages}
+    onPageChange={setMembersPage}
+    onPageSizeChange={setMembersPageSize}
+  />
+</div>
 
           {/* Remove Member Modal */}
           <RemoveProjectMemberModal
