@@ -49,6 +49,8 @@ public class RecordResponseDto
 
     [Column("file_size")] public long? FileSize { get; set; }
 
+    [Column("extraction_id")] public long? ExtractionId { get; set; }
+
     [Column("file_content_hash")] public string? FileContentHash { get; set; }
 
     [NotMapped] public ICollection<RecordTagDto> Tags { get; set; } = new List<RecordTagDto>();
@@ -77,6 +79,7 @@ public class RecordResponseDto
             IsArchived = IsArchived,
             FileType = FileType,
             FileSize = FileSize,
+            ExtractionId = ExtractionId,
             FileContentHash = FileContentHash,
             Tags = Tags,
             SensitivityLabels = Labels,
@@ -119,6 +122,8 @@ public class RecordResponseDtoV2
     [Column("file_type")] public string? FileType { get; set; }
 
     [Column("file_size")] public long? FileSize { get; set; }
+
+    [Column("extraction_id")] public long? ExtractionId { get; set; }
 
     [Column("file_content_hash")] public string? FileContentHash { get; set; }
 

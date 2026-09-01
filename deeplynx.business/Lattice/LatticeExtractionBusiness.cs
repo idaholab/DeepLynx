@@ -98,6 +98,22 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
 
+        if (record.ExtractionId.HasValue)
+        {
+            var previousExtraction = await _context.Extractions
+                .FirstOrDefaultAsync(e => e.Id == record.ExtractionId.Value);
+
+            if (previousExtraction != null)
+            {
+                _context.Extractions.Remove(previousExtraction);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        record.ExtractionId = extraction.Id;
+        _context.Records.Update(record);
+        await _context.SaveChangesAsync();
+
         try
         {
             // IDs necessary for POST back from Insight 
