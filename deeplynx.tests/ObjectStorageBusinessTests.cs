@@ -965,7 +965,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         var exception =
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
                 _objectStorageBusiness.GetDefaultObjectStorage(oid3, null));
-        Assert.Contains("Default object storage not found", exception.Message);
+        Assert.Contains("Default object storage not set", exception.Message);
     }
 
     [Fact]
