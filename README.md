@@ -74,7 +74,7 @@ The Insight services connect to the same `nx-postgres` container as the rest of 
 
 The values need to point at the same database. If you change the credentials, make sure both sets match in `docker-compose.yaml`:
 
-| Setting  | Nexus (`server`, `nx-postgres`) | Insight (`insight-fastapi`, `insight-rabbitmq-runner`) |
+| Setting  | Nexus (`server`, `nx-postgres`) | Insight (`insight-fastapi`, `insight-worker-*`) |
 | -------- | --------------------------------------------------- | ------------------------------------------------------ |
 | Host     | `POSTGRES_DB_HOST`                                  | `PG_HOST`                                              |
 | Port     | `POSTGRES_PORT`                                     | `PG_PORT`                                              |
@@ -84,17 +84,13 @@ The values need to point at the same database. If you change the credentials, ma
 
 ### Developing Insight
 
-The default env file used by `insight-fastapi` and `insight-rabbitmq-runner` in `docker-compose.yaml` is `.env.production`, which has no model endpoints configured. If you are actively developing Insight and want default model endpoints wired in (which for production is not needed as Nexus will be configured to pass that information to Insight when Insights endpoints are called), swap the `env_file` for those two services in `docker-compose.yaml` to point at one of the development env files instead:
+`insight-rabbitmq`, `insight-fastapi`, and every `insight-worker-*` service in `docker-compose.yaml` read their config from a single `./deeplynx.insight/.env` file. Copy `deeplynx.insight/.env.example` to `deeplynx.insight/.env` to get started:
 
-- `./deeplynx.insight/.env.hpc.local` -- for HPC-hosted models via the INL API
-- `./deeplynx.insight/.env.ollama.local` -- for local models running via Ollama
-
-```yaml
-env_file:
-  - ./deeplynx.insight/.env.hpc.local
+```bash
+cp deeplynx.insight/.env.example deeplynx.insight/.env
 ```
 
-If you are using `.env.hpc.local`, make sure to fill in the auth tokens for the services you want to use as defaults (`LLM_AUTH_TOKEN`, `MM_AUTH_TOKEN`, `EMB_AUTH_TOKEN`). Those are left blank intentionally and the services will not authenticate without them.
+`.env.example` already ships with default HPC-hosted model endpoints filled in (`LLM_SERVER_URL`, `MM_SERVER_URL`, `EMB_SERVER_URL`, etc.) for local development convenience. Fill in the auth tokens for the services you want to use as defaults (`LLM_AUTH_TOKEN`, `MM_AUTH_TOKEN`, `EMB_AUTH_TOKEN`) — those are left blank intentionally and the services will not authenticate without them. In production these are not needed, since Nexus is configured to pass model configuration directly in API requests to Insight.
 
 ## Local Developmental Setup
 
