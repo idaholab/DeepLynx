@@ -99,7 +99,7 @@ export type RecordResponseDto = {
   fileSize?: number | null;
   fileContentHash?: string | null;
   tags?: { id: number | null; name: string }[];
-  labels?: { id: number | null; name: string }[];
+  sensitivityLabels?: { id: number | null; name: string }[];
 };
 
 export type PaginatedResponse<T> = {
@@ -134,7 +134,7 @@ export type RecordCollectionResponseDto = {
   isArchived: boolean;
   recordCount: number;
   tags?: RecordCollectionTagDto[];
-  labels?: RecordCollectionLabelDto[];
+  sensitivityLabels?: RecordCollectionLabelDto[];
 };
 
 export type PaginatedRecordCollectionsResponseDto =
@@ -266,6 +266,28 @@ export type SensitivityLabelsDto = {
   isArchived: boolean;
   projectId: number | null;
   organizationId: number | null;
+};
+
+export type UserSensitivityLabelResponseDto = {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  labelId: number;
+  grantedBy: number | null;
+  grantedByName: string | null;
+  grantedAt: string;
+};
+
+export type SensitivityLabelPermissionResponseDto = {
+  id: number;
+  labelId: number;
+  action: string;
+  name: string;
+  description: string | null;
+  lastUpdatedAt: string;
+  lastUpdatedBy: number | null;
+  isArchived: boolean;
 };
 
 export type UserResponseDto = {

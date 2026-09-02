@@ -163,46 +163,121 @@ namespace deeplynx.helpers
             await CacheService.Instance.SetAsync(CacheKeys.OrganizationDeleted(organizationId), true, DeletedOrganizationCacheTtl);
             await CacheService.Instance.DeleteAsync(CacheKeys.OrganizationArchivedStatus(organizationId));
         }
+        private static readonly TimeSpan DeletedProjectCacheTtl = TimeSpan.FromMinutes(5);
 
-        public static async Task<ProjectResponseDto> EnsureProjectExistsAsync(
+        public static async Task EnsureProjectExistsAsync(
             DeeplynxContext context,
             long projectId,
             bool hideArchived = true)
         {
-            // Try to get the cached list of projects
-            var projectResponseList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>("projects");
-
-            if (projectResponseList == null || projectResponseList.Count == 0)
-            {
-                // Cache is empty, so populate it
-                var projectList = await context.Projects.ToListAsync();
-
-                projectResponseList = projectList.Select(p => new ProjectResponseDto
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Description = p.Description,
-                    Abbreviation = p.Abbreviation,
-                    IsArchived = p.IsArchived,
-                    LastUpdatedAt = p.LastUpdatedAt,
-                    LastUpdatedBy = p.LastUpdatedBy,
-                    OrganizationId = p.OrganizationId
-                }).ToList();
-
-                // Store the list in the cache
-                await CacheService.Instance.SetAsync("projects", projectResponseList, TimeSpan.FromHours(1));
-            }
-
-            // Find the project by ID from the list
-            var project = projectResponseList.FirstOrDefault(p => p.Id == projectId);
-
-            if (project == null || hideArchived && project.IsArchived)
-            {
-
+            var deletedCacheKey = CacheKeys.ProjectDeleted(projectId);
+            var cachedDeleted = await CacheService.Instance.GetAsync<bool?>(deletedCacheKey);
+            if (cachedDeleted.HasValue && cachedDeleted.Value)
                 throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+            var cacheKey = CacheKeys.ProjectArchivedStatus(projectId);
+            var cachedIsArchived = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+
+            bool projectExists;
+            bool isArchived;
+
+            if (cachedIsArchived.HasValue)
+            {
+                projectExists = true;
+                isArchived = cachedIsArchived.Value;
+            }
+            else
+            {
+                var project = await context.Projects
+                    .Where(p => p.Id == projectId)
+                    .Select(p => new { p.IsArchived })
+                    .FirstOrDefaultAsync();
+
+                projectExists = project != null;
+
+                if (projectExists)
+                {
+                    isArchived = project!.IsArchived;
+                    await CacheService.Instance.SetAsync(cacheKey, isArchived, (TimeSpan?)null);
+                }
+                else
+                {
+                    isArchived = false;
+                }
             }
 
-            return project;
+            if (!projectExists)
+                throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+            if (hideArchived && isArchived)
+                throw new KeyNotFoundException($"Project with id {projectId} not found.");
+        }
+
+        /// <summary>
+        ///     Like EnsureProjectExistsAsync, but returns the full ProjectResponseDto for callers that
+        ///     need more than a throw-or-not check (currently: MetricsBusiness.GetProjectStorageSize,
+        ///     which needs OrganizationId to validate org/project ownership). Reuses the same
+        ///     ProjectArchivedStatus / ProjectDeleted cache entries as EnsureProjectExistsAsync, but
+        ///     always performs a DB fetch to build the DTO regardless of cache state.
+        /// </summary>
+        public static async Task<ProjectResponseDto> GetProjectExistsAsync(
+            DeeplynxContext context,
+            long projectId,
+            bool hideArchived = true)
+        {
+            var deletedCacheKey = CacheKeys.ProjectDeleted(projectId);
+            var cachedDeleted = await CacheService.Instance.GetAsync<bool?>(deletedCacheKey);
+            if (cachedDeleted.HasValue && cachedDeleted.Value)
+                throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+            var project = await context.Projects
+                .Where(p => p.Id == projectId)
+                .FirstOrDefaultAsync();
+
+            if (project == null)
+                throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+            if (hideArchived && project.IsArchived)
+                throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+            // Opportunistically populate the archived-status cache if it wasn't already set, so a
+            // subsequent EnsureProjectExistsAsync call for the same id gets a cache hit.
+            var cacheKey = CacheKeys.ProjectArchivedStatus(projectId);
+            var cachedIsArchived = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+            if (!cachedIsArchived.HasValue)
+                await CacheService.Instance.SetAsync(cacheKey, project.IsArchived, (TimeSpan?)null);
+
+            return new ProjectResponseDto
+            {
+                Id = project.Id,
+                Name = project.Name,
+                Description = project.Description,
+                Abbreviation = project.Abbreviation,
+                IsArchived = project.IsArchived,
+                LastUpdatedAt = project.LastUpdatedAt,
+                LastUpdatedBy = project.LastUpdatedBy,
+                OrganizationId = project.OrganizationId
+            };
+        }
+
+        /// <summary>
+        ///     Sets the cached archived status for a project, with no expiration. Call this whenever a
+        ///     mutation determines a project's archived status directly (create, archive, unarchive).
+        /// </summary>
+        public static Task SetProjectArchivedStatusCache(long projectId, bool isArchived)
+        {
+            return CacheService.Instance.SetAsync(CacheKeys.ProjectArchivedStatus(projectId), isArchived, (TimeSpan?)null);
+        }
+
+        /// <summary>
+        ///     Marks a project as not-existing in the cache with a short TTL, mirroring
+        ///     SetUserDeletedCache / SetOrganizationDeletedCache. Also clears the no-TTL
+        ///     ProjectArchivedStatus entry so it can't outlive the short TTL and mislead a later read.
+        /// </summary>
+        public static async Task SetProjectDeletedCache(long projectId)
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.ProjectDeleted(projectId), true, DeletedProjectCacheTtl);
+            await CacheService.Instance.DeleteAsync(CacheKeys.ProjectArchivedStatus(projectId));
         }
 
         public static async Task EnsureDataSourceExistsForProjectAsync(

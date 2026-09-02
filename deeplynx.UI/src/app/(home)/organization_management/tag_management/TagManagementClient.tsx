@@ -18,6 +18,7 @@ import {
   archiveSensitivityLabelOrg,
   createSensitivityLabelsOrg,
   getAllSensitivityLabelsOrg,
+  getPermissionsForLabelOrg,
   updateSensitivityLabelOrg,
 } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import {
@@ -31,7 +32,7 @@ import { AxiosError } from "axios";
 import { useRouter } from "next/navigation";
 import ConfirmArchiveLabelModal from "./ConfirmArchiveLabelModal";
 import ConfirmArchiveTagModal from "./ConfirmArchiveTagModal";
-import LabelEditModal from "./LabelEditModal";
+import LabelEditModal, { FILE_ACTIONS, RECORD_ACTIONS } from "./LabelEditModal";
 import OrganizationTagOverviewStrip from "./OrganizationTagOverviewStrip";
 import OrgTagsPanel from "./OrgTagsPanel";
 import SecurityLabelsOrg from "./SecurityLabelsOrg";
@@ -132,6 +133,10 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
   const [labelNameInput, setLabelNameInput] = useState("");
   const [labelDescriptionInput, setLabelDescriptionInput] = useState("");
   const [savingLabel, setSavingLabel] = useState(false);
+  const [selectedActions, setSelectedActions] = useState<Set<string>>(
+    new Set([...RECORD_ACTIONS, ...FILE_ACTIONS]),
+  );
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
 
   const [showArchiveLabelModal, setShowArchiveLabelModal] = useState(false);
   const [labelToArchive, setLabelToArchive] =
@@ -148,6 +153,17 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
     setLabelNameInput("");
     setLabelDescriptionInput("");
     setSavingLabel(false);
+    setSelectedActions(new Set([...RECORD_ACTIONS, ...FILE_ACTIONS]));
+    setPermissionsLoading(false);
+  };
+
+  const toggleAction = (action: string) => {
+    setSelectedActions((current) => {
+      const next = new Set(current);
+      if (next.has(action)) next.delete(action);
+      else next.add(action);
+      return next;
+    });
   };
 
   const openCreateTagModal = () => {
@@ -185,11 +201,22 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
   const openEditLabelModal = (id: number) => {
     resetLabelModalState();
     const found = labels.find((l) => l.id === id) || null;
-    if (found) {
+    if (found && orgId) {
       setEditingLabel(found);
       setLabelNameInput(found.name);
       setLabelDescriptionInput(found.description ?? "");
       setIsLabelModalOpen(true);
+      setPermissionsLoading(true);
+      getPermissionsForLabelOrg(orgId, found.id)
+        .then((perms) => {
+          setSelectedActions(
+            new Set(perms.filter((p) => !p.isArchived).map((p) => p.action)),
+          );
+        })
+        .catch((error) => {
+          console.error(`Failed to load permissions for label ${found.id}:`, error);
+        })
+        .finally(() => setPermissionsLoading(false));
     }
   };
 
@@ -325,6 +352,7 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
           {
             name: labelNameInput.trim(),
             description: labelDescriptionInput.trim() || null,
+            permissionActions: Array.from(selectedActions),
           },
         );
 
@@ -337,6 +365,7 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
         const created = await createSensitivityLabelsOrg(orgId, {
           name: labelNameInput.trim(),
           description: labelDescriptionInput.trim() || null,
+          permissionActions: Array.from(selectedActions),
         });
 
         setLabels((prev) => [...prev, created]);
@@ -509,10 +538,13 @@ const TagManagementClient: React.FC<Props> = ({ projects, initialLabels }) => {
         editingLabel={!!editingLabel}
         nameInput={labelNameInput}
         descriptionInput={labelDescriptionInput}
+        selectedActions={selectedActions}
         onNameChange={setLabelNameInput}
         onDescriptionChange={setLabelDescriptionInput}
+        onToggleAction={toggleAction}
         onCancel={closeLabelModal}
         onSave={handleSaveLabel}
+        permissionsLoading={permissionsLoading}
       />
 
       {/* Confirm Archive Modal */}

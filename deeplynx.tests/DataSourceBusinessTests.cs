@@ -2058,4 +2058,377 @@ public class DataSourceBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region DefaultDataSource Caching Tests
+
+    [Fact]
+    public async Task SetDefault_InOrganization_CachesDataSourceId()
+    {
+        // Act
+        await _dataSourceBusiness.SetDefaultDataSource(oid, null, uid, did2);
+
+        // Assert
+        var cacheKey = CacheKeys.OrganizationDefaultDataSource(oid);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(did2, cached.Value);
+    }
+
+    [Fact]
+    public async Task SetDefault_InProject_CachesDataSourceId()
+    {
+        // Act
+        await _dataSourceBusiness.SetDefaultDataSource(oid, pid, uid, did);
+
+        // Assert
+        var cacheKey = CacheKeys.ProjectDefaultDataSource(pid);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(did, cached.Value);
+    }
+
+    [Fact]
+    public async Task SetDefault_CalledTwice_OverwritesCachedDataSourceId()
+    {
+        // Arrange - second org-level data source to switch the default to
+        var orgDataSource2 = new DataSource
+        {
+            Name = "Org Data Source 2",
+            ProjectId = null,
+            Default = false,
+            OrganizationId = oid,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+        Context.DataSources.Add(orgDataSource2);
+        await Context.SaveChangesAsync();
+
+        // Act
+        await _dataSourceBusiness.SetDefaultDataSource(oid, null, uid, did2);
+        await _dataSourceBusiness.SetDefaultDataSource(oid, null, uid, orgDataSource2.Id);
+
+        // Assert
+        var cacheKey = CacheKeys.OrganizationDefaultDataSource(oid);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(orgDataSource2.Id, cached.Value);
+    }
+
+    [Fact]
+    public async Task SetDefault_InProject_DoesNotOverwriteOrganizationCache()
+    {
+        // Arrange
+        var organizationCacheKey = CacheKeys.OrganizationDefaultDataSource(oid);
+        var projectCacheKey = CacheKeys.ProjectDefaultDataSource(pid);
+
+        await CacheService.Instance.SetAsync(organizationCacheKey, did2, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.DeleteAsync(projectCacheKey);
+
+        try
+        {
+            // Act
+            await _dataSourceBusiness.SetDefaultDataSource(oid, pid, uid, did);
+
+            // Assert
+            var cachedOrganizationId = await CacheService.Instance.GetAsync<long?>(organizationCacheKey);
+            var cachedProjectId = await CacheService.Instance.GetAsync<long?>(projectCacheKey);
+
+            Assert.Equal(did2, cachedOrganizationId);
+            Assert.Equal(did, cachedProjectId);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(organizationCacheKey);
+            await CacheService.Instance.DeleteAsync(projectCacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Create_WithDefaultTrue_InOrganization_CachesDataSourceId()
+    {
+        // Arrange
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Cache Default Org",
+            Type = "PostgreSQL",
+            Default = true
+        };
+
+        // Act
+        var created = await _dataSourceBusiness.CreateDataSource(oid, null, uid, dto);
+
+        // Assert
+        var cacheKey = CacheKeys.OrganizationDefaultDataSource(oid);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(created.Id, cached.Value);
+    }
+
+    [Fact]
+    public async Task Create_WithDefaultTrue_InProject_CachesDataSourceId()
+    {
+        // Arrange
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Cache Default Project",
+            Type = "PostgreSQL",
+            Default = true
+        };
+
+        // Act
+        var created = await _dataSourceBusiness.CreateDataSource(oid, pid2, uid, dto);
+
+        // Assert
+        var cacheKey = CacheKeys.ProjectDefaultDataSource(pid2);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(created.Id, cached.Value);
+    }
+
+    [Fact]
+    public async Task Create_WithDefaultFalse_DoesNotWriteCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.OrganizationDefaultDataSource(oid);
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Nondefault Organization Source",
+            Type = "PostgreSQL",
+            Default = false
+        };
+
+        try
+        {
+            // Act
+            await _dataSourceBusiness.CreateDataSource(oid, null, uid, dto);
+
+            // Assert
+            Assert.Null(await CacheService.Instance.GetAsync<long?>(cacheKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetDefault_InOrganization_CacheMiss_PopulatesCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.OrganizationDefaultDataSource(oid);
+
+        var orgDataSource = await Context.DataSources.FindAsync(did2);
+        orgDataSource!.Default = true;
+        await Context.SaveChangesAsync();
+
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        try
+        {
+            // Act
+            var result = await _dataSourceBusiness.GetDefaultDataSource(oid, null);
+
+            // Assert
+            var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+
+            Assert.Equal(did2, result.Id);
+            Assert.Equal(did2, cached);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetDefault_InProject_CacheMiss_PopulatesCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectDefaultDataSource(pid);
+
+        var projectDataSource = await Context.DataSources.FindAsync(did);
+        projectDataSource!.Default = true;
+        await Context.SaveChangesAsync();
+
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        try
+        {
+            // Act
+            var result = await _dataSourceBusiness.GetDefaultDataSource(oid, pid);
+
+            // Assert
+            var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+
+            Assert.Equal(did, result.Id);
+            Assert.Equal(did, cached);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetDefault_InOrganization_CacheHit_UsesCachedDataSourceId()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.OrganizationDefaultDataSource(oid);
+
+        // Establish did2 as the database default value.
+        var orgDataSource = await Context.DataSources.FindAsync(did2);
+        orgDataSource!.Default = true;
+        await Context.SaveChangesAsync();
+
+        // Create a second, valid org-level data source and deliberately cache
+        // its id instead, to prove the cached value wins over the DB value.
+        var alternateOrgDataSource = new DataSource
+        {
+            Name = "Alternate Org Data Source",
+            ProjectId = null,
+            Default = false,
+            OrganizationId = oid,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+        Context.DataSources.Add(alternateOrgDataSource);
+        await Context.SaveChangesAsync();
+
+        await CacheService.Instance.SetAsync(cacheKey, alternateOrgDataSource.Id, TimeSpan.FromMinutes(2));
+
+        try
+        {
+            // Act
+            var result = await _dataSourceBusiness.GetDefaultDataSource(oid, null);
+
+            // Assert
+            Assert.Equal(alternateOrgDataSource.Id, result.Id);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Archive_WhenDefault_InvalidatesCache()
+    {
+        // Arrange - make did the project-level default and confirm it's cached
+        await _dataSourceBusiness.SetDefaultDataSource(oid, pid, uid, did);
+        var cacheKey = CacheKeys.ProjectDefaultDataSource(pid);
+        Assert.Equal(did, await CacheService.Instance.GetAsync<long?>(cacheKey));
+
+        try
+        {
+            // Act
+            await _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, did);
+
+            // Assert - cache no longer resolves the now-archived default
+            Assert.Null(await CacheService.Instance.GetAsync<long?>(cacheKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Archive_WhenNotDefault_DoesNotInvalidateCache()
+    {
+        // Arrange - did2 is the cached org-level default
+        await _dataSourceBusiness.SetDefaultDataSource(oid, null, uid, did2);
+        var cacheKey = CacheKeys.OrganizationDefaultDataSource(oid);
+        Assert.Equal(did2, await CacheService.Instance.GetAsync<long?>(cacheKey));
+
+        try
+        {
+            // Act - archive an unrelated, non-default project-level data source
+            await _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, did);
+
+            // Assert - unrelated org-level default cache entry is untouched
+            Assert.Equal(did2, await CacheService.Instance.GetAsync<long?>(cacheKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Unarchive_WhenDefault_RepopulatesCache()
+    {
+        // Arrange - did3 is archived; flag it as default (simulating a data source that
+        // was default before being archived) and clear any stale cache entry
+        var archivedDefault = await Context.DataSources.FindAsync(did3);
+        archivedDefault!.Default = true;
+        await Context.SaveChangesAsync();
+
+        var cacheKey = CacheKeys.ProjectDefaultDataSource(pid);
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        try
+        {
+            // Act
+            await _dataSourceBusiness.UnarchiveDataSource(oid, pid, uid, did3);
+
+            // Assert - cache is repopulated immediately rather than waiting for the next
+            // cache-miss lookup
+            var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+            Assert.Equal(did3, cached);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Delete_WhenDefault_InvalidatesCache()
+    {
+        // Arrange
+        await _dataSourceBusiness.SetDefaultDataSource(oid, null, uid, did2);
+        var cacheKey = CacheKeys.OrganizationDefaultDataSource(oid);
+        Assert.Equal(did2, await CacheService.Instance.GetAsync<long?>(cacheKey));
+
+        try
+        {
+            // Act
+            await _dataSourceBusiness.DeleteDataSource(oid, null, did2);
+
+            // Assert
+            Assert.Null(await CacheService.Instance.GetAsync<long?>(cacheKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Delete_WhenNotDefault_DoesNotInvalidateCache()
+    {
+        // Arrange - did2 is the cached org-level default
+        await _dataSourceBusiness.SetDefaultDataSource(oid, null, uid, did2);
+        var cacheKey = CacheKeys.OrganizationDefaultDataSource(oid);
+        Assert.Equal(did2, await CacheService.Instance.GetAsync<long?>(cacheKey));
+
+        try
+        {
+            // Act - delete an unrelated, non-default project-level data source
+            await _dataSourceBusiness.DeleteDataSource(oid, pid, did);
+
+            // Assert - unrelated org-level default cache entry is untouched
+            Assert.Equal(did2, await CacheService.Instance.GetAsync<long?>(cacheKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    #endregion
 }

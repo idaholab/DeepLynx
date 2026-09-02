@@ -10,9 +10,8 @@ public interface IUserBusiness
     Task<PaginatedResponse<UserResponseDto>> GetAllUsersPaginated(
         PaginatedRequestDto dto, long? projectId, long? organizationId,
         bool includeArchived = false, bool includeServiceAccounts = false,
-        bool includeTestAccounts = false);
+        bool includeTestAccounts = false, bool activeOnly = false, bool recentLoginOnly = false);
     Task<UserActivityCountsDto> GetActiveUserCounts(long? projectId, long? organizationId, bool includeServiceAccounts = false);
-    Task<UserActivityUsersDto> GetActiveUsers(long? projectId, long? organizationId, bool includeServiceAccounts = false);
     Task<UserResponseDto> GetUser(long userId);
     Task<UserAdminInfoDto> GetUserAdminInfo(long userId, long? organizationId = null, long? projectId = null);
     Task<UserResponseDto> GetLocalDevUser();

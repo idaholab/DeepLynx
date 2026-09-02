@@ -29,7 +29,8 @@ import UsersListTable from "./UsersListTable";
 import { UsersTableRow } from "../../types/types";
 import { useLanguage } from "@/app/contexts/Language";
 import Tabs from "@/app/(home)/components/Tabs";
-
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
 /* -------------------------------------------------------------------------- */
@@ -479,6 +480,23 @@ const UsersTable = ({
   { label: "archived", displayLabel: t.translations.ARCHIVED_USERS, content: userContent },
 ];
 
+const {
+    currentPage: usersPage,
+    pageSize: usersPageSize,
+    paginatedItems: paginatedUsers,
+    resetPagination: resetUsersPagination,
+    setCurrentPage: setUsersPage,
+    setPageSize: setUsersPageSize,
+    totalPages: usersTotalPages,
+  } = useLocalPagination({
+    items: tableData,
+    initialPageSize: 10,
+  });
+
+useEffect(() => {
+  resetUsersPagination();
+}, [tableData, resetUsersPagination]);
+
   /* ------------------------------------------------------------------------ */
   /*                               Main Render                                */
   /* ------------------------------------------------------------------------ */
@@ -505,8 +523,9 @@ const UsersTable = ({
             tabs={tabs}
           />
         ) : (
+          <>
           <UsersListTable
-            tableData={tableData}
+            tableData={paginatedUsers}
             scope={scope}
             loading={loading}
             onResendInvite={handleResendInvite}
@@ -518,6 +537,16 @@ const UsersTable = ({
             }}
             onOpenConfirm={(item) => setConfirmModal(item)}
           />
+           <div className="mt-2 flex justify-end">
+            <PaginationControls
+              currentPage={usersPage}
+              pageSize={usersPageSize}
+              totalPages={usersTotalPages}
+              onPageChange={setUsersPage}
+              onPageSizeChange={setUsersPageSize}
+            />
+          </div>
+        </>
         )}
         </div>
       </div>
