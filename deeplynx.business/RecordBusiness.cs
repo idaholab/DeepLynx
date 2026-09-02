@@ -1080,6 +1080,8 @@ public class RecordBusiness : IRecordBusiness
             _context.Records.Add(record);
             await _context.SaveChangesAsync();
 
+            await InvalidateRecordCountCaches(organizationId, projectId);
+
             if (dto.Tags != null)
             {
                 dto.Tags = dto.Tags.Select(tag => string.IsNullOrWhiteSpace(tag) ? null : tag).ToList();
@@ -1510,6 +1512,8 @@ public class RecordBusiness : IRecordBusiness
 
         await tx.CommitAsync();
 
+        await InvalidateRecordCountCaches(organizationId, projectId);
+
         // Trigger provenance record creation
         var insertedRecordIds = inserted.Select(r => r.Id).ToList();
         if (!await _provenanceBusiness.BulkCreateProvenanceRecords(insertedRecordIds, "create-record", currentUserId, null))
@@ -1591,6 +1595,7 @@ public class RecordBusiness : IRecordBusiness
         }
 
         await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+        await InvalidateRecordCountCaches(organizationId, projectId);
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "archive-record", currentUserId, null))
@@ -1660,6 +1665,7 @@ public class RecordBusiness : IRecordBusiness
         }
 
         await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+        await InvalidateRecordCountCaches(organizationId, projectId);
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "unarchive-record", currentUserId, null))
@@ -1712,6 +1718,8 @@ public class RecordBusiness : IRecordBusiness
         await RecordFileHelper.TryDeleteFiles(query, _fileBusinessFactory, _objectStorageBusiness);
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
+
+        await InvalidateRecordCountCaches(organizationId, projectId);
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "delete-record", currentUserId, null))
@@ -2515,4 +2523,22 @@ public class RecordBusiness : IRecordBusiness
     }
 
     #endregion
+
+    /// <summary>
+    ///     Used for invalidating the cached record count values on mutation. 
+    /// </summary>
+    private static Task InvalidateRecordCountCaches(long organizationId, long projectId)
+    {
+        var keys = new List<string>
+        {
+            CacheKeys.SystemRecordCount(true),
+            CacheKeys.SystemRecordCount(false),
+            CacheKeys.OrganizationRecordCount(organizationId, true),
+            CacheKeys.OrganizationRecordCount(organizationId, false),
+            CacheKeys.ProjectRecordCount(projectId, true),
+            CacheKeys.ProjectRecordCount(projectId, false)
+        };
+
+        return Task.WhenAll(keys.Select(CacheService.Instance.DeleteAsync));
+    }
 }
