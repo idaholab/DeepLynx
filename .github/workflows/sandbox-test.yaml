@@ -216,7 +216,7 @@ jobs:
             --file deeplynx.insight/Dockerfiles/Dockerfile.rabbitmq.production \
             deeplynx.insight
 
-  build-insight-rabbitmq-runner:
+  build-insight-worker-file-downloader:
     runs-on: [self-hosted]
     environment: Test
     steps:
@@ -251,8 +251,369 @@ jobs:
           az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
           az account set --subscription "$ACR_SUBSCRIPTION"
           az acr build --registry $ACR_REGISTRY \
-            --image $ACR_PATH:insight-rabbitmq-runner-$GITHUB_RUN_NUMBER \
+            --image $ACR_PATH:insight-worker-file-downloader-$GITHUB_RUN_NUMBER \
             --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
+            --build-arg WORKER_EXTRA=worker-file-downloader \
+            deeplynx.insight
+
+  build-insight-worker-pdf-to-img:
+    runs-on: [self-hosted]
+    environment: Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
+      - shell: bash
+        name: Container Build
+        env:
+          ACR_SP_USER: ${{ secrets.CI_SP_USER }}
+          ACR_SP_PASSWORD: ${{ secrets.CI_SP_PASSWORD }}
+          ACR_REGISTRY: ${{ secrets.CI_REGISTRY }}
+          ACR_PATH: ${{ secrets.CI_REGISTRY_PATH }}
+          ACR_SP_TENANT: ${{ secrets.CI_SP_TENANT }}
+          ACR_SUBSCRIPTION: ${{ secrets.CI_ACR_SUBSCRIPTION }}
+          GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
+        run: |
+          az cloud set --name AzureUSGovernment
+          az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
+          az account set --subscription "$ACR_SUBSCRIPTION"
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-worker-pdf-to-img-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
+            --build-arg WORKER_EXTRA=worker-pdf-to-img \
+            deeplynx.insight
+
+  build-insight-worker-image-file-to-image:
+    runs-on: [self-hosted]
+    environment: Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
+      - shell: bash
+        name: Container Build
+        env:
+          ACR_SP_USER: ${{ secrets.CI_SP_USER }}
+          ACR_SP_PASSWORD: ${{ secrets.CI_SP_PASSWORD }}
+          ACR_REGISTRY: ${{ secrets.CI_REGISTRY }}
+          ACR_PATH: ${{ secrets.CI_REGISTRY_PATH }}
+          ACR_SP_TENANT: ${{ secrets.CI_SP_TENANT }}
+          ACR_SUBSCRIPTION: ${{ secrets.CI_ACR_SUBSCRIPTION }}
+          GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
+        run: |
+          az cloud set --name AzureUSGovernment
+          az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
+          az account set --subscription "$ACR_SUBSCRIPTION"
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-worker-image-file-to-image-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
+            --build-arg WORKER_EXTRA=worker-image-file-to-image \
+            deeplynx.insight
+
+  build-insight-worker-img-to-text:
+    runs-on: [self-hosted]
+    environment: Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
+      - shell: bash
+        name: Container Build
+        env:
+          ACR_SP_USER: ${{ secrets.CI_SP_USER }}
+          ACR_SP_PASSWORD: ${{ secrets.CI_SP_PASSWORD }}
+          ACR_REGISTRY: ${{ secrets.CI_REGISTRY }}
+          ACR_PATH: ${{ secrets.CI_REGISTRY_PATH }}
+          ACR_SP_TENANT: ${{ secrets.CI_SP_TENANT }}
+          ACR_SUBSCRIPTION: ${{ secrets.CI_ACR_SUBSCRIPTION }}
+          GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
+        run: |
+          az cloud set --name AzureUSGovernment
+          az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
+          az account set --subscription "$ACR_SUBSCRIPTION"
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-worker-img-to-text-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
+            --build-arg WORKER_EXTRA=worker-img-to-text \
+            deeplynx.insight
+
+  build-insight-worker-txt-to-text:
+    runs-on: [self-hosted]
+    environment: Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
+      - shell: bash
+        name: Container Build
+        env:
+          ACR_SP_USER: ${{ secrets.CI_SP_USER }}
+          ACR_SP_PASSWORD: ${{ secrets.CI_SP_PASSWORD }}
+          ACR_REGISTRY: ${{ secrets.CI_REGISTRY }}
+          ACR_PATH: ${{ secrets.CI_REGISTRY_PATH }}
+          ACR_SP_TENANT: ${{ secrets.CI_SP_TENANT }}
+          ACR_SUBSCRIPTION: ${{ secrets.CI_ACR_SUBSCRIPTION }}
+          GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
+        run: |
+          az cloud set --name AzureUSGovernment
+          az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
+          az account set --subscription "$ACR_SUBSCRIPTION"
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-worker-txt-to-text-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
+            --build-arg WORKER_EXTRA=worker-txt-to-text \
+            deeplynx.insight
+
+  build-insight-worker-text-to-chunks:
+    runs-on: [self-hosted]
+    environment: Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
+      - shell: bash
+        name: Container Build
+        env:
+          ACR_SP_USER: ${{ secrets.CI_SP_USER }}
+          ACR_SP_PASSWORD: ${{ secrets.CI_SP_PASSWORD }}
+          ACR_REGISTRY: ${{ secrets.CI_REGISTRY }}
+          ACR_PATH: ${{ secrets.CI_REGISTRY_PATH }}
+          ACR_SP_TENANT: ${{ secrets.CI_SP_TENANT }}
+          ACR_SUBSCRIPTION: ${{ secrets.CI_ACR_SUBSCRIPTION }}
+          GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
+        run: |
+          az cloud set --name AzureUSGovernment
+          az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
+          az account set --subscription "$ACR_SUBSCRIPTION"
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-worker-text-to-chunks-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
+            --build-arg WORKER_EXTRA=worker-text-to-chunks \
+            deeplynx.insight
+
+  build-insight-worker-html-to-chunks:
+    runs-on: [self-hosted]
+    environment: Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
+      - shell: bash
+        name: Container Build
+        env:
+          ACR_SP_USER: ${{ secrets.CI_SP_USER }}
+          ACR_SP_PASSWORD: ${{ secrets.CI_SP_PASSWORD }}
+          ACR_REGISTRY: ${{ secrets.CI_REGISTRY }}
+          ACR_PATH: ${{ secrets.CI_REGISTRY_PATH }}
+          ACR_SP_TENANT: ${{ secrets.CI_SP_TENANT }}
+          ACR_SUBSCRIPTION: ${{ secrets.CI_ACR_SUBSCRIPTION }}
+          GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
+        run: |
+          az cloud set --name AzureUSGovernment
+          az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
+          az account set --subscription "$ACR_SUBSCRIPTION"
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-worker-html-to-chunks-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
+            --build-arg WORKER_EXTRA=worker-html-to-chunks \
+            deeplynx.insight
+
+  build-insight-worker-docx-to-chunks:
+    runs-on: [self-hosted]
+    environment: Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
+      - shell: bash
+        name: Container Build
+        env:
+          ACR_SP_USER: ${{ secrets.CI_SP_USER }}
+          ACR_SP_PASSWORD: ${{ secrets.CI_SP_PASSWORD }}
+          ACR_REGISTRY: ${{ secrets.CI_REGISTRY }}
+          ACR_PATH: ${{ secrets.CI_REGISTRY_PATH }}
+          ACR_SP_TENANT: ${{ secrets.CI_SP_TENANT }}
+          ACR_SUBSCRIPTION: ${{ secrets.CI_ACR_SUBSCRIPTION }}
+          GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
+        run: |
+          az cloud set --name AzureUSGovernment
+          az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
+          az account set --subscription "$ACR_SUBSCRIPTION"
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-worker-docx-to-chunks-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
+            --build-arg WORKER_EXTRA=worker-docx-to-chunks \
+            deeplynx.insight
+
+  build-insight-worker-tracking-service:
+    runs-on: [self-hosted]
+    environment: Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
+      - shell: bash
+        name: Container Build
+        env:
+          ACR_SP_USER: ${{ secrets.CI_SP_USER }}
+          ACR_SP_PASSWORD: ${{ secrets.CI_SP_PASSWORD }}
+          ACR_REGISTRY: ${{ secrets.CI_REGISTRY }}
+          ACR_PATH: ${{ secrets.CI_REGISTRY_PATH }}
+          ACR_SP_TENANT: ${{ secrets.CI_SP_TENANT }}
+          ACR_SUBSCRIPTION: ${{ secrets.CI_ACR_SUBSCRIPTION }}
+          GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
+        run: |
+          az cloud set --name AzureUSGovernment
+          az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
+          az account set --subscription "$ACR_SUBSCRIPTION"
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-worker-tracking-service-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
+            --build-arg WORKER_EXTRA=worker-tracking-service \
+            deeplynx.insight
+
+  build-insight-worker-ontology-to-vectors:
+    runs-on: [self-hosted]
+    environment: Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ssh-known-hosts: ${{ secrets.GHE_KNOWN_HOSTS }}
+      - name: Checkout Insight Submodule
+        env:
+          INSIGHT_KEY: ${{ secrets.DEPLOY_KEY_INSIGHT }}
+          KNOWN_HOSTS: ${{ secrets.GHE_KNOWN_HOSTS }}
+        run: |
+          echo "$INSIGHT_KEY" > /tmp/insight_deploy
+          echo "$KNOWN_HOSTS" > /tmp/known_hosts
+          chmod 600 /tmp/insight_deploy
+          GIT_SSH_COMMAND="ssh -i /tmp/insight_deploy -o UserKnownHostsFile=/tmp/known_hosts" git submodule update --init --recursive deeplynx.insight
+          rm /tmp/insight_deploy /tmp/known_hosts
+      - shell: bash
+        name: Container Build
+        env:
+          ACR_SP_USER: ${{ secrets.CI_SP_USER }}
+          ACR_SP_PASSWORD: ${{ secrets.CI_SP_PASSWORD }}
+          ACR_REGISTRY: ${{ secrets.CI_REGISTRY }}
+          ACR_PATH: ${{ secrets.CI_REGISTRY_PATH }}
+          ACR_SP_TENANT: ${{ secrets.CI_SP_TENANT }}
+          ACR_SUBSCRIPTION: ${{ secrets.CI_ACR_SUBSCRIPTION }}
+          GITHUB_RUN_NUMBER: ${{ github.RUN_NUMBER }}
+        run: |
+          az cloud set --name AzureUSGovernment
+          az login --service-principal -u "$ACR_SP_USER" -p "$ACR_SP_PASSWORD" --tenant "$ACR_SP_TENANT"
+          az account set --subscription "$ACR_SUBSCRIPTION"
+          az acr build --registry $ACR_REGISTRY \
+            --image $ACR_PATH:insight-worker-ontology-to-vectors-$GITHUB_RUN_NUMBER \
+            --file deeplynx.insight/Dockerfiles/Dockerfile.runner.production \
+            --build-arg WORKER_EXTRA=worker-ontology-to-vectors \
             deeplynx.insight
 
   build-insight-fastapi:
@@ -302,7 +663,16 @@ jobs:
         build-docs,
         build-mcp,
         build-insight-rabbitmq,
-        build-insight-rabbitmq-runner,
+        build-insight-worker-file-downloader,
+        build-insight-worker-pdf-to-img,
+        build-insight-worker-image-file-to-image,
+        build-insight-worker-img-to-text,
+        build-insight-worker-txt-to-text,
+        build-insight-worker-text-to-chunks,
+        build-insight-worker-html-to-chunks,
+        build-insight-worker-docx-to-chunks,
+        build-insight-worker-tracking-service,
+        build-insight-worker-ontology-to-vectors,
         build-insight-fastapi,
       ]
     runs-on: [self-hosted]
