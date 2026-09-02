@@ -129,13 +129,11 @@ const ProjectManagementClient = ({
       content: <DataSources projectId={editingProject?.id as number} />,
     },
     {
-      label: t.translations.TAGS_AND_SECURITY_LABELS,
+      label: t.translations.TAGS,
       content: (
         <ProjectTagAndLabelManagementClient
           project={editingProject as ProjectResponseDto}
           orgTagsLocked={false}
-          initialLabels={labels}
-          refreshLabels={refreshLabels}
         />
       ),
     },
