@@ -121,7 +121,6 @@ public class SensitivityLabelService : ISensitivityLabelService
             .Select(l => l.Id)
             .ToHashSet();
 
-        // Update the cache 
         foreach (long projectId in uncachedProjectIds)
         {
             var projectAuthorized = new HashSet<long>(orgLevelAuthorized);
@@ -129,6 +128,7 @@ public class SensitivityLabelService : ISensitivityLabelService
 
             authorizedLabelIds.UnionWith(projectAuthorized);
 
+            // Update the cache 
             string cacheKey = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId, currentUserId, userAction);
             try
             {
