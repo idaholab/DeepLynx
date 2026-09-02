@@ -1,4 +1,3 @@
-using System.Text.Json;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.Cache;
@@ -11,7 +10,6 @@ using DotNetEnv;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 using Microsoft.AspNetCore.Http;
 using Azure.Storage.Blobs;
-using System.Text.RegularExpressions;
 
 
 namespace deeplynx.business;
@@ -302,7 +300,7 @@ public class OrganizationBusiness : IOrganizationBusiness
 
         if (dto.DefaultObjectStorageId != null)
         {
-            organization.DefaultObjectStorageId = dto.DefaultObjectStorageId;
+            organization.DefaultObjectStorageId = dto.DefaultObjectStorageId.Value;
         }
 
         organization.Name = dto.Name ?? organization.Name;
@@ -491,7 +489,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Add(orgUser);
         await _context.SaveChangesAsync();
 
-        // overwrite the cached member and admin flags now that they've changed
+        // overwrite the cached member/admin flags and permissions now that they've changed
         try
         {
             await CacheService.Instance.SetAsync(CacheKeys.OrgMember(userId, organizationId), true, (TimeSpan?)null);
@@ -915,11 +913,10 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Update(existingOrgUser);
         await _context.SaveChangesAsync();
 
-        // overwrite the cached admin flag now that it's changed
+        // overwrite the cached member/admin flags and permissions now that they've changed
         try
         {
             await CacheService.Instance.SetAsync(CacheKeys.OrgAdmin(userId, organizationId), isAdmin, (TimeSpan?)null);
-
         }
         catch (Exception ex)
         {
@@ -948,7 +945,7 @@ public class OrganizationBusiness : IOrganizationBusiness
         _context.OrganizationUsers.Remove(existingOrgUser);
         await _context.SaveChangesAsync();
 
-        // invalidate the cached admin flag now that it's changed
+        // overwrite the cached member/admin flags and permissions now that they've changed
         try
         {
             await CacheService.Instance.DeleteAsync(CacheKeys.OrgMember(userId, organizationId));
@@ -1032,10 +1029,22 @@ public class OrganizationBusiness : IOrganizationBusiness
         {
             Name = "Instance Default",
             Config = configDto,
-            Default = true
         };
-        await _objectStorageBusiness.CreateObjectStorage(
+
+
+        var objectStorageResponse = await _objectStorageBusiness.CreateObjectStorage(
             currentUserId, organizationId, null, objectStorageRequestDto);
+
+        var organization = await _context.Organizations
+                .Where(o => o.Id == organizationId)
+                .FirstOrDefaultAsync() ?? throw new KeyNotFoundException($"Organization with id {organizationId} not found");
+
+        organization.DefaultObjectStorageId = objectStorageResponse.Id;
+
+        _context.Organizations.Update(organization);
+
+        await _context.SaveChangesAsync();
+
 
         // ===============================
         // CREATE DEFAULT ROLES

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using deeplynx.datalayer.Models;
@@ -11,9 +12,11 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    partial class DeeplynxContextModelSnapshot : ModelSnapshot
+    [Migration("20260901192930_RemoveDefaultFromObjectStorage")]
+    partial class RemoveDefaultFromObjectStorage
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -843,7 +846,7 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("mode");
 
-                    b.Property<long>("ProjectId")
+                    b.Property<long?>("ProjectId")
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
 
@@ -1602,8 +1605,8 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("create_container_per_project");
 
-                    b.Property<long>("DefaultObjectStorageId")
-                        .HasColumnType("bigint")
+                    b.Property<int?>("DefaultObjectStorageId")
+                        .HasColumnType("integer")
                         .HasColumnName("default_object_storage_id");
 
                     b.Property<bool>("DefaultOrg")
@@ -1814,8 +1817,8 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("banner");
 
-                    b.Property<long>("DefaultObjectStorageId")
-                        .HasColumnType("bigint")
+                    b.Property<int?>("DefaultObjectStorageId")
+                        .HasColumnType("integer")
                         .HasColumnName("default_object_storage_id");
 
                     b.Property<string>("Description")

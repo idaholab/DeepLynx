@@ -13,5 +13,5 @@ public class ProjectResponseDto
     public string? Banner { get; set; }
     public bool? RequireSensitivityLabel { get; set; }
     public ObjectStorageResponseDto? AssociatedObjectStorage { get; set; }
-    public int? DefaultObjectStorageId { get; set; }
+    public long? DefaultObjectStorageId { get; set; }
 }

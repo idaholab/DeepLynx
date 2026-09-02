@@ -14,5 +14,5 @@ public class OrganizationResponseDto
     public string Theme { get; set; } = "default";
     public bool? CreateContainerPerProject { get; set; } = false;
     public bool? DisableFileTransfer { get; set; } = false;
-    public int? DefaultObjectStorageId { get; set; } = null;
+    public long DefaultObjectStorageId { get; set; }
 }

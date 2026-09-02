@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -845,6 +846,31 @@ public class GroupBusinessTests : IntegrationTestBase
         Assert.DoesNotContain(group.Users, u => u.Id == uidSa);
     }
 
+    [Fact]
+    public async Task AddUser_InvalidatesProjectPermissionCache_ForProjectsGroupBelongsTo()
+    {
+        // Arrange: create a project and attach the group to it as a member
+        var project = new Project { Name = "Group Cache Test Project", OrganizationId = oid };
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+
+        Context.ProjectMembers.Add(new ProjectMember { ProjectId = project.Id, GroupId = gid });
+        await Context.SaveChangesAsync();
+
+        // Pre-populate cache as if uid2 (about to be added) had a stale cached "false"
+        var permKey = CacheKeys.ProjectPermission(uid2, project.Id, "read", "test");
+        var permittedIdsKey = CacheKeys.ProjectPermittedIds(uid2, "read", "test");
+        await CacheService.Instance.SetAsync(permKey, false, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(permittedIdsKey, new List<long> { }, (TimeSpan?)null);
+
+        // Act
+        await _groupBusiness.AddUserToGroup(uid2, oid, gid);
+
+        // Assert: both the specific permission key and the permitted-ids key are gone
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(permKey));
+        Assert.Null(await CacheService.Instance.GetAsync<List<long>>(permittedIdsKey));
+    }
+
     #endregion
 
     #region RemoveUser Tests
@@ -887,6 +913,22 @@ public class GroupBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _groupBusiness.RemoveUserFromGroup(99999, oid, gid));
 
         Assert.Contains("User with id 99999 does not exist", exception.Message);
+    }
+
+    [Fact]
+    public async Task AddUserToGroup_GroupWithNoProjectAssignment_DoesNotThrow()
+    {
+        Exception? exception = null;
+        try
+        {
+            await _groupBusiness.AddUserToGroup(uid2, oid, gid);
+        }
+        catch (Exception ex)
+        {
+            exception = ex;
+        }
+
+        Assert.Null(exception);
     }
 
     #endregion

@@ -19,5 +19,5 @@ public class UpdateOrganizationRequestDto
     public OrganizationTheme? Theme { get; set; }
     public bool? CreateContainerPerProject { get; set; } = false;
     public bool? DisableFileTransfer { get; set; } = false;
-    public int? DefaultObjectStorageId { get; set; } = null;
+    public long? DefaultObjectStorageId { get; set; }
 }
