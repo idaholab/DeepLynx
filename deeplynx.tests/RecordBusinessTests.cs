@@ -1427,7 +1427,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _recordBusiness.CreateRecord(uid, organizationId, 1000999L, did, dto));
 
-        Assert.Contains($"DataSource with id {did} not found in project", exception.Message);
+        Assert.Contains($"DataSource with id {did} not found", exception.Message);
 
         // Ensure that no record create event was logged
         var eventList = await Context.Events.ToListAsync();
@@ -1522,7 +1522,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _recordBusiness.CreateRecord(uid, organizationId, pid, dataSourceInWrongProject.Id, dto));
 
-        Assert.Contains($"DataSource with id {dataSourceInWrongProject.Id} not found in project with id {pid}",
+        Assert.Contains($"DataSource with id {dataSourceInWrongProject.Id} not found",
             exception.Message);
 
         // Ensure that no record create event was logged

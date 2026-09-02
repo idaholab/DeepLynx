@@ -309,7 +309,7 @@ namespace deeplynx.helpers
             {
                 entry = cached;
                 if (cached.Status == EntityStatus.Deleted)
-                    throw new KeyNotFoundException($"data source with id {dataSourceId} not found");
+                    throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found");
             } 
             else
             {
@@ -338,7 +338,7 @@ namespace deeplynx.helpers
                 }
                 catch (Exception ex)
                 {
-                    logger?.LogWarning(ex, "Data source status cache update failed for key {Key}", cacheKey);
+                    logger?.LogWarning(ex, "DataSource status cache update failed for key {Key}", cacheKey);
                 }
             }
 
@@ -347,10 +347,10 @@ namespace deeplynx.helpers
                 (entry.ProjectId == null || entry.ProjectId == projectId);
 
             if (!belongsToScope || entry.Status == EntityStatus.Deleted)
-                throw new KeyNotFoundException($"data source with id {dataSourceId} not found");
+                throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found");
 
             if (hideArchived && entry.Status == EntityStatus.Archived)
-                throw new KeyNotFoundException($"data source with id {dataSourceId} not found");     
+                throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found");     
         }
 
         
