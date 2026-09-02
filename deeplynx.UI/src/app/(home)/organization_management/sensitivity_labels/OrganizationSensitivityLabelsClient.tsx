@@ -8,7 +8,6 @@ import {
   PlusIcon,
   ShieldCheckIcon,
   TrashIcon,
-  InformationCircleIcon,
   CheckCircleIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
@@ -16,16 +15,17 @@ import type {
   SensitivityLabelsDto,
   UserSensitivityLabelResponseDto,
   SensitivityLabelPermissionResponseDto,
-  ProjectMemberResponseDto,
+  UserResponseDto,
   GroupResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import {
-  archiveSensitivityLabelProject,
-  createSensitivityLabelProject,
-  updateSensitivityLabelProject,
-  getUsersWithAccessToLabelProject,
-  revokeSensitivityLabelAccessProject,
-  getPermissionsForLabelProject,
+  archiveSensitivityLabelOrg,
+  createSensitivityLabelsOrg,
+  updateSensitivityLabelOrg,
+  getAllSensitivityLabelsOrg,
+  getUsersWithAccessToLabelOrg,
+  revokeSensitivityLabelAccessOrg,
+  getPermissionsForLabelOrg,
 } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import LabelEditModal, {
   FILE_ACTIONS,
@@ -33,28 +33,25 @@ import LabelEditModal, {
 } from "@/app/(home)/organization_management/tag_management/LabelEditModal";
 import ConfirmArchiveLabelModal from "@/app/(home)/organization_management/tag_management/ConfirmArchiveLabelModal";
 import AvatarCell from "@/app/(home)/components/Avatar";
-import AssignUsersWizardModal from "./AssignUsersWizardModal";
+import AssignUsersWizardModalOrg from "./AssignUsersWizardModalOrg";
 import { useLanguage } from "@/app/contexts/Language";
+import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 
 type DetailTab = "permissions" | "assigned-users";
 
 interface Props {
   labels: SensitivityLabelsDto[];
-  projectId: number;
-  organizationId: number;
-  orgLabelsLocked: boolean;
-  refreshLabels: () => Promise<void>;
-  projectMembers: ProjectMemberResponseDto[];
-  projectGroups: GroupResponseDto[];
+  members: UserResponseDto[];
+  groups: GroupResponseDto[];
 }
 
 function LabelPermissionsPanel({
   label,
-  projectId,
+  organizationId,
   refreshKey,
 }: {
   label: SensitivityLabelsDto;
-  projectId: number;
+  organizationId: number;
   refreshKey: number;
 }) {
   const { t } = useLanguage();
@@ -71,7 +68,7 @@ function LabelPermissionsPanel({
   const loadPermissions = async () => {
     try {
       setLoading(true);
-      const perms = await getPermissionsForLabelProject(projectId, label.id);
+      const perms = await getPermissionsForLabelOrg(organizationId, label.id);
       setPermissions(perms.filter((p) => !p.isArchived));
     } catch (error) {
       console.error(`Failed to load permissions for label ${label.id}:`, error);
@@ -139,16 +136,14 @@ function LabelPermissionsPanel({
 
 function AssignedUsersPanel({
   label,
-  projectId,
   organizationId,
-  projectMembers,
-  projectGroups,
+  members,
+  groups,
 }: {
   label: SensitivityLabelsDto;
-  projectId: number;
   organizationId: number;
-  projectMembers: ProjectMemberResponseDto[];
-  projectGroups: GroupResponseDto[];
+  members: UserResponseDto[];
+  groups: GroupResponseDto[];
 }) {
   const { t } = useLanguage();
   const [assignedUsers, setAssignedUsers] = useState<UserSensitivityLabelResponseDto[]>([]);
@@ -158,10 +153,9 @@ function AssignedUsersPanel({
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const loadAssignedUsers = async () => {
-    if (!label.projectId) return;
     try {
       setLoading(true);
-      const users = await getUsersWithAccessToLabelProject(projectId, label.id);
+      const users = await getUsersWithAccessToLabelOrg(organizationId, label.id);
       setAssignedUsers(users);
     } catch (error) {
       console.error("Failed to load assigned users:", error);
@@ -171,25 +165,14 @@ function AssignedUsersPanel({
   };
 
   useEffect(() => {
-    if (label.projectId) {
-      loadAssignedUsers();
-    }
+    loadAssignedUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [label.id, label.projectId]);
-
-  if (!label.projectId) {
-    return (
-      <div className="alert alert-info mt-6 items-start">
-        <InformationCircleIcon className="h-5 w-5 shrink-0" />
-        <span className="text-sm">{t.translations.LABEL_ACCESS_MANAGED_AT_ORG_LEVEL}</span>
-      </div>
-    );
-  }
+  }, [label.id]);
 
   const handleRevoke = async (userId: number) => {
     try {
       setRevokingUserId(userId);
-      await revokeSensitivityLabelAccessProject(projectId, label.id, userId);
+      await revokeSensitivityLabelAccessOrg(organizationId, label.id, userId);
       setAssignedUsers((current) => current.filter((u) => u.userId !== userId));
     } catch (error) {
       console.error(`Failed to revoke access for user ${userId}:`, error);
@@ -273,15 +256,14 @@ function AssignedUsersPanel({
         </div>
       )}
 
-      <AssignUsersWizardModal
+      <AssignUsersWizardModalOrg
         isOpen={wizardOpen}
         onClose={() => setWizardOpen(false)}
-        projectId={projectId}
+        organizationId={organizationId}
         labelId={label.id}
         labelName={label.name}
-        organizationId={organizationId}
-        projectMembers={projectMembers}
-        projectGroups={projectGroups}
+        members={members}
+        groups={groups}
         assignedUserIds={new Set(assignedUsers.map((u) => u.userId))}
         onAssigned={loadAssignedUsers}
       />
@@ -289,16 +271,15 @@ function AssignedUsersPanel({
   );
 }
 
-const ProjectSensitivityLabelsClient: React.FC<Props> = ({
+const OrganizationSensitivityLabelsClient: React.FC<Props> = ({
   labels,
-  projectId,
-  organizationId,
-  orgLabelsLocked,
-  refreshLabels,
-  projectMembers,
-  projectGroups,
+  members,
+  groups,
 }) => {
   const { t } = useLanguage();
+  const { organization } = useOrganizationSession();
+  const orgId = organization?.organizationId as number | undefined;
+
   const [selectedLabelId, setSelectedLabelId] = useState<number | null>(
     labels[0]?.id ?? null,
   );
@@ -326,21 +307,38 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
 
   const [permissionsRefreshKey, setPermissionsRefreshKey] = useState(0);
 
+  const [localLabels, setLocalLabels] = useState<SensitivityLabelsDto[]>(labels);
+
+  const loadLabels = async () => {
+    if (!orgId) return;
+    try {
+      const fresh = await getAllSensitivityLabelsOrg(orgId);
+      setLocalLabels(fresh);
+    } catch (error) {
+      console.error("Failed to load organization sensitivity labels:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadLabels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId]);
+
   const normalizedSearch = labelSearch.trim().toLowerCase();
   const filteredLabels = useMemo(
     () =>
       normalizedSearch
-        ? labels.filter(
+        ? localLabels.filter(
             (l) =>
               l.name.toLowerCase().includes(normalizedSearch) ||
               l.description?.toLowerCase().includes(normalizedSearch),
           )
-        : labels,
-    [labels, normalizedSearch],
+        : localLabels,
+    [localLabels, normalizedSearch],
   );
 
   const selectedLabel =
-    labels.find((l) => l.id === selectedLabelId) ?? labels[0] ?? null;
+    localLabels.find((l) => l.id === selectedLabelId) ?? localLabels[0] ?? null;
 
   const resetLabelModalState = () => {
     setEditingLabel(null);
@@ -371,8 +369,9 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
     setLabelNameInput(label.name);
     setLabelDescriptionInput(label.description ?? "");
     setIsLabelModalOpen(true);
+    if (!orgId) return;
     setPermissionsLoading(true);
-    getPermissionsForLabelProject(projectId, label.id)
+    getPermissionsForLabelOrg(orgId, label.id)
       .then((perms) => {
         setSelectedActions(
           new Set(perms.filter((p) => !p.isArchived).map((p) => p.action)),
@@ -390,34 +389,35 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
   };
 
   const handleSaveLabel = async () => {
-    if (!labelNameInput.trim() || !projectId) return;
+    if (!labelNameInput.trim() || !orgId) return;
 
     try {
       setSavingLabel(true);
 
       if (editingLabel) {
-        await updateSensitivityLabelProject(projectId, editingLabel.id, {
+        const updated = await updateSensitivityLabelOrg(orgId, editingLabel.id, {
           name: labelNameInput.trim(),
           description: labelDescriptionInput.trim() || null,
           permissionActions: Array.from(selectedActions),
         });
-        toast.success(t.translations.PROJECT_LABEL_UPDATED);
+        setLocalLabels((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+        toast.success(t.translations.ORGANIZATION_LABEL_UPDATED);
       } else {
-        const created = await createSensitivityLabelProject(projectId, {
+        const created = await createSensitivityLabelsOrg(orgId, {
           name: labelNameInput.trim(),
           description: labelDescriptionInput.trim() || null,
           permissionActions: Array.from(selectedActions),
         });
+        setLocalLabels((prev) => [...prev, created]);
         setSelectedLabelId(created.id);
-        toast.success(t.translations.PROJECT_LABEL_CREATED);
+        toast.success(t.translations.ORGANIZATION_LABEL_CREATED);
       }
 
-      await refreshLabels();
       setPermissionsRefreshKey((prev) => prev + 1);
       closeLabelModal();
     } catch (error) {
-      console.error("Failed to save project label:", error);
-      toast.error(t.translations.FAILED_TO_SAVE_PROJECT_LABEL);
+      console.error("Failed to save organization label:", error);
+      toast.error(t.translations.FAILED_TO_SAVE_ORGANIZATION_LABEL);
     } finally {
       setSavingLabel(false);
     }
@@ -429,12 +429,12 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
   };
 
   const confirmArchiveLabel = async () => {
-    if (!labelToArchive || !projectId) return;
+    if (!labelToArchive || !orgId) return;
 
     try {
       setArchivingLabelId(labelToArchive.id);
-      await archiveSensitivityLabelProject(projectId, labelToArchive.id, true);
-      await refreshLabels();
+      await archiveSensitivityLabelOrg(orgId, labelToArchive.id, true);
+      setLocalLabels((prev) => prev.filter((l) => l.id !== labelToArchive.id));
       toast.success(
         `${t.translations.LABEL} "${labelToArchive.name}" ${t.translations.ARCHIVED}.`,
       );
@@ -468,14 +468,14 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
           <div>
             <h3 className="font-bold">{t.translations.SENSITIVITY_LABELS}</h3>
             <p className="text-sm text-base-content/60">
-              {labels.length} {t.translations.TOTAL}
+              {localLabels.length} {t.translations.TOTAL}
             </p>
           </div>
           <button
             type="button"
             className="btn btn-primary btn-sm"
             onClick={openCreateLabelModal}
-            disabled={orgLabelsLocked || !projectId}
+            disabled={!orgId}
           >
             <PlusIcon className="h-4 w-4" />
             {t.translations.NEW_LABEL}
@@ -509,18 +509,6 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
           >
             <span className="min-w-0 flex-1">
               <strong className="block">{label.name}</strong>
-              <span className="block text-sm text-base-content/60">
-                {label.projectId
-                  ? t.translations.PROJECT
-                  : t.translations.ORGANIZATION_LABEL}
-              </span>
-            </span>
-            <span
-              className={`badge badge-sm ${
-                label.projectId ? "badge-primary" : "badge-secondary"
-              }`}
-            >
-              {label.projectId ? "PROJECT" : "ORG"}
             </span>
           </button>
         ))}
@@ -533,30 +521,25 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
               <ShieldCheckIcon className="h-5 w-5 text-secondary" />
               <h3 className="text-xl font-bold">{selectedLabel.name}</h3>
             </div>
-            {selectedLabel.projectId ? (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="btn btn-outline btn-primary btn-sm"
-                  onClick={() => openEditLabelModal(selectedLabel)}
-                  disabled={orgLabelsLocked}
-                >
-                  {t.translations.EDIT}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-error btn-sm"
-                  onClick={() => openArchiveModal(selectedLabel)}
-                  disabled={
-                    orgLabelsLocked || archivingLabelId === selectedLabel.id
-                  }
-                >
-                  {archivingLabelId === selectedLabel.id
-                    ? t.translations.ARCHIVING
-                    : t.translations.DELETE}
-                </button>
-              </div>
-            ) : null}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn btn-outline btn-primary btn-sm"
+                onClick={() => openEditLabelModal(selectedLabel)}
+              >
+                {t.translations.EDIT}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-error btn-sm"
+                onClick={() => openArchiveModal(selectedLabel)}
+                disabled={archivingLabelId === selectedLabel.id}
+              >
+                {archivingLabelId === selectedLabel.id
+                  ? t.translations.ARCHIVING
+                  : t.translations.DELETE}
+              </button>
+            </div>
           </div>
 
           <div role="tablist" className="tabs tabs-border mt-6 border-b border-base-200">
@@ -578,21 +561,20 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
             </button>
           </div>
 
-          {detailTab === "permissions" ? (
+          {orgId && detailTab === "permissions" ? (
             <LabelPermissionsPanel
               label={selectedLabel}
-              projectId={projectId}
+              organizationId={orgId}
               refreshKey={permissionsRefreshKey}
             />
-          ) : (
+          ) : orgId ? (
             <AssignedUsersPanel
               label={selectedLabel}
-              projectId={projectId}
-              organizationId={organizationId}
-              projectMembers={projectMembers}
-              projectGroups={projectGroups}
+              organizationId={orgId}
+              members={members}
+              groups={groups}
             />
-          )}
+          ) : null}
         </section>
       ) : (
         <section className="card border border-base-300/50 bg-base-100 p-6 shadow-sm">
@@ -631,4 +613,4 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
   );
 };
 
-export default ProjectSensitivityLabelsClient;
+export default OrganizationSensitivityLabelsClient;
