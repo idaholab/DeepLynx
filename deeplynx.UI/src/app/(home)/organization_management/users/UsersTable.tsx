@@ -525,23 +525,6 @@ const userContent = (
   { label: "archived", displayLabel: t.translations.ARCHIVED_USERS, content: userContent },
 ];
 
-const {
-    currentPage: usersPage,
-    pageSize: usersPageSize,
-    paginatedItems: paginatedUsers,
-    resetPagination: resetUsersPagination,
-    setCurrentPage: setUsersPage,
-    setPageSize: setUsersPageSize,
-    totalPages: usersTotalPages,
-  } = useLocalPagination({
-    items: tableData,
-    initialPageSize: 10,
-  });
-
-useEffect(() => {
-  resetUsersPagination();
-}, [tableData, resetUsersPagination]);
-
   /* ------------------------------------------------------------------------ */
   /*                               Main Render                                */
   /* ------------------------------------------------------------------------ */

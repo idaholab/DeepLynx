@@ -178,6 +178,73 @@ export const getPermissionsForLabelOrg = async (
     }
 }
 
+/**
+ * Get all users with access to an organization-level Sensitivity Label
+ * @param organizationId - The ID of the organization
+ * @param labelId - The ID of the sensitivity label
+ * @returns Promise with array of UserSensitivityLabelResponseDto
+ */
+export const getUsersWithAccessToLabelOrg = async (
+    organizationId: number,
+    labelId: number
+): Promise<UserSensitivityLabelResponseDto[]> => {
+    try {
+        const res = await api.get(
+            `/organizations/${organizationId}/labels/${labelId}/users`
+        );
+        return res.data;
+    } catch (error) {
+        console.error(`Error getting users with access to Sensitivity Label ${labelId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Grant a user access to an organization-level Sensitivity Label
+ * @param organizationId - The ID of the organization
+ * @param labelId - The ID of the sensitivity label
+ * @param userId - The ID of the user to grant access to
+ * @returns Promise with UserSensitivityLabelResponseDto
+ */
+export const grantSensitivityLabelAccessOrg = async (
+    organizationId: number,
+    labelId: number,
+    userId: number
+): Promise<UserSensitivityLabelResponseDto> => {
+    try {
+        const res = await api.post(
+            `/organizations/${organizationId}/labels/${labelId}/users/${userId}`
+        );
+        return res.data;
+    } catch (error) {
+        console.error(`Error granting user ${userId} access to Sensitivity Label ${labelId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Revoke a user's access to an organization-level Sensitivity Label
+ * @param organizationId - The ID of the organization
+ * @param labelId - The ID of the sensitivity label
+ * @param userId - The ID of the user to revoke access from
+ * @returns Promise with a boolean success flag
+ */
+export const revokeSensitivityLabelAccessOrg = async (
+    organizationId: number,
+    labelId: number,
+    userId: number
+): Promise<boolean> => {
+    try {
+        const res = await api.delete(
+            `/organizations/${organizationId}/labels/${labelId}/users/${userId}`
+        );
+        return res.data;
+    } catch (error) {
+        console.error(`Error revoking user ${userId} access to Sensitivity Label ${labelId}:`, error);
+        throw error;
+    }
+}
+
 // ============================================================================
 // PROJECT LEVEL API CALLS
 // ============================================================================
