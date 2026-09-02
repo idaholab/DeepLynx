@@ -175,14 +175,13 @@ public class OrganizationBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
-            Default = true
         };
 
         Context.ObjectStorages.Add(objectStorage);
         await Context.SaveChangesAsync();
         os1 = objectStorage.Id;
 
-        testOrg.DefaultObjectStorageId = (int?)os1;
+        testOrg.DefaultObjectStorageId = os1;
         Context.Organizations.Update(testOrg);
         await Context.SaveChangesAsync();
     }

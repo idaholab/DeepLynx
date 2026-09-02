@@ -942,7 +942,9 @@ export const translations = {
       LATTICE_SELECT_EXTRACTION_PROMPT:
         "Select an extraction from the list to review it.",
       LATTICE_APPROVE_ALL: "Approve All",
+      LATTICE_APPROVED: "Approved",
       LATTICE_REJECT_ALL: "Reject All",
+      LATTICE_REJECTED: "Rejected",
       LATTICE_EXTRACTION_RUNNING:
         "Extraction is in progress. This page will update automatically.",
       LATTICE_EXTRACTION_REVIEW:
@@ -3306,7 +3308,9 @@ export const translations = {
       LATTICE_SELECT_EXTRACTION_PROMPT:
         "Selecciona una extracción de la lista para revisarla.",
       LATTICE_APPROVE_ALL: "Aprobar todo",
+      LATTICE_APPROVED: "Aprobado",
       LATTICE_REJECT_ALL: "Rechazar todo",
+      LATTICE_REJECTED: "Rechazado",
       LATTICE_EXTRACTION_RUNNING:
         "La extracción está en progreso. Esta página se actualizará automáticamente.",
       LATTICE_EXTRACTION_REVIEW:

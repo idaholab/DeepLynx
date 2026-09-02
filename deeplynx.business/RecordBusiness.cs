@@ -1181,7 +1181,7 @@ public class RecordBusiness : IRecordBusiness
         // update cache
         try
         {
-            await CacheService.Instance.DeleteByPrefixAsync($"recordcountbydatasource:{projectId}:{dataSourceId}:");
+            await CacheService.Instance.DeleteByPrefixAsync(CacheKeys.RecordCountByDataSourcePrefix(projectId, dataSourceId));
         }
         catch (Exception ex)
         {
@@ -1531,7 +1531,7 @@ public class RecordBusiness : IRecordBusiness
         // update cache
         try
         {
-            await CacheService.Instance.DeleteByPrefixAsync($"recordcountbydatasource:{projectId}:{dataSourceId}:");
+            await CacheService.Instance.DeleteByPrefixAsync(CacheKeys.RecordCountByDataSourcePrefix(projectId, dataSourceId));
         }
         catch (Exception ex)
         {
@@ -1627,7 +1627,7 @@ public class RecordBusiness : IRecordBusiness
         // update cache
         try
         {
-            await CacheService.Instance.DeleteByPrefixAsync($"recordcountbydatasource:{projectId}:{returnedRecord.DataSourceId}:");
+            await CacheService.Instance.DeleteByPrefixAsync(CacheKeys.RecordCountByDataSourcePrefix(projectId, returnedRecord.DataSourceId));
         }
         catch (Exception ex)
         {
@@ -1700,7 +1700,7 @@ public class RecordBusiness : IRecordBusiness
         // update cache
         try
         {
-            await CacheService.Instance.DeleteByPrefixAsync($"recordcountbydatasource:{projectId}:{returnedRecord.DataSourceId}:");
+            await CacheService.Instance.DeleteByPrefixAsync(CacheKeys.RecordCountByDataSourcePrefix(projectId, returnedRecord.DataSourceId));
         }
         catch (Exception ex)
         {
@@ -1776,7 +1776,7 @@ public class RecordBusiness : IRecordBusiness
          // update cache
         try
         {
-            await CacheService.Instance.DeleteByPrefixAsync($"recordcountbydatasource:{projectId}:{returnedRecord.DataSourceId}:");
+            await CacheService.Instance.DeleteByPrefixAsync(CacheKeys.RecordCountByDataSourcePrefix(projectId, returnedRecord.DataSourceId));
         }
         catch (Exception ex)
         {

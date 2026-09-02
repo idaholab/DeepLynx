@@ -34,15 +34,16 @@ public class OrgRolePermissionService : IOrgRolePermissionService
             userId, orgId, action, resource);
         
         var hasPermission = _dbContext.Database
-            .SqlQuery<bool>($@"
-             SELECT EXISTS(
+        .SqlQuery<bool>($@"
+            SELECT EXISTS(
                 SELECT 1
                 FROM deeplynx.organization_users ou
                 WHERE ou.user_id = {userId}
-                  AND ou.organization_id = {orgId}
-                  AND (ou.is_org_admin = true OR {action} = 'read')) as has_permission")
-            .AsEnumerable()
-            .FirstOrDefault();
+                AND ou.organization_id = {orgId}
+                AND (ou.is_org_admin = true OR {action} = 'read')
+            )")
+        .AsEnumerable()
+        .FirstOrDefault();
 
         if (hasPermission)
         {

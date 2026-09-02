@@ -71,6 +71,11 @@ public class CacheKeys
         return $"projectadmin:{userId}:{projectId}";
     }
 
+    public static string ObjectStorageStatus(long objectStorageId)
+    {
+        return $"object_storage:{objectStorageId}:status";
+    }
+
     public static string OrganizationDefaultObjectStorage(long organizationId)
     {
         return $"orgdefaultobjectstorage:{organizationId}";
@@ -103,6 +108,21 @@ public class CacheKeys
 
     public static string RecordCountByDataSource(long projectId, long dataSourceId, bool hideArchived)
     {
-        return $"record_count_by_datasource:{projectId}:{dataSourceId}:{hideArchived}";
+        return $"recordcountbydatasource:{projectId}:{dataSourceId}:{hideArchived}";
+    }
+
+    public static string RecordCountByDataSourcePrefix(long projectId, long dataSourceId)
+    {
+        return $"recordcountbydatasource:{projectId}:{dataSourceId}:";
+    }
+
+    public static string ProjectPermission(long userId, long projectId, string action, string resource)
+    {
+        return $"projectpermission:{userId}:{projectId}:{action}:{resource}";
+    }
+
+    public static string ProjectPermittedIds(long userId, string action, string resource)
+    {
+        return $"projectpermittedids:{userId}:{action}:{resource}";
     }
 }
