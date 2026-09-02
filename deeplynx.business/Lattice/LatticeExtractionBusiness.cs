@@ -98,6 +98,22 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
 
+        if (record.ExtractionId.HasValue)
+        {
+            var previousExtraction = await _context.Extractions
+                .FirstOrDefaultAsync(e => e.Id == record.ExtractionId.Value);
+
+            if (previousExtraction != null)
+            {
+                _context.Extractions.Remove(previousExtraction);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        record.ExtractionId = extraction.Id;
+        _context.Records.Update(record);
+        await _context.SaveChangesAsync();
+
         try
         {
             // IDs necessary for POST back from Insight 
@@ -517,7 +533,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 extractionId, currentUserId, now);
             var relIdMap = await PromoteRelationships(stagingRelationships, selectedRelIds, classIdMap, organizationId,
                 projectId, extractionId, currentUserId, now);
-            var (RecordIdMap, NewRecordCount) = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
+            var (RecordIdMap, NewRecordCount, RecordTagLinks) = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
                 projectId, extractionId, currentUserId, now);
             await PromoteEdges(stagingEdges, selectedEdgeIds, RecordIdMap, relIdMap, organizationId,
                 projectId,
@@ -525,6 +541,11 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             await deepLynxTransaction.CommitAsync();
             await latticeTransaction.CommitAsync();
+
+            if (RecordTagLinks.Count != 0)
+            {
+                await _recordBusiness.BulkInsertRecordTagLinks(RecordTagLinks);
+            }
 
             extraction.Status = ComputeExtractionStatus(
                 stagingClasses, stagingRecords, stagingRelationships, stagingEdges, extraction.Status);
@@ -1069,6 +1090,11 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         string stage,
         string message)
     {
+        if (message != null && message.Contains("Unclosed JSON object in LLM output", StringComparison.OrdinalIgnoreCase))
+        {
+            message = "The document is too large for Lattice to process";
+        }
+
         var properties = GetExtractionProperties(extraction.Properties);
         properties["failure_stage"] = stage;
 

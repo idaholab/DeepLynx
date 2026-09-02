@@ -531,6 +531,7 @@ public class RecordBusiness : IRecordBusiness
             DataSourceId = record.DataSourceId,
             ProjectId = record.ProjectId,
             OrganizationId = record.OrganizationId,
+            ExtractionId = record.ExtractionId,
             LastUpdatedBy = record.LastUpdatedBy,
             LastUpdatedAt = record.LastUpdatedAt,
             IsArchived = record.IsArchived,
@@ -1739,7 +1740,7 @@ public class RecordBusiness : IRecordBusiness
 
             if (filteredTags.Count == 0)
                 filteredTags = null;
-            
+
             tags = await ProcessTags(currentUserId, organizationId, projectId, returnedRecord.Id, filteredTags);
         }
 

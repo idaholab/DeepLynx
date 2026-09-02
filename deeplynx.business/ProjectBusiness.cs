@@ -257,6 +257,11 @@ public class ProjectBusiness : IProjectBusiness
                 ProjectId = objectStorageResponse.ProjectId,
                 OrganizationId = objectStorageResponse.OrganizationId
             };
+
+            project.DefaultObjectStorageId = objectStorageResponse.Id;
+
+            _context.Projects.Update(project);
+            await _context.SaveChangesAsync();
         }
 
         // Log create Project event
@@ -716,10 +721,7 @@ public class ProjectBusiness : IProjectBusiness
             .Where(p => p.Id == projectId
                         && p.OrganizationId == organizationId
                         && !p.IsArchived)
-            .FirstOrDefaultAsync();
-
-        if (project == null)
-            throw new KeyNotFoundException(
+            .FirstOrDefaultAsync() ?? throw new KeyNotFoundException(
                 $"Project with id {projectId} not found or does not belong to the specified organization context");
 
         // Validate that if the RequireSensitivityLabel is enabled all existing records have labels
@@ -740,7 +742,7 @@ public class ProjectBusiness : IProjectBusiness
             project.RequireSensitivityLabel = dto.RequireSensitivityLabel.Value;
 
         if (dto.DefaultObjectStorageId != null)
-            project.DefaultObjectStorageId = dto.DefaultObjectStorageId;
+            project.DefaultObjectStorageId = dto.DefaultObjectStorageId.Value;
 
         project.Name = dto.Name ?? project.Name;
         project.Description = dto.Description ?? project.Description;
@@ -981,7 +983,7 @@ public class ProjectBusiness : IProjectBusiness
         long projectId,
         PaginatedRequestDto paginatedRequestDto
     )
-    {   
+    {
         var returnAll = paginatedRequestDto.PageSize == -1;
         var users = _context.ProjectMembers
             .Where(pm => pm.ProjectId == projectId && pm.UserId != null)
@@ -1085,6 +1087,9 @@ public class ProjectBusiness : IProjectBusiness
             await OverwriteProjectAdminCache(projectId, userId, groupId, makeProjectAdmin);
         }
 
+        // invalidate the project permissions cache
+        await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, projectId, userId, groupId, _logger);
+
         if (userId.HasValue && userId != UserContextStorage.UserId)
         {
             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
@@ -1155,6 +1160,9 @@ public class ProjectBusiness : IProjectBusiness
         {
             await OverwriteProjectAdminCache(projectId, userId, groupId, isProjectAdmin.Value);
         }
+
+        // invalidate the project permissions cache
+        await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, projectId, userId, groupId, _logger);
 
         return true;
     }
@@ -1253,6 +1261,9 @@ public class ProjectBusiness : IProjectBusiness
         // delete the cached admin flag now that it's changed
         await OverwriteProjectAdminCache(projectId, userId, groupId, isAdmin: false, deleting: true);
 
+        // invalidate the project permissions cache
+        await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, projectId, userId, groupId, _logger);
+
         return true;
     }
 
@@ -1344,7 +1355,7 @@ public class ProjectBusiness : IProjectBusiness
 
     #region Deprecated
 
-     /// <summary>
+    /// <summary>
     ///     [DEPRECATED - V1 ONLY] Retrieves all classes without pagination.
     ///     Superseded by <see cref="GetProjectMembersPaginated"/>. Do not call this from new controller versions;
     ///     it exists solely to back the deprecated v1 class controllers and should be deleted once
@@ -1416,6 +1427,29 @@ public class ProjectBusiness : IProjectBusiness
         // Add current user as admin to project
         // ===============================
         await AddMemberToProject(projectId, null, currentUserId, null, makeProjectAdmin: true);
+
+        // ===============================
+        // SET DEFAULT OBJECT STORAGE
+        // ===============================
+
+        var organization = await _context.Organizations
+            .Where(org => org.Id == organizationId)
+            .FirstOrDefaultAsync() ?? throw new Exception("Organization not found.");
+
+        if (organization.CreateContainerPerProject == false)
+        {
+            var project = await _context.Projects
+            .Where(p => p.Id == projectId
+                        && p.OrganizationId == organizationId
+                        && !p.IsArchived)
+            .FirstOrDefaultAsync() ?? throw new KeyNotFoundException(
+                $"Project with id {projectId} not found or does not belong to the specified organization context");
+
+            project.DefaultObjectStorageId = organization.DefaultObjectStorageId;
+
+            _context.Projects.Update(project);
+            await _context.SaveChangesAsync();
+        }
     }
 
     private async Task<long> ResolveObjectStorageId(long organizationId, long projectId, long? objectStorageId)
@@ -1472,7 +1506,7 @@ public class ProjectBusiness : IProjectBusiness
                     else
                     {
                         await CacheService.Instance.SetAsync(CacheKeys.ProjectAdmin(memberId, projectId), isAdmin, (TimeSpan?)null);
-                    }  
+                    }
                 }
                 catch (Exception ex)
                 {

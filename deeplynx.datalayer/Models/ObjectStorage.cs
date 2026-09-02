@@ -15,18 +15,15 @@ public partial class ObjectStorage
 
     [Column("type")]
     public string Type { get; set; } = null!;
-    
+
     [Column("config_encrypted")]
     public string ConfigEncrypted { get; set; } = null!;
 
     [Column("project_id")]
     public long? ProjectId { get; set; }
-    
+
     [Column("organization_id")]
     public long OrganizationId { get; set; }
-
-    [Column("default")]
-    public bool Default { get; set; }
 
     [Column("last_updated_at", TypeName = "timestamp without time zone")]
     public DateTime LastUpdatedAt { get; set; }
@@ -50,7 +47,7 @@ public partial class ObjectStorage
 
     [InverseProperty("ObjectStorage")]
     public virtual ICollection<Record> Records { get; set; } = new List<Record>();
-    
+
     [InverseProperty("LastUpdatedObjectStorages")]
     public virtual User? LastUpdatedByUser { get; set; }
 }
