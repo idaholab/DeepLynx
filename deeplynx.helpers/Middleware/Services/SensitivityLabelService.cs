@@ -217,4 +217,66 @@ public class SensitivityLabelService : ISensitivityLabelService
 
         return [.. ids];
     }
+
+    /// <summary>
+    /// Invalidates the authorized-labels cache  across every project the label is visible in 
+    /// (its own project, or every project in the org for an org-level label). 
+    /// Invalidates the cache for every user, or for a specific user if the userId is provided.
+    /// </summary>
+    public async Task InvalidateAuthorizedLabelsCache(long labelId, long? userId = null)
+    {
+        // Get IDs of all projects that would be affected by a sensitivity label mutation
+        List<long> affectedProjects;
+
+        var label = await _context.SensitivityLabels
+            .Where(l => l.Id == labelId)
+            .Select(l => new { l.ProjectId, l.OrganizationId })
+            .FirstOrDefaultAsync();
+
+        if (label == null)
+        {
+            return;
+        }
+        else
+        {
+            if (label.ProjectId.HasValue)
+            {
+                affectedProjects = new List<long> { label.ProjectId.Value };
+            }
+            else
+            {
+                affectedProjects = await _context.Projects
+                    .Where(p => p.OrganizationId == label.OrganizationId)
+                    .Select(p => p.Id)
+                    .ToListAsync();
+            }
+        }
+
+        // Invalidate the cache for all affected projects (scoped to userId if it is provided)
+        foreach (var projectId in affectedProjects)
+        {
+            if (userId.HasValue)
+            {
+                try
+                {
+                    await CacheService.Instance.DeleteByPrefixAsync($"authorizedsensitivitylabels:{projectId}:{userId}:");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Cache prefix invalidation failed for label {LabelId}, user {UserId}, project {ProjectId}", labelId, userId, projectId);
+                }
+            }
+            else
+            {
+                try
+                {
+                    await CacheService.Instance.DeleteByPrefixAsync($"authorizedsensitivitylabels:{projectId}:");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Cache prefix invalidation failed for label {LabelId}, project {ProjectId}", labelId, projectId);
+                }
+            }
+        }
+    }
 }
