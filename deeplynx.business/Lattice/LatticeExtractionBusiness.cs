@@ -533,7 +533,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 extractionId, currentUserId, now);
             var relIdMap = await PromoteRelationships(stagingRelationships, selectedRelIds, classIdMap, organizationId,
                 projectId, extractionId, currentUserId, now);
-            var (RecordIdMap, NewRecordCount) = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
+            var (RecordIdMap, NewRecordCount, RecordTagLinks) = await PromoteRecords(stagingRecords, selectedRecordIds, classIdMap, organizationId,
                 projectId, extractionId, currentUserId, now);
             await PromoteEdges(stagingEdges, selectedEdgeIds, RecordIdMap, relIdMap, organizationId,
                 projectId,
@@ -541,6 +541,11 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
 
             await deepLynxTransaction.CommitAsync();
             await latticeTransaction.CommitAsync();
+
+            if (RecordTagLinks.Count != 0)
+            {
+                await _recordBusiness.BulkInsertRecordTagLinks(RecordTagLinks);
+            }
 
             extraction.Status = ComputeExtractionStatus(
                 stagingClasses, stagingRecords, stagingRelationships, stagingEdges, extraction.Status);
