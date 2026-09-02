@@ -170,7 +170,7 @@ export default function DataCatalogClient({
   const [nextFilterId, setNextFilterId] = useState(1);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(1);
 
