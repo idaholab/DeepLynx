@@ -1181,7 +1181,7 @@ public class RecordBusiness : IRecordBusiness
         // update cache
         try
         {
-            await CacheService.Instance.DeleteByPrefixAsync("recordcountbydatasource");
+            await CacheService.Instance.DeleteByPrefixAsync($"recordcountbydatasource:{projectId}:{dataSourceId}:");
         }
         catch (Exception ex)
         {
@@ -1531,7 +1531,7 @@ public class RecordBusiness : IRecordBusiness
         // update cache
         try
         {
-            await CacheService.Instance.DeleteByPrefixAsync("recordcountbydatasource");
+            await CacheService.Instance.DeleteByPrefixAsync($"recordcountbydatasource:{projectId}:{dataSourceId}:");
         }
         catch (Exception ex)
         {
@@ -1611,11 +1611,28 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
-        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete failed: ProjectStorageSize for project {ProjectId}", projectId);
+        }
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "archive-record", currentUserId, null))
             _logger.LogWarning("Failed to create provenance record for archive on record {RecordId}", recordId);
+
+        // update cache
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync($"recordcountbydatasource:{projectId}:{returnedRecord.DataSourceId}:");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource");
+        }    
 
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {
@@ -1680,7 +1697,25 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
-        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+        // update cache
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync($"recordcountbydatasource:{projectId}:{returnedRecord.DataSourceId}:");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource for project {ProjectId}, data source {DataSourceId}",
+                projectId, returnedRecord.DataSourceId);
+        }
+
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete failed: ProjectStorageSize for project {ProjectId}", projectId);
+        }
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "unarchive-record", currentUserId, null))
@@ -1737,6 +1772,17 @@ public class RecordBusiness : IRecordBusiness
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "delete-record", currentUserId, null))
             _logger.LogWarning("Failed to create provenance record for delete on record {RecordId}", recordId);
+
+         // update cache
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync($"recordcountbydatasource:{projectId}:{returnedRecord.DataSourceId}:");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource for project {ProjectId}, data source {DataSourceId}",
+                projectId, returnedRecord.DataSourceId);
+        }    
 
         // Log record delete event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -1990,7 +2036,7 @@ public class RecordBusiness : IRecordBusiness
         int? cache = null;
         try
         {
-            cache = await CacheService.Instance.GetAsync<int>(cacheKey);
+            cache = await CacheService.Instance.GetAsync<int?>(cacheKey);
             if (cache is not null)
                 return cache.Value;
         }

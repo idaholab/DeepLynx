@@ -101,8 +101,8 @@ public class CacheKeys
         return $"projectdefaultaimodelconfig:{projectId}:{modelType}";
     }
 
-    public static string RecordCountByDataSource(long projectId, long dataSourceId, bool hidearchived)
+    public static string RecordCountByDataSource(long projectId, long dataSourceId, bool hideArchived)
     {
-        return $"recordcountbydatasource:{projectId}:{dataSourceId}:{hidearchived}";
+        return $"record_count_by_datasource:{projectId}:{dataSourceId}:{hideArchived}";
     }
 }

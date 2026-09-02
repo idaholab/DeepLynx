@@ -37,13 +37,11 @@ namespace deeplynx.business
         /// </summary>
         /// <param name="key">The key of cached data</param>
         /// <returns>The matching Cached data </returns>
-        public async Task<T> GetAsync<T>(string key)
+        public async Task<T?> GetAsync<T>(string key)
         {
             var value = await _db.StringGetAsync(key);
             if (value.IsNullOrEmpty)
-            {
                 return default;
-            }
 
             return JsonSerializer.Deserialize<T>(value.ToString(), _jsonOptions);
         }

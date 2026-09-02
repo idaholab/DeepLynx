@@ -771,9 +771,13 @@ public class RecordBusinessTests : IntegrationTestBase
         // Add another record to the same data source directly via the DB, bypassing the cache.
         Context.Records.Add(new Record
         {
+            Name = "CachedValue_SurvivesSubsequentRecordChanges",
+            Description = "GetRecordsCountByDataSource_CachedValue_SurvivesSubsequentRecordChanges",
             OrganizationId = organizationId,
             ProjectId = pid,
             DataSourceId = did2,
+            Properties = "{}",
+            OriginalId = "GetRecordsCountByDataSource_CachedValue_SurvivesSubsequentRecordChanges",
             IsArchived = false
         });
         await Context.SaveChangesAsync();
