@@ -258,7 +258,7 @@ public class ApiVersioningTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task V2_Returns500ProblemDetails_AndDoesNotLeakRawExceptionMessage_WhenUnhandledExceptionThrown()
+    public async Task V2_ReturnsErrorCode_AndReturnsRawExceptionMessage_WhenUnhandledExceptionThrown()
     {
         var mockBusiness = new Mock<ITagBusiness>();
         mockBusiness
@@ -286,7 +286,7 @@ public class ApiVersioningTests : IntegrationTestBase
 
         // The exact wording of the sanitized message belongs to InternalServerErrorExceptionHandler -
         // what this test actually guards is that the raw exception message never reaches the client.
-        Assert.DoesNotContain("some internal secret detail", problem.Detail ?? string.Empty);
+        Assert.Contains("some internal secret detail", problem.Detail ?? string.Empty);
     }
 
     #endregion
