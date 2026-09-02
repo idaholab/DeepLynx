@@ -793,10 +793,10 @@ spec:
               value: ${NEXUS_API_URL}
           resources:
             requests:
-              memory: "256Mi"
+              memory: "128Mi"
               cpu: "100m"
             limits:
-              memory: "1Gi"
+              memory: "768Mi"
               cpu: "500m"
           volumeMounts:
             - name: nexus-storage
@@ -884,11 +884,11 @@ spec:
                   key: encryption-iv
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "1Gi"
+              memory: "512Mi"
               cpu: "500m"
+            limits:
+              memory: "2560Mi"
+              cpu: "2000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
@@ -975,10 +975,10 @@ spec:
                   key: encryption-iv
           resources:
             requests:
-              memory: "256Mi"
+              memory: "128Mi"
               cpu: "100m"
             limits:
-              memory: "1Gi"
+              memory: "768Mi"
               cpu: "500m"
           volumeMounts:
             - name: nexus-storage
@@ -1067,10 +1067,10 @@ spec:
           resources:
             requests:
               memory: "256Mi"
-              cpu: "100m"
+              cpu: "200m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1024Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
@@ -1157,10 +1157,10 @@ spec:
                   key: encryption-iv
           resources:
             requests:
-              memory: "256Mi"
+              memory: "128Mi"
               cpu: "100m"
             limits:
-              memory: "1Gi"
+              memory: "768Mi"
               cpu: "500m"
           volumeMounts:
             - name: nexus-storage
@@ -1249,10 +1249,10 @@ spec:
           resources:
             requests:
               memory: "256Mi"
-              cpu: "100m"
+              cpu: "200m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1024Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
@@ -1340,10 +1340,10 @@ spec:
           resources:
             requests:
               memory: "256Mi"
-              cpu: "100m"
+              cpu: "200m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1024Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
@@ -1430,11 +1430,11 @@ spec:
                   key: encryption-iv
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "1Gi"
+              memory: "512Mi"
               cpu: "500m"
+            limits:
+              memory: "2560Mi"
+              cpu: "2000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
@@ -1521,10 +1521,10 @@ spec:
                   key: encryption-iv
           resources:
             requests:
-              memory: "256Mi"
+              memory: "128Mi"
               cpu: "100m"
             limits:
-              memory: "1Gi"
+              memory: "768Mi"
               cpu: "500m"
           volumeMounts:
             - name: nexus-storage
@@ -1613,10 +1613,10 @@ spec:
           resources:
             requests:
               memory: "256Mi"
-              cpu: "100m"
+              cpu: "200m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1024Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb

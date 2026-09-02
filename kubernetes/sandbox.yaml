@@ -509,8 +509,6 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: rabbitmq-default-pass
-            - name: NEXUS_API_URL
-              value: ${NEXUS_API_URL}
           resources:
             requests:
               cpu: "250m"
@@ -753,44 +751,14 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: encryption-iv
-            - name: LLM_SERVER_URL
-              value: "http://deeplynx-api.inl.gov:4000/v1"
-            - name: LLM_MODEL_NAME
-              value: "llm"
-            - name: MM_SERVER_URL
-              value: "http://deeplynx-api.inl.gov:4000/v1"
-            - name: MM_MODEL_NAME
-              value: "mmllm"
-            - name: EMB_SERVER_URL
-              value: "http://deeplynx-api.inl.gov:4000/v1"
-            - name: EMB_MODEL_NAME
-              value: "bge-m3"
-            - name: EMB_DIMENSION
-              value: "1024"
-            - name: IMG_TO_TEXT_PROCS
-              value: "2"
-            - name: IMG_TO_TEXT_BATCH_SIZE
-              value: "20"
-            - name: IMG_TO_TEXT_BATCH_TIMEOUT
-              value: "0.5"
-            - name: PDF_TO_IMG_PROCS
-              value: "2"
-            - name: TEXT_TO_CHUNKS_PROCS
-              value: "2"
-            - name: RAG_MAX_CHUNKS
-              value: "25"
-            - name: LITELLM_HTTP_LOGGING
-              value: "false"
-            - name: STORAGE_BASE_DIR
-              value: "/data/insight"
             - name: NEXUS_API_URL
               value: ${NEXUS_API_URL}
           resources:
             requests:
-              memory: "256Mi"
+              memory: "128Mi"
               cpu: "100m"
             limits:
-              memory: "1Gi"
+              memory: "768Mi"
               cpu: "500m"
           volumeMounts:
             - name: duckdb-storage
@@ -878,11 +846,11 @@ spec:
                   key: encryption-iv
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "1Gi"
+              memory: "512Mi"
               cpu: "500m"
+            limits:
+              memory: "2560Mi"
+              cpu: "2000m"
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
@@ -969,10 +937,10 @@ spec:
                   key: encryption-iv
           resources:
             requests:
-              memory: "256Mi"
+              memory: "128Mi"
               cpu: "100m"
             limits:
-              memory: "1Gi"
+              memory: "768Mi"
               cpu: "500m"
           volumeMounts:
             - name: duckdb-storage
@@ -1061,10 +1029,10 @@ spec:
           resources:
             requests:
               memory: "256Mi"
-              cpu: "100m"
+              cpu: "200m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1024Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
@@ -1151,10 +1119,10 @@ spec:
                   key: encryption-iv
           resources:
             requests:
-              memory: "256Mi"
+              memory: "128Mi"
               cpu: "100m"
             limits:
-              memory: "1Gi"
+              memory: "768Mi"
               cpu: "500m"
           volumeMounts:
             - name: duckdb-storage
@@ -1243,10 +1211,10 @@ spec:
           resources:
             requests:
               memory: "256Mi"
-              cpu: "100m"
+              cpu: "200m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1024Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
@@ -1334,10 +1302,10 @@ spec:
           resources:
             requests:
               memory: "256Mi"
-              cpu: "100m"
+              cpu: "200m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1024Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
@@ -1424,11 +1392,11 @@ spec:
                   key: encryption-iv
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "1Gi"
+              memory: "512Mi"
               cpu: "500m"
+            limits:
+              memory: "2560Mi"
+              cpu: "2000m"
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
@@ -1515,10 +1483,10 @@ spec:
                   key: encryption-iv
           resources:
             requests:
-              memory: "256Mi"
+              memory: "128Mi"
               cpu: "100m"
             limits:
-              memory: "1Gi"
+              memory: "768Mi"
               cpu: "500m"
           volumeMounts:
             - name: duckdb-storage
@@ -1607,10 +1575,10 @@ spec:
           resources:
             requests:
               memory: "256Mi"
-              cpu: "100m"
+              cpu: "200m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1024Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: duckdb-storage
               mountPath: /data/duckdb
