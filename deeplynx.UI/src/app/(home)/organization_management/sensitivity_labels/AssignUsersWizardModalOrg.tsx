@@ -11,11 +11,11 @@ import {
   CheckIcon,
 } from "@heroicons/react/24/outline";
 import type {
-  ProjectMemberResponseDto,
+  UserResponseDto,
   GroupResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { getGroupMembers } from "@/app/lib/client_service/group_services.client";
-import { grantSensitivityLabelAccessProject } from "@/app/lib/client_service/sensitivity_labels_services.client";
+import { grantSensitivityLabelAccessOrg } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AvatarCell from "@/app/(home)/components/Avatar";
 import { useLanguage } from "@/app/contexts/Language";
 
@@ -31,25 +31,23 @@ interface NormalizedUser {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  projectId: number;
+  organizationId: number;
   labelId: number;
   labelName: string;
-  organizationId: number;
-  projectMembers: ProjectMemberResponseDto[];
-  projectGroups: GroupResponseDto[];
+  members: UserResponseDto[];
+  groups: GroupResponseDto[];
   assignedUserIds: Set<number>;
   onAssigned: () => void;
 }
 
-const AssignUsersWizardModal: React.FC<Props> = ({
+const AssignUsersWizardModalOrg: React.FC<Props> = ({
   isOpen,
   onClose,
-  projectId,
+  organizationId,
   labelId,
   labelName,
-  organizationId,
-  projectMembers,
-  projectGroups,
+  members,
+  groups,
   assignedUserIds,
   onAssigned,
 }) => {
@@ -64,16 +62,10 @@ const AssignUsersWizardModal: React.FC<Props> = ({
   const [loadingGroupIds, setLoadingGroupIds] = useState<Set<number>>(new Set());
   const [assigning, setAssigning] = useState(false);
 
-  const individualUsers: NormalizedUser[] = useMemo(() => {
-    const seen = new Set<number>();
-    const result: NormalizedUser[] = [];
-    for (const member of projectMembers) {
-      if (!member.memberId || seen.has(member.memberId)) continue;
-      seen.add(member.memberId);
-      result.push({ id: member.memberId, name: member.name, email: member.email });
-    }
-    return result;
-  }, [projectMembers]);
+  const individualUsers: NormalizedUser[] = useMemo(
+    () => members.map((m) => ({ id: m.id, name: m.name, email: m.email })),
+    [members],
+  );
 
   const resetState = () => {
     setStep("select");
@@ -101,12 +93,12 @@ const AssignUsersWizardModal: React.FC<Props> = ({
       setLoadingGroupIds((current) => new Set(current).add(groupId));
       try {
         const res = await getGroupMembers(organizationId, groupId);
-        const members: NormalizedUser[] = res.items.map((u) => ({
+        const groupMembers: NormalizedUser[] = res.items.map((u) => ({
           id: u.id,
           name: u.name,
           email: u.email,
         }));
-        setGroupMembersCache((current) => ({ ...current, [groupId]: members }));
+        setGroupMembersCache((current) => ({ ...current, [groupId]: groupMembers }));
       } catch (error) {
         console.error(`Failed to load members for group ${groupId}:`, error);
       } finally {
@@ -142,7 +134,7 @@ const AssignUsersWizardModal: React.FC<Props> = ({
     individualUsers
       .filter((u) => selectedUserIds.has(u.id))
       .forEach((u) => map.set(u.id, { user: u }));
-    projectGroups
+    groups
       .filter((g) => selectedGroupIds.has(g.id as number))
       .forEach((g) => {
         (groupMembersCache[g.id as number] ?? []).forEach((u) => {
@@ -150,7 +142,7 @@ const AssignUsersWizardModal: React.FC<Props> = ({
         });
       });
     return Array.from(map.values());
-  }, [individualUsers, selectedUserIds, projectGroups, selectedGroupIds, groupMembersCache]);
+  }, [individualUsers, selectedUserIds, groups, selectedGroupIds, groupMembersCache]);
 
   const newAssignmentCount = previewUsers.filter(
     ({ user }) => !assignedUserIds.has(user.id) && !excludedPreviewUserIds.has(user.id),
@@ -169,7 +161,7 @@ const AssignUsersWizardModal: React.FC<Props> = ({
     setAssigning(true);
     try {
       const results = await Promise.allSettled(
-        idsToGrant.map((userId) => grantSensitivityLabelAccessProject(projectId, labelId, userId)),
+        idsToGrant.map((userId) => grantSensitivityLabelAccessOrg(organizationId, labelId, userId)),
       );
       const succeeded = results.filter((r) => r.status === "fulfilled").length;
       const failed = results.length - succeeded;
@@ -190,8 +182,8 @@ const AssignUsersWizardModal: React.FC<Props> = ({
 
   const normalizedSearch = search.trim().toLowerCase();
   const filteredGroups = normalizedSearch
-    ? projectGroups.filter((g) => g.name.toLowerCase().includes(normalizedSearch))
-    : projectGroups;
+    ? groups.filter((g) => g.name.toLowerCase().includes(normalizedSearch))
+    : groups;
   const filteredUsers = normalizedSearch
     ? individualUsers.filter(
         (u) =>
@@ -318,7 +310,7 @@ const AssignUsersWizardModal: React.FC<Props> = ({
                     {selectedGroupIds.size === 0 && (
                       <span className="text-sm text-base-content/50">{t.translations.NONE_SELECTED}</span>
                     )}
-                    {projectGroups
+                    {groups
                       .filter((g) => selectedGroupIds.has(g.id as number))
                       .map((g) => (
                         <span key={g.id} className="badge badge-primary gap-1">
@@ -462,4 +454,4 @@ const AssignUsersWizardModal: React.FC<Props> = ({
   );
 };
 
-export default AssignUsersWizardModal;
+export default AssignUsersWizardModalOrg;

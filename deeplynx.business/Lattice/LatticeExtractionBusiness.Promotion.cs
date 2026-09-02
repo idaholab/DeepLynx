@@ -564,7 +564,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
     ///     LLM-produced "originId" key.
     ///     Returns a map of ExtractionRecord.Id → deeplynx Record id, and the count of newly created records.
     /// </summary>
-    private async Task<(Dictionary<long, long> RecordIdMap, int NewRecordCount)> PromoteRecords(
+    private async Task<(Dictionary<long, long> RecordIdMap, int NewRecordCount, List<RecordTagLinkDto> RecordTagLinks)> PromoteRecords(
         List<ExtractionRecord> stagingRecords,
         HashSet<long> selectedRecordIds,
         Dictionary<long, long?> classIdMap,
@@ -572,6 +572,8 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         long currentUserId, DateTime now)
     {
         var selected = stagingRecords.Where(r => selectedRecordIds.Contains(r.Id)).ToList();
+
+        var recordTagLinks = new List<RecordTagLinkDto>();
 
         // Link records that already exist in the KG — no creation needed
         foreach (var sr in selected.Where(r => r.DeeplynxRecordId.HasValue))
@@ -639,26 +641,30 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             await _context.SaveChangesAsync();
 
             foreach (var (sr, newRecord) in newRecords)
+            {
+                if (newRecord.Id <= 0)
+                {
+                    throw new InvalidOperationException($"New record id not assigned for record '{sr.Name}'.");
+                }
                 sr.PromotedId = newRecord.Id;
+            }
 
             var distinctTags = extractedTags.Distinct().ToList();
             var tagsToInsert = distinctTags.Select(t => new CreateTagRequestDto { Name = t.Name }).ToList();
 
             var tagMap = await BulkUpsertTags(organizationId, currentUserId, projectId, tagsToInsert);
 
-            foreach (var (_, newRecord) in newRecords)
+            foreach (var (sr, newRecord) in newRecords)
             {
                 var recordTags = distinctTags
                     .Where(tag => tagMap.ContainsKey(tag.Name))
                     .Select(tag => new RecordTagLinkDto
                     {
-                        RecordId = newRecord.Id,
+                        RecordId = sr.PromotedId!.Value,
                         TagId = tagMap[tag.Name].Id
-                    })
-                    .ToList();
+                    });
 
-                if (recordTags.Any())
-                    await _recordBusiness.BulkInsertRecordTagLinks(recordTags);
+                recordTagLinks.AddRange(recordTags);
             }
         }
 
@@ -668,7 +674,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             .Where(r => r.PromotedId.HasValue)
             .ToDictionary(r => r.Id, r => r.PromotedId!.Value);
 
-        return (recordIdMap, toCreate.Count);
+        return (recordIdMap, toCreate.Count, recordTagLinks);
     }
 
     /// <summary>
