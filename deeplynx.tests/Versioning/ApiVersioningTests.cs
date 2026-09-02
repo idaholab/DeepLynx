@@ -270,7 +270,7 @@ public class ApiVersioningTests : IntegrationTestBase
                 It.IsAny<bool>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>()))
-            .ThrowsAsync(new Exception("some internal secret detail"));
+            .ThrowsAsync(new Exception("clear error details"));
 
         using var mockedFactory = WithMockedTagBusiness(mockBusiness);
         using var client = mockedFactory.CreateClient();
@@ -286,7 +286,7 @@ public class ApiVersioningTests : IntegrationTestBase
 
         // The exact wording of the sanitized message belongs to InternalServerErrorExceptionHandler -
         // what this test actually guards is that the raw exception message never reaches the client.
-        Assert.Contains("some internal secret detail", problem.Detail ?? string.Empty);
+        Assert.Contains("clear error details", problem.Detail ?? string.Empty);
     }
 
     #endregion
