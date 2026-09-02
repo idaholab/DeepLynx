@@ -19,6 +19,8 @@ public interface IRecordBusiness
         long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search, PaginatedRequestDto paginated,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
+    [Obsolete("Used by deprecated v1 record endpoints. Superseded by SearchPaginated. " +
+              "Remove once those callers are migrated to the paginated variant.", error: false)]
     Task<List<RecordResponseDto>> Search(
         long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
