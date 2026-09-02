@@ -106,6 +106,16 @@ public class CacheKeys
         return $"projectdefaultaimodelconfig:{projectId}:{modelType}";
     }
 
+    public static string RecordCountByDataSource(long projectId, long dataSourceId, bool hideArchived)
+    {
+        return $"recordcountbydatasource:{projectId}:{dataSourceId}:{hideArchived}";
+    }
+
+    public static string RecordCountByDataSourcePrefix(long projectId, long dataSourceId)
+    {
+        return $"recordcountbydatasource:{projectId}:{dataSourceId}:";
+    }
+
     public static string ProjectPermission(long userId, long projectId, string action, string resource)
     {
         return $"projectpermission:{userId}:{projectId}:{action}:{resource}";
