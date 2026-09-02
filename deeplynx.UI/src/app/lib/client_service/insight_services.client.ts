@@ -182,9 +182,31 @@ function parseJsonOrTextResponseBody(responseText: string): unknown {
 
 function extractInsightErrorMessage(value: unknown): string {
   if (typeof value === "string") return value.trim();
+
+  if (Array.isArray(value)) {
+    return (
+      value
+        .map(extractInsightErrorMessage)
+        .filter(Boolean)
+        .join("; ")
+    );
+  }
+
   if (!value || typeof value !== "object") return "";
 
-  const errorPayload = value as InsightErrorPayload;
+  const errorPayload = value as InsightErrorPayload & {
+    errors?: Record<string, unknown>;
+  };
+
+  if (errorPayload.errors) {
+    const validationMessage = Object.values(errorPayload.errors)
+      .map(extractInsightErrorMessage)
+      .filter(Boolean)
+      .join("; ");
+
+    if (validationMessage) return validationMessage;
+  }
+
   return (
     extractInsightErrorMessage(errorPayload.details) ||
     extractInsightErrorMessage(errorPayload.detail) ||
