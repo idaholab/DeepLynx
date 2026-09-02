@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
@@ -190,6 +191,75 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         //     _logger.LogWarning("Failed to create provenance record for embedding trigger on record {RecordId}", recordId);
 
         return extraction.Id;
+    }
+
+    /// <summary>
+    /// Processes progress updates for an extraction.
+    /// </summary>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The ID of the extraction.</param>
+    /// <param name="progressDto">The progress update payload.</param>
+    /// <returns>True if the progress update was successfully processed.</returns>
+    public async Task<bool> ProcessExtractionProgress(
+        long projectId,
+        long extractionId,
+        InsightExtractionProgressCombinedDto progressDto)
+    {
+        var extraction = await _context.Extractions.FindAsync(extractionId)
+                    ?? throw new InvalidOperationException($"Extraction {extractionId} not found.");
+        EnsureExtractionInProject(extraction, projectId);
+
+        JsonObject? propertiesJson = null;
+        if (!string.IsNullOrEmpty(extraction.Properties))
+        {
+            propertiesJson = JsonNode.Parse(extraction.Properties) as JsonObject;
+        }
+        propertiesJson ??= [];
+
+        var progressRoot = propertiesJson["progress"] as JsonObject ?? [];
+
+        foreach (var kvp in progressDto.Progress)
+        {
+            string stageKey = kvp.Key.ToLowerInvariant();
+            var stageValue = kvp.Value;
+
+            var stageNode = new JsonObject
+            {
+                ["stage"] = stageValue.Stage,
+                ["detail"] = stageValue.Detail,
+                ["count"] = stageValue.Count
+            };
+
+            progressRoot[stageKey] = stageNode;
+        }
+
+        propertiesJson["progress"] = progressRoot;
+
+        extraction.Properties = propertiesJson.ToJsonString(new JsonSerializerOptions
+        {
+            WriteIndented = false
+        });
+
+        try
+        {
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Progress update for extraction {ExtractionId}: stages updated: {Stages}",
+                extractionId,
+                string.Join(", ", progressDto.Progress.Keys)
+            );
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to update progress for extraction {ExtractionId}",
+                extractionId);
+            return false;
+        }
     }
 
 
@@ -789,6 +859,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             Status = extraction.Status,
             Mode = extraction.Mode,
             CreatedBy = extraction.CreatedBy,
+            Properties = extraction.Properties,
             FailureMessage = GetExtractionFailureMessage(extraction.Properties),
             RecordId = extraction.SourceRecordId,
             Classes = classes.Select(c => new StagedClassDto

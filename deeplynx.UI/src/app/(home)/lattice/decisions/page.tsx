@@ -436,21 +436,28 @@ function ExtractionDetailPanel({
   organizationId,
   projectId,
   onStatusChange,
+  onExtractionChange,
 }: {
   extractionId: number;
   extractionName: string;
   organizationId: number;
   projectId: number;
   onStatusChange?: () => void;
+  onExtractionChange?: (newExtractionId: number) => void;
 }) {
   const [staging, setStaging] = useState<ExtractionStagingResponseDTO | null>(
     null,
   );
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState(false);
   const [activeTab, setActiveTab] = useState<DetailTab>("records");
+  const [currentExtractionId, setCurrentExtractionId] = useState<number>(extractionId);
+  const [recordsCount, setRecordsCount] = useState<number>(0);
+  const [edgesCount, setEdgesCount] = useState<number>(0);
+  const [classesCount, setClassesCount] = useState<number>(0);
+  const [relationshipsCount, setRelationshipsCount] = useState<number>(0);
+
   const { t } = useLanguage();
 
   type ItemType = "records" | "classes" | "edges" | "relationships";
@@ -559,6 +566,10 @@ function ExtractionDetailPanel({
   };
   const requestIdRef = useRef(0);
 
+  useEffect(() => {
+    setCurrentExtractionId(extractionId);
+  }, [extractionId]);
+
   const fetchStaging = useCallback(async () => {
     const myRequestId = ++requestIdRef.current;
 
@@ -566,12 +577,47 @@ function ExtractionDetailPanel({
       const data = await getExtractionStaging(
         organizationId,
         projectId,
-        extractionId,
+        currentExtractionId,
       );
 
       if (requestIdRef.current !== myRequestId) return;
 
+      if (data.properties) {
+        try {
+          const props = JSON.parse(data.properties);
+          const progress = props.progress || {};
+
+          if (progress.records?.count) {
+            setRecordsCount(progress.records?.count);
+          }
+          if (progress.classes?.count) {
+            setClassesCount(progress.classes?.count);
+          }
+          if (progress.relationships?.count) {
+            setRelationshipsCount(progress.relationships?.count);
+          }
+          if (progress.edges?.count) {
+            setEdgesCount(progress.edges?.count);
+          }
+        } catch (parseError) {
+          console.warn("Failed to parse properties.progress JSON", parseError);
+        }
+      }
+
       setStaging(data);
+
+      if (data.records.length > 0) {
+        setRecordsCount(data.records.length)
+      }
+      if (data.classes.length > 0) {
+        setClassesCount(data.classes.length)
+      }
+      if (data.edges.length > 0) {
+        setEdgesCount(data.edges.length)
+      }
+      if (data.relationships.length > 0) {
+        setRelationshipsCount(data.relationships.length)
+      }
 
       if (NOT_RUNNING_STATUSES.includes(data.status)) {
         onStatusChange?.();
@@ -615,7 +661,7 @@ function ExtractionDetailPanel({
   }, [
     organizationId,
     projectId,
-    extractionId,
+    currentExtractionId,
     onStatusChange,
     t.translations.LATTICE_FAILED_LOAD_EXTRACTION,
   ]);
@@ -667,7 +713,7 @@ function ExtractionDetailPanel({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [staging?.status, fetchStaging]);
+  }, [staging?.status, fetchStaging, currentExtractionId]);
 
   const handleTriggerLatticeExtraction = useCallback(async (staging: ExtractionStagingResponseDTO) => {
     try {
@@ -687,9 +733,15 @@ function ExtractionDetailPanel({
       );
 
       if (newExtractionId) {
-        router.replace(`/lattice/decisions?extractionId=${newExtractionId}`);
+        if (projectId) localStorage.setItem(storageKey(projectId), String(newExtractionId));
+        setCurrentExtractionId(Number(newExtractionId));
+        onExtractionChange?.(currentExtractionId);
+        const newExtraction = await getExtractionStaging(organizationId, projectId, Number(newExtractionId));
+        setStaging(newExtraction);
       } else {
-        router.replace(`/lattice/decisions?extractionId=${staging.id}`);
+        if (projectId) localStorage.setItem(storageKey(projectId), String(staging.id));
+        onExtractionChange?.(staging.id);
+        setStaging(staging);
       }
 
       onStatusChange?.();
@@ -991,15 +1043,15 @@ function ExtractionDetailPanel({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {(
             [
-              { label: t.translations.RECORDS, count: staging.records.length },
-              { label: t.translations.CLASSES, count: staging.classes.length },
+              { label: t.translations.RECORDS, count: recordsCount },
+              { label: t.translations.CLASSES, count: classesCount },
               {
                 label: t.translations.RELATIONSHIPS,
-                count: staging.relationships.length,
+                count: relationshipsCount,
               },
               {
                 label: t.translations.LATTICE_EDGES,
-                count: staging.edges.length,
+                count: edgesCount,
               },
             ] as const
           ).map(({ label, count }) => (
@@ -1110,6 +1162,19 @@ export default function LatticeDecisionsPage() {
   const projId = project?.projectId as number | undefined;
   const insightHidden = isInsightHidden();
 
+  const {
+    currentPage: extractionPage,
+    pageSize: extractionPageSize,
+    paginatedItems: paginatedExtractions,
+    resetPagination: resetExtractionPagination,
+    setCurrentPage: setExtractionPage,
+    setPageSize: setExtractionPageSize,
+    totalPages: extractionTotalPages,
+  } = useLocalPagination({
+    items: items,
+    initialPageSize: 5,
+  });
+
   const refreshList = useCallback(() => {
     if (!orgId || !projId) return;
     listExtractions(orgId, projId)
@@ -1117,13 +1182,23 @@ export default function LatticeDecisionsPage() {
         if (response?.items) {
           setItems(response.items);
 
-
           const latestExtraction = response.items.reduce((prev, current) =>
             current.id > prev.id ? current : prev,
             response.items[0]);
 
-          if (latestExtraction && !selectedId) {
-            router.replace(`/lattice/decisions?extractionId=${latestExtraction.id}`, { scroll: false });
+          if (latestExtraction) {
+            if (!selectedId || !response.items.some(item => item.id === selectedId)) {
+              if (projId) localStorage.setItem(storageKey(projId), String(latestExtraction.id));
+
+              const latestIndex = response.items.findIndex(item => item.id === latestExtraction.id);
+              if (latestIndex !== -1) {
+                const pageSize = extractionPageSize;
+                const pageNumber = Math.floor(latestIndex / pageSize) + 1;
+                setExtractionPage(pageNumber);
+              }
+
+              setSelectedId(latestExtraction.id);
+            }
           }
         } else {
           setItems([]);
@@ -1132,7 +1207,28 @@ export default function LatticeDecisionsPage() {
       .catch(() =>
         setListError(t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS),
       );
-  }, [orgId, projId, selectedId, t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS, router]);
+  }, [
+    orgId,
+    projId,
+    selectedId,
+    extractionPageSize,
+    setExtractionPage,
+    t.translations.LATTICE_FAILED_LOAD_EXTRACTIONS,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (!selectedId || items.length === 0) return;
+
+    const idx = items.findIndex(item => item.id === selectedId);
+    if (idx === -1) return;
+
+
+    const pageSize = extractionPageSize;
+    const pageNumber = Math.floor(idx / pageSize) + 1;
+    setExtractionPage(pageNumber);
+
+  }, [selectedId, items, extractionPageSize, setExtractionPage]);
 
   useEffect(() => {
     if (insightHidden) {
@@ -1183,19 +1279,6 @@ export default function LatticeDecisionsPage() {
   if (insightHidden) {
     return null;
   }
-
-  const {
-    currentPage: extractionPage,
-    pageSize: extractionPageSize,
-    paginatedItems: paginatedExtractions,
-    resetPagination: resetExtractionPagination,
-    setCurrentPage: setExtractionPage,
-    setPageSize: setExtractionPageSize,
-    totalPages: extractionTotalPages,
-  } = useLocalPagination({
-    items: items,
-    initialPageSize: 5,
-  });
 
   useEffect(() => {
     resetExtractionPagination();
@@ -1360,6 +1443,7 @@ export default function LatticeDecisionsPage() {
                 organizationId={orgId}
                 projectId={projId}
                 onStatusChange={refreshList}
+                onExtractionChange={setSelectedId}
               />
             ) : (
               <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-base-300 bg-base-100 text-sm text-base-content/50">
