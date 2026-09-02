@@ -73,7 +73,12 @@ public class CacheKeys
 
     public static string ObjectStorageStatus(long objectStorageId)
     {
-        return $"object_storage:{objectStorageId}:status";
+        return $"objectstorage:{objectStorageId}:status";
+    }
+
+    public static string DataSourceStatus(long dataSourceId)
+    {
+        return $"datasource:{dataSourceId}:status";
     }
 
     public static string OrganizationDefaultObjectStorage(long organizationId)
