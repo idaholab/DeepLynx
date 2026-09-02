@@ -64,7 +64,7 @@ public class SensitivityLabelService : ISensitivityLabelService
         var uncachedProjectIds = new List<long>();
 
         // Check cache before querying db
-        foreach (long projectId in projectIds)
+        foreach (long projectId in distinctProjectIds)
         {
             string cacheKey = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId, currentUserId, userAction);
 
