@@ -3,9 +3,6 @@
 import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useLanguage } from "@/app/contexts/Language";
 import { RecordTableRow } from "@/app/(home)/types/types";
-import { useLocalPagination } from "@/app/hooks/useLocalPagination";
-import { useEffect } from "react";
-import PaginationControls from "@/app/(home)/components/PaginationControls";
 
 /**
  * Exported so AllRecordsClient can type its own statusFilter state without
@@ -100,40 +97,6 @@ export default function FilterSidebar({
     },
   ];
 
-  const {
-    currentPage: tagPage,
-    pageSize: tagPageSize,
-    paginatedItems: paginatedTags,
-    resetPagination: resetTagPagination,
-    setCurrentPage: setTagPage,
-    setPageSize: setTagPageSize,
-    totalPages: tagTotalPages,
-  } = useLocalPagination({
-    items: filteredTagFacetOptions,
-    initialPageSize: 5,
-  });
-
-  useEffect(() => {
-    resetTagPagination();
-  }, [filteredTagFacetOptions, resetTagPagination]);
-
-  const {
-    currentPage: classPage,
-    pageSize: classPageSize,
-    paginatedItems: paginatedClasses,
-    resetPagination: resetClassPagination,
-    setCurrentPage: setClassPage,
-    setPageSize: setClassPageSize,
-    totalPages: classTotalPages,
-  } = useLocalPagination({
-    items: filteredClassFacetOptions,
-    initialPageSize: 5,
-  });
-
-  useEffect(() => {
-    resetClassPagination();
-  }, [filteredClassFacetOptions, resetClassPagination]);
-
   return (
     <aside>
       <div className="rounded-box border border-base-300/50 bg-base-100 shadow-sm">
@@ -161,6 +124,19 @@ export default function FilterSidebar({
            * classes at once (e.g. "Sensor" + "Asset"). The search input
            * filters the displayed options client-side; it does NOT trigger a
            * new API call. Options are capped at FACET_LIMIT by the parent.
+           *
+           * The full (filtered) list is rendered directly — no pagination —
+           * since it's already entirely in memory (AllRecordsClient fetches
+           * every class/tag up front). The list below just scrolls past
+           * whatever doesn't fit in max-h-56.
+           *
+           * max-h-56 (224px): the record list column caps at a literal
+           * 706px (AllRecordsClient.tsx). With both Class and Tags open,
+           * the fixed chrome around the two lists — header row (~49px) +
+           * per-section title (~48px) + search input+margin (~44px) +
+           * bottom padding (~16px), times two sections — comes to ~265px,
+           * leaving ~441px to split between the two lists (~220px each).
+           * 224px is the closest round Tailwind step to that split.
            */}
           <div className="collapse collapse-arrow rounded-none">
             <input type="checkbox" defaultChecked />
@@ -175,8 +151,8 @@ export default function FilterSidebar({
                 value={classFacetQuery}
                 onChange={(e) => onClassFacetQueryChange(e.target.value)}
               />
-              <div className="max-h-64 space-y-2 overflow-auto pr-1">
-                {paginatedClasses.map((option) => (
+              <div className="max-h-56 space-y-2 overflow-auto pr-1">
+                {filteredClassFacetOptions.map((option) => (
                   <label
                     key={option.label}
                     className="flex cursor-pointer items-center justify-between gap-3 text-sm"
@@ -198,13 +174,6 @@ export default function FilterSidebar({
                   </label>
                 ))}
               </div>
-              <PaginationControls
-                  currentPage={classPage}
-                  pageSize={classPageSize}
-                  totalPages={classTotalPages}
-                  onPageChange={setClassPage}
-                  onPageSizeChange={setClassPageSize}
-                />
             </div>
           </div>
 
@@ -227,13 +196,13 @@ export default function FilterSidebar({
                 value={tagFacetQuery}
                 onChange={(e) => onTagFacetQueryChange(e.target.value)}
               />
-              <div className="max-h-64 space-y-2 overflow-auto pr-1">
+              <div className="max-h-56 space-y-2 overflow-auto pr-1">
                 {filteredTagFacetOptions.length === 0 ? (
                   <p className="text-xs text-base-content/50">
                     {t.translations.NO_TAGS_MATCH_SEARCH}
                   </p>
                 ) : (
-                  paginatedTags.map((option) => (
+                  filteredTagFacetOptions.map((option) => (
                     <label
                       key={option.label}
                       className="flex cursor-pointer items-center justify-between gap-3 text-sm"
@@ -256,17 +225,6 @@ export default function FilterSidebar({
                   ))
                 )}
               </div>
-
-              {/* Pagination Controls */}
-                <div className="mt-2 flex justify-end">
-                  <PaginationControls
-                    currentPage={tagPage}
-                    pageSize={tagPageSize}
-                    totalPages={tagTotalPages}
-                    onPageChange={setTagPage}
-                    onPageSizeChange={setTagPageSize}
-                  />
-                </div>
             </div>
           </div>
         </div>
