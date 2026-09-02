@@ -3374,6 +3374,6 @@ public class AuthMiddlewareTests : IntegrationTestBase
         // Assert
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
     }
-
+    
     #endregion
 }

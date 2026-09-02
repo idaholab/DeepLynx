@@ -29,7 +29,8 @@ import UsersListTable from "./UsersListTable";
 import { UsersTableRow } from "../../types/types";
 import { useLanguage } from "@/app/contexts/Language";
 import Tabs from "@/app/(home)/components/Tabs";
-
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
 /* -------------------------------------------------------------------------- */
@@ -452,9 +453,44 @@ const UsersTable = ({
   /*                               User Conent Tabs                           */
   /* ------------------------------------------------------------------------ */
 
-  const userContent = (
+const {
+    currentPage: usersPage,
+    pageSize: usersPageSize,
+    paginatedItems: paginatedUsers,
+    resetPagination: resetUsersPagination,
+    setCurrentPage: setUsersPage,
+    setPageSize: setUsersPageSize,
+    totalPages: usersTotalPages,
+  } = useLocalPagination({
+    items: tableData,
+    initialPageSize: 10,
+  });
+
+useEffect(() => {
+  resetUsersPagination();
+}, [tableData, resetUsersPagination]);
+
+const {
+  currentPage: archivedPage,
+  pageSize: archivedPageSize,
+  paginatedItems: paginatedArchivedUsers,
+  resetPagination: resetArchivedPagination,
+  setCurrentPage: setArchivedPage,
+  setPageSize: setArchivedPageSize,
+  totalPages: archivedTotalPages,
+} = useLocalPagination({
+  items: archivedUsers,
+  initialPageSize: 10,
+});
+
+useEffect(() => {
+  resetArchivedPagination();
+}, [archivedUsers, resetArchivedPagination]);
+
+const userContent = (
+    <>
             <UsersListTable
-            tableData={activeTab === "active" ? tableData : archivedUsers}
+            tableData={activeTab === "active" ? paginatedUsers : paginatedArchivedUsers}
             scope={scope}
             loading={loading}
             onResendInvite={handleResendInvite}
@@ -472,7 +508,17 @@ const UsersTable = ({
             onOpenConfirm={(item: ConfirmModalState) => setConfirmModal(item)}
             isArchivedTab={activeTab === "archived"}  
             onUnarchive={handleUnarchive} 
-          />);
+          />
+        <div className="mt-2 flex justify-end">
+      <PaginationControls
+        currentPage={activeTab === "active" ? usersPage : archivedPage}
+        pageSize={activeTab === "active" ? usersPageSize : archivedPageSize}
+        totalPages={activeTab === "active" ? usersTotalPages : archivedTotalPages}
+        onPageChange={activeTab === "active" ? setUsersPage : setArchivedPage}
+        onPageSizeChange={activeTab === "active" ? setUsersPageSize : setArchivedPageSize}
+      />
+    </div>
+  </>);
 
   const tabs = [
   { label: "active", displayLabel: t.translations.ACTIVE_USERS, content: userContent },
@@ -505,8 +551,9 @@ const UsersTable = ({
             tabs={tabs}
           />
         ) : (
+          <>
           <UsersListTable
-            tableData={tableData}
+            tableData={paginatedUsers}
             scope={scope}
             loading={loading}
             onResendInvite={handleResendInvite}
@@ -518,6 +565,16 @@ const UsersTable = ({
             }}
             onOpenConfirm={(item) => setConfirmModal(item)}
           />
+           <div className="mt-2 flex justify-end">
+            <PaginationControls
+              currentPage={usersPage}
+              pageSize={usersPageSize}
+              totalPages={usersTotalPages}
+              onPageChange={setUsersPage}
+              onPageSizeChange={setUsersPageSize}
+            />
+          </div>
+        </>
         )}
         </div>
       </div>

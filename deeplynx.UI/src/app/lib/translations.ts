@@ -241,6 +241,8 @@ export const translations = {
         "Configure branding and manage your project",
       CONFIRM_BULK_UPLOAD: "Confirm Bulk Upload",
       CONFIRM_UPLOAD: "Confirm Upload",
+      CONFIRM_EXTRACTION: "Confirm Extraction",
+      CONFIRM_OVERWRITE_PREVIOUS_EXTRACTION: "The previous extraction data for this record will be overwritten, are you sure you want to proceed?",
       CONNECT_STORAGE_MANUALLY_INSTEAD: "Connect storage manually instead",
       CONNECTION_STRING: "Connection String",
       CONNECTIONS: "Connections",
@@ -374,8 +376,12 @@ export const translations = {
         "Define an organization-level tag. Projects inherit this tag and can use it across their assets.",
       DEFINE_ORGANIZATION_TAGS_AND_SENSITIVITY_LABELS_DESCRIPTION:
         "Define organization-wide tags and sensitivity labels. Projects inherit these and can optionally add their own.",
+      DEFINE_ORGANIZATION_TAGS_DESCRIPTION:
+        "Define organization-wide tags. Projects inherit these and can optionally add their own.",
       DEFINE_PROJECT_TAGS_AND_LABELS_DESCRIPTION:
         "Define project tags and sensitivity labels for classification, workflows, and access control.",
+      DEFINE_PROJECT_TAGS_DESCRIPTION:
+        "Define project tags for classification, workflows, and search.",
       DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH:
         "Define project-level tags for classification, workflows, and search. Organization-level locks determine whether this project can define additional tags beyond those inherited from the organization.",
       DELETE: "Delete",
@@ -830,6 +836,8 @@ export const translations = {
       LABEL_CREATED_BUT_FAILED_TO_ATTACH: "created but failed to attach",
       LABEL_IN_USE:
         "Label is currently in use. Remove the label from the record(s) before archiving.",
+      LABEL_IN_USE_ON_RECORDS:
+        'Cannot archive "{name}": it is currently applied to {count} record(s). Remove the label from those records first.',
       LABEL_NAME: "Label Name",
       LABEL_NAME_PLACEHOLDER: "e.g., CUI, ITAR, Public",
       LABELS_ARE_LOCKED: "Labels are locked",
@@ -940,7 +948,9 @@ export const translations = {
       LATTICE_SELECT_EXTRACTION_PROMPT:
         "Select an extraction from the list to review it.",
       LATTICE_APPROVE_ALL: "Approve All",
+      LATTICE_APPROVED: "Approved",
       LATTICE_REJECT_ALL: "Reject All",
+      LATTICE_REJECTED: "Rejected",
       LATTICE_EXTRACTION_RUNNING:
         "Extraction is in progress. This page will update automatically.",
       LATTICE_EXTRACTION_REVIEW:
@@ -1914,6 +1924,48 @@ export const translations = {
       SENSITIVITY_LABEL_REMOVED: "Sensitivity label removed",
       SENSITIVITY_LABELS: "Sensitivity Labels",
       SENSITIVITY_LABEL: "Sensitivity Label",
+      ASSIGNED_USERS: "Assigned Users",
+      ASSIGN_USERS: "Assign Users",
+      LABEL_ACCESS_BEHAVIOR: "Access behavior",
+      LABEL_ACCESS_BEHAVIOR_DESCRIPTION:
+        "Only users explicitly assigned this label can access records carrying it.",
+      LABEL_ACCESS_MANAGED_AT_ORG_LEVEL:
+        "User access for inherited organization labels is managed at the organization level.",
+      RECORD_PERMISSIONS: "Record",
+      FILE_PERMISSIONS: "File",
+      PERMISSION_READ_RECORD: "Read record",
+      PERMISSION_WRITE_RECORD: "Write record",
+      PERMISSION_UPDATE_RECORD: "Update record",
+      PERMISSION_DELETE_RECORD: "Delete record",
+      PERMISSION_DOWNLOAD_FILE: "Download file",
+      PERMISSION_UPLOAD_FILE: "Upload file",
+      PERMISSION_UPDATE_FILE: "Update file",
+      PERMISSION_DELETE_FILE: "Delete file",
+      SEARCH_ASSIGNED_USERS: "Search assigned users",
+      NO_ASSIGNED_USERS: "No users assigned to this label yet.",
+      GRANTED_BY_ON: "Granted by {name} on {date}",
+      REMOVE_ACCESS: "Remove access",
+      SELECT_GROUPS_AND_USERS: "Select groups and users",
+      PREVIEW_USERS: "Preview users",
+      INDIVIDUAL_USERS: "Individual Users",
+      SEARCH_GROUPS: "Search groups",
+      VIA_GROUP: "Via {group}",
+      ALREADY_ASSIGNED: "Already assigned",
+      SELECTED_INDIVIDUALLY: "Selected individually",
+      DESELECTED: "Deselected",
+      CURRENT_SELECTION: "Current selection",
+      NONE_SELECTED: "None selected",
+      GROUP_MEMBERSHIP_EXPANSION_NOTE:
+        "Group membership is expanded only for this assignment. Future group changes will not change label access.",
+      PREVIEW_USERS_COUNT: "Preview {count} users",
+      NEW_USERS_WILL_RECEIVE_LABEL: "{count} new users will receive the label",
+      ALREADY_ASSIGNED_COUNT: "{count} already assigned",
+      DESELECTED_COUNT: "{count} deselected",
+      ASSIGN_LABEL_TO_N_USERS: "Assign label to {count} users",
+      ASSIGN_LABEL_TO_USERS: "Assign label to users",
+      GRANTED_ACCESS_TO_USERS: "Granted access to {count} users",
+      FAILED_TO_GRANT_ACCESS: "Failed to grant access to one or more users",
+      FAILED_TO_REVOKE_ACCESS: "Failed to revoke access",
       SERVER_REJECTED_UPLOAD_FIX_ISSUES:
         "The server rejected the upload. Please fix the following issues:",
       SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON:
@@ -2497,6 +2549,8 @@ export const translations = {
         "Configura la identidad visual y administra tu proyecto",
       CONFIRM_BULK_UPLOAD: "Confirmar carga masiva",
       CONFIRM_UPLOAD: "Confirmar carga",
+      CONFIRM_EXTRACTION: "Confirmar extracción",
+      CONFIRM_OVERWRITE_PREVIOUS_EXTRACTION: "Los datos de la extracción anterior para este registro serán sobrescritos, ¿estás seguro de que deseas continuar?",
       CONNECT_STORAGE_MANUALLY_INSTEAD:
         "Conectar el almacenamiento manualmente en su lugar",
       CONNECTION_STRING: "Cadena de conexión",
@@ -2644,8 +2698,12 @@ export const translations = {
         "Define una etiqueta a nivel de organización. Los proyectos heredan esta etiqueta y pueden usarla en sus activos.",
       DEFINE_ORGANIZATION_TAGS_AND_SENSITIVITY_LABELS_DESCRIPTION:
         "Define etiquetas de toda la organización y etiquetas de sensitividad. Los proyectos las heredan y opcionalmente pueden agregar las suyas.",
+      DEFINE_ORGANIZATION_TAGS_DESCRIPTION:
+        "Define etiquetas de toda la organización. Los proyectos las heredan y opcionalmente pueden agregar las suyas.",
       DEFINE_PROJECT_TAGS_AND_LABELS_DESCRIPTION:
         "Define etiquetas del proyecto y etiquetas de sensitividad para clasificación, flujos de trabajo y control de acceso.",
+      DEFINE_PROJECT_TAGS_DESCRIPTION:
+        "Define etiquetas del proyecto para clasificación, flujos de trabajo y búsqueda.",
       DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH:
         "Define etiquetas a nivel de proyecto para clasificación, flujos de trabajo y búsqueda. Los bloqueos a nivel de organización determinan si este proyecto puede definir etiquetas adicionales además de las heredadas de la organización.",
       DELETE: "Eliminar",
@@ -3137,6 +3195,8 @@ export const translations = {
       LABEL_CREATED_BUT_FAILED_TO_ATTACH: "creada pero no se pudo adjuntar",
       LABEL_IN_USE:
         "La etiqueta está en uso actualmente. Quita la etiqueta del(los) registro(s) antes de archivarlo(s).",
+      LABEL_IN_USE_ON_RECORDS:
+        'No se puede archivar "{name}": actualmente está aplicada a {count} registro(s). Primero quita la etiqueta de esos registros.',
       LABEL_NAME: "Nombre de la etiqueta",
       LABEL_NAME_PLACEHOLDER: "p. ej., CUI, ITAR, Pública",
       LABELS_ARE_LOCKED: "Las etiquetas de sensibilidad están bloqueadas",
@@ -3260,7 +3320,9 @@ export const translations = {
       LATTICE_SELECT_EXTRACTION_PROMPT:
         "Selecciona una extracción de la lista para revisarla.",
       LATTICE_APPROVE_ALL: "Aprobar todo",
+      LATTICE_APPROVED: "Aprobado",
       LATTICE_REJECT_ALL: "Rechazar todo",
+      LATTICE_REJECTED: "Rechazado",
       LATTICE_EXTRACTION_RUNNING:
         "La extracción está en progreso. Esta página se actualizará automáticamente.",
       LATTICE_EXTRACTION_REVIEW:
@@ -4272,6 +4334,48 @@ export const translations = {
       SEND_INVITATIONS: "Enviar invitación(es)",
       SENSITIVITY_LABEL_REMOVED: "Etiqueta de sensibilidad eliminada",
       SENSITIVITY_LABELS: "Etiquetas de sensibilidad",
+      ASSIGNED_USERS: "Usuarios asignados",
+      ASSIGN_USERS: "Asignar usuarios",
+      LABEL_ACCESS_BEHAVIOR: "Comportamiento de acceso",
+      LABEL_ACCESS_BEHAVIOR_DESCRIPTION:
+        "Solo los usuarios explícitamente asignados a esta etiqueta pueden acceder a los registros que la contienen.",
+      LABEL_ACCESS_MANAGED_AT_ORG_LEVEL:
+        "El acceso de usuarios a etiquetas heredadas de la organización se gestiona a nivel de organización.",
+      RECORD_PERMISSIONS: "Registro",
+      FILE_PERMISSIONS: "Archivo",
+      PERMISSION_READ_RECORD: "Leer registro",
+      PERMISSION_WRITE_RECORD: "Agregar registro",
+      PERMISSION_UPDATE_RECORD: "Actualizar registro",
+      PERMISSION_DELETE_RECORD: "Eliminar registro",
+      PERMISSION_DOWNLOAD_FILE: "Descargar archivo",
+      PERMISSION_UPLOAD_FILE: "Subir archivo",
+      PERMISSION_UPDATE_FILE: "Actualizar archivo",
+      PERMISSION_DELETE_FILE: "Eliminar archivo",
+      SEARCH_ASSIGNED_USERS: "Buscar usuarios asignados",
+      NO_ASSIGNED_USERS: "Aún no hay usuarios asignados a esta etiqueta.",
+      GRANTED_BY_ON: "Otorgado por {name} el {date}",
+      REMOVE_ACCESS: "Quitar acceso",
+      SELECT_GROUPS_AND_USERS: "Seleccionar grupos y usuarios",
+      PREVIEW_USERS: "Vista previa de usuarios",
+      INDIVIDUAL_USERS: "Usuarios individuales",
+      SEARCH_GROUPS: "Buscar grupos",
+      VIA_GROUP: "Vía {group}",
+      ALREADY_ASSIGNED: "Ya asignado",
+      SELECTED_INDIVIDUALLY: "Seleccionado individualmente",
+      DESELECTED: "Deseleccionado",
+      CURRENT_SELECTION: "Selección actual",
+      NONE_SELECTED: "Ninguno seleccionado",
+      GROUP_MEMBERSHIP_EXPANSION_NOTE:
+        "La membresía del grupo se expande solo para esta asignación. Los cambios futuros en el grupo no modificarán el acceso a la etiqueta.",
+      PREVIEW_USERS_COUNT: "Vista previa de {count} usuarios",
+      NEW_USERS_WILL_RECEIVE_LABEL: "{count} usuarios nuevos recibirán la etiqueta",
+      ALREADY_ASSIGNED_COUNT: "{count} ya asignados",
+      DESELECTED_COUNT: "{count} deseleccionados",
+      ASSIGN_LABEL_TO_N_USERS: "Asignar etiqueta a {count} usuarios",
+      ASSIGN_LABEL_TO_USERS: "Asignar etiqueta a usuarios",
+      GRANTED_ACCESS_TO_USERS: "Acceso otorgado a {count} usuarios",
+      FAILED_TO_GRANT_ACCESS: "No se pudo otorgar acceso a uno o más usuarios",
+      FAILED_TO_REVOKE_ACCESS: "No se pudo quitar el acceso",
       SERVER_REJECTED_UPLOAD_FIX_ISSUES:
         "El servidor rechazó la carga. Corrija los siguientes problemas:",
       SERVICE_CONFIG_WILL_BE_AVAILABLE_SOON:

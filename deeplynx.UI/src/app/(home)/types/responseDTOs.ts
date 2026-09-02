@@ -92,6 +92,7 @@ export type RecordResponseDto = {
   dataSourceId?: number | null;
   dataSourceName?: string | null;
   projectId?: number | null;
+  extractionId?: number | null;
   lastUpdatedAt?: string;
   lastUpdatedBy?: string | null;
   isArchived?: boolean;
@@ -266,6 +267,28 @@ export type SensitivityLabelsDto = {
   isArchived: boolean;
   projectId: number | null;
   organizationId: number | null;
+};
+
+export type UserSensitivityLabelResponseDto = {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  labelId: number;
+  grantedBy: number | null;
+  grantedByName: string | null;
+  grantedAt: string;
+};
+
+export type SensitivityLabelPermissionResponseDto = {
+  id: number;
+  labelId: number;
+  action: string;
+  name: string;
+  description: string | null;
+  lastUpdatedAt: string;
+  lastUpdatedBy: number | null;
+  isArchived: boolean;
 };
 
 export type UserResponseDto = {
