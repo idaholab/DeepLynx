@@ -17,7 +17,6 @@ import type {
   UserSensitivityLabelResponseDto,
   SensitivityLabelPermissionResponseDto,
   ProjectMemberResponseDto,
-  GroupResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import {
   archiveSensitivityLabelProject,
@@ -26,6 +25,8 @@ import {
   getUsersWithAccessToLabelProject,
   revokeSensitivityLabelAccessProject,
   getPermissionsForLabelProject,
+  getUsersWithAccessToLabelOrg,
+  revokeSensitivityLabelAccessOrg,
 } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import LabelEditModal, {
   FILE_ACTIONS,
@@ -45,7 +46,6 @@ interface Props {
   orgLabelsLocked: boolean;
   refreshLabels: () => Promise<void>;
   projectMembers: ProjectMemberResponseDto[];
-  projectGroups: GroupResponseDto[];
 }
 
 function LabelPermissionsPanel({
@@ -142,13 +142,11 @@ function AssignedUsersPanel({
   projectId,
   organizationId,
   projectMembers,
-  projectGroups,
 }: {
   label: SensitivityLabelsDto;
   projectId: number;
   organizationId: number;
   projectMembers: ProjectMemberResponseDto[];
-  projectGroups: GroupResponseDto[];
 }) {
   const { t } = useLanguage();
   const [assignedUsers, setAssignedUsers] = useState<UserSensitivityLabelResponseDto[]>([]);
@@ -156,12 +154,14 @@ function AssignedUsersPanel({
   const [search, setSearch] = useState("");
   const [revokingUserId, setRevokingUserId] = useState<number | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const isOrgLabel = !label.projectId;
 
   const loadAssignedUsers = async () => {
-    if (!label.projectId) return;
     try {
       setLoading(true);
-      const users = await getUsersWithAccessToLabelProject(projectId, label.id);
+      const users = isOrgLabel
+        ? await getUsersWithAccessToLabelOrg(organizationId, label.id)
+        : await getUsersWithAccessToLabelProject(projectId, label.id);
       setAssignedUsers(users);
     } catch (error) {
       console.error("Failed to load assigned users:", error);
@@ -171,25 +171,18 @@ function AssignedUsersPanel({
   };
 
   useEffect(() => {
-    if (label.projectId) {
-      loadAssignedUsers();
-    }
+    loadAssignedUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [label.id, label.projectId]);
-
-  if (!label.projectId) {
-    return (
-      <div className="alert alert-info mt-6 items-start">
-        <InformationCircleIcon className="h-5 w-5 shrink-0" />
-        <span className="text-sm">{t.translations.LABEL_ACCESS_MANAGED_AT_ORG_LEVEL}</span>
-      </div>
-    );
-  }
 
   const handleRevoke = async (userId: number) => {
     try {
       setRevokingUserId(userId);
-      await revokeSensitivityLabelAccessProject(projectId, label.id, userId);
+      if (isOrgLabel) {
+        await revokeSensitivityLabelAccessOrg(organizationId, label.id, userId);
+      } else {
+        await revokeSensitivityLabelAccessProject(projectId, label.id, userId);
+      }
       setAssignedUsers((current) => current.filter((u) => u.userId !== userId));
     } catch (error) {
       console.error(`Failed to revoke access for user ${userId}:`, error);
@@ -199,17 +192,62 @@ function AssignedUsersPanel({
     }
   };
 
+  const assignedByUserId = useMemo(
+    () => new Map(assignedUsers.map((u) => [u.userId, u])),
+    [assignedUsers],
+  );
+
+  const allUsersView = useMemo(() => {
+    const seen = new Set<number>();
+    const result: {
+      userId: number;
+      userName: string;
+      userEmail: string;
+      assigned: UserSensitivityLabelResponseDto | null;
+    }[] = [];
+    for (const member of projectMembers) {
+      if (!member.memberId || !member.email || seen.has(member.memberId)) continue;
+      seen.add(member.memberId);
+      result.push({
+        userId: member.memberId,
+        userName: member.name,
+        userEmail: member.email,
+        assigned: assignedByUserId.get(member.memberId) ?? null,
+      });
+    }
+    return result.sort((a, b) => {
+      if (!!a.assigned === !!b.assigned) return a.userName.localeCompare(b.userName);
+      return a.assigned ? -1 : 1;
+    });
+  }, [projectMembers, assignedByUserId]);
+
+  const assignedOnlyView = useMemo(
+    () =>
+      allUsersView
+        .filter((u) => !!u.assigned)
+        .sort((a, b) => a.userName.localeCompare(b.userName)),
+    [allUsersView],
+  );
+
+  const usersView = isOrgLabel ? allUsersView : assignedOnlyView;
+
   const normalizedSearch = search.trim().toLowerCase();
   const filteredUsers = normalizedSearch
-    ? assignedUsers.filter(
+    ? usersView.filter(
         (u) =>
           u.userName.toLowerCase().includes(normalizedSearch) ||
           u.userEmail.toLowerCase().includes(normalizedSearch),
       )
-    : assignedUsers;
+    : usersView;
 
   return (
     <div className="py-6">
+      {isOrgLabel && (
+        <div className="alert alert-info mb-5 items-start">
+          <InformationCircleIcon className="h-5 w-5 shrink-0" />
+          <span className="text-sm">{t.translations.LABEL_ACCESS_MANAGED_AT_ORG_LEVEL}</span>
+        </div>
+      )}
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <label className="input input-bordered input-sm flex w-full max-w-xs items-center gap-2 bg-base-100">
           <MagnifyingGlassIcon className="h-4 w-4 text-base-content/50" />
@@ -221,10 +259,12 @@ function AssignedUsersPanel({
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => setWizardOpen(true)}>
-          <PlusIcon className="h-4 w-4" />
-          {t.translations.ASSIGN_USERS}
-        </button>
+        {!isOrgLabel && (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setWizardOpen(true)}>
+            <PlusIcon className="h-4 w-4" />
+            {t.translations.ASSIGN_USERS}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -237,39 +277,52 @@ function AssignedUsersPanel({
         </p>
       ) : (
         <div className="overflow-hidden rounded-box border border-base-200">
-          {filteredUsers.map((u) => (
-            <div
-              key={u.id}
-              className="flex items-center gap-3 border-b border-base-200 px-4 py-4 last:border-b-0"
-            >
-              <AvatarCell name={u.userName} size={9} containerClassName="space-x-0" />
-              <span className="min-w-0 flex-1">
-                <strong className="block">{u.userName}</strong>
-                <span className="block text-sm text-base-content/60">
-                  {u.userEmail}
-                  {u.grantedByName && (
-                    <>
-                      {" · "}
-                      {t.translations.GRANTED_BY_ON.replace("{name}", u.grantedByName).replace(
-                        "{date}",
-                        new Date(u.grantedAt).toLocaleDateString(),
-                      )}
-                    </>
-                  )}
-                </span>
-              </span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm text-error"
-                onClick={() => handleRevoke(u.userId)}
-                disabled={revokingUserId === u.userId}
-                aria-label={t.translations.REMOVE_ACCESS}
-                title={t.translations.REMOVE_ACCESS}
+          {filteredUsers.map((u) => {
+            const isAssigned = !!u.assigned;
+            return (
+              <div
+                key={u.userId}
+                className={`flex items-center gap-3 border-b border-base-200 px-4 py-4 last:border-b-0 ${
+                  isOrgLabel ? "opacity-50" : isAssigned ? "" : "opacity-50"
+                }`}
               >
-                <TrashIcon className="h-5 w-5" />
-              </button>
-            </div>
-          ))}
+                <AvatarCell name={u.userName} size={9} containerClassName="space-x-0" />
+                <span className="min-w-0 flex-1">
+                  <strong className="block">{u.userName}</strong>
+                  <span className="block text-sm text-base-content/60">
+                    {u.userEmail}
+                    {u.assigned?.grantedByName && (
+                      <>
+                        {" · "}
+                        {t.translations.GRANTED_BY_ON.replace(
+                          "{name}",
+                          u.assigned.grantedByName,
+                        ).replace(
+                          "{date}",
+                          new Date(u.assigned.grantedAt).toLocaleDateString(),
+                        )}
+                      </>
+                    )}
+                  </span>
+                </span>
+                {!isAssigned && (
+                  <span className="badge badge-ghost">{t.translations.UNASSIGNED}</span>
+                )}
+                {isAssigned && !isOrgLabel && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm text-error"
+                    onClick={() => handleRevoke(u.userId)}
+                    disabled={revokingUserId === u.userId}
+                    aria-label={t.translations.REMOVE_ACCESS}
+                    title={t.translations.REMOVE_ACCESS}
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -279,9 +332,7 @@ function AssignedUsersPanel({
         projectId={projectId}
         labelId={label.id}
         labelName={label.name}
-        organizationId={organizationId}
         projectMembers={projectMembers}
-        projectGroups={projectGroups}
         assignedUserIds={new Set(assignedUsers.map((u) => u.userId))}
         onAssigned={loadAssignedUsers}
       />
@@ -296,7 +347,6 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
   orgLabelsLocked,
   refreshLabels,
   projectMembers,
-  projectGroups,
 }) => {
   const { t } = useLanguage();
   const [selectedLabelId, setSelectedLabelId] = useState<number | null>(
@@ -462,7 +512,7 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-5 p-4 lg:grid-cols-[minmax(280px,.78fr)_minmax(0,1.72fr)]">
+    <div className="grid grid-cols-1 gap-5 p-4 lg:min-h-[75vh] lg:grid-cols-[minmax(280px,.78fr)_minmax(0,1.72fr)]">
       <aside className="card overflow-hidden border border-base-300/50 bg-base-100 shadow-sm">
         <div className="flex items-start justify-between gap-3 border-b border-base-200 p-4">
           <div>
@@ -590,7 +640,6 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
               projectId={projectId}
               organizationId={organizationId}
               projectMembers={projectMembers}
-              projectGroups={projectGroups}
             />
           )}
         </section>

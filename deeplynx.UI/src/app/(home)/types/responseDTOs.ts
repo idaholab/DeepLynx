@@ -279,6 +279,16 @@ export type UserSensitivityLabelResponseDto = {
   grantedAt: string;
 };
 
+export type GroupSensitivityLabelResponseDto = {
+  id: number;
+  groupId: number;
+  groupName: string;
+  labelId: number;
+  grantedBy: number | null;
+  grantedByName: string | null;
+  grantedAt: string;
+};
+
 export type SensitivityLabelPermissionResponseDto = {
   id: number;
   labelId: number;

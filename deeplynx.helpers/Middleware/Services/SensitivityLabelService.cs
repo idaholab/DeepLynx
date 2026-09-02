@@ -65,10 +65,14 @@ public class SensitivityLabelService : ISensitivityLabelService
             .Where(p => p.Action == userAction && !p.IsArchived)
             .Select(p => p.LabelId);
 
-        // Labels this user has been explicitly granted access to
+        // Labels this user has been explicitly granted access to, either directly or through
+        // a group they belong to
         var grantedLabelIds = _context.UserSensitivityLabels
             .Where(u => u.UserId == currentUserId)
-            .Select(u => u.LabelId);
+            .Select(u => u.LabelId)
+            .Union(_context.GroupSensitivityLabels
+                .Where(g => g.Group.Users.Any(u => u.Id == currentUserId))
+                .Select(g => g.LabelId));
 
         // A label is "authorized" for this action if it isn't gated for that action at all,
         // or the user has an explicit grant for it

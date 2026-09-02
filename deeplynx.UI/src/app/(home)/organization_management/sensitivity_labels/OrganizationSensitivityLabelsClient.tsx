@@ -10,13 +10,13 @@ import {
   TrashIcon,
   CheckCircleIcon,
   XCircleIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import type {
   SensitivityLabelsDto,
   UserSensitivityLabelResponseDto,
   SensitivityLabelPermissionResponseDto,
   UserResponseDto,
-  GroupResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import {
   archiveSensitivityLabelOrg,
@@ -26,7 +26,9 @@ import {
   getUsersWithAccessToLabelOrg,
   revokeSensitivityLabelAccessOrg,
   getPermissionsForLabelOrg,
+  getGroupsWithAccessToLabelOrg,
 } from "@/app/lib/client_service/sensitivity_labels_services.client";
+import { getGroupMembers } from "@/app/lib/client_service/group_services.client";
 import LabelEditModal, {
   FILE_ACTIONS,
   RECORD_ACTIONS,
@@ -42,7 +44,6 @@ type DetailTab = "permissions" | "assigned-users";
 interface Props {
   labels: SensitivityLabelsDto[];
   members: UserResponseDto[];
-  groups: GroupResponseDto[];
 }
 
 function LabelPermissionsPanel({
@@ -138,12 +139,10 @@ function AssignedUsersPanel({
   label,
   organizationId,
   members,
-  groups,
 }: {
   label: SensitivityLabelsDto;
   organizationId: number;
   members: UserResponseDto[];
-  groups: GroupResponseDto[];
 }) {
   const { t } = useLanguage();
   const [assignedUsers, setAssignedUsers] = useState<UserSensitivityLabelResponseDto[]>([]);
@@ -151,6 +150,10 @@ function AssignedUsersPanel({
   const [search, setSearch] = useState("");
   const [revokingUserId, setRevokingUserId] = useState<number | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  // userId -> names of groups that also grant this label to the user
+  const [groupAccessByUser, setGroupAccessByUser] = useState<
+    Map<number, string[]>
+  >(new Map());
 
   const loadAssignedUsers = async () => {
     try {
@@ -164,8 +167,38 @@ function AssignedUsersPanel({
     }
   };
 
+  const loadGroupAccess = async () => {
+    try {
+      const groups = await getGroupsWithAccessToLabelOrg(organizationId, label.id);
+      const memberLists = await Promise.all(
+        groups.map(async (g) => {
+          try {
+            const res = await getGroupMembers(organizationId, g.groupId);
+            return { name: g.groupName, members: res.items };
+          } catch (error) {
+            console.error(`Failed to load members for group ${g.groupId}:`, error);
+            return { name: g.groupName, members: [] };
+          }
+        }),
+      );
+      const map = new Map<number, string[]>();
+      memberLists.forEach(({ name, members: groupMembers }) => {
+        groupMembers.forEach((u) => {
+          const existing = map.get(u.id);
+          if (existing) existing.push(name);
+          else map.set(u.id, [name]);
+        });
+      });
+      setGroupAccessByUser(map);
+    } catch (error) {
+      console.error("Failed to load group-derived access:", error);
+      setGroupAccessByUser(new Map());
+    }
+  };
+
   useEffect(() => {
     loadAssignedUsers();
+    loadGroupAccess();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [label.id]);
 
@@ -182,14 +215,35 @@ function AssignedUsersPanel({
     }
   };
 
+  const assignedByUserId = useMemo(
+    () => new Map(assignedUsers.map((u) => [u.userId, u])),
+    [assignedUsers],
+  );
+
+  const allUsersView = useMemo(
+    () =>
+      members
+        .map((m) => ({
+          userId: m.id,
+          userName: m.name,
+          userEmail: m.email,
+          assigned: assignedByUserId.get(m.id) ?? null,
+        }))
+        .sort((a, b) => {
+          if (!!a.assigned === !!b.assigned) return a.userName.localeCompare(b.userName);
+          return a.assigned ? -1 : 1;
+        }),
+    [members, assignedByUserId],
+  );
+
   const normalizedSearch = search.trim().toLowerCase();
   const filteredUsers = normalizedSearch
-    ? assignedUsers.filter(
+    ? allUsersView.filter(
         (u) =>
           u.userName.toLowerCase().includes(normalizedSearch) ||
           u.userEmail.toLowerCase().includes(normalizedSearch),
       )
-    : assignedUsers;
+    : allUsersView;
 
   return (
     <div className="py-6">
@@ -220,39 +274,64 @@ function AssignedUsersPanel({
         </p>
       ) : (
         <div className="overflow-hidden rounded-box border border-base-200">
-          {filteredUsers.map((u) => (
-            <div
-              key={u.id}
-              className="flex items-center gap-3 border-b border-base-200 px-4 py-4 last:border-b-0"
-            >
-              <AvatarCell name={u.userName} size={9} containerClassName="space-x-0" />
-              <span className="min-w-0 flex-1">
-                <strong className="block">{u.userName}</strong>
-                <span className="block text-sm text-base-content/60">
-                  {u.userEmail}
-                  {u.grantedByName && (
-                    <>
-                      {" · "}
-                      {t.translations.GRANTED_BY_ON.replace("{name}", u.grantedByName).replace(
-                        "{date}",
-                        new Date(u.grantedAt).toLocaleDateString(),
-                      )}
-                    </>
-                  )}
-                </span>
-              </span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm text-error"
-                onClick={() => handleRevoke(u.userId)}
-                disabled={revokingUserId === u.userId}
-                aria-label={t.translations.REMOVE_ACCESS}
-                title={t.translations.REMOVE_ACCESS}
+          {filteredUsers.map((u) => {
+            const isAssigned = !!u.assigned;
+            return (
+              <div
+                key={u.userId}
+                className={`flex items-center gap-3 border-b border-base-200 px-4 py-4 last:border-b-0 ${
+                  isAssigned ? "" : "opacity-50"
+                }`}
               >
-                <TrashIcon className="h-5 w-5" />
-              </button>
-            </div>
-          ))}
+                <AvatarCell name={u.userName} size={9} containerClassName="space-x-0" />
+                <span className="min-w-0 flex-1">
+                  <strong className="block">{u.userName}</strong>
+                  <span className="block text-sm text-base-content/60">
+                    {u.userEmail}
+                    {u.assigned?.grantedByName && (
+                      <>
+                        {" · "}
+                        {t.translations.GRANTED_BY_ON.replace(
+                          "{name}",
+                          u.assigned.grantedByName,
+                        ).replace(
+                          "{date}",
+                          new Date(u.assigned.grantedAt).toLocaleDateString(),
+                        )}
+                      </>
+                    )}
+                  </span>
+                </span>
+                {!isAssigned && (
+                  <span className="badge badge-ghost">{t.translations.UNASSIGNED}</span>
+                )}
+                {groupAccessByUser.has(u.userId) && (
+                  <span
+                    className="badge badge-secondary gap-1"
+                    title={t.translations.ALSO_GRANTED_VIA_GROUPS.replace(
+                      "{groups}",
+                      groupAccessByUser.get(u.userId)!.join(", "),
+                    )}
+                  >
+                    <UserGroupIcon className="h-3.5 w-3.5" />
+                    {t.translations.VIA_GROUP_BADGE}
+                  </span>
+                )}
+                {isAssigned && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm text-error"
+                    onClick={() => handleRevoke(u.userId)}
+                    disabled={revokingUserId === u.userId}
+                    aria-label={t.translations.REMOVE_ACCESS}
+                    title={t.translations.REMOVE_ACCESS}
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -263,7 +342,6 @@ function AssignedUsersPanel({
         labelId={label.id}
         labelName={label.name}
         members={members}
-        groups={groups}
         assignedUserIds={new Set(assignedUsers.map((u) => u.userId))}
         onAssigned={loadAssignedUsers}
       />
@@ -274,7 +352,6 @@ function AssignedUsersPanel({
 const OrganizationSensitivityLabelsClient: React.FC<Props> = ({
   labels,
   members,
-  groups,
 }) => {
   const { t } = useLanguage();
   const { organization } = useOrganizationSession();
@@ -462,7 +539,7 @@ const OrganizationSensitivityLabelsClient: React.FC<Props> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-5 p-4 lg:grid-cols-[minmax(280px,.78fr)_minmax(0,1.72fr)]">
+    <div className="grid grid-cols-1 gap-5 p-4 lg:min-h-[75vh] lg:grid-cols-[minmax(280px,.78fr)_minmax(0,1.72fr)]">
       <aside className="card overflow-hidden border border-base-300/50 bg-base-100 shadow-sm">
         <div className="flex items-start justify-between gap-3 border-b border-base-200 p-4">
           <div>
@@ -572,7 +649,6 @@ const OrganizationSensitivityLabelsClient: React.FC<Props> = ({
               label={selectedLabel}
               organizationId={orgId}
               members={members}
-              groups={groups}
             />
           ) : null}
         </section>

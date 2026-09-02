@@ -13,7 +13,7 @@ import {
 import { useLanguage } from "@/app/contexts/Language";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
 import { useEffect, useState } from "react";
-import InlineGroupsTable from "./groups/InlineGroupsTable";
+import OrganizationGroupsClient from "./groups/OrganizationGroupsClient";
 import RolesAndPermissions from "./roles_and_permissions/RolesAndPermissions";
 import OrganizationSensitivityLabelsClient from "./sensitivity_labels/OrganizationSensitivityLabelsClient";
 import OrganizationSettings from "./settings/OrganizationSettings";
@@ -70,10 +70,10 @@ const OrganizationManagementClient = ({
     {
       label: t.translations.GROUPS,
       content: (
-        <InlineGroupsTable
+        <OrganizationGroupsClient
           initialGroups={initialGroups}
-          availableUsers={members}
-          organizationId={organization?.organizationId}
+          members={members}
+          labels={labels}
         />
       ),
     },
@@ -83,7 +83,6 @@ const OrganizationManagementClient = ({
         <OrganizationSensitivityLabelsClient
           labels={labels}
           members={members}
-          groups={initialGroups}
         />
       ),
     },
