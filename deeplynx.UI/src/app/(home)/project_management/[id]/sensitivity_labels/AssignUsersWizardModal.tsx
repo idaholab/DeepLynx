@@ -217,15 +217,6 @@ const AssignUsersWizardModal: React.FC<Props> = ({
           </div>
         </header>
 
-        <div className="border-b border-base-200 px-6 py-4">
-          <ul className="steps w-full">
-            <li className="step step-primary">{t.translations.SELECT_GROUPS_AND_USERS}</li>
-            <li className={`step ${step === "preview" ? "step-primary" : ""}`}>
-              {t.translations.PREVIEW_USERS}
-            </li>
-          </ul>
-        </div>
-
         {step === "select" ? (
           <div className="grid min-h-[470px] grid-cols-1 lg:grid-cols-[1.35fr_.65fr]">
             <section className="border-b border-base-200 p-6 lg:border-b-0 lg:border-r">
