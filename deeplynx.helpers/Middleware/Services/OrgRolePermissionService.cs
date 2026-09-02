@@ -40,7 +40,7 @@ public class OrgRolePermissionService : IOrgRolePermissionService
                 FROM deeplynx.organization_users ou
                 WHERE ou.user_id = {userId}
                   AND ou.organization_id = {orgId}
-                  AND (ou.is_org_admin = true OR {action} = 'read')) as has_permission")
+                  AND ou.is_org_admin = true) as has_permission")
             .AsEnumerable()
             .FirstOrDefault();
 

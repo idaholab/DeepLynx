@@ -98,6 +98,22 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         _context.Extractions.Add(extraction);
         await _context.SaveChangesAsync();
 
+        if (record.ExtractionId.HasValue)
+        {
+            var previousExtraction = await _context.Extractions
+                .FirstOrDefaultAsync(e => e.Id == record.ExtractionId.Value);
+
+            if (previousExtraction != null)
+            {
+                _context.Extractions.Remove(previousExtraction);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        record.ExtractionId = extraction.Id;
+        _context.Records.Update(record);
+        await _context.SaveChangesAsync();
+
         try
         {
             // IDs necessary for POST back from Insight 
@@ -1069,6 +1085,11 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         string stage,
         string message)
     {
+        if (message != null && message.Contains("Unclosed JSON object in LLM output", StringComparison.OrdinalIgnoreCase))
+        {
+            message = "The document is too large for Lattice to process";
+        }
+
         var properties = GetExtractionProperties(extraction.Properties);
         properties["failure_stage"] = stage;
 
