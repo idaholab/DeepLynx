@@ -118,20 +118,7 @@ public class ProvenanceController : ControllerBase
         [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
         paginatedRequestDto ??= new PaginatedRequestDto();
-        try
-        {
-            var history = await _provenanceBusiness.GetProjectProvenanceHistory(projectId, paginatedRequestDto);
-            return Ok(history);
-        }
-        catch (KeyNotFoundException exc)
-        {
-            return NotFound(exc.Message);
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while retrieving provenance history for project {projectId}: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(projectId, paginatedRequestDto);
+        return Ok(history);
     }
 }
