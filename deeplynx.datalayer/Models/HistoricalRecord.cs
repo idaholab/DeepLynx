@@ -90,7 +90,4 @@ public partial class HistoricalRecord
     [ForeignKey("OrganizationId")]
     [InverseProperty("HistoricalRecords")]
     public virtual Organization Organization { get; set; } = null!;
-    
-    [InverseProperty("HistoricalRecord")]
-    public virtual ICollection<ProvenanceRecord> ProvenanceRecords { get; set; }
 }
