@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using deeplynx.helpers.exceptions;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.tests;
 
@@ -1193,6 +1194,18 @@ public class RoleBusinessTests : IntegrationTestBase
         Assert.Empty(eventList);
     }
 
+    [Fact]
+    public async Task ArchiveRole_InvalidatesCache_ForMembersWhoHeldRoleBeforeArchive()
+    {
+        // uid holds rid4 in pid per seed data
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "execute", "test2");
+        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
+
+        await _roleBusiness.ArchiveRole(uid, rid4, oid, pid);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
+    }
+
     #endregion
 
     #region UnarchiveRole Tests
@@ -1335,6 +1348,17 @@ public class RoleBusinessTests : IntegrationTestBase
             exception.Message);
     }
 
+    [Fact]
+    public async Task DeleteRole_InvalidatesCache_ForMembersWhoHeldRoleBeforeDelete()
+    {
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "execute", "test2");
+        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
+
+        await _roleBusiness.DeleteRole(uid, rid4, oid, pid);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
+    }
+
     #endregion
 
     #region GetPermissionsByRole Tests
@@ -1460,6 +1484,18 @@ public class RoleBusinessTests : IntegrationTestBase
             exception.Message);
     }
 
+    [Fact]
+    public async Task AddPermissionToRole_InvalidatesCache_ForMembersHoldingRole()
+    {
+        // uid holds rid4 in project pid per SeedTestDataAsync (see 'mid' project member)
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "execute", "test2");
+        await CacheService.Instance.SetAsync(staleKey, false, (TimeSpan?)null);
+
+        await _roleBusiness.AddPermissionToRole(rid4, permid3, oid, pid);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
+    }
+
     #endregion
 
     #region RemovePermissionFromRole Tests
@@ -1512,6 +1548,19 @@ public class RoleBusinessTests : IntegrationTestBase
         Assert.Contains(
             $"Role with id {rid5} not found or does not belong to the specified organization/project context",
             exception.Message);
+    }
+
+    [Fact]
+    public async Task RemovePermissionFromRole_InvalidatesCache_ForMembersHoldingRole()
+    {
+        await _roleBusiness.AddPermissionToRole(rid4, permid3, oid, pid);
+
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "execute", "test2");
+        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
+
+        await _roleBusiness.RemovePermissionFromRole(rid4, permid3, oid, pid);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
     }
 
     #endregion
@@ -1623,6 +1672,17 @@ public class RoleBusinessTests : IntegrationTestBase
             exception.Message);
     }
 
+    [Fact]
+    public async Task SetPermissionsForRole_InvalidatesCache_ForMembersHoldingRole()
+    {
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "read", "test");
+        await CacheService.Instance.SetAsync(staleKey, false, (TimeSpan?)null);
+
+        await _roleBusiness.SetPermissionsForRole(rid4, [permid1], oid, pid);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
+    }
+
     #endregion
 
     #region SetPermissionsByPattern Tests
@@ -1700,6 +1760,20 @@ public class RoleBusinessTests : IntegrationTestBase
         Assert.Contains(
             $"Role with id {rid4} not found or does not belong to the specified organization/project context",
             exception.Message);
+    }
+
+    [Fact]
+    public async Task SetPermissionsByPattern_InvalidatesCache_ForMembersHoldingRole()
+    {
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "write", "test");
+        await CacheService.Instance.SetAsync(staleKey, false, (TimeSpan?)null);
+
+        await _roleBusiness.SetPermissionsByPattern(
+            rid4,
+            new Dictionary<string, string[]> { { "test", new[] { "write" } } },
+            oid, pid);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
     }
 
     #endregion

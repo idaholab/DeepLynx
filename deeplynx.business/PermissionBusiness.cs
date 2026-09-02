@@ -4,6 +4,7 @@ using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.business;
 
@@ -19,15 +20,18 @@ public class PermissionBusiness : IPermissionBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
+    private readonly ILogger<PermissionBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="PermissionBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for permission operations</param>
-    public PermissionBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
+    /// <param name="logger">Used for uniformity in logging</param>
+    public PermissionBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ILogger<PermissionBusiness>? logger = null)
     {
         _context = context;
         _eventBusiness = eventBusiness;
+        _logger = logger;
     }
 
     /// <summary>
@@ -233,8 +237,16 @@ public class PermissionBusiness : IPermissionBusiness
         permission.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         permission.LastUpdatedBy = currentUserId;
 
+        var affectedMembers = await GetAffectedProjectMembersForPermission(permissionId);
+
         _context.Permissions.Update(permission);
         await _context.SaveChangesAsync();
+
+        // Invalidate cached permissions
+        foreach (var member in affectedMembers)
+        {
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+        }
 
         // Log update Permission event
         await _eventBusiness.CreateEvent(
@@ -289,11 +301,19 @@ public class PermissionBusiness : IPermissionBusiness
         if (permission.IsDefault)
             throw new KeyNotFoundException($"Permission with id {permissionId} cannot be updated");
 
+        var affectedMembers = await GetAffectedProjectMembersForPermission(permissionId);
+
         permission.IsArchived = true;
         permission.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         permission.LastUpdatedBy = currentUserId;
         _context.Permissions.Update(permission);
         await _context.SaveChangesAsync();
+
+        // Invalidate cached permissions
+        foreach (var member in affectedMembers)
+        {
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+        }
 
         // Log archive Permission event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -331,11 +351,19 @@ public class PermissionBusiness : IPermissionBusiness
         if (permission == null || !permission.IsArchived)
             throw new KeyNotFoundException($"Permission with id {permissionId} not found or is not archived");
 
+        var affectedMembers = await GetAffectedProjectMembersForPermission(permissionId);
+
         permission.IsArchived = false;
         permission.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         permission.LastUpdatedBy = currentUserId;
         _context.Permissions.Update(permission);
         await _context.SaveChangesAsync();
+
+        // Invalidate cached permissions
+        foreach (var member in affectedMembers)
+        {
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+        }
 
         // Log unarchive Permission event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -373,8 +401,16 @@ public class PermissionBusiness : IPermissionBusiness
         if (permission.IsDefault)
             throw new KeyNotFoundException($"Permission with id {permissionId} cannot be deleted");
 
+        var affectedMembers = await GetAffectedProjectMembersForPermission(permissionId);
+
         _context.Permissions.Remove(permission);
         await _context.SaveChangesAsync();
+
+        // Invalidate cached permissions
+        foreach (var member in affectedMembers)
+        {
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+        }
 
         // Log delete Permission event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -387,5 +423,25 @@ public class PermissionBusiness : IPermissionBusiness
         });
 
         return true;
+    }
+
+    /// <summary>
+    ///     Finds every project member whose role currently includes this permission.
+    /// </summary>
+    private async Task<List<(long ProjectId, long? UserId, long? GroupId)>> GetAffectedProjectMembersForPermission(long permissionId)
+    {
+        var affectedRoleIds = await _context.Roles
+            .Where(r => r.Permissions.Any(p => p.Id == permissionId))
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        if (affectedRoleIds.Count == 0)
+            return new List<(long, long?, long?)>();
+
+        return await _context.ProjectMembers
+            .Where(pm => pm.RoleId.HasValue && affectedRoleIds.Contains(pm.RoleId.Value))
+            .Select(pm => new { pm.ProjectId, pm.UserId, pm.GroupId })
+            .ToListAsync()
+            .ContinueWith(t => t.Result.Select(m => (m.ProjectId, m.UserId, m.GroupId)).ToList());
     }
 }
