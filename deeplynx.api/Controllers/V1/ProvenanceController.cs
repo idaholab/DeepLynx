@@ -99,4 +99,39 @@ public class ProvenanceController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, message);
         }
     }
+
+    /// <summary>
+    ///     Get Project-Level Provenance History
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project for which to retrieve provenance history</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>
+    ///     A paginated list of every provenance record ever created for the project, most recent
+    ///     first, including provenance for records that have since been deleted.
+    /// </returns>
+    [HttpGet("project-history", Name = "api_get_provenance_history_for_project")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<PaginatedResponse<ProvenanceRecordResponseDto>>> GetProjectProvenanceHistory(
+        long organizationId,
+        long projectId,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
+    {
+        paginatedRequestDto ??= new PaginatedRequestDto();
+        try
+        {
+            var history = await _provenanceBusiness.GetProjectProvenanceHistory(projectId, paginatedRequestDto);
+            return Ok(history);
+        }
+        catch (KeyNotFoundException exc)
+        {
+            return NotFound(exc.Message);
+        }
+        catch (Exception exc)
+        {
+            var message = $"An error occurred while retrieving provenance history for project {projectId}: {exc}";
+            _logger.LogError(message);
+            return StatusCode(StatusCodes.Status500InternalServerError, message);
+        }
+    }
 }
