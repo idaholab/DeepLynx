@@ -30,8 +30,7 @@ const ConfirmArchiveLabelModal: React.FC<Props> = ({
             <h3 className="font-bold text-lg">{t.translations.ARCHIVE_LABEL}</h3>
             <p className="text-sm text-base-content/70 mt-1">
               {t.translations.ARE_YOU_SURE_YOU_WANT_TO_ARCHIVE}{" "}
-              <span className="font-semibold">{labelName}</span>?<br />
-              {t.translations.ARCHIVED_LABEL_RESTORED_LATER}
+              <span className="font-semibold">{labelName}</span>?
             </p>
           </div>
         </div>
