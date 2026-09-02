@@ -104,7 +104,7 @@ public class RecordController : ControllerBase
     [HttpGet("search", Name = "api_record_search")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
-    public async Task<ActionResult<PaginatedResponse<RecordResponseDto>>> Search(
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDtoV2>>> Search(
         long organizationId,
         long projectId,
         [FromQuery] RecordSearchRequestDto search,
