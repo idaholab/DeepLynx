@@ -21,6 +21,21 @@ public class CacheKeys
     {
         return $"system:data_source_count:hide_archived:{hideArchived}";
     }
+    
+    public static string ProjectRecordCount(long projectId, bool hideArchived)
+    {
+        return $"project:{projectId}:record_count:hide_archived:{hideArchived}";
+    }
+
+    public static string OrganizationRecordCount(long organizationId, bool hideArchived)
+    {
+        return $"organization:{organizationId}:record_count:hide_archived:{hideArchived}";
+    }
+
+    public static string SystemRecordCount(bool hideArchived)
+    {
+        return $"system:record_count:hide_archived:{hideArchived}";
+    }
 
     public static string UserArchivedStatus(long userId)
     {
@@ -73,7 +88,12 @@ public class CacheKeys
 
     public static string ObjectStorageStatus(long objectStorageId)
     {
-        return $"object_storage:{objectStorageId}:status";
+        return $"objectstorage:{objectStorageId}:status";
+    }
+
+    public static string DataSourceStatus(long dataSourceId)
+    {
+        return $"datasource:{dataSourceId}:status";
     }
 
     public static string OrganizationDefaultObjectStorage(long organizationId)
