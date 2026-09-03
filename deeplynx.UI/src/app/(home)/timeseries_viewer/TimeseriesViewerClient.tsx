@@ -62,8 +62,8 @@ export default function TimeseriesViewerClient({
 
   const fetchTimeseriesFiles = async () => {
     try {
-      const result = await getTimeseriesFiles(organizationId, projectId);
-      setAvailableTimeseriesFiles(result);
+      const result = await getTimeseriesFiles(organizationId, projectId, undefined, -1);
+      setAvailableTimeseriesFiles(result.items);
     } catch (err) {
       console.error("Failed to grab timeseries files:", err);
     }

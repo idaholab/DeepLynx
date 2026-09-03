@@ -20,7 +20,7 @@ import SearchBar from "@/app/(home)/components/SearchBar";
 import { RecordTableRow } from "@/app/(home)/types/types";
 import { useProjectSession } from "@/app/contexts/ProjectSessionProvider";
 import { useOrganizationSession } from "@/app/contexts/OrganizationSessionProvider";
-import { queryBuilderPaginated } from "@/app/lib/client_service/query_services.client";
+import { queryBuilder } from "@/app/lib/client_service/query_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
 import { QueryRecordViewResponseDto } from "@/app/(home)/types/responseDTOs";
 import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
@@ -362,13 +362,13 @@ export default function DataCatalogClient({
       }
 
       try {
-        const result = await queryBuilderPaginated(
+        const result = await queryBuilder(
           Number(organization.organizationId),
           queryFilters,
           idsNum,
+          submittedSearchText || null,
           pageNumber,
           pageSize,
-          submittedSearchText || null,
         );
 
         if (requestId !== requestIdRef.current) return;
