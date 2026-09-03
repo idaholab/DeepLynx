@@ -125,4 +125,10 @@ public class CacheKeys
     {
         return $"projectpermittedids:{userId}:{action}:{resource}";
     }
+
+    public static string ProjectAuthorizedSensitivityLabels(long projectId, long userId, string action)
+    {
+        string normalizedAction = action.Trim().ToLowerInvariant().Replace(' ', '-');
+        return $"authorizedsensitivitylabels:{projectId}:{userId}:{normalizedAction}";
+    }
 }
