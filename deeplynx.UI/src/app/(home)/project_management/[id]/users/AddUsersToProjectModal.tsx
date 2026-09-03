@@ -83,13 +83,15 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
   }, [isOpen]);
 
   // Filter users based on search query
-  const filteredOrgUsers = usersNotInProject.filter((user) => {
+  const filteredOrgUsers = useMemo(() => {
+  return usersNotInProject.filter((user) => {
     const searchLower = searchQuery.toLowerCase();
     return (
       user.name.toLowerCase().includes(searchLower) ||
       user.email?.toLowerCase().includes(searchLower)
     );
   });
+}, [usersNotInProject, searchQuery]);
 
   const {
     currentPage: orgUsersPage,
