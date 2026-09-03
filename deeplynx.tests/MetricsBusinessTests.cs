@@ -1581,6 +1581,180 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     }
 
     #endregion
+
+    #region Record Count Caching Tests
+
+    [Fact]
+    public async Task GetRecordCount_SingleProject_PopulatesCache()
+    {
+        var cacheKey = CacheKeys.ProjectRecordCount(_org1Proj1Id, true);
+
+        var count = await _metricsBusiness.GetRecordCount(_org1Id, (long?)_org1Proj1Id, hideArchived: true);
+
+        Assert.Equal(3, count);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(3, cached);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_SingleProject_ReturnsCachedValue_WhenCacheHit()
+    {
+        // Seed a sentinel that does NOT match the true DB count (3), so a hit proves the
+        // cache short-circuited the query rather than happening to agree with it.
+        var cacheKey = CacheKeys.ProjectRecordCount(_org1Proj1Id, true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var count = await _metricsBusiness.GetRecordCount(_org1Id, (long?)_org1Proj1Id, hideArchived: true);
+
+            Assert.Equal(999, count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetRecordCount_SingleProjectOverload_NullProjectId_PopulatesOrganizationCache()
+    {
+        var cacheKey = CacheKeys.OrganizationRecordCount(_org2Id, true);
+
+        // Org2: Proj1 (4 active) + Proj2 (2 active) = 6, per GetRecordCount_SingleProject_NullProjectId_ReturnsAllActiveForOrg
+        var count = await _metricsBusiness.GetRecordCount(_org2Id, (long?)null, hideArchived: true);
+
+        Assert.Equal(6, count);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(6, cached);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_SingleProjectOverload_NullProjectId_ReturnsCachedValue_WhenCacheHit()
+    {
+        var cacheKey = CacheKeys.OrganizationRecordCount(_org2Id, true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var count = await _metricsBusiness.GetRecordCount(_org2Id, (long?)null, hideArchived: true);
+
+            Assert.Equal(999, count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetRecordCount_ArrayOverload_NullProjectIds_PopulatesOrganizationCache()
+    {
+        var cacheKey = CacheKeys.OrganizationRecordCount(_org2Id, true);
+
+        var count = await _metricsBusiness.GetRecordCount(_org2Id, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(6, count);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(6, cached);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_ArrayOverload_EmptyProjectIds_UsesSameOrganizationCacheKey()
+    {
+        var cacheKey = CacheKeys.OrganizationRecordCount(_org1Id, true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var count = await _metricsBusiness.GetRecordCount(_org1Id, Array.Empty<long>(), hideArchived: true);
+
+            Assert.Equal(999, count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetRecordCount_NullOrganization_PopulatesSystemCache()
+    {
+        var cacheKey = CacheKeys.SystemRecordCount(true);
+
+        var count = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(9, count);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(9, cached);
+    }
+
+    [Fact]
+    public async Task GetRecordCount_NullOrganization_ReturnsCachedValue_WhenCacheHit()
+    {
+        var cacheKey = CacheKeys.SystemRecordCount(true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var count = await _metricsBusiness.GetRecordCount((long?)null, (long[]?)null, hideArchived: true);
+
+            Assert.Equal(999, count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetRecordCount_CachesSeparately_PerHideArchivedFlag()
+    {
+        var falseKey = CacheKeys.OrganizationRecordCount(_org2Id, false);
+        await CacheService.Instance.SetAsync(falseKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var trueResult = await _metricsBusiness.GetRecordCount(_org2Id, (long?)null, hideArchived: true);
+            var falseResult = await _metricsBusiness.GetRecordCount(_org2Id, (long?)null, hideArchived: false);
+
+            Assert.Equal(6, trueResult);    // computed fresh, unaffected by the false-flag sentinel
+            Assert.Equal(999, falseResult); // reflects the sentinel — separate cache key
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(falseKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetRecordCount_MultipleProjectIdsWithOrganization_IsNotCached()
+    {
+        var firstResult = await _metricsBusiness.GetRecordCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: true);
+        Assert.Equal(6, firstResult);
+
+        // Mutate underlying data directly, bypassing any invalidation path, to prove this
+        // combination was never cached in the first place.
+        var records = Context.Records.Where(r => r.ProjectId == _org2Proj2Id).ToList();
+        Context.Records.RemoveRange(records);
+        await Context.SaveChangesAsync();
+
+        var secondResult = await _metricsBusiness.GetRecordCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: true);
+
+        Assert.Equal(4, secondResult); // org2 proj1 only, now that proj2's records are gone
+    }
+
+    #endregion
     
     #region File Count Caching Tests
 
