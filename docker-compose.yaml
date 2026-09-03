@@ -92,8 +92,8 @@ services:
     volumes:
       - object_storage:/data
     depends_on:
-      db-version-check:
-        condition: service_completed_successfully
+      nx-postgres:
+        condition: service_healthy
 
   nx-postgres:
     build:
