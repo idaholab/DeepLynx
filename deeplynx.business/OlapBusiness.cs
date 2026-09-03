@@ -116,7 +116,7 @@ public class OlapBusiness : IOlapBusiness
     //     long dataSourceId,
     //     string tableName, string fileType)
     // {
-    // await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+    // await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, hideArchived: true, _logger);
     // var request = new TimeseriesQueryRequestDto
     // {
     //     Query = $"SELECT * FROM '{tableName}'"

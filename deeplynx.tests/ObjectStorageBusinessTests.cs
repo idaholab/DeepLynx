@@ -1353,16 +1353,16 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task GetObjectStorage_CacheMiss_PopulatesCache_WithCorrectEntry()
     {
         var cacheKey = CacheKeys.ObjectStorageStatus(os1);
-        var precheck = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+        var precheck = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
         Assert.Null(precheck);
 
         await _objectStorageBusiness.GetObjectStorage(organizationId, pid, os1, true);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
         Assert.NotNull(cached);
         Assert.Equal(organizationId, cached.OrganizationId);
         Assert.Equal(pid, cached.ProjectId);
-        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+        Assert.Equal(EntityStatus.Active, cached.Status);
     }
 
     [Fact]
@@ -1376,26 +1376,26 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         await _objectStorageBusiness.GetObjectStorage(organizationId, pid, os6, true);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
         Assert.NotNull(cached);
         Assert.Equal(organizationId, cached.OrganizationId);
         Assert.Null(cached.ProjectId);
-        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+        Assert.Equal(EntityStatus.Active, cached.Status);
     }
 
     [Fact]
     public async Task EnsureObjectStorageExistsAsync_CacheMiss_FallsBackToDatabase_AndPopulatesCache()
     {
         var cacheKey = CacheKeys.ObjectStorageStatus(os2);
-        Assert.Null(await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey));
+        Assert.Null(await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey));
 
         await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os2);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
         Assert.NotNull(cached);
         Assert.Equal(organizationId, cached.OrganizationId);
         Assert.Equal(pid, cached.ProjectId);
-        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+        Assert.Equal(EntityStatus.Active, cached.Status);
     }
 
     [Fact]
@@ -1409,7 +1409,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, missingId));
 
-        Assert.Null(await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey));
+        Assert.Null(await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey));
     }
 
     [Fact]
@@ -1420,7 +1420,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // DB instead, it will not.
         await CacheService.Instance.SetAsync(
             CacheKeys.ObjectStorageStatus(os1),
-            new ObjectStorageCacheEntry { OrganizationId = organizationId, ProjectId = pid, Status = ObjectStorageStatus.Deleted },
+            new EntityStatusCacheEntry { OrganizationId = organizationId, ProjectId = pid, Status = EntityStatus.Deleted },
             TimeSpan.FromHours(1));
 
         await Assert.ThrowsAsync<KeyNotFoundException>(
@@ -1449,9 +1449,9 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Prime the cache with the real (Archived) status via a hideArchived:false call.
         await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: false);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(archivedOs));
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(archivedOs));
         Assert.NotNull(cached);
-        Assert.Equal(ObjectStorageStatus.Archived, cached.Status);
+        Assert.Equal(EntityStatus.Archived, cached.Status);
 
         // The SAME cache entry correctly serves both filter variants without a second key or a DB round-trip.
         await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: false);
@@ -1466,9 +1466,9 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // since delete is blocked on already-archived rows) - it must write Deleted explicitly.
         await _objectStorageBusiness.DeleteObjectStorage(uid, organizationId, pid, os2);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
         Assert.NotNull(cached);
-        Assert.Equal(ObjectStorageStatus.Deleted, cached.Status);
+        Assert.Equal(EntityStatus.Deleted, cached.Status);
         Assert.Equal(organizationId, cached.OrganizationId);
         Assert.Equal(pid, cached.ProjectId);
     }
@@ -1487,9 +1487,9 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     {
         await _objectStorageBusiness.ArchiveObjectStorage(uid, organizationId, pid, os2);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
         Assert.NotNull(cached);
-        Assert.Equal(ObjectStorageStatus.Archived, cached.Status);
+        Assert.Equal(EntityStatus.Archived, cached.Status);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os2, hideArchived: true));
@@ -1501,9 +1501,9 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     {
         await _objectStorageBusiness.UnarchiveObjectStorage(uid, organizationId, pid, archivedOs);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(archivedOs));
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(archivedOs));
         Assert.NotNull(cached);
-        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+        Assert.Equal(EntityStatus.Active, cached.Status);
 
         await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: true);
     }
@@ -1516,11 +1516,11 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         var created = await _objectStorageBusiness.CreateObjectStorage(uid, organizationId, pid, dto);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(created.Id));
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(created.Id));
         Assert.NotNull(cached);
         Assert.Equal(organizationId, cached.OrganizationId);
         Assert.Equal(pid, cached.ProjectId);
-        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+        Assert.Equal(EntityStatus.Active, cached.Status);
 
         // A subsequent existence check should not need to touch the DB to succeed.
         await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, created.Id);
@@ -1535,11 +1535,11 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, null, os7, dto);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(os7));
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(os7));
         Assert.NotNull(cached);
         Assert.Equal(organizationId, cached.OrganizationId);
         Assert.Null(cached.ProjectId);
-        Assert.Equal(ObjectStorageStatus.Active, cached.Status);
+        Assert.Equal(EntityStatus.Active, cached.Status);
     }
 
     [Fact]
@@ -1560,7 +1560,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         await _objectStorageBusiness.GetDefaultObjectStorage(oid2, pid3);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(os10));
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(os10));
         Assert.NotNull(cached);
         Assert.Equal(oid2, cached.OrganizationId);
         Assert.Null(cached.ProjectId);
@@ -1571,7 +1571,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     {
         await _objectStorageBusiness.SetDefaultObjectStorage(uid, organizationId, pid, os2);
 
-        var cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
         Assert.NotNull(cached);
         Assert.Equal(organizationId, cached.OrganizationId);
         Assert.Equal(pid, cached.ProjectId);

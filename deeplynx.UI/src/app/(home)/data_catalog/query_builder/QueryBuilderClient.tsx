@@ -706,6 +706,7 @@ export default function QueryBuilderClient({
   const [selectedProjects, setSelectedProjects] = useState<string[]>(initialSelectedProjects);
   const [records, setQueriedRecords] = useState<QueryRecordViewResponseDto[] | null>(null);
   const [resultsPagination, setResultsPagination] = useState(initialResultsPagination);
+  const [pageSize, setPageSize] = useState(QUERY_RESULTS_PAGE_SIZE);
   const [submittedCriteria, setSubmittedCriteria] = useState<QueryResultsCriteria | null>(null);
   const [isSearchingRecords, setIsSearchingRecords] = useState(false);
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm ?? "");
@@ -887,7 +888,8 @@ export default function QueryBuilderClient({
           criteria.projectIds,
           criteria.textSearch,
           pageNumber,
-          QUERY_RESULTS_PAGE_SIZE,
+          pageSize,
+          criteria.textSearch,
         );
 
         setQueriedRecords(result.items);
@@ -904,8 +906,15 @@ export default function QueryBuilderClient({
         setIsSearchingRecords(false);
       }
     },
-    [organizationId, submittedCriteria]
+    [organizationId, submittedCriteria, pageSize]
   );
+
+  /** Re-runs the last submitted search at page 1 whenever the page size changes. */
+  useEffect(() => {
+    if (!submittedCriteria) return;
+    fetchResultsPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageSize]);
   // ---- Handlers -------------------------------------------------------------
   const handleSubmit = async () => {
     const queryDtos = hasValidQueries() ? rows.map((r) => r.query) : [];
@@ -1109,6 +1118,7 @@ export default function QueryBuilderClient({
               totalPages={resultsPagination.totalPages}
               isLoading={isSearchingRecords}
               onPageChange={fetchResultsPage}
+              onPageSizeChange={setPageSize}
             />
           ) : (
             records && <EmptyResultsState />
