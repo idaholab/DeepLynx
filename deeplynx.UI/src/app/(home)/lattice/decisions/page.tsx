@@ -291,21 +291,33 @@ function ClassCard({ cls, isApproved, isRejected, onToggle, locked }:
 }
 
 
-function EdgeCard({ edge, isApproved, isRejected, onToggle, locked }: {
-  edge: StagedEdgeDTO; isApproved: boolean;
+function EdgeCard({ edge, originRecord, destinationRecord, isApproved, isRejected, onToggle, locked }: {
+  edge: StagedEdgeDTO;
+  originRecord?: StagedRecordDTO;
+  destinationRecord?: StagedRecordDTO;
+  isApproved: boolean;
   isRejected: boolean;
   onToggle: (action: "approve" | "reject") => void;
   locked: boolean;
 }) {
   const { t } = useLanguage();
+
+  const formatRecord = (record: StagedRecordDTO | undefined, fallbackName: string | null) => {
+    const recordName = record?.name ?? fallbackName ?? "?";
+    const className = record?.class_name ?? "?";
+    const classId = record?.extraction_class_id ?? "?";
+
+    return `${recordName} (${className}: ${classId})`;
+  };
+
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold break-words">
-              {edge.origin_record_name ?? "?"} → {edge.relationship_name ?? "?"} →{" "}
-              {edge.destination_record_name ?? "?"}
+              {formatRecord(originRecord, edge.origin_record_name)} → {edge.relationship_name ?? "?"} →{" "}
+              {formatRecord(destinationRecord, edge.destination_record_name)}
             </p>
 
             <span className="badge badge-outline">{t.translations.ID_LABEL}{edge.id}</span>
@@ -1062,12 +1074,22 @@ function ExtractionDetailPanel({
             (visibleEdges.length === 0 ? (
               <EmptyState message={t.translations.LATTICE_NO_EDGES_STAGED} />
             ) : (
-              visibleEdges.map((edge) => (
-                <EdgeCard key={edge.id} edge={edge} isApproved={approved.edges.has(edge.id)}
-                  isRejected={rejected.edges.has(edge.id)}
-                  locked={!!edge.promoted_id || edge.rejected}
-                  onToggle={(action) => toggleItem("edges", edge.id, action)} />
-              ))
+              visibleEdges.map((edge) => {
+                const originRecord = visibleRecords.find((record) => record.id === edge.origin_record_id);
+                const destinationRecord = visibleRecords.find((record) => record.id === edge.destination_record_id);
+                return (
+                  <EdgeCard
+                    key={edge.id}
+                    edge={edge}
+                    originRecord={originRecord}
+                    destinationRecord={destinationRecord}
+                    isApproved={approved.edges.has(edge.id)}
+                    isRejected={rejected.edges.has(edge.id)}
+                    locked={!!edge.promoted_id || edge.rejected}
+                    onToggle={(action) => toggleItem("edges", edge.id, action)}
+                  />
+                );
+              })
             ))}
 
           {activeTab === "relationships" &&
