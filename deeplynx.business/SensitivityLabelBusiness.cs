@@ -190,6 +190,10 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             await _context.AddRangeAsync(permissions);
             
             await _context.SaveChangesAsync();
+
+            // Invalidate cached sensitivity labels
+            await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
+
             await transaction.CommitAsync();
             
             // Log create SensitivityLabel event (outside transaction)
@@ -324,6 +328,12 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
 
             await _context.SaveChangesAsync();
 
+            // Invalidate cached sensitivity labels
+            foreach (var label in result)
+            {
+                await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
+            }
+
             // Log create event
             var createEvent = new CreateEventRequestDto
             {
@@ -418,6 +428,9 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                 }
 
                 _context.SensitivityLabelPermissions.UpdateRange(kept);
+
+                // Invalidate cached sensitivity labels
+                await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
             }
             else
             {
@@ -538,6 +551,9 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                 .Where(p => p.LabelId == labelId)
                 .ExecuteDeleteAsync();
 
+            // Invalidate cached sensitivity labels
+            await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
+
             // Remove the label
             _context.SensitivityLabels.Remove(label);
             await _context.SaveChangesAsync();
@@ -635,6 +651,9 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
 
             await _context.SaveChangesAsync();
 
+            // Invalidate cached sensitivity labels
+            await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
+
             // Log archive SensitivityLabel event
             var eventLog = new CreateEventRequestDto
             {
@@ -716,6 +735,9 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                     .SetProperty(p => p.LastUpdatedBy, currentUserId));
 
             await _context.SaveChangesAsync();
+
+            // Invalidate cached sensitivity labels
+            await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
 
             // Log unarchive SensitivityLabel event
             var eventLog = new CreateEventRequestDto

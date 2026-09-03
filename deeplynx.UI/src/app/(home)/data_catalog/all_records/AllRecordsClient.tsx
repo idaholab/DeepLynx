@@ -27,10 +27,9 @@ import ProjectDropdown from "@/app/(home)/components/ProjectDropdown";
 import { useLanguage } from "@/app/contexts/Language";
 import {
   ArchiveBoxIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
 
 import ActiveFiltersBar from "./components/ActiveFiltersBar";
 import FilterSidebar, { RecordStatusFilter } from "./components/FilterSidebar";
@@ -171,11 +170,9 @@ export default function DataCatalogClient({
   const [nextFilterId, setNextFilterId] = useState(1);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(1);
-  const [hasPreviousPage, setHasPreviousPage] = useState(false);
-  const [hasNextPage, setHasNextPage] = useState(false);
 
   // Facet filter state — all local, no API calls.
   const [selectedClassFilters, setSelectedClassFilters] = useState<string[]>(
@@ -254,6 +251,7 @@ export default function DataCatalogClient({
         selectedTagFilters,
         selectedUpdatedByFilters,
         statusFilter,
+        pageSize,
       }),
     [
       selectedProjectsToken,
@@ -262,6 +260,7 @@ export default function DataCatalogClient({
       selectedTagFilters,
       selectedUpdatedByFilters,
       statusFilter,
+      pageSize,
     ],
   );
 
@@ -358,8 +357,6 @@ export default function DataCatalogClient({
         setTableData([]);
         setTotalCount(0);
         setServerTotalPages(1);
-        setHasPreviousPage(false);
-        setHasNextPage(false);
         setLoading(false);
         return;
       }
@@ -380,8 +377,6 @@ export default function DataCatalogClient({
         setCurrentPage(result.pageNumber);
         setTotalCount(result.totalCount);
         setServerTotalPages(Math.max(1, result.totalPages));
-        setHasPreviousPage(result.hasPrevious);
-        setHasNextPage(result.hasNext);
       } catch (error) {
         if (requestId !== requestIdRef.current) return;
 
@@ -389,8 +384,6 @@ export default function DataCatalogClient({
         setTableData([]);
         setTotalCount(0);
         setServerTotalPages(1);
-        setHasPreviousPage(false);
-        setHasNextPage(false);
       } finally {
         if (requestId === requestIdRef.current) {
           setLoading(false);
@@ -583,7 +576,10 @@ export default function DataCatalogClient({
   );
 
   const tagFacetOptions = useMemo(
-    () => availableTags.map((tag) => ({ label: tag.name })),
+    () =>
+      Array.from(new Set(availableTags.map((tag) => tag.name).filter(Boolean))).map(
+        (label) => ({ label }),
+      ),
     [availableTags],
   );
 
@@ -986,48 +982,48 @@ export default function DataCatalogClient({
 
           {/* Record list */}
           <div className="min-w-0">
-            {loading === true ? (
-              <div className="divide-y divide-base-200 overflow-hidden rounded-box border border-base-300/50 bg-base-100 shadow-sm">
-                {times(6).map((i) => (
-                  <article
-                    key={i}
-                    className={`grid grid-cols-1 gap-3 p-4 ${isBulkMode
-                      ? "md:grid-cols-[auto_minmax(0,1fr)_auto]"
-                      : "md:grid-cols-[minmax(0,1fr)_auto]"
-                      }`}
-                  >
-                    {isBulkMode && (
-                      <div className="flex items-start pt-1">
-                        <Skeleton width={20} height={20} />
-                      </div>
-                    )}
+            <div className="max-h-[705px] overflow-y-auto rounded-box border border-base-300/50 bg-base-100 shadow-sm">
+              {loading === true ? (
+                <div className="divide-y divide-base-200">
+                  {times(6).map((i) => (
+                    <article
+                      key={i}
+                      className={`grid grid-cols-1 gap-3 p-4 ${isBulkMode
+                        ? "md:grid-cols-[auto_minmax(0,1fr)_auto]"
+                        : "md:grid-cols-[minmax(0,1fr)_auto]"
+                        }`}
+                    >
+                      {isBulkMode && (
+                        <div className="flex items-start pt-1">
+                          <Skeleton width={20} height={20} />
+                        </div>
+                      )}
 
-                    <div className="min-w-0">
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <Skeleton width={54} height={24} />
-                        <Skeleton width={128} height={24} />
-                        {i % 4 === 0 && <Skeleton width={92} height={24} />}
+                      <div className="min-w-0">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <Skeleton width={54} height={24} />
+                          <Skeleton width={128} height={24} />
+                          {i % 4 === 0 && <Skeleton width={92} height={24} />}
+                        </div>
+                        <Skeleton height={20} width="48%" />
+                        <div className="mt-1">
+                          <Skeleton height={16} width="76%" />
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                          <Skeleton height={14} width={132} />
+                          <Skeleton height={14} width={156} />
+                          <Skeleton height={14} width={118} />
+                        </div>
                       </div>
-                      <Skeleton height={20} width="48%" />
-                      <div className="mt-1">
-                        <Skeleton height={16} width="76%" />
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                        <Skeleton height={14} width={132} />
-                        <Skeleton height={14} width={156} />
-                        <Skeleton height={14} width={118} />
-                      </div>
-                    </div>
 
-                    <div className="flex items-center justify-end">
-                      <Skeleton width={40} height={32} />
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : currentRecords.length === 0 ? (
-              <div className="card border border-base-300/50 bg-base-100 shadow-sm">
-                <div className="card-body items-center py-16 text-center">
+                      <div className="flex items-center justify-end">
+                        <Skeleton width={40} height={32} />
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : currentRecords.length === 0 ? (
+                <div className="flex flex-col items-center py-16 text-center">
                   <DocumentTextIcon className="size-12 text-base-content/30" />
                   <h2 className="card-title">
                     {t.translations.NO_RECORDS_FOUND}
@@ -1036,51 +1032,33 @@ export default function DataCatalogClient({
                     {t.translations.NO_RECORDS}
                   </p>
                 </div>
-              </div>
-            ) : (
-              <div className="divide-y divide-base-200 overflow-hidden rounded-box border border-base-300/50 bg-base-100 shadow-sm">
-                {currentRecords.map((record) => (
-                  <RecordCard
-                    key={`${record.projectId}-${record.id}`}
-                    record={record}
-                    activeSearchTerms={activeSearchTerms}
-                    isBulkMode={isBulkMode}
-                    isSelected={selectedRecordKeys.includes(
-                      getRecordKey(record),
-                    )}
-                    onToggleSelected={toggleRecordSelection}
-                  />
-                ))}
-              </div>
-            )}
+              ) : (
+                <div className="divide-y divide-base-200">
+                  {currentRecords.map((record) => (
+                    <RecordCard
+                      key={`${record.projectId}-${record.id}`}
+                      record={record}
+                      activeSearchTerms={activeSearchTerms}
+                      isBulkMode={isBulkMode}
+                      isSelected={selectedRecordKeys.includes(
+                        getRecordKey(record),
+                      )}
+                      onToggleSelected={toggleRecordSelection}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <PaginationControls
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+            />
           </div>
         </div>
-
-        {/* Pagination — only rendered when the result set spans more than one page */}
-        {totalPages > 1 && (
-          <div className="join justify-end">
-            <button
-              className="btn join-item btn-sm"
-              disabled={!hasPreviousPage}
-              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-            >
-              <ChevronLeftIcon className="size-4" />
-            </button>
-            <button className="btn join-item btn-sm pointer-events-none">
-              {t.translations.PAGE} {currentPage} {t.translations.OF}{" "}
-              {totalPages}
-            </button>
-            <button
-              className="btn join-item btn-sm"
-              disabled={!hasNextPage}
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-              }
-            >
-              <ChevronRightIcon className="size-4" />
-            </button>
-          </div>
-        )}
       </section>
     </main>
   );

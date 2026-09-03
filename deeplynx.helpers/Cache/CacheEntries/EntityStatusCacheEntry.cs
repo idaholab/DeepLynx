@@ -1,13 +1,13 @@
-    public enum ObjectStorageStatus
+    public enum EntityStatus
     {
         Active,
         Archived,
         Deleted
     }
 
-    public class ObjectStorageCacheEntry
+    public class EntityStatusCacheEntry
     {
         public long OrganizationId { get; set; }
         public long? ProjectId { get; set; }
-        public ObjectStorageStatus Status { get; set; }
+        public EntityStatus Status { get; set; }
     }

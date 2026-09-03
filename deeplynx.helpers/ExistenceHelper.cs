@@ -283,28 +283,74 @@ namespace deeplynx.helpers
             await CacheService.Instance.DeleteAsync(CacheKeys.ProjectArchivedStatus(projectId));
         }
 
+        private static readonly TimeSpan _dataSourceCacheTtl = TimeSpan.FromHours(1);
+
         public static async Task EnsureDataSourceExistsForProjectAsync(
             DeeplynxContext context,
             long dataSourceId,
             long projectId,
             long organizationId,
-            bool hideArchived = true)
+            bool hideArchived = true,
+            ILogger? logger = null)
         {
-            var dataSourceExists = hideArchived
-                ? await context.DataSources.AnyAsync(ds =>
-                    ds.Id == dataSourceId &&
-                    ds.OrganizationId == organizationId &&
-                    (ds.ProjectId == projectId || ds.ProjectId == null) &&
-                    ds.IsArchived == false)
-                : await context.DataSources.AnyAsync(ds =>
-                    ds.Id == dataSourceId &&
-                    ds.OrganizationId == organizationId &&
-                    (ds.ProjectId == projectId || ds.ProjectId == null));
-
-            if (!dataSourceExists)
+            var cacheKey = CacheKeys.DataSourceStatus(dataSourceId);
+            EntityStatusCacheEntry? cached = null;
+            try
             {
-                throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found in project with id {projectId} and organization with id {organizationId}");
+                cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
             }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "cache fetch failed for data source status: {cacheKey}", cacheKey);
+            }
+
+            EntityStatusCacheEntry entry;
+            if (cached != null)
+            {
+                entry = cached;
+                if (cached.Status == EntityStatus.Deleted)
+                    throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found");
+            } 
+            else
+            {
+                var dataSource = await context.DataSources
+                    .Where(ds => ds.Id == dataSourceId)
+                    .Select(ds => new { ds.OrganizationId, ds.ProjectId, ds.IsArchived})
+                    .FirstOrDefaultAsync();
+
+                if (dataSource == null)
+                {
+                    throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found in project with id {projectId} and organization with id {organizationId}");
+                }
+
+                entry = new EntityStatusCacheEntry
+                {
+                    OrganizationId = dataSource.OrganizationId,
+                    ProjectId = dataSource.ProjectId,
+                    Status = dataSource.IsArchived
+                            ? EntityStatus.Archived
+                            : EntityStatus.Active
+                };
+
+                try
+                {
+                    await CacheService.Instance.SetAsync(cacheKey, entry, _dataSourceCacheTtl);
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogWarning(ex, "DataSource status cache update failed for key {Key}", cacheKey);
+                }
+            }
+
+            var belongsToScope = 
+                entry.OrganizationId == organizationId &&
+                (entry.ProjectId == null || entry.ProjectId == projectId);
+
+            if (!belongsToScope || entry.Status == EntityStatus.Deleted)
+                throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found");
+
+            if (hideArchived && entry.Status == EntityStatus.Archived)
+                throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found");     
         }
 
         
@@ -319,24 +365,22 @@ namespace deeplynx.helpers
             ILogger? logger = null)
         {
             var cacheKey = CacheKeys.ObjectStorageStatus(objectStorageId);
-            ObjectStorageCacheEntry? cached = null;
+            EntityStatusCacheEntry? cached = null;
 
             try
             {
-                cached = await CacheService.Instance.GetAsync<ObjectStorageCacheEntry>(cacheKey);
+                cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
             } 
             catch (Exception ex)
             {
                 logger?.LogWarning(ex, "Object Storage existence cache check failed for key: {CacheKey}", cacheKey);
             }
 
-            ObjectStorageCacheEntry entry;
+            EntityStatusCacheEntry entry;
 
             if (cached != null)
             {
                 entry = cached;
-                if (entry.Status == ObjectStorageStatus.Deleted)
-                    throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
             }
             else
             {
@@ -348,13 +392,13 @@ namespace deeplynx.helpers
                 if (objectStorage == null)
                     throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
 
-                entry = new ObjectStorageCacheEntry
+                entry = new EntityStatusCacheEntry
                 {
                     OrganizationId = objectStorage.OrganizationId,
                     ProjectId = objectStorage.ProjectId,
                     Status = objectStorage.IsArchived
-                            ? ObjectStorageStatus.Archived
-                            : ObjectStorageStatus.Active
+                            ? EntityStatus.Archived
+                            : EntityStatus.Active
                 };
 
                 await CacheService.Instance.SetAsync(cacheKey, entry, _objectStorageCacheTtl);
@@ -364,10 +408,10 @@ namespace deeplynx.helpers
                 entry.OrganizationId == organizationId &&
                 (entry.ProjectId == null || entry.ProjectId == projectId);
 
-            if (!belongsToScope || entry.Status == ObjectStorageStatus.Deleted)
+            if (!belongsToScope || entry.Status == EntityStatus.Deleted)
                 throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
 
-            if (hideArchived && entry.Status == ObjectStorageStatus.Archived)
+            if (hideArchived && entry.Status == EntityStatus.Archived)
                 throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
         }
     }

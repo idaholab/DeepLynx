@@ -30,6 +30,8 @@ public class RecordBusiness : IRecordBusiness
     private readonly IObjectStorageBusiness _objectStorageBusiness;
     private readonly IFileBusinessFactory _fileBusinessFactory;
 
+    private readonly TimeSpan _recordCountByDataSource = TimeSpan.FromHours(1);
+
     /// <summary>
     ///     Initializes a new instance of the <see cref="RecordBusiness" /> class.
     /// </summary>
@@ -965,7 +967,7 @@ public class RecordBusiness : IRecordBusiness
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         ValidationHelper.ValidateModel(dto);
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId, hideArchived: true, _logger);
 
         if (dto.Properties == null)
             throw new ArgumentNullException(nameof(dto.Properties), "Properties cannot be null");
@@ -1118,6 +1120,16 @@ public class RecordBusiness : IRecordBusiness
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(response.Id, "create-record", currentUserId, null))
             _logger.LogWarning("Failed to create provenance record for record creation, record {RecordId}", response.Id);
+
+        // update cache
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync(CacheKeys.RecordCountByDataSourcePrefix(projectId, dataSourceId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource");
+        }    
 
         return response;
     }
@@ -1459,6 +1471,15 @@ public class RecordBusiness : IRecordBusiness
             _logger.LogWarning("Failed to create provenance records for bulk record creation, records {RecordIds}",
                 string.Join(", ", insertedRecordIds));
 
+        // update cache
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync(CacheKeys.RecordCountByDataSourcePrefix(projectId, dataSourceId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource");
+        }
 
         return inserted;
     }
@@ -1533,11 +1554,28 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
-        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete failed: ProjectStorageSize for project {ProjectId}", projectId);
+        }
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "archive-record", currentUserId, null))
             _logger.LogWarning("Failed to create provenance record for archive on record {RecordId}", recordId);
+
+        // update cache
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync(CacheKeys.RecordCountByDataSourcePrefix(projectId, returnedRecord.DataSourceId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource");
+        }    
 
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {
@@ -1602,7 +1640,25 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
-        await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+        // update cache
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync(CacheKeys.RecordCountByDataSourcePrefix(projectId, returnedRecord.DataSourceId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource for project {ProjectId}, data source {DataSourceId}",
+                projectId, returnedRecord.DataSourceId);
+        }
+
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete failed: ProjectStorageSize for project {ProjectId}", projectId);
+        }
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "unarchive-record", currentUserId, null))
@@ -1659,6 +1715,17 @@ public class RecordBusiness : IRecordBusiness
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "delete-record", currentUserId, null))
             _logger.LogWarning("Failed to create provenance record for delete on record {RecordId}", recordId);
+
+         // update cache
+        try
+        {
+            await CacheService.Instance.DeleteByPrefixAsync(CacheKeys.RecordCountByDataSourcePrefix(projectId, returnedRecord.DataSourceId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource for project {ProjectId}, data source {DataSourceId}",
+                projectId, returnedRecord.DataSourceId);
+        }    
 
         // Log record delete event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -1904,15 +1971,42 @@ public class RecordBusiness : IRecordBusiness
     public async Task<int> GetRecordsCountByDataSource(
         long organizationId, long projectId, long dataSourceId, bool hideArchived)
     {
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId,
-            hideArchived);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(
+            _context, dataSourceId, projectId, organizationId, hideArchived);
+
+        // check cache before hitting db
+        var cacheKey = CacheKeys.RecordCountByDataSource(projectId, dataSourceId, hideArchived);
+        int? cache = null;
+        try
+        {
+            cache = await CacheService.Instance.GetAsync<int?>(cacheKey);
+            if (cache is not null)
+                return cache.Value;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch cache for record count by data source metric: {cacheKey}", cacheKey);
+        }
+
         var recordQuery = _context.Records
             .Where(r => r.OrganizationId == organizationId && r.ProjectId == projectId &&
                         r.DataSourceId == dataSourceId);
 
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
 
-        return await recordQuery.CountAsync();
+        var count = await recordQuery.CountAsync();
+
+        // update cache
+        try
+        {
+            await CacheService.Instance.SetAsync(cacheKey, count, _recordCountByDataSource);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Update cache failed for metric record count by datasource: {cacheKey}", cacheKey);
+        }
+
+        return count;
     }
 
     /// <summary>
