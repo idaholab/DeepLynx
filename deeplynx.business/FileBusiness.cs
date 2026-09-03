@@ -1384,6 +1384,8 @@ public class FileBusiness : IFileControllerBusiness
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
 
+        await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
+
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {
             Operation = "delete",

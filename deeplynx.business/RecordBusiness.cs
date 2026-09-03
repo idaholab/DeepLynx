@@ -1026,6 +1026,7 @@ public class RecordBusiness : IRecordBusiness
             await _context.SaveChangesAsync();
 
             await InvalidateRecordCountCaches(organizationId, projectId);
+            await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
 
             if (dto.Tags != null)
             {
@@ -1468,6 +1469,7 @@ public class RecordBusiness : IRecordBusiness
         await tx.CommitAsync();
 
         await InvalidateRecordCountCaches(organizationId, projectId);
+        await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
 
         // Trigger provenance record creation
         var insertedRecordIds = inserted.Select(r => r.Id).ToList();
@@ -1721,6 +1723,7 @@ public class RecordBusiness : IRecordBusiness
         await _context.SaveChangesAsync();
 
         await InvalidateRecordCountCaches(organizationId, projectId);
+        await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "delete-record", currentUserId, null))
@@ -1837,6 +1840,7 @@ public class RecordBusiness : IRecordBusiness
 
         _context.Records.Update(returnedRecord);
         await _context.SaveChangesAsync();
+        await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
 
         // Log Record Update Event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
