@@ -888,8 +888,7 @@ export default function QueryBuilderClient({
           criteria.projectIds,
           criteria.textSearch,
           pageNumber,
-          pageSize,
-          criteria.textSearch,
+          pageSize
         );
 
         setQueriedRecords(result.items);
