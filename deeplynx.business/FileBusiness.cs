@@ -199,6 +199,7 @@ public class FileBusiness : IFileControllerBusiness
         }
 
         await InvalidateProjectStorageSizeCache(projectId);
+        await InvalidateFileCountCaches(organizationId, projectId);
 
         return createdRecord;
     }
@@ -444,6 +445,7 @@ public class FileBusiness : IFileControllerBusiness
             recordId);
 
         await InvalidateProjectStorageSizeCache(projectId);
+        await InvalidateFileCountCaches(organizationId, projectId);
 
         return deleted;
 
