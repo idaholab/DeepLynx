@@ -22,6 +22,10 @@ public class ProvenanceRecordResponseDto
 
     [Column("signature")] public string? Signature { get; set; }
 
+    [Column("previous_hash")] public string? PreviousHash { get; set; }
+
+    [Column("chain_hash")] public string? ChainHash { get; set; }
+
     [Column("created_at", TypeName = "timestamp without time zone")]
     public DateTime CreatedAt { get; set; }
 }

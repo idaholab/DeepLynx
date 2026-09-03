@@ -91,7 +91,7 @@ public class RecordController : ControllerBase
     
 
     /// <summary>
-    ///     Paginated full text records search
+    ///     Full text records search
     /// </summary>
     /// <remarks>
     ///     Embedding must be one of: any, embedded, pending
@@ -101,15 +101,16 @@ public class RecordController : ControllerBase
     /// <param name="search">Search parameters</param>
     /// <param name="paginated">Pagination parameters</param>
     /// <returns>Paginated list of record response dtos from the query view that match provided query parameters</returns>
-    [HttpGet("search/paginated", Name = "api_record_search_paginated")]
+    [HttpGet("search", Name = "api_record_search")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "record")]
-    public async Task<ActionResult<PaginatedResponse<RecordResponseDtoV2>>> SearchPaginated(
+    public async Task<ActionResult<PaginatedResponse<RecordResponseDtoV2>>> Search(
         long organizationId,
         long projectId,
         [FromQuery] RecordSearchRequestDto search,
-        [FromQuery] PaginatedRequestDto paginated)
+        [FromQuery] PaginatedRequestDto? paginated = null)
     {
+        paginated ??= new PaginatedRequestDto();
         var currentUserId = UserContextStorage.UserId;
         var isSysAdmin = UserContextStorage.IsSysAdmin;
         var isOrgAdmin = UserContextStorage.IsOrgAdmin;
@@ -119,44 +120,6 @@ public class RecordController : ControllerBase
                 isSysAdmin, isOrgAdmin, isProjectAdmin);
         return Ok(ToV2Page(records));
     }
-
-    /// <summary>
-    ///     Full text records search
-    /// </summary>
-    /// <remarks>
-    ///     Embedding must be one of: any, embedded, pending
-    /// </remarks>
-    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
-    /// <param name="projectId">The ID of the project to which the records belongs</param>
-    /// <param name="search">Search parameters</param>
-    /// <returns>List of record response dtos from the query view that match provided query parameters</returns>
-    [HttpGet("search", Name = "api_record_search")]
-    [Auth("read", "record")]
-    public async Task<ActionResult<List<RecordResponseDtoV2>>> Search(
-        long organizationId,
-        long projectId,
-        [FromQuery] RecordSearchRequestDto search)
-    {
-        try
-        {
-            var currentUserId = UserContextStorage.UserId;
-            var isSysAdmin = UserContextStorage.IsSysAdmin;
-            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
-            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
-            var records =
-                await _recordBusiness.Search(currentUserId, organizationId, projectId, search,
-                    isSysAdmin, isOrgAdmin, isProjectAdmin);
-            return Ok(records.Select(r => r.ToV2()).ToList());
-        }
-        catch (Exception exc)
-        {
-            var message = $"An error occurred while searching records: {exc}";
-            _logger.LogError(message);
-            return StatusCode(StatusCodes.Status500InternalServerError, message);
-        }
-    }
-
-
 
     /// <summary>
     ///     Get Records by Tags
