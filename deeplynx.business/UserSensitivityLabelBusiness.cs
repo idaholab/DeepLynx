@@ -1,4 +1,5 @@
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
@@ -86,6 +87,9 @@ public class UserSensitivityLabelBusiness : IUserSensitivityLabelBusiness
         _context.UserSensitivityLabels.Add(grant);
         await _context.SaveChangesAsync();
 
+        // Invalidate cached sensitivity labels
+        await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(labelId, userId);
+
         return new UserSensitivityLabelResponseDto
         {
             Id = grant.Id,
@@ -120,6 +124,10 @@ public class UserSensitivityLabelBusiness : IUserSensitivityLabelBusiness
 
         _context.UserSensitivityLabels.Remove(grant);
         await _context.SaveChangesAsync();
+
+        // Invalidate cached sensitivity labels
+        await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(labelId, userId);
+
         return true;
     }
 
@@ -164,6 +172,12 @@ public class UserSensitivityLabelBusiness : IUserSensitivityLabelBusiness
                 GrantedBy = currentUserId,
                 GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
             });
+        }
+
+        // Invalidate cached sensitivity labels
+        foreach (var uid in existingGrants.Select(g => g.UserId).Union(userIds).Distinct())
+        {
+            await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(labelId, uid);
         }
 
         await _context.SaveChangesAsync();

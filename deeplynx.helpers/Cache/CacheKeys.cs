@@ -21,6 +21,21 @@ public class CacheKeys
     {
         return $"system:data_source_count:hide_archived:{hideArchived}";
     }
+    
+    public static string ProjectRecordCount(long projectId, bool hideArchived)
+    {
+        return $"project:{projectId}:record_count:hide_archived:{hideArchived}";
+    }
+
+    public static string OrganizationRecordCount(long organizationId, bool hideArchived)
+    {
+        return $"organization:{organizationId}:record_count:hide_archived:{hideArchived}";
+    }
+
+    public static string SystemRecordCount(bool hideArchived)
+    {
+        return $"system:record_count:hide_archived:{hideArchived}";
+    }
 
     public static string UserArchivedStatus(long userId)
     {
@@ -73,7 +88,12 @@ public class CacheKeys
 
     public static string ObjectStorageStatus(long objectStorageId)
     {
-        return $"object_storage:{objectStorageId}:status";
+        return $"objectstorage:{objectStorageId}:status";
+    }
+
+    public static string DataSourceStatus(long dataSourceId)
+    {
+        return $"datasource:{dataSourceId}:status";
     }
 
     public static string OrganizationDefaultObjectStorage(long organizationId)
@@ -106,6 +126,16 @@ public class CacheKeys
         return $"projectdefaultaimodelconfig:{projectId}:{modelType}";
     }
 
+    public static string RecordCountByDataSource(long projectId, long dataSourceId, bool hideArchived)
+    {
+        return $"recordcountbydatasource:{projectId}:{dataSourceId}:{hideArchived}";
+    }
+
+    public static string RecordCountByDataSourcePrefix(long projectId, long dataSourceId)
+    {
+        return $"recordcountbydatasource:{projectId}:{dataSourceId}:";
+    }
+
     public static string ProjectPermission(long userId, long projectId, string action, string resource)
     {
         return $"projectpermission:{userId}:{projectId}:{action}:{resource}";
@@ -114,5 +144,11 @@ public class CacheKeys
     public static string ProjectPermittedIds(long userId, string action, string resource)
     {
         return $"projectpermittedids:{userId}:{action}:{resource}";
+    }
+
+    public static string ProjectAuthorizedSensitivityLabels(long projectId, long userId, string action)
+    {
+        string normalizedAction = action.Trim().ToLowerInvariant().Replace(' ', '-');
+        return $"authorizedsensitivitylabels:{projectId}:{userId}:{normalizedAction}";
     }
 }

@@ -6,6 +6,7 @@ using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -17,6 +18,7 @@ public class EdgeBusiness : IEdgeBusiness
     private readonly DeeplynxContext _context;
     private readonly IProjectRolePermissionService _projectRolePermissionService;
     private readonly IEventBusiness _eventBusiness;
+    private readonly ILogger<EdgeBusiness>? _logger;
 
     private readonly ISensitivityLabelService _sensitivityLabelService;
 
@@ -28,16 +30,19 @@ public class EdgeBusiness : IEdgeBusiness
     /// <param name="bulkCopyUpsertExecutor">Used for bulk database operations.</param>
     /// <param name="sensitivityLabelService">Used for sensitivity label record authorization.</param>
     public EdgeBusiness(
-        DeeplynxContext context, IEventBusiness eventBusiness,
+        DeeplynxContext context,
+        IEventBusiness eventBusiness,
         IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
         ISensitivityLabelService sensitivityLabelService,
-        IProjectRolePermissionService projectRolePermissionService)
+        IProjectRolePermissionService projectRolePermissionService,
+        ILogger<EdgeBusiness>? logger = null)
     {
         _context = context;
         _eventBusiness = eventBusiness;
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
         _projectRolePermissionService = projectRolePermissionService;
         _sensitivityLabelService = sensitivityLabelService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -258,7 +263,7 @@ public class EdgeBusiness : IEdgeBusiness
         if (dto.OriginId == dto.DestinationId)
             throw new ValidationException("Destination and origin IDs cannot be the same");
 
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId, hideArchived: true, _logger);
 
         var originRecordExists = _context.Records.Any(r => r.Id == dto.OriginId);
         if (!originRecordExists) throw new KeyNotFoundException($"Origin record with id {dto.OriginId} not found");
@@ -382,7 +387,7 @@ public class EdgeBusiness : IEdgeBusiness
         if (invalidEdges.Any())
             throw new ArgumentException("All edges must have valid OriginId and DestinationId before bulk creation.");
 
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId, hideArchived: true, _logger);
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
         await using var tx = await conn.BeginTransactionAsync();

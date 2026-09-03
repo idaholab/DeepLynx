@@ -283,6 +283,23 @@ const GroupRow: React.FC<GroupRowProps> = ({
     resetMemberPagination();
   }, [currentMembers, resetMemberPagination]);
 
+  const {
+  currentPage: availablePage,
+  pageSize: availablePageSize,
+  paginatedItems: paginatedAvailable,
+  resetPagination: resetAvailablePagination,
+  setCurrentPage: setAvailablePage,
+  setPageSize: setAvailablePageSize,
+  totalPages: availableTotalPages,
+} = useLocalPagination({
+  items: filteredAvailable,
+  initialPageSize: 5,
+});
+
+useEffect(() => {
+  resetAvailablePagination();
+}, [filteredAvailable, resetAvailablePagination]);
+
   return (
     <>
       {/* Main Row */}
@@ -522,7 +539,7 @@ const GroupRow: React.FC<GroupRowProps> = ({
                             : t.translations.NO_USERS_FOUND}
                         </div>
                       ) : (
-                        filteredAvailable.map((user) => (
+                        paginatedAvailable.map((user) => (
                           <div
                             key={user.id}
                             className="flex items-center justify-between p-3 bg-base-200 rounded-lg hover:bg-base-300 transition"
@@ -547,6 +564,17 @@ const GroupRow: React.FC<GroupRowProps> = ({
                         ))
                       )}
                     </div>
+                      {filteredAvailable.length > 0 && (
+                        <div className="mt-2 flex justify-end">
+                          <PaginationControls
+                            currentPage={availablePage}
+                            pageSize={availablePageSize}
+                            totalPages={availableTotalPages}
+                            onPageChange={setAvailablePage}
+                            onPageSizeChange={setAvailablePageSize}
+                          />
+                        </div>
+                      )}
                   </div>
                 </div>
               )}

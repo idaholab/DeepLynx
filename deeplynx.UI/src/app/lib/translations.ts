@@ -376,8 +376,12 @@ export const translations = {
         "Define an organization-level tag. Projects inherit this tag and can use it across their assets.",
       DEFINE_ORGANIZATION_TAGS_AND_SENSITIVITY_LABELS_DESCRIPTION:
         "Define organization-wide tags and sensitivity labels. Projects inherit these and can optionally add their own.",
+      DEFINE_ORGANIZATION_TAGS_DESCRIPTION:
+        "Define organization-wide tags. Projects inherit these and can optionally add their own.",
       DEFINE_PROJECT_TAGS_AND_LABELS_DESCRIPTION:
         "Define project tags and sensitivity labels for classification, workflows, and access control.",
+      DEFINE_PROJECT_TAGS_DESCRIPTION:
+        "Define project tags for classification, workflows, and search.",
       DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH:
         "Define project-level tags for classification, workflows, and search. Organization-level locks determine whether this project can define additional tags beyond those inherited from the organization.",
       DELETE: "Delete",
@@ -832,6 +836,8 @@ export const translations = {
       LABEL_CREATED_BUT_FAILED_TO_ATTACH: "created but failed to attach",
       LABEL_IN_USE:
         "Label is currently in use. Remove the label from the record(s) before archiving.",
+      LABEL_IN_USE_ON_RECORDS:
+        'Cannot archive "{name}": it is currently applied to {count} record(s). Remove the label from those records first.',
       LABEL_NAME: "Label Name",
       LABEL_NAME_PLACEHOLDER: "e.g., CUI, ITAR, Public",
       LABELS_ARE_LOCKED: "Labels are locked",
@@ -2692,8 +2698,12 @@ export const translations = {
         "Define una etiqueta a nivel de organización. Los proyectos heredan esta etiqueta y pueden usarla en sus activos.",
       DEFINE_ORGANIZATION_TAGS_AND_SENSITIVITY_LABELS_DESCRIPTION:
         "Define etiquetas de toda la organización y etiquetas de sensitividad. Los proyectos las heredan y opcionalmente pueden agregar las suyas.",
+      DEFINE_ORGANIZATION_TAGS_DESCRIPTION:
+        "Define etiquetas de toda la organización. Los proyectos las heredan y opcionalmente pueden agregar las suyas.",
       DEFINE_PROJECT_TAGS_AND_LABELS_DESCRIPTION:
         "Define etiquetas del proyecto y etiquetas de sensitividad para clasificación, flujos de trabajo y control de acceso.",
+      DEFINE_PROJECT_TAGS_DESCRIPTION:
+        "Define etiquetas del proyecto para clasificación, flujos de trabajo y búsqueda.",
       DEFINE_PROJECT_TAGS_FOR_CLASSIFICATION_WORKFLOWS_AND_SEARCH:
         "Define etiquetas a nivel de proyecto para clasificación, flujos de trabajo y búsqueda. Los bloqueos a nivel de organización determinan si este proyecto puede definir etiquetas adicionales además de las heredadas de la organización.",
       DELETE: "Eliminar",
@@ -3185,6 +3195,8 @@ export const translations = {
       LABEL_CREATED_BUT_FAILED_TO_ATTACH: "creada pero no se pudo adjuntar",
       LABEL_IN_USE:
         "La etiqueta está en uso actualmente. Quita la etiqueta del(los) registro(s) antes de archivarlo(s).",
+      LABEL_IN_USE_ON_RECORDS:
+        'No se puede archivar "{name}": actualmente está aplicada a {count} registro(s). Primero quita la etiqueta de esos registros.',
       LABEL_NAME: "Nombre de la etiqueta",
       LABEL_NAME_PLACEHOLDER: "p. ej., CUI, ITAR, Pública",
       LABELS_ARE_LOCKED: "Las etiquetas de sensibilidad están bloqueadas",

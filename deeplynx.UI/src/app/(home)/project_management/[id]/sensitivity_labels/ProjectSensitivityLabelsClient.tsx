@@ -9,10 +9,13 @@ import {
   ShieldCheckIcon,
   TrashIcon,
   InformationCircleIcon,
+  CheckCircleIcon,
+  XCircleIcon,
 } from "@heroicons/react/24/outline";
 import type {
   SensitivityLabelsDto,
   UserSensitivityLabelResponseDto,
+  SensitivityLabelPermissionResponseDto,
   ProjectMemberResponseDto,
   GroupResponseDto,
 } from "@/app/(home)/types/responseDTOs";
@@ -33,7 +36,7 @@ import AvatarCell from "@/app/(home)/components/Avatar";
 import AssignUsersWizardModal from "./AssignUsersWizardModal";
 import { useLanguage } from "@/app/contexts/Language";
 
-type DetailTab = "details" | "assigned-users";
+type DetailTab = "permissions" | "assigned-users";
 
 interface Props {
   labels: SensitivityLabelsDto[];
@@ -45,44 +48,91 @@ interface Props {
   projectGroups: GroupResponseDto[];
 }
 
-function LabelDetailsPanel({ label }: { label: SensitivityLabelsDto }) {
+function LabelPermissionsPanel({
+  label,
+  projectId,
+  refreshKey,
+}: {
+  label: SensitivityLabelsDto;
+  projectId: number;
+  refreshKey: number;
+}) {
   const { t } = useLanguage();
-  const origin = label.projectId
-    ? t.translations.PROJECT
-    : t.translations.ORGANIZATION;
+  const [permissions, setPermissions] = useState<
+    SensitivityLabelPermissionResponseDto[]
+  >([]);
+  const [loading, setLoading] = useState(false);
+
+  const actionLabel = (action: string): string => {
+    const key = `PERMISSION_${action.toUpperCase().replace(" ", "_")}` as keyof typeof t.translations;
+    return (t.translations[key] as string | undefined) ?? action;
+  };
+
+  const loadPermissions = async () => {
+    try {
+      setLoading(true);
+      const perms = await getPermissionsForLabelProject(projectId, label.id);
+      setPermissions(perms.filter((p) => !p.isArchived));
+    } catch (error) {
+      console.error(`Failed to load permissions for label ${label.id}:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPermissions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [label.id, refreshKey]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-10">
+        <span className="loading loading-spinner loading-md" />
+      </div>
+    );
+  }
+
+  const grantedActions = new Set(permissions.map((p) => p.action));
 
   return (
     <div className="max-w-3xl py-6">
-      <dl className="grid gap-6 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-6">
         <div>
-          <dt className="text-sm font-bold text-base-content/60">
-            {t.translations.LABEL_NAME}
-          </dt>
-          <dd className="mt-1">{label.name}</dd>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-base-content/55">
+            {t.translations.RECORD_PERMISSIONS}
+          </p>
+          <ul className="space-y-2">
+            {RECORD_ACTIONS.map((action) => (
+              <li key={action} className="flex items-center gap-2 text-sm">
+                {grantedActions.has(action) ? (
+                  <CheckCircleIcon className="h-4 w-4 shrink-0 text-success" />
+                ) : (
+                  <XCircleIcon className="h-4 w-4 shrink-0 text-base-content/30" />
+                )}
+                {actionLabel(action)}
+              </li>
+            ))}
+          </ul>
         </div>
         <div>
-          <dt className="text-sm font-bold text-base-content/60">
-            {t.translations.ORIGIN}
-          </dt>
-          <dd className="mt-1">{origin}</dd>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-base-content/55">
+            {t.translations.FILE_PERMISSIONS}
+          </p>
+          <ul className="space-y-2">
+            {FILE_ACTIONS.map((action) => (
+              <li key={action} className="flex items-center gap-2 text-sm">
+                {grantedActions.has(action) ? (
+                  <CheckCircleIcon className="h-4 w-4 shrink-0 text-success" />
+                ) : (
+                  <XCircleIcon className="h-4 w-4 shrink-0 text-base-content/30" />
+                )}
+                {actionLabel(action)}
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="sm:col-span-2">
-          <dt className="text-sm font-bold text-base-content/60">
-            {t.translations.DESCRIPTION}
-          </dt>
-          <dd className="mt-1">
-            {label.description || t.translations.NO_DESCRIPTION}
-          </dd>
-        </div>
-        <div className="sm:col-span-2">
-          <dt className="text-sm font-bold text-base-content/60">
-            {t.translations.LABEL_ACCESS_BEHAVIOR}
-          </dt>
-          <dd className="mt-1">
-            {t.translations.LABEL_ACCESS_BEHAVIOR_DESCRIPTION}
-          </dd>
-        </div>
-      </dl>
+      </div>
     </div>
   );
 }
@@ -252,7 +302,7 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
   const [selectedLabelId, setSelectedLabelId] = useState<number | null>(
     labels[0]?.id ?? null,
   );
-  const [detailTab, setDetailTab] = useState<DetailTab>("details");
+  const [detailTab, setDetailTab] = useState<DetailTab>("assigned-users");
   const [labelSearch, setLabelSearch] = useState("");
   const [archivingLabelId, setArchivingLabelId] = useState<number | null>(
     null,
@@ -273,6 +323,8 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [labelToArchive, setLabelToArchive] =
     useState<SensitivityLabelsDto | null>(null);
+
+  const [permissionsRefreshKey, setPermissionsRefreshKey] = useState(0);
 
   const normalizedSearch = labelSearch.trim().toLowerCase();
   const filteredLabels = useMemo(
@@ -361,6 +413,7 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
       }
 
       await refreshLabels();
+      setPermissionsRefreshKey((prev) => prev + 1);
       closeLabelModal();
     } catch (error) {
       console.error("Failed to save project label:", error);
@@ -387,9 +440,16 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
       );
     } catch (error) {
       console.error("Failed to archive label:", error);
-      if (
-        String((error as AxiosError).response?.data).includes("Cannot archive")
-      ) {
+      const errorMessage = (error as AxiosError).message ?? "";
+      const recordCountMatch = errorMessage.match(/used on (\d+) records?/);
+      if (recordCountMatch) {
+        toast.error(
+          t.translations.LABEL_IN_USE_ON_RECORDS.replace(
+            "{name}",
+            labelToArchive.name,
+          ).replace("{count}", recordCountMatch[1]),
+        );
+      } else if (errorMessage.includes("Cannot archive")) {
         toast.error(t.translations.LABEL_IN_USE);
       } else {
         toast.error(t.translations.FAILED_TO_ARCHIVE_LABEL);
@@ -439,7 +499,7 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
             type="button"
             onClick={() => {
               setSelectedLabelId(label.id);
-              setDetailTab("details");
+              setDetailTab("assigned-users");
             }}
             className={`flex w-full items-center gap-3 border-b border-base-200 px-4 py-4 text-left ${
               selectedLabel?.id === label.id
@@ -455,7 +515,11 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
                   : t.translations.ORGANIZATION_LABEL}
               </span>
             </span>
-            <span className="badge badge-sm badge-outline">
+            <span
+              className={`badge badge-sm ${
+                label.projectId ? "badge-primary" : "badge-secondary"
+              }`}
+            >
               {label.projectId ? "PROJECT" : "ORG"}
             </span>
           </button>
@@ -499,23 +563,27 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
             <button
               type="button"
               role="tab"
-              onClick={() => setDetailTab("details")}
-              className={`tab ${detailTab === "details" ? "tab-active text-primary" : ""}`}
-            >
-              {t.translations.DETAILS}
-            </button>
-            <button
-              type="button"
-              role="tab"
               onClick={() => setDetailTab("assigned-users")}
               className={`tab ${detailTab === "assigned-users" ? "tab-active text-primary" : ""}`}
             >
               {t.translations.ASSIGNED_USERS}
             </button>
+            <button
+              type="button"
+              role="tab"
+              onClick={() => setDetailTab("permissions")}
+              className={`tab ${detailTab === "permissions" ? "tab-active text-primary" : ""}`}
+            >
+              {t.translations.PERMISSIONS}
+            </button>
           </div>
 
-          {detailTab === "details" ? (
-            <LabelDetailsPanel label={selectedLabel} />
+          {detailTab === "permissions" ? (
+            <LabelPermissionsPanel
+              label={selectedLabel}
+              projectId={projectId}
+              refreshKey={permissionsRefreshKey}
+            />
           ) : (
             <AssignedUsersPanel
               label={selectedLabel}

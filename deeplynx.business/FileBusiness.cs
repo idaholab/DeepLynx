@@ -1162,7 +1162,7 @@ public class FileBusiness : IFileControllerBusiness
     {
         if (dataSourceId.HasValue)
         {
-            await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId.Value, projectId, organizationId);
+            await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId.Value, projectId, organizationId, hideArchived: true, _logger);
             return dataSourceId.Value;
         }
 
