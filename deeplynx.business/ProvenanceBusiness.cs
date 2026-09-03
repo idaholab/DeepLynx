@@ -1,5 +1,6 @@
 using System.Text.Json;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.ResponseDTOs;
@@ -150,6 +151,48 @@ public class ProvenanceBusiness : IProvenanceBusiness
                 CreatedAt = r.CreatedAt
             }).ToList()
         };
+    }
+
+    /// <summary>
+    ///     Retrieve every provenance record ever created for a project, most recent first,
+    ///     including provenance for records/historical records that have since been deleted.
+    ///     Unlike <see cref="GetProvenanceHistory" />, this does not check whether any
+    ///     individual record still exists — only that the project does.
+    /// </summary>
+    /// <param name="projectId">The ID of the project whose provenance history is being retrieved</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of provenance records for the given project, most recent first</returns>
+    /// <exception cref="KeyNotFoundException">Thrown if no matching project is found</exception>
+    public async Task<PaginatedResponse<ProvenanceRecordResponseDto>> GetProjectProvenanceHistory(
+        long projectId, PaginatedRequestDto paginatedRequestDto)
+    {
+        var projectExists = await _context.Projects.AnyAsync(p => p.Id == projectId);
+        if (!projectExists)
+            throw new KeyNotFoundException($"Project with id {projectId} not found");
+
+        // ThenByDescending(Id) breaks ties deterministically: BulkCreateProvenanceRecords
+        // stamps one shared CreatedAt across a whole batch, so CreatedAt alone isn't unique
+        // enough to page through without skipping or duplicating rows.
+        return await _context.ProvenanceRecords
+            .Where(p => p.ProjectId == projectId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ThenByDescending(p => p.Id)
+            .Select(p => new ProvenanceRecordResponseDto
+            {
+                Id = p.Id,
+                RecordId = p.RecordId,
+                HistoricalRecordId = p.HistoricalRecordId,
+                OrganizationId = p.OrganizationId,
+                ProjectId = p.ProjectId,
+                ProvId = p.ProvId,
+                ProvenanceJson = p.ProvenanceJson,
+                FileContentHash = p.FileContentHash,
+                Signature = p.Signature,
+                PreviousHash = p.PreviousHash,
+                ChainHash = p.ChainHash,
+                CreatedAt = p.CreatedAt
+            })
+            .ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>

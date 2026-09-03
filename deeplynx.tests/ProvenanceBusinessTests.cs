@@ -281,6 +281,157 @@ public class ProvenanceBusinessTests : IntegrationTestBase
     #endregion
 
     // =========================================================================
+    // GetProjectProvenanceHistory Tests
+    // =========================================================================
+
+    #region GetProjectProvenanceHistory Tests
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_Throws_WhenProjectNotFound()
+    {
+        var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _provenanceBusiness.GetProjectProvenanceHistory(999999L, new PaginatedRequestDto()));
+
+        Assert.Contains("Project with id 999999 not found", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_ReturnsEmptyPaginatedResponse_WhenNoProvenanceExists()
+    {
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(pid, new PaginatedRequestDto());
+
+        Assert.Empty(history.Items);
+        Assert.Equal(0, history.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_IncludesProvenance_ForDeletedRecord()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        var provenanceRecord = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid);
+
+        // provenance_records no longer cascade-deletes with its record (dropped FKs), so the
+        // record can be removed while its provenance trail stays put.
+        var record = await Context.Records.FirstAsync(r => r.Id == rid);
+        Context.Records.Remove(record);
+        await Context.SaveChangesAsync();
+
+        Assert.False(await Context.Records.AnyAsync(r => r.Id == rid));
+
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(pid, new PaginatedRequestDto());
+
+        Assert.Contains(history.Items, p => p.Id == provenanceRecord.Id);
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_ExcludesProvenance_FromOtherProjects()
+    {
+        var otherProject = new Project
+        {
+            Name = "Other Project", OrganizationId = oid, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid
+        };
+        Context.Projects.Add(otherProject);
+        await Context.SaveChangesAsync();
+
+        var otherDataSource = new DataSource
+        {
+            Name = "Other DS", ProjectId = otherProject.Id, OrganizationId = oid,
+            LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid
+        };
+        Context.DataSources.Add(otherDataSource);
+        await Context.SaveChangesAsync();
+
+        var otherRecord = new datalayer.Models.Record
+        {
+            Name = "Other Project Record",
+            ProjectId = otherProject.Id,
+            OrganizationId = oid,
+            DataSourceId = otherDataSource.Id,
+            OriginalId = "other-rec-001",
+            Description = "",
+            Properties = "{}",
+            IsArchived = false,
+            LastUpdatedAt = UnspecifiedNow(),
+            LastUpdatedBy = uid,
+            Uri = "/data/org_1/other.pdf",
+            FileType = "pdf",
+            FileSize = 256,
+            FileContentHash = "hash-other-v1"
+        };
+        Context.Records.Add(otherRecord);
+        await Context.SaveChangesAsync();
+
+        await _provenanceBusiness.CreateProvenanceRecord(otherRecord.Id, "create-record", uid, null);
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(pid, new PaginatedRequestDto());
+
+        Assert.Single(history.Items);
+        Assert.All(history.Items, p => Assert.Equal(pid, p.ProjectId));
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_OrdersNewestFirst_WithIdTiebreaker()
+    {
+        // BulkCreateProvenanceRecords stamps one shared CreatedAt across the whole batch, so
+        // CreatedAt alone can't order these two rows deterministically - the query needs the
+        // Id tiebreaker to avoid skipping/duplicating rows across pages.
+        var result = await _provenanceBusiness.BulkCreateProvenanceRecords([rid, rid2], "attach-tag", uid, null);
+        Assert.True(result);
+
+        var created = await Context.ProvenanceRecords.OrderBy(p => p.Id).ToListAsync();
+        Assert.Equal(2, created.Count);
+
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(pid, new PaginatedRequestDto());
+
+        Assert.Equal(2, history.Items.Count);
+        Assert.Equal(created[1].Id, history.Items[0].Id);
+        Assert.Equal(created[0].Id, history.Items[1].Id);
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_Paginates_AcrossMultiplePages()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+            await Task.Delay(10);
+        }
+
+        var page1 = await _provenanceBusiness.GetProjectProvenanceHistory(
+            pid, new PaginatedRequestDto { PageNumber = 1, PageSize = 2 });
+        var page2 = await _provenanceBusiness.GetProjectProvenanceHistory(
+            pid, new PaginatedRequestDto { PageNumber = 2, PageSize = 2 });
+        var page3 = await _provenanceBusiness.GetProjectProvenanceHistory(
+            pid, new PaginatedRequestDto { PageNumber = 3, PageSize = 2 });
+
+        Assert.Equal(5, page1.TotalCount);
+        Assert.Equal(3, page1.TotalPages);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Single(page3.Items);
+
+        var allIds = page1.Items.Concat(page2.Items).Concat(page3.Items).Select(p => p.Id).ToList();
+        Assert.Equal(allIds.Distinct().Count(), allIds.Count);
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_ReturnsAllRows_WhenPageSizeIsNegativeOne()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        await Task.Delay(10);
+        await _provenanceBusiness.CreateProvenanceRecord(rid2, "create-record", uid, null);
+
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(
+            pid, new PaginatedRequestDto { PageSize = -1 });
+
+        Assert.Equal(2, history.Items.Count);
+        Assert.Equal(2, history.TotalCount);
+    }
+
+    #endregion
+
+    // =========================================================================
     // CreateProvenanceRecord Tests
     // =========================================================================
 
