@@ -22,6 +22,21 @@ public class CacheKeys
         return $"system:data_source_count:hide_archived:{hideArchived}";
     }
 
+    public static string ProjectFileCount(long projectId, bool hideArchived)
+    {
+        return $"project:{projectId}:file_count:hide_archived:{hideArchived}";
+    }
+
+    public static string OrganizationFileCount(long organizationId, bool hideArchived)
+    {
+        return $"organization:{organizationId}:file_count:hide_archived:{hideArchived}";
+    }
+
+    public static string SystemFileCount(bool hideArchived)
+    {
+        return $"system:file_count:hide_archived:{hideArchived}";
+    }
+
     public static string UserArchivedStatus(long userId)
     {
         return $"user:{userId}:archived_status";

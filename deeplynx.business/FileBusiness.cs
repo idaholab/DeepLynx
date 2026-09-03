@@ -1396,4 +1396,22 @@ public class FileBusiness : IFileControllerBusiness
 
         return true;
     }
+
+    /// <summary>
+    ///     Used for invalidating the cached file count values on mutation. 
+    /// </summary>
+    private static Task InvalidateFileCountCaches(long organizationId, long projectId)
+    {
+        var keys = new List<string>
+        {
+            CacheKeys.SystemFileCount(true),
+            CacheKeys.SystemFileCount(false),
+            CacheKeys.OrganizationFileCount(organizationId, true),
+            CacheKeys.OrganizationFileCount(organizationId, false),
+            CacheKeys.ProjectFileCount(projectId, true),
+            CacheKeys.ProjectFileCount(projectId, false)
+        };
+
+        return Task.WhenAll(keys.Select(CacheService.Instance.DeleteAsync));
+    }
 }
