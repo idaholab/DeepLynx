@@ -75,7 +75,7 @@ public class InternalServerErrorExceptionHandlerTests
     }
 
     [Fact]
-    public async Task TryHandleAsync_ReturnsGenericMessage_WhenProductionEnvironment()
+    public async Task TryHandleAsync_ReturnsExceptionMessage_WhenProductionEnvironment()
     {
         // Arrange
         _hostEnvironmentMock.SetupGet(e => e.EnvironmentName).Returns(Environments.Production);
@@ -93,7 +93,7 @@ public class InternalServerErrorExceptionHandlerTests
         Assert.True(result);
         _problemDetailsServiceMock.Verify(
             s => s.TryWriteAsync(It.Is<ProblemDetailsContext>(ctx =>
-                ctx.ProblemDetails.Detail == "An unexpected error occurred.")),
+                ctx.ProblemDetails.Detail == exception.Message)),
             Times.Once);
     }
 

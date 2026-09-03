@@ -6,6 +6,7 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.exceptions;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
@@ -666,6 +667,284 @@ public class RecordBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(3, result1); // Original data source has 1 record
         Assert.Equal(1, result2); // New data source has 2 records
+    }
+
+    #endregion
+
+    #region GetRecordsCountByDataSource Cache Tests
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_CacheMiss_PopulatesCache_WithCorrectValue()
+    {
+        var cacheKey = CacheKeys.RecordCountByDataSource(pid, did2, true);
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKey));
+
+        var result = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did2, true);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(result, cached);
+        Assert.Equal(1, cached); // did2 has 1 record per fixture setup
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_CacheHit_ReturnsCachedValue_WithoutQueryingDatabase()
+    {
+        // did genuinely has 3 records in the DB (per fixture). Poison the cache with a value the DB
+        // would never produce right now. If the method trusts the cache it returns 999; if it falls
+        // through to the DB instead, it will return the real count.
+        var cacheKey = CacheKeys.RecordCountByDataSource(pid, did, true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        var result = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        Assert.Equal(999, result);
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_CacheHit_DoesNotOverwriteExistingCacheEntry()
+    {
+        // Same poisoning technique, but this time assert the poisoned value is still in the cache
+        // afterward - proving the method didn't recompute and re-set it on a hit.
+        var cacheKey = CacheKeys.RecordCountByDataSource(pid, did, true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.Equal(999, cached);
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_UsesCacheKeyThatVariesByHideArchived()
+    {
+        // Populate the hideArchived:true entry with a real call.
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        // hideArchived:false must be a distinct key - still a genuine cache miss.
+        var keyHideFalse = CacheKeys.RecordCountByDataSource(pid, did, false);
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(keyHideFalse));
+
+        var result = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, false);
+
+        var cachedFalse = await CacheService.Instance.GetAsync<int?>(keyHideFalse);
+        Assert.NotNull(cachedFalse);
+        Assert.Equal(result, cachedFalse);
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_UsesCacheKeyThatVariesByDataSource()
+    {
+        // Poison did's cache entry only. did2's key must be unaffected and still a genuine miss.
+        var keyDid = CacheKeys.RecordCountByDataSource(pid, did, true);
+        var keyDid2 = CacheKeys.RecordCountByDataSource(pid, did2, true);
+        await CacheService.Instance.SetAsync(keyDid, 999, TimeSpan.FromHours(1));
+
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(keyDid2));
+
+        var resultDid = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+        var resultDid2 = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did2, true);
+
+        Assert.Equal(999, resultDid);   // served from poisoned cache
+        Assert.Equal(1, resultDid2);    // did2's real DB count, unaffected by did's poisoned entry
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_NonExistentDataSource_DoesNotPopulateCache()
+    {
+        var cacheKey = CacheKeys.RecordCountByDataSource(pid, 999L, true);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, 999L, true));
+
+        // Existence check should fail before the cache is ever consulted or written.
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKey));
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_CachedValue_SurvivesSubsequentRecordChanges()
+    {
+        // Prime the cache with the real count.
+        var firstResult = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did2, true);
+        Assert.Equal(1, firstResult);
+
+        // Add another record to the same data source directly via the DB, bypassing the cache.
+        Context.Records.Add(new Record
+        {
+            Name = "CachedValue_SurvivesSubsequentRecordChanges",
+            Description = "GetRecordsCountByDataSource_CachedValue_SurvivesSubsequentRecordChanges",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did2,
+            Properties = "{}",
+            OriginalId = "GetRecordsCountByDataSource_CachedValue_SurvivesSubsequentRecordChanges",
+            IsArchived = false
+        });
+        await Context.SaveChangesAsync();
+
+        // The cached count should still be served, proving the method trusts the cache
+        // rather than re-querying on every call.
+        var secondResult = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did2, true);
+        Assert.Equal(1, secondResult);
+    }
+
+    #endregion
+
+    #region Cache Invalidation on Create Tests
+
+    [Fact]
+    public async Task CreateRecord_InvalidatesRecordCountCache_ForAffectedDataSource()
+    {
+        // Arrange - prime the count cache for this data source/hideArchived combo
+        var cacheKeyHideTrue = CacheKeys.RecordCountByDataSource(pid, did, true);
+        var cacheKeyHideFalse = CacheKeys.RecordCountByDataSource(pid, did, false);
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, false);
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(cacheKeyHideTrue));
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(cacheKeyHideFalse));
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Cache Invalidation Test Record",
+            Description = "Test",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            Uri = "test://uri",
+            OriginalId = "cache-invalidation-1",
+            ClassId = cid,
+            FileType = "png"
+        };
+
+        // Act
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert - both hideArchived variants for this data source must be invalidated,
+        // otherwise a stale count would be served until the TTL expires.
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKeyHideTrue));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKeyHideFalse));
+    }
+
+    [Fact]
+    public async Task CreateRecord_NextCountRead_ReflectsNewRecord_NotStaleCachedValue()
+    {
+        // Arrange - prime the cache with the pre-create count
+        var preCount = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Cache Freshness Test Record",
+            Description = "Test",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            Uri = "test://uri",
+            OriginalId = "cache-invalidation-2",
+            ClassId = cid,
+            FileType = "png"
+        };
+
+        // Act
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+        var postCount = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        // Assert
+        Assert.Equal(preCount + 1, postCount);
+    }
+
+    [Fact]
+    public async Task CreateRecord_DoesNotInvalidateCache_ForUnrelatedDataSource()
+    {
+        // Arrange - prime the cache for a data source not being written to
+        var unrelatedKey = CacheKeys.RecordCountByDataSource(pid, did2, true);
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did2, true);
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(unrelatedKey));
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Scoped Invalidation Test Record",
+            Description = "Test",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            Uri = "test://uri",
+            OriginalId = "cache-invalidation-3",
+            ClassId = cid,
+            FileType = "png"
+        };
+
+        // Act
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert - unrelated data source's cache entry should be untouched
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(unrelatedKey));
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_InvalidatesRecordCountCache_ForAffectedDataSource()
+    {
+        // Arrange
+        var cacheKeyHideTrue = CacheKeys.RecordCountByDataSource(pid, did, true);
+        var cacheKeyHideFalse = CacheKeys.RecordCountByDataSource(pid, did, false);
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, false);
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(cacheKeyHideTrue));
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(cacheKeyHideFalse));
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Cache Test 1",
+                Description = "Test",
+                ObjectStorageId = osid,
+                OriginalId = "bulk-cache-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "Bulk Cache Test 2",
+                Description = "Test",
+                ObjectStorageId = osid,
+                OriginalId = "bulk-cache-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+
+        // Act
+        await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+
+        // Assert
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKeyHideTrue));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKeyHideFalse));
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_NextCountRead_ReflectsAllNewRecords_NotStaleCachedValue()
+    {
+        // Arrange
+        var preCount = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Freshness Test 1",
+                Description = "Test",
+                ObjectStorageId = osid,
+                OriginalId = "bulk-freshness-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "Bulk Freshness Test 2",
+                Description = "Test",
+                ObjectStorageId = osid,
+                OriginalId = "bulk-freshness-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+
+        // Act
+        await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+        var postCount = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        // Assert
+        Assert.Equal(preCount + 2, postCount);
     }
 
     #endregion

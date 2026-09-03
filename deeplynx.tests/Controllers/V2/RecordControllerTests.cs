@@ -1270,27 +1270,26 @@ public class RecordControllerTests : IDisposable
     }
 
     // =========================================================================
-    // SearchPaginated Tests
+    // Search Tests
     // =========================================================================
 
-    #region SearchPaginated Tests
+    #region Search Tests
 
     [Fact]
-    public async Task SearchPaginated_Returns200_WithPaginatedResult()
+    public async Task Search_Returns200_WithPaginatedResult()
     {
         var search = new RecordSearchRequestDto();
-        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
         var expected = new PaginatedResponse<RecordResponseDto>
         {
             Items = [new() { Id = 1, Name = "Record 1" }, new() { Id = 2, Name = "Record 2" }],
             TotalCount = 2
         };
         _mockBusiness.Setup(b => b.SearchPaginated(
-                         UserId, OrgId, ProjectId, search, paginated,
+                         UserId, OrgId, ProjectId, search, It.IsAny<PaginatedRequestDto>(),
                          false, false, false))
                      .ReturnsAsync(expected);
 
-        var result = (await _controller.SearchPaginated(OrgId, ProjectId, search, paginated)).Result as OkObjectResult;
+        var result = (await _controller.Search(OrgId, ProjectId, search)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -1303,10 +1302,9 @@ public class RecordControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchPaginated_Returns200_WithEmptyResult()
+    public async Task Search_Returns200_WithEmptyResult()
     {
         var search = new RecordSearchRequestDto();
-        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
         var expected = new PaginatedResponse<RecordResponseDto> { Items = [], TotalCount = 0 };
         _mockBusiness.Setup(b => b.SearchPaginated(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
@@ -1314,7 +1312,7 @@ public class RecordControllerTests : IDisposable
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ReturnsAsync(expected);
 
-        var result = (await _controller.SearchPaginated(OrgId, ProjectId, search, paginated)).Result as OkObjectResult;
+        var result = (await _controller.Search(OrgId, ProjectId, search)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
@@ -1322,62 +1320,102 @@ public class RecordControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchPaginated_Returns500_OnUnexpectedException()
+    public async Task Search_ThrowsException_WhenBusinessThrows()
     {
         var search = new RecordSearchRequestDto();
-        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
         _mockBusiness.Setup(b => b.SearchPaginated(
                          It.IsAny<long>(), It.IsAny<long>(), It.IsAny<long>(),
                          It.IsAny<RecordSearchRequestDto>(), It.IsAny<PaginatedRequestDto>(),
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ThrowsAsync(new Exception("db error"));
 
-        await Assert.ThrowsAsync<Exception>(() => _controller.SearchPaginated(OrgId, ProjectId, search, paginated));
+        await Assert.ThrowsAsync<Exception>(() => _controller.Search(OrgId, ProjectId, search));
     }
 
     [Fact]
-    public async Task SearchPaginated_PassesAdminFlagsToBusinessLayer()
+    public async Task Search_PassesAdminFlagsToBusinessLayer()
     {
         UserContextStorage.IsSysAdmin = true;
         UserContextStorage.IsOrgAdmin = false;
         UserContextStorage.IsProjectAdmin = false;
 
         var search = new RecordSearchRequestDto();
-        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
         _mockBusiness.Setup(b => b.SearchPaginated(
-                         UserId, OrgId, ProjectId, search, paginated, true, false, false))
+                         UserId, OrgId, ProjectId, search, It.IsAny<PaginatedRequestDto>(), true, false, false))
                      .ReturnsAsync(new PaginatedResponse<RecordResponseDto>());
 
-        await _controller.SearchPaginated(OrgId, ProjectId, search, paginated);
+        await _controller.Search(OrgId, ProjectId, search);
 
         _mockBusiness.Verify(b => b.SearchPaginated(
-            UserId, OrgId, ProjectId, search, paginated, true, false, false), Times.Once);
+            UserId, OrgId, ProjectId, search, It.IsAny<PaginatedRequestDto>(), true, false, false), Times.Once);
     }
 
     [Fact]
-    public async Task SearchPaginated_PassesCurrentUserIdToBusinessLayer()
+    public async Task Search_PassesCurrentUserIdToBusinessLayer()
     {
         UserContextStorage.UserId = 99L;
 
         var search = new RecordSearchRequestDto();
-        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 20 };
         _mockBusiness.Setup(b => b.SearchPaginated(
-                         99L, OrgId, ProjectId, search, paginated,
+                         99L, OrgId, ProjectId, search, It.IsAny<PaginatedRequestDto>(),
                          It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()))
                      .ReturnsAsync(new PaginatedResponse<RecordResponseDto>());
 
-        await _controller.SearchPaginated(OrgId, ProjectId, search, paginated);
+        await _controller.Search(OrgId, ProjectId, search);
 
         _mockBusiness.Verify(b => b.SearchPaginated(
-            99L, OrgId, ProjectId, search, paginated,
+            99L, OrgId, ProjectId, search, It.IsAny<PaginatedRequestDto>(),
             It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>()), Times.Once);
     }
 
     [Fact]
-    public void SearchPaginated_HasHttpGetAndReadRecordAuthorization()
+    public async Task Search_DefaultsPaginatedRequestDto_WhenNotProvided()
+    {
+        var search = new RecordSearchRequestDto();
+        _mockBusiness.Setup(b => b.SearchPaginated(
+                         UserId, OrgId, ProjectId, search,
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+                         false, false, false))
+                     .ReturnsAsync(new PaginatedResponse<RecordResponseDto>());
+
+        await _controller.Search(OrgId, ProjectId, search);
+
+        _mockBusiness.Verify(b => b.SearchPaginated(
+            UserId, OrgId, ProjectId, search,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 1 && p.PageSize == 25),
+            false, false, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task Search_PassesProvidedPaginatedRequestDto_WhenGiven()
+    {
+        var search = new RecordSearchRequestDto();
+        var pagination = new PaginatedRequestDto { PageNumber = 3, PageSize = 10 };
+        _mockBusiness.Setup(b => b.SearchPaginated(
+                         UserId, OrgId, ProjectId, search,
+                         It.Is<PaginatedRequestDto>(p => p.PageNumber == 3 && p.PageSize == 10),
+                         false, false, false))
+                     .ReturnsAsync(new PaginatedResponse<RecordResponseDto>
+                     {
+                         Items = [],
+                         PageNumber = 3,
+                         PageSize = 10,
+                         TotalCount = 0
+                     });
+
+        await _controller.Search(OrgId, ProjectId, search, pagination);
+
+        _mockBusiness.Verify(b => b.SearchPaginated(
+            UserId, OrgId, ProjectId, search,
+            It.Is<PaginatedRequestDto>(p => p.PageNumber == 3 && p.PageSize == 10),
+            false, false, false), Times.Once);
+    }
+
+    [Fact]
+    public void Search_HasHttpGetAndReadRecordAuthorization()
     {
         var method = GetControllerMethod(
-            nameof(RecordController.SearchPaginated),
+            nameof(RecordController.Search),
             "organizationId",
             "projectId",
             "search",
