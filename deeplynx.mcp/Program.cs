@@ -17,7 +17,10 @@ builder.Services.AddScoped<IAuthenticatedHttpClientFactory, AuthenticatedHttpCli
 
 builder.Services.AddMcpServer()
     .WithHttpTransport()
-    .WithToolsFromAssembly();
+    .WithToolsFromAssembly()
+    // Opt-in GCF output (DEEPLYNX_OUTPUT_FORMAT=gcf): one call-tool filter re-encodes each
+    // tool's JSON result as a smaller, lossless GCF wire. See GcfOutput / GcfCallToolFilter.
+    .AddCallToolFilter(deeplynx.mcp.GcfCallToolFilter.Instance);
 
 var app = builder.Build();
 
