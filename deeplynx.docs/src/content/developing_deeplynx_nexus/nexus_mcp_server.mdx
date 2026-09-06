@@ -35,6 +35,21 @@ If it is your first time running the server, you can use the command `dotnet bui
 From then on, every time you want to start the server, you will only need to execute `dotnet run` unless changes are made to the server code.
 For local docker instances, as well as deployed instances, MCP server startup is part of the dockerfile/kubernetes config and should already be handled for you.
 
+## Compact output (GCF)
+
+By default the MCP server returns tool results as JSON. Set `DEEPLYNX_OUTPUT_FORMAT=gcf` to return them
+as [GCF](https://gcformat.com) instead, a compact, lossless encoding designed for structured data crossing
+into a model's context.
+
+The list tools return arrays of uniform records (records, projects, organizations). JSON repeats every field
+name on every row; GCF factors those names into a single header, so a model spends fewer tokens reading the
+result — roughly **60% fewer** on a typical "records for a project" pull than the indented JSON returned by default.
+
+**The substitution is opt-in and conservative.** A result is re-encoded only when the GCF wire is both smaller
+than the JSON and decodes back to the same value, so anything it cannot losslessly shrink is returned as the
+original JSON. It is applied at a single call-tool filter that covers every tool, so no tool behavior changes.
+Leave `DEEPLYNX_OUTPUT_FORMAT` unset (or set to any other value) to keep JSON.
+
 ## Client Setup: Connection URLs
 
 The remainder of this article covers connecting to the MCP server as a client.

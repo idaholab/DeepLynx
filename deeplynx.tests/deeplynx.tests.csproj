@@ -53,6 +53,7 @@
       <ProjectReference Include="..\deeplynx.helpers\deeplynx.helpers.csproj" />
       <ProjectReference Include="..\deeplynx.interfaces\deeplynx.interfaces.csproj" />
       <ProjectReference Include="..\deeplynx.models\deeplynx.models.csproj" />
+      <ProjectReference Include="..\deeplynx.mcp\deeplynx.mcp.csproj" />
     </ItemGroup>
 
 </Project>
