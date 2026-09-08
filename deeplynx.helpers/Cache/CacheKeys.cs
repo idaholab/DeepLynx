@@ -37,6 +37,31 @@ public class CacheKeys
         return $"system:record_count:hide_archived:{hideArchived}";
     }
 
+    public static string ProjectFileCount(long projectId, bool hideArchived)
+    {
+        return $"project:{projectId}:file_count:hide_archived:{hideArchived}";
+    }
+
+    public static string OrganizationFileCount(long organizationId, bool hideArchived)
+    {
+        return $"organization:{organizationId}:file_count:hide_archived:{hideArchived}";
+    }
+
+    public static string SystemFileCount(bool hideArchived)
+    {
+        return $"system:file_count:hide_archived:{hideArchived}";
+    }
+
+    public static string ProjectModalityCount(long projectId)
+    {
+        return $"project:{projectId}:modality_count";
+    }
+
+    public static string OrganizationModalityCount(long organizationId)
+    {
+        return $"organization:{organizationId}:modality_count";
+    }
+
     public static string UserArchivedStatus(long userId)
     {
         return $"user:{userId}:archived_status";
