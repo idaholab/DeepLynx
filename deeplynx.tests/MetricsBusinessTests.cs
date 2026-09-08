@@ -1917,4 +1917,119 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     }
 
     #endregion
+
+    #region Data Modality Count Caching Tests
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_WithProjectId_PopulatesCache()
+    {
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        Context.Records.AddRange(
+            new DlRecord { Name = "R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" },
+            new DlRecord { Name = "R2", OriginalId = "2", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "text/csv" }
+        );
+        await Context.SaveChangesAsync();
+
+        var cacheKey = CacheKeys.ProjectModalityCount(_org1Proj1Id);
+
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, _org1Proj1Id);
+
+        Assert.Equal(2, count);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(2, cached);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_WithProjectId_ReturnsCachedValue_WhenCacheHit()
+    {
+        // Seed a sentinel that does NOT match the true DB count (0, since no records exist yet), so a
+        // hit proves the cache short-circuited the query rather than happening to agree with it.
+        var cacheKey = CacheKeys.ProjectModalityCount(_org1Proj1Id);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, _org1Proj1Id);
+
+            Assert.Equal(999, count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_NullProjectId_PopulatesOrganizationCache()
+    {
+        var ds = new DataSource { Name = "DS", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, IsArchived = false };
+        Context.DataSources.Add(ds);
+        await Context.SaveChangesAsync();
+
+        Context.Records.Add(
+            new DlRecord { Name = "R1", OriginalId = "1", Properties = "{}", Description = "", OrganizationId = _org1Id, ProjectId = _org1Proj1Id, DataSourceId = ds.Id, LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), FileType = "image/png" }
+        );
+        await Context.SaveChangesAsync();
+
+        var cacheKey = CacheKeys.OrganizationModalityCount(_org1Id);
+
+        var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+        Assert.Equal(1, count);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(1, cached);
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_NullProjectId_ReturnsCachedValue_WhenCacheHit()
+    {
+        var cacheKey = CacheKeys.OrganizationModalityCount(_org1Id);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var count = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+            Assert.Equal(999, count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_ProjectAndOrganizationCaches_AreIndependent()
+    {
+        // Poisoning the project-scoped key must not affect the org-scoped key, and vice versa —
+        // these represent different aggregations and must live under different cache keys.
+        var projectKey = CacheKeys.ProjectModalityCount(_org1Proj1Id);
+        var orgKey = CacheKeys.OrganizationModalityCount(_org1Id);
+
+        await CacheService.Instance.SetAsync(projectKey, 111, TimeSpan.FromHours(1));
+        await CacheService.Instance.SetAsync(orgKey, 222, TimeSpan.FromHours(1));
+
+        try
+        {
+            var projectCount = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, _org1Proj1Id);
+            var orgCount = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, null);
+
+            Assert.Equal(111, projectCount);
+            Assert.Equal(222, orgCount);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(projectKey);
+            await CacheService.Instance.DeleteAsync(orgKey);
+        }
+    }
+
+    #endregion
 }

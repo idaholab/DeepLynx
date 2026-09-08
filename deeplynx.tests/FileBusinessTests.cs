@@ -6546,6 +6546,62 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     #endregion
+    #region Data Modality Count Cache Invalidation Tests
+
+    private static async Task SeedModalityCountCacheSentinels(long organizationId, long projectId)
+    {
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectModalityCount(projectId), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationModalityCount(organizationId), 999, (TimeSpan?)null);
+    }
+
+    private static async Task AssertAllModalityCountCacheKeysCleared(long organizationId, long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectModalityCount(projectId)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationModalityCount(organizationId)));
+    }
+
+    [Fact]
+    public async Task UploadFile_InvalidatesModalityCountCache()
+    {
+        await SeedModalityCountCacheSentinels(oid, pid);
+
+        var content = "Modality cache invalidation upload test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "modality-cache-invalidation-upload.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await AssertAllModalityCountCacheKeysCleared(oid, pid);
+    }
+
+    [Fact]
+    public async Task DeleteFile_InvalidatesModalityCountCache()
+    {
+        // DeleteFile bypasses RecordBusiness.DeleteRecord (it calls a private DeleteFileRecordOnly
+        // helper directly), so invalidation must be wired up explicitly on this path too — this
+        // test exists specifically to catch that gap.
+        var content = "Modality cache invalidation delete test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "modality-cache-invalidation-delete.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await SeedModalityCountCacheSentinels(oid, pid);
+
+        await _fileBusiness.DeleteFile(uid, oid, pid, record.Id);
+
+        await AssertAllModalityCountCacheKeysCleared(oid, pid);
+    }
+
+    #endregion
 
     private static IFormFile CreateTestCsvFile(string content, string fileName = "test.csv")
     {
