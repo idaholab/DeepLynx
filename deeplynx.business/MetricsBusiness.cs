@@ -14,6 +14,7 @@ public class MetricsBusiness : IMetricsBusiness
     private readonly TimeSpan _storageSizeCacheTtl = TimeSpan.FromHours(1);
     private readonly TimeSpan _dataSourceCountCacheTtl = TimeSpan.FromHours(1);
     private readonly TimeSpan _recordCountCacheTtl = TimeSpan.FromHours(1);
+    private readonly TimeSpan _fileCountCacheTtl = TimeSpan.FromHours(1);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsBusiness" /> class.
@@ -341,18 +342,46 @@ public class MetricsBusiness : IMetricsBusiness
     /// <returns>The record count for the given scope</returns>
     public async Task<int> GetFileCount(long? organizationId, long[]? projectIds, bool hideArchived)
     {
+        var hasProjectFilter = projectIds is { Length: > 0 };
+
+        // Check the cache before querying the db
+        string? cacheKey = (organizationId, hasProjectFilter) switch
+        {
+            (null, false) => CacheKeys.SystemFileCount(hideArchived),
+            (not null, false) => CacheKeys.OrganizationFileCount(organizationId!.Value, hideArchived),
+            (_, true) when projectIds!.Length == 1 => CacheKeys.ProjectFileCount(projectIds[0], hideArchived),
+            _ => null
+        };
+
+        if (cacheKey != null)
+        {
+            var cachedCount = await CacheService.Instance.GetAsync<int?>(cacheKey);
+            if (cachedCount.HasValue)
+            {
+                return cachedCount.Value;
+            }
+        }
+
         var fileQuery = _context.Records
             .Where(r => r.Uri != null)
             .AsQueryable();
 
         if (organizationId != null) fileQuery = fileQuery.Where(r => r.OrganizationId == organizationId);
 
-        if (projectIds is { Length: > 0 })
+        if (hasProjectFilter)
             fileQuery = fileQuery.Where(r => projectIds.Contains(r.ProjectId));
 
         if (hideArchived) fileQuery = fileQuery.Where(r => !r.IsArchived);
 
-        return await fileQuery.CountAsync();
+        var count = await fileQuery.CountAsync();
+
+        // Update the cache
+        if (cacheKey != null)
+        {
+            await CacheService.Instance.SetAsync(cacheKey, count, _fileCountCacheTtl);
+        }
+
+        return count;
     }
 
     private async Task<long> GetProjectStorageSizeBytes(long projectId)
