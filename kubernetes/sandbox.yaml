@@ -644,6 +644,8 @@ spec:
               value: "/data/insight"
             - name: NEXUS_API_URL
               value: ${NEXUS_API_URL}
+            - name: NEXT_PUBLIC_API_VERSION
+              value: ${NEXT_PUBLIC_API_VERSION}
           resources:
             requests:
               cpu: "150m"
@@ -761,6 +763,8 @@ spec:
                   key: encryption-iv
             - name: NEXUS_API_URL
               value: ${NEXUS_API_URL}
+            - name: NEXT_PUBLIC_API_VERSION
+              value: ${NEXT_PUBLIC_API_VERSION}
           resources:
             requests:
               memory: "128Mi"
