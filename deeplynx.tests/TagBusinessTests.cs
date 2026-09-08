@@ -1117,63 +1117,96 @@ public class TagBusinessTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task ArchiveTag_RemovesTagFromHistoricalRecordDenormalizedTagList()
+public async Task ArchiveTag_RemovesTagFromHistoricalRecordDenormalizedTagList()
+{
+    // Arrange
+    var dataSource = new DataSource
     {
-        // Arrange - attach the tag (tid) to a record; this should already produce
-        // a historical record snapshot (via the insert/update trigger) that lists the tag
-        var dataSource = new DataSource
-        {
-            Name = "Historical Cascade Test DS",
-            OrganizationId = oid,
-            ProjectId = pid,
-            IsArchived = false
-        };
-        Context.DataSources.Add(dataSource);
-        await Context.SaveChangesAsync();
+        Name = "Historical Cascade Test DS",
+        OrganizationId = oid,
+        ProjectId = pid,
+        IsArchived = false
+    };
 
-        var tagEntity = await Context.Tags.FindAsync(tid);
+    Context.DataSources.Add(dataSource);
+    await Context.SaveChangesAsync();
 
-        var record = new Record
-        {
-            Name = "Historical Cascade Test Record",
-            Description = "record used to verify historical tag removal",
-            OriginalId = Guid.NewGuid().ToString(),
-            Properties = "{}",
-            ProjectId = pid,
-            OrganizationId = oid,
-            DataSourceId = dataSource.Id,
-            IsArchived = false,
-            Uri = "localhost:8090/historical-cascade-test",
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            LastUpdatedBy = uid,
-            Tags = new List<Tag> { tagEntity! }
-        };
-        Context.Records.Add(record);
-        await Context.SaveChangesAsync();
+    var tagEntity = await Context.Tags.FindAsync(tid);
+    Assert.NotNull(tagEntity);
 
-        Context.ChangeTracker.Clear();
+    // Create the record first. Its initial historical snapshot will not contain
+    // the tag because the record_tags association does not exist yet.
+    var record = new Record
+    {
+        Name = "Historical Cascade Test Record",
+        Description = "record used to verify historical tag removal",
+        OriginalId = Guid.NewGuid().ToString(),
+        Properties = "{}",
+        ProjectId = pid,
+        OrganizationId = oid,
+        DataSourceId = dataSource.Id,
+        IsArchived = false,
+        Uri = "localhost:8090/historical-cascade-test",
+        LastUpdatedAt = DateTime.SpecifyKind(
+            DateTime.UtcNow,
+            DateTimeKind.Unspecified),
+        LastUpdatedBy = uid,
+        Tags = new List<Tag>()
+    };
 
-        // Sanity check: the most recent historical record for this record should list the tag
-        var historicalBeforeArchive = await Context.HistoricalRecords
-            .Where(hr => hr.RecordId == record.Id)
-            .OrderByDescending(hr => hr.LastUpdatedAt)
-            .FirstOrDefaultAsync();
-        Assert.NotNull(historicalBeforeArchive);
-        Assert.Contains("Analytics", historicalBeforeArchive.Tags);
+    Context.Records.Add(record);
+    await Context.SaveChangesAsync();
 
-        // Act
-        await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
+    var recordId = record.Id;
 
-        Context.ChangeTracker.Clear();
+    // Create the record_tags association after the record exists.
+    record.Tags.Add(tagEntity);
+    await Context.SaveChangesAsync();
 
-        // Assert - the newest historical record snapshot should no longer list the archived tag
-        var historicalAfterArchive = await Context.HistoricalRecords
-            .Where(hr => hr.RecordId == record.Id)
-            .OrderByDescending(hr => hr.LastUpdatedAt)
-            .FirstOrDefaultAsync();
-        Assert.NotNull(historicalAfterArchive);
-        Assert.DoesNotContain("Analytics", historicalAfterArchive.Tags ?? string.Empty);
-    }
+    // Updating the record after the association exists causes the historical
+    // record trigger to create a snapshot that includes the tag.
+    record.LastUpdatedAt = record.LastUpdatedAt.AddSeconds(1);
+    await Context.SaveChangesAsync();
+
+    Context.ChangeTracker.Clear();
+
+    // Verify the tag exists on the current record.
+    var recordBeforeArchive = await Context.Records
+        .AsNoTracking()
+        .Include(r => r.Tags)
+        .FirstAsync(r => r.Id == recordId);
+
+    Assert.Contains(recordBeforeArchive.Tags, tag => tag.Id == tid);
+
+    // Verify the latest historical snapshot contains the tag.
+    var historicalBeforeArchive = await Context.HistoricalRecords
+        .AsNoTracking()
+        .Where(hr => hr.RecordId == recordId)
+        .OrderByDescending(hr => hr.LastUpdatedAt)
+        .FirstOrDefaultAsync();
+
+    Assert.NotNull(historicalBeforeArchive);
+    Assert.Contains(
+        "Analytics",
+        historicalBeforeArchive.Tags ?? string.Empty);
+
+    // Act
+    await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
+
+    Context.ChangeTracker.Clear();
+
+    // Assert
+    var historicalAfterArchive = await Context.HistoricalRecords
+        .AsNoTracking()
+        .Where(hr => hr.RecordId == recordId)
+        .OrderByDescending(hr => hr.LastUpdatedAt)
+        .FirstOrDefaultAsync();
+
+    Assert.NotNull(historicalAfterArchive);
+    Assert.DoesNotContain(
+        "Analytics",
+        historicalAfterArchive.Tags ?? string.Empty);
+}
 
     [Fact]
     public async Task ArchiveTag_AttachedToMultipleRecords_UnlinksAndUpdatesHistoryForAllOfThem()
