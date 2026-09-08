@@ -1245,6 +1245,99 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
         Assert.NotEqual(org1Count, org2Count);
     }
 
+    // Verifies that a modality is not counted if the only record(s) with that FileType are archived.
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_ExcludesModalitiesOnlyPresentOnArchivedRecords()
+    {
+        var scope = await CreateMetricsStorageTestProject(_org1Id);
+
+        Context.Records.AddRange(
+            new Record
+            {
+                Name = "Active PDF Record",
+                Description = "active",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                OrganizationId = _org1Id,
+                ProjectId = scope.ProjectId,
+                DataSourceId = scope.DataSourceId,
+                FileType = "pdf",
+                IsArchived = false,
+                Uri = "localhost:8090/active.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            new Record
+            {
+                Name = "Archived CSV Record",
+                Description = "archived, only record of this modality",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                OrganizationId = _org1Id,
+                ProjectId = scope.ProjectId,
+                DataSourceId = scope.DataSourceId,
+                FileType = "csv",
+                IsArchived = true,
+                Uri = "localhost:8090/archived.csv",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            });
+
+        await Context.SaveChangesAsync();
+
+        var result = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, scope.ProjectId);
+
+        // Only "pdf" should count; "csv" only exists on an archived record and should be excluded
+        Assert.Equal(1, result);
+    }
+
+    // Verifies that a modality still counts if at least one unarchived record has that FileType,
+    // even when other records with the same FileType are archived.
+    [Fact]
+    public async Task GetOrganizationDataModalityCount_CountsModalityIfAtLeastOneUnarchivedRecordExists()
+    {
+        var scope = await CreateMetricsStorageTestProject(_org1Id);
+
+        Context.Records.AddRange(
+            new Record
+            {
+                Name = "Active PDF Record",
+                Description = "active",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                OrganizationId = _org1Id,
+                ProjectId = scope.ProjectId,
+                DataSourceId = scope.DataSourceId,
+                FileType = "pdf",
+                IsArchived = false,
+                Uri = "localhost:8090/active.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            },
+            new Record
+            {
+                Name = "Archived PDF Record",
+                Description = "archived, same modality as an active record",
+                OriginalId = Guid.NewGuid().ToString(),
+                Properties = "{}",
+                OrganizationId = _org1Id,
+                ProjectId = scope.ProjectId,
+                DataSourceId = scope.DataSourceId,
+                FileType = "pdf",
+                IsArchived = true,
+                Uri = "localhost:8090/archived.pdf",
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                LastUpdatedBy = _userId
+            });
+
+        await Context.SaveChangesAsync();
+
+        var result = await _metricsBusiness.GetOrganizationDataModalityCount(_org1Id, scope.ProjectId);
+
+        // "pdf" should still count once, since at least one unarchived record has it
+        Assert.Equal(1, result);
+    }
+
     #endregion
 
     #region GetFileCount Tests

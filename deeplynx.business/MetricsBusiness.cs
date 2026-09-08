@@ -239,6 +239,7 @@ public class MetricsBusiness : IMetricsBusiness
 
         var count = await _context.Records
             .Where(r => r.FileType != null)
+            .Where(r => !r.IsArchived)
             .Where(r => r.OrganizationId == organizationId &&
                         (projectId == null || r.ProjectId == projectId))
             .Select(r => r.FileType)
