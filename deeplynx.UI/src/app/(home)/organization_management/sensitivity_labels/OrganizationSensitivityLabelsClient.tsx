@@ -8,8 +8,6 @@ import {
   PlusIcon,
   ShieldCheckIcon,
   TrashIcon,
-  CheckCircleIcon,
-  XCircleIcon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import type {
@@ -93,43 +91,37 @@ function LabelPermissionsPanel({
 
   const grantedActions = new Set(permissions.map((p) => p.action));
 
+  const permissionCategories = [
+    { id: "records", label: t.translations.RECORD_PERMISSIONS, actions: RECORD_ACTIONS },
+    { id: "files", label: t.translations.FILE_PERMISSIONS, actions: FILE_ACTIONS },
+  ];
+
   return (
-    <div className="max-w-3xl py-6">
-      <div className="grid grid-cols-2 gap-6">
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-base-content/55">
-            {t.translations.RECORD_PERMISSIONS}
-          </p>
-          <ul className="space-y-2">
-            {RECORD_ACTIONS.map((action) => (
-              <li key={action} className="flex items-center gap-2 text-sm">
-                {grantedActions.has(action) ? (
-                  <CheckCircleIcon className="h-4 w-4 shrink-0 text-success" />
-                ) : (
-                  <XCircleIcon className="h-4 w-4 shrink-0 text-base-content/30" />
-                )}
-                {actionLabel(action)}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-base-content/55">
-            {t.translations.FILE_PERMISSIONS}
-          </p>
-          <ul className="space-y-2">
-            {FILE_ACTIONS.map((action) => (
-              <li key={action} className="flex items-center gap-2 text-sm">
-                {grantedActions.has(action) ? (
-                  <CheckCircleIcon className="h-4 w-4 shrink-0 text-success" />
-                ) : (
-                  <XCircleIcon className="h-4 w-4 shrink-0 text-base-content/30" />
-                )}
-                {actionLabel(action)}
-              </li>
-            ))}
-          </ul>
-        </div>
+    <div className="py-6">
+      <div className="space-y-4">
+        {permissionCategories.map((category) => (
+          <div key={category.id} className="card bg-base-200/25">
+            <div className="card-body p-4">
+              <h3 className="card-title mb-3 text-sm">{category.label}</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {category.actions.map((action) => (
+                  <label
+                    key={action}
+                    className="label cursor-default justify-start gap-2"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={grantedActions.has(action)}
+                      disabled
+                      className="checkbox checkbox-primary checkbox-sm"
+                    />
+                    <span className="label-text">{actionLabel(action)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -223,6 +215,10 @@ function AssignedUsersPanel({
   const allUsersView = useMemo(
     () =>
       members
+        .filter(
+          (member) =>
+            assignedByUserId.has(member.id) || groupAccessByUser.has(member.id),
+        )
         .map((m) => ({
           userId: m.id,
           userName: m.name,
@@ -233,7 +229,7 @@ function AssignedUsersPanel({
           if (!!a.assigned === !!b.assigned) return a.userName.localeCompare(b.userName);
           return a.assigned ? -1 : 1;
         }),
-    [members, assignedByUserId],
+    [members, assignedByUserId, groupAccessByUser],
   );
 
   const normalizedSearch = search.trim().toLowerCase();
@@ -275,7 +271,9 @@ function AssignedUsersPanel({
       ) : (
         <div className="overflow-hidden rounded-box border border-base-200">
           {filteredUsers.map((u) => {
-            const isAssigned = !!u.assigned;
+            const hasGroupAccess = groupAccessByUser.has(u.userId);
+            const hasDirectAssignment = !!u.assigned;
+            const isAssigned = hasDirectAssignment || hasGroupAccess;
             return (
               <div
                 key={u.userId}
@@ -302,29 +300,43 @@ function AssignedUsersPanel({
                     )}
                   </span>
                 </span>
-                {!isAssigned && (
-                  <span className="badge badge-ghost">{t.translations.UNASSIGNED}</span>
-                )}
-                {groupAccessByUser.has(u.userId) && (
-                  <span
-                    className="badge badge-secondary gap-1"
-                    title={t.translations.ALSO_GRANTED_VIA_GROUPS.replace(
-                      "{groups}",
-                      groupAccessByUser.get(u.userId)!.join(", "),
+                {hasGroupAccess && (
+                  <div className="flex items-center gap-1">
+                    {hasDirectAssignment && hasGroupAccess && (
+                      <span className="badge badge-primary">
+                        {t.translations.DIRECT_ACCESS}
+                      </span>
                     )}
-                  >
-                    <UserGroupIcon className="h-3.5 w-3.5" />
-                    {t.translations.VIA_GROUP_BADGE}
-                  </span>
+                    {hasGroupAccess && (
+                      <span
+                        className="badge badge-secondary gap-1"
+                        title={t.translations.ALSO_GRANTED_VIA_GROUPS.replace(
+                          "{groups}",
+                          groupAccessByUser.get(u.userId)!.join(", "),
+                        )}
+                      >
+                        <UserGroupIcon className="h-3.5 w-3.5" />
+                        {t.translations.VIA_GROUP_BADGE}
+                      </span>
+                    )}
+                  </div>
                 )}
-                {isAssigned && (
+                {hasDirectAssignment && (
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm text-error"
                     onClick={() => handleRevoke(u.userId)}
                     disabled={revokingUserId === u.userId}
-                    aria-label={t.translations.REMOVE_ACCESS}
-                    title={t.translations.REMOVE_ACCESS}
+                    aria-label={
+                      hasGroupAccess
+                        ? t.translations.REMOVE_DIRECT_ACCESS
+                        : t.translations.REMOVE_ACCESS
+                    }
+                    title={
+                      hasGroupAccess
+                        ? t.translations.REMOVE_DIRECT_ACCESS
+                        : t.translations.REMOVE_ACCESS
+                    }
                   >
                     <TrashIcon className="h-5 w-5" />
                   </button>
@@ -343,6 +355,7 @@ function AssignedUsersPanel({
         labelName={label.name}
         members={members}
         assignedUserIds={new Set(assignedUsers.map((u) => u.userId))}
+        groupAccessByUser={groupAccessByUser}
         onAssigned={loadAssignedUsers}
       />
     </div>

@@ -4,15 +4,13 @@ import React, { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
   MagnifyingGlassIcon,
-  ArrowLeftIcon,
   CheckIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import type { UserResponseDto } from "@/app/(home)/types/responseDTOs";
 import { grantSensitivityLabelAccessOrg } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AvatarCell from "@/app/(home)/components/Avatar";
 import { useLanguage } from "@/app/contexts/Language";
-
-type WizardStep = "select" | "preview";
 
 interface NormalizedUser {
   id: number;
@@ -28,6 +26,7 @@ interface Props {
   labelName: string;
   members: UserResponseDto[];
   assignedUserIds: Set<number>;
+  groupAccessByUser: Map<number, string[]>;
   onAssigned: () => void;
 }
 
@@ -39,13 +38,12 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
   labelName,
   members,
   assignedUserIds,
+  groupAccessByUser,
   onAssigned,
 }) => {
   const { t } = useLanguage();
-  const [step, setStep] = useState<WizardStep>("select");
   const [search, setSearch] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(new Set());
-  const [excludedPreviewUserIds, setExcludedPreviewUserIds] = useState<Set<number>>(new Set());
   const [assigning, setAssigning] = useState(false);
 
   const individualUsers: NormalizedUser[] = useMemo(
@@ -54,10 +52,8 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
   );
 
   const resetState = () => {
-    setStep("select");
     setSearch("");
     setSelectedUserIds(new Set());
-    setExcludedPreviewUserIds(new Set());
   };
 
   const handleClose = () => {
@@ -66,6 +62,8 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
   };
 
   const toggleUser = (userId: number) => {
+    if (assignedUserIds.has(userId)) return;
+
     setSelectedUserIds((current) => {
       const next = new Set(current);
       if (next.has(userId)) next.delete(userId);
@@ -74,32 +72,14 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
     });
   };
 
-  const togglePreviewUser = (userId: number) => {
-    setExcludedPreviewUserIds((current) => {
-      const next = new Set(current);
-      if (next.has(userId)) next.delete(userId);
-      else next.add(userId);
-      return next;
-    });
-  };
-
-  const previewUsers = useMemo(() => {
-    const map = new Map<number, { user: NormalizedUser }>();
-    individualUsers
-      .filter((u) => selectedUserIds.has(u.id))
-      .forEach((u) => map.set(u.id, { user: u }));
-    return Array.from(map.values());
-  }, [individualUsers, selectedUserIds]);
-
-  const newAssignmentCount = previewUsers.filter(
-    ({ user }) => !assignedUserIds.has(user.id) && !excludedPreviewUserIds.has(user.id),
+  const newAssignmentCount = Array.from(selectedUserIds).filter(
+    (userId) => !assignedUserIds.has(userId),
   ).length;
-  const existingCount = previewUsers.filter(({ user }) => assignedUserIds.has(user.id)).length;
 
   const handleConfirm = async () => {
-    const idsToGrant = previewUsers
-      .filter(({ user }) => !assignedUserIds.has(user.id) && !excludedPreviewUserIds.has(user.id))
-      .map(({ user }) => user.id);
+    const idsToGrant = Array.from(selectedUserIds).filter(
+      (userId) => !assignedUserIds.has(userId),
+    );
 
     if (idsToGrant.length === 0) return;
 
@@ -148,8 +128,7 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
           </div>
         </header>
 
-        {step === "select" ? (
-          <div className="grid min-h-[470px] grid-cols-1 lg:grid-cols-[1.35fr_.65fr]">
+        <div className="grid min-h-[470px] grid-cols-1 lg:grid-cols-[1.35fr_.65fr]">
             <section className="border-b border-base-200 p-6 lg:border-b-0 lg:border-r">
               <label className="input input-bordered flex w-full items-center gap-2 bg-base-100">
                 <MagnifyingGlassIcon className="h-4 w-4 text-base-content/50" />
@@ -163,24 +142,54 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
               </label>
 
               <div className="mt-4 max-h-[340px] overflow-auto rounded-box border border-base-200">
-                {filteredUsers.map((user) => (
-                  <label
-                    key={user.id}
-                    className="flex cursor-pointer items-center gap-3 border-b border-base-200 px-4 py-4 last:border-b-0 hover:bg-base-200/50"
-                  >
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      checked={selectedUserIds.has(user.id)}
-                      onChange={() => toggleUser(user.id)}
-                    />
-                    <AvatarCell name={user.name} size={9} containerClassName="space-x-0" />
-                    <span className="min-w-0 flex-1">
-                      <strong className="block">{user.name}</strong>
-                      <span className="block text-sm text-base-content/60">{user.email}</span>
-                    </span>
-                  </label>
-                ))}
+                {filteredUsers.map((user) => {
+                  const alreadyAssigned = assignedUserIds.has(user.id);
+                  const groupNames = groupAccessByUser.get(user.id);
+                  const hasGroupAccess = !!groupNames?.length;
+                  return (
+                    <label
+                      key={user.id}
+                      className={`flex items-center gap-3 border-b border-base-200 px-4 py-4 last:border-b-0 ${
+                        alreadyAssigned
+                          ? "cursor-not-allowed bg-success/10"
+                          : hasGroupAccess
+                          ? "cursor-pointer bg-base-200/25 hover:bg-base-200/50"
+                          : "cursor-pointer hover:bg-base-200/50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary checkbox-sm"
+                        checked={alreadyAssigned || selectedUserIds.has(user.id)}
+                        disabled={alreadyAssigned}
+                        onChange={() => toggleUser(user.id)}
+                      />
+                      <AvatarCell name={user.name} size={9} containerClassName="space-x-0" />
+                      <span className="min-w-0 flex-1">
+                        <strong className="block">{user.name}</strong>
+                        <span className="block text-sm text-base-content/60">{user.email}</span>
+                      </span>
+                      {alreadyAssigned && (
+                        <span className="badge badge-success gap-1">
+                          <CheckIcon className="h-3.5 w-3.5" />
+                          {t.translations.ALREADY_ASSIGNED}
+                        </span>
+                      )}
+                      {hasGroupAccess && (
+                        <span
+                          className="badge badge-secondary gap-1"
+                          title={t.translations.ALSO_GRANTED_VIA_GROUPS.replace(
+                            "{groups}",
+                            groupNames.join(", "),
+                          )}
+                        >
+                          <UserGroupIcon className="h-3.5 w-3.5" />
+                          {t.translations.VIA_GROUP_BADGE}
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
               </div>
             </section>
 
@@ -206,100 +215,26 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
                 </div>
               </div>
             </aside>
-          </div>
-        ) : (
-          <section className="p-6">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-              <div className="text-right text-sm">
-                <strong className="block">
-                  {t.translations.NEW_USERS_WILL_RECEIVE_LABEL.replace("{count}", String(newAssignmentCount))}
-                </strong>
-                <span className="text-base-content/60">
-                  {t.translations.ALREADY_ASSIGNED_COUNT.replace("{count}", String(existingCount))} ·{" "}
-                  {t.translations.DESELECTED_COUNT.replace(
-                    "{count}",
-                    String(excludedPreviewUserIds.size),
-                  )}
-                </span>
-              </div>
-            </div>
+        </div>
 
-            <div className="max-h-[390px] overflow-auto rounded-box border border-base-200">
-              {previewUsers.map(({ user }) => {
-                const alreadyAssigned = assignedUserIds.has(user.id);
-                const excluded = excludedPreviewUserIds.has(user.id);
-                return (
-                  <label
-                    key={user.id}
-                    className={`flex items-center gap-3 border-b border-base-200 px-4 py-4 last:border-b-0 ${
-                      excluded ? "opacity-55" : ""
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      checked={alreadyAssigned || !excluded}
-                      disabled={alreadyAssigned}
-                      onChange={() => togglePreviewUser(user.id)}
-                    />
-                    <AvatarCell name={user.name} size={9} containerClassName="space-x-0" />
-                    <span className="min-w-0 flex-1">
-                      <strong className="block">{user.name}</strong>
-                      <span className="block text-sm text-base-content/60">{user.email}</span>
-                    </span>
-                    {alreadyAssigned && (
-                      <span className="badge badge-success gap-1">
-                        <CheckIcon className="h-3.5 w-3.5" />
-                        {t.translations.ALREADY_ASSIGNED}
-                      </span>
-                    )}
-                    {!alreadyAssigned && excluded && (
-                      <span className="badge badge-ghost">{t.translations.DESELECTED}</span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-base-200 px-6 py-4">
-          {step === "preview" ? (
-            <button type="button" className="btn btn-ghost" onClick={() => setStep("select")}>
-              <ArrowLeftIcon className="h-4 w-4" />
-              {t.translations.BACK}
-            </button>
-          ) : (
-            <span />
-          )}
+        <footer className="flex justify-end gap-3 border-t border-base-200 px-6 py-4">
           <div className="flex gap-3">
             <button type="button" className="btn btn-ghost" onClick={handleClose}>
               {t.translations.CANCEL}
             </button>
-            {step === "select" ? (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setStep("preview")}
-                disabled={previewUsers.length === 0}
-              >
-                {t.translations.PREVIEW_USERS_COUNT.replace("{count}", String(previewUsers.length))}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleConfirm}
-                disabled={newAssignmentCount === 0 || assigning}
-              >
-                {assigning
-                  ? t.translations.SAVING
-                  : t.translations.ASSIGN_LABEL_TO_N_USERS.replace(
-                      "{count}",
-                      String(newAssignmentCount),
-                    )}
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleConfirm}
+              disabled={newAssignmentCount === 0 || assigning}
+            >
+              {assigning
+                ? t.translations.SAVING
+                : t.translations.ASSIGN_LABEL_TO_N_USERS.replace(
+                    "{count}",
+                    String(newAssignmentCount),
+                  )}
+            </button>
           </div>
         </footer>
       </div>

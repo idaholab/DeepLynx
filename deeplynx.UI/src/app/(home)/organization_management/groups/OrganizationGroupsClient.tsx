@@ -577,6 +577,9 @@ const OrganizationGroupsClient: React.FC<Props> = ({
 
   const [localGroups, setLocalGroups] =
     useState<GroupResponseDto[]>(initialGroups);
+  const [verifiedMemberCountGroupIds, setVerifiedMemberCountGroupIds] = useState<
+    Set<number | string>
+  >(new Set());
   const [localLabels, setLocalLabels] = useState<SensitivityLabelsDto[]>(labels);
   const [selectedGroupId, setSelectedGroupId] = useState<number | string | null>(
     initialGroups[0]?.id ?? null,
@@ -605,7 +608,30 @@ const OrganizationGroupsClient: React.FC<Props> = ({
     if (!orgId) return;
     try {
       const fresh = await getAllGroups(orgId);
-      setLocalGroups(fresh.items);
+      const memberCounts = await Promise.all(
+        fresh.items.map(async (group) => {
+          try {
+            const members = await getGroupMembers(orgId, group.id as number, 1, 1);
+            return [group.id, members.totalCount] as const;
+          } catch (error) {
+            console.error(`Failed to load member count for group ${group.id}:`, error);
+            return null;
+          }
+        }),
+      );
+      const resolvedCounts = new Map(
+        memberCounts.filter(
+          (count): count is readonly [number | string, number] => count !== null,
+        ),
+      );
+
+      setLocalGroups(
+        fresh.items.map((group) => ({
+          ...group,
+          memberCount: resolvedCounts.get(group.id) ?? group.memberCount,
+        })),
+      );
+      setVerifiedMemberCountGroupIds(new Set(resolvedCounts.keys()));
     } catch (error) {
       console.error("Failed to load groups:", error);
     }
@@ -690,6 +716,7 @@ const OrganizationGroupsClient: React.FC<Props> = ({
     setLocalGroups((prev) =>
       prev.map((g) => (g.id === groupId ? { ...g, memberCount: count } : g)),
     );
+    setVerifiedMemberCountGroupIds((prev) => new Set(prev).add(groupId));
   };
 
   const openCreateGroupModal = () => {
@@ -824,7 +851,8 @@ const OrganizationGroupsClient: React.FC<Props> = ({
                 </span>
               )}
             </span>
-            {typeof group.memberCount === "number" && (
+            {verifiedMemberCountGroupIds.has(group.id) &&
+              typeof group.memberCount === "number" && (
               <span className="badge badge-primary">{group.memberCount}</span>
             )}
           </button>

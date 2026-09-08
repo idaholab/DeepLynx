@@ -9,8 +9,7 @@ import {
   ShieldCheckIcon,
   TrashIcon,
   InformationCircleIcon,
-  CheckCircleIcon,
-  XCircleIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import type {
   SensitivityLabelsDto,
@@ -27,7 +26,9 @@ import {
   getPermissionsForLabelProject,
   getUsersWithAccessToLabelOrg,
   revokeSensitivityLabelAccessOrg,
+  getGroupsWithAccessToLabelOrg,
 } from "@/app/lib/client_service/sensitivity_labels_services.client";
+import { getGroupMembers } from "@/app/lib/client_service/group_services.client";
 import LabelEditModal, {
   FILE_ACTIONS,
   RECORD_ACTIONS,
@@ -95,43 +96,37 @@ function LabelPermissionsPanel({
 
   const grantedActions = new Set(permissions.map((p) => p.action));
 
+  const permissionCategories = [
+    { id: "records", label: t.translations.RECORD_PERMISSIONS, actions: RECORD_ACTIONS },
+    { id: "files", label: t.translations.FILE_PERMISSIONS, actions: FILE_ACTIONS },
+  ];
+
   return (
-    <div className="max-w-3xl py-6">
-      <div className="grid grid-cols-2 gap-6">
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-base-content/55">
-            {t.translations.RECORD_PERMISSIONS}
-          </p>
-          <ul className="space-y-2">
-            {RECORD_ACTIONS.map((action) => (
-              <li key={action} className="flex items-center gap-2 text-sm">
-                {grantedActions.has(action) ? (
-                  <CheckCircleIcon className="h-4 w-4 shrink-0 text-success" />
-                ) : (
-                  <XCircleIcon className="h-4 w-4 shrink-0 text-base-content/30" />
-                )}
-                {actionLabel(action)}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-base-content/55">
-            {t.translations.FILE_PERMISSIONS}
-          </p>
-          <ul className="space-y-2">
-            {FILE_ACTIONS.map((action) => (
-              <li key={action} className="flex items-center gap-2 text-sm">
-                {grantedActions.has(action) ? (
-                  <CheckCircleIcon className="h-4 w-4 shrink-0 text-success" />
-                ) : (
-                  <XCircleIcon className="h-4 w-4 shrink-0 text-base-content/30" />
-                )}
-                {actionLabel(action)}
-              </li>
-            ))}
-          </ul>
-        </div>
+    <div className="py-6">
+      <div className="space-y-4">
+        {permissionCategories.map((category) => (
+          <div key={category.id} className="card bg-base-200/25">
+            <div className="card-body p-4">
+              <h3 className="card-title mb-3 text-sm">{category.label}</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {category.actions.map((action) => (
+                  <label
+                    key={action}
+                    className="label cursor-default justify-start gap-2"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={grantedActions.has(action)}
+                      disabled
+                      className="checkbox checkbox-primary checkbox-sm"
+                    />
+                    <span className="label-text">{actionLabel(action)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -154,6 +149,10 @@ function AssignedUsersPanel({
   const [search, setSearch] = useState("");
   const [revokingUserId, setRevokingUserId] = useState<number | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [groupAccessByUser, setGroupAccessByUser] = useState<
+    Map<number, string[]>
+  >(new Map());
+  const [groupAccessLoading, setGroupAccessLoading] = useState(false);
   const isOrgLabel = !label.projectId;
 
   const loadAssignedUsers = async () => {
@@ -174,6 +173,48 @@ function AssignedUsersPanel({
     loadAssignedUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [label.id, label.projectId]);
+
+  useEffect(() => {
+    if (!isOrgLabel) {
+      setGroupAccessByUser(new Map());
+      setGroupAccessLoading(false);
+      return;
+    }
+
+    const loadGroupAccess = async () => {
+      try {
+        setGroupAccessLoading(true);
+        const groups = await getGroupsWithAccessToLabelOrg(organizationId, label.id);
+        const memberLists = await Promise.all(
+          groups.map(async (group) => {
+            try {
+              const members = await getGroupMembers(organizationId, group.groupId);
+              return { name: group.groupName, members: members.items };
+            } catch (error) {
+              console.error(`Failed to load members for group ${group.groupId}:`, error);
+              return { name: group.groupName, members: [] };
+            }
+          }),
+        );
+        const accessByUser = new Map<number, string[]>();
+        memberLists.forEach(({ name, members }) => {
+          members.forEach((member) => {
+            const existing = accessByUser.get(member.id);
+            if (existing) existing.push(name);
+            else accessByUser.set(member.id, [name]);
+          });
+        });
+        setGroupAccessByUser(accessByUser);
+      } catch (error) {
+        console.error("Failed to load group-derived label access:", error);
+        setGroupAccessByUser(new Map());
+      } finally {
+        setGroupAccessLoading(false);
+      }
+    };
+
+    void loadGroupAccess();
+  }, [isOrgLabel, label.id, organizationId]);
 
   const handleRevoke = async (userId: number) => {
     try {
@@ -216,10 +257,12 @@ function AssignedUsersPanel({
       });
     }
     return result.sort((a, b) => {
-      if (!!a.assigned === !!b.assigned) return a.userName.localeCompare(b.userName);
-      return a.assigned ? -1 : 1;
+      const aHasAccess = !!a.assigned || groupAccessByUser.has(a.userId);
+      const bHasAccess = !!b.assigned || groupAccessByUser.has(b.userId);
+      if (aHasAccess === bHasAccess) return a.userName.localeCompare(b.userName);
+      return aHasAccess ? -1 : 1;
     });
-  }, [projectMembers, assignedByUserId]);
+  }, [projectMembers, assignedByUserId, groupAccessByUser]);
 
   const assignedOnlyView = useMemo(
     () =>
@@ -278,7 +321,8 @@ function AssignedUsersPanel({
       ) : (
         <div className="overflow-hidden rounded-box border border-base-200">
           {filteredUsers.map((u) => {
-            const isAssigned = !!u.assigned;
+            const hasGroupAccess = groupAccessByUser.has(u.userId);
+            const isAssigned = !!u.assigned || hasGroupAccess;
             return (
               <div
                 key={u.userId}
@@ -305,8 +349,20 @@ function AssignedUsersPanel({
                     )}
                   </span>
                 </span>
-                {!isAssigned && (
+                {!isAssigned && !(isOrgLabel && groupAccessLoading) && (
                   <span className="badge badge-ghost">{t.translations.UNASSIGNED}</span>
+                )}
+                {hasGroupAccess && (
+                  <span
+                    className="badge badge-secondary gap-1"
+                    title={t.translations.ALSO_GRANTED_VIA_GROUPS.replace(
+                      "{groups}",
+                      groupAccessByUser.get(u.userId)!.join(", "),
+                    )}
+                  >
+                    <UserGroupIcon className="h-3.5 w-3.5" />
+                    {t.translations.VIA_GROUP_BADGE}
+                  </span>
                 )}
                 {isAssigned && !isOrgLabel && (
                   <button
