@@ -109,7 +109,4 @@ public partial class Record
 
     [InverseProperty("Record")]
     public virtual ICollection<Embedding> Embeddings { get; set; } = new List<Embedding>();
-
-    [InverseProperty("Record")]
-    public virtual ICollection<ProvenanceRecord> ProvenanceRecords { get; set; } = new List<ProvenanceRecord>();
 }

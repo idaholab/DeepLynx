@@ -181,6 +181,10 @@ public class DataSourceBusiness : IDataSourceBusiness
             throw new KeyNotFoundException(
                 $"Data source with id {datasourceId} not found or does not belong to the specified organization/project context");
 
+        // update the status cache for this datasource
+        var status = dataSource.IsArchived ? EntityStatus.Archived : EntityStatus.Active;
+        await SetDataSourceStatusCache(dataSource, status);
+
         return new DataSourceResponseDto
         {
             Id = dataSource.Id,
@@ -240,10 +244,10 @@ public class DataSourceBusiness : IDataSourceBusiness
 
             // If project id supplied, inherit org level data sources too
             if (projectId.HasValue)
-                dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+                dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null && d.Default == true).OrderByDescending(d => d.ProjectId == projectId.Value);
             else
                 // If no project id, only org-level data sources
-                dsQuery = dsQuery.Where(d => d.ProjectId == null);
+                dsQuery = dsQuery.Where(d => d.ProjectId == null && d.OrganizationId == organizationId).OrderByDescending(d => d.OrganizationId == organizationId);
 
             var dataSourceLookup = await dsQuery.Select(d => new { d.Id }).FirstOrDefaultAsync();
 
@@ -274,6 +278,10 @@ public class DataSourceBusiness : IDataSourceBusiness
                 _logger?.LogWarning(ex, "Cache population failed for default-data-source key {CacheKey}", cacheKey);
             }
         }
+
+        // update the status cache for this datasource
+        var status = returnedDataSource.IsArchived ? EntityStatus.Archived : EntityStatus.Active;
+        await SetDataSourceStatusCache(returnedDataSource, status);
 
         return new DataSourceResponseDto
         {
@@ -354,6 +362,10 @@ public class DataSourceBusiness : IDataSourceBusiness
             DataSourceId = null,
             Properties = JsonSerializer.Serialize(new { dataSource.Name })
         });
+
+        // update the status cache for this datasource
+        var status = dataSource.IsArchived ? EntityStatus.Archived : EntityStatus.Active;
+        await SetDataSourceStatusCache(dataSource, status);
 
         return new DataSourceResponseDto
         {
@@ -440,6 +452,10 @@ public class DataSourceBusiness : IDataSourceBusiness
 
             await transaction.CommitAsync();
 
+            // update the status cache for this datasource
+            var status = dataSource.IsArchived ? EntityStatus.Archived : EntityStatus.Active;
+            await SetDataSourceStatusCache(dataSource, status);
+
             return new DataSourceResponseDto
             {
                 Id = dataSource.Id,
@@ -507,6 +523,10 @@ public class DataSourceBusiness : IDataSourceBusiness
 
         await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
 
+        // update the status cache for this datasource
+        var status = EntityStatus.Deleted;
+        await SetDataSourceStatusCache(dataSource, status);
+
         return true;
     }
 
@@ -568,6 +588,10 @@ public class DataSourceBusiness : IDataSourceBusiness
             Properties = JsonSerializer.Serialize(new { dataSource.Name })
         });
 
+        // update the status cache for this datasource
+        var status = dataSource.IsArchived ? EntityStatus.Archived : EntityStatus.Active;
+        await SetDataSourceStatusCache(dataSource, status);
+
         return true;
     }
 
@@ -628,6 +652,10 @@ public class DataSourceBusiness : IDataSourceBusiness
             DataSourceId = null,
             Properties = JsonSerializer.Serialize(new { dataSource.Name })
         });
+
+        // update the status cache for this datasource
+        var status = dataSource.IsArchived ? EntityStatus.Archived : EntityStatus.Active;
+        await SetDataSourceStatusCache(dataSource, status);
 
         return true;
     }
@@ -705,6 +733,10 @@ public class DataSourceBusiness : IDataSourceBusiness
             await UpdateDefaultDataSourceCache(dataSource.Id, organizationId, projectId);
         }
 
+        // update the status cache for this datasource
+        var status = dataSource.IsArchived ? EntityStatus.Archived : EntityStatus.Active;
+        await SetDataSourceStatusCache(dataSource, status);
+
         return new DataSourceResponseDto
         {
             Id = dataSource.Id,
@@ -723,6 +755,26 @@ public class DataSourceBusiness : IDataSourceBusiness
             LastUpdatedBy = dataSource.LastUpdatedBy,
             IsArchived = dataSource.IsArchived
         };
+    }
+
+    private async Task SetDataSourceStatusCache(DataSource ds, EntityStatus status)
+    {
+        var cacheKey = CacheKeys.DataSourceStatus(ds.Id);
+        try
+        {
+            await CacheService.Instance.SetAsync(cacheKey,
+            new EntityStatusCacheEntry
+            {
+                OrganizationId = ds.OrganizationId,
+                ProjectId = ds.ProjectId,
+                Status = status
+            },
+            DataSourceCacheTtl);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Cache update failed for data source status: {CacheKey}", cacheKey);
+        }
     }
 
     private async Task ResetProjectDefaults(long projectId, long newDefaultId)
@@ -788,6 +840,6 @@ public class DataSourceBusiness : IDataSourceBusiness
                 _logger?.LogWarning(ex, "Default data source cache update failed for key {CacheKey}", key);
             }
         }
-            
+
     }
 }

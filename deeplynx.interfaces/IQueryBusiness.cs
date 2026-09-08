@@ -12,6 +12,8 @@ public interface IQueryBusiness
     Task<PaginatedResponse<QueryRecordViewResponseDto>> SearchPaginated(long currentUserId, string query, long organizationId, long[] projectIds,
         PaginatedRequestDto paginatedRequestDto, bool hideArchived, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
+    [Obsolete("V1-only. Used by deprecated v1 query endpoints. Superseded by QueryBuilderPaginated. " +
+              "Remove once v1 query endpoints are sunset.", error: false)]
     Task<IEnumerable<QueryRecordViewResponseDto>> QueryBuilder(long currentUserId, CustomQueryDtos.CustomQueryRequestDto[] request,
         long organizationId, long[] projectIds, string? textSearch, bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 

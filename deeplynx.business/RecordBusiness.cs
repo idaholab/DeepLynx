@@ -967,7 +967,7 @@ public class RecordBusiness : IRecordBusiness
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false)
     {
         ValidationHelper.ValidateModel(dto);
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId, hideArchived: true, _logger);
 
         if (dto.Properties == null)
             throw new ArgumentNullException(nameof(dto.Properties), "Properties cannot be null");
@@ -1024,6 +1024,9 @@ public class RecordBusiness : IRecordBusiness
 
             _context.Records.Add(record);
             await _context.SaveChangesAsync();
+
+            await InvalidateRecordCountCaches(organizationId, projectId);
+            await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
 
             if (dto.Tags != null)
             {
@@ -1465,6 +1468,9 @@ public class RecordBusiness : IRecordBusiness
 
         await tx.CommitAsync();
 
+        await InvalidateRecordCountCaches(organizationId, projectId);
+        await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
+
         // Trigger provenance record creation
         var insertedRecordIds = inserted.Select(r => r.Id).ToList();
         if (!await _provenanceBusiness.BulkCreateProvenanceRecords(insertedRecordIds, "create-record", currentUserId, null))
@@ -1554,6 +1560,8 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
+        await InvalidateRecordCountCaches(organizationId, projectId);
+        
         try
         {
             await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStorageSize(projectId));
@@ -1640,6 +1648,8 @@ public class RecordBusiness : IRecordBusiness
             }
         }
 
+        await InvalidateRecordCountCaches(organizationId, projectId);
+        
         // update cache
         try
         {
@@ -1711,6 +1721,9 @@ public class RecordBusiness : IRecordBusiness
         await RecordFileHelper.TryDeleteFiles(query, _fileBusinessFactory, _objectStorageBusiness);
         _context.Records.Remove(returnedRecord);
         await _context.SaveChangesAsync();
+
+        await InvalidateRecordCountCaches(organizationId, projectId);
+        await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "delete-record", currentUserId, null))
@@ -1827,6 +1840,7 @@ public class RecordBusiness : IRecordBusiness
 
         _context.Records.Update(returnedRecord);
         await _context.SaveChangesAsync();
+        await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
 
         // Log Record Update Event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -2619,4 +2633,22 @@ public class RecordBusiness : IRecordBusiness
     }
 
     #endregion
+
+    /// <summary>
+    ///     Used for invalidating the cached record count values on mutation. 
+    /// </summary>
+    private static Task InvalidateRecordCountCaches(long organizationId, long projectId)
+    {
+        var keys = new List<string>
+        {
+            CacheKeys.SystemRecordCount(true),
+            CacheKeys.SystemRecordCount(false),
+            CacheKeys.OrganizationRecordCount(organizationId, true),
+            CacheKeys.OrganizationRecordCount(organizationId, false),
+            CacheKeys.ProjectRecordCount(projectId, true),
+            CacheKeys.ProjectRecordCount(projectId, false)
+        };
+
+        return Task.WhenAll(keys.Select(CacheService.Instance.DeleteAsync));
+    }
 }

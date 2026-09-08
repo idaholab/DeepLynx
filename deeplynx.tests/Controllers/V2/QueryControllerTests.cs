@@ -235,143 +235,6 @@ public class QueryControllerTests : IDisposable
     #region QueryBuilder Tests
 
     [Fact]
-    public async Task QueryBuilder_Returns200_WithRecordResponse()
-    {
-        // Arrange
-        IEnumerable<QueryRecordViewResponseDto> expected =
-            new List<QueryRecordViewResponseDto>();
-
-        var request = Array.Empty<CustomQueryDtos.CustomQueryRequestDto>();
-
-        _mockQueryBusiness
-            .Setup(b => b.QueryBuilder(
-                UserId,
-                request,
-                OrgId,
-                ProjectList,
-                Query,
-                false,
-                false,
-                false))
-            .ReturnsAsync(expected);
-
-        // Act
-        var actionResult = await _QueryController.QueryBuilder(
-            OrgId,
-            Query,
-            ProjectList,
-            request);
-
-        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(200, result.StatusCode);
-        Assert.Same(expected, result.Value);
-    }
-
-    [Fact]
-    public async Task QueryBuilder_Returns200_WithEmptyList()
-    {
-        // Arrange
-        var request = Array.Empty<CustomQueryDtos.CustomQueryRequestDto>();
-
-        _mockQueryBusiness
-            .Setup(b => b.QueryBuilder(
-                UserId,
-                request,
-                OrgId,
-                ProjectList,
-                Query,
-                false,
-                false,
-                false))
-            .ReturnsAsync(new List<QueryRecordViewResponseDto>());
-
-        // Act
-        var actionResult = await _QueryController.QueryBuilder(
-            OrgId,
-            Query,
-            ProjectList,
-            request);
-
-        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
-
-        // Assert
-        Assert.Equal(200, result.StatusCode);
-
-        var records = Assert.IsAssignableFrom<IEnumerable<QueryRecordViewResponseDto>>(result.Value);
-        Assert.Empty(records);
-    }
-
-    [Fact]
-    public async Task QueryBuilder_Returns500_UnexpectedException()
-    {
-        // Arrange
-        var request = Array.Empty<CustomQueryDtos.CustomQueryRequestDto>();
-
-        _mockQueryBusiness
-            .Setup(b => b.QueryBuilder(
-                UserId,
-                request,
-                OrgId,
-                ProjectList,
-                Query,
-                false,
-                false,
-                false))
-            .ThrowsAsync(new Exception("db error"));
-
-        // Act
-        await Assert.ThrowsAsync<Exception>(() => _QueryController.QueryBuilder(
-            OrgId,
-            Query,
-            ProjectList,
-            request));
-    }
-
-    [Fact]
-    public async Task QueryBuilder_PassesToBusinessLayer()
-    {
-        // Arrange
-        IEnumerable<QueryRecordViewResponseDto> expected =
-            new List<QueryRecordViewResponseDto>();
-
-        var request = Array.Empty<CustomQueryDtos.CustomQueryRequestDto>();
-
-        _mockQueryBusiness
-            .Setup(b => b.QueryBuilder(
-                UserId,
-                request,
-                OrgId,
-                ProjectList,
-                Query,
-                false,
-                false,
-                false))
-            .ReturnsAsync(expected);
-
-        var result = (await _QueryController.QueryBuilder(
-            OrgId,
-            Query,
-            ProjectList,
-            request)).Result as OkObjectResult;
-
-
-        _mockQueryBusiness.Verify(
-            b => b.QueryBuilder(
-                UserId,
-                request,
-                OrgId,
-                ProjectList,
-                Query,
-                false,
-                false,
-                false),
-            Times.Once);
-    }
-
-    [Fact]
     public async Task QueryBuilderPaginated_Returns200_WithPaginatedResponse()
     {
         var request = Array.Empty<CustomQueryDtos.CustomQueryRequestDto>();
@@ -396,12 +259,12 @@ public class QueryControllerTests : IDisposable
                 false))
             .ReturnsAsync(expected);
 
-        var actionResult = await _QueryController.QueryBuilderPaginated(
+        var actionResult = await _QueryController.QueryBuilder(
             OrgId,
             Query,
             ProjectList,
-            paginatedDto,
-            request);
+            request,
+            paginatedDto);
 
         var result = Assert.IsType<OkObjectResult>(actionResult.Result);
 
@@ -428,12 +291,12 @@ public class QueryControllerTests : IDisposable
                 false))
             .ReturnsAsync(expected);
 
-        await _QueryController.QueryBuilderPaginated(
+        var actionResult = await _QueryController.QueryBuilder(
             OrgId,
             Query,
             ProjectList,
-            paginatedDto,
-            request);
+            request,
+            paginatedDto);
 
         _mockQueryBusiness.Verify(
             b => b.QueryBuilderPaginated(
@@ -449,16 +312,16 @@ public class QueryControllerTests : IDisposable
     }
 
     [Fact]
-    public void QueryBuilderPaginated_HasAdvancedPaginatedHttpPost()
+    public void QueryBuilder_HasAdvancedHttpPost()
     {
         var method = GetControllerMethod(
-            nameof(QueryController.QueryBuilderPaginated),
+            nameof(QueryController.QueryBuilder),
             "filterArray",
             "paginatedDto");
 
         var httpPost = Assert.Single(method.GetCustomAttributesData(), attribute =>
             attribute.AttributeType.Name == "HttpPostAttribute");
-        Assert.Equal("records/advanced/paginated", httpPost.ConstructorArguments[0].Value);
+        Assert.Equal("records/advanced", httpPost.ConstructorArguments[0].Value);
     }
 
     [Fact]
