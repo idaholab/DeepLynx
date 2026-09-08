@@ -32,7 +32,7 @@ import {
 import { getAllClassesOrg } from "@/app/lib/client_service/class_services.client";
 import { getAllDataSourcesOrg } from "@/app/lib/client_service/data_source_services.client";
 import { getAllTagsOrg } from "@/app/lib/client_service/tag_services.client";
-import { queryBuilderPaginated } from "@/app/lib/client_service/query_services.client";
+import { queryBuilder } from "@/app/lib/client_service/query_services.client";
 import {
   getSavedSearchById,
   saveSearch,
@@ -882,13 +882,13 @@ export default function QueryBuilderClient({
 
       setIsSearchingRecords(true);
       try {
-        const result = await queryBuilderPaginated(
+        const result = await queryBuilder(
           organizationId,
           criteria.queryDtos,
           criteria.projectIds,
-          pageNumber,
-          pageSize,
           criteria.textSearch,
+          pageNumber,
+          pageSize
         );
 
         setQueriedRecords(result.items);

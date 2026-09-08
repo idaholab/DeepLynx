@@ -244,10 +244,10 @@ public class DataSourceBusiness : IDataSourceBusiness
 
             // If project id supplied, inherit org level data sources too
             if (projectId.HasValue)
-                dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null);
+                dsQuery = dsQuery.Where(d => d.ProjectId == projectId.Value || d.ProjectId == null && d.Default == true).OrderByDescending(d => d.ProjectId == projectId.Value);
             else
                 // If no project id, only org-level data sources
-                dsQuery = dsQuery.Where(d => d.ProjectId == null);
+                dsQuery = dsQuery.Where(d => d.ProjectId == null && d.OrganizationId == organizationId).OrderByDescending(d => d.OrganizationId == organizationId);
 
             var dataSourceLookup = await dsQuery.Select(d => new { d.Id }).FirstOrDefaultAsync();
 
@@ -762,7 +762,7 @@ public class DataSourceBusiness : IDataSourceBusiness
         var cacheKey = CacheKeys.DataSourceStatus(ds.Id);
         try
         {
-            await CacheService.Instance.SetAsync(cacheKey, 
+            await CacheService.Instance.SetAsync(cacheKey,
             new EntityStatusCacheEntry
             {
                 OrganizationId = ds.OrganizationId,
@@ -774,7 +774,7 @@ public class DataSourceBusiness : IDataSourceBusiness
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Cache update failed for data source status: {CacheKey}", cacheKey);
-        }        
+        }
     }
 
     private async Task ResetProjectDefaults(long projectId, long newDefaultId)
@@ -840,6 +840,6 @@ public class DataSourceBusiness : IDataSourceBusiness
                 _logger?.LogWarning(ex, "Default data source cache update failed for key {CacheKey}", key);
             }
         }
-            
+
     }
 }

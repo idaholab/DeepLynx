@@ -1755,6 +1755,168 @@ public class MetricsBusinessTests : IntegrationTestBase, IClassFixture<MetricsAz
     }
 
     #endregion
+    
+    #region File Count Caching Tests
+
+    [Fact]
+    public async Task GetFileCount_SingleProject_PopulatesCache()
+    {
+        var cacheKey = CacheKeys.ProjectFileCount(_org1Proj1Id, true);
+
+        // Org1 Proj1 has 3 active records but only 2 have a URI
+        var count = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: true);
+
+        Assert.Equal(2, count);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(2, cached);
+    }
+
+    [Fact]
+    public async Task GetFileCount_SingleProject_ReturnsCachedValue_WhenCacheHit()
+    {
+        // Seed a sentinel that does NOT match the true DB count (2), so a hit proves the
+        // cache short-circuited the query rather than happening to agree with it.
+        var cacheKey = CacheKeys.ProjectFileCount(_org1Proj1Id, true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var count = await _metricsBusiness.GetFileCount(_org1Id, new[] { _org1Proj1Id }, hideArchived: true);
+
+            Assert.Equal(999, count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileCount_NullProjectIds_PopulatesOrganizationCache()
+    {
+        var cacheKey = CacheKeys.OrganizationFileCount(_org2Id, true);
+
+        // Org2: Proj1 (3 active files) + Proj2 (2 active files) = 5
+        var count = await _metricsBusiness.GetFileCount(_org2Id, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(5, count);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(5, cached);
+    }
+
+    [Fact]
+    public async Task GetFileCount_NullProjectIds_ReturnsCachedValue_WhenCacheHit()
+    {
+        var cacheKey = CacheKeys.OrganizationFileCount(_org2Id, true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var count = await _metricsBusiness.GetFileCount(_org2Id, (long[]?)null, hideArchived: true);
+
+            Assert.Equal(999, count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileCount_ArrayOverload_EmptyProjectIds_UsesSameOrganizationCacheKey()
+    {
+        var cacheKey = CacheKeys.OrganizationFileCount(_org1Id, true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var count = await _metricsBusiness.GetFileCount(_org1Id, Array.Empty<long>(), hideArchived: true);
+
+            Assert.Equal(999, count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileCount_NullOrganization_PopulatesSystemCache()
+    {
+        var cacheKey = CacheKeys.SystemFileCount(true);
+
+        // Org1 Proj1 (2) + Org2 Proj1 (3) + Org2 Proj2 (2) = 7 active files
+        var count = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
+
+        Assert.Equal(7, count);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(7, cached);
+    }
+
+    [Fact]
+    public async Task GetFileCount_NullOrganization_ReturnsCachedValue_WhenCacheHit()
+    {
+        var cacheKey = CacheKeys.SystemFileCount(true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var count = await _metricsBusiness.GetFileCount((long?)null, (long[]?)null, hideArchived: true);
+
+            Assert.Equal(999, count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileCount_CachesSeparately_PerHideArchivedFlag()
+    {
+        var falseKey = CacheKeys.OrganizationFileCount(_org2Id, false);
+        await CacheService.Instance.SetAsync(falseKey, 999, TimeSpan.FromHours(1));
+
+        try
+        {
+            var trueResult = await _metricsBusiness.GetFileCount(_org2Id, (long[]?)null, hideArchived: true);
+            var falseResult = await _metricsBusiness.GetFileCount(_org2Id, (long[]?)null, hideArchived: false);
+
+            Assert.Equal(5, trueResult);    // computed fresh, unaffected by the false-flag sentinel
+            Assert.Equal(999, falseResult); // reflects the sentinel — separate cache key
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(falseKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetFileCount_MultipleProjectIdsWithOrganization_IsNotCached()
+    {
+        var firstResult = await _metricsBusiness.GetFileCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: true);
+        Assert.Equal(5, firstResult);
+
+        // Mutate underlying data directly, bypassing any invalidation path, to prove this
+        // combination was never cached in the first place.
+        var records = Context.Records.Where(r => r.ProjectId == _org2Proj2Id).ToList();
+        Context.Records.RemoveRange(records);
+        await Context.SaveChangesAsync();
+
+        var secondResult = await _metricsBusiness.GetFileCount(
+            _org2Id, new[] { _org2Proj1Id, _org2Proj2Id }, hideArchived: true);
+
+        Assert.Equal(3, secondResult); // org2 proj1's 3 active files only, now that proj2's records are gone
+    }
+
+    #endregion
 
     #region Data Modality Count Caching Tests
 

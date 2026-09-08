@@ -6454,7 +6454,98 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(fileClass.Id, createdRecord.ClassId);
     }
     #endregion
+    
+    #region File Count Cache Invalidation Tests
 
+    private static async Task SeedFileCountCacheSentinels(long organizationId, long projectId)
+    {
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectFileCount(projectId, true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectFileCount(projectId, false), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationFileCount(organizationId, true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationFileCount(organizationId, false), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.SystemFileCount(true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.SystemFileCount(false), 999, (TimeSpan?)null);
+    }
+
+    private static async Task AssertAllFileCountCacheKeysCleared(long organizationId, long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectFileCount(projectId, true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectFileCount(projectId, false)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationFileCount(organizationId, true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationFileCount(organizationId, false)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.SystemFileCount(true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.SystemFileCount(false)));
+    }
+
+    [Fact]
+    public async Task UploadFile_InvalidatesFileCountCache()
+    {
+        await SeedFileCountCacheSentinels(oid, pid);
+
+        var content = "Cache invalidation upload test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "cache-invalidation-upload.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await AssertAllFileCountCacheKeysCleared(oid, pid);
+    }
+
+    [Fact]
+    public async Task DeleteFile_InvalidatesFileCountCache()
+    {
+        var content = "Cache invalidation delete test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "cache-invalidation-delete.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await SeedFileCountCacheSentinels(oid, pid);
+
+        await _fileBusiness.DeleteFile(uid, oid, pid, record.Id);
+
+        await AssertAllFileCountCacheKeysCleared(oid, pid);
+    }
+
+    [Fact]
+    public async Task UploadFile_DoesNotInvalidateUnrelatedProjectsCache()
+    {
+        // Arrange: a second project in the same organization
+        var project2 = new Project { Name = "Unrelated Project", OrganizationId = oid };
+        Context.Projects.Add(project2);
+        await Context.SaveChangesAsync();
+        var pid2 = project2.Id;
+
+        var pid2Key = CacheKeys.ProjectFileCount(pid2, true);
+        await CacheService.Instance.SetAsync(pid2Key, 999, (TimeSpan?)null);
+        await SeedFileCountCacheSentinels(oid, pid);
+
+        var content = "Scoped invalidation test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "scoped-invalidation.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // pid's own project-scope key is cleared
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectFileCount(pid, true)));
+
+        // pid2's key is untouched — the invalidation is scoped to the mutated project only
+        Assert.Equal(999, await CacheService.Instance.GetAsync<int?>(pid2Key));
+    }
+
+    #endregion
     #region Data Modality Count Cache Invalidation Tests
 
     private static async Task SeedModalityCountCacheSentinels(long organizationId, long projectId)
