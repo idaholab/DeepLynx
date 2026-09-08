@@ -2928,6 +2928,82 @@ public class ProjectBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetProjectStats Cache Tests
+
+    [Fact]
+    public async Task GetProjectStats_CacheMiss_CachesCalculatedStats()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectStats(pid);
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        // Act
+        var result = await _projectBusiness.GetProjectStats(oid, pid);
+        var cachedStats = await CacheService.Instance
+            .GetAsync<ProjectStatResponseDto?>(cacheKey);
+
+        // Assert
+        Assert.NotNull(cachedStats);
+        Assert.Equal(result.classes, cachedStats.classes);
+        Assert.Equal(result.records, cachedStats.records);
+        Assert.Equal(result.datasources, cachedStats.datasources);
+    }
+
+    [Fact]
+    public async Task GetProjectStats_CacheHit_ReturnsCachedStats()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectStats(pid);
+        var expected = new ProjectStatResponseDto
+        {
+            classes = 11,
+            records = 22,
+            datasources = 33
+        };
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            expected,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.GetProjectStats(oid, pid);
+
+        // Assert
+        Assert.Equal(expected.classes, result.classes);
+        Assert.Equal(expected.records, result.records);
+        Assert.Equal(expected.datasources, result.datasources);
+    }
+
+    [Fact]
+    public async Task InvalidateProjectStatsCache_RemovesCachedStats()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectStats(pid);
+        var cachedStats = new ProjectStatResponseDto
+        {
+            classes = 1,
+            records = 1,
+            datasources = 1
+        };
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            cachedStats,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        await ProjectBusiness.InvalidateProjectStatsCache(
+            pid,
+            _mockLogger.Object);
+
+        // Assert
+        Assert.Null(await CacheService.Instance
+            .GetAsync<ProjectStatResponseDto?>(cacheKey));
+    }
+
+    #endregion
+
     // Helper method to create an IFormFile from a string or byte array
     private IFormFile CreateTestFormFile(string fileName, string content, string contentType = "image/png")
     {

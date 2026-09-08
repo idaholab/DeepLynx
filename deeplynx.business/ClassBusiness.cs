@@ -20,7 +20,7 @@ public class ClassBusiness : IClassBusiness
     private readonly IAdminService _adminService;
 
     private readonly IRelationshipBusiness _relationshipBusiness;
-    private readonly ILogger<ClassBusiness> _logger;
+    private readonly ILogger<ClassBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ClassBusiness" /> class.
@@ -40,7 +40,7 @@ public class ClassBusiness : IClassBusiness
         IEventBusiness eventBusiness,
         IProjectRolePermissionService projectRolePermissionService,
         IAdminService adminService,
-        ILogger<ClassBusiness> logger
+        ILogger<ClassBusiness>? logger = null
     )
     {
         _context = context;
