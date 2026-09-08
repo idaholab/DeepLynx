@@ -66,6 +66,7 @@ function GroupMembersPanel({
   const { t } = useLanguage();
   const [members, setMembers] = useState<UserResponseDto[]>([]);
   const [loading, setLoading] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [addingSelected, setAddingSelected] = useState(false);
@@ -91,6 +92,7 @@ function GroupMembersPanel({
 
   useEffect(() => {
     loadMembers();
+    setMemberSearch("");
     setSearch("");
     setSelectedIds(new Set());
     setShowLabelWarning(false);
@@ -192,6 +194,14 @@ function GroupMembersPanel({
   };
 
   const memberIds = new Set(members.map((m) => m.id));
+  const normalizedMemberSearch = memberSearch.trim().toLowerCase();
+  const filteredMembers = normalizedMemberSearch
+    ? members.filter(
+        (member) =>
+          member.name.toLowerCase().includes(normalizedMemberSearch) ||
+          member.email.toLowerCase().includes(normalizedMemberSearch),
+      )
+    : members;
   const normalizedSearch = search.trim().toLowerCase();
   const candidates = availableUsers.filter(
     (u) => !memberIds.has(u.id) && !u.isArchived,
@@ -221,15 +231,16 @@ function GroupMembersPanel({
   };
 
   const allMembersSelected =
-    members.length > 0 && members.every((u) => removeSelectedIds.has(u.id));
+    filteredMembers.length > 0 &&
+    filteredMembers.every((u) => removeSelectedIds.has(u.id));
 
   const toggleRemoveSelectAll = () => {
     setRemoveSelectedIds((prev) => {
       const next = new Set(prev);
       if (allMembersSelected) {
-        members.forEach((u) => next.delete(u.id));
+        filteredMembers.forEach((u) => next.delete(u.id));
       } else {
-        members.forEach((u) => next.add(u.id));
+        filteredMembers.forEach((u) => next.add(u.id));
       }
       return next;
     });
@@ -257,11 +268,21 @@ function GroupMembersPanel({
             {removeSelectedIds.size > 0 ? ` (${removeSelectedIds.size})` : ""}
           </button>
         </div>
+        <label className="input input-bordered input-sm mb-3 flex w-full items-center gap-2 bg-base-100">
+          <MagnifyingGlassIcon className="h-4 w-4 text-base-content/50" />
+          <input
+            type="search"
+            className="grow"
+            placeholder={t.translations.SEARCH_MEMBERS}
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+          />
+        </label>
         {loading ? (
           <div className="flex justify-center py-10">
             <span className="loading loading-spinner loading-md" />
           </div>
-        ) : members.length === 0 ? (
+        ) : filteredMembers.length === 0 ? (
           <p className="py-8 text-center text-sm text-base-content/60">
             {t.translations.NO_MEMBERS}
           </p>
@@ -278,7 +299,7 @@ function GroupMembersPanel({
                 {t.translations.SELECT_ALL}
               </span>
             </label>
-            {members.map((u) => (
+            {filteredMembers.map((u) => (
               <label
                 key={u.id}
                 className="flex cursor-pointer items-center gap-3 border-b border-base-200 px-4 py-3 last:border-b-0 hover:bg-base-200/50"

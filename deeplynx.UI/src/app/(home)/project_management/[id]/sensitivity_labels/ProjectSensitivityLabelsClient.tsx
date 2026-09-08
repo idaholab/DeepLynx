@@ -152,7 +152,6 @@ function AssignedUsersPanel({
   const [groupAccessByUser, setGroupAccessByUser] = useState<
     Map<number, string[]>
   >(new Map());
-  const [groupAccessLoading, setGroupAccessLoading] = useState(false);
   const isOrgLabel = !label.projectId;
 
   const loadAssignedUsers = async () => {
@@ -177,13 +176,11 @@ function AssignedUsersPanel({
   useEffect(() => {
     if (!isOrgLabel) {
       setGroupAccessByUser(new Map());
-      setGroupAccessLoading(false);
       return;
     }
 
     const loadGroupAccess = async () => {
       try {
-        setGroupAccessLoading(true);
         const groups = await getGroupsWithAccessToLabelOrg(organizationId, label.id);
         const memberLists = await Promise.all(
           groups.map(async (group) => {
@@ -208,8 +205,6 @@ function AssignedUsersPanel({
       } catch (error) {
         console.error("Failed to load group-derived label access:", error);
         setGroupAccessByUser(new Map());
-      } finally {
-        setGroupAccessLoading(false);
       }
     };
 
@@ -248,6 +243,12 @@ function AssignedUsersPanel({
     }[] = [];
     for (const member of projectMembers) {
       if (!member.memberId || !member.email || seen.has(member.memberId)) continue;
+      if (
+        !assignedByUserId.has(member.memberId) &&
+        !groupAccessByUser.has(member.memberId)
+      ) {
+        continue;
+      }
       seen.add(member.memberId);
       result.push({
         userId: member.memberId,
@@ -349,7 +350,7 @@ function AssignedUsersPanel({
                     )}
                   </span>
                 </span>
-                {!isAssigned && !(isOrgLabel && groupAccessLoading) && (
+                {!isAssigned && !isOrgLabel && (
                   <span className="badge badge-ghost">{t.translations.UNASSIGNED}</span>
                 )}
                 {hasGroupAccess && (
