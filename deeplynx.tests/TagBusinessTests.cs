@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Record = deeplynx.datalayer.Models.Record;
 
 namespace deeplynx.tests;
 
@@ -1019,6 +1020,239 @@ public class TagBusinessTests : IntegrationTestBase
         // Ensure that the update tag event was not logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+    }
+
+    #endregion
+
+    #region ArchiveTag Cascade Tests
+
+    [Fact]
+    public async Task ArchiveTag_RemovesAssociationFromRecordTags()
+    {
+        // Arrange - attach the tag (tid) to a record via the many-to-many navigation property
+        var dataSource = new DataSource
+        {
+            Name = "Cascade Test DS",
+            OrganizationId = oid,
+            ProjectId = pid,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+
+        var tagEntity = await Context.Tags.FindAsync(tid);
+
+        var record = new Record
+        {
+            Name = "Cascade Test Record",
+            Description = "record used to verify tag unlink cascade",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = oid,
+            DataSourceId = dataSource.Id,
+            IsArchived = false,
+            Uri = "localhost:8090/cascade-test",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tagEntity! }
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        // Sanity check the link exists before archiving
+        var recordBeforeArchive = await Context.Records
+            .Include(r => r.Tags)
+            .FirstAsync(r => r.Id == record.Id);
+        Assert.Contains(recordBeforeArchive.Tags, t => t.Id == tid);
+
+        // Act
+        await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
+
+        Context.ChangeTracker.Clear();
+
+        // Assert - the tag should no longer be associated with the record
+        var recordAfterArchive = await Context.Records
+            .Include(r => r.Tags)
+            .FirstAsync(r => r.Id == record.Id);
+        Assert.DoesNotContain(recordAfterArchive.Tags, t => t.Id == tid);
+    }
+
+    [Fact]
+    public async Task ArchiveTag_RemovesAssociationFromRecordCollectionTags()
+    {
+        // Arrange - attach the tag (tid) to a record collection via the many-to-many navigation property
+        var tagEntity = await Context.Tags.FindAsync(tid);
+
+        var collection = new RecordCollection
+        {
+            Name = "Cascade Test Collection",
+            Description = "collection used to verify tag unlink cascade",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tagEntity! }
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+
+        // Sanity check the link exists before archiving
+        var collectionBeforeArchive = await Context.RecordCollections
+            .Include(rc => rc.Tags)
+            .FirstAsync(rc => rc.Id == collection.Id);
+        Assert.Contains(collectionBeforeArchive.Tags, t => t.Id == tid);
+
+        // Act
+        await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
+
+        Context.ChangeTracker.Clear();
+
+        // Assert - the tag should no longer be associated with the collection
+        var collectionAfterArchive = await Context.RecordCollections
+            .Include(rc => rc.Tags)
+            .FirstAsync(rc => rc.Id == collection.Id);
+        Assert.DoesNotContain(collectionAfterArchive.Tags, t => t.Id == tid);
+    }
+
+    [Fact]
+    public async Task ArchiveTag_RemovesTagFromHistoricalRecordDenormalizedTagList()
+    {
+        // Arrange - attach the tag (tid) to a record; this should already produce
+        // a historical record snapshot (via the insert/update trigger) that lists the tag
+        var dataSource = new DataSource
+        {
+            Name = "Historical Cascade Test DS",
+            OrganizationId = oid,
+            ProjectId = pid,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+
+        var tagEntity = await Context.Tags.FindAsync(tid);
+
+        var record = new Record
+        {
+            Name = "Historical Cascade Test Record",
+            Description = "record used to verify historical tag removal",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = oid,
+            DataSourceId = dataSource.Id,
+            IsArchived = false,
+            Uri = "localhost:8090/historical-cascade-test",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tagEntity! }
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        Context.ChangeTracker.Clear();
+
+        // Sanity check: the most recent historical record for this record should list the tag
+        var historicalBeforeArchive = await Context.HistoricalRecords
+            .Where(hr => hr.RecordId == record.Id)
+            .OrderByDescending(hr => hr.LastUpdatedAt)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(historicalBeforeArchive);
+        Assert.Contains("Analytics", historicalBeforeArchive.Tags);
+
+        // Act
+        await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
+
+        Context.ChangeTracker.Clear();
+
+        // Assert - the newest historical record snapshot should no longer list the archived tag
+        var historicalAfterArchive = await Context.HistoricalRecords
+            .Where(hr => hr.RecordId == record.Id)
+            .OrderByDescending(hr => hr.LastUpdatedAt)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(historicalAfterArchive);
+        Assert.DoesNotContain("Analytics", historicalAfterArchive.Tags ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task ArchiveTag_AttachedToMultipleRecords_UnlinksAndUpdatesHistoryForAllOfThem()
+    {
+        // Arrange - attach the same tag (tid) to two different records
+        var dataSource = new DataSource
+        {
+            Name = "Multi Record Cascade Test DS",
+            OrganizationId = oid,
+            ProjectId = pid,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+
+        var tagEntity = await Context.Tags.FindAsync(tid);
+
+        var record1 = new Record
+        {
+            Name = "Multi Cascade Record 1",
+            Description = "first record sharing the archived tag",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = oid,
+            DataSourceId = dataSource.Id,
+            IsArchived = false,
+            Uri = "localhost:8090/multi-cascade-1",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tagEntity! }
+        };
+        var record2 = new Record
+        {
+            Name = "Multi Cascade Record 2",
+            Description = "second record sharing the archived tag",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = oid,
+            DataSourceId = dataSource.Id,
+            IsArchived = false,
+            Uri = "localhost:8090/multi-cascade-2",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tagEntity! }
+        };
+        Context.Records.AddRange(record1, record2);
+        await Context.SaveChangesAsync();
+
+        // Act
+        await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
+
+        Context.ChangeTracker.Clear();
+
+        // Assert - neither record should still be associated with the tag
+        var record1AfterArchive = await Context.Records
+            .Include(r => r.Tags)
+            .FirstAsync(r => r.Id == record1.Id);
+        var record2AfterArchive = await Context.Records
+            .Include(r => r.Tags)
+            .FirstAsync(r => r.Id == record2.Id);
+        Assert.DoesNotContain(record1AfterArchive.Tags, t => t.Id == tid);
+        Assert.DoesNotContain(record2AfterArchive.Tags, t => t.Id == tid);
+
+        // Assert - both records' newest historical snapshots should no longer list the tag
+        var latestHistory1 = await Context.HistoricalRecords
+            .Where(hr => hr.RecordId == record1.Id)
+            .OrderByDescending(hr => hr.LastUpdatedAt)
+            .FirstOrDefaultAsync();
+        var latestHistory2 = await Context.HistoricalRecords
+            .Where(hr => hr.RecordId == record2.Id)
+            .OrderByDescending(hr => hr.LastUpdatedAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(latestHistory1);
+        Assert.NotNull(latestHistory2);
+        Assert.DoesNotContain("Analytics", latestHistory1.Tags ?? string.Empty);
+        Assert.DoesNotContain("Analytics", latestHistory2.Tags ?? string.Empty);
     }
 
     #endregion

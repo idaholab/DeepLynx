@@ -19,6 +19,9 @@ namespace deeplynx.datalayer.Migrations
                     IF NEW.is_archived = TRUE
                        AND OLD.is_archived = FALSE THEN
 
+                        DELETE FROM deeplynx.record_tags
+                        WHERE tag_id = NEW.id;
+
                         DELETE FROM deeplynx.record_collection_tags
                         WHERE tag_id = NEW.id;
                     END IF;
