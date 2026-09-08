@@ -6,6 +6,7 @@ using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace deeplynx.business;
@@ -19,6 +20,7 @@ public class ClassBusiness : IClassBusiness
     private readonly IAdminService _adminService;
 
     private readonly IRelationshipBusiness _relationshipBusiness;
+    private readonly ILogger<ClassBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ClassBusiness" /> class.
@@ -29,6 +31,7 @@ public class ClassBusiness : IClassBusiness
     /// <param name="eventBusiness">Used for logging events during create, update, and delete Operations.</param>
     /// <param name="projectRolePermissionService">Used to get permissions allowed for a user</param>
     /// <param name="adminService">Used to check level the user is</param>
+    /// <param name="logger">Used for uniformity in logging</param>
 
     public ClassBusiness(
         DeeplynxContext context,
@@ -36,7 +39,8 @@ public class ClassBusiness : IClassBusiness
         IRelationshipBusiness relationshipBusiness,
         IEventBusiness eventBusiness,
         IProjectRolePermissionService projectRolePermissionService,
-        IAdminService adminService
+        IAdminService adminService,
+        ILogger<ClassBusiness>? logger = null
     )
     {
         _context = context;
@@ -45,6 +49,7 @@ public class ClassBusiness : IClassBusiness
         _eventBusiness = eventBusiness;
         _projectRolePermissionService = projectRolePermissionService;
         _adminService = adminService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -218,6 +223,11 @@ public class ClassBusiness : IClassBusiness
         _context.Classes.Add(newClass);
         await _context.SaveChangesAsync();
 
+        if (projectId.HasValue)
+        {
+            await ProjectBusiness.InvalidateProjectStatsCache(projectId.Value, _logger);
+        }
+
         // log event with class create details
         await _eventBusiness.CreateEvent(
             currentUserId,
@@ -323,6 +333,11 @@ public class ClassBusiness : IClassBusiness
         var result = await _context.Database
             .SqlQueryRaw<ClassResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
+
+        if (projectId.HasValue)
+        {
+            await ProjectBusiness.InvalidateProjectStatsCache(projectId.Value, _logger);
+        }
 
         var createEvent = new CreateEventRequestDto
         {
@@ -434,6 +449,11 @@ public class ClassBusiness : IClassBusiness
         _context.Classes.Remove(returnedClass);
         await _context.SaveChangesAsync();
 
+        if (projectId.HasValue)
+        {
+            await ProjectBusiness.InvalidateProjectStatsCache(projectId.Value, _logger);
+        }
+
         // log event with class delete details
         await _eventBusiness.CreateEvent(
             currentUserId,
@@ -509,6 +529,11 @@ public class ClassBusiness : IClassBusiness
             }
         }
 
+        if (projectId.HasValue)
+        {
+            await ProjectBusiness.InvalidateProjectStatsCache(projectId.Value, _logger);
+        }
+
         await _eventBusiness.CreateEvent(
             currentUserId,
             organizationId,
@@ -581,6 +606,11 @@ public class ClassBusiness : IClassBusiness
                 throw new DependencyDeletionException(
                     $"unable to unarchive class {classId} or its downstream dependents: {exc}");
             }
+        }
+
+        if (projectId.HasValue)
+        {
+            await ProjectBusiness.InvalidateProjectStatsCache(projectId.Value, _logger);
         }
 
         await _eventBusiness.CreateEvent(

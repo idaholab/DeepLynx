@@ -352,6 +352,11 @@ public class DataSourceBusiness : IDataSourceBusiness
 
         await InvalidateDataSourceCountCaches(organizationId, projectId);
 
+        if (projectId.HasValue)
+        {
+            await ProjectBusiness.InvalidateProjectStatsCache(projectId.Value, _logger);
+        }
+
         // Log DataSource Create Event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
         {
@@ -523,6 +528,11 @@ public class DataSourceBusiness : IDataSourceBusiness
 
         await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
 
+        if (projectId.HasValue)
+        {
+            await ProjectBusiness.InvalidateProjectStatsCache(projectId.Value, _logger);
+        }
+
         // update the status cache for this datasource
         var status = EntityStatus.Deleted;
         await SetDataSourceStatusCache(dataSource, status);
@@ -576,6 +586,11 @@ public class DataSourceBusiness : IDataSourceBusiness
         }
 
         await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
+
+        if (projectId.HasValue)
+        {
+            await ProjectBusiness.InvalidateProjectStatsCache(projectId.Value, _logger);
+        }
 
         // Log dataSource archive event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
@@ -641,6 +656,11 @@ public class DataSourceBusiness : IDataSourceBusiness
         }
 
         await InvalidateDataSourceCountCaches(dataSource.OrganizationId, dataSource.ProjectId);
+
+        if (projectId.HasValue)
+        {
+            await ProjectBusiness.InvalidateProjectStatsCache(projectId.Value, _logger);
+        }
 
         // Log dataSource unarchive event
         await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, new CreateEventRequestDto
