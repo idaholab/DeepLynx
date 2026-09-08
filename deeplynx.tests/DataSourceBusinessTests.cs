@@ -2709,5 +2709,112 @@ public class DataSourceBusinessTests : IntegrationTestBase
     }
 
     #endregion
+    
+    #region Project Stats Cache Invalidation Tests
+
+    private static async Task SeedProjectStatsCacheSentinel(long projectId)
+    {
+        await CacheService.Instance.SetAsync(
+            CacheKeys.ProjectStats(projectId),
+            new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 },
+            (TimeSpan?)null);
+    }
+
+    private static async Task AssertProjectStatsCacheCleared(long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(CacheKeys.ProjectStats(projectId)));
+    }
+
+    [Fact]
+    public async Task CreateDataSource_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Project Stats Cache Invalidation Source",
+            Type = "PostgreSQL"
+        };
+
+        await _dataSourceBusiness.CreateDataSource(oid, pid, uid, dto);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task DeleteDataSource_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _dataSourceBusiness.DeleteDataSource(oid, pid, did);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task ArchiveDataSource_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, did);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task UnarchiveDataSource_InvalidatesProjectStatsCache()
+    {
+        // did3 is seeded as already archived
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _dataSourceBusiness.UnarchiveDataSource(oid, pid, uid, did3);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task CreateDataSource_OrgLevel_DoesNotThrow_AndSkipsProjectStatsInvalidation()
+    {
+        // Org-level data sources (projectId == null) have no project scope to invalidate;
+        // this just confirms the null-projectId path completes without error.
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Org Level Project Stats Test Source",
+            Type = "PostgreSQL"
+        };
+
+        var created = await _dataSourceBusiness.CreateDataSource(oid, null, uid, dto);
+
+        Assert.NotNull(created);
+        Assert.Null(created.ProjectId);
+    }
+
+    [Fact]
+    public async Task CreateDataSource_DoesNotInvalidateUnrelatedProjectsStatsCache()
+    {
+        var pid2Key = CacheKeys.ProjectStats(pid2);
+        var pid2Sentinel = new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 };
+        await CacheService.Instance.SetAsync(pid2Key, pid2Sentinel, (TimeSpan?)null);
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Scoped Project Stats Invalidation Source",
+            Type = "PostgreSQL"
+        };
+
+        await _dataSourceBusiness.CreateDataSource(oid, pid, uid, dto);
+
+        // pid's own stats cache is cleared
+        await AssertProjectStatsCacheCleared(pid);
+
+        // pid2's cache is untouched — invalidation is scoped to the mutated project only
+        var pid2Cached = await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(pid2Key);
+        Assert.NotNull(pid2Cached);
+        Assert.Equal(999, pid2Cached.classes);
+    }
+
+    #endregion
+
 }
 

@@ -62,6 +62,11 @@ public class CacheKeys
         return $"organization:{organizationId}:modality_count";
     }
 
+    public static string ProjectStats(long projectId)
+    {
+        return $"project:{projectId}:project_stats";
+    }
+
     public static string UserArchivedStatus(long userId)
     {
         return $"user:{userId}:archived_status";

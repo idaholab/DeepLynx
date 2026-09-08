@@ -1134,6 +1134,8 @@ public class RecordBusiness : IRecordBusiness
             _logger.LogWarning(ex, "Cache delete by prefix failed: recordcountbydatasource");
         }    
 
+        await ProjectBusiness.InvalidateProjectStatsCache(projectId, _logger);
+
         return response;
     }
 
@@ -1470,6 +1472,7 @@ public class RecordBusiness : IRecordBusiness
 
         await InvalidateRecordCountCaches(organizationId, projectId);
         await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
+        await ProjectBusiness.InvalidateProjectStatsCache(projectId, _logger);
 
         // Trigger provenance record creation
         var insertedRecordIds = inserted.Select(r => r.Id).ToList();
@@ -1561,6 +1564,7 @@ public class RecordBusiness : IRecordBusiness
         }
 
         await InvalidateRecordCountCaches(organizationId, projectId);
+        await ProjectBusiness.InvalidateProjectStatsCache(projectId, _logger);
         
         try
         {
@@ -1649,6 +1653,7 @@ public class RecordBusiness : IRecordBusiness
         }
 
         await InvalidateRecordCountCaches(organizationId, projectId);
+        await ProjectBusiness.InvalidateProjectStatsCache(projectId, _logger);
         
         // update cache
         try
@@ -1724,6 +1729,7 @@ public class RecordBusiness : IRecordBusiness
 
         await InvalidateRecordCountCaches(organizationId, projectId);
         await MetricsBusiness.InvalidateModalityCountCaches(organizationId, projectId);
+        await ProjectBusiness.InvalidateProjectStatsCache(projectId, _logger);
 
         // Trigger provenance record creation
         if (!await _provenanceBusiness.CreateProvenanceRecord(recordId, "delete-record", currentUserId, null))

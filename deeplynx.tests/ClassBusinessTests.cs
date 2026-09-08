@@ -3,6 +3,7 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -1315,4 +1316,118 @@ public class ClassBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region Project Stats Cache Invalidation Tests
+
+    private static async Task SeedProjectStatsCacheSentinel(long projectId)
+    {
+        await CacheService.Instance.SetAsync(
+            CacheKeys.ProjectStats(projectId),
+            new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 },
+            (TimeSpan?)null);
+    }
+
+    private static async Task AssertProjectStatsCacheCleared(long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(CacheKeys.ProjectStats(projectId)));
+    }
+
+    [Fact]
+    public async Task CreateClass_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateClassRequestDto
+        {
+            Name = $"Project Stats Cache Invalidation Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Verifies project stats cache invalidation on create"
+        };
+
+        await _classBusiness.CreateClass(uid, oid, pid, dto);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task BulkCreateClasses_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var bulkDto = new List<CreateClassRequestDto>
+        {
+            new()
+            {
+                Name = $"Bulk Project Stats Cache Class 1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                Description = "Bulk create project stats cache invalidation test"
+            },
+            new()
+            {
+                Name = $"Bulk Project Stats Cache Class 2 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                Description = "Bulk create project stats cache invalidation test"
+            }
+        };
+
+        await _classBusiness.BulkCreateClasses(uid, oid, pid, bulkDto);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task DeleteClass_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _classBusiness.DeleteClass(uid, oid, pid, cid1);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task ArchiveClass_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _classBusiness.ArchiveClass(uid, oid, pid, cid1);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task UnarchiveClass_InvalidatesProjectStatsCache()
+    {
+        // cid2 is seeded as already archived
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _classBusiness.UnarchiveClass(uid, oid, pid, cid2);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task CreateClass_DoesNotInvalidateUnrelatedProjectsStatsCache()
+    {
+        var pid2Key = CacheKeys.ProjectStats(pid2);
+        var pid2Sentinel = new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 };
+        await CacheService.Instance.SetAsync(pid2Key, pid2Sentinel, (TimeSpan?)null);
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateClassRequestDto
+        {
+            Name = $"Scoped Project Stats Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Only pid's stats cache should clear, not pid2's"
+        };
+
+        await _classBusiness.CreateClass(uid, oid, pid, dto);
+
+        // pid's own stats cache is cleared
+        await AssertProjectStatsCacheCleared(pid);
+
+        // pid2's cache is untouched — invalidation is scoped to the mutated project only
+        var pid2Cached = await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(pid2Key);
+        Assert.NotNull(pid2Cached);
+        Assert.Equal(999, pid2Cached.classes);
+    }
+
+    #endregion
+
 }
