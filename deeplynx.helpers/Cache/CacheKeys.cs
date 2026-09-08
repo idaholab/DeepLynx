@@ -37,6 +37,11 @@ public class CacheKeys
         return $"system:record_count:hide_archived:{hideArchived}";
     }
 
+    public static string ProjectStats(long projectId)
+    {
+        return $"project:{projectId}:project_stats";
+    }
+
     public static string UserArchivedStatus(long userId)
     {
         return $"user:{userId}:archived_status";
