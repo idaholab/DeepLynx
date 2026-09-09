@@ -45,12 +45,12 @@ RUN dotnet publish deeplynx.sln -c Release -o /app/publish /p:UseAppHost=false
 # Stage 2: Create the final .net runtime image 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.11 AS final
 
+# Set working directory
 WORKDIR /usr/src/app
 
-# Fix OS vulnerabilities and install entrypoint dependencies
+# Fix vulnerability
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the published backend code from the build stage
