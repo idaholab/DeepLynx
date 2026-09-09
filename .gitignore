@@ -43,3 +43,6 @@ global.json
 .continue
 
 playwright
+
+## Local planning documents ##
+/documentation/DL-1254-signature-pr-split-plan.md
