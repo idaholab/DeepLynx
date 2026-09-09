@@ -9,15 +9,13 @@ import {
   ShieldCheckIcon,
   TrashIcon,
   InformationCircleIcon,
-  CheckCircleIcon,
-  XCircleIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import type {
   SensitivityLabelsDto,
   UserSensitivityLabelResponseDto,
   SensitivityLabelPermissionResponseDto,
   ProjectMemberResponseDto,
-  GroupResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import {
   archiveSensitivityLabelProject,
@@ -26,7 +24,11 @@ import {
   getUsersWithAccessToLabelProject,
   revokeSensitivityLabelAccessProject,
   getPermissionsForLabelProject,
+  getUsersWithAccessToLabelOrg,
+  revokeSensitivityLabelAccessOrg,
+  getGroupsWithAccessToLabelOrg,
 } from "@/app/lib/client_service/sensitivity_labels_services.client";
+import { getGroupMembers } from "@/app/lib/client_service/group_services.client";
 import LabelEditModal, {
   FILE_ACTIONS,
   RECORD_ACTIONS,
@@ -45,7 +47,6 @@ interface Props {
   orgLabelsLocked: boolean;
   refreshLabels: () => Promise<void>;
   projectMembers: ProjectMemberResponseDto[];
-  projectGroups: GroupResponseDto[];
 }
 
 function LabelPermissionsPanel({
@@ -95,43 +96,37 @@ function LabelPermissionsPanel({
 
   const grantedActions = new Set(permissions.map((p) => p.action));
 
+  const permissionCategories = [
+    { id: "records", label: t.translations.RECORD_PERMISSIONS, actions: RECORD_ACTIONS },
+    { id: "files", label: t.translations.FILE_PERMISSIONS, actions: FILE_ACTIONS },
+  ];
+
   return (
-    <div className="max-w-3xl py-6">
-      <div className="grid grid-cols-2 gap-6">
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-base-content/55">
-            {t.translations.RECORD_PERMISSIONS}
-          </p>
-          <ul className="space-y-2">
-            {RECORD_ACTIONS.map((action) => (
-              <li key={action} className="flex items-center gap-2 text-sm">
-                {grantedActions.has(action) ? (
-                  <CheckCircleIcon className="h-4 w-4 shrink-0 text-success" />
-                ) : (
-                  <XCircleIcon className="h-4 w-4 shrink-0 text-base-content/30" />
-                )}
-                {actionLabel(action)}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-base-content/55">
-            {t.translations.FILE_PERMISSIONS}
-          </p>
-          <ul className="space-y-2">
-            {FILE_ACTIONS.map((action) => (
-              <li key={action} className="flex items-center gap-2 text-sm">
-                {grantedActions.has(action) ? (
-                  <CheckCircleIcon className="h-4 w-4 shrink-0 text-success" />
-                ) : (
-                  <XCircleIcon className="h-4 w-4 shrink-0 text-base-content/30" />
-                )}
-                {actionLabel(action)}
-              </li>
-            ))}
-          </ul>
-        </div>
+    <div className="py-6">
+      <div className="space-y-4">
+        {permissionCategories.map((category) => (
+          <div key={category.id} className="card bg-base-200/25">
+            <div className="card-body p-4">
+              <h3 className="card-title mb-3 text-sm">{category.label}</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {category.actions.map((action) => (
+                  <label
+                    key={action}
+                    className="label cursor-default justify-start gap-2"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={grantedActions.has(action)}
+                      disabled
+                      className="checkbox checkbox-primary checkbox-sm"
+                    />
+                    <span className="label-text">{actionLabel(action)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -142,13 +137,11 @@ function AssignedUsersPanel({
   projectId,
   organizationId,
   projectMembers,
-  projectGroups,
 }: {
   label: SensitivityLabelsDto;
   projectId: number;
   organizationId: number;
   projectMembers: ProjectMemberResponseDto[];
-  projectGroups: GroupResponseDto[];
 }) {
   const { t } = useLanguage();
   const [assignedUsers, setAssignedUsers] = useState<UserSensitivityLabelResponseDto[]>([]);
@@ -156,12 +149,17 @@ function AssignedUsersPanel({
   const [search, setSearch] = useState("");
   const [revokingUserId, setRevokingUserId] = useState<number | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [groupAccessByUser, setGroupAccessByUser] = useState<
+    Map<number, string[]>
+  >(new Map());
+  const isOrgLabel = !label.projectId;
 
   const loadAssignedUsers = async () => {
-    if (!label.projectId) return;
     try {
       setLoading(true);
-      const users = await getUsersWithAccessToLabelProject(projectId, label.id);
+      const users = isOrgLabel
+        ? await getUsersWithAccessToLabelOrg(organizationId, label.id)
+        : await getUsersWithAccessToLabelProject(projectId, label.id);
       setAssignedUsers(users);
     } catch (error) {
       console.error("Failed to load assigned users:", error);
@@ -171,25 +169,56 @@ function AssignedUsersPanel({
   };
 
   useEffect(() => {
-    if (label.projectId) {
-      loadAssignedUsers();
-    }
+    loadAssignedUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [label.id, label.projectId]);
 
-  if (!label.projectId) {
-    return (
-      <div className="alert alert-info mt-6 items-start">
-        <InformationCircleIcon className="h-5 w-5 shrink-0" />
-        <span className="text-sm">{t.translations.LABEL_ACCESS_MANAGED_AT_ORG_LEVEL}</span>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!isOrgLabel) {
+      setGroupAccessByUser(new Map());
+      return;
+    }
+
+    const loadGroupAccess = async () => {
+      try {
+        const groups = await getGroupsWithAccessToLabelOrg(organizationId, label.id);
+        const memberLists = await Promise.all(
+          groups.map(async (group) => {
+            try {
+              const members = await getGroupMembers(organizationId, group.groupId);
+              return { name: group.groupName, members: members.items };
+            } catch (error) {
+              console.error(`Failed to load members for group ${group.groupId}:`, error);
+              return { name: group.groupName, members: [] };
+            }
+          }),
+        );
+        const accessByUser = new Map<number, string[]>();
+        memberLists.forEach(({ name, members }) => {
+          members.forEach((member) => {
+            const existing = accessByUser.get(member.id);
+            if (existing) existing.push(name);
+            else accessByUser.set(member.id, [name]);
+          });
+        });
+        setGroupAccessByUser(accessByUser);
+      } catch (error) {
+        console.error("Failed to load group-derived label access:", error);
+        setGroupAccessByUser(new Map());
+      }
+    };
+
+    void loadGroupAccess();
+  }, [isOrgLabel, label.id, organizationId]);
 
   const handleRevoke = async (userId: number) => {
     try {
       setRevokingUserId(userId);
-      await revokeSensitivityLabelAccessProject(projectId, label.id, userId);
+      if (isOrgLabel) {
+        await revokeSensitivityLabelAccessOrg(organizationId, label.id, userId);
+      } else {
+        await revokeSensitivityLabelAccessProject(projectId, label.id, userId);
+      }
       setAssignedUsers((current) => current.filter((u) => u.userId !== userId));
     } catch (error) {
       console.error(`Failed to revoke access for user ${userId}:`, error);
@@ -199,17 +228,70 @@ function AssignedUsersPanel({
     }
   };
 
+  const assignedByUserId = useMemo(
+    () => new Map(assignedUsers.map((u) => [u.userId, u])),
+    [assignedUsers],
+  );
+
+  const allUsersView = useMemo(() => {
+    const seen = new Set<number>();
+    const result: {
+      userId: number;
+      userName: string;
+      userEmail: string;
+      assigned: UserSensitivityLabelResponseDto | null;
+    }[] = [];
+    for (const member of projectMembers) {
+      if (!member.memberId || !member.email || seen.has(member.memberId)) continue;
+      if (
+        !assignedByUserId.has(member.memberId) &&
+        !groupAccessByUser.has(member.memberId)
+      ) {
+        continue;
+      }
+      seen.add(member.memberId);
+      result.push({
+        userId: member.memberId,
+        userName: member.name,
+        userEmail: member.email,
+        assigned: assignedByUserId.get(member.memberId) ?? null,
+      });
+    }
+    return result.sort((a, b) => {
+      const aHasAccess = !!a.assigned || groupAccessByUser.has(a.userId);
+      const bHasAccess = !!b.assigned || groupAccessByUser.has(b.userId);
+      if (aHasAccess === bHasAccess) return a.userName.localeCompare(b.userName);
+      return aHasAccess ? -1 : 1;
+    });
+  }, [projectMembers, assignedByUserId, groupAccessByUser]);
+
+  const assignedOnlyView = useMemo(
+    () =>
+      allUsersView
+        .filter((u) => !!u.assigned)
+        .sort((a, b) => a.userName.localeCompare(b.userName)),
+    [allUsersView],
+  );
+
+  const usersView = isOrgLabel ? allUsersView : assignedOnlyView;
+
   const normalizedSearch = search.trim().toLowerCase();
   const filteredUsers = normalizedSearch
-    ? assignedUsers.filter(
+    ? usersView.filter(
         (u) =>
           u.userName.toLowerCase().includes(normalizedSearch) ||
           u.userEmail.toLowerCase().includes(normalizedSearch),
       )
-    : assignedUsers;
+    : usersView;
 
   return (
     <div className="py-6">
+      {isOrgLabel && (
+        <div className="alert alert-info mb-5 items-start">
+          <InformationCircleIcon className="h-5 w-5 shrink-0" />
+          <span className="text-sm">{t.translations.LABEL_ACCESS_MANAGED_AT_ORG_LEVEL}</span>
+        </div>
+      )}
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <label className="input input-bordered input-sm flex w-full max-w-xs items-center gap-2 bg-base-100">
           <MagnifyingGlassIcon className="h-4 w-4 text-base-content/50" />
@@ -221,10 +303,12 @@ function AssignedUsersPanel({
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => setWizardOpen(true)}>
-          <PlusIcon className="h-4 w-4" />
-          {t.translations.ASSIGN_USERS}
-        </button>
+        {!isOrgLabel && (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setWizardOpen(true)}>
+            <PlusIcon className="h-4 w-4" />
+            {t.translations.ASSIGN_USERS}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -237,39 +321,65 @@ function AssignedUsersPanel({
         </p>
       ) : (
         <div className="overflow-hidden rounded-box border border-base-200">
-          {filteredUsers.map((u) => (
-            <div
-              key={u.id}
-              className="flex items-center gap-3 border-b border-base-200 px-4 py-4 last:border-b-0"
-            >
-              <AvatarCell name={u.userName} size={9} containerClassName="space-x-0" />
-              <span className="min-w-0 flex-1">
-                <strong className="block">{u.userName}</strong>
-                <span className="block text-sm text-base-content/60">
-                  {u.userEmail}
-                  {u.grantedByName && (
-                    <>
-                      {" · "}
-                      {t.translations.GRANTED_BY_ON.replace("{name}", u.grantedByName).replace(
-                        "{date}",
-                        new Date(u.grantedAt).toLocaleDateString(),
-                      )}
-                    </>
-                  )}
-                </span>
-              </span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm text-error"
-                onClick={() => handleRevoke(u.userId)}
-                disabled={revokingUserId === u.userId}
-                aria-label={t.translations.REMOVE_ACCESS}
-                title={t.translations.REMOVE_ACCESS}
+          {filteredUsers.map((u) => {
+            const hasGroupAccess = groupAccessByUser.has(u.userId);
+            const isAssigned = !!u.assigned || hasGroupAccess;
+            return (
+              <div
+                key={u.userId}
+                className={`flex items-center gap-3 border-b border-base-200 px-4 py-4 last:border-b-0 ${
+                  isOrgLabel ? "opacity-50" : isAssigned ? "" : "opacity-50"
+                }`}
               >
-                <TrashIcon className="h-5 w-5" />
-              </button>
-            </div>
-          ))}
+                <AvatarCell name={u.userName} size={9} containerClassName="space-x-0" />
+                <span className="min-w-0 flex-1">
+                  <strong className="block">{u.userName}</strong>
+                  <span className="block text-sm text-base-content/60">
+                    {u.userEmail}
+                    {u.assigned?.grantedByName && (
+                      <>
+                        {" · "}
+                        {t.translations.GRANTED_BY_ON.replace(
+                          "{name}",
+                          u.assigned.grantedByName,
+                        ).replace(
+                          "{date}",
+                          new Date(u.assigned.grantedAt).toLocaleDateString(),
+                        )}
+                      </>
+                    )}
+                  </span>
+                </span>
+                {!isAssigned && !isOrgLabel && (
+                  <span className="badge badge-ghost">{t.translations.UNASSIGNED}</span>
+                )}
+                {hasGroupAccess && (
+                  <span
+                    className="badge badge-secondary gap-1"
+                    title={t.translations.ALSO_GRANTED_VIA_GROUPS.replace(
+                      "{groups}",
+                      groupAccessByUser.get(u.userId)!.join(", "),
+                    )}
+                  >
+                    <UserGroupIcon className="h-3.5 w-3.5" />
+                    {t.translations.VIA_GROUP_BADGE}
+                  </span>
+                )}
+                {isAssigned && !isOrgLabel && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm text-error"
+                    onClick={() => handleRevoke(u.userId)}
+                    disabled={revokingUserId === u.userId}
+                    aria-label={t.translations.REMOVE_ACCESS}
+                    title={t.translations.REMOVE_ACCESS}
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -279,9 +389,7 @@ function AssignedUsersPanel({
         projectId={projectId}
         labelId={label.id}
         labelName={label.name}
-        organizationId={organizationId}
         projectMembers={projectMembers}
-        projectGroups={projectGroups}
         assignedUserIds={new Set(assignedUsers.map((u) => u.userId))}
         onAssigned={loadAssignedUsers}
       />
@@ -296,7 +404,6 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
   orgLabelsLocked,
   refreshLabels,
   projectMembers,
-  projectGroups,
 }) => {
   const { t } = useLanguage();
   const [selectedLabelId, setSelectedLabelId] = useState<number | null>(
@@ -462,7 +569,7 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-5 p-4 lg:grid-cols-[minmax(280px,.78fr)_minmax(0,1.72fr)]">
+    <div className="grid grid-cols-1 gap-5 p-4 lg:min-h-[75vh] lg:grid-cols-[minmax(280px,.78fr)_minmax(0,1.72fr)]">
       <aside className="card overflow-hidden border border-base-300/50 bg-base-100 shadow-sm">
         <div className="flex items-start justify-between gap-3 border-b border-base-200 p-4">
           <div>
@@ -590,7 +697,6 @@ const ProjectSensitivityLabelsClient: React.FC<Props> = ({
               projectId={projectId}
               organizationId={organizationId}
               projectMembers={projectMembers}
-              projectGroups={projectGroups}
             />
           )}
         </section>
