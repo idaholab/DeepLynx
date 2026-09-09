@@ -1,0 +1,135 @@
+using deeplynx.interfaces;
+using deeplynx.models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using deeplynx.helpers;
+using deeplynx.helpers.Context;
+using Asp.Versioning;
+using Scalar.AspNetCore;
+
+namespace deeplynx.api.Controllers.V2;
+
+/// <summary>
+///     Controller for managing historical records.
+/// </summary>
+/// <remarks>
+///     This controller provides endpoints to retrieve historical record information and record history.
+/// </remarks>
+[ApiController]
+[ApiVersion(2)]
+[Route("organizations/{organizationId:long}/projects/{projectId:long}/records/historical")]
+[Authorize]
+[Tags("Historical Record")]
+public class HistoricalRecordController : ControllerBase
+{
+    private readonly IHistoricalRecordBusiness _historicalRecordBusiness;
+    private readonly ILogger<HistoricalRecordController> _logger;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="HistoricalRecordController" /> class
+    /// </summary>
+    /// <param name="historicalRecordBusiness">The business logic interface for handling historical record operations.</param>
+    /// <param name="logger">Error/Info logging interface for database log table.</param>
+    public HistoricalRecordController(IHistoricalRecordBusiness historicalRecordBusiness,
+        ILogger<HistoricalRecordController> logger)
+    {
+        _historicalRecordBusiness = historicalRecordBusiness;
+        _logger = logger;
+    }
+
+
+
+    /// <summary>
+    ///     Get All Historical Records
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project whose historical records are to be retrieved</param>
+    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter records</param>
+    /// <param name="pointInTime">(Optional) Find the most current records that existed before this point in time</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of historical records based on the applied filters</returns>
+    [HttpGet(Name = "api_get_all_historical_records")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetAllHistoricalRecords(
+        long organizationId,
+        long projectId,
+        [FromQuery] PaginatedRequestDto? paginatedRequestDto = null,
+        [FromQuery] long? dataSourceId = null,
+        [FromQuery] DateTime? pointInTime = null,
+        [FromQuery] bool hideArchived = true)
+    {
+            paginatedRequestDto ??= new PaginatedRequestDto();
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+            var records =
+                await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+                    currentUserId, projectId, organizationId, paginatedRequestDto, dataSourceId, pointInTime, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(records);
+    }
+
+
+
+    /// <summary>
+    ///     Get a Historical Record
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="recordId">The ID of the record to retrieve</param>
+    /// <param name="pointInTime">(Optional) Find the most current record that existed before this point in time</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived records from the result (Default true)</param>
+    /// <returns>The historical record at the specified point in time</returns>
+    [HttpGet("{recordId:long}", Name = "api_get_a_historical_record")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<HistoricalRecordResponseDto>> GetHistoricalRecord(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromQuery] DateTime? pointInTime = null,
+        [FromQuery] bool hideArchived = true)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
+            var record =
+                await _historicalRecordBusiness.GetHistoricalRecord(
+                    currentUserId, recordId, organizationId, pointInTime, hideArchived, isSysAdmin, isOrgAdmin, isProjectAdmin);
+            return Ok(record);
+    }
+
+
+
+    /// <summary>
+    ///     Get Record History
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="recordId">The ID of the record for which to retrieve history</param>
+    /// <returns>A list of all previous versions of the record</returns>
+    [HttpGet("{recordId:long}/history", Name = "api_get_record_history")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "record")]
+    [Sensitivity("read record")]
+    public async Task<ActionResult<IEnumerable<HistoricalRecordResponseDto>>> GetRecordHistory(
+        long organizationId,
+        long projectId,
+        long recordId)
+    {
+            var currentUserId = UserContextStorage.UserId;
+            var isSysAdmin = UserContextStorage.IsSysAdmin;
+            var isOrgAdmin = UserContextStorage.IsOrgAdmin;
+            var isProjectAdmin = UserContextStorage.IsProjectAdmin;
+
+            var history = await _historicalRecordBusiness.GetHistoryForRecord(
+                currentUserId, recordId, organizationId, isSysAdmin, isOrgAdmin, isProjectAdmin);
+
+            return Ok(history);
+    }
+}

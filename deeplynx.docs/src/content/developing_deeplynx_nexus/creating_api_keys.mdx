@@ -41,10 +41,12 @@ Next, use your API key/secret pair to generate an access token. Navigate to the 
 
 This endpoint does not require a bearer token.
 
+The examples below use v2, the forward-development API. The frozen and deprecated v1 API remains accessible; replace `/api/v2` with `/api/v1` only when you intentionally need the legacy contract.
+
 **Create an Access Token**
 
 ```bash
-curl https://deeplynx.inl.gov/api/v1/oauth/tokens \
+curl https://deeplynx.inl.gov/api/v2/oauth/tokens \
   --request POST \
   --header 'Content-Type: application/json' \
   --data '{ \
@@ -78,7 +80,7 @@ Now you can use the Nexus API by including your access token in the Authorizatio
 Note that the access token in the authorization header on a request is prefixed by the `Bearer` keyword, because it is a bearer token.
 
 ```bash
-curl https://deeplynx.inl.gov/api/v1/organizations \
+curl https://deeplynx.inl.gov/api/v2/organizations \
   --request GET \
   --header "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
@@ -88,7 +90,7 @@ curl https://deeplynx.inl.gov/api/v1/organizations \
 When your access token expires, generate a new one by calling the token endpoint, again with your saved API Key and API Secret. Remember this request does not need a bearer token, because it expired.
 
 ```bash
-curl https://deeplynx.inl.gov/api/v1/oauth/tokens \
+curl https://deeplynx.inl.gov/api/v2/oauth/tokens \
   --request POST \
   --header 'Content-Type: application/json' \
   --data '{

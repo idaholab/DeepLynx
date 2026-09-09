@@ -2,7 +2,6 @@
 import { getAllProjectsServer } from "@/app/lib/server_service/projects_services.server";
 import { cookies } from "next/headers";
 import { auth } from "../../../../../auth";
-import { ProjectResponseDto } from "../../types/responseDTOs";
 import AllRecordsClient from "./AllRecordsClient";
 
 export default async function Page({
@@ -36,9 +35,9 @@ export default async function Page({
   }
 
   // Keep SSR for projects (fast initial render, no client flash)
-  const projects = (await getAllProjectsServer(
+  const { items: projects } = (await getAllProjectsServer(
     organizationId as number,
-  )) as ProjectResponseDto[];
+  ));
   const initialProjects = projects.map((p) => ({
     id: String(p.id),
     name: p.name,

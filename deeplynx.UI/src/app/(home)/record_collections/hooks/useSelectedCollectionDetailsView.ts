@@ -80,8 +80,9 @@ export function useSelectedCollectionDetailsView({
   );
 
   const visibleCollectionDetailRecords = useMemo(() => {
+    const records = Array.isArray(filteredCollectionDetailRecords) ? filteredCollectionDetailRecords : [];
     const startIndex = (collectionDetailRecordPage - 1) * recordsPerPage;
-    return filteredCollectionDetailRecords.slice(startIndex, startIndex + recordsPerPage);
+    return records.slice(startIndex, startIndex + recordsPerPage);
   }, [collectionDetailRecordPage, filteredCollectionDetailRecords, recordsPerPage]);
 
   useEffect(() => {
@@ -89,7 +90,7 @@ export function useSelectedCollectionDetailsView({
   }, [collectionDetailRecordSearchTerm, collectionRecords.length]);
 
   const editableSelectedCollection = selectedCollectionDraft ?? selectedCollection;
-  const selectedCollectionLabels = selectedCollection?.labels ?? [];
+  const selectedCollectionLabels = selectedCollection?.sensitivityLabels ?? [];
   const selectedCollectionTags = selectedCollection?.tags ?? [];
   const visibleSelectedCollectionLabels = selectedLabelsExpanded
     ? selectedCollectionLabels

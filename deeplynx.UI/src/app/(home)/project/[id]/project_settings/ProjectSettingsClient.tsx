@@ -46,7 +46,7 @@ export default function ProjectSettingsClient({
 
   useEffect(() => {
     const fetchRoles = async () => {
-      const rolesData = await getAllRoles(
+      const { items: rolesData } = await getAllRoles(
         organization?.organizationId as number,
         Number(selectedProjectId)
       );
@@ -64,7 +64,7 @@ export default function ProjectSettingsClient({
           organization?.organizationId as number,
           Number(selectedProjectId)
         );
-        setProjectMembers(users);
+        setProjectMembers(users.items);
         setIsMembersLoading(false);
       } catch (err) {
         console.error(err);
@@ -78,7 +78,7 @@ export default function ProjectSettingsClient({
         organization?.organizationId as number,
         Number(selectedProjectId)
       );
-      setProjectMembers(users);
+      setProjectMembers(users.items);
     }
   };
 

@@ -2,7 +2,6 @@ import EventHistoryClient from "./EventHistoryClient"
 import { cookies } from "next/headers";
 import { auth } from "../../../../auth";
 import { getAllProjectsServer } from "@/app/lib/server_service/projects_services.server";
-import { ProjectResponseDto } from "../types/responseDTOs";
 
 const EventManagementPage = async () => {
 
@@ -29,9 +28,9 @@ const EventManagementPage = async () => {
   }
 
   // Fetch projects filtered by organization
-  const projects = (await getAllProjectsServer(
+  const { items: projects } = (await getAllProjectsServer(
     organizationId as number
-  )) as ProjectResponseDto[];
+  ));
   const initialProjects = projects.map((p) => ({
     id: String(p.id),
     name: p.name,
@@ -54,7 +53,7 @@ const EventManagementPage = async () => {
 
   return (
     <section>
-      <EventHistoryClient 
+      <EventHistoryClient
         initialProjects={initialProjects}
         initialSelectedProjects={initialSelectedProjects}
       />

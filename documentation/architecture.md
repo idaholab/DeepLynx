@@ -62,6 +62,8 @@ A typical API request flows as follows:
 ```
 HTTP Request
     ↓
+Global exception boundary     — wraps downstream processing; maps uncaught v2 errors to RFC 7807 ProblemDetails
+    ↓
 UserContextMiddleware       — extracts JWT, populates UserContextStorage (AsyncLocal)
     ↓
 AuthMiddleware              — reads [Auth]/[OrgAdmin]/[SysAdmin] attributes, checks RBAC
@@ -77,7 +79,9 @@ DeeplynxContext (EF Core)   — database access
 Response DTO                — returned up the chain
 ```
 
-No component bypasses this chain. Controllers do not touch the database; business classes do not set HTTP response codes.
+On the success path, the response DTO returns through the same middleware pipeline. If a v2 action throws, the exception unwinds to the registered global exception handlers, which log it and select the HTTP status and RFC 7807 `ProblemDetails` response. Frozen v1 actions retain their legacy controller-level catches, so those catches may translate an exception before it reaches the global boundary.
+
+No component bypasses the controller-to-business-to-data layering. Controllers do not touch the database; business classes do not set HTTP response codes.
 
 ---
 
@@ -90,15 +94,22 @@ Controllers are **thin HTTP adapters**. They are responsible for:
 - Routing and HTTP method binding
 - Reading `UserContextStorage` for the current `OrganizationId` and `UserId`
 - Calling the injected `I*Business` interface
-- Returning the appropriate HTTP status code
-- Catching and logging unexpected exceptions
+- Returning the appropriate success status code
+- Allowing v2 exceptions to reach the global RFC 7807 exception handlers
 
-Controllers contain no conditional business logic, no data access, and no validation beyond what the framework provides via model binding. Every method follows the same shape:
+Controllers contain no conditional business logic, no data access, and no validation beyond what the framework provides via model binding.
+
+#### Frozen v1 Controller Shape
+
+v1 is supported, frozen, and deprecated. Its controller-level `try`/`catch`, logging, status codes, and error bodies are part of the preserved legacy contract. Do not modify v1 controllers or actions, add v1 endpoints, or strip their catches.
+
+The following is the legacy v1 shape and must not be used for new development:
 
 ```csharp
 [HttpGet]
+[MapToApiVersion(1)]
 [Auth("read", "class")]
-public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetAllClasses(long projectId)
+public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetAllClassesV1(long projectId)
 {
     try
     {
@@ -113,6 +124,26 @@ public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetAllClasses(lon
     }
 }
 ```
+
+#### V2 and Later Controller Shape
+
+v2 is the forward-development version. Its controllers contain the success path only and must not use controller-level `try`/`catch` for logging or HTTP error translation. Business and domain exceptions propagate to the global handlers.
+
+The equivalent v2 action is:
+
+```csharp
+[HttpGet]
+[MapToApiVersion(2)]
+[Auth("read", "class")]
+public async Task<ActionResult<IEnumerable<ClassResponseDto>>> GetAllClassesV2(long projectId)
+{
+    var organizationId = UserContextStorage.OrganizationId;
+    var classes = await _classBusiness.GetAllClasses(organizationId, [projectId], true);
+    return Ok(classes);
+}
+```
+
+The global handlers log uncaught exceptions and map known exception types to RFC 7807 `ProblemDetails` responses. Unexpected exceptions reach the global `500 Internal Server Error` fallback. If v2 needs a mapping that does not exist, add an appropriate exception type and global handler rather than catching it in the controller.
 
 ### Business Layer — Business Classes (`deeplynx.business`)
 

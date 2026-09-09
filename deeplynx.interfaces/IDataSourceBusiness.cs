@@ -5,7 +5,7 @@ namespace deeplynx.interfaces;
 public interface IDataSourceBusiness
 {
     Task<List<DataSourceResponseDto>>
-        GetAllDataSources(long organizationId, long[]? projectIds, bool hideArchived = true);
+        GetAllDataSources(long currentUserId, long organizationId, long[]? projectIds, bool hideArchived = true);
 
     Task<DataSourceResponseDto> GetDataSource(long organizationId, long? projectId, long dataSourceId,
         bool hideArchived = true);

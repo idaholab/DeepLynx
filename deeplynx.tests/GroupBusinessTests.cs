@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -150,6 +151,191 @@ public class GroupBusinessTests : IntegrationTestBase
         // Assert
         Assert.All(groups, g => Assert.Equal(oid, g.OrganizationId));
         Assert.Contains(groups, g => g.Id == gid);
+    }
+
+    #endregion
+
+    #region GetAllGroupsPaginated Tests
+
+    [Fact]
+    public async Task GetAllGroupsPaginated_ExcludesArchived_WhenHideArchivedTrue()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _groupBusiness.GetAllGroupsPaginated(oid, paginatedRequest, hideArchived: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Items, g => Assert.False(g.IsArchived));
+        Assert.Contains(result.Items, g => g.Id == gid);
+        Assert.DoesNotContain(result.Items, g => g.Id == gid2);
+    }
+
+    [Fact]
+    public async Task GetAllGroupsPaginated_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _groupBusiness.GetAllGroupsPaginated(oid, paginatedRequest, hideArchived: false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Contains(result.Items, g => g.IsArchived);
+        Assert.Contains(result.Items, g => g.Id == gid);
+        Assert.Contains(result.Items, g => g.Id == gid2);
+    }
+
+    [Fact]
+    public async Task GetAllGroupsPaginated_FiltersByOrganizationId()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _groupBusiness.GetAllGroupsPaginated(oid, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Items, g => Assert.Equal(oid, g.OrganizationId));
+        Assert.Contains(result.Items, g => g.Id == gid);
+    }
+
+    [Fact]
+    public async Task GetAllGroupsPaginated_ReturnsAll_WhenPageSizeIsMinusOne()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 5, PageSize = -1 };
+
+        // Act
+        var result = await _groupBusiness.GetAllGroupsPaginated(oid, paginatedRequest, hideArchived: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
+        Assert.Equal(result.TotalCount, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllGroupsPaginated_PaginatesCorrectly()
+    {
+        // Arrange
+        var pageSize = 1;
+        var firstPageRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = pageSize };
+        var secondPageRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = pageSize };
+
+        // Act
+        var firstPage = await _groupBusiness.GetAllGroupsPaginated(oid, firstPageRequest, hideArchived: true);
+        var secondPage = await _groupBusiness.GetAllGroupsPaginated(oid, secondPageRequest, hideArchived: true);
+
+        // Assert
+        Assert.NotNull(firstPage);
+        Assert.NotNull(secondPage);
+
+        Assert.Equal(firstPage.TotalCount, secondPage.TotalCount);
+
+        Assert.Equal(pageSize, firstPage.Items.Count);
+        Assert.True(secondPage.Items.Count <= pageSize);
+
+        var firstPageIds = firstPage.Items.Select(g => g.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(g => g.Id).ToHashSet();
+
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    #endregion
+
+    #region GetAllGroupMembersPaginated Tests
+
+    [Fact]
+    public async Task GetAllGroupMembersPaginated_ExcludesArchived()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto
+        {
+            PageNumber = 1,
+            PageSize = -1
+        };
+
+        // Act
+        var result = await _groupBusiness.GetGroupMembersPaginated(oid, gid, paginatedRequest);
+        var members = result.Items.ToList();
+
+        // Assert
+        Assert.All(members, m => Assert.False(m.IsArchived));
+        Assert.Contains(members, m => m.Id == uid);
+        Assert.DoesNotContain(members, m => m.Id == uid2);
+    }
+
+    [Fact]
+    public async Task GetAllGroupMembersPaginated_ReturnsAll_WhenPageSizeIsMinusOne()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 1 };
+
+        // Act
+        var result = await _groupBusiness.GetGroupMembersPaginated(oid, gid, paginatedRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
+        Assert.Equal(result.TotalCount, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllGroupMembersPaginated_PaginatesCorrectly()
+    {
+        // Arrange
+        var pageSize = 1;
+        var firstPageRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = pageSize };
+        var secondPageRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = pageSize };
+
+        // Act
+        var firstPage = await _groupBusiness.GetGroupMembersPaginated(oid, gid, firstPageRequest);
+        var secondPage = await _groupBusiness.GetGroupMembersPaginated(oid, gid, secondPageRequest);
+
+        // Assert
+        Assert.NotNull(firstPage);
+        Assert.NotNull(secondPage);
+
+        Assert.Equal(firstPage.TotalCount, secondPage.TotalCount);
+
+        Assert.Equal(pageSize, firstPage.Items.Count);
+        Assert.True(secondPage.Items.Count <= pageSize);
+
+        var firstPageIds = firstPage.Items.Select(m => m.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(m => m.Id).ToHashSet();
+
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    [Fact]
+    public async Task GetAllGroupMembersPaginated_Throws_WhenGroupNotFound()
+    {
+        // Arrange
+        long nonExistentGroupId = 999999;
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 1 };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(async () =>
+            await _groupBusiness.GetGroupMembersPaginated(oid, nonExistentGroupId, paginatedRequest));
+    }
+
+    [Fact]
+    public async Task GetAllGroupMembersPaginated_Throws_WhenGroupIsArchived()
+    {
+        // Arrange
+        long archivedGroupId = gid2;
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 1 };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(async () =>
+            await _groupBusiness.GetGroupMembersPaginated(oid, archivedGroupId, paginatedRequest));
     }
 
     #endregion
@@ -660,6 +846,31 @@ public class GroupBusinessTests : IntegrationTestBase
         Assert.DoesNotContain(group.Users, u => u.Id == uidSa);
     }
 
+    [Fact]
+    public async Task AddUser_InvalidatesProjectPermissionCache_ForProjectsGroupBelongsTo()
+    {
+        // Arrange: create a project and attach the group to it as a member
+        var project = new Project { Name = "Group Cache Test Project", OrganizationId = oid };
+        Context.Projects.Add(project);
+        await Context.SaveChangesAsync();
+
+        Context.ProjectMembers.Add(new ProjectMember { ProjectId = project.Id, GroupId = gid });
+        await Context.SaveChangesAsync();
+
+        // Pre-populate cache as if uid2 (about to be added) had a stale cached "false"
+        var permKey = CacheKeys.ProjectPermission(uid2, project.Id, "read", "test");
+        var permittedIdsKey = CacheKeys.ProjectPermittedIds(uid2, "read", "test");
+        await CacheService.Instance.SetAsync(permKey, false, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(permittedIdsKey, new List<long> { }, (TimeSpan?)null);
+
+        // Act
+        await _groupBusiness.AddUserToGroup(uid2, oid, gid);
+
+        // Assert: both the specific permission key and the permitted-ids key are gone
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(permKey));
+        Assert.Null(await CacheService.Instance.GetAsync<List<long>>(permittedIdsKey));
+    }
+
     #endregion
 
     #region RemoveUser Tests
@@ -702,6 +913,22 @@ public class GroupBusinessTests : IntegrationTestBase
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _groupBusiness.RemoveUserFromGroup(99999, oid, gid));
 
         Assert.Contains("User with id 99999 does not exist", exception.Message);
+    }
+
+    [Fact]
+    public async Task AddUserToGroup_GroupWithNoProjectAssignment_DoesNotThrow()
+    {
+        Exception? exception = null;
+        try
+        {
+            await _groupBusiness.AddUserToGroup(uid2, oid, gid);
+        }
+        catch (Exception ex)
+        {
+            exception = ex;
+        }
+
+        Assert.Null(exception);
     }
 
     #endregion

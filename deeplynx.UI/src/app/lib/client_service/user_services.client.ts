@@ -4,15 +4,30 @@
 import {
   UserAdminInfoDto,
   UserResponseDto,
-  UserActivityCountsDto
+  UserActivityCountsDto,
+  PaginatedResponse
 } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 /** ---- Browser calls (with session cookies) ---- */
 
-export async function getAllUsers(organizationId?: number | string, projectId?: number | string, includeArchived: boolean = false) {
+export async function getAllUsers(
+  organizationId?: number | string, 
+  projectId?: number | string, 
+  includeArchived: boolean = false,
+  includeServiceAccounts: boolean = false,
+  includeTestAccounts: boolean = false,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<UserResponseDto>> {
   try {
-    const params: Record<string, string | number | boolean> = {};
+    const params: Record<string, string | number | boolean> = {
+      includeArchived,
+      includeServiceAccounts,
+      includeTestAccounts,
+      pageNumber,
+      pageSize
+    };
 
     if (organizationId !== undefined) {
       params.organizationId = organizationId;

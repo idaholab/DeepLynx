@@ -9,6 +9,7 @@ import {
   fetchOrganizationLogo,
   getAllOrganizationsForUser,
 } from "@/app/lib/client_service/organization_services.client";
+import { getNexusScalarUrl } from "@/app/lib/api-version";
 import { isRunHidden } from "@/app/lib/feature_flags";
 import {
   AdjustmentsHorizontalIcon,
@@ -72,7 +73,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
     const fetchOrganizations = async () => {
       try {
         setLoadingOrgs(true);
-        const orgs = await getAllOrganizationsForUser(true);
+        const { items: orgs } = await getAllOrganizationsForUser(true);
         setOrganizations(orgs);
       } catch (error) {
         console.error("Failed to fetch organizations:", error);
@@ -325,7 +326,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
               )}
               <OrgAdminRoute>
                 <li className="mt-5">
-                  <Link href="/organization_management">
+                  <Link href="/organization_management" aria-label="Organization Settings">
                     <AdjustmentsHorizontalIcon className="size-10" />
                   </Link>
                 </li>
@@ -336,7 +337,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
             <ul className="mt-auto">
               <li className="mt-5">
                 <SysAdminRoute>
-                  <Link href={"/site_management"} prefetch={false}>
+                  <Link href={"/site_management"} prefetch={false} aria-label="Admin Settings">
                     <Cog6ToothIcon className="size-10" />
                   </Link>
                 </SysAdminRoute>
@@ -344,11 +345,9 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
               <li className="mt-5 id-tooltip group relative">
                 <Link
                   target="_blank"
-                  href={
-                    process.env.NEXT_PUBLIC_API_URL
-                      ? `${process.env.NEXT_PUBLIC_API_URL}/scalar`
-                      : "/api/v1/scalar"
-                  }
+                  href={getNexusScalarUrl(
+                    process.env.NEXT_PUBLIC_API_URL ?? "",
+                  )}
                   prefetch={false}
                 >
                   <CommandLineIcon className="size-10" />
@@ -445,7 +444,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                   <QuestionMarkCircleIcon className="size-10" />
                 </Link>
               </li>
-              <span className="text-xs font-bold text-base-200/50">v0.7.2</span>
+              <span className="text-xs font-bold text-base-200/50">v0.8.0</span>
             </ul>
           </aside>
         </div>

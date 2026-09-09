@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using deeplynx.datalayer.Models;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -76,7 +78,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
         var recordNames = validRecords.Select(r => r.Name.Trim()).ToList();
         var kgMatches = await _context.Records
             .Where(r => r.ProjectId == projectId && recordNames.Contains(r.Name))
-            .Select(r => new { r.Id, r.Name })
+            .Select(r => new { r.Id, r.Name, r.Properties })
             .ToListAsync();
         var nameToKg = kgMatches
             .GroupBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
@@ -104,43 +106,114 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 continue;
             }
 
-            classSimilarities.TryGetValue(classType, out var classMatch);
-            nameToKg.TryGetValue(recordName, out var kgRecord);
-
-            var embeddingPlausibility = classMatch?.Score ?? 0.0;
-            var statFreq = maxFrequency > 0 ? (double)record.Frequency / maxFrequency : 0.0;
-
-            var normalizedClassName = classMatch?.OntologyEntityName;
-            var structuralConsistency = normalizedClassName != null && ontologyPatterns.Any(p =>
-                string.Equals(p.OriginClassName, normalizedClassName, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(p.DestinationClassName, normalizedClassName, StringComparison.OrdinalIgnoreCase))
-                ? 1.0
-                : 0.0;
-
-            extractionRecords.Add(new ExtractionRecord
-            {
-                ExtractionId = extractionId,
-                ExtractionClassId = extractionClassId,
-                Name = kgRecord?.Name ?? recordName,
-                Attributes = record.Attributes?.ToJsonString(),
-                OrganizationId = organizationId,
-                ProjectId = projectId,
-                DataSourceId = dataSourceId,
-                DeeplynxRecordId = kgRecord?.Id,
-                SourceRecordId = record.RecordId,
-                ValidationStatus = classMatch != null
-                    ? ExtractionValidationStatus.Valid
-                    : ExtractionValidationStatus.InvalidSchema,
-                Frequency = record.Frequency,
-                LlmScore = record.Confidence,
-                EmbeddingPlausibility = embeddingPlausibility,
-                StatisticalFrequency = statFreq,
-                StructuralConsistency = structuralConsistency,
-                EnsembleScore = CalculateEnsembleScore(
-                    record.Confidence, embeddingPlausibility, statFreq, structuralConsistency)
-            });
             stagedRecordNames.Add(recordName);
             stagedRecordClasses.Add(classType);
+
+            classSimilarities.TryGetValue(classType, out var classMatch);
+            var normalizedClassName = classMatch?.OntologyEntityName;
+
+            var matchingKgRecords = kgMatches
+                .Where(r => string.Equals(r.Name, recordName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            bool matchedKgRecord = false;
+
+            foreach (var kgRecord in matchingKgRecords)
+            {
+                var recordTags = await _context.Database
+                    .SqlQueryRaw<string>(
+                        @"SELECT t.name
+                  FROM deeplynx.record_tags rt
+                  JOIN deeplynx.tags t ON rt.tag_id = t.id
+                  WHERE rt.record_id = {0}", kgRecord.Id)
+                    .ToListAsync();
+
+                var kgRecordAttributesNode = JsonNode.Parse(kgRecord.Properties)?.AsObject();
+                if (recordTags.Count != 0)
+                {
+                    kgRecordAttributesNode?["tags"] = new JsonArray(recordTags.Select(t => JsonValue.Create(t)).ToArray());
+                }
+
+                kgRecordAttributesNode?.Remove("originId");
+                kgRecordAttributesNode?.Remove("source_page");
+                record.Attributes.Remove("originId");
+                record.Attributes.Remove("source_page");
+
+                var attributesMatch = JsonNodesDeepEquals(record.Attributes, kgRecordAttributesNode, "/");
+
+                kgRecordAttributesNode?.Remove("tags");
+
+                if (attributesMatch)
+                {
+                    var structuralConsistency = normalizedClassName != null && ontologyPatterns.Any(p =>
+                        string.Equals(p.OriginClassName, normalizedClassName, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(p.DestinationClassName, normalizedClassName, StringComparison.OrdinalIgnoreCase))
+                        ? 1.0
+                        : 0.0;
+
+                    var embeddingPlausibility = classMatch?.Score ?? 0.0;
+                    var statFreq = maxFrequency > 0 ? (double)record.Frequency / maxFrequency : 0.0;
+
+                    extractionRecords.Add(new ExtractionRecord
+                    {
+                        ExtractionId = extractionId,
+                        ExtractionClassId = extractionClassId,
+                        Name = kgRecord?.Name ?? recordName,
+                        Attributes = record.Attributes?.ToJsonString(),
+                        OrganizationId = organizationId,
+                        ProjectId = projectId,
+                        DataSourceId = dataSourceId,
+                        DeeplynxRecordId = kgRecord?.Id,
+                        SourceRecordId = record.RecordId,
+                        ValidationStatus = classMatch != null
+                            ? ExtractionValidationStatus.Valid
+                            : ExtractionValidationStatus.InvalidSchema,
+                        Frequency = record.Frequency,
+                        LlmScore = record.Confidence,
+                        EmbeddingPlausibility = embeddingPlausibility,
+                        StatisticalFrequency = statFreq,
+                        StructuralConsistency = structuralConsistency,
+                        EnsembleScore = CalculateEnsembleScore(
+                            record.Confidence, embeddingPlausibility, statFreq, structuralConsistency)
+                    });
+
+                    matchedKgRecord = true;
+                    break;
+                }
+            }
+
+            if (!matchedKgRecord)
+            {
+                var structuralConsistency = normalizedClassName != null && ontologyPatterns.Any(p =>
+                    string.Equals(p.OriginClassName, normalizedClassName, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(p.DestinationClassName, normalizedClassName, StringComparison.OrdinalIgnoreCase))
+                    ? 1.0
+                    : 0.0;
+                var embeddingPlausibility = classMatch?.Score ?? 0.0;
+                var statFreq = maxFrequency > 0 ? (double)record.Frequency / maxFrequency : 0.0;
+
+                extractionRecords.Add(new ExtractionRecord
+                {
+                    ExtractionId = extractionId,
+                    ExtractionClassId = extractionClassId,
+                    Name = recordName,
+                    Attributes = record.Attributes?.ToJsonString(),
+                    OrganizationId = organizationId,
+                    ProjectId = projectId,
+                    DataSourceId = dataSourceId,
+                    DeeplynxRecordId = null,
+                    SourceRecordId = record.RecordId,
+                    ValidationStatus = classMatch != null
+                        ? ExtractionValidationStatus.Valid
+                        : ExtractionValidationStatus.InvalidSchema,
+                    Frequency = record.Frequency,
+                    LlmScore = record.Confidence,
+                    EmbeddingPlausibility = embeddingPlausibility,
+                    StatisticalFrequency = statFreq,
+                    StructuralConsistency = structuralConsistency,
+                    EnsembleScore = CalculateEnsembleScore(record.Confidence, embeddingPlausibility, statFreq, structuralConsistency)
+                });
+            }
         }
 
         _latticeContext.ExtractionRecords.AddRange(extractionRecords);
@@ -154,6 +227,136 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
                 x => x.Id);
 
         return nameToId;
+    }
+    private static bool JsonNodesDeepEquals(JsonNode? node1, JsonNode? node2, string path = "")
+    {
+        if (node1 == null && node2 == null)
+            return true;
+        if (node1 == null || node2 == null)
+        {
+            return false;
+        }
+
+        if (node1.GetType() != node2.GetType())
+        {
+            if (node1 is JsonValue val1 && node2 is JsonValue val2)
+            {
+                var v1 = val1.GetValue<object>();
+                var v2 = val2.GetValue<object>();
+
+                string? ExtractString(object? val)
+                {
+                    if (val == null)
+                        return null;
+
+                    if (val is JsonElement je)
+                    {
+                        if (je.ValueKind == JsonValueKind.String)
+                            return je.GetString();
+                        else
+                            return je.ToString();
+                    }
+
+                    return val.ToString();
+                }
+                bool EqualsJsonValues(object? val1, object? val2)
+                {
+                    string? s1 = ExtractString(val1);
+                    string? s2 = ExtractString(val2);
+
+                    if (s1 != null && s2 != null)
+                        return string.Equals(s1.Trim(), s2.Trim(), StringComparison.OrdinalIgnoreCase);
+
+                    return Equals(val1, val2);
+                }
+
+                return EqualsJsonValues(v1, v2);
+            }
+
+            return false;
+        }
+
+        switch (node1)
+        {
+            case JsonObject obj1 when node2 is JsonObject obj2:
+                var keys1 = obj1.Select(kv => kv.Key).ToList();
+                var keys2 = obj2.Select(kv => kv.Key).ToList();
+
+                if (keys1.Count != keys2.Count)
+                {
+                    return false;
+                }
+
+                foreach (var key1 in keys1)
+                {
+                    var matchKey = keys2.FirstOrDefault(k => string.Equals(k, key1, StringComparison.OrdinalIgnoreCase));
+                    if (matchKey == null)
+                    {
+                        return false;
+                    }
+
+                    if (!JsonNodesDeepEquals(obj1[key1], obj2[matchKey], $"{path}/{key1}"))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+
+            case JsonArray arr1 when node2 is JsonArray arr2:
+                if (arr1.Count != arr2.Count)
+                {
+                    return false;
+                }
+
+                var matchedIndices = new bool[arr2.Count];
+
+                foreach (var item1 in arr1)
+                {
+                    bool foundMatch = false;
+                    for (int i = 0; i < arr2.Count; i++)
+                    {
+                        if (matchedIndices[i])
+                            continue;
+
+                        if (JsonNodesDeepEquals(item1, arr2[i], $"{path}[{i}]"))
+                        {
+                            matchedIndices[i] = true;
+                            foundMatch = true;
+                            break;
+                        }
+                    }
+                    if (!foundMatch)
+                    {
+                        return false;
+                    }
+                }
+                return true;
+
+            case JsonValue val1 when node2 is JsonValue val2:
+                var v1 = val1.GetValue<object>();
+                var v2 = val2.GetValue<object>();
+
+                if (v1 == null && v2 == null)
+                    return true;
+                if (v1 == null || v2 == null)
+                {
+                    return false;
+                }
+
+                var str1 = v1?.ToString()?.Trim();
+                var str2 = v2?.ToString()?.Trim();
+
+                if (!string.Equals(str1, str2, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                return true;
+
+            default:
+                var deepEquals = JsonNode.DeepEquals(node1, node2);
+                return deepEquals;
+        }
     }
 
     private async Task<Dictionary<string, long>> StageRelationships(

@@ -1,7 +1,7 @@
 'use client';
 
 import api from './api';
-import { ClassResponseDto } from '../../(home)/types/responseDTOs';
+import { ClassResponseDto, PaginatedResponse } from '../../(home)/types/responseDTOs';
 import { CreateClassRequestDto, UpdateClassRequestDto } from '../../(home)/types/requestDTOs';
 
 // ============================================================================
@@ -12,16 +12,20 @@ import { CreateClassRequestDto, UpdateClassRequestDto } from '../../(home)/types
  * Get all classes for a project
  * @param projectId - The ID of the project
  * @param hideArchived - Flag to hide archived classes (default: true)
- * @returns Promise with array of ClassResponseDto
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
+ * @returns Promise with paginated ClassResponseDto
  */
 export const getAllClasses = async (
     projectId: number,
-    hideArchived: boolean = true
-): Promise<ClassResponseDto[]> => {
+    hideArchived: boolean = true,
+    pageNumber: number = 1,
+    pageSize: number = -1
+): Promise<PaginatedResponse<ClassResponseDto>> => {
     try {
         const res = await api.get(
             `/projects/${projectId}/classes`,
-            { params: { hideArchived } }
+            { params: { hideArchived, pageNumber, pageSize } }
         );
         return res.data;
     } catch (error) {
@@ -177,24 +181,28 @@ export const archiveClass = async (
  * @param organizationId - The ID of the organization
  * @param projectIds - Optional array of project IDs to filter by
  * @param hideArchived - Flag to hide archived classes (default: true)
- * @returns Promise with array of ClassResponseDto
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all classes (default: -1)
+ * @returns Promise with paginated ClassResponseDto
  */
 export const getAllClassesOrg = async (
     organizationId: number,
     projectIds?: number[],
-    hideArchived: boolean = true
-): Promise<ClassResponseDto[]> => {
-  try {
-    const projectIdsQuery = projectIds?.map(id => `projectIds=${id}`).join('&') ?? '';
-    const separator = projectIdsQuery ? '&' : '';
-    const res = await api.get(
-        `/organizations/${organizationId}/classes?${projectIdsQuery}${separator}hideArchived=${hideArchived}`
-    );
-    return res.data;
-  } catch (error) {
-    console.error("Error getting all classes for organization:", error);
-    throw error;
-  }
+    hideArchived: boolean = true,
+    pageNumber: number = 1,
+    pageSize: number = -1
+): Promise<PaginatedResponse<ClassResponseDto>> => {
+    try {
+        const projectIdsQuery = projectIds?.map(id => `projects=${id}`).join('&') ?? '';
+        const separator = projectIdsQuery ? '&' : '';
+        const res = await api.get(
+            `/organizations/${organizationId}/classes?${projectIdsQuery}${separator}hideArchived=${hideArchived}&pageNumber=${pageNumber}&pageSize=${pageSize}`
+        );
+        return res.data;
+    } catch (error) {
+        console.error("Error getting all classes for organization:", error);
+        throw error;
+    }
 };
 
 /**

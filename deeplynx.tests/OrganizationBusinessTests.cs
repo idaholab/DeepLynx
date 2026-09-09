@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -16,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit.Sdk;
 using Record = deeplynx.datalayer.Models.Record;
+using deeplynx.helpers.Cache;
 
 namespace deeplynx.tests;
 
@@ -173,12 +175,15 @@ public class OrganizationBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
-            Default = true
         };
 
         Context.ObjectStorages.Add(objectStorage);
         await Context.SaveChangesAsync();
         os1 = objectStorage.Id;
+
+        testOrg.DefaultObjectStorageId = os1;
+        Context.Organizations.Update(testOrg);
+        await Context.SaveChangesAsync();
     }
 
     private void AssertRolePermissions(
@@ -236,6 +241,85 @@ public class OrganizationBusinessTests : IntegrationTestBase
         Assert.Contains(organizations, o => o.IsArchived);
         Assert.Contains(organizations, o => o.Id == oid);
         Assert.Contains(organizations, o => o.Id == oid2); // archived organization
+    }
+
+    #endregion
+
+    #region GetAllOrganizationsPaginated Tests
+
+    [Fact]
+    public async Task GetAllOrganizationsPaginated_ExcludesArchived_WhenHideArchivedTrue()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _organizationBusiness.GetAllOrganizationsForUserPaginated(uid, paginatedRequest, hideArchived: true);
+        var organizations = result.Items.ToList();
+
+        // Assert
+        Assert.All(organizations, o => Assert.False(o.IsArchived));
+        Assert.Contains(organizations, o => o.Id == oid);
+        Assert.DoesNotContain(organizations, o => o.Id == oid2);
+    }
+
+    [Fact]
+    public async Task GetAllOrganizationsPaginated_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _organizationBusiness.GetAllOrganizationsForUserPaginated(uid, paginatedRequest, hideArchived: false);
+        var organizations = result.Items.ToList();
+
+        // Assert
+        Assert.Contains(organizations, o => o.IsArchived);
+        Assert.Contains(organizations, o => o.Id == oid);
+        Assert.Contains(organizations, o => o.Id == oid2);
+    }
+
+    [Fact]
+    public async Task GetAllOrganizationsPaginated_ReturnsAll_WhenPageSizeIsMinusOne()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 5, PageSize = -1 };
+
+        // Act
+        var result = await _organizationBusiness.GetAllOrganizationsForUserPaginated(uid, paginatedRequest, hideArchived: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
+        Assert.Equal(result.TotalCount, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllOrganizationsPaginated_PaginatesCorrectly()
+    {
+        // Arrange
+        var pageSize = 1;
+        var firstPageRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = pageSize };
+        var secondPageRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = pageSize };
+
+        // Act
+        var firstPage = await _organizationBusiness.GetAllOrganizationsForUserPaginated(uid, firstPageRequest, hideArchived: true);
+        var secondPage = await _organizationBusiness.GetAllOrganizationsForUserPaginated(uid, secondPageRequest, hideArchived: true);
+
+        // Assert
+        Assert.NotNull(firstPage);
+        Assert.NotNull(secondPage);
+
+        Assert.Equal(firstPage.TotalCount, secondPage.TotalCount);
+
+        Assert.Equal(pageSize, firstPage.Items.Count);
+        Assert.True(secondPage.Items.Count <= pageSize);
+
+        var firstPageIds = firstPage.Items.Select(o => o.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(o => o.Id).ToHashSet();
+
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
     }
 
     #endregion
@@ -1074,6 +1158,37 @@ public class OrganizationBusinessTests : IntegrationTestBase
     #region AddUser Tests
 
     [Fact]
+    public async Task AddUserToOrganization_UpdatesOrgMemberAndOrgAdminCache()
+    {
+        // Arrange
+        var orgMemberKey = CacheKeys.OrgMember(uid2, oid);
+        var orgAdminKey = CacheKeys.OrgAdmin(uid2, oid);
+
+        await CacheService.Instance.SetAsync(
+            orgMemberKey,
+            false,
+            TimeSpan.FromMinutes(2));
+
+        // Use the opposite value to prove the cache is updated.
+        await CacheService.Instance.SetAsync(
+            orgAdminKey,
+            true,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _organizationBusiness.AddUserToOrganization(oid, uid2);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(orgMemberKey));
+        Assert.Equal(
+            false,
+            await CacheService.Instance.GetAsync<bool?>(orgAdminKey));
+    }
+
+    [Fact]
     public async Task AddUser_Succeeds_IfOrgAndUserExists()
     {
         // Act
@@ -1194,6 +1309,43 @@ public class OrganizationBusinessTests : IntegrationTestBase
     #region UpdateUserAdmin Tests
 
     [Fact]
+    public async Task SetOrganizationAdminStatus_UpdatesOnlyOrgAdminCache()
+    {
+        // Arrange
+        var orgAdminKey = CacheKeys.OrgAdmin(uid, oid);
+        var orgMemberKey = CacheKeys.OrgMember(uid, oid);
+
+        await CacheService.Instance.SetAsync(
+            orgAdminKey,
+            false,
+            TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(
+            orgMemberKey,
+            true,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _organizationBusiness.SetOrganizationAdminStatus(
+            oid,
+            uid,
+            true);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(orgAdminKey));
+
+        // The unrelated member cache value should remain unchanged.
+        Assert.Equal(
+            true,
+            await CacheService.Instance.GetAsync<bool?>(orgMemberKey));
+
+        await CacheService.Instance.DeleteAsync(orgAdminKey);
+        await CacheService.Instance.DeleteAsync(orgMemberKey);
+    }
+
+    [Fact]
     public async Task UpdateUserAdmin_Succeeds_IfOrgUserExists()
     {
         // Act - set user as admin
@@ -1222,6 +1374,25 @@ public class OrganizationBusinessTests : IntegrationTestBase
     #endregion
 
     #region RemoveUser Tests
+
+    [Fact]
+    public async Task RemoveUserFromOrganization_InvalidatesOrgMemberAndOrgAdminCache()
+    {
+        // Arrange
+        var orgMemberKey = CacheKeys.OrgMember(uid, oid);
+        var orgAdminKey = CacheKeys.OrgAdmin(uid, oid);
+
+        await CacheService.Instance.SetAsync(orgMemberKey, true, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(orgAdminKey, true, TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _organizationBusiness.RemoveUserFromOrganization(oid, uid);
+
+        // Assert
+        Assert.True(result);
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(orgMemberKey));
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(orgAdminKey));
+    }
 
     [Fact]
     public async Task RemoveUser_Succeeds_IfOrgUserExists()
@@ -1451,6 +1622,214 @@ public class OrganizationBusinessTests : IntegrationTestBase
         {
             File.Delete(metadataFilePath);
         }
+    }
+
+    #endregion
+
+    #region OrganizationExists Cache Tests
+
+    // Model under test (mirrors UserExists caching - see ExistenceHelper.cs for full rationale):
+    //   - One cache entry per organization: CacheKeys.OrganizationArchivedStatus(organizationId) -> bool.
+    //     hideArchived is a filter applied to the cached/DB value at call time, NOT part of the key.
+    //   - Existing organizations (archived or not) are cached with NO TTL - only explicit mutations
+    //     change them.
+    //   - Non-existent organizations are NEVER cached - every call for a missing id re-queries the DB.
+    //   - Deleted organizations are the one exception: CacheKeys.OrganizationDeleted(organizationId) is
+    //     set to true with a short TTL immediately after delete, and the old
+    //     OrganizationArchivedStatus entry is cleared so it can't outlive the short TTL and mislead a
+    //     later read.
+    //   - CreateOrganization populates the archived-status cache immediately (as not archived).
+    //   - ArchiveOrganization / UnarchiveOrganization update the archived-status cache directly to the
+    //     new value.
+    //   - UpdateOrganization has NO cache hook: UpdateOrganizationRequestDto has no IsArchived field
+    //     and the method never assigns organization.IsArchived, so there is nothing for it to
+    //     invalidate or update.
+
+    [Fact]
+    public async Task EnsureOrganizationExistsAsync_CacheMiss_FallsBackToDatabase_AndSucceeds()
+    {
+        // Arrange - oid exists in the DB; nothing has populated the cache for it yet
+        var cacheKey = CacheKeys.OrganizationArchivedStatus(oid);
+        var precheck = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+        Assert.Null(precheck);
+
+        // Act & Assert - falls through to DB, finds the organization (not archived), does not throw
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task EnsureOrganizationExistsAsync_CacheMiss_FallsBackToDatabase_AndThrowsForMissingOrg()
+    {
+        // Arrange - 99999 does not exist; nothing cached for it (and never will be)
+        var cacheKey = CacheKeys.OrganizationArchivedStatus(99999);
+        var precheck = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+        Assert.Null(precheck);
+
+        // Act & Assert - falls through to DB, finds nothing, throws
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureOrganizationExistsAsync(Context, 99999, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task EnsureOrganizationExistsAsync_CacheMiss_PopulatesCache_WithCorrectArchivedStatus()
+    {
+        // Arrange - confirm nothing cached yet for oid (not archived) and oid2 (archived)
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid)));
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid2)));
+
+        // Act - first calls are cache misses; hideArchived:false so the archived oid2 doesn't throw
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid, hideArchived: false);
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid2, hideArchived: false);
+
+        // Assert - cache now holds the correct DB-backed archived flag for each
+        var cachedOid = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid));
+        var cachedOid2 = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid2));
+        Assert.NotNull(cachedOid);
+        Assert.False(cachedOid.Value); // oid is not archived
+        Assert.NotNull(cachedOid2);
+        Assert.True(cachedOid2.Value); // oid2 is archived
+    }
+
+    [Fact]
+    public async Task EnsureOrganizationExistsAsync_NonExistentOrg_IsNeverCached()
+    {
+        // Arrange/Act - call for a missing organization twice
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureOrganizationExistsAsync(Context, 99999, hideArchived: true));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureOrganizationExistsAsync(Context, 99999, hideArchived: true));
+
+        // Assert - still nothing cached for this id, proving negative results are never written
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(99999));
+        Assert.Null(cached);
+    }
+
+    [Fact]
+    public async Task EnsureOrganizationExistsAsync_CacheHit_ReturnsCachedArchivedStatus_WithoutQueryingDatabase()
+    {
+        // Arrange - oid is genuinely NOT archived in the DB. Poison the cache with "true" (archived),
+        // a value the DB would never produce for oid. If the method reads from cache, hideArchived:true
+        // will (incorrectly, by design of this test) throw; if it ignores the cache and hits the DB, it
+        // will not throw.
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationArchivedStatus(oid), true, (TimeSpan?)null);
+
+        // Act & Assert - the poisoned cached value wins, proving the DB was not consulted
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid, hideArchived: true));
+
+        // hideArchived:false should still succeed even with the (wrongly) cached archived=true,
+        // confirming hideArchived is applied as a post-cache-read filter, not baked into the cache key
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task EnsureOrganizationExistsAsync_HideArchivedFilter_AppliesToSingleCachedEntry()
+    {
+        // Arrange - oid2 is archived in the DB; prime the cache once via a hideArchived:false call
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid2, hideArchived: false);
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid2));
+        Assert.NotNull(cached);
+        Assert.True(cached.Value);
+
+        // Act & Assert - the SAME cache entry now correctly serves both filter variants without
+        // re-querying the DB or requiring a second cache key
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid2, hideArchived: false); // should not throw
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid2, hideArchived: true)); // archived excluded
+    }
+
+    [Fact]
+    public async Task CreateOrganization_PopulatesArchivedStatusCache_Immediately()
+    {
+        // Arrange
+        var dto = new CreateOrganizationRequestDto
+        {
+            Name = "Cache Test Org",
+            Description = "Created to verify cache population on create"
+        };
+
+        // Act
+        var created = await _organizationBusiness.CreateOrganization(uid, dto);
+
+        // Assert - cache is already populated with "not archived", without needing a read first
+        var cached = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(created.Id));
+        Assert.NotNull(cached);
+        Assert.False(cached.Value);
+
+        // And a subsequent existence check should not need to touch the DB to succeed
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, created.Id, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task DeleteOrganization_SetsShortTtlDeletedMarker_AndClearsArchivedStatusCache()
+    {
+        // Arrange - prime the archived-status cache for oid (not archived) before deleting.
+        // DeleteOrganization requires the org to be non-archived (throws otherwise - see
+        // DeleteOrganization_Fails_IfArchived), so oid (not oid2) is the correct fixture here.
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid, hideArchived: true);
+        var primedCache = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid));
+        Assert.NotNull(primedCache);
+
+        // Act
+        await _organizationBusiness.DeleteOrganization(oid);
+
+        // Assert - the old no-TTL archived-status entry is gone
+        var staleCache = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid));
+        Assert.Null(staleCache);
+
+        // Assert - the short-TTL deleted marker is set
+        var deletedMarker = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationDeleted(oid));
+        Assert.NotNull(deletedMarker);
+        Assert.True(deletedMarker.Value);
+
+        // Assert - existence check now correctly throws, served by the deleted marker rather than the DB
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task ArchiveOrganization_UpdatesArchivedStatusCache_ToTrue_WithoutClearingIt()
+    {
+        // Arrange - prime the cache with "not archived" (the correct pre-archive state)
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid, hideArchived: false);
+        var before = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid));
+        Assert.NotNull(before);
+        Assert.False(before.Value);
+
+        // Act
+        await _organizationBusiness.ArchiveOrganization(uid, oid);
+
+        // Assert - cache entry still exists (not cleared) but now reflects archived=true directly
+        var after = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid));
+        Assert.NotNull(after);
+        Assert.True(after.Value);
+
+        // hideArchived:true now correctly excludes the archived org; hideArchived:false still finds it
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid, hideArchived: true));
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UnarchiveOrganization_UpdatesArchivedStatusCache_ToFalse_WithoutClearingIt()
+    {
+        // Arrange - oid2 starts archived; prime the cache with that correct state
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid2, hideArchived: false);
+        var before = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid2));
+        Assert.NotNull(before);
+        Assert.True(before.Value);
+
+        // Act
+        await _organizationBusiness.UnarchiveOrganization(uid, oid2);
+
+        // Assert - cache entry still exists but now reflects archived=false directly
+        var after = await CacheService.Instance.GetAsync<bool?>(CacheKeys.OrganizationArchivedStatus(oid2));
+        Assert.NotNull(after);
+        Assert.False(after.Value);
+
+        // Both filter variants now succeed since the org is no longer archived
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid2, hideArchived: true);
+        await ExistenceHelper.EnsureOrganizationExistsAsync(Context, oid2, hideArchived: false);
     }
 
     #endregion

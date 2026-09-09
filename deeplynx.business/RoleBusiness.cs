@@ -5,6 +5,7 @@ using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace deeplynx.business;
@@ -13,30 +14,85 @@ public class RoleBusiness : IRoleBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
+    private readonly ILogger<RoleBusiness>? _logger;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="RoleBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for role operations</param>
     /// <param name="eventBusiness">Used for logging events during CRUD operations</param>
-    public RoleBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
+    /// <param name="logger">Used for uniformity in logging</param>
+    public RoleBusiness(DeeplynxContext context, IEventBusiness eventBusiness, ILogger<RoleBusiness>? logger = null)
     {
         _context = context;
         _eventBusiness = eventBusiness;
+        _logger = logger;
     }
 
     /// <summary>
-    ///     Get all roles for a given organization and optionally filter by project
+    ///     List all roles
+    /// </summary>
+    /// <param name="organizationId">(Required) ID of the organization</param>
+    /// <param name="projectId">(Optional) ID of the project to filter by</param>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching roles are returned unpaginated</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived roles</param>
+    /// <returns>A paginated list of roles, or all roles if no pagination is specified</returns>
+    public async Task<PaginatedResponse<RoleResponseDto>> GetAllRolesPaginated(
+        long organizationId, long? projectId, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true)
+    {
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId);
+
+        if (hideArchived)
+        {
+            roleQuery = roleQuery.Where(r => !r.IsArchived);
+        }
+
+        // If project id supplied, inherit org level roles
+        if (projectId.HasValue)
+        {
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId || r.ProjectId == null);
+        }
+        else
+        {
+            // Only return org-level roles when no project specified
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
+        }
+
+        return await roleQuery
+            .OrderBy(r => r.Id)
+            .Select(r => new RoleResponseDto
+            {
+                Id = r.Id,
+                Name = r.Name,
+                Description = r.Description,
+                LastUpdatedAt = r.LastUpdatedAt,
+                LastUpdatedBy = r.LastUpdatedBy,
+                IsArchived = r.IsArchived,
+                ProjectId = r.ProjectId,
+                OrganizationId = r.OrganizationId
+            })
+            .ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    /// [DEPRECATED - V1 ONLY] List all roles without pagination
+    /// Superseded by <see cref="GetAllRolesPaginated"/>. Do not call this from new controller versions;
+    /// it exists solely to back the deprecated v1 role controllers and should be deleted once
+    /// those v1 endpoints are sunset.
     /// </summary>
     /// <param name="organizationId">(Required) ID of the organization</param>
     /// <param name="projectId">(Optional) ID of the project to filter by</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived roles</param>
     /// <returns>A list of roles</returns>
+    [Obsolete("V1-only. Used by deprecated v1 role endpoints. Superseded by GetAllRolesPaginated. " +
+              "Remove once v1 role endpoints are sunset.", error: false)]
     public async Task<IEnumerable<RoleResponseDto>> GetAllRoles(
         long organizationId, long? projectId, bool hideArchived = true)
     {
         var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId);
-        
+
         //hide archived roles 
         if (hideArchived)
         {
@@ -51,27 +107,29 @@ public class RoleBusiness : IRoleBusiness
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-             roleQuery = roleQuery.Where( r => r.ProjectId == projectId || r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId || r.ProjectId == null);
         }
         else
         {
             // Only return org-level roles when no project specified
             roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
-        
+
         return await roleQuery.Select(r => new RoleResponseDto
-            {
-                Id = r.Id,
-                Name = r.Name,
-                Description = r.Description,
-                LastUpdatedAt = r.LastUpdatedAt,
-                LastUpdatedBy = r.LastUpdatedBy,
-                IsArchived = r.IsArchived,
-                ProjectId = r.ProjectId,
-                OrganizationId = r.OrganizationId
-            })
+        {
+            Id = r.Id,
+            Name = r.Name,
+            Description = r.Description,
+            LastUpdatedAt = r.LastUpdatedAt,
+            LastUpdatedBy = r.LastUpdatedBy,
+            IsArchived = r.IsArchived,
+            ProjectId = r.ProjectId,
+            OrganizationId = r.OrganizationId
+        })
             .ToListAsync();
     }
+
+    #endregion
 
     /// <summary>
     ///     Get a role by ID
@@ -86,7 +144,7 @@ public class RoleBusiness : IRoleBusiness
         bool hideArchived = true)
     {
         var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId && r.Id == roleId);
-        
+
         //hide archived roles 
         if (hideArchived)
         {
@@ -101,8 +159,8 @@ public class RoleBusiness : IRoleBusiness
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId || r.ProjectId == null);
-        } 
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId || r.ProjectId == null);
+        }
         else
         {
             // Only return org-level roles when no project specified
@@ -142,6 +200,22 @@ public class RoleBusiness : IRoleBusiness
     {
         ValidationHelper.ValidateModel(dto);
 
+
+    // Explicit case-insensitive duplicate check
+    var normalizedName = dto.Name.Trim().ToLower();
+    var duplicateExists = await _context.Roles.AnyAsync(r =>
+        r.OrganizationId == organizationId &&
+        r.ProjectId == projectId &&
+        r.Name.ToLower() == normalizedName);
+
+    if (duplicateExists)
+    {
+        var scope = projectId.HasValue ? "project" : "organization";
+        throw new ResourceConflictException(
+            $"A role with the name '{dto.Name}' already exists in this {scope}");
+    }
+
+
         var role = new Role
         {
             Name = dto.Name,
@@ -151,7 +225,7 @@ public class RoleBusiness : IRoleBusiness
             ProjectId = projectId,
             OrganizationId = organizationId
         };
-        
+
         try
         {
             _context.Roles.Add(role);
@@ -188,9 +262,9 @@ public class RoleBusiness : IRoleBusiness
         {
             await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
         }
-        
+
         await _context.SaveChangesAsync();
-        
+
         return new RoleResponseDto
         {
             Id = role.Id,
@@ -284,13 +358,13 @@ public class RoleBusiness : IRoleBusiness
         var result = await _context.Database
             .SqlQueryRaw<RoleResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
-        
+
         var createEvent = new CreateEventRequestDto
         {
             Operation = "create",
             EntityType = "role"
         };
-        
+
         if (projectId.HasValue)
         {
             await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId, createEvent, result.Count);
@@ -299,7 +373,7 @@ public class RoleBusiness : IRoleBusiness
         {
             await _eventBusiness.CreateEvent(currentUserId, organizationId, null, createEvent, result.Count);
         }
-        
+
         return result;
     }
 
@@ -317,23 +391,23 @@ public class RoleBusiness : IRoleBusiness
         UpdateRoleRequestDto dto)
     {
         ValidationHelper.ValidateModel(dto);
-        
-        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId 
-                                                  && r.Id == roleId 
+
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId
+                                                  && r.Id == roleId
                                                   && r.IsArchived == false);
 
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
 
         var role = await roleQuery.FirstOrDefaultAsync();
-        
+
         if (role == null)
             throw new KeyNotFoundException(
                 $"Role with id {roleId} not found or does not belong to the specified organization/project context");
@@ -343,7 +417,28 @@ public class RoleBusiness : IRoleBusiness
         {
             throw new InvalidOperationException("Organization roles cannot be updated from the child projects.");
         }
-        
+
+        // Explicit case-insensitive duplicate check, same as CreateRole. Only
+        // relevant when the name is actually changing - skip the check (and
+        // avoid a false-positive self-collision) if the name isn't being updated.
+        var newName = dto.Name ?? role.Name;
+        if (dto.Name != null && !string.Equals(dto.Name.Trim(), role.Name, StringComparison.Ordinal))
+        {
+            var normalizedName = newName.Trim().ToLower();
+            var duplicateExists = await _context.Roles.AnyAsync(r =>
+                r.Id != role.Id &&
+                r.OrganizationId == organizationId &&
+                r.ProjectId == role.ProjectId &&
+                r.Name.ToLower() == normalizedName);
+
+            if (duplicateExists)
+            {
+                var scope = role.ProjectId.HasValue ? "project" : "organization";
+                throw new ResourceConflictException(
+                    $"A role with the name '{newName}' already exists in this {scope}");
+            }
+        }
+
         // Update fields
         role.Name = dto.Name ?? role.Name;
         role.Description = dto.Description ?? role.Description;
@@ -386,7 +481,7 @@ public class RoleBusiness : IRoleBusiness
         {
             await _eventBusiness.CreateEvent(currentUserId, organizationId, null, eventLog);
         }
-        
+
         return new RoleResponseDto
         {
             Id = role.Id,
@@ -412,35 +507,40 @@ public class RoleBusiness : IRoleBusiness
     /// <exception cref="DependencyDeletionException">Returned if role removal from project members fails</exception>
     public async Task<bool> ArchiveRole(long currentUserId, long roleId, long organizationId, long? projectId)
     {
-        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId 
-                                                  && r.Id == roleId 
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId
+                                                  && r.Id == roleId
                                                   && r.IsArchived == false);
 
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
 
         var role = await roleQuery.FirstOrDefaultAsync();
-        
+
         if (role == null)
             throw new KeyNotFoundException(
                 $"Role with id {roleId} not found or does not belong to the specified organization/project context");
 
-        
+
         // Organization roles cannot be updated from a project level
         if (projectId.HasValue && role.ProjectId == null)
         {
             throw new InvalidOperationException("Organization roles cannot be updated from the child projects.");
         }
-        
+
         // set lastUpdatedAt timestamp
         var lastUpdatedAt = DateTime.UtcNow;
+
+        var affectedMembers = await _context.ProjectMembers
+            .Where(pm => pm.RoleId == roleId)
+            .Select(pm => new { pm.ProjectId, pm.UserId, pm.GroupId })
+            .ToListAsync();
 
         // run archive procedure in a transaction to roll back any errors
         using (var transaction = await _context.Database.BeginTransactionAsync())
@@ -459,6 +559,12 @@ public class RoleBusiness : IRoleBusiness
                         $"Unable to archive role {roleId} or its downstream dependents.");
 
                 await transaction.CommitAsync();
+
+                // invalidate project permissions cache for each affected member
+                foreach (var member in affectedMembers)
+                {
+                    await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+                }
             }
             catch (Exception exc)
             {
@@ -477,7 +583,7 @@ public class RoleBusiness : IRoleBusiness
             EntityName = role.Name,
             Properties = JsonSerializer.Serialize(new { role.Name }),
         };
-        
+
         if (projectId.HasValue)
         {
             await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId.Value, eventLog);
@@ -501,33 +607,33 @@ public class RoleBusiness : IRoleBusiness
     /// <exception cref="KeyNotFoundException">Returned if role not found or is not archived</exception>
     public async Task<bool> UnarchiveRole(long currentUserId, long roleId, long organizationId, long? projectId)
     {
-        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId 
-                                                  && r.Id == roleId 
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId
+                                                  && r.Id == roleId
                                                   && r.IsArchived == true);
 
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
 
         var role = await roleQuery.FirstOrDefaultAsync();
-        
+
         if (role == null)
             throw new KeyNotFoundException(
                 $"Role with id {roleId} not found or does not belong to the specified organization/project context");
 
-        
+
         // Organization roles cannot be updated from a project level
         if (projectId.HasValue && role.ProjectId == null)
         {
             throw new InvalidOperationException("Organization roles cannot be updated from the child projects.");
         }
-        
+
         role.IsArchived = false;
         role.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         role.LastUpdatedBy = currentUserId;
@@ -543,7 +649,7 @@ public class RoleBusiness : IRoleBusiness
             EntityName = role.Name,
             Properties = JsonSerializer.Serialize(new { role.Name }),
         };
-        
+
         if (projectId.HasValue)
         {
             await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId.Value, eventLog);
@@ -567,34 +673,44 @@ public class RoleBusiness : IRoleBusiness
     /// <exception cref="KeyNotFoundException">Returned if role not found</exception>
     public async Task<bool> DeleteRole(long currentUserId, long roleId, long organizationId, long? projectId)
     {
-        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId 
-                                                  && r.Id == roleId 
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId
+                                                  && r.Id == roleId
                                                   && r.IsArchived == false);
 
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == null);
         }
 
         var role = await roleQuery.FirstOrDefaultAsync();
-        
+
         if (role == null)
             throw new KeyNotFoundException(
                 $"Role with id {roleId} not found or does not belong to the specified organization/project context");
-        
+
         // Organization roles cannot be updated from a project level
         if (projectId.HasValue && role.ProjectId == null)
         {
             throw new InvalidOperationException("Organization roles cannot be updated from the child projects.");
         }
 
+        var affectedMembersForDelete = await _context.ProjectMembers
+            .Where(pm => pm.RoleId == roleId)
+            .Select(pm => new { pm.ProjectId, pm.UserId, pm.GroupId })
+            .ToListAsync();
+
         _context.Roles.Remove(role);
         await _context.SaveChangesAsync();
+
+        foreach (var member in affectedMembersForDelete)
+        {
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+        }
 
         // Log archive Role event
         var eventLog = new CreateEventRequestDto
@@ -605,7 +721,7 @@ public class RoleBusiness : IRoleBusiness
             EntityId = role.Id,
             Properties = JsonSerializer.Serialize(new { role.Name }),
         };
-        
+
         if (projectId.HasValue)
         {
             await _eventBusiness.CreateEvent(currentUserId, organizationId, projectId.Value, eventLog);
@@ -629,14 +745,14 @@ public class RoleBusiness : IRoleBusiness
     public async Task<IEnumerable<PermissionResponseDto>> GetPermissionsByRole(long roleId, long organizationId,
         long? projectId)
     {
-        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId 
-                                                  && r.Id == roleId 
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId
+                                                  && r.Id == roleId
                                                   && r.IsArchived == false);
 
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
@@ -660,7 +776,6 @@ public class RoleBusiness : IRoleBusiness
             LastUpdatedAt = p.LastUpdatedAt,
             LastUpdatedBy = p.LastUpdatedBy,
             IsArchived = p.IsArchived,
-            LabelId = p.LabelId,
             ProjectId = p.ProjectId,
             OrganizationId = p.OrganizationId,
             IsDefault = p.IsDefault
@@ -679,14 +794,14 @@ public class RoleBusiness : IRoleBusiness
     /// <exception cref="InvalidOperationException">Returned if permission already exists for role</exception>
     public async Task<bool> AddPermissionToRole(long roleId, long permissionId, long organizationId, long? projectId)
     {
-        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId 
-                                                  && r.Id == roleId 
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId
+                                                  && r.Id == roleId
                                                   && r.IsArchived == false);
 
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
@@ -695,11 +810,11 @@ public class RoleBusiness : IRoleBusiness
         }
 
         var role = await roleQuery.Include(r => r.Permissions).FirstOrDefaultAsync();
-        
+
         if (role == null)
             throw new KeyNotFoundException(
                 $"Role with id {roleId} not found or does not belong to the specified organization/project context");
-        
+
         // Organization roles cannot be updated from a project level
         if (projectId.HasValue && role?.ProjectId == null)
         {
@@ -717,6 +832,10 @@ public class RoleBusiness : IRoleBusiness
 
         role.Permissions.Add(permission);
         await _context.SaveChangesAsync();
+
+        // invalidate cached permissions for this role
+        await InvalidatePermissionCacheForRole(roleId);
+
         return true;
     }
 
@@ -732,14 +851,14 @@ public class RoleBusiness : IRoleBusiness
     public async Task<bool> RemovePermissionFromRole(long roleId, long permissionId, long organizationId,
         long? projectId)
     {
-        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId 
-                                                  && r.Id == roleId 
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId
+                                                  && r.Id == roleId
                                                   && r.IsArchived == false);
 
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
@@ -748,11 +867,11 @@ public class RoleBusiness : IRoleBusiness
         }
 
         var role = await roleQuery.Include(r => r.Permissions).FirstOrDefaultAsync();
-        
+
         if (role == null)
             throw new KeyNotFoundException(
                 $"Role with id {roleId} not found or does not belong to the specified organization/project context");
-        
+
         // Organization roles cannot be updated from a project level
         if (projectId.HasValue && role.ProjectId == null)
         {
@@ -766,6 +885,10 @@ public class RoleBusiness : IRoleBusiness
 
         role.Permissions.Remove(permission);
         await _context.SaveChangesAsync();
+
+        // invalidate cached permissions for this role
+        await InvalidatePermissionCacheForRole(roleId);
+
         return true;
     }
 
@@ -781,14 +904,14 @@ public class RoleBusiness : IRoleBusiness
     public async Task<bool> SetPermissionsForRole(long roleId, long[] permissionIds, long organizationId,
         long? projectId)
     {
-        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId 
-                                                  && r.Id == roleId 
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId
+                                                  && r.Id == roleId
                                                   && r.IsArchived == false);
 
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
@@ -797,11 +920,11 @@ public class RoleBusiness : IRoleBusiness
         }
 
         var role = await roleQuery.Include(r => r.Permissions).FirstOrDefaultAsync();
-        
+
         if (role == null)
             throw new KeyNotFoundException(
                 $"Role with id {roleId} not found or does not belong to the specified organization/project context");
-        
+
         // Organization roles cannot be updated from a project level
         if (projectId.HasValue && role.ProjectId == null)
         {
@@ -825,6 +948,10 @@ public class RoleBusiness : IRoleBusiness
             role.Permissions.Add(permission);
 
         await _context.SaveChangesAsync();
+
+        // invalidate cached permissions for this role
+        await InvalidatePermissionCacheForRole(roleId);
+
         return true;
     }
 
@@ -840,14 +967,14 @@ public class RoleBusiness : IRoleBusiness
     public async Task<bool> SetPermissionsByPattern(long roleId, Dictionary<string, string[]> permissionPatterns,
         long organizationId, long? projectId)
     {
-        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId 
-                                                  && r.Id == roleId 
+        var roleQuery = _context.Roles.Where(r => r.OrganizationId == organizationId
+                                                  && r.Id == roleId
                                                   && r.IsArchived == false);
 
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            roleQuery = roleQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            roleQuery = roleQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
@@ -856,11 +983,11 @@ public class RoleBusiness : IRoleBusiness
         }
 
         var role = await roleQuery.Include(r => r.Permissions).FirstOrDefaultAsync();
-        
+
         if (role == null)
             throw new KeyNotFoundException(
                 $"Role with id {roleId} not found or does not belong to the specified organization/project context");
-        
+
         // Organization roles cannot be updated from a project level
         if (projectId.HasValue && role.ProjectId == null)
         {
@@ -888,6 +1015,26 @@ public class RoleBusiness : IRoleBusiness
             role.Permissions.Add(permission);
 
         await _context.SaveChangesAsync();
+
+        // invalidate cached permissions for this role
+        await InvalidatePermissionCacheForRole(roleId);
+
         return true;
+    }
+
+    /// <summary>
+    ///     Finds every (user/group, project) pair currently holding this role and invalidates their cached project permissions. 
+    /// </summary>
+    private async Task InvalidatePermissionCacheForRole(long roleId)
+    {
+        var affectedMembers = await _context.ProjectMembers
+            .Where(pm => pm.RoleId == roleId)
+            .Select(pm => new { pm.ProjectId, pm.UserId, pm.GroupId })
+            .ToListAsync();
+
+        foreach (var member in affectedMembers)
+        {
+            await PermissionCachingHelper.InvalidateProjectPermissionsCache(_context, member.ProjectId, member.UserId, member.GroupId, _logger);
+        }
     }
 }

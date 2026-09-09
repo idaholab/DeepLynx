@@ -1,3 +1,33 @@
+x-insight-worker-env: &insight-worker-env
+  LITELLM_LOCAL_MODEL_COST_MAP: "True"
+  RABBITMQ_HOST: insight-rabbitmq
+  PG_HOST: nx-postgres
+  PG_PORT: "5432"
+  PG_USER: postgres
+  PG_PASSWORD: nexuscore
+  PG_DBNAME: deeplynx
+
+x-insight-worker-common: &insight-worker-common
+  profiles: [insight]
+  build:
+    context: ./deeplynx.insight
+    dockerfile: Dockerfiles/Dockerfile.runner.production
+  env_file:
+    - ./deeplynx.insight/.env
+  depends_on:
+    insight-rabbitmq:
+      condition: service_healthy
+    nx-postgres:
+      condition: service_healthy
+  networks:
+    - nexus-network
+
+x-insight-worker-storage: &insight-worker-storage
+  <<: *insight-worker-common
+  volumes:
+    - object_storage:/data
+    - insight_storage:/data/insight
+
 services:
   ui:
     build:
@@ -8,11 +38,12 @@ services:
         NEXTAUTH_URL: "http://localhost:3000"
         REDIRECT_LINK: "http://localhost:3000/api/auth/callback/okta"
         NEXT_PUBLIC_DOCS_PATH: "http://localhost:3001/docs"
-        NEXT_PUBLIC_API_URL: "http://localhost:5000/api/v1"
+        NEXT_PUBLIC_API_URL: "http://localhost:5000/api"
+        NEXT_PUBLIC_API_VERSION: ${NEXT_PUBLIC_API_VERSION:-v2}
         OKTA_CLIENT_ID: ""
         OKTA_CLIENT_SECRET: ""
         NEXTAUTH_SECRET: "changeMe"
-        BACKEND_BASE_URL: "http://server:5000/api/v1"
+        BACKEND_BASE_URL: "http://server:5000/api"
         AUTH_TRUST_HOST: true
         NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
     environment:
@@ -21,11 +52,12 @@ services:
       NEXTAUTH_URL: "http://localhost:3000"
       REDIRECT_LINK: "http://localhost:3000/api/auth/callback/okta"
       NEXT_PUBLIC_DOCS_PATH: "http://localhost:3001/docs"
-      NEXT_PUBLIC_API_URL: "http://localhost:5000/api/v1"
+      NEXT_PUBLIC_API_URL: "http://localhost:5000/api"
+      NEXT_PUBLIC_API_VERSION: ${NEXT_PUBLIC_API_VERSION:-v2}
       OKTA_CLIENT_ID: ""
       OKTA_CLIENT_SECRET: ""
       NEXTAUTH_SECRET: "changeMe"
-      BACKEND_BASE_URL: "http://server:5000/api/v1"
+      BACKEND_BASE_URL: "http://server:5000/api"
       INSIGHT_API_URL: "http://insight-fastapi:5009"
       AUTH_TRUST_HOST: true
       NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: true # change to false if supplying okta info on lines 12-13, 25-26
@@ -83,7 +115,6 @@ services:
       ENCRYPTION_IV: SU5TRUNVUkVfREVWX0lWIQ== # base64 encoded from the string "INSECURE_DEV_IV!"
       AIRFLOW_BASE_URL: ${AIRFLOW_BASE_URL:-http://localhost:8080}
       AIRFLOW_JWT: ${AIRFLOW_JWT:-}
-    entrypoint: /usr/local/bin/entrypoint.sh
     ports:
       - "5000:5000"
       - "50051:50051"
@@ -92,8 +123,8 @@ services:
     volumes:
       - object_storage:/data
     depends_on:
-      db-version-check:
-        condition: service_completed_successfully
+      nx-postgres:
+        condition: service_healthy
 
   nx-postgres:
     build:
@@ -120,33 +151,12 @@ services:
       retries: 5
       start_period: 30s
 
-  db-version-check:
-    image: postgres:18-alpine3.23
-    networks:
-      - nexus-network
-    volumes:
-      - ./Dockerfiles/database/check_db_version.sh:/scripts/check_db_version.sh
-    environment:
-      DB_HOST: nx-postgres
-      DB_USER: postgres
-      DB_PASSWORD: nexuscore
-      DB_NAME: deeplynx
-    command: >
-      sh -c "
-        apk add --no-cache bash &&
-        chmod +x /scripts/check_db_version.sh &&
-        /scripts/check_db_version.sh
-      "
-    depends_on:
-      nx-postgres:
-        condition: service_healthy
-
   mcp:
     build:
       context: ./
       dockerfile: Dockerfiles/mcp/Dockerfile.local
     environment:
-      NEXUS_API_URL: "http://server:5000/api/v1"
+      NEXUS_API_URL: "http://server:5000"
       MCP_SERVER_URL: "http://0.0.0.0:43656"
     ports:
       - "43656:43656"
@@ -165,7 +175,7 @@ services:
       - "15672:15672"
       - "15692:15692"
     env_file:
-      - ./deeplynx.insight/.env.production
+      - ./deeplynx.insight/.env
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 10s
@@ -185,7 +195,7 @@ services:
     command:
       ["uvicorn", "app.fastapi.main:app", "--host", "0.0.0.0", "--port", "5009"]
     env_file:
-      - ./deeplynx.insight/.env.production
+      - ./deeplynx.insight/.env
     environment:
       - LITELLM_LOCAL_MODEL_COST_MAP=True
       - RABBITMQ_HOST=insight-rabbitmq
@@ -205,32 +215,115 @@ services:
     networks:
       - nexus-network
 
-  insight-rabbitmq-runner:
-    profiles: [insight]
+  insight-worker-file-downloader:
+    <<: *insight-worker-storage
     build:
       context: ./deeplynx.insight
       dockerfile: Dockerfiles/Dockerfile.runner.production
-    command: ["python", "-m", "app.rabbitmq.runner"]
-    env_file:
-      - ./deeplynx.insight/.env.production
+      args:
+        WORKER_EXTRA: worker-file-downloader
     environment:
-      - LITELLM_LOCAL_MODEL_COST_MAP=True
-      - RABBITMQ_HOST=insight-rabbitmq
-      - PG_HOST=nx-postgres
-      - PG_PORT=5432
-      - PG_USER=postgres
-      - PG_PASSWORD=nexuscore
-      - PG_DBNAME=deeplynx
-    depends_on:
-      insight-rabbitmq:
-        condition: service_healthy
-      nx-postgres:
-        condition: service_healthy
-    volumes:
-      - object_storage:/data
-      - insight_storage:/data/insight
-    networks:
-      - nexus-network
+      <<: *insight-worker-env
+      WORKER_NAME: file_downloader
+
+  insight-worker-pdf-to-img:
+    <<: *insight-worker-storage
+    build:
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+      args:
+        WORKER_EXTRA: worker-pdf-to-img
+    environment:
+      <<: *insight-worker-env
+      WORKER_NAME: pdf_to_img
+
+  insight-worker-image-file-to-image:
+    <<: *insight-worker-storage
+    build:
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+      args:
+        WORKER_EXTRA: worker-image-file-to-image
+    environment:
+      <<: *insight-worker-env
+      WORKER_NAME: image_file_to_image
+
+  insight-worker-img-to-text:
+    <<: *insight-worker-storage
+    build:
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+      args:
+        WORKER_EXTRA: worker-img-to-text
+    environment:
+      <<: *insight-worker-env
+      WORKER_NAME: img_to_text
+
+  insight-worker-txt-to-text:
+    <<: *insight-worker-storage
+    build:
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+      args:
+        WORKER_EXTRA: worker-txt-to-text
+    environment:
+      <<: *insight-worker-env
+      WORKER_NAME: txt_to_text
+
+  insight-worker-text-to-chunks:
+    <<: *insight-worker-storage
+    build:
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+      args:
+        WORKER_EXTRA: worker-text-to-chunks
+    environment:
+      <<: *insight-worker-env
+      WORKER_NAME: text_to_chunks
+
+  insight-worker-html-to-chunks:
+    <<: *insight-worker-storage
+    build:
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+      args:
+        WORKER_EXTRA: worker-html-to-chunks
+    environment:
+      <<: *insight-worker-env
+      WORKER_NAME: html_to_chunks
+
+  insight-worker-docx-to-chunks:
+    <<: *insight-worker-storage
+    build:
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+      args:
+        WORKER_EXTRA: worker-docx-to-chunks
+    environment:
+      <<: *insight-worker-env
+      WORKER_NAME: docx_to_chunks
+
+  insight-worker-tracking-service:
+    <<: *insight-worker-storage
+    build:
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+      args:
+        WORKER_EXTRA: worker-tracking-service
+    environment:
+      <<: *insight-worker-env
+      WORKER_NAME: tracking_service
+
+  insight-worker-ontology-to-vectors:
+    <<: *insight-worker-common
+    build:
+      context: ./deeplynx.insight
+      dockerfile: Dockerfiles/Dockerfile.runner.production
+      args:
+        WORKER_EXTRA: worker-ontology-to-vectors
+    environment:
+      <<: *insight-worker-env
+      WORKER_NAME: ontology_to_vectors
 
   # lattice:
   #   build:

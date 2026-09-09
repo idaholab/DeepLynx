@@ -42,6 +42,11 @@ public partial class Project
     [MaxLength(255)]
     public string? FilePath { get; set; }
 
+    [Column("default_object_storage_id")]
+    public long DefaultObjectStorageId { get; set; }
+    [Column("logo_object_storage_id")]
+    public int? LogoObjectStorageId { get; set; } = null;
+
     [InverseProperty("Project")]
     public virtual ICollection<Action> Actions { get; set; } = new List<Action>();
 
@@ -102,7 +107,4 @@ public partial class Project
 
     [InverseProperty("Project")]
     public virtual ICollection<AiModelConfig> AiModelConfigs { get; set; } = new List<AiModelConfig>();
-
-    [InverseProperty("Project")]
-    public virtual ICollection<ProvenanceRecord> ProvenanceRecords { get; set; } = new List<ProvenanceRecord>();
 }

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -18,6 +19,10 @@ public class TagBusinessTests : IntegrationTestBase
     private EventBusiness _eventBusiness;
     private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
+    private Mock<ILogger<ProjectRolePermissionService>> _projectServiceLogger;
+    private Mock<ILogger<AdminService>> _adminServiceLogger;
+    private IProjectRolePermissionService _permissionService = null!;
+    private IAdminService _adminService = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private TagBusiness _tagBusiness;
@@ -42,13 +47,19 @@ public class TagBusinessTests : IntegrationTestBase
         await base.InitializeAsync();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _projectServiceLogger = new Mock<ILogger<ProjectRolePermissionService>>();
+        _adminServiceLogger = new Mock<ILogger<AdminService>>();
+        _permissionService = new ProjectRolePermissionService(Context, _projectServiceLogger.Object);
+        _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _tagBusiness = new TagBusiness(
             Context,
-            _eventBusiness);
+            _eventBusiness,
+            _permissionService,
+            _adminService);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -170,7 +181,7 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task GetAllTags_ValidProjectId_ReturnsActiveProjectAndOrgTags()
     {
         // Act
-        var result = await _tagBusiness.GetAllTags(oid, [pid], true);
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], true, true);
         var tags = result.ToList();
 
         // Assert
@@ -185,10 +196,29 @@ public class TagBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetAllTags_ValidProjectId_ReturnsActiveProjectAndOrgTagsWithArchivedTags()
+    {
+        // Act
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], false, true);
+        var tags = result.ToList();
+
+
+        // Assert
+        Assert.Equal(4, tags.Count);
+        Assert.All(tags, t => Assert.Equal(oid, t.OrganizationId));
+        Assert.True(tags[2].IsArchived, "The third tag should be archived.");
+        Assert.Contains(tags, t => t.Id == tid);
+        Assert.Contains(tags, t => t.Id == tid2);
+        Assert.Contains(tags, t => t.Id == tid5);
+        Assert.DoesNotContain(tags, t => t.Id == tid4);
+    }
+
+
+    [Fact]
     public async Task GetAllTags_ProjectWithNoTags_ReturnsOrgInheritedTag()
     {
         // Act
-        var result = await _tagBusiness.GetAllTags(oid, [pid3], true);
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid3], true, true);
         var tags = result.ToList();
 
         // Assert
@@ -199,7 +229,7 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task GetAllTags_DifferentProject_ReturnsOrgInheritedTags()
     {
         // Act
-        var result = await _tagBusiness.GetAllTags(oid, [pid], true);
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], true, true);
         var tags = result.ToList();
 
         // Assert
@@ -208,6 +238,124 @@ public class TagBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region GetAllTagsPaginated Tests
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ValidProjectId_ReturnsActiveProjectAndOrgTags()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Items, t => Assert.Equal(oid, t.OrganizationId));
+        Assert.All(result.Items, t => Assert.False(t.IsArchived));
+        Assert.Equal(3, result.TotalCount);
+        Assert.Contains(result.Items, t => t.Id == tid);
+        Assert.Contains(result.Items, t => t.Id == tid2);
+        Assert.Contains(result.Items, t => t.Id == tid5);
+        Assert.DoesNotContain(result.Items, t => t.Id == tid3);
+        Assert.DoesNotContain(result.Items, t => t.Id == tid4);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ValidProjectId_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: false, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Items, t => Assert.Equal(oid, t.OrganizationId));
+        Assert.Equal(4, result.TotalCount);
+        Assert.Contains(result.Items, t => t.IsArchived);
+        Assert.Contains(result.Items, t => t.Id == tid);
+        Assert.Contains(result.Items, t => t.Id == tid2);
+        Assert.Contains(result.Items, t => t.Id == tid5);
+        Assert.DoesNotContain(result.Items, t => t.Id == tid4);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ProjectWithNoTags_ReturnsOrgInheritedTag()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid3], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_DifferentProject_ReturnsOrgInheritedTags()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(3, result.TotalCount);
+        Assert.All(result.Items, t => Assert.Equal(oid, t.OrganizationId));
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ReturnsAll_WhenPageSizeIsMinusOne()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 5, PageSize = -1 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
+        Assert.Equal(result.TotalCount, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_PaginatesCorrectly()
+    {
+        // Arrange
+        var pageSize = 2;
+        var firstPageRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = pageSize };
+        var secondPageRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = pageSize };
+
+        // Act
+        var firstPage = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], firstPageRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+        var secondPage = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], secondPageRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(firstPage);
+        Assert.NotNull(secondPage);
+
+        Assert.Equal(firstPage.TotalCount, secondPage.TotalCount);
+
+        Assert.Equal(pageSize, firstPage.Items.Count);
+        Assert.True(secondPage.Items.Count <= pageSize);
+
+        var firstPageIds = firstPage.Items.Select(t => t.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(t => t.Id).ToHashSet();
+
+        Assert.Empty(firstPageIds.Intersect(secondPageIds)); // no overlap
+    }
+
+    #endregion
+
 
     #region GetTag Tests
 
@@ -292,7 +440,7 @@ public class TagBusinessTests : IntegrationTestBase
         Assert.Equal(oid, result[0].OrganizationId);
         Assert.Equal("Org Tag By Name", result[0].Name);
     }
-    
+
     [Fact]
     public async Task GetTagsByName_Success_WithProjectId()
     {
@@ -843,11 +991,11 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task ArchiveTag_ArchivedTagNotReturnedInGetAll()
     {
         // Arrange
-        var initialCount = (await _tagBusiness.GetAllTags(oid, [pid], true)).Count;
+        var initialCount = (await _tagBusiness.GetAllTags(uid, oid, [pid], true, true)).Count;
 
         // Act
         await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
-        var finalCount = (await _tagBusiness.GetAllTags(oid, [pid], true)).Count;
+        var finalCount = (await _tagBusiness.GetAllTags(uid, oid, [pid], true, true)).Count;
 
         // Assert
         Assert.Equal(initialCount - 1, finalCount);

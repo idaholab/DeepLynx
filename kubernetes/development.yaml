@@ -166,6 +166,8 @@ spec:
               value: ${SUPERUSER_EMAIL}
             - name: INSIGHT_FASTAPI_URL
               value: ${INSIGHT_FASTAPI_URL}
+            - name: NEXT_PUBLIC_API_VERSION
+              value: ${NEXT_PUBLIC_API_VERSION}
             - name: LATTICE_MODEL
               value: ${LATTICE_MODEL}
             - name: TENANT_MODE
@@ -429,14 +431,6 @@ spec:
         - name: deeplynxv3
           image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:deeplynxv3-docs-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
-          env:
-            - name: NODE_ENV
-              value: "production"
-            - name: HOSTED_LINK
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: hosted-link
           resources:
             requests:
               cpu: "100m"
@@ -671,23 +665,49 @@ spec:
             claimName: insight-storage
 
 
-# insight-rabbitmq-runner
+# insight-worker-config: shared, non-secret env vars for every insight-worker-* Deployment
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: insight-worker-config
+  namespace: deeplynxv3-dev
+data:
+  LITELLM_LOCAL_MODEL_COST_MAP: "True"
+  RABBITMQ_HOST: "insight-rabbitmq-service"
+  PG_HOST: ${POSTGRES_DB_HOST}
+  PG_PORT: "5432"
+  PG_USER: ${POSTGRES_USER}
+  PG_PASSWORD: ${POSTGRES_PASSWORD}
+  PG_DBNAME: ${POSTGRES_DB_NAME}
+  LLM_SERVER_URL: "http://deeplynx-api.inl.gov:4000/v1"
+  LLM_MODEL_NAME: "llm"
+  MM_SERVER_URL: "http://deeplynx-api.inl.gov:4000/v1"
+  MM_MODEL_NAME: "mmllm"
+  EMB_SERVER_URL: "http://deeplynx-api.inl.gov:4000/v1"
+  EMB_MODEL_NAME: "bge-m3"
+  EMB_DIMENSION: "1024"
+  STORAGE_BASE_DIR: "/data/insight"
+
+
+# insight-worker-file-downloader
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: insight-rabbitmq-runner
+  name: insight-worker-file-downloader
   namespace: deeplynxv3-dev
 spec:
+  replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: insight-rabbitmq-runner
+      app: insight-worker-file-downloader
   template:
     metadata:
       labels:
-        app: insight-rabbitmq-runner
+        app: insight-worker-file-downloader
     spec:
       terminationGracePeriodSeconds: 120
       hostAliases:
@@ -695,14 +715,15 @@ spec:
           hostnames:
             - "deeplynx-api.inl.gov"
       containers:
-        - name: insight-rabbitmq-runner
-          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-rabbitmq-runner-${GITHUB_RUN_NUMBER}
+        - name: insight-worker-file-downloader
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-worker-file-downloader-${GITHUB_RUN_NUMBER}
           imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: insight-worker-config
           env:
-            - name: LITELLM_LOCAL_MODEL_COST_MAP
-              value: "True"
-            - name: RABBITMQ_HOST
-              value: "insight-rabbitmq-service"
+            - name: WORKER_NAME
+              value: "file_downloader"
             - name: RABBITMQ_USERNAME
               valueFrom:
                 configMapKeyRef:
@@ -713,16 +734,6 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: rabbitmq-default-pass
-            - name: PG_HOST
-              value: ${POSTGRES_DB_HOST}
-            - name: PG_PORT
-              value: "5432"
-            - name: PG_USER
-              value: ${POSTGRES_USER}
-            - name: PG_PASSWORD
-              value: ${POSTGRES_PASSWORD}
-            - name: PG_DBNAME
-              value: ${POSTGRES_DB_NAME}
             - name: LLM_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -782,11 +793,830 @@ spec:
               value: ${NEXUS_API_URL}
           resources:
             requests:
-              memory: "512Mi"
-              cpu: "1500m"
+              memory: "128Mi"
+              cpu: "100m"
             limits:
-              memory: "12Gi"
-              cpu: "10000m"
+              memory: "768Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
+
+
+# insight-worker-pdf-to-img
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-worker-pdf-to-img
+  namespace: deeplynxv3-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insight-worker-pdf-to-img
+  template:
+    metadata:
+      labels:
+        app: insight-worker-pdf-to-img
+    spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-worker-pdf-to-img
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-worker-pdf-to-img-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: insight-worker-config
+          env:
+            - name: WORKER_NAME
+              value: "pdf_to_img"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "2560Mi"
+              cpu: "2000m"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
+
+
+# insight-worker-image-file-to-image
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-worker-image-file-to-image
+  namespace: deeplynxv3-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insight-worker-image-file-to-image
+  template:
+    metadata:
+      labels:
+        app: insight-worker-image-file-to-image
+    spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-worker-image-file-to-image
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-worker-image-file-to-image-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: insight-worker-config
+          env:
+            - name: WORKER_NAME
+              value: "image_file_to_image"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
+
+
+# insight-worker-img-to-text
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-worker-img-to-text
+  namespace: deeplynxv3-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insight-worker-img-to-text
+  template:
+    metadata:
+      labels:
+        app: insight-worker-img-to-text
+    spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-worker-img-to-text
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-worker-img-to-text-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: insight-worker-config
+          env:
+            - name: WORKER_NAME
+              value: "img_to_text"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "1024Mi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
+
+
+# insight-worker-txt-to-text
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-worker-txt-to-text
+  namespace: deeplynxv3-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insight-worker-txt-to-text
+  template:
+    metadata:
+      labels:
+        app: insight-worker-txt-to-text
+    spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-worker-txt-to-text
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-worker-txt-to-text-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: insight-worker-config
+          env:
+            - name: WORKER_NAME
+              value: "txt_to_text"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
+
+
+# insight-worker-text-to-chunks
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-worker-text-to-chunks
+  namespace: deeplynxv3-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insight-worker-text-to-chunks
+  template:
+    metadata:
+      labels:
+        app: insight-worker-text-to-chunks
+    spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-worker-text-to-chunks
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-worker-text-to-chunks-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: insight-worker-config
+          env:
+            - name: WORKER_NAME
+              value: "text_to_chunks"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "1024Mi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
+
+
+# insight-worker-html-to-chunks
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-worker-html-to-chunks
+  namespace: deeplynxv3-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insight-worker-html-to-chunks
+  template:
+    metadata:
+      labels:
+        app: insight-worker-html-to-chunks
+    spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-worker-html-to-chunks
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-worker-html-to-chunks-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: insight-worker-config
+          env:
+            - name: WORKER_NAME
+              value: "html_to_chunks"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "1024Mi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
+
+
+# insight-worker-docx-to-chunks
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-worker-docx-to-chunks
+  namespace: deeplynxv3-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insight-worker-docx-to-chunks
+  template:
+    metadata:
+      labels:
+        app: insight-worker-docx-to-chunks
+    spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-worker-docx-to-chunks
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-worker-docx-to-chunks-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: insight-worker-config
+          env:
+            - name: WORKER_NAME
+              value: "docx_to_chunks"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "2560Mi"
+              cpu: "2000m"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
+
+
+# insight-worker-tracking-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-worker-tracking-service
+  namespace: deeplynxv3-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insight-worker-tracking-service
+  template:
+    metadata:
+      labels:
+        app: insight-worker-tracking-service
+    spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-worker-tracking-service
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-worker-tracking-service-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: insight-worker-config
+          env:
+            - name: WORKER_NAME
+              value: "tracking_service"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: nexus-storage
+              mountPath: /data/duckdb
+              readOnly: true
+            - name: insight-storage
+              mountPath: /data/insight
+      volumes:
+        - name: nexus-storage
+          persistentVolumeClaim:
+            claimName: ${AZURE_FILE_SHARE_PVC}
+        - name: insight-storage
+          persistentVolumeClaim:
+            claimName: insight-storage
+
+
+# insight-worker-ontology-to-vectors
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insight-worker-ontology-to-vectors
+  namespace: deeplynxv3-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: insight-worker-ontology-to-vectors
+  template:
+    metadata:
+      labels:
+        app: insight-worker-ontology-to-vectors
+    spec:
+      terminationGracePeriodSeconds: 120
+      hostAliases:
+        - ip: "10.6.17.82"
+          hostnames:
+            - "deeplynx-api.inl.gov"
+      containers:
+        - name: insight-worker-ontology-to-vectors
+          image: ${CI_REGISTRY}/${CI_REGISTRY_PATH}:insight-worker-ontology-to-vectors-${GITHUB_RUN_NUMBER}
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: insight-worker-config
+          env:
+            - name: WORKER_NAME
+              value: "ontology_to_vectors"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: rabbitmq-default-user
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: rabbitmq-default-pass
+            - name: LLM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: llm-auth-token
+            - name: MM_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: mm-auth-token
+            - name: EMB_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: emb-auth-token
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-key
+            - name: ENCRYPTION_IV
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: encryption-iv
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "1024Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: nexus-storage
               mountPath: /data/duckdb
@@ -930,7 +1760,7 @@ spec:
                 name: deeplynxv3-service
                 port:
                   number: 80
-          - path: /api/v1
+          - path: /api
             pathType: Prefix
             backend:
               service:
@@ -956,5 +1786,12 @@ spec:
             backend:
               service:
                 name: deeplynxv3-mcp-service
+                port:
+                  number: 80
+          - path: /api/oauth
+            pathType: Prefix
+            backend:
+              service:
+                name: deeplynx-service
                 port:
                   number: 80

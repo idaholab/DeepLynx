@@ -26,6 +26,7 @@ import DataSourceCreateForm from "./DataSourceCreateForm";
 import DataSourceHeader from "./DataSourceHeader";
 import DataSourceList from "./DataSourceList";
 import DataSourceSummaryStats from "./DataSourceSummaryStats";
+import { useLanguage } from "@/app/contexts/Language";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -116,6 +117,7 @@ export const maskKey = (key: string) =>
 
 const DataSources = ({ projectId }: Props) => {
   const { organization } = useOrganizationSession();
+  const { t } = useLanguage();
 
   /* --------------------------------- State -------------------------------- */
 
@@ -382,7 +384,7 @@ const DataSources = ({ projectId }: Props) => {
           <ArrowPathIcon
             className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
           />
-          Refresh
+          {t.translations.REFRESH}
         </button>
         <button
           className="btn btn-primary gap-2"
@@ -390,7 +392,7 @@ const DataSources = ({ projectId }: Props) => {
           disabled={saving}
         >
           <PlusIcon className="w-5 h-5" />
-          Add Data Source
+          {t.translations.ADD_DATA_SOURCE}
         </button>
       </div>
 

@@ -71,12 +71,12 @@ public class MetadataBusinessTests : IntegrationTestBase
 
         // Build leaf dependencies first
         _userBusiness = new UserBusiness(Context);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyUpsertExecutor, _sensitivityLabelService, _mockPermissionService.Object);
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
@@ -94,7 +94,12 @@ public class MetadataBusinessTests : IntegrationTestBase
         _relationshipBusiness = new RelationshipBusiness(Context, _edgeBusiness, _eventBusiness);
 
         // Now classBusiness gets valid dependencies
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _relationshipBusiness, _eventBusiness);
+        _classBusiness = new ClassBusiness(Context,
+            _recordBusiness,
+            _relationshipBusiness,
+            _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
 
         _metadataBusiness = new MetadataBusiness(
             Context, _classBusiness, _relationshipBusiness, _tagBusiness, _recordBusiness, _edgeBusiness);

@@ -17,6 +17,8 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Compression;
+using Azure.Storage.Sas;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace deeplynx.tests;
 
@@ -26,6 +28,7 @@ public class FileAzuriteFixture : IAsyncLifetime
     private AzuriteContainer _azuriteContainer = null!;
 
     public string AzuriteConnectionString { get; private set; } = null!;
+    public string AzuriteLimitedConnectionString { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
@@ -35,6 +38,38 @@ public class FileAzuriteFixture : IAsyncLifetime
 
         await _azuriteContainer.StartAsync();
         AzuriteConnectionString = _azuriteContainer.GetConnectionString();
+        AzuriteLimitedConnectionString = await CreateLimitedConnectionString();
+    }
+
+    // Returns a connection string that may only download files, but not generate SAS.
+    private async Task<string> CreateLimitedConnectionString()
+    {
+        // One-time setup with a keyed client to mint the SAS and create test data
+        var containerName = "test-container";
+        var setupContainerClient = new BlobContainerClient(
+            _azuriteContainer.GetConnectionString(),
+            containerName);
+
+        await setupContainerClient.CreateIfNotExistsAsync();
+
+        var accountSasBuilder = new AccountSasBuilder
+        {
+            Services = AccountSasServices.Blobs,
+            ResourceTypes = AccountSasResourceTypes.Container | AccountSasResourceTypes.Object,
+            StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5),
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+        };
+        accountSasBuilder.SetPermissions(AccountSasPermissions.Read | AccountSasPermissions.List);
+
+        // Sign with the well-known Azurite key
+        var credential = new Azure.Storage.StorageSharedKeyCredential(
+            "devstoreaccount1",
+            "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="); // well-known Azurite dev key
+
+        string sasToken = accountSasBuilder.ToSasQueryParameters(credential).ToString();
+
+        var mappedPort = _azuriteContainer.GetMappedPublicPort(10000);
+        return $"BlobEndpoint=http://127.0.0.1:{mappedPort}/devstoreaccount1;SharedAccessSignature={sasToken}";
     }
 
     public async Task DisposeAsync()
@@ -54,6 +89,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
     private string _containerName = "test-container";
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
     private ObjectStorageConfigDto _objectStorageConfig = null!;
+    private ObjectStorageConfigDto _objectStorageConfigNoSas = null!; // Nuh uh, no SAS
     private ClassBusiness _classBusiness = null!;
     private TagBusiness _tagBusiness = null!;
     private long _classId;
@@ -76,6 +112,7 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private ITimeLimitedDataProtector _downloadProtector = null!;
     private Mock<IInsightBusiness> _insightBusiness = null!;
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyUpsertExecutor = null!;
@@ -119,6 +156,17 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             }
         };
 
+        // This object storage cannot create SAS URLs
+        // Look at CreateLimitedConnectionString for implementation details
+        _objectStorageConfigNoSas = new ObjectStorageConfigDto
+        {
+            AzureObjectConfig = new AzureObjectConfigDto
+            {
+                AzureConnectionString = _azuriteFixture.AzuriteLimitedConnectionString,
+                AzureContainerName = _containerName
+            }
+        };
+
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
@@ -149,8 +197,13 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
 
         // Initialize FileBusinessFactory mocks
-        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness);
-        var realFileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        var protectProvider = new EphemeralDataProtectionProvider();
+        _downloadProtector = protectProvider
+            .CreateProtector(RecordUrlHelper.DownloadProtector)
+            .ToTimeLimitedDataProtector();
+
+        var realFileFilesystemBusiness = new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
+        var realFileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper, protectProvider);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("filesystem")).Returns(realFileFilesystemBusiness);
         _fileBusinessFactory.Setup(x => x.CreateFileBusiness("azure_object")).Returns(realFileAzureBusiness);
@@ -169,13 +222,24 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             _fileBusinessFactory.Object);
 
 
-        _classBusiness = new ClassBusiness(Context, _recordBusiness, _mockRelationshipBusiness.Object, _eventBusiness);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _classBusiness = new ClassBusiness(Context, _recordBusiness,
+            _mockRelationshipBusiness.Object,
+            _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
+
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+
         _userBusiness = new UserBusiness(Context);
-        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness, _eventBusiness);
+        _dataSourceBusiness = new DataSourceBusiness(Context,
+            _edgeBusiness.Object,
+            _recordBusiness,
+            _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
 
-        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper, protectProvider);
 
         _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
 
@@ -189,7 +253,8 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
             _olapBusiness,
             _objectStorageBusiness,
             NullLogger<FileBusiness>.Instance,
-            _eventBusiness
+            _eventBusiness,
+            protectProvider
         );
     }
 
@@ -360,6 +425,107 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
     #endregion
 
     #region UploadFile Tests
+
+    [Fact]
+    public async Task CalculateFileContentHash_ReturnsSha256ForUploadBytes()
+    {
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("abc"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "hash.txt");
+
+        var result = await _fileAzureBusiness.CalculateFileContentHash(file);
+
+        Assert.Equal(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            result);
+    }
+
+    [Fact]
+    public async Task CalculateStoredFileContentHash_ReturnsSha256ForAzureBlob()
+    {
+        const string content = "abc";
+        var file = CreateMockFile("stored-hash.txt", content);
+        var uri = await _fileAzureBusiness.UploadFile(
+            _oid,
+            _pid,
+            _dsid,
+            _objectStorageConfig,
+            file,
+            Guid.NewGuid());
+
+        var result = await _fileAzureBusiness.CalculateStoredFileContentHash(
+            uri,
+            _objectStorageConfig);
+
+        Assert.Equal(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            result);
+    }
+
+    [Fact]
+    public async Task UploadFile_ThroughFileBusiness_PersistsContentHash()
+    {
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("abc"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "hash.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var result = await _fileBusiness.UploadFile(
+            _uid,
+            _oid,
+            _pid,
+            _dsid,
+            _azureObjectStorageId,
+            file);
+
+        Assert.Equal(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            result.FileContentHash);
+
+        var storedRecord = await Context.Records.FindAsync(result.Id);
+        Assert.Equal(result.FileContentHash, storedRecord!.FileContentHash);
+    }
+
+    [Fact]
+    public async Task UpdateFile_ThroughFileBusiness_ReplacesContentHash()
+    {
+        await using var originalStream = new MemoryStream(Encoding.UTF8.GetBytes("abc"));
+        var originalFile = new FormFile(
+            originalStream,
+            0,
+            originalStream.Length,
+            "file",
+            "original.txt");
+
+        var originalRecord = await _fileBusiness.UploadFile(
+            _uid,
+            _oid,
+            _pid,
+            _dsid,
+            _azureObjectStorageId,
+            originalFile);
+
+        await using var updatedStream = new MemoryStream(Encoding.UTF8.GetBytes("def"));
+        var updatedFile = new FormFile(
+            updatedStream,
+            0,
+            updatedStream.Length,
+            "file",
+            "updated.txt");
+
+        var updatedRecord = await _fileBusiness.UpdateFile(
+            _uid,
+            _oid,
+            _pid,
+            originalRecord.Id,
+            updatedFile);
+
+        Assert.Equal(
+            "cb8379ac2098aa165029e3938a51da0bcecfc008fd6795f401178647f96c5b34",
+            updatedRecord.FileContentHash);
+        Assert.NotEqual(originalRecord.FileContentHash, updatedRecord.FileContentHash);
+    }
 
     [Fact]
     public async Task UploadFile_Success_CreatesFileInAzure()
@@ -1312,6 +1478,71 @@ public class FileAzureBusinessTests : IntegrationTestBase, IClassFixture<FileAzu
     #endregion
 
     #region GenerateDownloadUrl Tests
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_ReturnsValidGenericUrl()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "download-no-sas-test.txt";
+        var fileContent = "Content for SAS download";
+        var mockFile = CreateMockFile(fileName, fileContent);
+
+        // Upload file first
+        var uri = await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
+
+        var recordDto = new RecordResponseDto
+        {
+            Uri = uri,
+            Name = fileName,
+        };
+
+        // Act
+        var result = await _fileAzureBusiness.GenerateDownloadUrl(
+            recordDto, _objectStorageConfigNoSas, expirationHours: 1, directUrl: "https://example.com");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.StartsWith("https://example.com?token=", result);
+    }
+
+    [Fact]
+    public async Task GenerateDownloadUrl_Success_GeneratedGenericUrlCanBeUsedForDownload()
+    {
+        // Arrange
+        var guid = Guid.NewGuid();
+        var fileName = "download-no-sas-download-test.txt";
+        var fileContent = "Content for SAS download";
+        var mockFile = CreateMockFile(fileName, fileContent);
+        var rid = 100;
+
+        // Upload file first
+        var uri = await _fileAzureBusiness.UploadFile(
+            _oid, _pid, _dsid, _objectStorageConfig, mockFile, guid);
+
+        var recordDto = new RecordResponseDto
+        {
+            Uri = uri,
+            Name = fileName,
+            Id = rid,
+        };
+
+        // Act
+        var result = await _fileAzureBusiness.GenerateDownloadUrl(
+            recordDto, _objectStorageConfigNoSas, expirationHours: 1, directUrl: "https://example.com");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.StartsWith("https://example.com?token=", result);
+
+        // Assert token
+        var token = result.Split("?token=")[1];
+        Assert.NotNull(token);
+
+        var valid = RecordUrlHelper.IsValidToken(_downloadProtector, token, rid);
+        Assert.True(valid);
+    }
 
     [Fact]
     public async Task GenerateDownloadUrl_Success_ReturnsValidSasUri()

@@ -6,6 +6,7 @@ using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -15,7 +16,9 @@ public class EdgeBusiness : IEdgeBusiness
 {
     private readonly IBulkCopyUpsertExecutor _bulkCopyUpsertExecutor;
     private readonly DeeplynxContext _context;
+    private readonly IProjectRolePermissionService _projectRolePermissionService;
     private readonly IEventBusiness _eventBusiness;
+    private readonly ILogger<EdgeBusiness>? _logger;
 
     private readonly ISensitivityLabelService _sensitivityLabelService;
 
@@ -27,18 +30,95 @@ public class EdgeBusiness : IEdgeBusiness
     /// <param name="bulkCopyUpsertExecutor">Used for bulk database operations.</param>
     /// <param name="sensitivityLabelService">Used for sensitivity label record authorization.</param>
     public EdgeBusiness(
-        DeeplynxContext context, IEventBusiness eventBusiness,
+        DeeplynxContext context,
+        IEventBusiness eventBusiness,
         IBulkCopyUpsertExecutor bulkCopyUpsertExecutor,
-        ISensitivityLabelService sensitivityLabelService)
+        ISensitivityLabelService sensitivityLabelService,
+        IProjectRolePermissionService projectRolePermissionService,
+        ILogger<EdgeBusiness>? logger = null)
     {
         _context = context;
         _eventBusiness = eventBusiness;
         _bulkCopyUpsertExecutor = bulkCopyUpsertExecutor;
+        _projectRolePermissionService = projectRolePermissionService;
         _sensitivityLabelService = sensitivityLabelService;
+        _logger = logger;
     }
 
     /// <summary>
-    ///     Retrieves all edges for a specific project and (optionally) datasource
+    ///     Retrieves all edges
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the edges belong</param>
+    /// <param name="currentUserId">The ID of the user</param>
+    /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter edges</param>
+    /// <param name="projectId">(optional) The ID of the project to filter edges by</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if null, all matching edges are returned unpaginated</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived edges from the result</param>
+    /// <param name="isSysAdmin">Flag indicating whether you are a system admin</param>
+    /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin</param>
+    /// <returns>A paginated list of edges, or all edges if no pagination is specified</returns>
+    public async Task<PaginatedResponse<EdgeResponseDto>> GetAllEdgesPaginated(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        PaginatedRequestDto paginatedRequestDto,
+        long? dataSourceId = null,
+        bool hideArchived = true,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false)
+    {
+        bool isUserProjectAdmin = false;
+
+        isUserProjectAdmin = await _context.ProjectMembers
+            .AnyAsync(pm =>
+                pm.IsProjectAdmin &&
+                pm.ProjectId == projectId &&
+                (
+                    (pm.UserId != null && pm.UserId == currentUserId) ||
+                    pm.Group!.Users.Any(u => u.Id == currentUserId)
+                ));
+
+        bool isAuthorized = isSysAdmin || isOrgAdmin || isUserProjectAdmin;
+
+        if (!isAuthorized)
+        {
+            isAuthorized = await _projectRolePermissionService.PermissionInProject(
+                currentUserId, projectId, "read", "edge");
+
+            if (!isAuthorized)
+            {
+                return new PaginatedResponse<EdgeResponseDto>
+                {
+                    Items = [],
+                    PageNumber = paginatedRequestDto.PageNumber,
+                    PageSize = paginatedRequestDto.PageSize,
+                    TotalCount = 0
+                };
+            }
+        }
+
+        var query = _context.Edges
+            .Include(e => e.Origin)
+            .Include(e => e.Destination)
+            .Where(e => e.OrganizationId == organizationId && e.ProjectId == projectId)
+            .AsQueryable();
+
+        if (dataSourceId.HasValue)
+            query = query.Where(e => e.DataSourceId == dataSourceId.Value);
+
+        if (hideArchived)
+            query = query.Where(e => !e.IsArchived);
+
+        var orderedQuery = query.OrderBy(e => e.Id);
+
+        return await orderedQuery.Select(e => EdgeToResponse(e)).ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    /// <summary>
+    ///     [DEPRECATED - V1 ONLY] Retrieves all edges without pagination.
+    ///     Superseded by <see cref="GetAllEdgesPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 edge controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
     /// </summary>
     /// <param name="currentUserId">The ID of the currentUser making the request</param>
     /// <param name="organizationId">The ID of the organization to which the project belongs</param>
@@ -46,6 +126,8 @@ public class EdgeBusiness : IEdgeBusiness
     /// <param name="dataSourceId">(Optional) The ID of the datasource by which to filter edges</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived edges from the result</param>
     /// <returns>A list of edges based on the applied filters.</returns>
+    [Obsolete("V1-only. Used by deprecated v1 edge endpoints. Superseded by GetAllEdgesPaginated. " +
+              "Remove once v1 edge endpoints are sunset.", error: false)]
     public async Task<List<EdgeResponseDto>> GetAllEdges(
         long currentUserId,
         long organizationId,
@@ -181,7 +263,7 @@ public class EdgeBusiness : IEdgeBusiness
         if (dto.OriginId == dto.DestinationId)
             throw new ValidationException("Destination and origin IDs cannot be the same");
 
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId, hideArchived: true, _logger);
 
         var originRecordExists = _context.Records.Any(r => r.Id == dto.OriginId);
         if (!originRecordExists) throw new KeyNotFoundException($"Origin record with id {dto.OriginId} not found");
@@ -190,7 +272,40 @@ public class EdgeBusiness : IEdgeBusiness
         if (!destinationRecordExists)
             throw new KeyNotFoundException($"Destination record with id {dto.DestinationId} not found");
 
-        var edge = new Edge
+        var edge = await FindEdge(organizationId, null, dto.OriginId, dto.DestinationId);
+
+        if (edge != null && edge.IsArchived == true)
+        {
+            await UnarchiveEdge(currentUserId, organizationId, projectId, null, dto.OriginId, dto.DestinationId);
+
+            return new EdgeResponseDto
+            {
+                Id = edge.Id,
+                OriginOriginalId = edge.Origin?.OriginalId,
+                DestinationOriginalId = edge.Destination?.OriginalId,
+                Properties = edge.Properties,
+                OriginId = edge.OriginId,
+                DestinationId = edge.DestinationId,
+                RelationshipId = edge.RelationshipId,
+                DataSourceId = edge.DataSourceId,
+                ProjectId = edge.ProjectId,
+                OrganizationId = edge.OrganizationId,
+                LastUpdatedAt = edge.LastUpdatedAt,
+                LastUpdatedBy = edge.LastUpdatedBy,
+                IsArchived = false
+            };
+        }
+
+        if (!dto.RelationshipId.HasValue && !string.IsNullOrEmpty(dto.RelationshipName))
+        {
+            var relationship = await _context.Relationships
+                .FirstOrDefaultAsync(r =>
+                    r.OrganizationId == organizationId &&
+                    r.Name.ToLower() == dto.RelationshipName.ToLower()) ?? throw new ValidationException($"Relationship with name '{dto.RelationshipName}' not found in organization {organizationId}");
+            dto.RelationshipId = relationship.Id;
+        }
+
+        edge = new Edge
         {
             Properties = dto.Properties?.ToString(),
             OriginId = dto.OriginId.Value,
@@ -272,7 +387,7 @@ public class EdgeBusiness : IEdgeBusiness
         if (invalidEdges.Any())
             throw new ArgumentException("All edges must have valid OriginId and DestinationId before bulk creation.");
 
-        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(_context, dataSourceId, projectId, organizationId, hideArchived: true, _logger);
         var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
         if (conn.State != ConnectionState.Open) await conn.OpenAsync();
         await using var tx = await conn.BeginTransactionAsync();
@@ -568,6 +683,26 @@ public class EdgeBusiness : IEdgeBusiness
         return classes;
     }
 
+    private static EdgeResponseDto EdgeToResponse(Edge edge)
+    {
+        return new EdgeResponseDto
+        {
+            Id = edge.Id,
+            OriginOriginalId = edge.Origin.OriginalId,
+            DestinationOriginalId = edge.Destination.OriginalId,
+            Properties = edge.Properties,
+            OriginId = edge.OriginId,
+            DestinationId = edge.DestinationId,
+            RelationshipId = edge.RelationshipId,
+            DataSourceId = edge.DataSourceId,
+            ProjectId = edge.ProjectId,
+            OrganizationId = edge.OrganizationId,
+            LastUpdatedAt = edge.LastUpdatedAt,
+            LastUpdatedBy = edge.LastUpdatedBy,
+            IsArchived = edge.IsArchived
+        };
+    }
+
     /// <summary>
     ///     Processes a list of edges, adding new nodes and links to our graph data structures
     /// </summary>
@@ -659,7 +794,6 @@ public class EdgeBusiness : IEdgeBusiness
         if (edge == null)
         {
             if (edgeId != null) throw new KeyNotFoundException($"Edge with id {edgeId} not found");
-            throw new KeyNotFoundException($"Edge with origin {originId} and destination {destinationId} not found");
         }
 
         return edge;

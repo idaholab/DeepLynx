@@ -16,10 +16,10 @@ public class HistoricalRecordResponseDto
     public string? ObjectStorageName { get; set; }
     public long ProjectId { get; set; }
     public string ProjectName { get; set; }
-    public string? FileType {get; set;}
-    public long? FileSize {get; set;}
+    public string? FileType { get; set; }
+    public long? FileSize { get; set; }
     public string? Tags { get; set; } = null!;
-    public string? Labels { get; set; } = null!;
+    public List<string>? Labels { get; set; }
     public DateTime LastUpdatedAt { get; set; }
     public string? LastUpdatedBy { get; set; }
     public bool IsArchived { get; set; } = false;

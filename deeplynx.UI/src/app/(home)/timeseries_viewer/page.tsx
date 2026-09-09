@@ -60,9 +60,12 @@ export default async function Page({
         const result = await queryBuilderServer(
             Number(organizationId),
             [dto],
-            [Number(projectId)]
+            [Number(projectId)],
+            null,
+            undefined,
+            -1
         );
-        availableFiles = result;
+        availableFiles = result.items;
     } catch (err) {
         console.error("Failed to grab timeseries files:", err);
     }

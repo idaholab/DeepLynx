@@ -5,7 +5,10 @@ namespace deeplynx.interfaces;
 
 public interface IProjectBusiness
 {
+    [Obsolete("V1-only. Used by deprecated v1 project endpoints. Superseded by GetAllProjectsPaginated. " +
+              "Remove once v1 project endpoints are sunset.", error: false)]
     Task<IEnumerable<ProjectResponseDto>> GetAllProjects(long userId, long organizationId, bool hideArchived = true);
+    Task<PaginatedResponse<ProjectResponseDto>> GetAllProjectsPaginated(long userId, long organizationId, PaginatedRequestDto paginatedRequestDto, bool hideArchived = true);
     Task<ProjectResponseDto> GetProject(long organizationId, long projectId, bool hideArchived = true);
     Task<ProjectResponseDto> CreateProject(long currentUserId, long organizationId, CreateProjectRequestDto dto);
 
@@ -16,13 +19,16 @@ public interface IProjectBusiness
     Task<bool> ArchiveProject(long currentUserId, long organizationId, long projectId);
     Task<bool> UnarchiveProject(long currentUserId, long organizationId, long projectId);
     Task<ProjectStatResponseDto> GetProjectStats(long organizationId, long projectId);
+    [Obsolete("V1-only. Used by deprecated v1 project endpoints. Superseded by GetAllProjectsPaginated. " +
+              "Remove once v1 project endpoints are sunset.", error: false)]
     Task<IEnumerable<ProjectMemberResponseDto>> GetProjectMembers(long projectId);
+    Task<PaginatedResponse<ProjectMemberResponseDto>> GetProjectMembersPaginated(long projectId, PaginatedRequestDto paginatedRequestDto);
     Task<bool> AddMemberToProject(long projectId, long? roleId, long? userId,
         long? groupId, bool makeProjectAdmin = false, bool allowServiceAccount = false);
     Task<bool> UpdateProjectMemberRole(long projectId, long roleId, long? userId, long? groupId,
         bool? isProjectAdmin = null);
     Task<bool> SetProjectAdminStatus(long projectId, long? userId, long? groupId, bool isAdmin = false);
-    Task<bool> RemoveMemberFromProject(long projectId, long? userId, long? groupId);
+    Task<bool> RemoveMemberFromProject(long projectId, long? userId, long? groupId, long? currentUserId);
     Task<string> UploadProjectLogo(long organizationId, long projectId, long? objectStorageId, IFormFile logoFile);
     Task<(Stream Stream, string FullPath)?> GetProjectLogoStreamAsync(long organizationId, long projectId, long? objectStorageId);
     Task<bool> RemoveLogoFileAsync(long organizationId, long projectId, long? objectStorageId);
