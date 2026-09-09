@@ -1,5 +1,5 @@
 # Stage 1: Build the C# backend
-FROM mcr.microsoft.com/dotnet/sdk:10.0.302 AS backend-build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.302 AS build
 
 # Define build arguments
 ARG OKTA_CLIENT_ID
@@ -54,7 +54,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the published backend code from the build stage
-COPY --from=backend-build /app/publish .
+COPY --from=build /app/publish .
 COPY deeplynx.api/moon.css .
 
 # Run the application directly. Database readiness and requirements are handled
