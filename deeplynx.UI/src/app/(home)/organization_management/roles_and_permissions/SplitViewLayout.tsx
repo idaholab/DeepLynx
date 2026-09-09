@@ -1,14 +1,12 @@
 // src/app/(home)/organization_management/roles_and_permissions/SplitViewLayout.tsx
 
 import React from "react";
-import { useMemo, useState } from "react";
 import {
   CheckIcon,
   PencilIcon,
   ShieldCheckIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import Tabs from "@/app/(home)/components/Tabs";
 import {
   PermissionResponseDto,
   RoleResponseDto,
@@ -60,68 +58,8 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
   isSeededUserRole,
 }) => {
   const { t } = useLanguage();
-  const [activePermissionTab, setActivePermissionTab] = useState(
-    t.translations.RESOURCE_PERMISSIONS,
-  );
 
-  const splitPermissionCategories = useMemo(() => {
-    const withoutLabelId: PermissionCategory[] = [];
-    const withLabelId: PermissionCategory[] = [];
-
-    permissionCategories.forEach((category) => {
-      const categoryWithoutLabel = category.permissions.filter(
-        (perm) => perm.labelId == null,
-      );
-      const categoryWithLabel = category.permissions.filter(
-        (perm) => perm.labelId != null,
-      );
-
-      if (categoryWithoutLabel.length > 0) {
-        withoutLabelId.push({
-          ...category,
-          permissions: categoryWithoutLabel,
-        });
-      }
-
-      if (categoryWithLabel.length > 0) {
-        withLabelId.push({
-          ...category,
-          permissions: categoryWithLabel,
-        });
-      }
-    });
-
-    return { withoutLabelId, withLabelId };
-  }, [permissionCategories]);
-
-  const labelPermissionCategoriesByName = useMemo(() => {
-    const labelPermissions = splitPermissionCategories.withLabelId.flatMap(
-      (category) => category.permissions,
-    );
-
-    const groupedByName = labelPermissions.reduce(
-      (acc, perm) => {
-        const key = (perm.name || "Unnamed Label Permission").trim();
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(perm);
-        return acc;
-      },
-      {} as Record<string, PermissionResponseDto[]>,
-    );
-
-    return Object.entries(groupedByName).map(([name, perms]) => ({
-      id: `label-${name.toLowerCase().replace(/\s+/g, "-")}`,
-      label: name,
-      permissions: perms.sort((a, b) =>
-        String(a.action || "").localeCompare(String(b.action || "")),
-      ),
-    }));
-  }, [splitPermissionCategories.withLabelId]);
-
-  const renderPermissionsContent = (
-    categories: PermissionCategory[],
-    displayMode: "permission-name" | "permission-action" = "permission-name",
-  ): React.ReactNode => {
+  const renderPermissionsContent = (): React.ReactNode => {
     if (!currentRole) return null;
     const isSeededUser = isSeededUserRole(currentRole);
 
@@ -136,9 +74,9 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
               className="btn btn-primary btn-sm gap-2"
               title={
                 isSeededUser
-                    ? t.translations
-                        .SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
-                    : rolesLocked
+                  ? t.translations
+                    .SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
+                  : rolesLocked
                     ? "Roles are locked"
                     : "Edit Permissions"
               }
@@ -169,13 +107,13 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
           <div className="flex items-center justify-center py-12">
             <span className="loading loading-spinner loading-lg text-primary"></span>
           </div>
-        ) : categories.length === 0 ? (
+        ) : permissionCategories.length === 0 ? (
           <div className="alert">
             <span>{t.translations.NO_PERMISSIONS}</span>
           </div>
         ) : (
           <div className="space-y-4">
-            {categories.map((category) => (
+            {permissionCategories.map((category) => (
               <div key={category.id} className="card bg-base-200/25">
                 <div className="card-body p-4">
                   <h4 className="card-title text-sm mb-3">{category.label}</h4>
@@ -188,16 +126,11 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                       return (
                         <label
                           key={perm.id}
-                          className={`label justify-start gap-2 ${
-                            isEditingPermissions
-                              ? "cursor-pointer"
-                              : "cursor-default"
-                          }`}
-                          title={
-                            displayMode === "permission-action"
-                              ? perm.description || perm.action || perm.name
-                              : perm.description || perm.name
-                          }
+                          className={`label justify-start gap-2 ${isEditingPermissions
+                            ? "cursor-pointer"
+                            : "cursor-default"
+                            }`}
+                          title={perm.description || perm.name}
                         >
                           <input
                             type="checkbox"
@@ -206,11 +139,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                             disabled={!isEditingPermissions}
                             className="checkbox checkbox-primary checkbox-sm"
                           />
-                          <span className="label-text">
-                            {displayMode === "permission-action"
-                              ? perm.action
-                              : perm.name}
-                          </span>
+                          <span className="label-text">{perm.name}</span>
                         </label>
                       );
                     })}
@@ -223,20 +152,6 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
       </div>
     );
   };
-
-  const permissionTabs = [
-    {
-      label: t.translations.RESOURCE_PERMISSIONS,
-      content: renderPermissionsContent(splitPermissionCategories.withoutLabelId),
-    },
-    {
-      label: t.translations.SENSITIVITY_LABELS,
-      content: renderPermissionsContent(
-        labelPermissionCategoriesByName,
-        "permission-action",
-      ),
-    },
-  ];
 
   return (
     <div className="flex gap-6" style={{ height: "calc(100vh - 28rem)" }}>
@@ -269,24 +184,21 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
                   key={role.id}
                   onClick={() => onRoleSelection(role.id)}
                   disabled={isEditingPermissions}
-                  className={`w-full px-4 py-3 text-left border-b border-base-300 transition-colors ${
-                    selectedRoleId === role.id
-                      ? "bg-primary/10 border-l-4 border-l-primary"
-                      : ""
-                  } ${
-                    isEditingPermissions
+                  className={`w-full px-4 py-3 text-left border-b border-base-300 transition-colors ${selectedRoleId === role.id
+                    ? "bg-primary/10 border-l-4 border-l-primary"
+                    : ""
+                    } ${isEditingPermissions
                       ? "opacity-50 cursor-not-allowed"
                       : "hover:bg-base-200 cursor-pointer"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <ShieldCheckIcon
-                        className={`w-4 h-4 ${
-                          selectedRoleId === role.id
-                            ? "text-primary"
-                            : "text-base-content/40"
-                        }`}
+                        className={`w-4 h-4 ${selectedRoleId === role.id
+                          ? "text-primary"
+                          : "text-base-content/40"
+                          }`}
                       />
                       <span className="font-medium text-sm">{role.name}</span>
                     </div>
@@ -357,11 +269,7 @@ const SplitViewLayout: React.FC<SplitViewLayoutProps> = ({
 
             {/* Permissions Section */}
             <div className="flex-1 overflow-y-auto p-6">
-              <Tabs
-                tabs={permissionTabs}
-                activeTab={activePermissionTab}
-                onTabChange={setActivePermissionTab}
-              />
+              {renderPermissionsContent()}
             </div>
           </>
         ) : (

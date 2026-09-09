@@ -1,15 +1,19 @@
 using System.Text.Json;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.ResponseDTOs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace deeplynx.business;
 
 public class ProvenanceBusiness : IProvenanceBusiness
 {
+    private const int MaxChainConflictRetries = 3;
+
     private readonly DeeplynxContext _context;
     private readonly ILogger<ProvenanceBusiness> _logger;
 
@@ -23,6 +27,52 @@ public class ProvenanceBusiness : IProvenanceBusiness
         _context = context;
         _logger = logger;
     }
+
+    /// <summary>
+    ///     Look up the chain hash of the most recent chained provenance record for a given
+    ///     record_id, defaulting to the genesis sentinel if the record has no chained history yet
+    ///     (either no provenance records exist, or only pre-chain legacy rows exist).
+    /// </summary>
+    private async Task<string> GetLatestChainHashAsync(long recordId)
+    {
+        var latest = await _context.ProvenanceRecords
+            .Where(p => p.RecordId == recordId && p.ChainHash != null)
+            .OrderByDescending(p => p.Id)
+            .Select(p => p.ChainHash)
+            .FirstOrDefaultAsync();
+
+        return latest ?? ProvenanceChainEnvelope.GenesisHash;
+    }
+
+    /// <summary>
+    ///     Bulk variant of <see cref="GetLatestChainHashAsync" />: looks up the latest chain hash
+    ///     per distinct record_id in a single query. Record IDs with no chained history are simply
+    ///     absent from the result; callers should default those to the genesis sentinel.
+    /// </summary>
+    private async Task<Dictionary<long, string>> GetLatestChainHashesAsync(IEnumerable<long> recordIds)
+    {
+        var ids = recordIds.Distinct().ToArray();
+
+        var latest = await _context.ProvenanceRecords
+            .FromSqlInterpolated($@"
+                SELECT DISTINCT ON (record_id) *
+                FROM deeplynx.provenance_records
+                WHERE record_id = ANY({ids}) AND chain_hash IS NOT NULL
+                ORDER BY record_id, id DESC")
+            .AsNoTracking()
+            .ToListAsync();
+
+        return latest.ToDictionary(p => p.RecordId, p => p.ChainHash!);
+    }
+
+    /// <summary>
+    ///     True if the given exception is a unique-violation on the chain-start/chain-link
+    ///     partial unique index, meaning a concurrent writer won the race to extend this
+    ///     record's chain first and the caller should retry with a freshly-read previous hash.
+    /// </summary>
+    private static bool IsChainConflict(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg &&
+        pg.ConstraintName == "ux_provenance_records_record_id_previous_hash";
 
     /// <summary>
     ///     Retrieve a single provenance record by its database ID.
@@ -51,6 +101,8 @@ public class ProvenanceBusiness : IProvenanceBusiness
             ProvenanceJson = provenanceRecord.ProvenanceJson,
             FileContentHash = provenanceRecord.FileContentHash,
             Signature = provenanceRecord.Signature,
+            PreviousHash = provenanceRecord.PreviousHash,
+            ChainHash = provenanceRecord.ChainHash,
             CreatedAt = provenanceRecord.CreatedAt
         };
     }
@@ -94,9 +146,53 @@ public class ProvenanceBusiness : IProvenanceBusiness
                 ProvenanceJson = r.ProvenanceJson,
                 FileContentHash = r.FileContentHash,
                 Signature = r.Signature,
+                PreviousHash = r.PreviousHash,
+                ChainHash = r.ChainHash,
                 CreatedAt = r.CreatedAt
             }).ToList()
         };
+    }
+
+    /// <summary>
+    ///     Retrieve every provenance record ever created for a project, most recent first,
+    ///     including provenance for records/historical records that have since been deleted.
+    ///     Unlike <see cref="GetProvenanceHistory" />, this does not check whether any
+    ///     individual record still exists — only that the project does.
+    /// </summary>
+    /// <param name="projectId">The ID of the project whose provenance history is being retrieved</param>
+    /// <param name="paginatedRequestDto">Pagination parameters</param>
+    /// <returns>A paginated list of provenance records for the given project, most recent first</returns>
+    /// <exception cref="KeyNotFoundException">Thrown if no matching project is found</exception>
+    public async Task<PaginatedResponse<ProvenanceRecordResponseDto>> GetProjectProvenanceHistory(
+        long projectId, PaginatedRequestDto paginatedRequestDto)
+    {
+        var projectExists = await _context.Projects.AnyAsync(p => p.Id == projectId);
+        if (!projectExists)
+            throw new KeyNotFoundException($"Project with id {projectId} not found");
+
+        // ThenByDescending(Id) breaks ties deterministically: BulkCreateProvenanceRecords
+        // stamps one shared CreatedAt across a whole batch, so CreatedAt alone isn't unique
+        // enough to page through without skipping or duplicating rows.
+        return await _context.ProvenanceRecords
+            .Where(p => p.ProjectId == projectId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ThenByDescending(p => p.Id)
+            .Select(p => new ProvenanceRecordResponseDto
+            {
+                Id = p.Id,
+                RecordId = p.RecordId,
+                HistoricalRecordId = p.HistoricalRecordId,
+                OrganizationId = p.OrganizationId,
+                ProjectId = p.ProjectId,
+                ProvId = p.ProvId,
+                ProvenanceJson = p.ProvenanceJson,
+                FileContentHash = p.FileContentHash,
+                Signature = p.Signature,
+                PreviousHash = p.PreviousHash,
+                ChainHash = p.ChainHash,
+                CreatedAt = p.CreatedAt
+            })
+            .ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -154,24 +250,42 @@ public class ProvenanceBusiness : IProvenanceBusiness
             AiServerUrl = aiConfig?.ServerUrl
         }, out var provId);
 
-        // save the provenance JSON and relevant extracted fields to the DB
-        var provenanceRecord = new ProvenanceRecord
+        // chain this record to the most recent one for the same record_id, retrying if a
+        // concurrent writer wins the race to extend the chain first
+        for (var attempt = 1; ; attempt++)
         {
-            RecordId = recordId,
-            HistoricalRecordId = historicalRecord.Id,
-            OrganizationId = historicalRecord.OrganizationId,
-            ProjectId = historicalRecord.ProjectId,
-            ProvId = provId,
-            FileContentHash = historicalRecord.FileContentHash,
-            ProvenanceJson = provenanceJson,
-            // leaving null for now until we get hashing and signatures implemented
-            Signature = null,
-            CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
-        };
+            var previousHash = await GetLatestChainHashAsync(recordId);
+            var provenanceRecord = new ProvenanceRecord
+            {
+                RecordId = recordId,
+                HistoricalRecordId = historicalRecord.Id,
+                OrganizationId = historicalRecord.OrganizationId,
+                ProjectId = historicalRecord.ProjectId,
+                ProvId = provId,
+                FileContentHash = historicalRecord.FileContentHash,
+                ProvenanceJson = provenanceJson,
+                // leaving null for now; a future signing approach can layer a signature over
+                // the chain hash without a schema change
+                Signature = null,
+                PreviousHash = previousHash,
+                CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            };
+            provenanceRecord.ChainHash = ProvenanceChainEnvelope.HashBase64(provenanceRecord, previousHash);
 
-        _context.ProvenanceRecords.Add(provenanceRecord);
-        await _context.SaveChangesAsync();
-        return true;
+            _context.ProvenanceRecords.Add(provenanceRecord);
+            try
+            {
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (DbUpdateException ex) when (IsChainConflict(ex) && attempt < MaxChainConflictRetries)
+            {
+                _context.ChangeTracker.Clear();
+                _logger.LogWarning(ex,
+                    "CreateProvenanceRecord: chain conflict for record {RecordId} on attempt {Attempt}, retrying",
+                    recordId, attempt);
+            }
+        }
     }
 
     /// <summary>
@@ -226,78 +340,105 @@ public class ProvenanceBusiness : IProvenanceBusiness
         }
 
         var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        var provenanceRecords = new List<ProvenanceRecord>(historicalRecords.Count);
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
-        try
+        // build the provenance JSON once per record; only the chain fields depend on the
+        // latest chain state, which is re-read on every retry attempt below
+        var pending = historicalRecords.Select(histRecord =>
         {
-            foreach (var histRecord in historicalRecords)
+            var provenanceJson = BuildProvenanceRecord(new BuildProvenanceRecordDto
             {
-                var provenanceJson = BuildProvenanceRecord(new BuildProvenanceRecordDto
-                {
-                    RecordId = histRecord.RecordId,
-                    HistoricalRecordId = histRecord.Id,
-                    Action = action,
-                    ActorId = currentUserId,
-                    OrganizationId = histRecord.OrganizationId,
-                    ProjectId = histRecord.ProjectId,
-                    FileUri = histRecord.Uri,
-                    FileHash = histRecord.FileContentHash,
-                    FileSize = histRecord.FileSize,
-                    FileType = histRecord.FileType,
-                    AiConfigId = aiConfigId,
-                    AiModelProvider = aiConfig?.ModelProvider,
-                    AiModelName = aiConfig?.ModelName,
-                    AiModelType = aiConfig?.ModelType,
-                    AiServerUrl = aiConfig?.ServerUrl
-                }, out var provId);
+                RecordId = histRecord.RecordId,
+                HistoricalRecordId = histRecord.Id,
+                Action = action,
+                ActorId = currentUserId,
+                OrganizationId = histRecord.OrganizationId,
+                ProjectId = histRecord.ProjectId,
+                FileUri = histRecord.Uri,
+                FileHash = histRecord.FileContentHash,
+                FileSize = histRecord.FileSize,
+                FileType = histRecord.FileType,
+                AiConfigId = aiConfigId,
+                AiModelProvider = aiConfig?.ModelProvider,
+                AiModelName = aiConfig?.ModelName,
+                AiModelType = aiConfig?.ModelType,
+                AiServerUrl = aiConfig?.ServerUrl
+            }, out var provId);
 
-                provenanceRecords.Add(new ProvenanceRecord
+            return (histRecord, provenanceJson, provId);
+        }).ToList();
+
+        // chain each record to its own most recent provenance entry, retrying the whole batch
+        // if a concurrent writer wins the race to extend one of these records' chains first
+        for (var attempt = 1; ; attempt++)
+        {
+            var latestChainHashes = await GetLatestChainHashesAsync(distinctRecordIds);
+
+            var provenanceRecords = pending.Select(p =>
+            {
+                var previousHash = latestChainHashes.GetValueOrDefault(
+                    p.histRecord.RecordId, ProvenanceChainEnvelope.GenesisHash);
+
+                var provenanceRecord = new ProvenanceRecord
                 {
-                    RecordId = histRecord.RecordId,
-                    HistoricalRecordId = histRecord.Id,
-                    OrganizationId = histRecord.OrganizationId,
-                    ProjectId = histRecord.ProjectId,
-                    ProvId = provId,
-                    FileContentHash = histRecord.FileContentHash,
-                    ProvenanceJson = provenanceJson,
-                    // leaving null for now until we get hashing and signatures implemented
+                    RecordId = p.histRecord.RecordId,
+                    HistoricalRecordId = p.histRecord.Id,
+                    OrganizationId = p.histRecord.OrganizationId,
+                    ProjectId = p.histRecord.ProjectId,
+                    ProvId = p.provId,
+                    FileContentHash = p.histRecord.FileContentHash,
+                    ProvenanceJson = p.provenanceJson,
+                    // leaving null for now; a future signing approach can layer a signature over
+                    // the chain hash without a schema change
                     Signature = null,
+                    PreviousHash = previousHash,
                     CreatedAt = now
-                });
+                };
+                provenanceRecord.ChainHash = ProvenanceChainEnvelope.HashBase64(provenanceRecord, previousHash);
+                return provenanceRecord;
+            }).ToList();
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // save all bulk-created prov records in a single DB trip
+                _context.ProvenanceRecords.AddRange(provenanceRecords);
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+                return true;
             }
+            catch (DbUpdateException ex) when (IsChainConflict(ex) && attempt < MaxChainConflictRetries)
+            {
+                await transaction.RollbackAsync();
+                _context.ChangeTracker.Clear();
+                _logger.LogWarning(ex,
+                    "BulkCreateProvenanceRecords: chain conflict on attempt {Attempt}, retrying whole batch",
+                    attempt);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync();
 
-            // save all bulk-created prov records in a single DB trip
-            _context.ProvenanceRecords.AddRange(provenanceRecords);
-            await _context.SaveChangesAsync();
+                var failedRecordIds = ex.Entries
+                    .Select(e => e.Entity)
+                    .OfType<ProvenanceRecord>()
+                    .Select(p => p.RecordId)
+                    .ToList();
 
-            await transaction.CommitAsync();
+                _logger.LogError(ex,
+                    "BulkCreateProvenanceRecords failed while saving provenance records for record_ids [{FailedIds}]",
+                    string.Join(", ", failedRecordIds));
+
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "BulkCreateProvenanceRecords failed unexpectedly for record_ids [{RecordIds}]",
+                    string.Join(", ", distinctRecordIds));
+                throw;
+            }
         }
-        catch (DbUpdateException ex)
-        {
-            await transaction.RollbackAsync();
-
-            var failedRecordIds = ex.Entries
-                .Select(e => e.Entity)
-                .OfType<ProvenanceRecord>()
-                .Select(p => p.RecordId)
-                .ToList();
-
-            _logger.LogError(ex,
-                "BulkCreateProvenanceRecords failed while saving provenance records for record_ids [{FailedIds}]",
-                string.Join(", ", failedRecordIds));
-
-            throw;
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "BulkCreateProvenanceRecords failed unexpectedly for record_ids [{RecordIds}]",
-                string.Join(", ", historicalRecords.Select(h => h.RecordId)));
-            throw;
-        }
-
-        return true;
     }
 
     /// <summary>

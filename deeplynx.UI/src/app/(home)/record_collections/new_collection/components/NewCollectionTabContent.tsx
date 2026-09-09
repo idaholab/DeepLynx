@@ -12,6 +12,7 @@ import NewCollectionStepIndicator from "./NewCollectionStepIndicator";
 import SelectedRecordsPreviewPanel from "../../components/SelectedRecordsPreviewPanel";
 import { interpolateTemplate } from "@/app/lib/record_helpers";
 import type { NewCollectionTabController } from "../hooks/useNewCollectionWorkflow";
+import AdditionalPropertiesEditor from "@/app/(home)/record/components/AdditionalPropertiesEditor";
 
 type Props = {
   controller: NewCollectionTabController;
@@ -38,6 +39,7 @@ export default function NewCollectionTabContent({
       newCollectionDescription,
       setNewCollectionDescription,
     },
+    propertiesEditor: { onOpen, ...propertiesEditorProps },
     recordSearch: {
       newCollectionRecordSearchTerm,
       setNewCollectionRecordSearchTerm,
@@ -338,7 +340,7 @@ export default function NewCollectionTabContent({
                         emptyMessage={
                           t.translations.RECORD_COLLECTIONS_NO_RECORDS_FOUND
                         }
-                        maxHeightClassName="max-h-fit"
+                        maxHeightClassName="max-h-80"
                         pinnedHeader={false}
                         leadingHeaderCell={
                           <input
@@ -357,8 +359,7 @@ export default function NewCollectionTabContent({
                           />
                         }
                       />
-                      {newCollectionRecordSearchResults.length >
-                      recordsPerPage ? (
+                      {newCollectionRecordPageCount > 1 ? (
                         <div className="px-4 py-3 text-sm">
                           <PaginationControls
                             currentPage={newCollectionRecordPage}
@@ -523,6 +524,54 @@ export default function NewCollectionTabContent({
                         }
                       />
                     </label>
+                      
+                    <label className="form-control w-full">
+                      <div className="label">
+                        <span className="label-text font-medium">
+                          {t.translations.RECORD_COLLECTIONS_ADDITIONAL_PROPERTIES}
+                        </span>
+                      </div>
+                      <div className="rounded-2xl border border-base-300/50 bg-base-100 p-5">
+                        <div className="max-h-[17.5rem] overflow-auto pr-1">
+                          <table className="table table-pin-rows">
+                            <thead className="bg-base-100">
+                              <tr>
+                                <th>{t.translations.RECORD_COLLECTIONS_FIELD}</th>
+                                <th className="flex items-center justify-between">
+                                  <span>{t.translations.RECORD_COLLECTIONS_VALUE}</span>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-xs"
+                                    disabled={saving}
+                                    onClick={onOpen}
+                                  >
+                                    {t.translations.ADD}
+                                  </button>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Object.keys(propertiesEditorProps.properties ?? {}).length === 0 ? (
+                                <tr>
+                                  <td colSpan={2}>
+                                    {t.translations.RECORD_COLLECTIONS_NO_ADDITIONAL_PROPERTIES_SET}
+                                  </td>
+                                </tr>
+                              ) : (
+                                Object.entries(propertiesEditorProps.properties).map(([key, value]) => (
+                                  <tr key={key}>
+                                    <td>{key}</td>
+                                    <td>{String(value)}</td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </label>
+                    <AdditionalPropertiesEditor {...propertiesEditorProps} />
+                                      
 
                     {selectedRecordsPreview}
                   </div>

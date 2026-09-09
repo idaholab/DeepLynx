@@ -12,11 +12,10 @@ import {
 import { getAllClasses } from "@/app/lib/client_service/class_services.client";
 import { updateFile } from "@/app/lib/client_service/file_services.client";
 import { uploadBulkMetadata } from "@/app/lib/client_service/metadata_service.client";
-import { fullTextSearch } from "@/app/lib/client_service/query_services.client";
 import { getAllRecords } from "@/app/lib/client_service/record_services.client";
 import { parseBackendErrors } from "@/app/lib/error_parser";
 import { createUploadToastManager } from "@/app/lib/uploadToastManager";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useBulkUploadState } from "./hooks/useBulkUploadState";
 import { useProjectResources } from "./hooks/useProjectResources";
@@ -115,12 +114,10 @@ export default function UploadCenterClient() {
     let cancelled = false;
     (async () => {
       try {
-        const records = await getAllRecords(
+        const { items: records } = await getAllRecords(
           Number(organizationId),
           Number(projectId),
-          undefined,
-          undefined,
-          true,
+          { hideArchived: true },
         );
         if (cancelled) return;
 
@@ -153,7 +150,7 @@ export default function UploadCenterClient() {
 
     (async () => {
       try {
-        const classes = await getAllClasses(Number(projectId), true);
+        const { items: classes } = await getAllClasses(Number(projectId), true);
         if (cancelled) return;
         setAvailableClasses(classes);
       } catch (error) {
@@ -190,32 +187,6 @@ export default function UploadCenterClient() {
     projects,
     setProjectId,
   ]);
-
-  const handleSearchAvailableFiles = useCallback(
-    async (query: string): Promise<ExistingFile[]> => {
-      const trimmedQuery = query.trim();
-      if (!trimmedQuery) return availableFiles;
-      if (!organizationId || !projectId) return [];
-
-      try {
-        const results = await fullTextSearch(
-          Number(organizationId),
-          trimmedQuery,
-          [Number(projectId)],
-        );
-
-        return dedupeExistingFiles(
-          results
-            .map((record) => mapRecordToExistingFile(record))
-            .filter((record): record is ExistingFile => record !== null),
-        );
-      } catch (error) {
-        console.error("Error searching records for update picker:", error);
-        return [];
-      }
-    },
-    [availableFiles, organizationId, projectId],
-  );
 
   const needsTarget =
     fileUploadState.uploadType === "version" ||
@@ -321,13 +292,14 @@ export default function UploadCenterClient() {
     const showProgressToast = (progress: UploadProgressEvent) => {
       uploadToastManager.show({
         title: t.translations.UPLOADING_FILE,
-        message: `${progress.chunksCompleted} / ${progress.totalChunks} ${t.translations.CHUNKS
-          }`,
+        message: t.translations.PREPARING_UPLOAD,
         percent: progress.percentComplete,
-        chunksCompleted: progress.chunksCompleted,
-        totalChunks: progress.totalChunks,
+        bytesUploaded: progress.bytesUploaded,
+        totalBytes: progress.totalBytes,
+        speedBytesPerSec: progress.speedBytesPerSec,
+        isFinalizing: progress.isFinalizing,
         isCancelling: cancelling,
-        onCancel: progress.uploadId ? cancelFromToast : undefined,
+        onCancel: progress.uploadId && !progress.isFinalizing ? cancelFromToast : undefined,
         cancelDisabled: cancelling,
       });
     };
@@ -487,6 +459,7 @@ export default function UploadCenterClient() {
           Number(projectId),
           Number(metadata.targetRecordId),
           file,
+          metadata.metadataFile
         );
         uploadToastManager.success(
           t.translations.RECORD_FILE_UPDATED_SUCCESSFULLY,
@@ -847,7 +820,6 @@ export default function UploadCenterClient() {
                         availableFiles={availableFiles}
                         availableClasses={availableClasses}
                         isLoadingClasses={isLoadingClasses}
-                        onSearchFiles={handleSearchAvailableFiles}
                         needsTarget={needsTarget}
                         isUploading={fileUploadState.isUploading}
                         canUpload={canUpload}
@@ -855,6 +827,7 @@ export default function UploadCenterClient() {
                         onClear={fileUploadState.clearAll}
                         onRemoveAt={fileUploadState.removeAt}
                         projectId={Number(projectId)}
+                        organizationId={Number(organizationId)}
                       />
                     ) : (
                       <BulkUploadSection

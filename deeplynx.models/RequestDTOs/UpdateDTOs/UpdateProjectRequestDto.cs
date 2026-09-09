@@ -15,4 +15,5 @@ public class UpdateProjectRequestDto
     public bool? RequireSensitivityLabel { get; set; }
 
     public string? FilePath { get; set; }
+    public long? DefaultObjectStorageId { get; set; }
 }

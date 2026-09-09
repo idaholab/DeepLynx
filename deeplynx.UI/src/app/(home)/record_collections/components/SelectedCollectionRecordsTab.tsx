@@ -2,12 +2,14 @@
 
 import { useLanguage } from "@/app/contexts/Language";
 import Link from "next/link";
-import React from "react";
+import { useEffect } from "react";
 import CollectionRecordSearchControls from "./CollectionRecordSearchControls";
 import CollectionRecordSearchResultsTable from "./CollectionRecordSearchResultsTable";
 import SectionCard from "./SectionCard";
 import { interpolateTemplate } from "@/app/lib/record_helpers";
 import type { CollectionDetailsController } from "../[collectionId]/hooks/useCollectionDetails";
+import PaginationControls from "../../components/PaginationControls";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
 
 type Props = {
   controller: CollectionDetailsController["recordsController"];
@@ -41,6 +43,40 @@ export default function SelectedCollectionRecordsTab({
   },
 }: Props) {
   const { t } = useLanguage();
+
+  const {
+    currentPage: visibleRecordPage,
+    pageSize: visibleRecordPageSize,
+    paginatedItems: paginatedVisibleRecords,
+    resetPagination: resetVisibleRecordPagination,
+    setCurrentPage: setVisibleRecordPage,
+    setPageSize: setVisibleRecordPageSize,
+    totalPages: visibleRecordTotalPages,
+  } = useLocalPagination({
+    items: collectionRecords,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetVisibleRecordPagination();
+  }, [collectionRecords, resetVisibleRecordPagination]);
+
+  const {
+    currentPage: searchRecordPage,
+    pageSize: searchRecordPageSize,
+    paginatedItems: paginatedSearchRecords,
+    resetPagination: resetSearchRecordPagination,
+    setCurrentPage: setSearchRecordPage,
+    setPageSize: setSearchRecordPageSize,
+    totalPages: searchTotalPages,
+  } = useLocalPagination({
+    items: addableRecordResults,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+      resetSearchRecordPagination();
+    }, [addableRecordResults, resetSearchRecordPagination]);  
 
   return (
     <div className="mt-4">
@@ -83,7 +119,7 @@ export default function SelectedCollectionRecordsTab({
 
           {recordSearchResults.length ? (
             <CollectionRecordSearchResultsTable
-              rows={addableRecordResults.map((record) => {
+              rows={paginatedSearchRecords.map((record) => {
                 const classDisplayName =
                   record.className ??
                   (typeof record.classId === "number"
@@ -127,10 +163,22 @@ export default function SelectedCollectionRecordsTab({
                 t.translations
                   .RECORD_COLLECTIONS_ALL_MATCHING_ALREADY_IN_THIS_COLLECTION
               }
-              maxHeightClassName="max-h-fit"
+              maxHeightClassName="max-h-80"
               pinnedHeader={false}
             />
           ) : null}
+
+
+        {/* Pagination Controls */}
+        <div className="mt-2 flex justify-end">
+          <PaginationControls
+            currentPage={searchRecordPage}
+            pageSize={searchRecordPageSize}
+            totalPages={searchTotalPages}
+            onPageChange={setSearchRecordPage}
+            onPageSizeChange={setSearchRecordPageSize}
+          />
+        </div>
 
           {recordSearchLoading ? (
             <div className="mt-3 flex items-center gap-2 text-sm text-base-content/70">
@@ -147,7 +195,7 @@ export default function SelectedCollectionRecordsTab({
           </div>
         ) : (
           <CollectionRecordSearchResultsTable
-            rows={collectionRecords.map((record) => {
+            rows={paginatedVisibleRecords.map((record) => {
               const classDisplayName =
                 record.className ??
                 (typeof record.classId === "number"
@@ -185,10 +233,21 @@ export default function SelectedCollectionRecordsTab({
             emptyMessage={
               t.translations.RECORD_COLLECTIONS_NO_RECORDS_ARE_CURRENTLY_ASSIGNED
             }
-            maxHeightClassName="max-h-fit"
+            maxHeightClassName="max-h-80"
             pinnedHeader={false}
           />
         )}
+
+        {/* Pagination Controls */}
+        <div className="mt-2 flex justify-end">
+          <PaginationControls
+            currentPage={visibleRecordPage}
+            pageSize={visibleRecordPageSize}
+            totalPages={visibleRecordTotalPages}
+            onPageChange={setVisibleRecordPage}
+            onPageSizeChange={setVisibleRecordPageSize}
+          />
+        </div>
       </SectionCard>
     </div>
   );

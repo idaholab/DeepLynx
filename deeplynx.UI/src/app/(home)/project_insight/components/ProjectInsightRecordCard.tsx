@@ -84,7 +84,7 @@ export default function ProjectInsightRecordCard({
       : null,
   ].flatMap((item) => (item ? [item] : []));
 
-  const hasTagsOrLabels = record.tags.length > 0 || record.labels.length > 0;
+  const hasTagsOrLabels = record.tags.length > 0 || record.sensitivityLabels.length > 0;
   const hasDetails = metadataItems.length > 0 || hasTagsOrLabels;
 
   return (
@@ -170,7 +170,7 @@ export default function ProjectInsightRecordCard({
                       {tag.name}
                     </span>
                   ))}
-                  {record.labels.map((label) => (
+                  {record.sensitivityLabels.map((label) => (
                     <span
                       key={`${record.id}-label-${label.id}`}
                       className="badge badge-outline badge-xs"

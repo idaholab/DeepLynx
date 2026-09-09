@@ -11,7 +11,7 @@ import {
   removeMemberFromProject,
   updateProjectMemberRole,
 } from "@/app/lib/client_service/projects_services.client";
-import { getAllUsers } from "@/app/lib/client_service/user_services.client";
+import { getAllUsers, getCurrentUser } from "@/app/lib/client_service/user_services.client";
 import { useRBAC } from "@/app/(home)/rbac/useRBAC";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,7 @@ import toast from "react-hot-toast";
 import { InviteUserToOrganizationRequestDto } from "@/app/(home)/types/requestDTOs";
 import {
   GroupResponseDto,
+  PaginatedResponse,
   ProjectMemberResponseDto,
   ProjectResponseDto,
   RoleResponseDto,
@@ -41,6 +42,8 @@ import {
   ProjectMemberTableRow,
   buildTableData,
 } from "../../types/projectUsersTypes";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
 
 /* -------------------------------------------------------------------------- */
 /*                         ProjectUsersTable Component                        */
@@ -98,6 +101,40 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     members: [],
     loading: false,
   });
+
+  const {
+    currentPage,
+    pageSize,
+    paginatedItems,
+    resetPagination,
+    setCurrentPage,
+    setPageSize,
+    totalPages,
+  } = useLocalPagination({
+    items: viewGroupMembersModal.members,
+    initialPageSize: 5,
+  });
+
+  useEffect(() => {
+    resetPagination();
+  }, [viewGroupMembersModal.members, resetPagination]);
+
+  const {
+  currentPage: membersPage,
+  pageSize: membersPageSize,
+  paginatedItems: paginatedMembers,
+  resetPagination: resetMembersPagination,
+  setCurrentPage: setMembersPage,
+  setPageSize: setMembersPageSize,
+  totalPages: membersTotalPages,
+} = useLocalPagination({
+  items: tableData,
+  initialPageSize: 10,
+});
+
+useEffect(() => {
+  resetMembersPagination();
+}, [tableData, resetMembersPagination]);
 
   /* ------------------------------------------------------------------------ */
   /*                        Confirm Remove / Future Use                       */
@@ -187,7 +224,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     try {
       const users = await getAllUsers(organizationId);
-      setAvailableUsers(users);
+      setAvailableUsers(users.items);
     } catch (error) {
       console.error("Failed to load users:", error);
       toast.error(t.translations.UNABLE_TO_LOAD_USERS);
@@ -230,10 +267,10 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
           organizationId,
           projectId,
         );
-        setTableData(buildTableData(updatedMembers));
+        setTableData(buildTableData(updatedMembers.items));
       } else {
         const updatedMembers = await getAllUsers(organizationId);
-        setTableData(buildTableData(updatedMembers));
+        setTableData(buildTableData(updatedMembers.items));
       }
     } catch (refreshError) {
       console.error("Failed to refresh members list:", refreshError);
@@ -258,8 +295,8 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     setGroupModalLoading(true);
 
     try {
-      const groups = await getAllGroups(organizationId);
-      setAvailableGroups(groups);
+      const { items: paginatedGroups } = await getAllGroups(organizationId);
+      setAvailableGroups(paginatedGroups);
     } catch (error) {
       console.error("Failed to load groups:", error);
       toast.error(t.translations.UNABLE_TO_LOAD_USERS_OR_GROUPS);
@@ -278,7 +315,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     // Fetch asynchronously and cache
     getGroupMembers(organizationId, groupId)
-      .then((groupMembers) => {
+      .then(({ items: groupMembers }) => {
         setGroupMembersCache((prev) =>
           new Map(prev).set(groupId, groupMembers),
         );
@@ -289,38 +326,42 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
     return []; // Return empty while loading
   };
-  
+
   const handleViewGroupMembers = async (row: ProjectMemberTableRow) => {
     if (!organizationId) {
       toast.error(t.translations.NO_ORG_SELECTED);
       return;
     }
-    
+
     setViewGroupMembersModal({
       isOpen: true,
       groupName: row.name,
       members: [],
       loading: true,
     });
-    
+
     try {
       // Use members from cache if it exists, if not fetch API
-      const members = groupMembersCache.has(row.memberId)
+      const paginatedOrArray = groupMembersCache.has(row.memberId)
         ? groupMembersCache.get(row.memberId)!
         : await getGroupMembers(organizationId, row.memberId);
-      
-      setGroupMembersCache((prev) => new Map(prev).set(row.memberId, members));
-      
+
+      const membersArray: UserResponseDto[] = Array.isArray(paginatedOrArray)
+        ? paginatedOrArray
+        : paginatedOrArray.items;
+
+      setGroupMembersCache((prev) => new Map(prev).set(row.memberId, membersArray));
+
       setViewGroupMembersModal({
         isOpen: true,
         groupName: row.name,
-        members,
+        members: membersArray,
         loading: false,
       });
     } catch (error) {
       console.error(`Failed to load members for group ${row.memberId}:`, error);
       toast.error(t.translations.UNABLE_TO_LOAD_USERS);
-      
+
       setViewGroupMembersModal((prev) => ({
         ...prev,
         loading: false,
@@ -359,7 +400,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
       // Refresh the members list
       const updatedMembers = await getProjectMembers(organizationId, projectId);
-      setTableData(buildTableData(updatedMembers));
+      setTableData(buildTableData(updatedMembers.items));
       await refreshAccessIfAffected("group", groupId);
 
       setShowAddGroupModal(false);
@@ -479,7 +520,15 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
     try {
       setLoading(true);
 
+      const currentUser = await getCurrentUser(organizationId, projectId);
       const memberId = confirmModal.memberId;
+
+      if (confirmModal.memberType === "user" && currentUser.id === memberId) {
+        toast.error(t.translations.CANNOT_REMOVE_SELF_FROM_PROJECT); // Display a custom error message
+        setLoading(false);
+        return;
+      }
+
 
       if (confirmModal.memberType === "user") {
         await removeMemberFromProject(
@@ -534,7 +583,7 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
           />
 
           <ProjectUsersListTable
-            tableData={tableData}
+            tableData={paginatedMembers}
             loading={loading}
             onEditRole={handleOpenEditRoleModal}
             onViewGroupMembers={handleViewGroupMembers}
@@ -548,6 +597,16 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
               })
             }
           />
+
+<div className="mt-2 flex justify-end">
+  <PaginationControls
+    currentPage={membersPage}
+    pageSize={membersPageSize}
+    totalPages={membersTotalPages}
+    onPageChange={setMembersPage}
+    onPageSizeChange={setMembersPageSize}
+  />
+</div>
 
           {/* Remove Member Modal */}
           <RemoveProjectMemberModal
@@ -622,48 +681,59 @@ const ProjectUsersTable = ({ members, roles, project }: Props) => {
 
           {/* View Group Members Modal*/}
           {viewGroupMembersModal.isOpen && (
-              <dialog className="modal modal-open">
-                <div className="modal-box">
-                  <h3 className="font-bold text-lg">
-                    Users in {viewGroupMembersModal.groupName}
-                  </h3>
+            <dialog className="modal modal-open">
+              <div className="modal-box">
+                <h3 className="font-bold text-lg">
+                  Users in {viewGroupMembersModal.groupName}
+                </h3>
 
-                  {viewGroupMembersModal.loading ? (
-                      <div className="flex justify-center py-8">
-                        <span className="loading loading-spinner loading-lg" />
-                      </div>
-                  ) : viewGroupMembersModal.members.length === 0 ? (
-                      <p className="py-4 text-base-content/70">
-                        No users in this group.
-                      </p>
-                  ) : (
-                      <div className="py-4 space-y-2 max-h-80 overflow-y-auto">
-                        {viewGroupMembersModal.members.map((user) => (
-                            <div key={user.id} className="p-3 rounded-lg bg-base-200">
-                              <p className="font-semibold">{user.name || user.email}</p>
-                              <p className="text-sm text-base-content/70">{user.email}</p>
-                            </div>
-                        ))}
-                      </div>
-                  )}
-                  
-                  <div className="modal-action">
-                    <button
-                      className="btn"
-                      onClick={() =>
-                        setViewGroupMembersModal({
-                          isOpen: false,
-                          groupName: "",
-                          members: [],
-                          loading: false,
-                        })
-                      }
-                    >
-                      Close
-                    </button>
+                {viewGroupMembersModal.loading ? (
+                  <div className="flex justify-center py-8">
+                    <span className="loading loading-spinner loading-lg" />
                   </div>
+                ) : viewGroupMembersModal.members.length === 0 ? (
+                  <p className="py-4 text-base-content/70">
+                    No users in this group.
+                  </p>
+                ) : (
+                  <div className="py-4 space-y-2 max-h-80 overflow-y-auto">
+                    {paginatedItems.map((user) => (
+                      <div key={user.id} className="p-3 rounded-lg bg-base-200">
+                        <p className="font-semibold">{user.name || user.email}</p>
+                        <p className="text-sm text-base-content/70">{user.email}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Pagination Controls */}
+                <div className="mt-2 flex justify-end">
+                  <PaginationControls
+                    currentPage={currentPage}
+                    pageSize={pageSize}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                  />
                 </div>
-              </dialog>
+
+                <div className="modal-action">
+                  <button
+                    className="btn"
+                    onClick={() =>
+                      setViewGroupMembersModal({
+                        isOpen: false,
+                        groupName: "",
+                        members: [],
+                        loading: false,
+                      })
+                    }
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </dialog>
           )}
         </div>
       </div>

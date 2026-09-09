@@ -5,7 +5,6 @@ import { notFound, redirect } from "next/navigation";
 import ProjectManagementClient from "./ProjectManagementClient";
 
 import {
-  GroupResponseDto,
   PermissionResponseDto,
   ProjectMemberResponseDto,
   ProjectResponseDto,
@@ -69,13 +68,14 @@ export default async function ProjectManagementPage({ params }: Props) {
     }
 
     try {
-      projectMembers = await getProjectMembersServer(organizationId, projectId);
+      projectMembers = (await getProjectMembersServer(organizationId, projectId)).items;
     } catch (e) {
       console.error("getProjectMembersServer failed:", e);
     }
 
     try {
-      projectRoles = await getAllRolesServer(organizationId, projectId);
+      const { items } = await getAllRolesServer(organizationId, projectId);
+      projectRoles = items;
     } catch (e) {
       console.error("getAllRoles failed: ", e);
     }
@@ -91,16 +91,6 @@ export default async function ProjectManagementPage({ params }: Props) {
       console.error("getAllPermissionsServer failed: ", e);
     }
 
-    // Extract groups from projectMembers (groups have empty emails)
-    const projectGroups: GroupResponseDto[] = projectMembers
-      .filter((member) => member.email === "" && member.memberId !== undefined)
-      .map((member) => ({
-        id: member.memberId!,
-        name: member.name,
-        isArchived: false,
-        organizationId: organizationId,
-      }));
-
     // If project isn't found, mirror behavior of the other page
     if (!project) {
       return notFound();
@@ -110,7 +100,6 @@ export default async function ProjectManagementPage({ params }: Props) {
       <ProjectManagementClient
         project={project}
         projectMembers={projectMembers}
-        projectGroups={projectGroups}
         projectRoles={projectRoles}
         projectPermissions={projectPermissions}
       />

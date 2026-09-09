@@ -33,7 +33,7 @@ public class AirflowServiceClient
     public async Task<JsonObject> GetHealth()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "api/v2/monitor/health");
-        AuthorizeRequest(request);
+	// Note: health endpoint does not require bearer token
         var response = await _client.SendAsync(request);
         await EnsureSuccess(response);
         return await response.Content.ReadFromJsonAsync<JsonObject>()

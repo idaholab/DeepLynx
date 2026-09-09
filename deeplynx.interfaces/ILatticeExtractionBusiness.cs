@@ -11,6 +11,11 @@ public interface ILatticeExtractionBusiness
         long extractionId,
         InsightExtractionCallbackDto dto);
 
+    Task<bool> ProcessExtractionProgress(
+        long projectId,
+        long extractionId,
+        InsightExtractionProgressCombinedDto progressDto);
+
     Task MarkExtractionFailed(long extractionId, long organizationId, long projectId, string? errorMessage = null);
 
     Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId);
@@ -28,7 +33,12 @@ public interface ILatticeExtractionBusiness
 
     Task<EmbeddingStatusResponseDto> GetEmbeddingStatus(long projectId);
 
+    [Obsolete("V1-only. Used by deprecated v1 lattice extraction endpoints. Superseded by ListExtractionsByProjectPaginated. " +
+              "Remove once v1 lattice extraction endpoints are sunset.", error: false)]
     Task<List<ExtractionListItemDto>> ListExtractionsByProject(long projectId);
+    Task<PaginatedResponse<ExtractionListItemDto>> ListExtractionsByProjectPaginated(
+        long projectId,
+        PaginatedRequestDto paginatedRequestDto);
 
     Task<List<OntologySimilarityResultDto>> SearchOntologySimilarity(
         long recordId,

@@ -41,7 +41,7 @@ export function useProjectCollectionOptions(projectId: number) {
       }
 
       if (tagsResult.status === "fulfilled") {
-        setAvailableTags(tagsResult.value);
+        setAvailableTags(tagsResult.value.items);
       } else {
         console.error("Failed to load project tags:", tagsResult.reason);
         showToast(

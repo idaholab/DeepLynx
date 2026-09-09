@@ -4,6 +4,8 @@ namespace deeplynx.interfaces;
 
 public interface IRecordBusiness
 {
+    [Obsolete("Used by deprecated v1 record endpoints and NexusFlightServer. Superseded by GetAllRecordsPaginated. " +
+              "Remove once those callers are migrated to the paginated variant.", error: false)]
     Task<List<RecordResponseDto>> GetAllRecords(
         long currentUserId, long organizationId, long projectId, long? dataSourceId, bool hideArchived, string? fileType,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false, bool isInsightEligible = false);
@@ -17,12 +19,20 @@ public interface IRecordBusiness
         long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search, PaginatedRequestDto paginated,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
+    [Obsolete("Used by deprecated v1 record endpoints. Superseded by SearchPaginated. " +
+              "Remove once those callers are migrated to the paginated variant.", error: false)]
     Task<List<RecordResponseDto>> Search(
         long currentUserId, long organizationId, long projectId, RecordSearchRequestDto search,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
+    [Obsolete("V1-only. Used by deprecated v1 record endpoints. Superseded by GetRecordsByTagsPaginated. " +
+              "Remove once v1 record endpoints are sunset.", error: false)]
     Task<List<RecordResponseDto>> GetRecordsByTags(
         long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived,
+        bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
+    
+    Task<PaginatedResponse<RecordResponseDto>> GetRecordsByTagsPaginated(
+        long currentUserId, long organizationId, long projectId, long[] tagIds, bool hideArchived, PaginatedRequestDto paginatedRequestDto,
         bool isSysAdmin = false, bool isOrgAdmin = false, bool isProjectAdmin = false);
 
     Task<RecordResponseDto> GetRecord(
@@ -44,6 +54,10 @@ public interface IRecordBusiness
     Task<RecordResponseDto> UpdateRecord(
         long currentUserId, long organizationId, long projectId, long recordId, UpdateRecordRequestDto dto, bool isSysAdmin = false, bool isOrgAdmin = false,
         bool isProjectAdmin = false);
+
+    Task<RecordResponseDto> UpdateFileContentHash(
+        long currentUserId, long organizationId, long projectId, long recordId,
+        UpdateFileContentHashRequestDto dto);
 
     Task<bool> DeleteRecord(long currentUserId, long organizationId, long projectId, long recordId);
     Task<bool> ArchiveRecord(long currentUserId, long organizationId, long projectId, long recordId);

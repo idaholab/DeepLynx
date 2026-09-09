@@ -6,6 +6,8 @@ import {
   ProjectMemberResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import { useLanguage } from "@/app/contexts/Language";
+import { useLocalPagination } from "@/app/hooks/useLocalPagination";
+import PaginationControls from "@/app/(home)/components/PaginationControls";
 
 /* -------------------------------------------------------------------------- */
 /*                     Bulk Invite/Add Users to Project Modal                */
@@ -79,6 +81,34 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
       setSearchQuery("");
     }
   }, [isOpen]);
+
+  // Filter users based on search query
+  const filteredOrgUsers = useMemo(() => {
+  return usersNotInProject.filter((user) => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      user.name.toLowerCase().includes(searchLower) ||
+      user.email?.toLowerCase().includes(searchLower)
+    );
+  });
+}, [usersNotInProject, searchQuery]);
+
+  const {
+    currentPage: orgUsersPage,
+    pageSize: orgUsersPageSize,
+    paginatedItems: paginatedOrgUsers,
+    resetPagination: resetOrgUsersPagination,
+    setCurrentPage: setOrgUsersPage,
+    setPageSize: setOrgUsersPageSize,
+    totalPages: orgUsersTotalPages,
+  } = useLocalPagination({
+    items: filteredOrgUsers,
+    initialPageSize: 10,
+  });
+
+  useEffect(() => {
+    resetOrgUsersPagination();
+  }, [filteredOrgUsers, resetOrgUsersPagination]);
 
   if (!isOpen) return null;
 
@@ -197,15 +227,6 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
     !modalLoading;
 
   const hasErrors = emailErrors.length > 0;
-
-  // Filter users based on search query
-  const filteredOrgUsers = usersNotInProject.filter((user) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      user.name.toLowerCase().includes(searchLower) ||
-      user.email?.toLowerCase().includes(searchLower)
-    );
-  });
 
   // Get selected users for display
   const selectedUsers = usersNotInProject.filter((user) =>
@@ -440,7 +461,7 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                     </div>
                   ) : (
                     <ul className="space-y-2">
-                      {filteredOrgUsers.map((user) => {
+                      {paginatedOrgUsers.map((user) => {
                         const isSelected = selectedOrgUserIds.includes(user.id);
                         return (
                           <li key={user.id}>
@@ -473,6 +494,17 @@ const AddUsersToProjectModal: React.FC<AddUsersToProjectModalProps> = ({
                     </ul>
                   )}
                 </div>
+                {filteredOrgUsers.length > 0 && (
+  <div className="mt-2 flex justify-end">
+    <PaginationControls
+      currentPage={orgUsersPage}
+      pageSize={orgUsersPageSize}
+      totalPages={orgUsersTotalPages}
+      onPageChange={setOrgUsersPage}
+      onPageSizeChange={setOrgUsersPageSize}
+    />
+  </div>
+)}
               </div>
             </div>
 

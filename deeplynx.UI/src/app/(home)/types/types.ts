@@ -98,6 +98,11 @@ export type UploadProgressEvent = {
   totalChunks: number;
   currentBatch: number;
   uploadId?: string;
+  bytesUploaded: number;
+  totalBytes: number;
+  chunkSize: number;
+  speedBytesPerSec: number;
+  isFinalizing?: boolean;
 }
 
 //Widgets

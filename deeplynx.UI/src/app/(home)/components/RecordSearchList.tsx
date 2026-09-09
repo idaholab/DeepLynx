@@ -1,10 +1,14 @@
 "use client";
 
 import { useLanguage } from "@/app/contexts/Language";
-import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, TagIcon } from "@heroicons/react/24/outline";
+import { ClockIcon, TagIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import Skeleton from "react-loading-skeleton";
 import { QueryRecordViewResponseDto, TagResponseDto } from "../types/responseDTOs";
+import PaginationControls from "./PaginationControls";
+
+const times = (n: number) => Array.from({ length: n }, (_, i) => i);
 
 interface ListViewProps {
     data: QueryRecordViewResponseDto[];
@@ -16,6 +20,7 @@ interface ListViewProps {
     totalPages?: number;
     isLoading?: boolean;
     onPageChange?: (page: number) => void;
+    onPageSizeChange?: (pageSize: number) => void;
 }
 
 const DEFAULT_RECORDS_PER_PAGE = 10;
@@ -30,15 +35,17 @@ const RecordSearchList: React.FC<ListViewProps> = ({
     totalPages,
     isLoading = false,
     onPageChange,
+    onPageSizeChange,
 }) => {
     const { t } = useLanguage();
     const [localCurrentPage, setLocalCurrentPage] = useState(1);
+    const [localPageSize, setLocalPageSize] = useState(DEFAULT_RECORDS_PER_PAGE);
     const router = useRouter();
 
     const isServerPaginated =
         typeof currentPage === "number" && typeof onPageChange === "function";
     const activePage = currentPage ?? localCurrentPage;
-    const activePageSize = pageSize ?? DEFAULT_RECORDS_PER_PAGE;
+    const activePageSize = pageSize ?? localPageSize;
 
     useEffect(() => {
         if (!isServerPaginated) setLocalCurrentPage(1);
@@ -132,6 +139,15 @@ const RecordSearchList: React.FC<ListViewProps> = ({
         setLocalCurrentPage(nextPage);
     };
 
+    const handlePageSizeChange = (nextPageSize: number) => {
+        if (isServerPaginated) {
+            onPageSizeChange?.(nextPageSize);
+            return;
+        }
+        setLocalPageSize(nextPageSize);
+        setLocalCurrentPage(1);
+    };
+
     return (
         <div className="w-full">
             {/* Results Header */}
@@ -154,15 +170,30 @@ const RecordSearchList: React.FC<ListViewProps> = ({
             </div>
 
             {/* Results List */}
-            <div className="bg-base-100 rounded-b-xl overflow-hidden">
-                {paginatedRecords.length === 0 ? (
+            <div className="max-h-[705px] overflow-y-auto rounded-b-xl border border-t-0 border-base-300/50 bg-base-100 shadow-sm">
+                {isLoading ? (
+                    <div className="divide-y divide-base-300">
+                        {times(6).map((i) => (
+                            <div key={i} className="p-6">
+                                <Skeleton height={20} width="48%" />
+                                <div className="mt-2">
+                                    <Skeleton height={14} width="76%" />
+                                </div>
+                                <div className="mt-3 flex flex-wrap items-center gap-4">
+                                    <Skeleton width={70} height={20} />
+                                    <Skeleton width={150} height={16} />
+                                    {i % 2 === 0 && <Skeleton width={90} height={20} />}
+                                </div>
+                                <div className="mt-3">
+                                    <Skeleton width={160} height={18} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : paginatedRecords.length === 0 ? (
                     <div className="text-center py-16 text-base-content/60">
-                        <p className="text-lg font-medium mb-2">
-                            {isLoading ? "Loading records..." : "No records found"}
-                        </p>
-                        {!isLoading && (
-                            <p className="text-sm">Try adjusting your search criteria</p>
-                        )}
+                        <p className="text-lg font-medium mb-2">No records found</p>
+                        <p className="text-sm">Try adjusting your search criteria</p>
                     </div>
                 ) : (
                     <div className="divide-y divide-base-300">
@@ -254,67 +285,17 @@ const RecordSearchList: React.FC<ListViewProps> = ({
                         })}
                     </div>
                 )}
+            </div>
 
-                {/* Pagination Controls */}
-                {resolvedTotalPages > 1 && (
-                    <div className="bg-base-200 border-t-2 border-base-300 px-6 py-4">
-                        <div className="flex items-center justify-between">
-                            <div className="text-sm text-base-content/60">
-                                Page {activePage} of {resolvedTotalPages}
-                            </div>
-
-                            <div className="flex gap-2">
-                                <button
-                                    className="btn btn-sm btn-ghost"
-                                    disabled={isLoading || activePage === 1}
-                                    onClick={() => handlePageChange(activePage - 1)}
-                                >
-                                    <ChevronLeftIcon className="w-5 h-5" />
-                                    Previous
-                                </button>
-
-                                {/* Page Numbers */}
-                                <div className="flex gap-1">
-                                    {Array.from({ length: Math.min(5, resolvedTotalPages) }, (_, i) => {
-                                        let pageNum;
-                                        if (resolvedTotalPages <= 5) {
-                                            pageNum = i + 1;
-                                        } else if (activePage <= 3) {
-                                            pageNum = i + 1;
-                                        } else if (activePage >= resolvedTotalPages - 2) {
-                                            pageNum = resolvedTotalPages - 4 + i;
-                                        } else {
-                                            pageNum = activePage - 2 + i;
-                                        }
-
-                                        return (
-                                            <button
-                                                key={pageNum}
-                                                className={`btn btn-sm ${activePage === pageNum
-                                                    ? "btn-primary"
-                                                    : "btn-ghost"
-                                                    }`}
-                                                disabled={isLoading}
-                                                onClick={() => handlePageChange(pageNum)}
-                                            >
-                                                {pageNum}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                <button
-                                    className="btn btn-sm btn-ghost"
-                                    disabled={isLoading || activePage === resolvedTotalPages}
-                                    onClick={() => handlePageChange(activePage + 1)}
-                                >
-                                    Next
-                                    <ChevronRightIcon className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+            {/* Pagination Controls */}
+            <div className="mt-3">
+                <PaginationControls
+                    currentPage={activePage}
+                    pageSize={activePageSize}
+                    totalPages={resolvedTotalPages}
+                    onPageChange={handlePageChange}
+                    onPageSizeChange={handlePageSizeChange}
+                />
             </div>
         </div>
     );

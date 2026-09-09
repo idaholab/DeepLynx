@@ -27,6 +27,18 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         _eventBusiness = eventBusiness;
         _userBusiness = userBusiness;
     }
+
+    private static readonly (string Action, string DescriptionTemplate)[] DefaultPermissionActions =
+    {
+        ("read record", "Permission to read {0} labeled records"),
+        ("write record", "Permission to add records with label {0}"),
+        ("update record", "Permission to update {0} labeled records"),
+        ("delete record", "Permission to delete {0} labeled records"),
+        ("download file", "Permission to download {0} labeled files"),
+        ("upload file", "Permission to upload {0} labeled files"),
+        ("update file", "Permission to update {0} labeled files"),
+        ("delete file", "Permission to delete {0} labeled files")
+    };
     
      /// <summary>
     ///     Get all sensitivity labels for a given project and/or organization
@@ -112,10 +124,6 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         {
             query = query.Where(t => t.ProjectId == projectId || t.ProjectId == null);
         }
-        else
-        {   
-            query = query.Where(t => t.ProjectId == null);
-        }
 
         var label = await query.FirstOrDefaultAsync();
         
@@ -171,34 +179,21 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             _context.SensitivityLabels.Add(label);
             await _context.SaveChangesAsync();
 
-            var permissionActions = new[]
-            {
-                ("read", "record", "Permission to read {0} labeled records"),
-                ("write", "record", "Permission to add records with label {0}"),
-                ("update", "record", "Permission to update {0} labeled records"),
-                ("delete", "record", "Permission to delete {0} labeled records"),
-                ("download", "file", "Permission to download {0} labeled files"),
-                ("upload", "file", "Permission to upload {0} labeled files"),
-                ("update", "file", "Permission to update {0} labeled files"),
-                ("delete", "file", "Permission to delete {0} labeled files")
-            };
+            var actions = dto.PermissionActions is { Count: > 0 }
+                ? dto.PermissionActions
+                : DefaultPermissionActions.Select(p => p.Action).ToList();
 
-            var permissions = permissionActions.Select(p => new Permission
-            {
-                Name = dto.Name,
-                Description = string.Format(p.Item3, dto.Name),
-                Action = $"{p.Item1} {p.Item2}",
-                LabelId = label.Id,
-                IsDefault = false,
-                ProjectId = projectId,
-                OrganizationId = organizationId,
-                LastUpdatedAt = now,
-                LastUpdatedBy = currentUserId
-            }).ToList();
+            var permissions = actions
+                .Select(a => BuildPermission(a, dto.Name, label.Id, currentUserId, now))
+                .ToList();
 
             await _context.AddRangeAsync(permissions);
             
             await _context.SaveChangesAsync();
+
+            // Invalidate cached sensitivity labels
+            await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
+
             await transaction.CommitAsync();
             
             // Log create SensitivityLabel event (outside transaction)
@@ -313,37 +308,31 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                 .SqlQueryRaw<SensitivityLabelResponseDto>(sql, parameters.ToArray())
                 .ToListAsync();
 
+            var permissionActionsByName = labels
+                .Where(dto => dto.PermissionActions is { Count: > 0 })
+                .GroupBy(dto => dto.Name)
+                .ToDictionary(g => g.Key, g => g.Last().PermissionActions!);
+
             foreach (var label in result)
             {
-                var permissionActions = new[]
-                {
-                    ("read", "record", "Permission to read {0} labeled records"),
-                    ("write", "record", "Permission to add records with label {0}"),
-                    ("update", "record", "Permission to update {0} labeled records"),
-                    ("delete", "record", "Permission to delete {0} labeled records"),
-                    ("download", "file", "Permission to download {0} labeled files"),
-                    ("upload", "file", "Permission to upload {0} labeled files"),
-                    ("update", "file", "Permission to update {0} labeled files"),
-                    ("delete", "file", "Permission to delete {0} labeled files")
-                };
+                var actions = permissionActionsByName.TryGetValue(label.Name, out var overrideActions)
+                    ? overrideActions
+                    : DefaultPermissionActions.Select(p => p.Action).ToList();
 
-                var permissions = permissionActions.Select(p => new Permission
-                {
-                    Name = label.Name,
-                    Description = string.Format(p.Item3, label.Name),
-                    Action = $"{p.Item1} {p.Item2}",
-                    LabelId = label.Id,
-                    IsDefault = false,
-                    ProjectId = projectId,
-                    OrganizationId = organizationId,
-                    LastUpdatedAt = now,
-                    LastUpdatedBy = currentUserId
-                }).ToList();
+                var permissions = actions
+                    .Select(a => BuildPermission(a, label.Name, label.Id, currentUserId, now))
+                    .ToList();
 
                 await _context.AddRangeAsync(permissions);
             }
 
             await _context.SaveChangesAsync();
+
+            // Invalidate cached sensitivity labels
+            foreach (var label in result)
+            {
+                await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
+            }
 
             // Log create event
             var createEvent = new CreateEventRequestDto
@@ -411,30 +400,61 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             _context.SensitivityLabels.Update(label);
 
             // Update Permissions Associated with Label
-            var permissions = await _context.Permissions
+            var permissions = await _context.SensitivityLabelPermissions
                 .Where(p => p.LabelId == labelId)
                 .ToListAsync();
 
-            foreach (var permission in permissions)
+            if (dto.PermissionActions != null)
             {
-                permission.Name = dto.Name ?? permission.Name;
+                var desired = dto.PermissionActions.Select(a => a.Trim()).ToHashSet();
+                var toRemove = permissions.Where(p => !desired.Contains(p.Action)).ToList();
+                var kept = permissions.Except(toRemove).ToList();
 
-                if (dto.Description != null)
+                _context.SensitivityLabelPermissions.RemoveRange(toRemove);
+
+                var keptActions = kept.Select(p => p.Action).ToHashSet();
+                var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                var toAdd = desired.Except(keptActions)
+                    .Select(a => BuildPermission(a, label.Name, label.Id, currentUserId, now))
+                    .ToList();
+
+                await _context.SensitivityLabelPermissions.AddRangeAsync(toAdd);
+
+                foreach (var permission in kept)
                 {
-                    // Update description based on action type
-                    permission.Description = permission.Action switch
-                    {
-                        "read" => "Permission to read " + dto.Name + " labeled records",
-                        "write" => "Permission to modify " + dto.Name + " labeled records",
-                        _ => permission.Description // fallback
-                    };
+                    permission.Name = dto.Name ?? permission.Name;
+                    permission.LastUpdatedAt = now;
+                    permission.LastUpdatedBy = currentUserId;
                 }
 
-                permission.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-                permission.LastUpdatedBy = currentUserId;
-            }
+                _context.SensitivityLabelPermissions.UpdateRange(kept);
 
-            _context.Permissions.UpdateRange(permissions);
+                // Invalidate cached sensitivity labels
+                await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
+            }
+            else
+            {
+                foreach (var permission in permissions)
+                {
+                    permission.Name = dto.Name ?? permission.Name;
+
+                    if (dto.Description != null)
+                    {
+                        // Update description based on action type
+                        permission.Description = permission.Action switch
+                        {
+                            "read" => "Permission to read " + dto.Name + " labeled records",
+                            "write" => "Permission to modify " + dto.Name + " labeled records",
+                            _ => permission.Description // fallback
+                        };
+                    }
+
+                    permission.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                    permission.LastUpdatedBy = currentUserId;
+                }
+
+                _context.SensitivityLabelPermissions.UpdateRange(permissions);
+            }
 
             // Log update SensitivityLabel event
             var eventLog = new CreateEventRequestDto
@@ -527,9 +547,12 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             }
 
             // Remove the permissions associated with the label
-            await _context.Permissions
+            await _context.SensitivityLabelPermissions
                 .Where(p => p.LabelId == labelId)
                 .ExecuteDeleteAsync();
+
+            // Invalidate cached sensitivity labels
+            await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
 
             // Remove the label
             _context.SensitivityLabels.Remove(label);
@@ -613,8 +636,8 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                     $"Cannot archive. Sensitivity label with id {labelId} is used on {recordCount} records.");
             }
 
-            // Archive permissions for this sensitivity label 
-            await _context.Permissions
+            // Archive permissions for this sensitivity label
+            await _context.SensitivityLabelPermissions
                 .Where(p => p.LabelId == labelId)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(p => p.IsArchived, true)
@@ -627,6 +650,9 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             label.LastUpdatedBy = currentUserId;
 
             await _context.SaveChangesAsync();
+
+            // Invalidate cached sensitivity labels
+            await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
 
             // Log archive SensitivityLabel event
             var eventLog = new CreateEventRequestDto
@@ -701,7 +727,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             label.LastUpdatedBy = currentUserId;
 
             // Unarchive Permissions associated with the label
-            await _context.Permissions
+            await _context.SensitivityLabelPermissions
                 .Where(p => p.LabelId == labelId)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(p => p.IsArchived, false)
@@ -709,6 +735,9 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                     .SetProperty(p => p.LastUpdatedBy, currentUserId));
 
             await _context.SaveChangesAsync();
+
+            // Invalidate cached sensitivity labels
+            await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
 
             // Log unarchive SensitivityLabel event
             var eventLog = new CreateEventRequestDto
@@ -740,4 +769,31 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         }
     }
     
+    /// <summary>
+    ///     Builds a new SensitivityLabelPermission for the given flat action string (e.g. "read record"),
+    ///     using the known description template if it's one of the default actions, or a generic
+    ///     generated description otherwise.
+    /// </summary>
+    private static SensitivityLabelPermission BuildPermission(string action, string labelName,
+        long labelId, long currentUserId, DateTime now)
+    {
+        var trimmed = action.Trim();
+        var parts = trimmed.Split(' ', 2);
+        var verb = parts[0];
+        var resource = parts.Length > 1 ? parts[1] : "";
+
+        var template = DefaultPermissionActions
+                           .FirstOrDefault(p => p.Action == trimmed).DescriptionTemplate
+                       ?? $"Permission to {verb} {{0}} labeled {resource}(s)";
+
+        return new SensitivityLabelPermission
+        {
+            Name = labelName,
+            Description = string.Format(template, labelName),
+            Action = trimmed,
+            LabelId = labelId,
+            LastUpdatedAt = now,
+            LastUpdatedBy = currentUserId
+        };
+    }
 }

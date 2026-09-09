@@ -32,10 +32,10 @@ export function useSelectedCollectionEditDerived({
 }: Params) {
   const unattachedLabels = useMemo(() => {
     const attachedIds = new Set(
-      selectedCollectionDraft?.labels?.map((label) => label.id) ?? [],
+      selectedCollectionDraft?.sensitivityLabels?.map((label) => label.id) ?? [],
     );
     return availableLabels.filter((label) => !attachedIds.has(label.id));
-  }, [availableLabels, selectedCollectionDraft?.labels]);
+  }, [availableLabels, selectedCollectionDraft?.sensitivityLabels]);
 
   const unattachedTags = useMemo(() => {
     const attachedIds = new Set(selectedCollectionDraft?.tags?.map((tag) => tag.id) ?? []);
@@ -56,7 +56,7 @@ export function useSelectedCollectionEditDerived({
 
   const canAddTypedSelectedCollectionLabel =
     selectedCollectionLabelSearchTerm.trim().length > 0 &&
-    !(selectedCollectionDraft?.labels ?? []).some(
+    !(selectedCollectionDraft?.sensitivityLabels ?? []).some(
       (label) =>
         label.name.toLowerCase() ===
         selectedCollectionLabelSearchTerm.trim().toLowerCase(),
@@ -70,25 +70,27 @@ export function useSelectedCollectionEditDerived({
     );
 
   const addableRecordResults = useMemo(() => {
+    const recordsArray = Array.isArray(collectionRecords) ? collectionRecords : [];
     const existingIds = new Set(
-      collectionRecords
+      recordsArray
         .map((record) => record.id)
         .filter((id): id is number => typeof id === "number"),
     );
-    return recordSearchResults.filter(
+
+    const searchResultsArray = Array.isArray(recordSearchResults) ? recordSearchResults : [];
+    return searchResultsArray.filter(
       (record) => typeof record.id === "number" && !existingIds.has(record.id),
     );
   }, [collectionRecords, recordSearchResults]);
 
-  const collectionRecordIds = useMemo(
-    () =>
-      new Set(
-        collectionRecords
-          .map((record) => record.id)
-          .filter((id): id is number => typeof id === "number"),
-      ),
-    [collectionRecords],
-  );
+  const collectionRecordIds = useMemo(() => {
+    const recordsArray = Array.isArray(collectionRecords) ? collectionRecords : [];
+    return new Set(
+      recordsArray
+        .map(record => record.id)
+        .filter((id): id is number => typeof id === "number"),
+    );
+  }, [collectionRecords]);
 
   const isShowingRecordSearchResults =
     recordSearchTerm.trim().length > 0 || recordSearchResults.length > 0;

@@ -12,10 +12,12 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 
 interface StorageFormData {
+  id: number;
   name: string;
   config: Record<string, any>;
   default: boolean;
   existingContainer?: boolean;
+  filesDeletable: boolean;
 }
 
 interface CreateStorageModalProps {
@@ -57,6 +59,8 @@ const CreateStorageModal = ({
 }: CreateStorageModalProps) => {
   const { t } = useLanguage();
 
+  const isLocalEnv = process.env.NEXT_PUBLIC_API_URL?.includes("localhost")
+
   const [isFilePathDisabled, setIsFilePathDisabled] = useState(false);
   const [isManualSectionOpen, setIsManualSectionOpen] = useState(false);
 
@@ -84,6 +88,27 @@ const CreateStorageModal = ({
       },
     });
   };
+
+  const filesDeletableToggle = (
+    <div className="form-control mt-4">
+      <label className="cursor-pointer label">
+        <span className="label-text">
+          {t.translations.STORAGE_FILES_DELETABLE}
+        </span>
+        <input
+          type="checkbox"
+          className="checkbox checkbox-primary"
+          checked={storageFormData.filesDeletable}
+          onChange={(e) =>
+            setStorageFormData({
+              ...storageFormData,
+              filesDeletable: e.target.checked,
+            })
+          }
+        />
+      </label>
+    </div>
+  );
 
   return (
     <>
@@ -130,17 +155,19 @@ const CreateStorageModal = ({
               value={storageType}
               onChange={(e) => setStorageType(e.target.value)}
             >
-              <option value="filesystem">{t.translations.FILESYSTEM}</option>
-              <option value="aws_s3">
-                {t.translations.AWS_S3} ({t.translations.COMING_SOON})
-              </option>
               <option value="azure_object">
                 {t.translations.AZURE_BLOB_STORAGE}
+              </option>
+              {isLocalEnv && (
+                <option value="filesystem">{t.translations.FILESYSTEM}</option>
+              )}
+              <option value="aws_s3">
+                {t.translations.AWS_S3} ({t.translations.COMING_SOON})
               </option>
             </select>
           </div>
 
-          {storageType === "filesystem" && (
+          {storageType === "filesystem" && isLocalEnv && (
             <div className="form-control mb-4 w-full md:w-2/3">
               <label className="label">
                 <span className="label-text">
@@ -179,6 +206,7 @@ const CreateStorageModal = ({
                 </label>
               </div>
 
+              {filesDeletableToggle}
             </div>
           )}
 
@@ -214,6 +242,8 @@ const CreateStorageModal = ({
                   />
                 </label>
               </div>
+
+              {filesDeletableToggle}
             </div>
           )}
 
@@ -327,6 +357,8 @@ const CreateStorageModal = ({
                       />
                     </label>
                   </div>
+
+                  {filesDeletableToggle}
 
                   <button
                     className="btn btn-primary btn-sm shrink-0"
@@ -461,6 +493,8 @@ const CreateStorageModal = ({
                   />
                 </label>
               </div>
+
+              {filesDeletableToggle}
             </>
           )}
 

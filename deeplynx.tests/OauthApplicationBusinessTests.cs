@@ -282,7 +282,7 @@ public class OauthApplicationBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetAllOauthApplications Tests
+    #region GetAllOauthApplications (V1 / Legacy) Tests
 
     [Fact]
     public async Task GetAllOauthApplications_ExcludesArchived()
@@ -323,6 +323,117 @@ public class OauthApplicationBusinessTests : IntegrationTestBase
 
         // Assert
         Assert.Empty(applications);
+    }
+
+    #endregion
+
+    #region GetAllOauthApplicationsPaginated Tests
+
+    private static PaginatedRequestDto DefaultPagination(int pageNumber = 1, int pageSize = 100)
+    {
+        return new PaginatedRequestDto
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
+    [Fact]
+    public async Task GetAllOAuthApplicationsPaginated_ExcludesArchived()
+    {
+        // Act
+        var result = await _oauthApplicationBusiness.GetAllOauthApplicationsPaginated(DefaultPagination());
+
+        // Assert
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.All(result.Items, a => Assert.False(a.IsArchived));
+        Assert.Contains(result.Items, a => a.Id == appid1);
+        Assert.DoesNotContain(result.Items, a => a.Id == appid2);
+    }
+
+    [Fact]
+    public async Task GetAllOAuthApplicationsPaginated_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Act
+        var result = await _oauthApplicationBusiness.GetAllOauthApplicationsPaginated(DefaultPagination(), false);
+
+        // Assert
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, a => a.Id == appid1 && !a.IsArchived);
+        Assert.Contains(result.Items, a => a.Id == appid2 && a.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllOAuthApplicationsPaginated_ReturnsEmptyPaginatedResponse_WhenNoApplications()
+    {
+        // clear database for emptied list of apps
+        await base.SeedTestDataAsync();
+
+        // Act
+        var result = await _oauthApplicationBusiness.GetAllOauthApplicationsPaginated(DefaultPagination());
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(100, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllOAuthApplicationsPaginated_Paginates_Correctly()
+    {
+        // Arrange - both applications visible with hideArchived = false (2 total)
+        var pageOne = DefaultPagination(pageNumber: 1, pageSize: 1);
+        var pageTwo = DefaultPagination(pageNumber: 2, pageSize: 1);
+
+        // Act
+        var firstPage = await _oauthApplicationBusiness.GetAllOauthApplicationsPaginated(pageOne, false);
+        var secondPage = await _oauthApplicationBusiness.GetAllOauthApplicationsPaginated(pageTwo, false);
+
+        // Assert
+        Assert.Equal(2, firstPage.TotalCount);
+        Assert.Single(firstPage.Items);
+        Assert.Equal(2, secondPage.TotalCount);
+        Assert.Single(secondPage.Items);
+
+        var firstPageIds = firstPage.Items.Select(a => a.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(a => a.Id).ToHashSet();
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    [Fact]
+    public async Task GetAllOAuthApplicationsPaginated_PageSizeNegativeOne_ReturnsAll_IgnoringPageNumber()
+    {
+        // Arrange
+        var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+        // Act
+        var result = await _oauthApplicationBusiness.GetAllOauthApplicationsPaginated(sentinel, false);
+
+        // Assert
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(2, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllOAuthApplicationsPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+    {
+        // Arrange
+        var zeroSize = DefaultPagination(pageNumber: 1, pageSize: 0);
+
+        // Act
+        var result = await _oauthApplicationBusiness.GetAllOauthApplicationsPaginated(zeroSize, false);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
     }
 
     #endregion

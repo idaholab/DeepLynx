@@ -1,13 +1,13 @@
 // lib/client_service/api.ts
 
-import axios from 'axios';
-import { getSession } from 'next-auth/react';
-import type { Session } from 'next-auth';
+import axios from "axios";
+import { getSession } from "next-auth/react";
+import type { Session } from "next-auth";
+import { getApiErrorMessage } from "../api-error";
+import { withNexusApiVersion } from "../api-version";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL
-    ? `${process.env.NEXT_PUBLIC_API_URL}`
-    : "/api/v1",
+  baseURL: withNexusApiVersion(process.env.NEXT_PUBLIC_API_URL ?? ""),
 });
 
 // ----------------------------------------------------------------------------
@@ -59,6 +59,15 @@ api.interceptors.request.use(async (config) => {
   }
 
   return config;
+});
+
+// Axios already parses application/problem+json. Preserve the packet on
+// error.response.data while surfacing its detail/title through Error.message.
+api.interceptors.response.use(undefined, (error: unknown) => {
+  if (axios.isAxiosError(error) && error.response) {
+    error.message = getApiErrorMessage(error.response.data, error.message);
+  }
+  return Promise.reject(error);
 });
 
 export default api;
