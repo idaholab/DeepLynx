@@ -64,14 +64,18 @@ export async function fullTextSearchPaginated(
  * @param queryObj - Array of custom query request DTOs
  * @param projectIds - Array of project IDs to search across
  * @param textSearch - Optional full text search phrase
- * @returns Promise with array of QueryRecordViewResponseDto
+ * @param pageNumber - Page number to fetch; omit to use the API default
+ * @param pageSize - Page size; omit to use the API default, or pass -1 for all matching records
+ * @returns Promise with paginated QueryRecordViewResponseDto
  */
 export async function queryBuilder(
     organizationId: number,
     queryObj: CustomQueryRequestDto[],
     projectIds: number[],
     textSearch?: string | null,
-): Promise<QueryRecordViewResponseDto[]> {
+    pageNumber?: number,
+    pageSize?: number,
+): Promise<PaginatedResponse<QueryRecordViewResponseDto>> {
     try {
         const requestBody = prepareCustomQueryRequest(queryObj);
         const projectIdsQuery = projectIds
@@ -80,9 +84,11 @@ export async function queryBuilder(
         const textSearchParam = textSearch
             ? `&textSearch=${encodeURIComponent(textSearch)}`
             : "";
+        const pageNumberParam = pageNumber !== undefined ? `&pageNumber=${pageNumber}` : "";
+        const pageSizeParam = pageSize !== undefined ? `&pageSize=${pageSize}` : "";
 
-        const res = await api.post(
-            `/organizations/${organizationId}/query/records/advanced?${projectIdsQuery}${textSearchParam}`,
+        const res = await api.post<PaginatedResponse<QueryRecordViewResponseDto>>(
+            `/organizations/${organizationId}/query/records/advanced?${projectIdsQuery}${textSearchParam}${pageNumberParam}${pageSizeParam}`,
             requestBody,
             { headers: { "Content-Type": "application/json" } },
         );
@@ -93,44 +99,6 @@ export async function queryBuilder(
     }
 }
 
-/**
- * Build a custom query for records with server-side pagination.
- * @param organizationId - The ID of the organization
- * @param queryObj - Array of custom query request DTOs
- * @param projectIds - Array of project IDs to search across
- * @param pageNumber - Page number to fetch
- * @param pageSize - Number of records per page
- * @param textSearch - Optional full text search phrase
- * @returns Promise with paginated QueryRecordViewResponseDto
- */
-export async function queryBuilderPaginated(
-    organizationId: number,
-    queryObj: CustomQueryRequestDto[],
-    projects: number[],
-    pageNumber: number,
-    pageSize: number,
-    textSearch?: string | null,
-): Promise<PaginatedResponse<QueryRecordViewResponseDto>> {
-    try {
-        const params = new URLSearchParams();
-        projects.forEach((id) => params.append("projects", String(id)));
-        params.append("pageNumber", String(pageNumber ?? 1));
-        params.append("pageSize", String(pageSize ?? 25));
-        if (textSearch) params.append("textSearch", textSearch);
-
-        const res = await api.post<
-            PaginatedResponse<QueryRecordViewResponseDto>
-        >(
-            `/organizations/${organizationId}/query/records/advanced/paginated?${params.toString()}`,
-            prepareCustomQueryRequest(queryObj),
-            { headers: { "Content-Type": "application/json" } },
-        );
-        return res.data;
-    } catch (error) {
-        console.error("Error building paginated query:", error);
-        throw error;
-    }
-}
 
 /**
  * Get recently added records

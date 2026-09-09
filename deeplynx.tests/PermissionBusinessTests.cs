@@ -2,6 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -215,6 +217,27 @@ public class PermissionBusinessTests : IntegrationTestBase
         lpid3 = labelPermission3.Id;
         lpid4 = labelPermission4.Id;
         lpid5 = labelPermission5.Id;
+    }
+
+    /// <summary>
+    /// Shared setup: attach permid1 to a role, and put a project member on that role, so
+    /// mutating permid1 has an observable effect on a cached ProjectPermission entry.
+    /// </summary>
+    private async Task<(long roleId, long memberId)> AttachPermissionToRoleWithMemberAsync(long permissionId)
+    {
+        var role = new Role { Name = $"Perm Cache Role {Guid.NewGuid()}", OrganizationId = oid, ProjectId = pid };
+        Context.Roles.Add(role);
+        await Context.SaveChangesAsync();
+
+        var permission = await Context.Permissions.FirstAsync(p => p.Id == permissionId);
+        role.Permissions.Add(permission);
+        await Context.SaveChangesAsync();
+
+        var member = new ProjectMember { ProjectId = pid, UserId = uid, RoleId = role.Id };
+        Context.ProjectMembers.Add(member);
+        await Context.SaveChangesAsync();
+
+        return (role.Id, member.Id);
     }
 
     #region GetAllPermissions Tests
@@ -687,6 +710,20 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.Empty(eventList);
     }
 
+    [Fact]
+    public async Task UpdatePermission_InvalidatesCache_ForMembersOfRolesHoldingPermission()
+    {
+        await AttachPermissionToRoleWithMemberAsync(permid1);
+
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "read", null);
+        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
+
+        await _permissionBusiness.UpdatePermission(oid, pid, uid, permid1,
+            new UpdatePermissionRequestDto { Action = "write" });
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
+    }
+
     #endregion
 
     #region ArchivePermission Tests
@@ -738,6 +775,19 @@ public class PermissionBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+    }
+
+    [Fact]
+    public async Task ArchivePermission_InvalidatesCache_ForMembersOfRolesHoldingPermission()
+    {
+        await AttachPermissionToRoleWithMemberAsync(permid1);
+
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "read", null);
+        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
+
+        await _permissionBusiness.ArchivePermission(oid, pid, uid, permid1);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
     }
 
     #endregion
@@ -814,6 +864,20 @@ public class PermissionBusinessTests : IntegrationTestBase
         Assert.Empty(eventList);
     }
 
+    [Fact]
+    public async Task UnarchivePermission_InvalidatesCache_ForMembersOfRolesHoldingPermission()
+    {
+        await AttachPermissionToRoleWithMemberAsync(permid1);
+        await _permissionBusiness.ArchivePermission(oid, pid, uid, permid1);
+
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "read", null);
+        await CacheService.Instance.SetAsync(staleKey, false, (TimeSpan?)null);
+
+        await _permissionBusiness.UnarchivePermission(oid, pid, uid, permid1);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
+    }
+
     #endregion
 
     #region DeletePermission Tests
@@ -870,6 +934,19 @@ public class PermissionBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+    }
+
+    [Fact]
+    public async Task DeletePermission_InvalidatesCache_ForMembersWhoHeldPermissionBeforeDelete()
+    {
+        await AttachPermissionToRoleWithMemberAsync(permid6); // permid6 is deletable (not IsDefault)
+
+        var staleKey = CacheKeys.ProjectPermission(uid, pid, "sing", null);
+        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
+
+        await _permissionBusiness.DeletePermission(oid, pid, uid, permid6);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
     }
 
     #endregion

@@ -2431,4 +2431,390 @@ public class DataSourceBusinessTests : IntegrationTestBase
     }
 
     #endregion
+    
+    #region DataSource Cache Tests
+
+    // Uses the fixtures from SeedTestDataAsync:
+    //   did  -> Active,   OrganizationId = oid, ProjectId = pid   (project-level)
+    //   did2 -> Active,   OrganizationId = oid, ProjectId = null  (org-level)
+    //   did3 -> Archived, OrganizationId = oid, ProjectId = pid   (project-level)
+    //   pid2 -> a second project under the SAME org (oid), with no data sources of its own
+    // A couple of tests need a second organization/project to prove cross-org scope checks; those are
+    // created inline, following the same ad-hoc pattern used elsewhere in this file (e.g. "Project 2
+    // Data Source" in GetAllDataSources_DifferentProject_ReturnsCorrectDataSources).
+
+    [Fact]
+    public async Task GetDataSource_PopulatesCache_WithCorrectEntry()
+    {
+        var cacheKey = CacheKeys.DataSourceStatus(did);
+        var precheck = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
+        Assert.Null(precheck);
+
+        await _dataSourceBusiness.GetDataSource(oid, pid, did, false);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(oid, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task GetDataSource_OrgLevelDataSource_CachesNullProjectId_NotCallerSuppliedProjectId()
+    {
+        // did2 is an organization-level data source (ProjectId == null in the DB). It's reachable via a
+        // project-scoped call because the query allows ProjectId == null. The cached entry must reflect
+        // the entity's real ProjectId (null) - caching the caller's pid instead would wrongly make an
+        // org-wide data source look scoped to a single project.
+        var cacheKey = CacheKeys.DataSourceStatus(did2);
+
+        await _dataSourceBusiness.GetDataSource(oid, pid, did2, true);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(oid, cached.OrganizationId);
+        Assert.Null(cached.ProjectId);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task EnsureDataSourceExistsForProjectAsync_CacheMiss_FallsBackToDatabase_AndPopulatesCache()
+    {
+        var cacheKey = CacheKeys.DataSourceStatus(did);
+        Assert.Null(await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey));
+
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did, pid, oid);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(oid, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task EnsureDataSourceExistsForProjectAsync_NonExistentDataSource_IsNeverCached()
+    {
+        var missingId = did + 100000;
+        var cacheKey = CacheKeys.DataSourceStatus(missingId);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, missingId, pid, oid));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, missingId, pid, oid));
+
+        Assert.Null(await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey));
+    }
+
+    [Fact]
+    public async Task EnsureDataSourceExistsForProjectAsync_CacheHit_UsesCachedEntry_WithoutQueryingDatabase()
+    {
+        // did is genuinely Active in the DB. Poison the cache with "Deleted" - a status the DB would never
+        // produce for did right now. If the method trusts the cache it throws; if it falls through to the
+        // DB instead, it will not.
+        await CacheService.Instance.SetAsync(
+            CacheKeys.DataSourceStatus(did),
+            new EntityStatusCacheEntry { OrganizationId = oid, ProjectId = pid, Status = EntityStatus.Deleted },
+            TimeSpan.FromHours(1));
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did, pid, oid));
+    }
+
+    [Fact]
+    public async Task EnsureDataSourceExistsForProjectAsync_ScopeMismatch_ThrowsEvenWhenCacheEntryExists()
+    {
+        // A second organization, used only to prove the cached entry is rejected across org boundaries.
+        var org2 = new Organization { Name = "Other Org" };
+        Context.Organizations.Add(org2);
+        await Context.SaveChangesAsync();
+
+        // Prime a correct cache entry for did scoped to (oid, pid).
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did, pid, oid);
+
+        // Same dataSourceId, wrong organization - must still be rejected. Proves the scope check is
+        // applied to the cached value on every call, not skipped just because the key was found.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did, pid, org2.Id));
+
+        // Same dataSourceId and organization, wrong project (pid2 belongs to oid but not to did) - must
+        // also be rejected.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did, pid2, oid));
+    }
+
+    [Fact]
+    public async Task EnsureDataSourceExistsForProjectAsync_OrgLevelDataSource_PassesScopeCheck_RegardlessOfProjectId()
+    {
+        // did2 is org-level (ProjectId == null). Because the helper's projectId parameter is non-nullable,
+        // the only way an org-level entry can satisfy "belongs to this project" is via the explicit
+        // (entry.ProjectId == null) branch of the scope check. Confirm it passes under two different
+        // projects in the same org, and still fails under a different org.
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did2, pid, oid);
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did2, pid2, oid);
+
+        var org2 = new Organization { Name = "Other Org" };
+        Context.Organizations.Add(org2);
+        await Context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did2, pid, org2.Id));
+    }
+
+    [Fact]
+    public async Task EnsureDataSourceExistsForProjectAsync_HideArchivedFilter_AppliesToSingleCachedEntry()
+    {
+        // Prime the cache with the real (Archived) status via a hideArchived:false call.
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did3, pid, oid, hideArchived: false);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.DataSourceStatus(did3));
+        Assert.NotNull(cached);
+        Assert.Equal(EntityStatus.Archived, cached.Status);
+
+        // The SAME cache entry correctly serves both filter variants without a second key or a DB round-trip.
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did3, pid, oid, hideArchived: false);
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did3, pid, oid, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task DeleteDataSource_CachesStatusAsDeleted()
+    {
+        // Regression test: Delete must not derive Status from IsArchived - it must write Deleted
+        // explicitly, even though DeleteDataSource performs a hard delete with no "already archived"
+        // precondition.
+        await _dataSourceBusiness.DeleteDataSource(oid, pid, did);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.DataSourceStatus(did));
+        Assert.NotNull(cached);
+        Assert.Equal(EntityStatus.Deleted, cached.Status);
+        Assert.Equal(oid, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+    }
+
+    [Fact]
+    public async Task DeleteDataSource_DeletedCacheEntry_CausesExistenceCheckToThrow()
+    {
+        await _dataSourceBusiness.DeleteDataSource(oid, null, did2);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did2, pid, oid));
+    }
+
+    [Fact]
+    public async Task ArchiveDataSource_UpdatesCacheStatus_ToArchived()
+    {
+        await _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, did);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.DataSourceStatus(did));
+        Assert.NotNull(cached);
+        Assert.Equal(EntityStatus.Archived, cached.Status);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did, pid, oid, hideArchived: true));
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did, pid, oid, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UnarchiveDataSource_UpdatesCacheStatus_ToActive()
+    {
+        await _dataSourceBusiness.UnarchiveDataSource(oid, pid, uid, did3);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.DataSourceStatus(did3));
+        Assert.NotNull(cached);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, did3, pid, oid, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task CreateDataSource_PopulatesCache_Immediately()
+    {
+        var dto = new CreateDataSourceRequestDto { Name = "Cache Test", Type = "generic" };
+
+        var created = await _dataSourceBusiness.CreateDataSource(oid, pid, uid, dto);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.DataSourceStatus(created.Id));
+        Assert.NotNull(cached);
+        Assert.Equal(oid, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+
+        // A subsequent existence check should not need to touch the DB to succeed.
+        await ExistenceHelper.EnsureDataSourceExistsForProjectAsync(Context, created.Id, pid, oid);
+    }
+
+    [Fact]
+    public async Task UpdateDataSource_RefreshesCache_WithEntityScope_NotCallerProjectIdParam()
+    {
+        // did2 is org-level (ProjectId == null); update it via an org-scoped call (projectId: null) - org
+        // data sources cannot be updated from a project level, so this is the only legal way to reach it -
+        // and confirm the cache reflects that, not some stale/incorrect scope.
+        var dto = new UpdateDataSourceRequestDto { Name = "Updated Via Cache Test" };
+
+        await _dataSourceBusiness.UpdateDataSource(oid, null, uid, did2, dto);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.DataSourceStatus(did2));
+        Assert.NotNull(cached);
+        Assert.Equal(oid, cached.OrganizationId);
+        Assert.Null(cached.ProjectId);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task GetDefaultDataSource_InheritedFromOrganization_CachesEntityScope_NotProjectParam()
+    {
+        // A fresh org/project pair, used so the org-level default we set up here can't collide with any
+        // of the seeded (oid/pid) data. org2Default is org-wide (ProjectId == null) under org2, retrieved
+        // via a project-scoped call (proj3). The cached entry must reflect the entity's real scope
+        // (org-wide / ProjectId == null), not proj3's id.
+        var org2 = new Organization { Name = "Other Org" };
+        Context.Organizations.Add(org2);
+        await Context.SaveChangesAsync();
+
+        var proj3 = new Project { Name = "Other Org Project", OrganizationId = org2.Id };
+        Context.Projects.Add(proj3);
+        await Context.SaveChangesAsync();
+
+        var org2Default = new DataSource
+        {
+            Name = "Org2-Wide Default",
+            OrganizationId = org2.Id,
+            ProjectId = null, // org-level
+            Default = true,
+            LastUpdatedBy = uid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        };
+        Context.DataSources.Add(org2Default);
+        await Context.SaveChangesAsync();
+
+        await _dataSourceBusiness.GetDefaultDataSource(org2.Id, proj3.Id);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.DataSourceStatus(org2Default.Id));
+        Assert.NotNull(cached);
+        Assert.Equal(org2.Id, cached.OrganizationId);
+        Assert.Null(cached.ProjectId);
+    }
+
+    [Fact]
+    public async Task SetDefaultDataSource_PopulatesCache_WithEntityScope()
+    {
+        await _dataSourceBusiness.SetDefaultDataSource(oid, pid, uid, did);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.DataSourceStatus(did));
+        Assert.NotNull(cached);
+        Assert.Equal(oid, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+    }
+
+    #endregion
+    
+    #region Project Stats Cache Invalidation Tests
+
+    private static async Task SeedProjectStatsCacheSentinel(long projectId)
+    {
+        await CacheService.Instance.SetAsync(
+            CacheKeys.ProjectStats(projectId),
+            new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 },
+            (TimeSpan?)null);
+    }
+
+    private static async Task AssertProjectStatsCacheCleared(long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(CacheKeys.ProjectStats(projectId)));
+    }
+
+    [Fact]
+    public async Task CreateDataSource_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Project Stats Cache Invalidation Source",
+            Type = "PostgreSQL"
+        };
+
+        await _dataSourceBusiness.CreateDataSource(oid, pid, uid, dto);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task DeleteDataSource_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _dataSourceBusiness.DeleteDataSource(oid, pid, did);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task ArchiveDataSource_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _dataSourceBusiness.ArchiveDataSource(oid, pid, uid, did);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task UnarchiveDataSource_InvalidatesProjectStatsCache()
+    {
+        // did3 is seeded as already archived
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _dataSourceBusiness.UnarchiveDataSource(oid, pid, uid, did3);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task CreateDataSource_OrgLevel_DoesNotThrow_AndSkipsProjectStatsInvalidation()
+    {
+        // Org-level data sources (projectId == null) have no project scope to invalidate;
+        // this just confirms the null-projectId path completes without error.
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Org Level Project Stats Test Source",
+            Type = "PostgreSQL"
+        };
+
+        var created = await _dataSourceBusiness.CreateDataSource(oid, null, uid, dto);
+
+        Assert.NotNull(created);
+        Assert.Null(created.ProjectId);
+    }
+
+    [Fact]
+    public async Task CreateDataSource_DoesNotInvalidateUnrelatedProjectsStatsCache()
+    {
+        var pid2Key = CacheKeys.ProjectStats(pid2);
+        var pid2Sentinel = new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 };
+        await CacheService.Instance.SetAsync(pid2Key, pid2Sentinel, (TimeSpan?)null);
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateDataSourceRequestDto
+        {
+            Name = "Scoped Project Stats Invalidation Source",
+            Type = "PostgreSQL"
+        };
+
+        await _dataSourceBusiness.CreateDataSource(oid, pid, uid, dto);
+
+        // pid's own stats cache is cleared
+        await AssertProjectStatsCacheCleared(pid);
+
+        // pid2's cache is untouched — invalidation is scoped to the mutated project only
+        var pid2Cached = await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(pid2Key);
+        Assert.NotNull(pid2Cached);
+        Assert.Equal(999, pid2Cached.classes);
+    }
+
+    #endregion
+
 }
+

@@ -47,7 +47,7 @@ import {
 } from "./components/projectInsight.view-utils";
 import { useProjectInsightTabState } from "./hooks/useProjectInsightTabState";
 import { BetaBadge } from "@/app/(home)/components/BetaBadge";
-import { useRecordSearchPaginated, useRecordSearch } from "./hooks/useRecordSearch";
+import { useRecordSearchHybrid } from "./hooks/useRecordSearch";
 import PaginationControls from "../components/PaginationControls";
 
 const STATUS_POLL_INTERVAL_MS = 5000;
@@ -122,7 +122,7 @@ export default function ProjectInsightClientView() {
   );
   const [selectedPendingIds, setSelectedPendingIds] = useState<Map<number, string>>(new Map());
   const [isQueueing, setIsQueueing] = useState(false);
-  const [isLibrarySearchLoading, setIsLibrarySearchLoading] = useState(false);
+  const [draftSearchQuery, setDraftSearchQuery] = useState("");
   const { selectedInsightModels, setSelectedInsightModels } =
     useInsightModelSelection(organizationId, projectId);
 
@@ -273,6 +273,11 @@ export default function ProjectInsightClientView() {
   const pageSize = 10;
 
   const {
+    page: libraryPage,
+    setPage: setLibraryPage,
+    pageSize: libraryPageSize,
+    setPageSize: setLibraryPageSize,
+    totalPages: libraryTotalPages,
     filters: libraryState,
     setFilters: setLibraryState,
     records: embedded,
@@ -280,7 +285,8 @@ export default function ProjectInsightClientView() {
     total: embeddedTotal,
     found: embeddedFound,
     error: embeddedError,
-  } = useRecordSearch("embedded", classes, sources);
+    isLoading: isLibrarySearchLoading,
+  } = useRecordSearchHybrid(pageSize, "embedded", classes, sources);
 
   const {
     page: pendingPage,
@@ -295,7 +301,8 @@ export default function ProjectInsightClientView() {
     total: pendingTotal,
     found: pendingFound,
     error: pendingError,
-  } = useRecordSearchPaginated(pageSize, "pending", classes, sources);
+    isLoading: isPendingSearchLoading,
+  } = useRecordSearchHybrid(pageSize, "pending", classes, sources);
 
   useEffect(() => {
     setStatusMap({ ...embeddedStatus, ...pendingStatus });
@@ -426,12 +433,22 @@ export default function ProjectInsightClientView() {
     activeTabKey === "library"
       ? libraryState.searchQuery
       : pendingState.searchQuery;
+
+  // The search box shows what the user is typing (draftSearchQuery), which is
+  // only committed to the actual filter — and only then triggers a search —
+  // on Enter. Keep the draft in sync with whichever tab is active.
+  useEffect(() => {
+    setDraftSearchQuery(activeSearchQuery);
+  }, [activeTabKey, activeSearchQuery]);
+
   const activeSearchPlaceholder =
     activeTabKey === "library"
       ? t.translations.PROJECT_INSIGHT_SEARCH_PLACEHOLDER
       : t.translations.PROJECT_INSIGHT_PENDING_SEARCH_PLACEHOLDER;
   const activeSearchError =
     activeTabKey === "library" ? embeddedError : pendingError;
+  const activeIsLoading =
+    activeTabKey === "library" ? isLibrarySearchLoading : isPendingSearchLoading;
   const activeFilterCount =
     activeFilters.classIds.length + activeFilters.tagIds.length;
   const activeFilterPills = buildActiveFilterPills(
@@ -486,6 +503,12 @@ export default function ProjectInsightClientView() {
       );
     } catch (error) {
       console.error("Failed to queue project Insight uploads:", error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : t.translations.INSIGHT_ERROR_PREFIX;
+
       setStatusMap((current) => ({
         ...current,
         ...Object.fromEntries(
@@ -493,19 +516,13 @@ export default function ProjectInsightClientView() {
             file.fileId,
             {
               state: "error",
-              error:
-                error instanceof Error
-                  ? error.message
-                  : t.translations.INSIGHT_ERROR_PREFIX,
+              error: message,
             },
           ]),
         ),
       }));
-      toast.error(
-        withTokens(t.translations.PROJECT_INSIGHT_FAILED_SUMMARY, {
-          count: uploadFileInfo.length,
-        }),
-      );
+
+      toast.error(message);
     } finally {
       setSelectedPendingIds(new Map());
       setIsQueueing(false);
@@ -526,9 +543,11 @@ export default function ProjectInsightClientView() {
         })
     : t.translations.PROJECT_INSIGHT_LIBRARY_DESCRIPTION;
   const pendingSearchSummary = normalizedPendingSearchQuery
-    ? withTokens(t.translations.PROJECT_INSIGHT_PENDING_SEARCH_RESULTS, {
-      count: pendingTotal,
-    })
+    ? isPendingSearchLoading
+      ? t.translations.PROJECT_INSIGHT_SEARCHING
+      : withTokens(t.translations.PROJECT_INSIGHT_PENDING_SEARCH_RESULTS, {
+        count: pendingTotal,
+      })
     : t.translations.PROJECT_INSIGHT_PENDING_DESCRIPTION;
   const activeContextTitle =
     activeTabKey === "library"
@@ -737,8 +756,8 @@ export default function ProjectInsightClientView() {
                 <button
                   type="button"
                   className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${activeTabKey === "library"
-                      ? "bg-base-100 text-base-content shadow-sm"
-                      : "text-base-content/70 hover:text-base-content"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70 hover:text-base-content"
                     }`}
                   onClick={() => setActiveTabKey("library")}
                 >
@@ -750,8 +769,8 @@ export default function ProjectInsightClientView() {
                 <button
                   type="button"
                   className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${activeTabKey === "pending"
-                      ? "bg-base-100 text-base-content shadow-sm"
-                      : "text-base-content/70 hover:text-base-content"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70 hover:text-base-content"
                     }`}
                   onClick={() => setActiveTabKey("pending")}
                 >
@@ -767,13 +786,24 @@ export default function ProjectInsightClientView() {
                   <div className="flex flex-wrap items-center gap-3">
                     <SearchBar
                       className="flex-1 min-w-[160px]"
-                      value={activeSearchQuery}
-                      onChange={(event) => updateActiveSearchQuery(event.target.value)}
+                      value={draftSearchQuery}
+                      onChange={(event) => setDraftSearchQuery(event.target.value)}
                       onEnter={updateActiveSearchQuery}
-                      onClearAll={clearActiveSearchQuery}
+                      onClearAll={() => {
+                        setDraftSearchQuery("");
+                        clearActiveSearchQuery();
+                      }}
                       placeholder={activeSearchPlaceholder}
                       aditionalFilters={false}
                     />
+
+                    {activeIsLoading && (
+                      <span
+                        className="loading loading-spinner loading-sm shrink-0 text-primary"
+                        role="status"
+                        aria-label={t.translations.PROJECT_INSIGHT_SEARCHING}
+                      />
+                    )}
 
                     <button
                       type="button"
@@ -820,14 +850,23 @@ export default function ProjectInsightClientView() {
 
               {activeTabKey === "library" ? libraryContent : pendingContent}
 
-              {(activeTabKey !== "library") &&
+              {activeTabKey === "library" ? (
+                <PaginationControls
+                  currentPage={libraryPage}
+                  pageSize={libraryPageSize}
+                  totalPages={libraryTotalPages}
+                  onPageChange={setLibraryPage}
+                  onPageSizeChange={setLibraryPageSize}
+                />
+              ) : (
                 <PaginationControls
                   currentPage={pendingPage}
                   pageSize={pendingPageSize}
                   totalPages={pendingTotalPages}
                   onPageChange={setPendingPage}
                   onPageSizeChange={setPendingPageSize}
-                />}
+                />
+              )}
             </div>
           </aside>
         </div>

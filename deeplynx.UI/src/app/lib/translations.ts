@@ -243,6 +243,8 @@ export const translations = {
         "Configure branding and manage your project",
       CONFIRM_BULK_UPLOAD: "Confirm Bulk Upload",
       CONFIRM_UPLOAD: "Confirm Upload",
+      CONFIRM_EXTRACTION: "Confirm Extraction",
+      CONFIRM_OVERWRITE_PREVIOUS_EXTRACTION: "The previous extraction data for this record will be overwritten, are you sure you want to proceed?",
       CONNECT_STORAGE_MANUALLY_INSTEAD: "Connect storage manually instead",
       CONNECTION_STRING: "Connection String",
       CONNECTIONS: "Connections",
@@ -980,7 +982,9 @@ export const translations = {
       LATTICE_SELECT_EXTRACTION_PROMPT:
         "Select an extraction from the list to review it.",
       LATTICE_APPROVE_ALL: "Approve All",
+      LATTICE_APPROVED: "Approved",
       LATTICE_REJECT_ALL: "Reject All",
+      LATTICE_REJECTED: "Rejected",
       LATTICE_EXTRACTION_RUNNING:
         "Extraction is in progress. This page will update automatically.",
       LATTICE_EXTRACTION_REVIEW:
@@ -2589,6 +2593,8 @@ export const translations = {
         "Configura la identidad visual y administra tu proyecto",
       CONFIRM_BULK_UPLOAD: "Confirmar carga masiva",
       CONFIRM_UPLOAD: "Confirmar carga",
+      CONFIRM_EXTRACTION: "Confirmar extracción",
+      CONFIRM_OVERWRITE_PREVIOUS_EXTRACTION: "Los datos de la extracción anterior para este registro serán sobrescritos, ¿estás seguro de que deseas continuar?",
       CONNECT_STORAGE_MANUALLY_INSTEAD:
         "Conectar el almacenamiento manualmente en su lugar",
       CONNECTION_STRING: "Cadena de conexión",
@@ -3390,7 +3396,9 @@ export const translations = {
       LATTICE_SELECT_EXTRACTION_PROMPT:
         "Selecciona una extracción de la lista para revisarla.",
       LATTICE_APPROVE_ALL: "Aprobar todo",
+      LATTICE_APPROVED: "Aprobado",
       LATTICE_REJECT_ALL: "Rechazar todo",
+      LATTICE_REJECTED: "Rechazado",
       LATTICE_EXTRACTION_RUNNING:
         "La extracción está en progreso. Esta página se actualizará automáticamente.",
       LATTICE_EXTRACTION_REVIEW:

@@ -202,18 +202,17 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(_osConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(objectStorage);
         await Context.SaveChangesAsync();
         osid = objectStorage.Id;
 
-        project.DefaultObjectStorageId = (int?)osid;
+        project.DefaultObjectStorageId = osid;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
-        organization.DefaultObjectStorageId = (int?)osid;
+        organization.DefaultObjectStorageId = osid;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
@@ -463,7 +462,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -515,7 +513,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -563,7 +560,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(secondaryOsConfig),
-            Default = false // Not the default
         };
 
         Context.ObjectStorages.Add(secondaryObjectStorage);
@@ -651,7 +647,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = otherOrg.Id, // Different org
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(otherOrgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(otherOrgStorage);
@@ -689,7 +684,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = false
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -746,7 +740,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = false
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -1521,7 +1514,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -1529,16 +1521,15 @@ public class FileBusinessTests : IntegrationTestBase
         var orgOsId = orgObjectStorage.Id;
 
         var organization = Context.Organizations.First(o => o.Id == oid);
-        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
         var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
         await Context.SaveChangesAsync();
 
         var project = Context.Projects.First(o => o.Id == pid);
-        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
@@ -1841,14 +1832,9 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
-        await Context.SaveChangesAsync();
-
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
         await Context.SaveChangesAsync();
 
         // Upload file using org default
@@ -1946,23 +1932,19 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
         var organization = Context.Organizations.First(o => o.Id == oid);
-        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
-        await Context.SaveChangesAsync();
 
         var project = Context.Projects.First(o => o.Id == pid);
-        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
@@ -2065,23 +2047,18 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
         var organization = Context.Organizations.First(o => o.Id == oid);
-        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
-        await Context.SaveChangesAsync();
-
         var project = Context.Projects.First(o => o.Id == pid);
-        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
@@ -3262,7 +3239,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "azure_object",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(new ObjectStorageConfigDto()),
-            Default = false
         };
 
         Context.ObjectStorages.Add(azureObjectStorage);
@@ -3854,24 +3830,18 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
         await Context.SaveChangesAsync();
 
         var organization = Context.Organizations.First(o => o.Id == oid);
-        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
-        // Remove project-level default
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
-        await Context.SaveChangesAsync();
-
         var project = Context.Projects.First(o => o.Id == pid);
-        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
@@ -3932,7 +3902,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -4064,7 +4033,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -4072,16 +4040,12 @@ public class FileBusinessTests : IntegrationTestBase
         var orgOsId = orgObjectStorage.Id;
 
         var organization = Context.Organizations.First(o => o.Id == oid);
-        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
-        await Context.SaveChangesAsync();
-
         var project = Context.Projects.First(o => o.Id == pid);
-        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
@@ -4159,7 +4123,6 @@ public class FileBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(orgOsConfig),
-            Default = true
         };
 
         Context.ObjectStorages.Add(orgObjectStorage);
@@ -4167,17 +4130,12 @@ public class FileBusinessTests : IntegrationTestBase
         var orgOsId = orgObjectStorage.Id;
 
         var organization = Context.Organizations.First(o => o.Id == oid);
-        organization.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        organization.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Organizations.Update(organization);
         await Context.SaveChangesAsync();
 
-        // Disable project default
-        var projectStorage = Context.ObjectStorages.First(os => os.Id == osid);
-        projectStorage.Default = false;
-        await Context.SaveChangesAsync();
-
         var project = Context.Projects.First(o => o.Id == pid);
-        project.DefaultObjectStorageId = (int?)orgObjectStorage.Id;
+        project.DefaultObjectStorageId = orgObjectStorage.Id;
         Context.Projects.Update(project);
         await Context.SaveChangesAsync();
 
@@ -4207,38 +4165,6 @@ public class FileBusinessTests : IntegrationTestBase
             $"File should be in org directory. Actual: {result.Uri}");
         Assert.False(result.Uri.Contains(_testDirectory),
             $"File should NOT be in project directory. Actual: {result.Uri}");
-    }
-
-    [Fact]
-    public async Task StartUpload_NoDefaultFound_ThrowsException()
-    {
-        // Arrange: Remove all default flags
-        var allStorages = Context.ObjectStorages.Where(os => os.OrganizationId == oid);
-        foreach (var storage in allStorages) storage.Default = false;
-        await Context.SaveChangesAsync();
-
-        var organization = Context.Organizations.First(o => o.Id == oid);
-        organization.DefaultObjectStorageId = null;
-        Context.Organizations.Update(organization);
-        await Context.SaveChangesAsync();
-
-        var project = Context.Projects.First(o => o.Id == pid);
-        project.DefaultObjectStorageId = null;
-        Context.Projects.Update(project);
-        await Context.SaveChangesAsync();
-
-        var request = new FileUploadInitRequestDto
-        {
-            FileName = "no-default.txt",
-            FileSize = 2048
-        };
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            _fileBusiness.StartUpload(oid, pid, did, null, request)
-        );
-
-        Assert.Contains("Default object storage not set", exception.Message);
     }
 
     #endregion
@@ -6528,7 +6454,154 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(fileClass.Id, createdRecord.ClassId);
     }
     #endregion
+    
+    #region File Count Cache Invalidation Tests
 
+    private static async Task SeedFileCountCacheSentinels(long organizationId, long projectId)
+    {
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectFileCount(projectId, true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectFileCount(projectId, false), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationFileCount(organizationId, true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationFileCount(organizationId, false), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.SystemFileCount(true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.SystemFileCount(false), 999, (TimeSpan?)null);
+    }
+
+    private static async Task AssertAllFileCountCacheKeysCleared(long organizationId, long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectFileCount(projectId, true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectFileCount(projectId, false)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationFileCount(organizationId, true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationFileCount(organizationId, false)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.SystemFileCount(true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.SystemFileCount(false)));
+    }
+
+    [Fact]
+    public async Task UploadFile_InvalidatesFileCountCache()
+    {
+        await SeedFileCountCacheSentinels(oid, pid);
+
+        var content = "Cache invalidation upload test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "cache-invalidation-upload.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await AssertAllFileCountCacheKeysCleared(oid, pid);
+    }
+
+    [Fact]
+    public async Task DeleteFile_InvalidatesFileCountCache()
+    {
+        var content = "Cache invalidation delete test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "cache-invalidation-delete.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await SeedFileCountCacheSentinels(oid, pid);
+
+        await _fileBusiness.DeleteFile(uid, oid, pid, record.Id);
+
+        await AssertAllFileCountCacheKeysCleared(oid, pid);
+    }
+
+    [Fact]
+    public async Task UploadFile_DoesNotInvalidateUnrelatedProjectsCache()
+    {
+        // Arrange: a second project in the same organization
+        var project2 = new Project { Name = "Unrelated Project", OrganizationId = oid };
+        Context.Projects.Add(project2);
+        await Context.SaveChangesAsync();
+        var pid2 = project2.Id;
+
+        var pid2Key = CacheKeys.ProjectFileCount(pid2, true);
+        await CacheService.Instance.SetAsync(pid2Key, 999, (TimeSpan?)null);
+        await SeedFileCountCacheSentinels(oid, pid);
+
+        var content = "Scoped invalidation test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "scoped-invalidation.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        // pid's own project-scope key is cleared
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectFileCount(pid, true)));
+
+        // pid2's key is untouched — the invalidation is scoped to the mutated project only
+        Assert.Equal(999, await CacheService.Instance.GetAsync<int?>(pid2Key));
+    }
+
+    #endregion
+    #region Data Modality Count Cache Invalidation Tests
+
+    private static async Task SeedModalityCountCacheSentinels(long organizationId, long projectId)
+    {
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectModalityCount(projectId), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationModalityCount(organizationId), 999, (TimeSpan?)null);
+    }
+
+    private static async Task AssertAllModalityCountCacheKeysCleared(long organizationId, long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectModalityCount(projectId)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationModalityCount(organizationId)));
+    }
+
+    [Fact]
+    public async Task UploadFile_InvalidatesModalityCountCache()
+    {
+        await SeedModalityCountCacheSentinels(oid, pid);
+
+        var content = "Modality cache invalidation upload test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "modality-cache-invalidation-upload.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await AssertAllModalityCountCacheKeysCleared(oid, pid);
+    }
+
+    [Fact]
+    public async Task DeleteFile_InvalidatesModalityCountCache()
+    {
+        // DeleteFile bypasses RecordBusiness.DeleteRecord (it calls a private DeleteFileRecordOnly
+        // helper directly), so invalidation must be wired up explicitly on this path too — this
+        // test exists specifically to catch that gap.
+        var content = "Modality cache invalidation delete test";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(ms, 0, ms.Length, "file", "modality-cache-invalidation-delete.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var record = await _fileBusiness.UploadFile(uid, oid, pid, did, osid, file);
+
+        await SeedModalityCountCacheSentinels(oid, pid);
+
+        await _fileBusiness.DeleteFile(uid, oid, pid, record.Id);
+
+        await AssertAllModalityCountCacheKeysCleared(oid, pid);
+    }
+
+    #endregion
 
     private static IFormFile CreateTestCsvFile(string content, string fileName = "test.csv")
     {

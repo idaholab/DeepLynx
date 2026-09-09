@@ -843,7 +843,7 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("mode");
 
-                    b.Property<long?>("ProjectId")
+                    b.Property<long>("ProjectId")
                         .HasColumnType("bigint")
                         .HasColumnName("project_id");
 
@@ -1527,10 +1527,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("text")
                         .HasColumnName("config_encrypted");
 
-                    b.Property<bool>("Default")
-                        .HasColumnType("boolean")
-                        .HasColumnName("default");
-
                     b.Property<bool>("FilesDeletable")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1654,8 +1650,8 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("create_container_per_project");
 
-                    b.Property<int?>("DefaultObjectStorageId")
-                        .HasColumnType("integer")
+                    b.Property<long>("DefaultObjectStorageId")
+                        .HasColumnType("bigint")
                         .HasColumnName("default_object_storage_id");
 
                     b.Property<bool>("DefaultOrg")
@@ -1866,8 +1862,8 @@ namespace deeplynx.datalayer.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("banner");
 
-                    b.Property<int?>("DefaultObjectStorageId")
-                        .HasColumnType("integer")
+                    b.Property<long>("DefaultObjectStorageId")
+                        .HasColumnType("bigint")
                         .HasColumnName("default_object_storage_id");
 
                     b.Property<string>("Description")
@@ -1992,6 +1988,10 @@ namespace deeplynx.datalayer.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("ChainHash")
+                        .HasColumnType("text")
+                        .HasColumnName("chain_hash");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -2009,6 +2009,10 @@ namespace deeplynx.datalayer.Migrations
                     b.Property<long>("OrganizationId")
                         .HasColumnType("bigint")
                         .HasColumnName("organization_id");
+
+                    b.Property<string>("PreviousHash")
+                        .HasColumnType("text")
+                        .HasColumnName("previous_hash");
 
                     b.Property<long>("ProjectId")
                         .HasColumnType("bigint")
@@ -2052,6 +2056,14 @@ namespace deeplynx.datalayer.Migrations
 
                     b.HasIndex("RecordId")
                         .HasDatabaseName("idx_provenance_records_record_id");
+
+                    b.HasIndex("RecordId", "Id")
+                        .HasDatabaseName("idx_provenance_records_record_id_id");
+
+                    b.HasIndex("RecordId", "PreviousHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_provenance_records_record_id_previous_hash")
+                        .HasFilter("previous_hash IS NOT NULL");
 
                     b.ToTable("provenance_records", "deeplynx");
                 });
@@ -3787,45 +3799,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("deeplynx.datalayer.Models.ProvenanceRecord", b =>
-                {
-                    b.HasOne("deeplynx.datalayer.Models.HistoricalRecord", "HistoricalRecord")
-                        .WithMany("ProvenanceRecords")
-                        .HasForeignKey("HistoricalRecordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("provenance_records_historical_record_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.Organization", "Organization")
-                        .WithMany("ProvenanceRecords")
-                        .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("provenance_records_organization_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.Project", "Project")
-                        .WithMany("ProvenanceRecords")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("provenance_records_project_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.Record", "Record")
-                        .WithMany("ProvenanceRecords")
-                        .HasForeignKey("RecordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("provenance_records_record_id_fkey");
-
-                    b.Navigation("HistoricalRecord");
-
-                    b.Navigation("Organization");
-
-                    b.Navigation("Project");
-
-                    b.Navigation("Record");
-                });
-
             modelBuilder.Entity("deeplynx.datalayer.Models.Record", b =>
                 {
                     b.HasOne("deeplynx.datalayer.Models.Class", "Class")
@@ -4219,11 +4192,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("ProjectMembers");
                 });
 
-            modelBuilder.Entity("deeplynx.datalayer.Models.HistoricalRecord", b =>
-                {
-                    b.Navigation("ProvenanceRecords");
-                });
-
             modelBuilder.Entity("deeplynx.datalayer.Models.OauthApplication", b =>
                 {
                     b.Navigation("ApiKeys");
@@ -4268,8 +4236,6 @@ namespace deeplynx.datalayer.Migrations
 
                     b.Navigation("Projects");
 
-                    b.Navigation("ProvenanceRecords");
-
                     b.Navigation("RecordCollections");
 
                     b.Navigation("Records");
@@ -4309,8 +4275,6 @@ namespace deeplynx.datalayer.Migrations
 
                     b.Navigation("ProjectMembers");
 
-                    b.Navigation("ProvenanceRecords");
-
                     b.Navigation("RecordCollections");
 
                     b.Navigation("Records");
@@ -4335,8 +4299,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Embeddings");
 
                     b.Navigation("HistoricalRecords");
-
-                    b.Navigation("ProvenanceRecords");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Relationship", b =>

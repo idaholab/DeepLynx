@@ -463,7 +463,7 @@ export default function DataSchema({ mode, organizationId }: DataSchemaProps) {
       return cachedCount;
     } else {
       const query: CustomQueryRequestDto = { filter: "class_id", operator: "=", value: String(classId) };
-      const records = await queryBuilder(organizationId, [query], [projectId]);
+      const { items: records } = await queryBuilder(organizationId, [query], [projectId], null, undefined, -1);
 
       const count = records.filter(record => record.classId === classId).length;
       setCachedRecordsCount(prev => ({

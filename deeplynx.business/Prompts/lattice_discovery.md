@@ -44,6 +44,20 @@ ATTRIBUTE EXTRACTION RULES:
 8. Represent tags as a list of strings under the attribute key "tags".
 9. Example: "attributes": { ..., "tags": ["high-priority", "classified"] }
 
+SOURCE PAGE RULES:
+
+1. Each chunk in the DOCUMENT TEXT below is tagged with `[record_id: N, page: P]` for single-page chunks
+   or `[record_id: N, pages: P-Q]` for chunks that span a range of pages.
+2. Every extracted class and relationship MUST include a "source_page" attribute inside its "attributes" object.
+3. The value of "source_page" MUST be copied verbatim from the chunk tag it was extracted from:
+   - Single page: "source_page": "5"
+   - Page range: "source_page": "5-7"
+4. If an entity appears across multiple chunks, use the page (or range) from the chunk where it is most clearly defined
+   — the same chunk you used to determine its record_id.
+5. Do NOT invent, infer, or guess a page number. Only copy what is present in the chunk tag.
+6. If a chunk tag is missing page information for any reason, omit "source_page" for entities from that chunk rather
+   than fabricating a value.
+
 DISCOVERY GUIDELINES:
 
 - Ontology matches: confidence 0.85-0.95
@@ -56,14 +70,14 @@ OUTPUT FORMAT: Return ONLY valid JSON (no markdown, no explanations), exactly th
 
 {
 "classes": [
-{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "record_id": 1, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing", "tags": ["strategic", "critical infrastructure"]}},
-{"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "record_id": 1, "attributes": {"role": "command and control", "location": "operations center"}}
+{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "record_id": 1, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing", "source_page": "3", "tags": ["strategic", "critical infrastructure"]}},
+{"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "record_id": 1, "attributes": {"role": "command and control", "location": "operations center", "source_page": "4-5"}}
 ],
 "relationships": [
 {"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-"relationship_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90, "record_id": 1},
+"relationship_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90, "record_id": 1, "attributes": {"source_page": "3"}},
 {"subject": "Tactical Operations Center", "subject_type": "CommandControlFacility",
-"relationship_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75, "record_id": 1}
+"relationship_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75, "record_id": 1, "attributes": {"source_page": "4-5"}}
 ]
 }
 
@@ -73,8 +87,9 @@ be truncated; extract from whatever is present and always return the complete JS
 
 Extract from the following DOCUMENT TEXT and return ONLY the JSON object described above:
 
-Each text chunk below is tagged with a [record_id: N] marker identifying its source document.
-You MUST include the corresponding record_id on every extracted class and relationship.
-If an entity appears across multiple chunks, use the record_id of the chunk where it is most clearly defined.
+Each text chunk below is tagged with a [record_id: N, page: P] marker (or [record_id: N, pages: P-Q] for multi-page
+chunks) identifying its source document and location. You MUST include the corresponding record_id on every extracted
+class and relationship, and copy the page value into "attributes.source_page" as described in the SOURCE PAGE RULES.
+If an entity appears across multiple chunks, use the record_id and page of the chunk where it is most clearly defined.
 
 {text}

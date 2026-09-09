@@ -134,7 +134,8 @@ function DecisionButtons({
 
 function RecordCard({ record, isApproved, isRejected, onToggle, locked }:
   {
-    record: StagedRecordDTO; isApproved: boolean;
+    record: StagedRecordDTO;
+    isApproved: boolean;
     isRejected: boolean;
     onToggle: (action: "approve" | "reject") => void;
     locked: boolean;
@@ -180,11 +181,21 @@ function RecordCard({ record, isApproved, isRejected, onToggle, locked }:
           </div>
 
           <div className="flex justify-end sm:ml-4 shrink-0">
-            <DecisionButtons
-              isApproved={isApproved}
-              isRejected={isRejected}
-              onToggle={onToggle}
-            />
+            {record.promoted_id ? (
+              <span className="badge badge-success badge-outline">
+                {t.translations.LATTICE_APPROVED}
+              </span>
+            ) : record.rejected ? (
+              <span className="badge badge-error badge-outline">
+                {t.translations.LATTICE_REJECTED}
+              </span>
+            ) : (
+              <DecisionButtons
+                isApproved={isApproved}
+                isRejected={isRejected}
+                onToggle={onToggle}
+              />
+            )}
           </div>
         </div>
 
@@ -258,6 +269,14 @@ function ClassCard({ cls, isApproved, isRejected, onToggle, locked }:
             <span className="badge badge-info badge-outline">
               {t.translations.LATTICE_ALREADY_IN_PROJECT}
             </span>
+          ) : cls.promoted_id ? (
+            <span className="badge badge-success badge-outline">
+              {t.translations.LATTICE_APPROVED}
+            </span>
+          ) : cls.rejected ? (
+            <span className="badge badge-error badge-outline">
+              {t.translations.LATTICE_REJECTED}
+            </span>
           ) : (
             <DecisionButtons
               isApproved={isApproved}
@@ -271,24 +290,34 @@ function ClassCard({ cls, isApproved, isRejected, onToggle, locked }:
   );
 }
 
-function EdgeCard({ edge, isApproved,
-  isRejected,
-  onToggle,
-  locked, }: {
-    edge: StagedEdgeDTO; isApproved: boolean;
-    isRejected: boolean;
-    onToggle: (action: "approve" | "reject") => void;
-    locked: boolean;
-  }) {
+
+function EdgeCard({ edge, originRecord, destinationRecord, isApproved, isRejected, onToggle, locked }: {
+  edge: StagedEdgeDTO;
+  originRecord?: StagedRecordDTO;
+  destinationRecord?: StagedRecordDTO;
+  isApproved: boolean;
+  isRejected: boolean;
+  onToggle: (action: "approve" | "reject") => void;
+  locked: boolean;
+}) {
   const { t } = useLanguage();
+
+  const formatRecord = (record: StagedRecordDTO | undefined, fallbackName: string | null) => {
+    const recordName = record?.name ?? fallbackName ?? "?";
+    const className = record?.class_name ?? "?";
+    const classId = record?.extraction_class_id ?? "?";
+
+    return `${recordName} (${className}: ${classId})`;
+  };
+
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold break-words">
-              {edge.origin_record_name ?? "?"} → {edge.relationship_name ?? "?"} →{" "}
-              {edge.destination_record_name ?? "?"}
+              {formatRecord(originRecord, edge.origin_record_name)} → {edge.relationship_name ?? "?"} →{" "}
+              {formatRecord(destinationRecord, edge.destination_record_name)}
             </p>
 
             <span className="badge badge-outline">{t.translations.ID_LABEL}{edge.id}</span>
@@ -312,26 +341,33 @@ function EdgeCard({ edge, isApproved,
         </div>
 
         <div className="flex justify-end sm:ml-4 shrink-0">
-          <DecisionButtons
-            isApproved={isApproved}
-            isRejected={isRejected}
-            onToggle={onToggle}
-          />
+          {edge.promoted_id ? (
+            <span className="badge badge-success badge-outline">
+              {t.translations.LATTICE_APPROVED}
+            </span>
+          ) : edge.rejected ? (
+            <span className="badge badge-error badge-outline">
+              {t.translations.LATTICE_REJECTED}
+            </span>
+          ) : (
+            <DecisionButtons
+              isApproved={isApproved}
+              isRejected={isRejected}
+              onToggle={onToggle}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function RelationshipCard({ rel, isApproved,
-  isRejected,
-  onToggle,
-  locked, }: {
-    rel: StagedRelationshipDTO; isApproved: boolean;
-    isRejected: boolean;
-    onToggle: (action: "approve" | "reject") => void;
-    locked: boolean;
-  }) {
+function RelationshipCard({ rel, isApproved, isRejected, onToggle, locked }: {
+  rel: StagedRelationshipDTO; isApproved: boolean;
+  isRejected: boolean;
+  onToggle: (action: "approve" | "reject") => void;
+  locked: boolean;
+}) {
   const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-base-300 bg-base-200/50 p-4">
@@ -384,6 +420,14 @@ function RelationshipCard({ rel, isApproved,
           {rel.ontology_relationship_id ? (
             <span className="badge badge-info badge-outline">
               {t.translations.LATTICE_ALREADY_IN_PROJECT}
+            </span>
+          ) : rel.promoted_id ? (
+            <span className="badge badge-success badge-outline">
+              {t.translations.LATTICE_APPROVED}
+            </span>
+          ) : rel.rejected ? (
+            <span className="badge badge-error badge-outline">
+              {t.translations.LATTICE_REJECTED}
             </span>
           ) : (
             <DecisionButtons
@@ -692,35 +736,62 @@ function ExtractionDetailPanel({
     if (!staging) return;
     try {
       setIsPromoting(true);
-      const hasApprovals = (["records", "classes", "edges", "relationships"] as ItemType[])
-        .some(t => approved[t].size > 0);
-      const hasRejections = (["records", "classes", "edges", "relationships"] as ItemType[])
-        .some(t => rejected[t].size > 0);
+
+      const filterApproved = <T extends { id: number; rejected?: boolean; promoted_id: number | null }>(
+        items: T[],
+        approvedSet: Set<number>
+      ) => {
+        return [...approvedSet].filter(id => {
+          const item = items.find(i => i.id === id);
+          return item && !item.rejected && !item.promoted_id;
+        });
+      };
+
+      const filterRejected = <T extends { id: number; rejected?: boolean; promoted_id: number | null }>(
+        items: T[],
+        rejectedSet: Set<number>
+      ) => {
+        return [...rejectedSet].filter(id => {
+          const item = items.find(i => i.id === id);
+          return item && !item.promoted_id && !item.rejected;
+        });
+      };
+
+      const filteredApproved = {
+        record_ids: filterApproved(staging.records, approved.records),
+        class_ids: filterApproved(staging.classes, approved.classes),
+        edge_ids: filterApproved(staging.edges, approved.edges),
+        relationship_ids: filterApproved(staging.relationships, approved.relationships),
+      };
+
+      const filteredRejected = {
+        record_ids: filterRejected(staging.records, rejected.records),
+        class_ids: filterRejected(staging.classes, rejected.classes),
+        edge_ids: filterRejected(staging.edges, rejected.edges),
+        relationship_ids: filterRejected(staging.relationships, rejected.relationships),
+      };
+
+      const hasApprovals = Object.values(filteredApproved).some(arr => arr.length > 0);
+      const hasRejections = Object.values(filteredRejected).some(arr => arr.length > 0);
 
       if (hasApprovals) {
-        await promoteExtraction(organizationId, projectId, extractionId, {
-          record_ids: [...approved.records],
-          class_ids: [...approved.classes],
-          edge_ids: [...approved.edges],
-          relationship_ids: [...approved.relationships]
-        });
+        await promoteExtraction(organizationId, projectId, extractionId, filteredApproved);
         await fetchStaging();
       }
       if (hasRejections) {
         await rejectExtraction(organizationId, projectId, extractionId, {
-          record_ids: [...rejected.records],
-          class_ids: [...rejected.classes],
-          edge_ids: [...rejected.edges],
-          relationship_ids: [...rejected.relationships],
+          ...filteredRejected,
           reject_by_status: [],
           reject_all_remaining: false,
         });
         await fetchStaging();
       }
+
       toast.success(t.translations.LATTICE_EXTRACTION_APPROVED_TOAST);
 
       await fetchStaging();
       onStatusChange?.();
+
       setApproved({ records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set() });
       setRejected({ records: new Set(), classes: new Set(), edges: new Set(), relationships: new Set() });
     } catch (error: any) {
@@ -772,21 +843,10 @@ function ExtractionDetailPanel({
     relationships: t.translations.RELATIONSHIPS,
   };
 
-  const visibleRecords = staging.records.filter(
-    (record) => !record.promoted_id && !record.rejected,
-  );
-
-  const visibleClasses = staging.classes.filter(
-    (cls) => !cls.promoted_id && !cls.rejected,
-  );
-
-  const visibleEdges = staging.edges.filter(
-    (edge) => !edge.promoted_id && !edge.rejected,
-  );
-
-  const visibleRelationships = staging.relationships.filter(
-    (rel) => !rel.promoted_id && !rel.rejected,
-  );
+  const visibleRecords = staging.records;
+  const visibleClasses = staging.classes;
+  const visibleEdges = staging.edges;
+  const visibleRelationships = staging.relationships;
 
   const countByStatus = (status: string) =>
     visibleRecords.filter((r) => r.validation_status === status).length +
@@ -989,10 +1049,14 @@ function ExtractionDetailPanel({
               <EmptyState message={t.translations.LATTICE_NO_RECORDS_STAGED} />
             ) : (
               visibleRecords.map((record) => (
-                <RecordCard key={record.id} record={record} isApproved={approved.records.has(record.id)}
+                <RecordCard
+                  key={record.id}
+                  record={record}
+                  isApproved={approved.records.has(record.id)}
                   isRejected={rejected.records.has(record.id)}
                   locked={!!record.promoted_id || record.rejected}
-                  onToggle={(action) => toggleItem("records", record.id, action)} />
+                  onToggle={(action) => toggleItem("records", record.id, action)}
+                />
               ))
             ))}
 
@@ -1010,12 +1074,22 @@ function ExtractionDetailPanel({
             (visibleEdges.length === 0 ? (
               <EmptyState message={t.translations.LATTICE_NO_EDGES_STAGED} />
             ) : (
-              visibleEdges.map((edge) => (
-                <EdgeCard key={edge.id} edge={edge} isApproved={approved.edges.has(edge.id)}
-                  isRejected={rejected.edges.has(edge.id)}
-                  locked={!!edge.promoted_id || edge.rejected}
-                  onToggle={(action) => toggleItem("edges", edge.id, action)} />
-              ))
+              visibleEdges.map((edge) => {
+                const originRecord = visibleRecords.find((record) => record.id === edge.origin_record_id);
+                const destinationRecord = visibleRecords.find((record) => record.id === edge.destination_record_id);
+                return (
+                  <EdgeCard
+                    key={edge.id}
+                    edge={edge}
+                    originRecord={originRecord}
+                    destinationRecord={destinationRecord}
+                    isApproved={approved.edges.has(edge.id)}
+                    isRejected={rejected.edges.has(edge.id)}
+                    locked={!!edge.promoted_id || edge.rejected}
+                    onToggle={(action) => toggleItem("edges", edge.id, action)}
+                  />
+                );
+              })
             ))}
 
           {activeTab === "relationships" &&

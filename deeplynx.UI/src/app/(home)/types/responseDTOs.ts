@@ -92,6 +92,7 @@ export type RecordResponseDto = {
   dataSourceId?: number | null;
   dataSourceName?: string | null;
   projectId?: number | null;
+  extractionId?: number | null;
   lastUpdatedAt?: string;
   lastUpdatedBy?: string | null;
   isArchived?: boolean;

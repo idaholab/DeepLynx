@@ -152,6 +152,20 @@ public class IntegrationTestBase : IAsyncLifetime
     /// </summary>
     protected async Task CleanDatabaseAsync()
     {
+        // provenance_records is append-only (see block_provenance_mutation trigger) and no
+        // longer cascade-deletes from its parent entities, so it must be cleared explicitly.
+        // session_replication_role bypasses the trigger for this test-only bulk cleanup; the
+        // transaction keeps the SET and the delete on the same pooled connection.
+        await using (var transaction = await Context.Database.BeginTransactionAsync())
+        {
+            await Context.Database.ExecuteSqlRawAsync("SET session_replication_role = replica;");
+            var provenanceRecords = await Context.ProvenanceRecords.ToListAsync();
+            Context.ProvenanceRecords.RemoveRange(provenanceRecords);
+            await Context.SaveChangesAsync();
+            await Context.Database.ExecuteSqlRawAsync("SET session_replication_role = DEFAULT;");
+            await transaction.CommitAsync();
+        }
+
         var subscriptions = await Context.Subscriptions.ToListAsync();
         Context.Subscriptions.RemoveRange(subscriptions);
         await Context.SaveChangesAsync();

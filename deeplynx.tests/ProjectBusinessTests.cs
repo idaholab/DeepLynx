@@ -182,6 +182,24 @@ public class ProjectBusinessTests : IntegrationTestBase
         );
     }
 
+    /// <summary>
+    /// Creates a fresh, unambiguous user scoped to this test rather than relying on shared
+    /// fixture fields (uid2, uid3, etc.) whose exact seed semantics vary by test class.
+    /// </summary>
+    private async Task<long> CreateTestUserAsync(string label)
+    {
+        var user = new User
+        {
+            Name = $"Cache Test {label}",
+            Email = $"cachetest-{label}-{Guid.NewGuid()}@test.com",
+            Username = $"cachetest-{label}-{Guid.NewGuid()}",
+            IsActive = true
+        };
+        Context.Users.Add(user);
+        await Context.SaveChangesAsync();
+        return user.Id;
+    }
+
     #region GetProjectStats Tests
 
     [Fact]
@@ -475,7 +493,6 @@ public class ProjectBusinessTests : IntegrationTestBase
             OrganizationId = oid,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
-            Default = true
         };
 
         Context.ObjectStorages.Add(objectStorage);
@@ -1778,6 +1795,46 @@ public class ProjectBusinessTests : IntegrationTestBase
         Assert.False(result); // Should return false when member already exists
     }
 
+    [Fact]
+    public async Task AddMemberToProject_InvalidatesProjectPermissionCache_ForUser()
+    {
+        var newUserId = await CreateTestUserAsync(nameof(AddMemberToProject_InvalidatesProjectPermissionCache_ForUser));
+
+        var staleKey = CacheKeys.ProjectPermission(newUserId, pid, "read", "test");
+        await CacheService.Instance.SetAsync(staleKey, false, (TimeSpan?)null);
+
+        await _projectBusiness.AddMemberToProject(pid, rid, newUserId, null);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
+    }
+
+    [Fact]
+    public async Task AddMemberToProject_InvalidatesProjectPermissionCache_ForAllGroupMembers()
+    {
+        var memberUserId1 = await CreateTestUserAsync("GroupMember1");
+        var memberUserId2 = await CreateTestUserAsync("GroupMember2");
+
+        var group = new Group { Name = $"Cache Test Group {Guid.NewGuid()}", OrganizationId = oid };
+        Context.Groups.Add(group);
+        await Context.SaveChangesAsync();
+
+        var member1 = await Context.Users.FirstAsync(u => u.Id == memberUserId1);
+        var member2 = await Context.Users.FirstAsync(u => u.Id == memberUserId2);
+        group.Users.Add(member1);
+        group.Users.Add(member2);
+        await Context.SaveChangesAsync();
+
+        var staleKey1 = CacheKeys.ProjectPermission(memberUserId1, pid, "read", "test");
+        var staleKey2 = CacheKeys.ProjectPermission(memberUserId2, pid, "read", "test");
+        await CacheService.Instance.SetAsync(staleKey1, false, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(staleKey2, false, (TimeSpan?)null);
+
+        await _projectBusiness.AddMemberToProject(pid, rid, null, group.Id);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey1));
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey2));
+    }
+
     #endregion
 
     #region UpdateProjectMemberRole Tests
@@ -1972,6 +2029,28 @@ public class ProjectBusinessTests : IntegrationTestBase
                 _projectBusiness.UpdateProjectMemberRole(pid3, rid, uid, null)
             );
         Assert.Equal($"User with id {uid} is not a member of project {pid3}", exception.Message);
+    }
+
+    [Fact]
+    public async Task UpdateProjectMemberRole_InvalidatesProjectPermissionCache_EvenWithoutAdminStatusChange()
+    {
+        var newUserId = await CreateTestUserAsync(nameof(UpdateProjectMemberRole_InvalidatesProjectPermissionCache_EvenWithoutAdminStatusChange));
+
+        await _projectBusiness.AddMemberToProject(pid, rid, newUserId, null);
+
+        // Second role scoped to this test rather than assuming rid2 exists.
+        var secondRole = new Role { Name = $"Cache Test Role {Guid.NewGuid()}", OrganizationId = oid, ProjectId = pid };
+        Context.Roles.Add(secondRole);
+        await Context.SaveChangesAsync();
+
+        var staleKey = CacheKeys.ProjectPermission(newUserId, pid, "write", "test");
+        await CacheService.Instance.SetAsync(staleKey, false, (TimeSpan?)null);
+
+        // isProjectAdmin intentionally omitted (null) — regression test for the gap where
+        // UpdateProjectMemberRole originally only invalidated when admin status was touched
+        await _projectBusiness.UpdateProjectMemberRole(pid, secondRole.Id, newUserId, null);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
     }
 
     #endregion
@@ -2219,6 +2298,23 @@ public class ProjectBusinessTests : IntegrationTestBase
                 _projectBusiness.RemoveMemberFromProject(pid3, uid, null, null)
             );
         Assert.Equal($"User with id {uid} is not a member of project {pid3}", exception.Message);
+    }
+
+    [Fact]
+    public async Task RemoveMemberFromProject_InvalidatesProjectPermissionCache()
+    {
+        var newUserId = await CreateTestUserAsync(nameof(RemoveMemberFromProject_InvalidatesProjectPermissionCache));
+
+        await _projectBusiness.AddMemberToProject(pid, rid, newUserId, null);
+
+        var staleKey = CacheKeys.ProjectPermission(newUserId, pid, "read", "test");
+        await CacheService.Instance.SetAsync(staleKey, true, (TimeSpan?)null);
+
+        // uid (testUser) is confirmed present and distinct from newUserId, so the self-removal
+        // guard in RemoveMemberFromProject (userId == currentUserId) won't trip here.
+        await _projectBusiness.RemoveMemberFromProject(pid, newUserId, null, uid);
+
+        Assert.Null(await CacheService.Instance.GetAsync<bool?>(staleKey));
     }
 
     #endregion
@@ -2828,6 +2924,82 @@ public class ProjectBusinessTests : IntegrationTestBase
         // Act & Assert - GetProjectExistsAsync checks the same short-TTL deleted marker
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => ExistenceHelper.GetProjectExistsAsync(Context, pid, hideArchived: true));
+    }
+
+    #endregion
+
+    #region GetProjectStats Cache Tests
+
+    [Fact]
+    public async Task GetProjectStats_CacheMiss_CachesCalculatedStats()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectStats(pid);
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        // Act
+        var result = await _projectBusiness.GetProjectStats(oid, pid);
+        var cachedStats = await CacheService.Instance
+            .GetAsync<ProjectStatResponseDto?>(cacheKey);
+
+        // Assert
+        Assert.NotNull(cachedStats);
+        Assert.Equal(result.classes, cachedStats.classes);
+        Assert.Equal(result.records, cachedStats.records);
+        Assert.Equal(result.datasources, cachedStats.datasources);
+    }
+
+    [Fact]
+    public async Task GetProjectStats_CacheHit_ReturnsCachedStats()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectStats(pid);
+        var expected = new ProjectStatResponseDto
+        {
+            classes = 11,
+            records = 22,
+            datasources = 33
+        };
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            expected,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        var result = await _projectBusiness.GetProjectStats(oid, pid);
+
+        // Assert
+        Assert.Equal(expected.classes, result.classes);
+        Assert.Equal(expected.records, result.records);
+        Assert.Equal(expected.datasources, result.datasources);
+    }
+
+    [Fact]
+    public async Task InvalidateProjectStatsCache_RemovesCachedStats()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectStats(pid);
+        var cachedStats = new ProjectStatResponseDto
+        {
+            classes = 1,
+            records = 1,
+            datasources = 1
+        };
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            cachedStats,
+            TimeSpan.FromMinutes(2));
+
+        // Act
+        await ProjectBusiness.InvalidateProjectStatsCache(
+            pid,
+            _mockLogger.Object);
+
+        // Assert
+        Assert.Null(await CacheService.Instance
+            .GetAsync<ProjectStatResponseDto?>(cacheKey));
     }
 
     #endregion

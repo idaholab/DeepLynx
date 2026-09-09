@@ -204,7 +204,6 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
-            Default = true
         };
 
         var os2Config = new JsonObject();
@@ -223,6 +222,10 @@ public class FileFileSystemBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         os1 = objectStorage.Id;
         os2 = objectStorage2.Id;
+
+        project.DefaultObjectStorageId = objectStorage.Id;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
 
         _objectStorageConfig = new ObjectStorageConfigDto
         {

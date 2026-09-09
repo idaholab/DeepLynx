@@ -43,7 +43,7 @@ public partial class Project
     public string? FilePath { get; set; }
 
     [Column("default_object_storage_id")]
-    public int? DefaultObjectStorageId { get; set; } = null;
+    public long DefaultObjectStorageId { get; set; }
     [Column("logo_object_storage_id")]
     public int? LogoObjectStorageId { get; set; } = null;
 
@@ -107,7 +107,4 @@ public partial class Project
 
     [InverseProperty("Project")]
     public virtual ICollection<AiModelConfig> AiModelConfigs { get; set; } = new List<AiModelConfig>();
-
-    [InverseProperty("Project")]
-    public virtual ICollection<ProvenanceRecord> ProvenanceRecords { get; set; } = new List<ProvenanceRecord>();
 }
