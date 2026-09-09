@@ -1,5 +1,5 @@
 # Stage 1: Build the C# backend
-FROM mcr.microsoft.com/dotnet/sdk:10.0.303 AS backend-build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.302 AS backend-build
 
 # Set working directory
 WORKDIR /usr/src/app
