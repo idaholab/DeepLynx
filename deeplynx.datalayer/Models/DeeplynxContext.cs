@@ -81,6 +81,8 @@ public partial class DeeplynxContext : DbContext
 
     public virtual DbSet<UserSensitivityLabel> UserSensitivityLabels { get; set; }
 
+    public virtual DbSet<GroupSensitivityLabel> GroupSensitivityLabels { get; set; }
+
     public virtual DbSet<Subscription> Subscriptions { get; set; }
 
     public virtual DbSet<Tag> Tags { get; set; }
@@ -1418,6 +1420,39 @@ public partial class DeeplynxContext : DbContext
                 .HasForeignKey(d => d.GrantedBy)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("user_sensitivity_labels_granted_by_fkey");
+        });
+
+        modelBuilder.Entity<GroupSensitivityLabel>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("group_sensitivity_labels_pkey");
+
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_group_sensitivity_labels_id");
+
+            entity.HasIndex(e => e.GroupId)
+                .HasDatabaseName("idx_group_sensitivity_labels_group_id");
+
+            entity.HasIndex(e => e.LabelId)
+                .HasDatabaseName("idx_group_sensitivity_labels_label_id");
+
+            entity.HasIndex(e => new { e.GroupId, e.LabelId })
+                .HasDatabaseName("unique_group_sensitivity_label")
+                .IsUnique();
+
+            entity.Property(e => e.GrantedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Group).WithMany(p => p.GroupSensitivityLabels)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("group_sensitivity_labels_group_id_fkey");
+
+            entity.HasOne(d => d.Label).WithMany(p => p.GroupSensitivityLabels)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("group_sensitivity_labels_label_id_fkey");
+
+            entity.HasOne(d => d.GrantedByUser).WithMany(p => p.GrantedGroupSensitivityLabels)
+                .HasForeignKey(d => d.GrantedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("group_sensitivity_labels_granted_by_fkey");
         });
 
         modelBuilder.Entity<Subscription>(entity =>

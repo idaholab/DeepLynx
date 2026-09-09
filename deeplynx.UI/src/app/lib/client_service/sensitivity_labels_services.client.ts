@@ -2,6 +2,7 @@ import {
     SensitivityLabelsDto,
     UserSensitivityLabelResponseDto,
     SensitivityLabelPermissionResponseDto,
+    GroupSensitivityLabelResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 import { CreateSensitivityLabelDto, UpdateSensitivityLabelDto } from "@/app/(home)/types/requestDTOs";
@@ -241,6 +242,73 @@ export const revokeSensitivityLabelAccessOrg = async (
         return res.data;
     } catch (error) {
         console.error(`Error revoking user ${userId} access to Sensitivity Label ${labelId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Get all groups granted access to an organization-level Sensitivity Label
+ * @param organizationId - The ID of the organization
+ * @param labelId - The ID of the sensitivity label
+ * @returns Promise with array of GroupSensitivityLabelResponseDto
+ */
+export const getGroupsWithAccessToLabelOrg = async (
+    organizationId: number,
+    labelId: number
+): Promise<GroupSensitivityLabelResponseDto[]> => {
+    try {
+        const res = await api.get(
+            `/organizations/${organizationId}/labels/${labelId}/groups`
+        );
+        return res.data;
+    } catch (error) {
+        console.error(`Error getting groups with access to Sensitivity Label ${labelId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Grant a group access to an organization-level Sensitivity Label
+ * @param organizationId - The ID of the organization
+ * @param labelId - The ID of the sensitivity label
+ * @param groupId - The ID of the group to grant access to
+ * @returns Promise with GroupSensitivityLabelResponseDto
+ */
+export const grantSensitivityLabelAccessToGroupOrg = async (
+    organizationId: number,
+    labelId: number,
+    groupId: number
+): Promise<GroupSensitivityLabelResponseDto> => {
+    try {
+        const res = await api.post(
+            `/organizations/${organizationId}/labels/${labelId}/groups/${groupId}`
+        );
+        return res.data;
+    } catch (error) {
+        console.error(`Error granting group ${groupId} access to Sensitivity Label ${labelId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Revoke a group's access to an organization-level Sensitivity Label
+ * @param organizationId - The ID of the organization
+ * @param labelId - The ID of the sensitivity label
+ * @param groupId - The ID of the group to revoke access from
+ * @returns Promise with a boolean success flag
+ */
+export const revokeSensitivityLabelAccessFromGroupOrg = async (
+    organizationId: number,
+    labelId: number,
+    groupId: number
+): Promise<boolean> => {
+    try {
+        const res = await api.delete(
+            `/organizations/${organizationId}/labels/${labelId}/groups/${groupId}`
+        );
+        return res.data;
+    } catch (error) {
+        console.error(`Error revoking group ${groupId} access to Sensitivity Label ${labelId}:`, error);
         throw error;
     }
 }

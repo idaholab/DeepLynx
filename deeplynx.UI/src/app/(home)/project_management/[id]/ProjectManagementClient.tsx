@@ -5,7 +5,6 @@
 import React, { useEffect, useState } from "react";
 import Tabs from "@/app/(home)/components/Tabs";
 import {
-  GroupResponseDto,
   ProjectResponseDto,
   RoleResponseDto,
   PermissionResponseDto,
@@ -27,7 +26,6 @@ import { getAllSensitivityLabelsProject } from "@/app/lib/client_service/sensiti
 interface ProjectManagementProps {
   project: ProjectResponseDto | null;
   projectMembers: ProjectMemberResponseDto[];
-  projectGroups: GroupResponseDto[];
   projectRoles: RoleResponseDto[];
   projectPermissions: PermissionResponseDto[];
 }
@@ -35,7 +33,6 @@ interface ProjectManagementProps {
 const ProjectManagementClient = ({
   project,
   projectMembers,
-  projectGroups,
   projectRoles,
   projectPermissions,
 }: ProjectManagementProps) => {
@@ -116,11 +113,10 @@ const ProjectManagementClient = ({
         <ProjectSensitivityLabelsClient
           labels={labels}
           projectId={editingProject?.id as number}
-          organizationId={Number(editingProject?.organizationId)}
+          organizationId={Number(editingProject?.organizationId ?? project?.organizationId)}
           orgLabelsLocked={false}
           refreshLabels={refreshLabels}
           projectMembers={projectMembers}
-          projectGroups={projectGroups}
         />
       ),
     },
