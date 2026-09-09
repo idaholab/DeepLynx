@@ -69,13 +69,14 @@ export default async function ProjectManagementPage({ params }: Props) {
     }
 
     try {
-      projectMembers = await getProjectMembersServer(organizationId, projectId);
+      projectMembers = (await getProjectMembersServer(organizationId, projectId)).items;
     } catch (e) {
       console.error("getProjectMembersServer failed:", e);
     }
 
     try {
-      projectRoles = await getAllRolesServer(organizationId, projectId);
+      const { items } = await getAllRolesServer(organizationId, projectId);
+      projectRoles = items;
     } catch (e) {
       console.error("getAllRoles failed: ", e);
     }

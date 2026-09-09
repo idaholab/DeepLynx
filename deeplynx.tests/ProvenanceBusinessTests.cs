@@ -4,12 +4,15 @@ using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Microsoft.Extensions.Logging;
+using Pgvector.EntityFrameworkCore;
+using Pgvector.Npgsql;
 
 namespace deeplynx.tests;
 
 [Collection("Test Suite Collection")]
 public class ProvenanceBusinessTests : IntegrationTestBase
 {
+    private readonly TestSuiteFixture _fixture;
     private ProvenanceBusiness _provenanceBusiness = null!;
     private Mock<ILogger<ProvenanceBusiness>> _mockProvLogger = null!;
 
@@ -28,6 +31,7 @@ public class ProvenanceBusinessTests : IntegrationTestBase
 
     public ProvenanceBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
+        _fixture = fixture;
     }
 
     public override async Task InitializeAsync()
@@ -277,6 +281,157 @@ public class ProvenanceBusinessTests : IntegrationTestBase
     #endregion
 
     // =========================================================================
+    // GetProjectProvenanceHistory Tests
+    // =========================================================================
+
+    #region GetProjectProvenanceHistory Tests
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_Throws_WhenProjectNotFound()
+    {
+        var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _provenanceBusiness.GetProjectProvenanceHistory(999999L, new PaginatedRequestDto()));
+
+        Assert.Contains("Project with id 999999 not found", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_ReturnsEmptyPaginatedResponse_WhenNoProvenanceExists()
+    {
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(pid, new PaginatedRequestDto());
+
+        Assert.Empty(history.Items);
+        Assert.Equal(0, history.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_IncludesProvenance_ForDeletedRecord()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        var provenanceRecord = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid);
+
+        // provenance_records no longer cascade-deletes with its record (dropped FKs), so the
+        // record can be removed while its provenance trail stays put.
+        var record = await Context.Records.FirstAsync(r => r.Id == rid);
+        Context.Records.Remove(record);
+        await Context.SaveChangesAsync();
+
+        Assert.False(await Context.Records.AnyAsync(r => r.Id == rid));
+
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(pid, new PaginatedRequestDto());
+
+        Assert.Contains(history.Items, p => p.Id == provenanceRecord.Id);
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_ExcludesProvenance_FromOtherProjects()
+    {
+        var otherProject = new Project
+        {
+            Name = "Other Project", OrganizationId = oid, LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid
+        };
+        Context.Projects.Add(otherProject);
+        await Context.SaveChangesAsync();
+
+        var otherDataSource = new DataSource
+        {
+            Name = "Other DS", ProjectId = otherProject.Id, OrganizationId = oid,
+            LastUpdatedAt = UnspecifiedNow(), LastUpdatedBy = uid
+        };
+        Context.DataSources.Add(otherDataSource);
+        await Context.SaveChangesAsync();
+
+        var otherRecord = new datalayer.Models.Record
+        {
+            Name = "Other Project Record",
+            ProjectId = otherProject.Id,
+            OrganizationId = oid,
+            DataSourceId = otherDataSource.Id,
+            OriginalId = "other-rec-001",
+            Description = "",
+            Properties = "{}",
+            IsArchived = false,
+            LastUpdatedAt = UnspecifiedNow(),
+            LastUpdatedBy = uid,
+            Uri = "/data/org_1/other.pdf",
+            FileType = "pdf",
+            FileSize = 256,
+            FileContentHash = "hash-other-v1"
+        };
+        Context.Records.Add(otherRecord);
+        await Context.SaveChangesAsync();
+
+        await _provenanceBusiness.CreateProvenanceRecord(otherRecord.Id, "create-record", uid, null);
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(pid, new PaginatedRequestDto());
+
+        Assert.Single(history.Items);
+        Assert.All(history.Items, p => Assert.Equal(pid, p.ProjectId));
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_OrdersNewestFirst_WithIdTiebreaker()
+    {
+        // BulkCreateProvenanceRecords stamps one shared CreatedAt across the whole batch, so
+        // CreatedAt alone can't order these two rows deterministically - the query needs the
+        // Id tiebreaker to avoid skipping/duplicating rows across pages.
+        var result = await _provenanceBusiness.BulkCreateProvenanceRecords([rid, rid2], "attach-tag", uid, null);
+        Assert.True(result);
+
+        var created = await Context.ProvenanceRecords.OrderBy(p => p.Id).ToListAsync();
+        Assert.Equal(2, created.Count);
+
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(pid, new PaginatedRequestDto());
+
+        Assert.Equal(2, history.Items.Count);
+        Assert.Equal(created[1].Id, history.Items[0].Id);
+        Assert.Equal(created[0].Id, history.Items[1].Id);
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_Paginates_AcrossMultiplePages()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+            await Task.Delay(10);
+        }
+
+        var page1 = await _provenanceBusiness.GetProjectProvenanceHistory(
+            pid, new PaginatedRequestDto { PageNumber = 1, PageSize = 2 });
+        var page2 = await _provenanceBusiness.GetProjectProvenanceHistory(
+            pid, new PaginatedRequestDto { PageNumber = 2, PageSize = 2 });
+        var page3 = await _provenanceBusiness.GetProjectProvenanceHistory(
+            pid, new PaginatedRequestDto { PageNumber = 3, PageSize = 2 });
+
+        Assert.Equal(5, page1.TotalCount);
+        Assert.Equal(3, page1.TotalPages);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Single(page3.Items);
+
+        var allIds = page1.Items.Concat(page2.Items).Concat(page3.Items).Select(p => p.Id).ToList();
+        Assert.Equal(allIds.Distinct().Count(), allIds.Count);
+    }
+
+    [Fact]
+    public async Task GetProjectProvenanceHistory_ReturnsAllRows_WhenPageSizeIsNegativeOne()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        await Task.Delay(10);
+        await _provenanceBusiness.CreateProvenanceRecord(rid2, "create-record", uid, null);
+
+        var history = await _provenanceBusiness.GetProjectProvenanceHistory(
+            pid, new PaginatedRequestDto { PageSize = -1 });
+
+        Assert.Equal(2, history.Items.Count);
+        Assert.Equal(2, history.TotalCount);
+    }
+
+    #endregion
+
+    // =========================================================================
     // CreateProvenanceRecord Tests
     // =========================================================================
 
@@ -497,6 +652,168 @@ public class ProvenanceBusinessTests : IntegrationTestBase
         var records = await Context.ProvenanceRecords.ToListAsync();
         Assert.All(records, r => Assert.Contains("detach-label", r.ProvenanceJson));
         Assert.All(records, r => Assert.Contains($"urn:deeplynx:user:{uid}", r.ProvenanceJson));
+    }
+
+    #endregion
+
+    // =========================================================================
+    // Chain Hash Tests
+    // =========================================================================
+
+    #region Chain Hash Tests
+
+    [Fact]
+    public async Task CreateProvenanceRecord_FirstRecordForRecordId_GetsGenesisHash()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+
+        var provenanceRecord = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid);
+
+        Assert.Equal(ProvenanceChainEnvelope.GenesisHash, provenanceRecord.PreviousHash);
+        Assert.False(string.IsNullOrWhiteSpace(provenanceRecord.ChainHash));
+    }
+
+    [Fact]
+    public async Task CreateProvenanceRecord_SecondRecordForSameRecordId_ChainsToFirst()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        var first = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid);
+
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "update-record", uid, null);
+        var second = await Context.ProvenanceRecords
+            .Where(p => p.RecordId == rid && p.Id != first.Id)
+            .FirstAsync();
+
+        Assert.Equal(first.ChainHash, second.PreviousHash);
+        Assert.NotEqual(first.ChainHash, second.ChainHash);
+    }
+
+    [Fact]
+    public async Task CreateProvenanceRecord_DifferentRecordIds_GetIndependentChains()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        await _provenanceBusiness.CreateProvenanceRecord(rid2, "update-record", uid, null);
+
+        var provRid = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid);
+        var provRid2 = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid2);
+
+        Assert.Equal(ProvenanceChainEnvelope.GenesisHash, provRid.PreviousHash);
+        Assert.Equal(ProvenanceChainEnvelope.GenesisHash, provRid2.PreviousHash);
+        Assert.NotEqual(provRid.ChainHash, provRid2.ChainHash);
+    }
+
+    [Fact]
+    public async Task CreateProvenanceRecord_DoesNotLinkTo_PreExistingLegacyRowWithNoChainHash()
+    {
+        // simulate a pre-chain legacy row: no PreviousHash/ChainHash set
+        var legacyRow = new datalayer.Models.ProvenanceRecord
+        {
+            RecordId = rid,
+            HistoricalRecordId = histId1,
+            OrganizationId = oid,
+            ProjectId = pid,
+            ProvId = "urn:deeplynx:provenance:legacy",
+            FileContentHash = "hash-rec1-v1",
+            ProvenanceJson = "{\"@id\":\"urn:deeplynx:provenance:legacy\",\"@graph\":[]}",
+            Signature = null,
+            PreviousHash = null,
+            ChainHash = null,
+            CreatedAt = UnspecifiedNow()
+        };
+        Context.ProvenanceRecords.Add(legacyRow);
+        await Context.SaveChangesAsync();
+
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+
+        var newRow = await Context.ProvenanceRecords
+            .Where(p => p.RecordId == rid && p.Id != legacyRow.Id)
+            .FirstAsync();
+
+        // starts a fresh chain at genesis rather than linking to the legacy row
+        Assert.Equal(ProvenanceChainEnvelope.GenesisHash, newRow.PreviousHash);
+    }
+
+    [Fact]
+    public async Task BulkCreateProvenanceRecords_ChainsEachRecordIndependently()
+    {
+        // rid already has a chained record; rid2 does not yet
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        var existingForRid = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid);
+
+        var result = await _provenanceBusiness.BulkCreateProvenanceRecords(
+            [rid, rid2], "attach-tag", uid, null);
+
+        Assert.True(result);
+
+        var newForRid = await Context.ProvenanceRecords
+            .Where(p => p.RecordId == rid && p.Id != existingForRid.Id)
+            .FirstAsync();
+        var newForRid2 = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid2);
+
+        Assert.Equal(existingForRid.ChainHash, newForRid.PreviousHash);
+        Assert.Equal(ProvenanceChainEnvelope.GenesisHash, newForRid2.PreviousHash);
+    }
+
+    [Fact]
+    public async Task CreateProvenanceRecord_ConcurrentCallsForSameRecordId_DoNotForkTheChain()
+    {
+        // DbContext isn't thread-safe, so exercising the real retry-on-conflict path
+        // requires two independent contexts/business instances, same as two concurrent
+        // requests each getting their own scoped DbContext in production.
+        await using var contextB = new datalayer.Models.DeeplynxContext(
+            new DbContextOptionsBuilder<datalayer.Models.DeeplynxContext>()
+                .UseNpgsql(_fixture.PostgresDataSource, o => o.UseVector())
+                .Options);
+        var provenanceBusinessB = new ProvenanceBusiness(contextB, _mockProvLogger.Object);
+
+        var results = await Task.WhenAll(
+            _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null),
+            provenanceBusinessB.CreateProvenanceRecord(rid, "update-record", uid, null));
+
+        Assert.All(results, Assert.True);
+
+        var rows = await Context.ProvenanceRecords
+            .Where(p => p.RecordId == rid)
+            .OrderBy(p => p.Id)
+            .ToListAsync();
+
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(ProvenanceChainEnvelope.GenesisHash, rows[0].PreviousHash);
+        Assert.Equal(rows[0].ChainHash, rows[1].PreviousHash);
+        Assert.NotEqual(rows[0].ChainHash, rows[1].ChainHash);
+    }
+
+    [Fact]
+    public async Task DuplicatePreviousHash_ForSameRecordId_ViolatesUniqueConstraint()
+    {
+        Context.ProvenanceRecords.Add(new datalayer.Models.ProvenanceRecord
+        {
+            RecordId = rid,
+            HistoricalRecordId = histId1,
+            OrganizationId = oid,
+            ProjectId = pid,
+            ProvId = "urn:deeplynx:provenance:dup-1",
+            ProvenanceJson = "{\"@id\":\"urn:deeplynx:provenance:dup-1\",\"@graph\":[]}",
+            PreviousHash = ProvenanceChainEnvelope.GenesisHash,
+            ChainHash = "chain-hash-1",
+            CreatedAt = UnspecifiedNow()
+        });
+        await Context.SaveChangesAsync();
+
+        Context.ProvenanceRecords.Add(new datalayer.Models.ProvenanceRecord
+        {
+            RecordId = rid,
+            HistoricalRecordId = histId1,
+            OrganizationId = oid,
+            ProjectId = pid,
+            ProvId = "urn:deeplynx:provenance:dup-2",
+            ProvenanceJson = "{\"@id\":\"urn:deeplynx:provenance:dup-2\",\"@graph\":[]}",
+            PreviousHash = ProvenanceChainEnvelope.GenesisHash,
+            ChainHash = "chain-hash-2",
+            CreatedAt = UnspecifiedNow()
+        });
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => Context.SaveChangesAsync());
     }
 
     #endregion

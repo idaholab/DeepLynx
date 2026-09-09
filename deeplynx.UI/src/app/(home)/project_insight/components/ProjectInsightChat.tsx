@@ -8,9 +8,11 @@ import {
 } from "@/app/(home)/components/insight/insightChat.utils";
 import type { InsightModelSelection } from "@/app/(home)/components/insight/useInsightModelSelection";
 import { streamInsightQuery } from "@/app/lib/client_service/insight_services.client";
+import type { InsightEndpointHealthByRole } from "@/app/lib/client_service/insight_services.client";
 import { useLanguage } from "@/app/contexts/Language";
 import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { PaperAirplaneIcon } from "@heroicons/react/24/solid";
+import InsightMarkdownMessage from "@/app/(home)/components/insight/InsightMarkdownMessage";
 
 type InsightRole = "assistant" | "user";
 
@@ -31,6 +33,7 @@ interface ProjectInsightChatProps {
     nextSelection: InsightModelSelection,
   ) => void;
   isChatUnavailable?: boolean;
+  endpointHealth?: InsightEndpointHealthByRole;
 }
 
 function withTokens(
@@ -51,6 +54,7 @@ export default function ProjectInsightChat({
   selectedInsightModels,
   onSelectedInsightModelsChange,
   isChatUnavailable = false,
+  endpointHealth,
 }: ProjectInsightChatProps) {
   const { t } = useLanguage();
   const scopeCount = scopedRecordIds.length;
@@ -242,13 +246,19 @@ export default function ProjectInsightChat({
                     <time className="ml-2">{message.timestamp}</time>
                   </div>
                   <div
-                    className={`chat-bubble whitespace-pre-wrap ${
+                    className={`chat-bubble ${
                       message.role === "user"
-                        ? "chat-bubble-primary"
+                        ? "whitespace-pre-wrap chat-bubble-primary"
                         : "border border-base-300 bg-base-100 text-base-content"
                     }`}
                   >
-                    {message.content || (
+                    {message.content ? (
+                        message.role === "assistant" ? (
+                            <InsightMarkdownMessage content={message.content} />
+                        ) : (
+                            message.content
+                        )
+                    ) : (
                       <span className="loading loading-dots loading-sm" />
                     )}
                   </div>
@@ -312,6 +322,7 @@ export default function ProjectInsightChat({
         selectedInsightModels={selectedInsightModels}
         onClose={() => setIsSettingsModalOpen(false)}
         onSaveSelection={onSelectedInsightModelsChange}
+        endpointHealth={endpointHealth}
       />
     </section>
   );

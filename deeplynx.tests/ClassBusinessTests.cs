@@ -3,6 +3,7 @@ using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -22,11 +23,16 @@ public class ClassBusinessTests : IntegrationTestBase
     private Mock<IDataSourceBusiness> _dataSourceBusiness = null!;
     private EventBusiness _eventBusiness = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
+    private Mock<ILogger<ProjectRolePermissionService>> _projectServiceLogger;
+    private Mock<ILogger<AdminService>> _adminServiceLogger;
     private Mock<ILogger<ProjectBusiness>> _mockLogger = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
+    private IAdminService _adminService = null!;
+    private IProjectRolePermissionService _permissionService = null!;
     private Mock<IObjectStorageBusiness> _objectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private ProjectBusiness _projectBusiness = null!;
     private Mock<IRecordBusiness> _recordBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
@@ -68,20 +74,27 @@ public class ClassBusinessTests : IntegrationTestBase
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
+        _projectServiceLogger = new Mock<ILogger<ProjectRolePermissionService>>();
+        _adminServiceLogger = new Mock<ILogger<AdminService>>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor.Object);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
+        _permissionService = new ProjectRolePermissionService(Context, _projectServiceLogger.Object);
+        _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _roleBusiness = new Mock<IRoleBusiness>();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
 
         _classBusiness = new ClassBusiness(
             Context, _recordBusiness.Object,
-            _relationshipBusiness.Object, _eventBusiness);
+            _relationshipBusiness.Object, _eventBusiness, _permissionService, _adminService);
+
+        _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -94,6 +107,7 @@ public class ClassBusinessTests : IntegrationTestBase
             Name = "Test User",
             Email = "test.user@test.com",
             Password = "test_password",
+            IsSysAdmin = true,
             IsArchived = false
         };
         Context.Users.Add(user);
@@ -200,7 +214,16 @@ public class ClassBusinessTests : IntegrationTestBase
             LastUpdatedBy = uid,
             IsArchived = false
         };
-        Context.Classes.AddRange(class1, class2, class3, class4, class5);
+        var class6 = new Class
+        {
+            Name = "Class 5",
+            ProjectId = null,
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            IsArchived = false
+        };
+        Context.Classes.AddRange(class1, class2, class3, class4, class5, class6);
         await Context.SaveChangesAsync();
         cid1 = class1.Id;
         cid2 = class2.Id;
@@ -342,6 +365,28 @@ public class ClassBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateClass_Success_GeneratesUuid_WhenUuidNotProvided()
+    {
+        // Arrange
+        var dto = new CreateClassRequestDto
+        {
+            Name = $"New Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "New Description"
+            // Intentionally leave Uuid null
+        };
+
+        // Act
+        var result = await _classBusiness.CreateClass(uid, oid, pid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.False(string.IsNullOrWhiteSpace(result.Uuid));
+        Assert.True(Guid.TryParse(result.Uuid, out _));
+        Assert.Equal(dto.Name, result.Name);
+        Assert.Equal(dto.Description, result.Description);
+    }
+
+    [Fact]
     public async Task CreateClasses_Success_OnBulkCreate()
     {
         // Arrange
@@ -463,16 +508,16 @@ public class ClassBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetAllClasses Tests
+    #region GetAllClasses (V1 / Legacy) Tests
 
     [Fact]
     public async Task GetAllClasses_ReturnsOnlyForProjects()
     {
         // Act - Get classes for pid only
-        var list = await _classBusiness.GetAllClasses(oid, new[] { pid }, true);
+        var list = await _classBusiness.GetAllClasses(uid, oid, [pid], true, true);
 
         // Assert - Should get class1 and class5 (not class2 which is archived, not class4 which is in pid2)
-        Assert.Equal(2, list.Count);
+        Assert.Equal(3, list.Count);
         Assert.Contains(list, c => c.Id == cid1);
         Assert.Contains(list, c => c.Id == cid5);
         Assert.DoesNotContain(list, c => c.Id == cid2);
@@ -483,7 +528,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ExcludesSoftDeleted()
     {
         // Act
-        var list = await _classBusiness.GetAllClasses(oid, new[] { pid }, true);
+        var list = await _classBusiness.GetAllClasses(uid, oid, [pid], true, true);
 
         // Assert - class2 is archived, should not be returned
         Assert.DoesNotContain(list, c => c.Id == cid2);
@@ -494,10 +539,10 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ValidProjectIds_ReturnsClassesFromAllProjects()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(oid, new[] { pid, pid2 }, true);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid, pid2], true, true);
 
         // Assert - Should get class1, class4, class5 (not class2 which is archived)
-        Assert.Equal(3, result.Count);
+        Assert.Equal(4, result.Count);
         Assert.Contains(result, c => c.Id == cid1 && c.ProjectId == pid);
         Assert.Contains(result, c => c.Id == cid4 && c.ProjectId == pid2);
         Assert.Contains(result, c => c.Id == cid5 && c.ProjectId == pid);
@@ -507,17 +552,17 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_NonExistentProjectIds_ReturnsEmptyList()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(oid, new long[] { 999, 998 }, true);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [999, 998], true, true);
 
         // Assert
-        Assert.Empty(result);
+        Assert.Single(result);
     }
 
     [Fact]
     public async Task GetAllClasses_HideArchivedFalse_ReturnsArchivedClasses()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(oid, new[] { pid }, false);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], false, true);
 
         // Assert - Should include archived class2
         Assert.Contains(result, c => c.Id == cid2 && c.IsArchived);
@@ -527,7 +572,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_HideArchivedTrue_ExcludesArchivedClasses()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(oid, new[] { pid }, true);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], true, true);
 
         // Assert
         Assert.DoesNotContain(result, c => c.Id == cid2);
@@ -538,7 +583,7 @@ public class ClassBusinessTests : IntegrationTestBase
     public async Task GetAllClasses_ReturnsAllProperties_Correctly()
     {
         // Act
-        var result = await _classBusiness.GetAllClasses(oid, new[] { pid }, false);
+        var result = await _classBusiness.GetAllClasses(uid, oid, [pid], false, true);
         var class1Dto = result.First(c => c.Id == cid1);
 
         // Assert
@@ -550,6 +595,237 @@ public class ClassBusinessTests : IntegrationTestBase
         Assert.Equal(oid, class1Dto.OrganizationId);
         Assert.Equal(uid, class1Dto.LastUpdatedBy);
         Assert.False(class1Dto.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllClasses_NoProjectIds_ReturnsEmptyList_WhenUnauthorized()
+    {
+        // Act - passing a project ID array with no authorized projects
+        var result = await _classBusiness.GetAllClasses(uid, oid, [999], false, false, false);
+
+        // Assert - old method returns a plain empty list, not a wrapper object
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    #endregion
+
+    #region GetAllClassesPaginated Tests
+
+    private static PaginatedRequestDto DefaultPagination(int pageNumber = 1, int pageSize = 100)
+    {
+        return new PaginatedRequestDto
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_ReturnsOnlyForProjects()
+    {
+        // Act - Get classes for pid only
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], DefaultPagination(), true, true);
+
+        // Assert - Should get class1 and class5 (not class2 which is archived, not class4 which is in pid2)
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.Contains(result.Items, c => c.Id == cid1);
+        Assert.Contains(result.Items, c => c.Id == cid5);
+        Assert.DoesNotContain(result.Items, c => c.Id == cid2);
+        Assert.DoesNotContain(result.Items, c => c.Id == cid4);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_ExcludesSoftDeleted()
+    {
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], DefaultPagination(), true, true);
+
+        // Assert - class2 is archived, should not be returned
+        Assert.DoesNotContain(result.Items, c => c.Id == cid2);
+        Assert.All(result.Items, c => Assert.False(c.IsArchived));
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_ValidProjectIds_ReturnsClassesFromAllProjects()
+    {
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid, pid2], DefaultPagination(), true, true);
+
+        // Assert - Should get class1, class4, class5 (not class2 which is archived)
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Contains(result.Items, c => c.Id == cid1 && c.ProjectId == pid);
+        Assert.Contains(result.Items, c => c.Id == cid4 && c.ProjectId == pid2);
+        Assert.Contains(result.Items, c => c.Id == cid5 && c.ProjectId == pid);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_NonExistentProjectIds_ReturnsEmptyList()
+    {
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [999, 998], DefaultPagination(), true, true);
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal(1, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_HideArchivedFalse_ReturnsArchivedClasses()
+    {
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], DefaultPagination(), false, true);
+
+        // Assert - Should include archived class2
+        Assert.Contains(result.Items, c => c.Id == cid2 && c.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_HideArchivedTrue_ExcludesArchivedClasses()
+    {
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], DefaultPagination(), true, true);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, c => c.Id == cid2);
+        Assert.All(result.Items, c => Assert.False(c.IsArchived));
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_ReturnsAllProperties_Correctly()
+    {
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], DefaultPagination(), false, true);
+        var class1Dto = result.Items.First(c => c.Id == cid1);
+
+        // Assert
+        Assert.Equal(cid1, class1Dto.Id);
+        Assert.Equal("Class 1", class1Dto.Name);
+        Assert.Equal("Description 1", class1Dto.Description);
+        Assert.Equal("uuid-1", class1Dto.Uuid);
+        Assert.Equal(pid, class1Dto.ProjectId);
+        Assert.Equal(oid, class1Dto.OrganizationId);
+        Assert.Equal(uid, class1Dto.LastUpdatedBy);
+        Assert.False(class1Dto.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_Paginates_Correctly()
+    {
+        // Arrange - pid has class1, class3, class5 unarchived (3 total)
+        var pageOne = DefaultPagination(pageNumber: 1, pageSize: 2);
+        var pageTwo = DefaultPagination(pageNumber: 2, pageSize: 2);
+
+        // Act
+        var firstPage = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], pageOne, true, true);
+        var secondPage = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], pageTwo, true, true);
+
+        // Assert
+        Assert.Equal(3, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.Equal(3, secondPage.TotalCount);
+        Assert.Single(secondPage.Items);
+
+        // No overlap between pages
+        var firstPageIds = firstPage.Items.Select(c => c.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(c => c.Id).ToHashSet();
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_NoAuthorizedProjects_ReturnsEmptyPaginatedResponse()
+    {
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [999], DefaultPagination(), false, false, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(100, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_PageSizeNegativeOne_ReturnsAllClasses_IgnoringPageNumber()
+    {
+        // Arrange - pid has 3 unarchived classes total; ask for a page far beyond that range
+        var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], sentinel, true, true);
+
+        // Assert - PageNumber is ignored entirely, every matching class comes back on "page 1"
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(3, result.PageSize);
+        Assert.Contains(result.Items, c => c.Id == cid1);
+        Assert.Contains(result.Items, c => c.Id == cid5);
+        Assert.DoesNotContain(result.Items, c => c.Id == cid2);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_PageSizeNegativeOne_RespectsHideArchivedAndProjectFilters()
+    {
+        // Act - request everything, but with hideArchived = false so class2 should be included
+        var result = await _classBusiness.GetAllClassesPaginated(
+            uid, oid, [pid], DefaultPagination(pageSize: -1), false, true);
+
+        // Assert - "return all" still applies the same filters as the paginated path
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Contains(result.Items, c => c.Id == cid2 && c.IsArchived);
+        Assert.DoesNotContain(result.Items, c => c.Id == cid4); // pid2, not requested
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_PageSizeNegativeOne_NoAuthorizedProjects_ReturnsEmptyPaginatedResponse()
+    {
+        // Act - unauthorized project short-circuit should take priority over the "return all" sentinel
+        var result = await _classBusiness.GetAllClassesPaginated(
+            uid, oid, [999], DefaultPagination(pageSize: -1), false, false, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(-1, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+    {
+        // Arrange - pid has 3 unarchived classes total
+        var zeroSize = DefaultPagination(pageNumber: 1, pageSize: 0);
+
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], zeroSize, true, true);
+
+        // Assert - Items is empty, but TotalCount still reflects the full matching set
+        Assert.Empty(result.Items);
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllClassesPaginated_PageSizeZero_OnAnyPageNumber_StillReturnsEmptyItems()
+    {
+        // Arrange - Skip(N * 0) is always Skip(0), so any page number should behave identically
+        var zeroSizePageThree = DefaultPagination(pageNumber: 3, pageSize: 0);
+
+        // Act
+        var result = await _classBusiness.GetAllClassesPaginated(uid, oid, [pid], zeroSizePageThree, true, true);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
     }
 
     #endregion
@@ -1040,4 +1316,118 @@ public class ClassBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region Project Stats Cache Invalidation Tests
+
+    private static async Task SeedProjectStatsCacheSentinel(long projectId)
+    {
+        await CacheService.Instance.SetAsync(
+            CacheKeys.ProjectStats(projectId),
+            new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 },
+            (TimeSpan?)null);
+    }
+
+    private static async Task AssertProjectStatsCacheCleared(long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(CacheKeys.ProjectStats(projectId)));
+    }
+
+    [Fact]
+    public async Task CreateClass_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateClassRequestDto
+        {
+            Name = $"Project Stats Cache Invalidation Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Verifies project stats cache invalidation on create"
+        };
+
+        await _classBusiness.CreateClass(uid, oid, pid, dto);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task BulkCreateClasses_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var bulkDto = new List<CreateClassRequestDto>
+        {
+            new()
+            {
+                Name = $"Bulk Project Stats Cache Class 1 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                Description = "Bulk create project stats cache invalidation test"
+            },
+            new()
+            {
+                Name = $"Bulk Project Stats Cache Class 2 {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                Description = "Bulk create project stats cache invalidation test"
+            }
+        };
+
+        await _classBusiness.BulkCreateClasses(uid, oid, pid, bulkDto);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task DeleteClass_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _classBusiness.DeleteClass(uid, oid, pid, cid1);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task ArchiveClass_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _classBusiness.ArchiveClass(uid, oid, pid, cid1);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task UnarchiveClass_InvalidatesProjectStatsCache()
+    {
+        // cid2 is seeded as already archived
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _classBusiness.UnarchiveClass(uid, oid, pid, cid2);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task CreateClass_DoesNotInvalidateUnrelatedProjectsStatsCache()
+    {
+        var pid2Key = CacheKeys.ProjectStats(pid2);
+        var pid2Sentinel = new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 };
+        await CacheService.Instance.SetAsync(pid2Key, pid2Sentinel, (TimeSpan?)null);
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateClassRequestDto
+        {
+            Name = $"Scoped Project Stats Class {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Description = "Only pid's stats cache should clear, not pid2's"
+        };
+
+        await _classBusiness.CreateClass(uid, oid, pid, dto);
+
+        // pid's own stats cache is cleared
+        await AssertProjectStatsCacheCleared(pid);
+
+        // pid2's cache is untouched — invalidation is scoped to the mutated project only
+        var pid2Cached = await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(pid2Key);
+        Assert.NotNull(pid2Cached);
+        Assert.Equal(999, pid2Cached.classes);
+    }
+
+    #endregion
+
 }

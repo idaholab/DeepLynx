@@ -32,7 +32,47 @@ public class OauthApplicationBusiness : IOauthApplicationBusiness
     }
 
     /// <summary>
-    /// Retrieves all oauth applications
+    ///     Retrieves all OAuth applications
+    /// </summary>
+    /// <param name="paginatedRequestDto">(optional) Pagination parameters; if null, all matching applications are returned unpaginated</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived applications from the result</param>
+    /// <returns>A paginated list of OAuth applications, or all applications if no pagination is specified</returns>
+    public async Task<PaginatedResponse<OauthApplicationResponseDto>> GetAllOauthApplicationsPaginated(
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true)
+    {
+        var applicationQuery = _context.OauthApplications.AsQueryable();
+
+        if (hideArchived)
+        {
+            applicationQuery = applicationQuery.Where(x => !x.IsArchived);
+        }
+
+        return await applicationQuery
+            .OrderBy(a => a.Id)
+            .Select(a => new OauthApplicationResponseDto
+            {
+                Id = a.Id,
+                Name = a.Name,
+                Description = a.Description,
+                AppOwnerEmail = a.AppOwnerEmail,
+                CallbackUrl = a.CallbackUrl,
+                BaseUrl = a.BaseUrl,
+                ClientId = a.ClientId,
+                IsArchived = a.IsArchived,
+                LastUpdatedAt = a.LastUpdatedAt,
+                LastUpdatedBy = a.LastUpdatedBy
+            })
+            .ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    #region Deprecated
+
+    /// <summary>
+    /// [DEPRECATED - V1 ONLY] List all OAuth applications without pagination
+    /// Superseded by <see cref="GetAllOauthApplicationsPaginated"/>. Do not call this from new controller versions;
+    /// it exists solely to back the deprecated v1 OAuth application controllers and should be deleted once
+    /// those v1 endpoints are sunset.
     /// </summary>
     /// <param name="hideArchived">Flag indicating whether to hide archived applications from the result</param>
     /// <returns>List of applications</returns>
@@ -62,6 +102,8 @@ public class OauthApplicationBusiness : IOauthApplicationBusiness
                 LastUpdatedBy = a.LastUpdatedBy
             });
     }
+
+    #endregion
 
     /// <summary>
     /// Retrieve a specific application by ID
@@ -232,7 +274,7 @@ public class OauthApplicationBusiness : IOauthApplicationBusiness
 
         return true;
     }
-    
+
     /// <summary>
     /// Delete an application by ID
     /// </summary>
@@ -243,7 +285,7 @@ public class OauthApplicationBusiness : IOauthApplicationBusiness
     public async Task<bool> DeleteOauthApplication(long applicationId, long userId)
     {
         var application = await _context.OauthApplications.FindAsync(applicationId);
-        
+
         if (application == null || application.IsArchived)
             throw new KeyNotFoundException($"Oauth application with id {applicationId} not found");
 

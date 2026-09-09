@@ -1,20 +1,95 @@
 using deeplynx.datalayer.Models;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
+using deeplynx.helpers.Cache;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Logging;
 
 namespace deeplynx.helpers
 {
     public static class ExistenceHelper
     {
+        private static readonly TimeSpan DeletedUserCacheTtl = TimeSpan.FromMinutes(5);
+
         public static async Task EnsureUserExistsAsync(DeeplynxContext context, long userId, bool hideArchived = true)
         {
-            var userExists = hideArchived
-                ? await context.Users.AnyAsync(u => u.Id == userId && u.IsArchived == false)
-                : await context.Users.AnyAsync(u => u.Id == userId);
+            var deletedCacheKey = CacheKeys.UserDeleted(userId);
+            var cachedDeleted = await CacheService.Instance.GetAsync<bool?>(deletedCacheKey);
+            if (cachedDeleted.HasValue && cachedDeleted.Value)
+                throw new KeyNotFoundException($"User with id {userId} does not exist");
+
+            var cacheKey = CacheKeys.UserArchivedStatus(userId);
+            var cachedIsArchived = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+
+            bool userExists;
+            bool isArchived;
+
+            if (cachedIsArchived.HasValue)
+            {
+                userExists = true;
+                isArchived = cachedIsArchived.Value;
+            }
+            else
+            {
+                var user = await context.Users
+                    .Where(u => u.Id == userId)
+                    .Select(u => new { u.IsArchived })
+                    .FirstOrDefaultAsync();
+
+                userExists = user != null;
+
+                if (userExists)
+                {
+                    isArchived = user!.IsArchived;
+                    await CacheService.Instance.SetAsync(cacheKey, isArchived, (TimeSpan?)null);
+                }
+                else
+                {
+                    isArchived = false;
+                }
+            }
 
             if (!userExists)
                 throw new KeyNotFoundException($"User with id {userId} does not exist");
+
+            if (hideArchived && isArchived)
+                throw new KeyNotFoundException($"User with id {userId} does not exist");
         }
+
+        /// <summary>
+        ///     Sets the cached archived status for a user, with no expiration. Call this whenever
+        ///     a mutation determines a user's archived status directly (create, archive, unarchive,
+        ///     or an update that changes IsArchived), so the cache reflects the new state.
+        /// </summary>
+        public static Task SetUserArchivedStatusCache(long userId, bool isArchived)
+        {
+            return CacheService.Instance.SetAsync(CacheKeys.UserArchivedStatus(userId), isArchived, (TimeSpan?)null);
+        }
+
+        /// <summary>
+        ///     Marks a user as not-existing in the cache with a short TTL. Used after a hard delete:
+        ///     unlike the general "user doesn't exist" case (never cached, see summary above), we
+        ///     know definitively that this specific ID was just deleted, so caching that briefly
+        ///     avoids a burst of repeat DB lookups right after the delete without permanently
+        ///     committing to caching a non-existent id indefinitely.
+        ///
+        ///     Also clears the no-TTL UserArchivedStatus entry for this id, if one exists. Without
+        ///     this, a stale "exists, archived: false/true" entry could sit there indefinitely
+        ///     (that key has no TTL by design) alongside the new short-TTL "deleted" entry - and
+        ///     once the deleted-entry TTL expires, the stale permanent entry could be read as if
+        ///     the user still existed.
+        /// </summary>
+        public static async Task SetUserDeletedCache(long userId)
+        {
+            // Represented as a distinct "deleted" cache entry rather than reusing the archived-status
+            // key/shape, since deleted is a different state than archived (archived users still
+            // exist and have a real IsArchived flag; deleted users don't exist at all).
+            await CacheService.Instance.SetAsync(CacheKeys.UserDeleted(userId), true, DeletedUserCacheTtl);
+            await CacheService.Instance.DeleteAsync(CacheKeys.UserArchivedStatus(userId));
+        }
+
+        private static readonly TimeSpan DeletedOrganizationCacheTtl = TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// Check if an organization exists
@@ -28,77 +103,316 @@ namespace deeplynx.helpers
             long organizationId,
             bool hideArchived = true)
         {
-            var organizationExists = hideArchived
-                ? await context.Organizations.AnyAsync(o => o.Id == organizationId && o.IsArchived == false)
-                : await context.Organizations.AnyAsync(o => o.Id == organizationId);
+            var deletedCacheKey = CacheKeys.OrganizationDeleted(organizationId);
+            var cachedDeleted = await CacheService.Instance.GetAsync<bool?>(deletedCacheKey);
+            if (cachedDeleted.HasValue && cachedDeleted.Value)
+                throw new KeyNotFoundException($"Organization with id {organizationId} does not exist");
+
+            var cacheKey = CacheKeys.OrganizationArchivedStatus(organizationId);
+            var cachedIsArchived = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+
+            bool organizationExists;
+            bool isArchived;
+
+            if (cachedIsArchived.HasValue)
+            {
+                organizationExists = true;
+                isArchived = cachedIsArchived.Value;
+            }
+            else
+            {
+                var organization = await context.Organizations
+                    .Where(o => o.Id == organizationId)
+                    .Select(o => new { o.IsArchived })
+                    .FirstOrDefaultAsync();
+
+                organizationExists = organization != null;
+
+                if (organizationExists)
+                {
+                    isArchived = organization!.IsArchived;
+                    await CacheService.Instance.SetAsync(cacheKey, isArchived, (TimeSpan?)null);
+                }
+                else
+                {
+                    isArchived = false;
+                }
+            }
 
             if (!organizationExists)
                 throw new KeyNotFoundException($"Organization with id {organizationId} does not exist");
+
+            if (hideArchived && isArchived)
+                throw new KeyNotFoundException($"Organization with id {organizationId} does not exist");
         }
 
-        public static async Task<ProjectResponseDto> EnsureProjectExistsAsync(
+        /// <summary>
+        ///     Sets the cached archived status for an organization, with no expiration. Call this whenever
+        ///     a mutation determines an organization's archived status directly (create, archive,
+        ///     unarchive), so the cache reflects the new state.
+        /// </summary>
+        public static Task SetOrganizationArchivedStatusCache(long organizationId, bool isArchived)
+        {
+            return CacheService.Instance.SetAsync(CacheKeys.OrganizationArchivedStatus(organizationId), isArchived, (TimeSpan?)null);
+        }
+
+        /// <summary>
+        ///     Marks an organization as not-existing in the cache with a short TTL, mirroring
+        ///     SetUserDeletedCache. Also clears the no-TTL OrganizationArchivedStatus entry so it can't
+        ///     outlive the short TTL and mislead a later read.
+        /// </summary>
+        public static async Task SetOrganizationDeletedCache(long organizationId)
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.OrganizationDeleted(organizationId), true, DeletedOrganizationCacheTtl);
+            await CacheService.Instance.DeleteAsync(CacheKeys.OrganizationArchivedStatus(organizationId));
+        }
+        private static readonly TimeSpan DeletedProjectCacheTtl = TimeSpan.FromMinutes(5);
+
+        public static async Task EnsureProjectExistsAsync(
             DeeplynxContext context,
             long projectId,
             bool hideArchived = true)
         {
-            // Try to get the cached list of projects
-            var projectResponseList = await CacheService.Instance.GetAsync<List<ProjectResponseDto>>("projects");
-
-            if (projectResponseList == null || projectResponseList.Count == 0)
-            {
-                // Cache is empty, so populate it
-                var projectList = await context.Projects.ToListAsync();
-
-                projectResponseList = projectList.Select(p => new ProjectResponseDto
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Description = p.Description,
-                    Abbreviation = p.Abbreviation,
-                    IsArchived = p.IsArchived,
-                    LastUpdatedAt = p.LastUpdatedAt,
-                    LastUpdatedBy = p.LastUpdatedBy,
-                    OrganizationId = p.OrganizationId
-                }).ToList();
-
-                // Store the list in the cache
-                await CacheService.Instance.SetAsync("projects", projectResponseList, TimeSpan.FromHours(1));
-            }
-
-            // Find the project by ID from the list
-            var project = projectResponseList.FirstOrDefault(p => p.Id == projectId);
-
-            if (project == null || hideArchived && project.IsArchived)
-            {
-
+            var deletedCacheKey = CacheKeys.ProjectDeleted(projectId);
+            var cachedDeleted = await CacheService.Instance.GetAsync<bool?>(deletedCacheKey);
+            if (cachedDeleted.HasValue && cachedDeleted.Value)
                 throw new KeyNotFoundException($"Project with id {projectId} not found.");
-            }
 
-            return project;
-        }
+            var cacheKey = CacheKeys.ProjectArchivedStatus(projectId);
+            var cachedIsArchived = await CacheService.Instance.GetAsync<bool?>(cacheKey);
 
-        public static async Task EnsureDataSourceExistsForProjectAsync(DeeplynxContext context, long dataSourceId, long projectId, bool hideArchived = true)
-        {
-            var dataSourceExists = hideArchived
-                ? await context.DataSources.AnyAsync(ds => ds.ProjectId == projectId && ds.Id == dataSourceId && ds.IsArchived == false)
-                : await context.DataSources.AnyAsync(ds => ds.ProjectId == projectId && ds.Id == dataSourceId);
+            bool projectExists;
+            bool isArchived;
 
-            if (!dataSourceExists)
+            if (cachedIsArchived.HasValue)
             {
-                throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found in project with id {projectId}");
+                projectExists = true;
+                isArchived = cachedIsArchived.Value;
             }
+            else
+            {
+                var project = await context.Projects
+                    .Where(p => p.Id == projectId)
+                    .Select(p => new { p.IsArchived })
+                    .FirstOrDefaultAsync();
+
+                projectExists = project != null;
+
+                if (projectExists)
+                {
+                    isArchived = project!.IsArchived;
+                    await CacheService.Instance.SetAsync(cacheKey, isArchived, (TimeSpan?)null);
+                }
+                else
+                {
+                    isArchived = false;
+                }
+            }
+
+            if (!projectExists)
+                throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+            if (hideArchived && isArchived)
+                throw new KeyNotFoundException($"Project with id {projectId} not found.");
         }
+
+        /// <summary>
+        ///     Like EnsureProjectExistsAsync, but returns the full ProjectResponseDto for callers that
+        ///     need more than a throw-or-not check (currently: MetricsBusiness.GetProjectStorageSize,
+        ///     which needs OrganizationId to validate org/project ownership). Reuses the same
+        ///     ProjectArchivedStatus / ProjectDeleted cache entries as EnsureProjectExistsAsync, but
+        ///     always performs a DB fetch to build the DTO regardless of cache state.
+        /// </summary>
+        public static async Task<ProjectResponseDto> GetProjectExistsAsync(
+            DeeplynxContext context,
+            long projectId,
+            bool hideArchived = true)
+        {
+            var deletedCacheKey = CacheKeys.ProjectDeleted(projectId);
+            var cachedDeleted = await CacheService.Instance.GetAsync<bool?>(deletedCacheKey);
+            if (cachedDeleted.HasValue && cachedDeleted.Value)
+                throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+            var project = await context.Projects
+                .Where(p => p.Id == projectId)
+                .FirstOrDefaultAsync();
+
+            if (project == null)
+                throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+            if (hideArchived && project.IsArchived)
+                throw new KeyNotFoundException($"Project with id {projectId} not found.");
+
+            // Opportunistically populate the archived-status cache if it wasn't already set, so a
+            // subsequent EnsureProjectExistsAsync call for the same id gets a cache hit.
+            var cacheKey = CacheKeys.ProjectArchivedStatus(projectId);
+            var cachedIsArchived = await CacheService.Instance.GetAsync<bool?>(cacheKey);
+            if (!cachedIsArchived.HasValue)
+                await CacheService.Instance.SetAsync(cacheKey, project.IsArchived, (TimeSpan?)null);
+
+            return new ProjectResponseDto
+            {
+                Id = project.Id,
+                Name = project.Name,
+                Description = project.Description,
+                Abbreviation = project.Abbreviation,
+                IsArchived = project.IsArchived,
+                LastUpdatedAt = project.LastUpdatedAt,
+                LastUpdatedBy = project.LastUpdatedBy,
+                OrganizationId = project.OrganizationId
+            };
+        }
+
+        /// <summary>
+        ///     Sets the cached archived status for a project, with no expiration. Call this whenever a
+        ///     mutation determines a project's archived status directly (create, archive, unarchive).
+        /// </summary>
+        public static Task SetProjectArchivedStatusCache(long projectId, bool isArchived)
+        {
+            return CacheService.Instance.SetAsync(CacheKeys.ProjectArchivedStatus(projectId), isArchived, (TimeSpan?)null);
+        }
+
+        /// <summary>
+        ///     Marks a project as not-existing in the cache with a short TTL, mirroring
+        ///     SetUserDeletedCache / SetOrganizationDeletedCache. Also clears the no-TTL
+        ///     ProjectArchivedStatus entry so it can't outlive the short TTL and mislead a later read.
+        /// </summary>
+        public static async Task SetProjectDeletedCache(long projectId)
+        {
+            await CacheService.Instance.SetAsync(CacheKeys.ProjectDeleted(projectId), true, DeletedProjectCacheTtl);
+            await CacheService.Instance.DeleteAsync(CacheKeys.ProjectArchivedStatus(projectId));
+        }
+
+        private static readonly TimeSpan _dataSourceCacheTtl = TimeSpan.FromHours(1);
+
+        public static async Task EnsureDataSourceExistsForProjectAsync(
+            DeeplynxContext context,
+            long dataSourceId,
+            long projectId,
+            long organizationId,
+            bool hideArchived = true,
+            ILogger? logger = null)
+        {
+            var cacheKey = CacheKeys.DataSourceStatus(dataSourceId);
+            EntityStatusCacheEntry? cached = null;
+            try
+            {
+                cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "cache fetch failed for data source status: {cacheKey}", cacheKey);
+            }
+
+            EntityStatusCacheEntry entry;
+            if (cached != null)
+            {
+                entry = cached;
+                if (cached.Status == EntityStatus.Deleted)
+                    throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found");
+            } 
+            else
+            {
+                var dataSource = await context.DataSources
+                    .Where(ds => ds.Id == dataSourceId)
+                    .Select(ds => new { ds.OrganizationId, ds.ProjectId, ds.IsArchived})
+                    .FirstOrDefaultAsync();
+
+                if (dataSource == null)
+                {
+                    throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found in project with id {projectId} and organization with id {organizationId}");
+                }
+
+                entry = new EntityStatusCacheEntry
+                {
+                    OrganizationId = dataSource.OrganizationId,
+                    ProjectId = dataSource.ProjectId,
+                    Status = dataSource.IsArchived
+                            ? EntityStatus.Archived
+                            : EntityStatus.Active
+                };
+
+                try
+                {
+                    await CacheService.Instance.SetAsync(cacheKey, entry, _dataSourceCacheTtl);
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogWarning(ex, "DataSource status cache update failed for key {Key}", cacheKey);
+                }
+            }
+
+            var belongsToScope = 
+                entry.OrganizationId == organizationId &&
+                (entry.ProjectId == null || entry.ProjectId == projectId);
+
+            if (!belongsToScope || entry.Status == EntityStatus.Deleted)
+                throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found");
+
+            if (hideArchived && entry.Status == EntityStatus.Archived)
+                throw new KeyNotFoundException($"DataSource with id {dataSourceId} not found");     
+        }
+
         
-        public static async Task EnsureObjectStorageExistsForProjectAsync(DeeplynxContext context, long objectStorageId, long projectId, bool hideArchived = true)
-        {
-            var dataSourceExists = hideArchived
-                ? await context.ObjectStorages.AnyAsync(os => os.ProjectId == projectId && os.Id == objectStorageId && os.IsArchived == false)
-                : await context.ObjectStorages.AnyAsync(os => os.ProjectId == projectId && os.Id == objectStorageId);
+        private static readonly TimeSpan _objectStorageCacheTtl = TimeSpan.FromHours(1);
 
-            if (!dataSourceExists)
+        public static async Task EnsureObjectStorageExistsAsync(
+            DeeplynxContext context,
+            long organizationId,
+            long projectId,
+            long objectStorageId,
+            bool hideArchived = true,
+            ILogger? logger = null)
+        {
+            var cacheKey = CacheKeys.ObjectStorageStatus(objectStorageId);
+            EntityStatusCacheEntry? cached = null;
+
+            try
             {
-                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found in project with id {projectId}");
+                cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
+            } 
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Object Storage existence cache check failed for key: {CacheKey}", cacheKey);
             }
+
+            EntityStatusCacheEntry entry;
+
+            if (cached != null)
+            {
+                entry = cached;
+            }
+            else
+            {
+                var objectStorage = await context.ObjectStorages
+                    .Where(os => os.Id == objectStorageId)
+                    .Select(os => new { os.OrganizationId, os.ProjectId, os.IsArchived })
+                    .FirstOrDefaultAsync();
+
+                if (objectStorage == null)
+                    throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
+
+                entry = new EntityStatusCacheEntry
+                {
+                    OrganizationId = objectStorage.OrganizationId,
+                    ProjectId = objectStorage.ProjectId,
+                    Status = objectStorage.IsArchived
+                            ? EntityStatus.Archived
+                            : EntityStatus.Active
+                };
+
+                await CacheService.Instance.SetAsync(cacheKey, entry, _objectStorageCacheTtl);
+            }
+
+            var belongsToScope =
+                entry.OrganizationId == organizationId &&
+                (entry.ProjectId == null || entry.ProjectId == projectId);
+
+            if (!belongsToScope || entry.Status == EntityStatus.Deleted)
+                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
+
+            if (hideArchived && entry.Status == EntityStatus.Archived)
+                throw new KeyNotFoundException($"Object Storage with id {objectStorageId} not found.");
         }
     }
 }

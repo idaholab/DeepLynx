@@ -1,6 +1,7 @@
 // src/app/lib/user_services.server.ts
 import "server-only";
 import {
+  PaginatedResponse,
   UserAdminInfoDto,
   UserResponseDto,
 } from "../../(home)/types/responseDTOs";
@@ -9,8 +10,22 @@ import { apiFetch, asJson } from "./api.server";
 
 /** ---- Server-safe calls (no browser cookies; safe in prerender/SSR) ---- */
 
-export async function getAllUsersServer(projectId?: number, organizationId?: number): Promise<UserResponseDto[]> {
-  const params: Record<string, string> = {};
+export async function getAllUsersServer(
+  projectId?: number,
+  organizationId?: number,
+  includeArchived: boolean = false,
+  includeServiceAccounts: boolean = false,
+  includeTestAccounts: boolean = false,
+  pageNumber: number = 1,
+  pageSize: number = -1,
+): Promise<UserResponseDto[]> {
+  const params: Record<string, string> = {
+    includeArchived: String(includeArchived),
+    includeServiceAccounts: String(includeServiceAccounts),
+    includeTestAccounts: String(includeTestAccounts),
+    pageNumber: String(pageNumber),
+    pageSize: String(pageSize),
+  };
   if (projectId !== undefined) {
     params.projectId = String(projectId);
   }
@@ -19,7 +34,8 @@ export async function getAllUsersServer(projectId?: number, organizationId?: num
   }
   const qs = new URLSearchParams(params);
   const res = await apiFetch(`users?${qs.toString()}`);
-  return asJson<UserResponseDto[]>(res);
+  const paginated = await asJson<PaginatedResponse<UserResponseDto>>(res);
+  return paginated.items;
 }
 
 export async function getCurrentUserServer(

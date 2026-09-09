@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -24,6 +25,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
     private Mock<IFileBusiness> _mockFileAzureBusiness;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private ObjectStorageBusiness _objectStorageBusiness;
     private Mock<IOrganizationBusiness> _organizationBusiness = null!;
@@ -64,7 +66,8 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
 
         await base.InitializeAsync();
         _organizationBusiness = new Mock<IOrganizationBusiness>();
-        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper);
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        _fileAzureBusiness = new FileAzureBusiness(Context, _encryptionHelper, protectProvider);
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _fileAzureBusiness);
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
@@ -77,6 +80,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         _mockDataSourceBusiness = new Mock<IDataSourceBusiness>();
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
         _projectBusiness = new ProjectBusiness(
             Context,
             _mockLogger.Object,
@@ -84,7 +88,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             _mockRoleBusiness.Object,
             _mockDataSourceBusiness.Object,
             _objectStorageBusiness,
-            _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _eventBusiness, _organizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     #region ObjectStorageResponseDto Tests
@@ -151,6 +155,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         var project3 = new Project { Name = "Test Project 3", OrganizationId = oid2 };
         Context.Projects.Add(project);
         Context.Projects.Add(project2);
+        Context.Projects.Add(project3);
         await Context.SaveChangesAsync();
         pid = project.Id;
         pid2 = project2.Id;
@@ -165,7 +170,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os1Config),
-            Default = true
         };
 
         var os2Config = new JsonObject();
@@ -221,7 +225,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             Type = "filesystem",
             OrganizationId = organizationId,
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os6Config),
-            Default = true,
             IsArchived = false
         };
 
@@ -267,7 +270,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = oid2,
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(os10Config),
             IsArchived = false,
-            Default = true
         };
 
         Context.ObjectStorages.Add(objectStorage);
@@ -291,6 +293,10 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         os9 = objectStorage9.Id;
         os10 = objectStorage10.Id;
         archivedOs = objectStorage5.Id;
+
+        organization.DefaultObjectStorageId = objectStorage.Id;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
     }
 
     #region Edge Cases
@@ -412,6 +418,17 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task GetObjectStorage_Success_CanIncludeArchived()
     {
         // Act
+
+        var organization = Context.Organizations.First(o => o.Id == organizationId);
+        organization.DefaultObjectStorageId = os2;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = os2;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var objectStorage = await _objectStorageBusiness.GetObjectStorage(
             organizationId, pid, archivedOs, false);
 
@@ -472,7 +489,8 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         var dto = new CreateObjectStorageRequestDto
         {
             Name = "Test",
-            Config = config
+            Config = config,
+            FilesDeletable = false,
         };
 
         var now = DateTime.UtcNow;
@@ -484,6 +502,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(objectStorageResponse);
         Assert.Equal(dto.Name, objectStorageResponse.Name);
+        Assert.Equal(dto.FilesDeletable, objectStorageResponse.FilesDeletable);
         Assert.Equal("filesystem", objectStorageResponse.Type);
         Assert.Null(objectStorageResponse.ProjectId);
         Assert.Equal(organizationId, objectStorageResponse.OrganizationId);
@@ -620,6 +639,18 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Update_Success_ReturnsUpdatedFilesDeletable()
+    {
+        var dto = new UpdateObjectStorageRequestDto { Name = "Updated Name", FilesDeletable = true };
+        var os = await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, null, os7, dto);
+        Assert.True(os.FilesDeletable);
+
+        dto = new UpdateObjectStorageRequestDto { Name = "Updated Name", FilesDeletable = false };
+        os = await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, null, os7, dto);
+        Assert.False(os.FilesDeletable);
+    }
+
+    [Fact]
     public async Task Update_Fails_WhenObjectStorageDoesNotExist()
     {
         // Arrange
@@ -712,7 +743,7 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         var exception =
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _objectStorageBusiness.DeleteObjectStorage(uid, organizationId, pid, os1));
-        Assert.Contains("Default object storage cannot be deleted. Please assign new default storage before deleting.",
+        Assert.Contains("Object storage is set as the default and cannot be deleted.",
             exception.Message);
     }
 
@@ -749,7 +780,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Assert.Equal("Test Object Storage 2", archivedObjectStorage.Name);
         Assert.Equal("filesystem", archivedObjectStorage.Type);
         Assert.Equal(pid, archivedObjectStorage.ProjectId);
-        Assert.False(archivedObjectStorage.Default);
         Assert.NotNull(archivedObjectStorage.ConfigEncrypted);
         Assert.True(archivedObjectStorage.LastUpdatedAt >= now);
         Assert.Equal(uid, archivedObjectStorage.LastUpdatedBy);
@@ -783,6 +813,16 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task Archive_Fails_IfObjectStorageIsDefault()
     {
         // Act & Assert
+        var organization = Context.Organizations.First(o => o.Id == organizationId);
+        organization.DefaultObjectStorageId = os1;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = os1;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _objectStorageBusiness.ArchiveObjectStorage(uid, organizationId, pid, os1));
         Assert.Contains(
@@ -833,7 +873,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         Assert.Equal("filesystem", unarchivedObjectStorage.Type);
         Assert.Equal(pid, unarchivedObjectStorage.ProjectId);
         Assert.Equal(organizationId, unarchivedObjectStorage.OrganizationId);
-        Assert.False(unarchivedObjectStorage.Default);
         Assert.True(unarchivedObjectStorage.LastUpdatedAt >= now);
         Assert.Equal(uid, unarchivedObjectStorage.LastUpdatedBy);
     }
@@ -881,6 +920,17 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task GetDefaultObjectStorage_Success_ReturnsDefaultObject()
     {
         // Act
+
+        var organization = Context.Organizations.First(o => o.Id == organizationId);
+        organization.DefaultObjectStorageId = os1;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid);
+        project.DefaultObjectStorageId = os1;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
             organizationId, pid);
 
@@ -893,6 +943,12 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task GetDefaultObjectStorage_Success_ReturnsDefaultObjectInOrganization()
     {
         // Act
+
+        var organization = Context.Organizations.First(o => o.Id == organizationId);
+        organization.DefaultObjectStorageId = os6;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
             organizationId, null);
 
@@ -915,6 +971,16 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
     public async Task GetDefaultObjectStorage_Success_ReturnsDefaultObjectInherited()
     {
         // Act
+        var organization = Context.Organizations.First(o => o.Id == oid2);
+        organization.DefaultObjectStorageId = os10;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(o => o.Id == pid3);
+        project.DefaultObjectStorageId = os10;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
         var defaultObjectStorage = await _objectStorageBusiness.GetDefaultObjectStorage(
             oid2, pid3);
 
@@ -937,17 +1003,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(newDefaultObjectStorage);
         Assert.Equal(os2, newDefaultObjectStorage.Id);
-        Assert.True(newDefaultObjectStorage.Default);
-
-        // Clear the change tracker to force a fresh query from the database
-        Context.ChangeTracker.Clear();
-
-        var oldDefaultObjectStorage = await Context.ObjectStorages
-            .Where(os => os.Id == os1 && os.ProjectId == pid)
-            .FirstOrDefaultAsync();
-        Assert.NotNull(oldDefaultObjectStorage);
-        Assert.Equal(os1, oldDefaultObjectStorage.Id);
-        Assert.False(oldDefaultObjectStorage.Default);
     }
 
     [Fact]
@@ -961,16 +1016,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
         // Assert
         Assert.NotNull(newDefaultObjectStorage);
         Assert.Equal(os7, newDefaultObjectStorage.Id);
-        Assert.True(newDefaultObjectStorage.Default);
-
-        // Clear the change tracker to force a fresh query from the database
-        Context.ChangeTracker.Clear();
-
-        var oldDefaultObjectStorage = await Context.ObjectStorages
-            .Where(os => os.Id == os6 && os.OrganizationId == organizationId).FirstOrDefaultAsync();
-        Assert.NotNull(oldDefaultObjectStorage);
-        Assert.Equal(os6, oldDefaultObjectStorage.Id);
-        Assert.False(oldDefaultObjectStorage.Default);
     }
 
     [Fact]
@@ -999,7 +1044,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
-            Default = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
@@ -1027,7 +1071,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
-            Default = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
         };
@@ -1060,7 +1103,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
-            Default = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = null
         };
@@ -1094,7 +1136,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             Type = "filesystem",
             ConfigEncrypted = _encryptionHelper.SerializeAndEncrypt(config),
-            Default = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = null
         };
@@ -1156,7 +1197,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig1,
-            Default = false,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1169,7 +1209,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig2,
-            Default = false,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1182,7 +1221,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig3,
-            Default = false,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1219,7 +1257,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig,
-            Default = true,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1252,7 +1289,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig,
-            Default = false,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1289,7 +1325,6 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             OrganizationId = organizationId,
             ProjectId = null,
             ConfigEncrypted = encryptedConfig,
-            Default = false,
             IsArchived = false,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             LastUpdatedBy = uid
@@ -1307,6 +1342,591 @@ public class ObjectStorageBusinessTests : IntegrationTestBase
             decryptedStorage.Config.AzureObjectConfig.AzureConnectionString);
         Assert.Equal("my-container",
             decryptedStorage.Config.AzureObjectConfig.AzureContainerName);
+    }
+
+    #endregion
+
+
+    #region ObjectStorage Cache Tests
+
+    [Fact]
+    public async Task GetObjectStorage_CacheMiss_PopulatesCache_WithCorrectEntry()
+    {
+        var cacheKey = CacheKeys.ObjectStorageStatus(os1);
+        var precheck = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
+        Assert.Null(precheck);
+
+        await _objectStorageBusiness.GetObjectStorage(organizationId, pid, os1, true);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task GetObjectStorage_OrgLevelObjectStorage_CachesNullProjectId_NotCallerSuppliedProjectId()
+    {
+        // os6 is an organization-level object storage (ProjectId == null in the DB). It's reachable via a
+        // project-scoped call because the query allows ProjectId == null. The cached entry must reflect the
+        // entity's real ProjectId (null) - caching the caller's pid instead would wrongly make an org-wide
+        // object storage look scoped to a single project.
+        var cacheKey = CacheKeys.ObjectStorageStatus(os6);
+
+        await _objectStorageBusiness.GetObjectStorage(organizationId, pid, os6, true);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Null(cached.ProjectId);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task EnsureObjectStorageExistsAsync_CacheMiss_FallsBackToDatabase_AndPopulatesCache()
+    {
+        var cacheKey = CacheKeys.ObjectStorageStatus(os2);
+        Assert.Null(await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey));
+
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os2);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task EnsureObjectStorageExistsAsync_NonExistentObjectStorage_IsNeverCached()
+    {
+        var missingId = os1 + 1000;
+        var cacheKey = CacheKeys.ObjectStorageStatus(missingId);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, missingId));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, missingId));
+
+        Assert.Null(await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(cacheKey));
+    }
+
+    [Fact]
+    public async Task EnsureObjectStorageExistsAsync_CacheHit_UsesCachedEntry_WithoutQueryingDatabase()
+    {
+        // os1 is genuinely Active in the DB. Poison the cache with "Deleted" - a status the DB would never
+        // produce for os1 right now. If the method trusts the cache it throws; if it falls through to the
+        // DB instead, it will not.
+        await CacheService.Instance.SetAsync(
+            CacheKeys.ObjectStorageStatus(os1),
+            new EntityStatusCacheEntry { OrganizationId = organizationId, ProjectId = pid, Status = EntityStatus.Deleted },
+            TimeSpan.FromHours(1));
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os1));
+    }
+
+    [Fact]
+    public async Task EnsureObjectStorageExistsAsync_ScopeMismatch_ThrowsEvenWhenCacheEntryExists()
+    {
+        // Prime a correct cache entry for os1 scoped to (organizationId, pid).
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os1);
+
+        // Same objectStorageId, wrong organization - must still be rejected. Proves the scope check is
+        // applied to the cached value on every call, not skipped just because the key was found.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, oid2, pid, os1));
+
+        // Same objectStorageId and organization, wrong project - must also be rejected.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid2, os1));
+    }
+
+    [Fact]
+    public async Task EnsureObjectStorageExistsAsync_HideArchivedFilter_AppliesToSingleCachedEntry()
+    {
+        // Prime the cache with the real (Archived) status via a hideArchived:false call.
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: false);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(archivedOs));
+        Assert.NotNull(cached);
+        Assert.Equal(EntityStatus.Archived, cached.Status);
+
+        // The SAME cache entry correctly serves both filter variants without a second key or a DB round-trip.
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: false);
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: true));
+    }
+
+    [Fact]
+    public async Task DeleteObjectStorage_CachesStatusAsDeleted()
+    {
+        // Regression test: Delete must not derive Status from IsArchived (which is always false here,
+        // since delete is blocked on already-archived rows) - it must write Deleted explicitly.
+        await _objectStorageBusiness.DeleteObjectStorage(uid, organizationId, pid, os2);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
+        Assert.NotNull(cached);
+        Assert.Equal(EntityStatus.Deleted, cached.Status);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+    }
+
+    [Fact]
+    public async Task DeleteObjectStorage_DeletedCacheEntry_CausesExistenceCheckToThrow()
+    {
+        await _objectStorageBusiness.DeleteObjectStorage(uid, organizationId, null, os7);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os7));
+    }
+
+    [Fact]
+    public async Task ArchiveObjectStorage_UpdatesCacheStatus_ToArchived()
+    {
+        await _objectStorageBusiness.ArchiveObjectStorage(uid, organizationId, pid, os2);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
+        Assert.NotNull(cached);
+        Assert.Equal(EntityStatus.Archived, cached.Status);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os2, hideArchived: true));
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, os2, hideArchived: false);
+    }
+
+    [Fact]
+    public async Task UnarchiveObjectStorage_UpdatesCacheStatus_ToActive()
+    {
+        await _objectStorageBusiness.UnarchiveObjectStorage(uid, organizationId, pid, archivedOs);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(archivedOs));
+        Assert.NotNull(cached);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, archivedOs, hideArchived: true);
+    }
+
+    [Fact]
+    public async Task CreateObjectStorage_PopulatesCache_Immediately()
+    {
+        var config = new ObjectStorageConfigDto { MountPath = "./cache-test-storage/" };
+        var dto = new CreateObjectStorageRequestDto { Name = "Cache Test", Config = config };
+
+        var created = await _objectStorageBusiness.CreateObjectStorage(uid, organizationId, pid, dto);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(created.Id));
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+
+        // A subsequent existence check should not need to touch the DB to succeed.
+        await ExistenceHelper.EnsureObjectStorageExistsAsync(Context, organizationId, pid, created.Id);
+    }
+
+    [Fact]
+    public async Task UpdateObjectStorage_RefreshesCache_WithEntityScope_NotCallerProjectIdParam()
+    {
+        // os7 is org-level (ProjectId == null); update it via an org-scoped call (projectId: null) and
+        // confirm the cache reflects that, not some stale/incorrect scope.
+        var dto = new UpdateObjectStorageRequestDto { Name = "Updated Via Cache Test" };
+
+        await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, null, os7, dto);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(os7));
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Null(cached.ProjectId);
+        Assert.Equal(EntityStatus.Active, cached.Status);
+    }
+
+    [Fact]
+    public async Task GetDefaultObjectStorage_InheritedFromOrganization_CachesEntityScope_NotProjectParam()
+    {
+        // os10 is an org-wide default (ProjectId == null) under oid2, retrieved here via a project-scoped
+        // call (pid3). The cached entry must reflect the entity's real scope (org-wide / ProjectId == null),
+        // not the pid3 the caller passed in to reach it through inheritance.
+        var organization = Context.Organizations.First(o => o.Id == oid2);
+        organization.DefaultObjectStorageId = os10;
+        Context.Organizations.Update(organization);
+        await Context.SaveChangesAsync();
+
+        var project = Context.Projects.First(p => p.Id == pid3);
+        project.DefaultObjectStorageId = os10;
+        Context.Projects.Update(project);
+        await Context.SaveChangesAsync();
+
+        await _objectStorageBusiness.GetDefaultObjectStorage(oid2, pid3);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(os10));
+        Assert.NotNull(cached);
+        Assert.Equal(oid2, cached.OrganizationId);
+        Assert.Null(cached.ProjectId);
+    }
+
+    [Fact]
+    public async Task SetDefaultObjectStorage_PopulatesCache_WithEntityScope()
+    {
+        await _objectStorageBusiness.SetDefaultObjectStorage(uid, organizationId, pid, os2);
+
+        var cached = await CacheService.Instance.GetAsync<EntityStatusCacheEntry>(CacheKeys.ObjectStorageStatus(os2));
+        Assert.NotNull(cached);
+        Assert.Equal(organizationId, cached.OrganizationId);
+        Assert.Equal(pid, cached.ProjectId);
+    }
+
+    #endregion
+
+    #region DefaultObjectStorage Caching Tests
+
+    [Fact]
+    public async Task SetDefault_InOrganization_CachesObjectStorageId()
+    {
+        // Act
+        await _objectStorageBusiness.SetDefaultObjectStorage(uid, organizationId, null, os7);
+
+        // Assert
+        var cacheKey = CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(os7, cached.Value);
+    }
+
+    [Fact]
+    public async Task SetDefault_InProject_CachesObjectStorageId()
+    {
+        // Act
+        await _objectStorageBusiness.SetDefaultObjectStorage(uid, organizationId, pid, os2);
+
+        // Assert
+        var cacheKey = CacheKeys.ProjectDefaultObjectStorage(pid);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(os2, cached.Value);
+    }
+
+    [Fact]
+    public async Task SetDefault_CalledTwice_OverwritesCachedObjectStorageId()
+    {
+        // Act
+        await _objectStorageBusiness.SetDefaultObjectStorage(uid, organizationId, null, os7);
+        await _objectStorageBusiness.SetDefaultObjectStorage(uid, organizationId, null, os9);
+
+        // Assert
+        var cacheKey = CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(os9, cached.Value);
+    }
+
+    [Fact]
+    public async Task SetDefault_InProject_DoesNotOverwriteOrganizationCache()
+    {
+        // Arrange
+        var organizationCacheKey =
+            CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+        var projectCacheKey =
+            CacheKeys.ProjectDefaultObjectStorage(pid);
+
+        await CacheService.Instance.SetAsync(
+            organizationCacheKey,
+            os7,
+            TimeSpan.FromMinutes(2));
+
+        await CacheService.Instance.DeleteAsync(projectCacheKey);
+
+        try
+        {
+            // Act
+            await _objectStorageBusiness.SetDefaultObjectStorage(
+                uid,
+                organizationId,
+                pid,
+                os2);
+
+            // Assert
+            var cachedOrganizationId =
+                await CacheService.Instance.GetAsync<long?>(
+                    organizationCacheKey);
+            var cachedProjectId =
+                await CacheService.Instance.GetAsync<long?>(
+                    projectCacheKey);
+
+            Assert.Equal(os7, cachedOrganizationId);
+            Assert.Equal(os2, cachedProjectId);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(organizationCacheKey);
+            await CacheService.Instance.DeleteAsync(projectCacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Create_WithDefaultTrue_InOrganization_CachesObjectStorageId()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = "./cache-test-org/" };
+        var dto = new CreateObjectStorageRequestDto
+        {
+            Name = "Cache Default Org",
+            Config = config,
+            Default = true
+        };
+
+        // Act
+        var created = await _objectStorageBusiness.CreateObjectStorage(
+            uid, organizationId, null, dto, createContainer: false);
+
+        // Assert
+        var cacheKey = CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(created.Id, cached.Value);
+    }
+
+    [Fact]
+    public async Task Create_WithDefaultTrue_InProject_CachesObjectStorageId()
+    {
+        // Arrange
+        var config = new ObjectStorageConfigDto { MountPath = "./cache-test-project/" };
+        var dto = new CreateObjectStorageRequestDto
+        {
+            Name = "Cache Default Project",
+            Config = config,
+            Default = true
+        };
+
+        // Act
+        var created = await _objectStorageBusiness.CreateObjectStorage(
+            uid, organizationId, pid2, dto, createContainer: false);
+
+        // Assert
+        var cacheKey = CacheKeys.ProjectDefaultObjectStorage(pid2);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(created.Id, cached.Value);
+    }
+
+    [Fact]
+    public async Task Create_WithDefaultFalse_DoesNotWriteCache()
+    {
+        // Arrange
+        var cacheKey =
+            CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        var dto = new CreateObjectStorageRequestDto
+        {
+            Name = "Nondefault Organization Storage",
+            Config = new ObjectStorageConfigDto
+            {
+                MountPath = "./cache-test-nondefault/"
+            },
+            Default = false
+        };
+
+        try
+        {
+            // Act
+            await _objectStorageBusiness.CreateObjectStorage(
+                uid,
+                organizationId,
+                null,
+                dto,
+                createContainer: false);
+
+            // Assert
+            Assert.Null(
+                await CacheService.Instance.GetAsync<long?>(cacheKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task Update_WithDefaultTrue_InOrganization_CachesObjectStorageId()
+    {
+        // Arrange
+        var dto = new UpdateObjectStorageRequestDto { Name = "Updated Org Default", Default = true };
+
+        // Act
+        await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, null, os7, dto);
+
+        // Assert
+        var cacheKey = CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(os7, cached.Value);
+    }
+
+    [Fact]
+    public async Task Update_WithDefaultTrue_InProject_CachesObjectStorageId()
+    {
+        // Arrange
+        var dto = new UpdateObjectStorageRequestDto { Name = "Updated Project Default", Default = true };
+
+        // Act
+        await _objectStorageBusiness.UpdateObjectStorage(uid, organizationId, pid, os2, dto);
+
+        // Assert
+        var cacheKey = CacheKeys.ProjectDefaultObjectStorage(pid);
+        var cached = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(os2, cached.Value);
+    }
+
+    [Fact]
+    public async Task Update_WithDefaultFalse_DoesNotOverwriteExistingCache()
+    {
+        // Arrange
+        var cacheKey =
+            CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            os9,
+            TimeSpan.FromMinutes(2));
+
+        var dto = new UpdateObjectStorageRequestDto
+        {
+            Name = "Not Default",
+            Default = false
+        };
+
+        try
+        {
+            // Act
+            await _objectStorageBusiness.UpdateObjectStorage(
+                uid,
+                organizationId,
+                null,
+                os7,
+                dto);
+
+            // Assert
+            var cached =
+                await CacheService.Instance.GetAsync<long?>(cacheKey);
+
+            Assert.Equal(os9, cached);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetDefault_InOrganization_CacheMiss_PopulatesCache()
+    {
+        // Arrange
+        var cacheKey =
+            CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+
+        await _objectStorageBusiness.SetDefaultObjectStorage(
+            uid,
+            organizationId,
+            null,
+            os7);
+
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        try
+        {
+            // Act
+            var result =
+                await _objectStorageBusiness.GetDefaultObjectStorage(
+                    organizationId,
+                    null);
+
+            // Assert
+            var cached =
+                await CacheService.Instance.GetAsync<long?>(cacheKey);
+
+            Assert.Equal(os7, result.Id);
+            Assert.Equal(os7, cached);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetDefault_InProject_CacheMiss_PopulatesCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectDefaultObjectStorage(pid);
+
+        await _objectStorageBusiness.SetDefaultObjectStorage(
+            uid,
+            organizationId,
+            pid,
+            os2);
+
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        try
+        {
+            // Act
+            var result =
+                await _objectStorageBusiness.GetDefaultObjectStorage(
+                    organizationId,
+                    pid);
+
+            // Assert
+            var cached =
+                await CacheService.Instance.GetAsync<long?>(cacheKey);
+
+            Assert.Equal(os2, result.Id);
+            Assert.Equal(os2, cached);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetDefault_InOrganization_CacheHit_UsesCachedObjectStorageId()
+    {
+        // Arrange
+        var cacheKey =
+            CacheKeys.OrganizationDefaultObjectStorage(organizationId);
+
+        // Establish os7 as the database value.
+        await _objectStorageBusiness.SetDefaultObjectStorage(
+            uid,
+            organizationId,
+            null,
+            os7);
+
+        // Deliberately cache a different valid value.
+        await CacheService.Instance.SetAsync(
+            cacheKey,
+            os9,
+            TimeSpan.FromMinutes(2));
+
+        try
+        {
+            // Act
+            var result =
+                await _objectStorageBusiness.GetDefaultObjectStorage(
+                    organizationId,
+                    null);
+
+            // Assert
+            Assert.Equal(os9, result.Id);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
     }
 
     #endregion

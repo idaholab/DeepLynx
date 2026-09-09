@@ -38,7 +38,7 @@ public interface IFileBusiness
     Task<bool> DeleteFile(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig);
 
     Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,
-        int expirationHours = 1);
+        int expirationHours = 1, string? directUrl = null);
 
     Task<Guid> StartUpload(long organizationId, long projectId, long datasourceId,
         ObjectStorageConfigDto objectStorageConfig);

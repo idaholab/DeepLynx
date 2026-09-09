@@ -88,7 +88,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
 
     try {
       setLoadingProjects(true);
-      const data = await getAllProjects(
+      const { items: data } = await getAllProjects(
         organization.organizationId as number,
         true,
       );
@@ -231,6 +231,9 @@ const SideMenu: React.FC<SideMenuProps> = ({
     // Upload Center is disabled when the organization has file transfer disabled
     if (targetPath === "/upload_center" && organization?.disableFileTransfer)
       return true;
+
+    // No project selected and in data catalog side bar should be disabled
+    if (pathname === "/data_catalog/all_records" && !activeProject) return true;
 
     return false;
   };

@@ -1,14 +1,18 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.helpers.BigData;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.exceptions;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -21,6 +25,7 @@ namespace deeplynx.tests;
 [Collection("Test Suite Collection")]
 public class RecordBusinessTests : IntegrationTestBase
 {
+    private readonly string _testDirectory = Path.Combine(Path.GetTempPath(), "RecordBusinessTests");
     private EventBusiness _eventBusiness;
     private SensitivityLabelBusiness _sensitivityLabelBusiness;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
@@ -39,6 +44,14 @@ public class RecordBusinessTests : IntegrationTestBase
     private Mock<IProvenanceBusiness> _provenanceBusiness = null!;
     private IObjectStorageBusiness _objectStorageBusiness = null!;
     private Mock<IFileBusinessFactory> _fileBusinessFactory = null!;
+    private Mock<IEdgeBusiness> _edgeBusiness = null!;
+    private FileBusiness _fileBusiness = null!;
+    private DataSourceBusiness _dataSourceBusiness = null!;
+    private Mock<IInsightBusiness> _insightBusiness = null!;
+    private Mock<ILogger<OlapBusiness>> _mockTimeseriesLogger = null!;
+    private OlapBusiness _olapBusiness = null!;
+    private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
+    private ClassBusiness _classBusiness = null!;
     public long cid; // class ID
     public long did; // datasource ID
     public long did2;
@@ -82,7 +95,7 @@ public class RecordBusinessTests : IntegrationTestBase
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
         _objectStorageBusiness = new ObjectStorageBusiness(Context, _encryptionHelper, _mockFileAzureBusiness.Object);
         _fileBusinessFactory = new Mock<IFileBusinessFactory>();
@@ -95,8 +108,43 @@ public class RecordBusinessTests : IntegrationTestBase
             _sensitivityLabelService,
             _provenanceBusiness.Object,
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
-    }
+        _relationshipBusiness = new Mock<IRelationshipBusiness>();
+        _classBusiness = new ClassBusiness(Context,
+            _recordBusiness,
+            _relationshipBusiness.Object,
+            _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
 
+        var protectProvider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        var realFileFilesystemBusiness =
+        new FileFilesystemBusiness(Context, _objectStorageBusiness, _classBusiness, _recordBusiness, protectProvider);
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(realFileFilesystemBusiness);
+
+        _edgeBusiness = new Mock<IEdgeBusiness>();
+        _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness.Object, _recordBusiness,
+            _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+        _insightBusiness = new Mock<IInsightBusiness>();
+        _mockTimeseriesLogger = new Mock<ILogger<OlapBusiness>>();
+        _olapBusiness = new OlapBusiness(Context, _recordBusiness, _objectStorageBusiness, _mockTimeseriesLogger.Object);
+
+        _fileBusiness = new FileBusiness(
+            Context,
+            _fileBusinessFactory.Object,
+            _dataSourceBusiness,
+            _classBusiness,
+            _recordBusiness,
+            _insightBusiness.Object,
+            _olapBusiness,
+            _objectStorageBusiness,
+            NullLogger<FileBusiness>.Instance,
+            _eventBusiness,
+            protectProvider
+        );
+    }
 
     #region RecordResponseDto Tests
 
@@ -126,6 +174,7 @@ public class RecordBusinessTests : IntegrationTestBase
             LastUpdatedBy = uid,
             IsArchived = false,
             FileType = "pdf",
+            FileContentHash = "abc123",
             Tags = tags
         };
 
@@ -144,8 +193,139 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal(uid, dto.LastUpdatedBy);
         Assert.False(dto.IsArchived);
         Assert.Equal("pdf", dto.FileType);
+        Assert.Equal("abc123", dto.FileContentHash);
         Assert.Single(dto.Tags);
         Assert.Equal("Test Tag", dto.Tags.First().Name);
+    }
+
+    #endregion
+
+    #region File Content Hash Tests
+
+    [Fact]
+    public async Task UpdateFileContentHash_WithMatchingRecord_StoresNormalizedSha256Hash()
+    {
+        var recordId = await CreateFileRecord(fileSize: 1234);
+        var hash = new string('a', 64);
+
+        var result = await _recordBusiness.UpdateFileContentHash(
+            uid,
+            organizationId,
+            pid,
+            recordId,
+            new UpdateFileContentHashRequestDto
+            {
+                HashHex = hash.ToUpperInvariant(),
+                ContentLength = 1234
+            });
+
+        var storedRecord = await Context.Records.FindAsync(recordId);
+
+        Assert.Equal(recordId, result.Id);
+        Assert.Equal(hash, result.FileContentHash);
+        Assert.Equal(hash, storedRecord!.FileContentHash);
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHash_WithMismatchedContentLength_ThrowsInvalidOperationException()
+    {
+        var recordId = await CreateFileRecord(fileSize: 100);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _recordBusiness.UpdateFileContentHash(
+                uid,
+                organizationId,
+                pid,
+                recordId,
+                new UpdateFileContentHashRequestDto
+                {
+                    HashHex = new string('1', 64),
+                    ContentLength = 101
+                }));
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHash_WithExistingSameHash_IsIdempotent()
+    {
+        var hash = new string('b', 64);
+        var recordId = await CreateFileRecord(fileContentHash: hash);
+
+        var result = await _recordBusiness.UpdateFileContentHash(
+            uid,
+            organizationId,
+            pid,
+            recordId,
+            new UpdateFileContentHashRequestDto
+            {
+                HashHex = hash
+            });
+
+        Assert.Equal(hash, result.FileContentHash);
+    }
+
+    [Fact]
+    public async Task UpdateFileContentHash_WhenRecordDoesNotExist_ThrowsKeyNotFoundException()
+    {
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _recordBusiness.UpdateFileContentHash(
+                uid,
+                organizationId,
+                pid,
+                long.MaxValue,
+                new UpdateFileContentHashRequestDto
+                {
+                    HashHex = new string('c', 64)
+                }));
+    }
+
+    [Theory]
+    [InlineData("MD5", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("SHA-256", "not-a-sha")]
+    public async Task UpdateFileContentHash_WithInvalidHashRequest_ThrowsArgumentException(
+        string algorithm,
+        string hashHex)
+    {
+        var recordId = await CreateFileRecord();
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _recordBusiness.UpdateFileContentHash(
+                uid,
+                organizationId,
+                pid,
+                recordId,
+                new UpdateFileContentHashRequestDto
+                {
+                    HashAlgorithm = algorithm,
+                    HashHex = hashHex
+                }));
+    }
+
+    private async Task<long> CreateFileRecord(
+        string? fileContentHash = null,
+        long? fileSize = null)
+    {
+        var record = new Record
+        {
+            Name = $"File Record {Guid.NewGuid()}",
+            Description = "File content hash test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Uri = $"file-{Guid.NewGuid()}",
+            FileType = "pdf",
+            FileSize = fileSize,
+            FileContentHash = fileContentHash,
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        return record.Id;
     }
 
     #endregion
@@ -236,7 +416,10 @@ public class RecordBusinessTests : IntegrationTestBase
         cid = testClass.Id;
 
         // Add object storage
-        var config = new JsonObject();
+        var config = new ObjectStorageConfigDto
+        {
+            MountPath = _testDirectory
+        };
         var objectStorage = new ObjectStorage
         {
             Name = "Object Storage 1",
@@ -488,7 +671,285 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetAllRecords Tests
+    #region GetRecordsCountByDataSource Cache Tests
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_CacheMiss_PopulatesCache_WithCorrectValue()
+    {
+        var cacheKey = CacheKeys.RecordCountByDataSource(pid, did2, true);
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKey));
+
+        var result = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did2, true);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Equal(result, cached);
+        Assert.Equal(1, cached); // did2 has 1 record per fixture setup
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_CacheHit_ReturnsCachedValue_WithoutQueryingDatabase()
+    {
+        // did genuinely has 3 records in the DB (per fixture). Poison the cache with a value the DB
+        // would never produce right now. If the method trusts the cache it returns 999; if it falls
+        // through to the DB instead, it will return the real count.
+        var cacheKey = CacheKeys.RecordCountByDataSource(pid, did, true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        var result = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        Assert.Equal(999, result);
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_CacheHit_DoesNotOverwriteExistingCacheEntry()
+    {
+        // Same poisoning technique, but this time assert the poisoned value is still in the cache
+        // afterward - proving the method didn't recompute and re-set it on a hit.
+        var cacheKey = CacheKeys.RecordCountByDataSource(pid, did, true);
+        await CacheService.Instance.SetAsync(cacheKey, 999, TimeSpan.FromHours(1));
+
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        var cached = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        Assert.Equal(999, cached);
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_UsesCacheKeyThatVariesByHideArchived()
+    {
+        // Populate the hideArchived:true entry with a real call.
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        // hideArchived:false must be a distinct key - still a genuine cache miss.
+        var keyHideFalse = CacheKeys.RecordCountByDataSource(pid, did, false);
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(keyHideFalse));
+
+        var result = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, false);
+
+        var cachedFalse = await CacheService.Instance.GetAsync<int?>(keyHideFalse);
+        Assert.NotNull(cachedFalse);
+        Assert.Equal(result, cachedFalse);
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_UsesCacheKeyThatVariesByDataSource()
+    {
+        // Poison did's cache entry only. did2's key must be unaffected and still a genuine miss.
+        var keyDid = CacheKeys.RecordCountByDataSource(pid, did, true);
+        var keyDid2 = CacheKeys.RecordCountByDataSource(pid, did2, true);
+        await CacheService.Instance.SetAsync(keyDid, 999, TimeSpan.FromHours(1));
+
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(keyDid2));
+
+        var resultDid = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+        var resultDid2 = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did2, true);
+
+        Assert.Equal(999, resultDid);   // served from poisoned cache
+        Assert.Equal(1, resultDid2);    // did2's real DB count, unaffected by did's poisoned entry
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_NonExistentDataSource_DoesNotPopulateCache()
+    {
+        var cacheKey = CacheKeys.RecordCountByDataSource(pid, 999L, true);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, 999L, true));
+
+        // Existence check should fail before the cache is ever consulted or written.
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKey));
+    }
+
+    [Fact]
+    public async Task GetRecordsCountByDataSource_CachedValue_SurvivesSubsequentRecordChanges()
+    {
+        // Prime the cache with the real count.
+        var firstResult = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did2, true);
+        Assert.Equal(1, firstResult);
+
+        // Add another record to the same data source directly via the DB, bypassing the cache.
+        Context.Records.Add(new Record
+        {
+            Name = "CachedValue_SurvivesSubsequentRecordChanges",
+            Description = "GetRecordsCountByDataSource_CachedValue_SurvivesSubsequentRecordChanges",
+            OrganizationId = organizationId,
+            ProjectId = pid,
+            DataSourceId = did2,
+            Properties = "{}",
+            OriginalId = "GetRecordsCountByDataSource_CachedValue_SurvivesSubsequentRecordChanges",
+            IsArchived = false
+        });
+        await Context.SaveChangesAsync();
+
+        // The cached count should still be served, proving the method trusts the cache
+        // rather than re-querying on every call.
+        var secondResult = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did2, true);
+        Assert.Equal(1, secondResult);
+    }
+
+    #endregion
+
+    #region Cache Invalidation on Create Tests
+
+    [Fact]
+    public async Task CreateRecord_InvalidatesRecordCountCache_ForAffectedDataSource()
+    {
+        // Arrange - prime the count cache for this data source/hideArchived combo
+        var cacheKeyHideTrue = CacheKeys.RecordCountByDataSource(pid, did, true);
+        var cacheKeyHideFalse = CacheKeys.RecordCountByDataSource(pid, did, false);
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, false);
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(cacheKeyHideTrue));
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(cacheKeyHideFalse));
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Cache Invalidation Test Record",
+            Description = "Test",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            Uri = "test://uri",
+            OriginalId = "cache-invalidation-1",
+            ClassId = cid,
+            FileType = "png"
+        };
+
+        // Act
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert - both hideArchived variants for this data source must be invalidated,
+        // otherwise a stale count would be served until the TTL expires.
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKeyHideTrue));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKeyHideFalse));
+    }
+
+    [Fact]
+    public async Task CreateRecord_NextCountRead_ReflectsNewRecord_NotStaleCachedValue()
+    {
+        // Arrange - prime the cache with the pre-create count
+        var preCount = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Cache Freshness Test Record",
+            Description = "Test",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            Uri = "test://uri",
+            OriginalId = "cache-invalidation-2",
+            ClassId = cid,
+            FileType = "png"
+        };
+
+        // Act
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+        var postCount = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        // Assert
+        Assert.Equal(preCount + 1, postCount);
+    }
+
+    [Fact]
+    public async Task CreateRecord_DoesNotInvalidateCache_ForUnrelatedDataSource()
+    {
+        // Arrange - prime the cache for a data source not being written to
+        var unrelatedKey = CacheKeys.RecordCountByDataSource(pid, did2, true);
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did2, true);
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(unrelatedKey));
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Scoped Invalidation Test Record",
+            Description = "Test",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            Uri = "test://uri",
+            OriginalId = "cache-invalidation-3",
+            ClassId = cid,
+            FileType = "png"
+        };
+
+        // Act
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert - unrelated data source's cache entry should be untouched
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(unrelatedKey));
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_InvalidatesRecordCountCache_ForAffectedDataSource()
+    {
+        // Arrange
+        var cacheKeyHideTrue = CacheKeys.RecordCountByDataSource(pid, did, true);
+        var cacheKeyHideFalse = CacheKeys.RecordCountByDataSource(pid, did, false);
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+        await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, false);
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(cacheKeyHideTrue));
+        Assert.NotNull(await CacheService.Instance.GetAsync<int?>(cacheKeyHideFalse));
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Cache Test 1",
+                Description = "Test",
+                ObjectStorageId = osid,
+                OriginalId = "bulk-cache-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "Bulk Cache Test 2",
+                Description = "Test",
+                ObjectStorageId = osid,
+                OriginalId = "bulk-cache-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+
+        // Act
+        await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+
+        // Assert
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKeyHideTrue));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(cacheKeyHideFalse));
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_NextCountRead_ReflectsAllNewRecords_NotStaleCachedValue()
+    {
+        // Arrange
+        var preCount = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Freshness Test 1",
+                Description = "Test",
+                ObjectStorageId = osid,
+                OriginalId = "bulk-freshness-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "Bulk Freshness Test 2",
+                Description = "Test",
+                ObjectStorageId = osid,
+                OriginalId = "bulk-freshness-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+
+        // Act
+        await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+        var postCount = await _recordBusiness.GetRecordsCountByDataSource(organizationId, pid, did, true);
+
+        // Assert
+        Assert.Equal(preCount + 2, postCount);
+    }
+
+    #endregion
+
+    #region GetAllRecords (Deprecated) Tests
 
     [Fact]
     public async Task GetAllRecords_ValidProjectId_ReturnsRecords()
@@ -543,6 +1004,10 @@ public class RecordBusinessTests : IntegrationTestBase
         Assert.Equal("pdf", correctFileTypeResponse.First().FileType);
     }
 
+    #endregion
+
+    #region GetAllRecordsPaginated Tests
+
     [Fact]
     public async Task GetAllRecordsPaginated_ReturnsRequestedPageAndTotalCount()
     {
@@ -573,7 +1038,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetRecordsByTags Tests
+    #region GetRecordsByTags (V1 / Legacy) Tests
 
     [Fact]
     public async Task GetRecordsByTags_ValidProjectIdWithSingleTag_ReturnsMatchingRecords()
@@ -801,6 +1266,300 @@ public class RecordBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetRecordsByTagsPaginated Tests
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_ValidProjectIdWithSingleTag_ReturnsMatchingRecords()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [tid], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("Test Record", result.Items.First().Name);
+        Assert.Single(result.Items.First().Tags);
+        Assert.Equal("Test Tag", result.Items.First().Tags.First().Name);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_WithMultipleTags_ReturnsOnlyRecordsWithAllTags()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        // Arrange - Add additional tag
+        var tag2 = new Tag
+        {
+            Name = "Tag2",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            OrganizationId = organizationId
+        };
+        Context.Tags.Add(tag2);
+        await Context.SaveChangesAsync();
+
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        var recordWithAllTags = new Record
+        {
+            Name = "Record With All Tags",
+            Description = "Has testTag and tag2",
+            OriginalId = "multi_tag_record",
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Tags = new List<Tag> { testTag, tag2 },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        var recordWithSomeTags = new Record
+        {
+            Name = "Record With Some Tags",
+            Description = "Has only testTag",
+            OriginalId = "partial_tag_record",
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.AddRange(recordWithAllTags, recordWithSomeTags);
+        await Context.SaveChangesAsync();
+
+        // Act - Query for records with both testTag AND tag2
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [tid, tag2.Id], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert - Should only get the record with ALL tags
+        Assert.NotNull(result);
+        Assert.Single(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("Record With All Tags", result.Items.First().Name);
+        Assert.Equal(2, result.Items.First().Tags.Count);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_WithMultipleTags_DifferentProject_ReturnsEmpty()
+    {
+        // Arrange - Add additional tag
+        var tag2 = new Tag
+        {
+            Name = "Tag2",
+            ProjectId = pid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            OrganizationId = organizationId
+        };
+        Context.Tags.Add(tag2);
+        await Context.SaveChangesAsync();
+
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        var recordWithAllTags = new Record
+        {
+            Name = "Record With All Tags",
+            Description = "Has testTag and tag2",
+            OriginalId = "multi_tag_different_project",
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Tags = new List<Tag> { testTag, tag2 },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(recordWithAllTags);
+        await Context.SaveChangesAsync();
+
+        // Act - Query for records with both tags but in different valid project (pid2)
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid2, [tid, tag2.Id], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert - Should return empty because records exist in pid, not pid2
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_EmptyTagArray_ReturnsAllNonArchivedRecords()
+    {
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal("Test Record", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_HideArchivedTrue_ExcludesArchivedRecords()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        // Arrange - Add an archived record with the same tag
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        var archivedRecord = new Record
+        {
+            Name = "Archived Record",
+            Description = "Archived",
+            OriginalId = "archived_record",
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(archivedRecord);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [tid], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert - Should only get the non-archived seeded record
+        Assert.NotNull(result);
+        Assert.Single(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("Test Record", result.Items.First().Name);
+        Assert.False(result.Items.First().IsArchived);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_HideArchivedFalse_IncludesArchivedRecords()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        // Arrange - Add an archived record with the same tag
+        var testTag = await Context.Tags.FindAsync(tid);
+
+        var archivedRecord = new Record
+        {
+            Name = "Archived Record",
+            Description = "Archived",
+            OriginalId = "archived_record_2",
+            Properties = "{}",
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Tags = new List<Tag> { testTag },
+            Uri = "localhost:8090",
+            FileType = "pdf",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(archivedRecord);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [tid], false, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert - Should get both archived and non-archived records
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Contains(result.Items, r => r.Name == "Test Record" && !r.IsArchived);
+        Assert.Contains(result.Items, r => r.Name == "Archived Record" && r.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_NonExistentTag_ReturnsEmpty()
+    {
+        await _recordBusiness.AttachTag(uid, organizationId, pid, rid, tid);
+        // Arrange - Make sure non-existent tag results in no results
+        var nonExistentTagResult = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [99999], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+        Assert.Empty(nonExistentTagResult.Items);
+        Assert.Equal(0, nonExistentTagResult.TotalCount);
+
+        // Act - Verify correct tag returns results
+        var correctTagResult = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [tid], true, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(correctTagResult);
+        Assert.Single(correctTagResult.Items);
+        Assert.Equal("Test Record", correctTagResult.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_Paginates_Correctly()
+    {
+        // Act - two-page split, page size 1, over the 4 seeded/no-tag-filter records
+        var page1 = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [], true, new PaginatedRequestDto { PageNumber = 1, PageSize = 2 });
+        var page2 = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [], true, new PaginatedRequestDto { PageNumber = 2, PageSize = 2 });
+
+        // Assert
+        Assert.NotNull(page1);
+        Assert.NotNull(page2);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Equal(4, page1.TotalCount);
+        Assert.Equal(4, page2.TotalCount);
+
+        var page1Ids = page1.Items.Select(r => r.Id).ToHashSet();
+        var page2Ids = page2.Items.Select(r => r.Id).ToHashSet();
+        Assert.Empty(page1Ids.Intersect(page2Ids));
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_NoMatches_ReturnsEmptyPaginatedResponse()
+    {
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [99999], true, new PaginatedRequestDto { PageNumber = 1, PageSize = 25 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(25, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetRecordsByTagsPaginated_PageSizeNegativeOne_ReturnsAll_IgnoringPageNumber()
+    {
+        // Act
+        var result = await _recordBusiness.GetRecordsByTagsPaginated(
+            uid, organizationId, pid, [], true, new PaginatedRequestDto { PageNumber = 5, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.Items.Count, result.PageSize);
+    }
+
+    #endregion
+
     #region GetRecord Tests
 
     [Fact]
@@ -880,6 +1639,58 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateRecord_EmptyStringTag_DoesNotCreateTag()
+    {
+        // Arrange
+
+        var now = DateTime.UtcNow;
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "New Test Record",
+            Description = "Test Record Description",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "TestValue" }))!,
+            Uri = "test://uri",
+            OriginalId = "original-123",
+            ClassId = cid,
+            FileType = "png",
+            Tags = [""]
+        };
+
+        // Act
+        var result = await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("New Test Record", result.Name);
+        Assert.Equal("Test Record Description", result.Description);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.Equal(did, result.DataSourceId);
+        Assert.Equal("test://uri", result.Uri);
+        Assert.Equal("original-123", result.OriginalId);
+        Assert.Equal(cid, result.ClassId);
+        Assert.Equal("png", result.FileType);
+        Assert.Empty(result.Tags);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(uid, result.LastUpdatedBy);
+
+        // Verify record was actually created in database
+        var createdRecord = await Context.Records.FindAsync(result.Id);
+        Assert.NotNull(createdRecord);
+        Assert.Equal("New Test Record", createdRecord.Name);
+
+        // Ensure that record create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Single(eventList);
+
+        var actualEvent = eventList[0];
+
+        Assert.Equal(createdRecord.ProjectId, actualEvent.ProjectId);
+        Assert.Equal("create", actualEvent.Operation);
+        Assert.Equal("record", actualEvent.EntityType);
+        Assert.Equal(createdRecord.Id, actualEvent.EntityId);
+    }
+
+    [Fact]
     public async Task CreateRecord_InvalidProjectId_ThrowsKeyNotFoundException()
     {
         // Arrange
@@ -895,7 +1706,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _recordBusiness.CreateRecord(uid, organizationId, 1000999L, did, dto));
 
-        Assert.Contains($"DataSource with id {did} not found in project", exception.Message);
+        Assert.Contains($"DataSource with id {did} not found", exception.Message);
 
         // Ensure that no record create event was logged
         var eventList = await Context.Events.ToListAsync();
@@ -990,7 +1801,7 @@ public class RecordBusinessTests : IntegrationTestBase
         var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _recordBusiness.CreateRecord(uid, organizationId, pid, dataSourceInWrongProject.Id, dto));
 
-        Assert.Contains($"DataSource with id {dataSourceInWrongProject.Id} not found in project with id {pid}",
+        Assert.Contains($"DataSource with id {dataSourceInWrongProject.Id} not found",
             exception.Message);
 
         // Ensure that no record create event was logged
@@ -1364,21 +2175,6 @@ public class RecordBusinessTests : IntegrationTestBase
         var label1response = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label1, pid, organizationId);
         var label2response = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, label2, pid, organizationId);
 
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstAsync(r => r.Id == roleId);
-
-        var label1WritePermission = Context.Permissions
-            .FirstOrDefault(p => p.LabelId == label1response.Id && p.Action == "write record");
-
-        var label2WritePermission = Context.Permissions
-            .FirstOrDefault(p => p.LabelId == label2response.Id && p.Action == "write record");
-
-        role.Permissions.Add(label1WritePermission);
-        role.Permissions.Add(label2WritePermission);
-
-        await Context.SaveChangesAsync();
-
         // Act
         var result = await _recordBusiness.BulkCreateRecords(
             uid, organizationId, pid, did, records, new List<long> { label1response.Id, label2response.Id });
@@ -1652,6 +2448,71 @@ public class RecordBusinessTests : IntegrationTestBase
             _recordBusiness.DeleteRecord(uid, organizationId, pid, 999L));
 
         Assert.Contains("Record with id 999 is archived or not found", exception.Message);
+    }
+
+    #endregion
+
+    #region Integration DeleteRecord Tests
+
+    [Fact]
+    public async Task DeleteRecord_FileDeleted_DeletesRecordFile()
+    {
+        // Create record file
+        var file = CreateMockFile("file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, organizationId, pid, did, osid, file);
+
+        // Attempt to delete record and file
+        var result = await _recordBusiness.DeleteRecord(uid, organizationId, pid, record.Id);
+        Assert.True(result);
+
+        // Check file
+        Assert.False(File.Exists(record.Uri));
+
+        // Verify record was actually deleted from database
+        var deletedRecord = await Context.Records.FindAsync(record.Id);
+        Assert.Null(deletedRecord);
+    }
+
+    [Fact]
+    public async Task DeleteRecord_FileSaved_DeletesRecordNotFile()
+    {
+        // Disable file deletion
+        var os = await Context.ObjectStorages.FindAsync(osid);
+        os!.FilesDeletable = false;
+        await Context.SaveChangesAsync();
+
+        // Create record file
+        var file = CreateMockFile("not_file_that_is_deleted.txt");
+        var record = await _fileBusiness.UploadFile(uid, organizationId, pid, did, osid, file);
+
+        // Delete record but not file
+        var result = await _recordBusiness.DeleteRecord(uid, organizationId, pid, record.Id);
+        Assert.True(result);
+
+        // Check file
+        Assert.True(File.Exists(record.Uri));
+
+        // Verify record was actually deleted from database
+        var deletedRecord = await Context.Records.FindAsync(record.Id);
+        Assert.Null(deletedRecord);
+    }
+
+    private static FormFile CreateMockFile(string fileName, string content = "Mock File")
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var stream = new MemoryStream(bytes)
+        {
+            Position = 0
+        };
+        var contentType = fileName.EndsWith(".csv", StringComparison.InvariantCultureIgnoreCase)
+            ? "text/csv"
+            : "text/plain";
+
+        return new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = contentType
+        };
     }
 
     #endregion
@@ -3520,43 +4381,25 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
-        var permission = new Permission
+        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
         {
             Name = $"Download File Permission {Guid.NewGuid()}",
-            Description = "Allows file download for this label",
+            Description = "Governs file download for this label",
             Action = "download file",
             LabelId = label.Id,
-            OrganizationId = organizationId,
-            ProjectId = pid,
             LastUpdatedBy = adminUser.Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            IsDefault = false
-        };
+            IsArchived = false
+        });
 
-        var role = new Role
-        {
-            Name = $"Download Role {Guid.NewGuid()}",
-            Description = "Role with download file permission",
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            Permissions = new List<Permission> { permission }
-        };
-
-        Context.Roles.Add(role);
-        await Context.SaveChangesAsync();
-
-        var projectMember = new ProjectMember
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
         {
             UserId = adminUser.Id,
-            ProjectId = pid,
-            RoleId = role.Id
-        };
+            LabelId = label.Id,
+            GrantedBy = adminUser.Id,
+            GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
+        });
 
-        Context.ProjectMembers.Add(projectMember);
         await Context.SaveChangesAsync();
 
         var expectedUri = $"../data/test/{Guid.NewGuid()}_protected-file.txt";
@@ -3641,54 +4484,34 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
-        var uploadPermission = new Permission
-        {
-            Name = $"Upload File Permission {Guid.NewGuid()}",
-            Description = "Allows file upload for this label",
-            Action = "update file",
-            LabelId = label.Id,
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            IsDefault = false
-        };
+        Context.SensitivityLabelPermissions.AddRange(
+            new SensitivityLabelPermission
+            {
+                Name = $"Upload File Permission {Guid.NewGuid()}",
+                Description = "Governs file upload for this label",
+                Action = "update file",
+                LabelId = label.Id,
+                LastUpdatedBy = adminUser.Id,
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                IsArchived = false
+            },
+            new SensitivityLabelPermission
+            {
+                Name = $"Download File Permission {Guid.NewGuid()}",
+                Description = "Governs file download for this label",
+                Action = "download file",
+                LabelId = label.Id,
+                LastUpdatedBy = adminUser.Id,
+                LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+                IsArchived = false
+            });
 
-        var downloadPermission = new Permission
-        {
-            Name = $"Download File Permission {Guid.NewGuid()}",
-            Description = "Allows file download for this label",
-            Action = "download file",
-            LabelId = label.Id,
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            IsDefault = false
-        };
-
-        var role = new Role
-        {
-            Name = $"Upload Download Role {Guid.NewGuid()}",
-            Description = "Role with upload and download file permission",
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            Permissions = new List<Permission> { uploadPermission, downloadPermission }
-        };
-
-        Context.Roles.Add(role);
-        await Context.SaveChangesAsync();
-
-        Context.ProjectMembers.Add(new ProjectMember
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
         {
             UserId = adminUser.Id,
-            ProjectId = pid,
-            RoleId = role.Id
+            LabelId = label.Id,
+            GrantedBy = adminUser.Id,
+            GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
         });
 
         await Context.SaveChangesAsync();
@@ -4134,64 +4957,29 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
-        var readPermission = new Permission
-        {
-            Name = $"Read Record Permission {Guid.NewGuid()}",
-            Description = "Allows record read for this label",
-            Action = "read record",
-            LabelId = label.Id,
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            IsDefault = false
-        };
-
-        var adminPermissions = permissionActions.Select(action => new Permission
+        // Gate the requested actions on this label. Access is now per-user via UserSensitivityLabel
+        // (a single grant unlocks ALL actions on a label), so "read record" is deliberately left
+        // ungoverned here — both users can read the record, only the gated actions differ.
+        var labelPermissions = permissionActions.Select(action => new SensitivityLabelPermission
         {
             Name = $"{action} Permission {Guid.NewGuid()}",
-            Description = $"Allows {action} for this label",
+            Description = $"Governs {action} for this label",
             Action = action,
             LabelId = label.Id,
-            OrganizationId = organizationId,
-            ProjectId = pid,
             LastUpdatedBy = adminUser.Id,
             LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            IsDefault = false
+            IsArchived = false
         }).ToList();
 
-        var adminRole = new Role
+        Context.SensitivityLabelPermissions.AddRange(labelPermissions);
+
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
         {
-            Name = $"Admin URI Role {Guid.NewGuid()}",
-            Description = "Role with URI permission",
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            Permissions = new List<Permission> { readPermission }.Concat(adminPermissions).ToList()
-        };
-
-        var restrictedRole = new Role
-        {
-            Name = $"Restricted URI Role {Guid.NewGuid()}",
-            Description = "Role with read permission only",
-            OrganizationId = organizationId,
-            ProjectId = pid,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false,
-            Permissions = new List<Permission> { readPermission }
-        };
-
-        Context.Roles.AddRange(adminRole, restrictedRole);
-        await Context.SaveChangesAsync();
-
-        Context.ProjectMembers.AddRange(
-            new ProjectMember { UserId = adminUser.Id, ProjectId = pid, RoleId = adminRole.Id },
-            new ProjectMember { UserId = restrictedUser.Id, ProjectId = pid, RoleId = restrictedRole.Id });
+            UserId = adminUser.Id,
+            LabelId = label.Id,
+            GrantedBy = adminUser.Id,
+            GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
+        });
 
         await Context.SaveChangesAsync();
 
@@ -4560,6 +5348,18 @@ public class RecordBusinessTests : IntegrationTestBase
 
         Context.Users.Add(otherUser);
         Context.Records.Add(restrictedRecord);
+        await Context.SaveChangesAsync();
+
+        // Gate "read record" on the label with no UserSensitivityLabel grant to otherUser,
+        // so the label is not open-by-default under the new access model.
+        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
+        {
+            LabelId = restrictedLabel.Id,
+            Action = "read record",
+            Name = "read record",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        });
         await Context.SaveChangesAsync();
 
         // Act
@@ -5055,6 +5855,18 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.Records.Add(restrictedRecord);
         await Context.SaveChangesAsync();
 
+        // Gate "read record" on the label with no UserSensitivityLabel grant to otherUser,
+        // so the label is not open-by-default under the new access model.
+        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
+        {
+            LabelId = restrictedLabel.Id,
+            Action = "read record",
+            Name = "read record",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            IsArchived = false
+        });
+        await Context.SaveChangesAsync();
+
         // Act
         var result = await _recordBusiness.SearchPaginated(
             otherUser.Id, organizationId, pid, DefaultSearch(), DefaultPagination(),
@@ -5510,4 +6322,371 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region Record Count Cache Invalidation Tests
+
+    private static async Task SeedRecordCountCacheSentinels(long organizationId, long projectId)
+    {
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectRecordCount(projectId, true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectRecordCount(projectId, false), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationRecordCount(organizationId, true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationRecordCount(organizationId, false), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.SystemRecordCount(true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.SystemRecordCount(false), 999, (TimeSpan?)null);
+    }
+
+    private static async Task AssertAllRecordCountCacheKeysCleared(long organizationId, long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectRecordCount(projectId, true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectRecordCount(projectId, false)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationRecordCount(organizationId, true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationRecordCount(organizationId, false)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.SystemRecordCount(true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.SystemRecordCount(false)));
+    }
+
+    [Fact]
+    public async Task CreateRecord_InvalidatesRecordCountCache()
+    {
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Cache Invalidation Test Record",
+            Description = "Verifies record count cache invalidation on create",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "cache-invalidation-create"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        await AssertAllRecordCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_InvalidatesRecordCountCache()
+    {
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Cache Invalidation 1",
+                Description = "Bulk create cache invalidation test",
+                OriginalId = "bulk-cache-invalidation-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "Bulk Cache Invalidation 2",
+                Description = "Bulk create cache invalidation test",
+                OriginalId = "bulk-cache-invalidation-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+
+        await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+
+        await AssertAllRecordCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task DeleteRecord_InvalidatesRecordCountCache()
+    {
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid);
+
+        await AssertAllRecordCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_InvalidatesRecordCountCache()
+    {
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+
+        await AssertAllRecordCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task UnarchiveRecord_InvalidatesRecordCountCache()
+    {
+        var record = await Context.Records.FindAsync(rid);
+        record!.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        await _recordBusiness.UnarchiveRecord(uid, organizationId, pid, rid);
+
+        await AssertAllRecordCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task CreateRecord_DoesNotInvalidateUnrelatedProjectsCache()
+    {
+        var pid2Key = CacheKeys.ProjectRecordCount(pid2, true);
+        await CacheService.Instance.SetAsync(pid2Key, 999, (TimeSpan?)null);
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Scoped Invalidation Test",
+            Description = "Only pid's project cache should clear, not pid2's",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "scoped-invalidation-test"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // pid's own project-scope key is cleared
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectRecordCount(pid, true)));
+        
+        Assert.Equal(999, await CacheService.Instance.GetAsync<int?>(pid2Key));
+    }
+
+    #endregion
+    
+    #region Data Modality Count Cache Invalidation Tests
+
+    private static async Task SeedModalityCountCacheSentinels(long organizationId, long projectId)
+    {
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectModalityCount(projectId), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationModalityCount(organizationId), 999, (TimeSpan?)null);
+    }
+
+    private static async Task AssertAllModalityCountCacheKeysCleared(long organizationId, long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectModalityCount(projectId)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationModalityCount(organizationId)));
+    }
+
+    [Fact]
+    public async Task CreateRecord_InvalidatesModalityCountCache()
+    {
+        await SeedModalityCountCacheSentinels(organizationId, pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Modality Cache Invalidation Test Record",
+            Description = "Verifies modality count cache invalidation on create",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "modality-cache-invalidation-create",
+            FileType = "png"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        await AssertAllModalityCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_InvalidatesModalityCountCache()
+    {
+        await SeedModalityCountCacheSentinels(organizationId, pid);
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Modality Cache Invalidation 1",
+                Description = "Bulk create modality cache invalidation test",
+                OriginalId = "bulk-modality-cache-invalidation-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!,
+                FileType = "csv"
+            },
+            new()
+            {
+                Name = "Bulk Modality Cache Invalidation 2",
+                Description = "Bulk create modality cache invalidation test",
+                OriginalId = "bulk-modality-cache-invalidation-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!,
+                FileType = "json"
+            }
+        };
+
+        await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+
+        await AssertAllModalityCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task UpdateRecord_InvalidatesModalityCountCache_WhenFileTypeChanges()
+    {
+        await SeedModalityCountCacheSentinels(organizationId, pid);
+
+        var dto = new UpdateRecordRequestDto
+        {
+            FileType = "webp"
+        };
+
+        await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
+
+        await AssertAllModalityCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task DeleteRecord_InvalidatesModalityCountCache()
+    {
+        await SeedModalityCountCacheSentinels(organizationId, pid);
+
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid);
+
+        await AssertAllModalityCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task CreateRecord_DoesNotInvalidateUnrelatedProjectsModalityCache()
+    {
+        var pid2Key = CacheKeys.ProjectModalityCount(pid2);
+        await CacheService.Instance.SetAsync(pid2Key, 999, (TimeSpan?)null);
+        await SeedModalityCountCacheSentinels(organizationId, pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Scoped Modality Invalidation Test",
+            Description = "Only pid's project cache should clear, not pid2's",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "scoped-modality-invalidation-test",
+            FileType = "png"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // pid's own project-scope key is cleared
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectModalityCount(pid)));
+
+        // pid2's key is untouched — the invalidation is scoped to the mutated project only
+        Assert.Equal(999, await CacheService.Instance.GetAsync<int?>(pid2Key));
+    }
+
+    #endregion
+    
+    #region Project Stats Cache Invalidation Tests
+
+    private static async Task SeedProjectStatsCacheSentinel(long projectId)
+    {
+        await CacheService.Instance.SetAsync(
+            CacheKeys.ProjectStats(projectId),
+            new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 },
+            (TimeSpan?)null);
+    }
+
+    private static async Task AssertProjectStatsCacheCleared(long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(CacheKeys.ProjectStats(projectId)));
+    }
+
+    [Fact]
+    public async Task CreateRecord_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Project Stats Cache Invalidation Test Record",
+            Description = "Verifies project stats cache invalidation on create",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "project-stats-cache-invalidation-create"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Project Stats Cache Invalidation 1",
+                Description = "Bulk create project stats cache invalidation test",
+                OriginalId = "bulk-project-stats-cache-invalidation-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "Bulk Project Stats Cache Invalidation 2",
+                Description = "Bulk create project stats cache invalidation test",
+                OriginalId = "bulk-project-stats-cache-invalidation-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+
+        await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task UnarchiveRecord_InvalidatesProjectStatsCache()
+    {
+        var record = await Context.Records.FindAsync(rid);
+        record!.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _recordBusiness.UnarchiveRecord(uid, organizationId, pid, rid);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task DeleteRecord_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task CreateRecord_DoesNotInvalidateUnrelatedProjectsStatsCache()
+    {
+        var pid2Key = CacheKeys.ProjectStats(pid2);
+        var pid2Sentinel = new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 };
+        await CacheService.Instance.SetAsync(pid2Key, pid2Sentinel, (TimeSpan?)null);
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Scoped Project Stats Invalidation Test",
+            Description = "Only pid's stats cache should clear, not pid2's",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "scoped-project-stats-invalidation-test"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // pid's own stats cache is cleared
+        await AssertProjectStatsCacheCleared(pid);
+
+        // pid2's cache is untouched — invalidation is scoped to the mutated project only
+        var pid2Cached = await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(pid2Key);
+        Assert.NotNull(pid2Cached);
+        Assert.Equal(999, pid2Cached.classes);
+    }
+
+    #endregion
+
 }

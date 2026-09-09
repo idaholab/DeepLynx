@@ -15,7 +15,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
   projects,
   onSelectionChange,
   defaultSelected,
-  disabled = false,  
+  disabled = false,
 }) => {
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -59,7 +59,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  
+
   // Automatically close the dropdown if the bulk mode disables project scope changes.
   useEffect(() => {
     if (disabled) {
@@ -90,11 +90,11 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
   );
 
   const selectedLabel = useMemo(() => {
-    if (selectedIds.includes("ALL")) return "All Your Projects";
+    if (selectedIds.includes("ALL")) return t.translations.ALL_YOUR_PROJECTS;
     if (selectedIds.length === 1) {
       const project = projects.find((p) => p.id === selectedIds[0]);
       const name = project?.name || "1 project selected";
-      return  name.length >50 ? name.slice(0 ,50) + "..." : name;
+      return name.length > 50 ? name.slice(0, 50) + "..." : name;
     }
     return `${selectedIds.length} projects selected`;
   }, [selectedIds, projects]);
@@ -105,9 +105,8 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
       ref={dropdownRef}
     >
       <button
-        className={`flex items-center gap-1 text-md max-w-full ${
-          disabled ? "cursor-not-allowed opacity-60" : ""
-        }`}
+        className={`flex items-center gap-1 text-md max-w-full ${disabled ? "cursor-not-allowed opacity-60" : ""
+          }`}
         onClick={() => {
           if (disabled) return;
           setIsOpen((o) => !o);
@@ -115,7 +114,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
         type="button"
       >
         <span className="truncate">{selectedLabel}</span>
-        {selectedLabel === "All Your Projects" && `(${projects.length})`}
+        {selectedIds.includes("ALL") && `(${projects.length})`}
         {isOpen ? (
           <ChevronUpIcon className="w-5 h-5 ml-1" />
         ) : (
@@ -127,7 +126,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
         <div className="absolute z-10 mt-2 w-full bg-base-100 shadow shadow-base-content/10 rounded-box p-4 max-h-80 overflow-auto">
           <input
             type="text"
-            placeholder="Search"
+            placeholder={t.translations.SEARCH}
             className="input input-bordered w-full mb-4"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -159,7 +158,7 @@ const ProjectDropdown: React.FC<ProjectDropdownProps> = ({
                   checked={selectedIds.includes(project.id)}
                   onChange={() => toggleProject(project.id)}
                 />
-                <span className="label-text" title={project.name}>{project.name.length> 50 ? project.name.slice(0,50) + "..." : project.name}</span>
+                <span className="label-text" title={project.name}>{project.name.length > 50 ? project.name.slice(0, 50) + "..." : project.name}</span>
               </label>
             ))}
           </div>

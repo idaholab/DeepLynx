@@ -152,6 +152,7 @@ const ProjectRolesAndPermissions = ({
           project?.projectId as number,
           newRole.id,
           userPermissionIds,
+          false,
         );
 
         setRolePermissions((prev) => ({
@@ -306,6 +307,7 @@ const ProjectRolesAndPermissions = ({
         project?.projectId as number,
         currentRole.id,
         Array.from(tempPermissions),
+        isOrganizationRole(currentRole),
       );
 
       const updatedPerms = permissions.filter((p) =>
@@ -413,6 +415,7 @@ const ProjectRolesAndPermissions = ({
           project?.projectId as number,
           role.id,
           newPermissions,
+          false,
         );
       });
 
@@ -584,7 +587,7 @@ const ProjectRolesAndPermissions = ({
     if (!organization?.organizationId || !project?.projectId) return;
 
     try {
-      const updatedRoles = await getAllRoles(
+      const { items: updatedRoles } = await getAllRoles(
         organization.organizationId as number,
         project.projectId as number,
         true,
@@ -646,17 +649,15 @@ const ProjectRolesAndPermissions = ({
         <div className="btn-group">
           <button
             onClick={() => setActiveLayout("split-view")}
-            className={`btn border-2 border-primary mr-3 ${
-              activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
-            }`}
+            className={`btn border-2 border-primary mr-3 ${activeLayout === "split-view" ? "btn-primary" : "btn-ghost"
+              }`}
           >
             {t.translations.SPLIT_VIEW}
           </button>
           <button
             onClick={() => setActiveLayout("matrix")}
-            className={`btn border-2 border-primary ${
-              activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
-            }`}
+            className={`btn border-2 border-primary ${activeLayout === "matrix" ? "btn-primary" : "btn-ghost"
+              }`}
           >
             {t.translations.MATRIX_VIEW}
           </button>

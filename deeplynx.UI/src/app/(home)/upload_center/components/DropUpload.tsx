@@ -80,6 +80,8 @@ export default function DropUpload({
 
   return (
     <div
+      role='button'
+      aria-label='File Upload Drag and Drop Area and Button'
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
       onClick={triggerPicker}

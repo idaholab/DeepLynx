@@ -35,6 +35,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private Mock<IRoleBusiness> _roleBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private UserBusiness _userBusiness = null!;
     private Mock<ILogger<InvitationBusiness>> _mockInvitationLogger = null!;
     public long gid; // group ID
@@ -74,19 +75,22 @@ public class InvitationBusinessTests : IntegrationTestBase
         _eventBusiness = new EventBusiness(Context, _mockNotificationBusiness.Object, _bulkCopyUpsertExecutor);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _roleBusiness = new Mock<IRoleBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
         _organizationBusiness = new OrganizationBusiness(
             Context, _eventBusiness, _roleBusiness.Object, _mockOrgLogger.Object, _objectStorageBusiness.Object);
 
         _classBusiness = new ClassBusiness(
             Context, _recordBusiness.Object,
-            _relationshipBusiness.Object, _eventBusiness);
+            _relationshipBusiness.Object, _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
 
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
 
         _invitationBusiness = new InvitationBusiness(
             Context,

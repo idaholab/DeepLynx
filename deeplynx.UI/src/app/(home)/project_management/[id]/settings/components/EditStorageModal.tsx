@@ -13,10 +13,12 @@ interface StorageConfig {
   AzureObjectConfig?: AzureObjectConfig;
 }
 interface StorageFormData {
+  id: number;
   name: string;
   config: StorageConfig;
   default: boolean;
   existingContainer?: boolean;
+  filesDeletable: boolean;
 }
 
 interface EditStorageModalProps {
@@ -145,11 +147,31 @@ const EditStorageModal = ({
                 type="checkbox"
                 className="checkbox checkbox-primary"
                 checked={storageFormData.default}
-                disabled={editingStorage?.projectId == null}
                 onChange={(e) =>
                   setStorageFormData({
                     ...storageFormData,
                     default: e.target.checked,
+                  })
+                }
+              />
+            </label>
+          </div>
+
+          {/* Set Files Deletable */}
+          <div className="form-control mt-4">
+            <label className="cursor-pointer label">
+              <span className="label-text">
+                {t.translations.STORAGE_FILES_DELETABLE}
+              </span>
+              <input
+                type="checkbox"
+                className="checkbox checkbox-primary"
+                checked={storageFormData.filesDeletable}
+                disabled={editingStorage?.projectId == null}
+                onChange={(e) =>
+                  setStorageFormData({
+                    ...storageFormData,
+                    filesDeletable: e.target.checked,
                   })
                 }
               />
@@ -163,7 +185,7 @@ const EditStorageModal = ({
               onClick={() => {
                 onToggle(false);
                 setEditingStorage(null);
-                setStorageFormData({ name: "", config: {}, default: false });
+                setStorageFormData({ id: -1, name: "", config: {}, default: false, filesDeletable: true });
                 setIsFilePathDisabled(false);
               }}
             >

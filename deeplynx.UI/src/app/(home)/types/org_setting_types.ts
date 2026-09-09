@@ -29,3 +29,4 @@ export interface FetchOrganizationLogoResponse {
   blobUrl: string | null;
   fileName?: string;
 }
+
