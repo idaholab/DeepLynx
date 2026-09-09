@@ -129,7 +129,7 @@ public partial class LatticeExtractionBusiness : ILatticeExtractionBusiness
             var filledPrompt = await ConstructPrompt(recordId, projectId, mode);
 
             var latticeModel = Environment.GetEnvironmentVariable("LATTICE_MODEL")
-                               ?? "gemma-4-31B-reasoning";
+                               ?? "Mistral-Small-3.2-24B-Instruct-2506";
 
             _logger.LogInformation(
                 "Triggering Lattice extraction {ExtractionId} for organization {OrganizationId}, project {ProjectId}, record {RecordId}, model {Model}",
