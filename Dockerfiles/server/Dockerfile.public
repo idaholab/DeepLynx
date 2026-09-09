@@ -30,7 +30,7 @@ WORKDIR /usr/src/app
 
 # Fix vulnerability
 RUN apt-get update && \
-    apt-get install -y --only-upgrade openssl libssl3t64 perl-base libgnutls30t64 && \
+    apt-get upgrade -y && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the published backend code
