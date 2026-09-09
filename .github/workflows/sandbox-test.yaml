@@ -778,6 +778,7 @@ jobs:
           AIRFLOW_JWT: ${{ secrets.AIRFLOW_JWT }}
           LATTICE_MODEL: ${{ vars.LATTICE_MODEL }}
           NEXUS_API_URL: ${{ vars.NEXUS_API_URL }}
+          NEXT_PUBLIC_API_VERSION: ${{ vars.NEXT_PUBLIC_API_VERSION }}
         run: |
           cd $GITHUB_WORKSPACE/kubernetes
           envsubst < sandbox.yaml > manifest.yaml

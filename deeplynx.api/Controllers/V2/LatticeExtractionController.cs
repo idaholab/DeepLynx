@@ -119,7 +119,6 @@ public class LatticeExtractionController : ControllerBase
     /// <summary>
     ///     Returns all extractions for the specified project.
     /// </summary>
-    /// <param name="organizationId">The ID of the organization.</param>
     /// <param name="projectId">The ID of the project.</param>
     /// <param name="paginatedRequestDto"> Pagination parameters</param>
     /// <returns>200 OK with a list of extractions belonging to the project.</returns>
@@ -127,7 +126,6 @@ public class LatticeExtractionController : ControllerBase
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [InsightEnabled]
     public async Task<IActionResult> ListExtractions(
-        long organizationId, 
         long projectId,
         [FromQuery] PaginatedRequestDto? paginatedRequestDto = null)
     {
@@ -243,6 +241,32 @@ public class LatticeExtractionController : ControllerBase
             dataSourceId,
             extractionId,
             dto);
+        return Ok(result);
+    }
+
+    /// <summary>
+    ///     Receive progress updates from Insight during the extraction process.
+    /// </summary>
+    /// <param name="projectId">The ID of the project.</param>
+    /// <param name="extractionId">The ID of the extraction.</param>
+    /// <param name="progressDto">The progress of the extraction.</param>
+    /// <returns>200 OK when progress update is successfully recorded.</returns>
+    [AllowAnonymous]
+    [HttpPost("{extractionId:long}/progress", Name = "api_insight_extraction_progress")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [InsightEnabled]
+    public async Task<IActionResult> InsightExtractionProgress(
+        long projectId,
+        long extractionId,
+        [FromBody] InsightExtractionProgressCombinedDto progressDto)
+    {
+
+        var result = await _latticeExtractionBusiness.ProcessExtractionProgress(
+            projectId,
+            extractionId,
+            progressDto
+        );
+
         return Ok(result);
     }
 
