@@ -11,6 +11,11 @@ public interface ILatticeExtractionBusiness
         long extractionId,
         InsightExtractionCallbackDto dto);
 
+    Task<bool> ProcessExtractionProgress(
+        long projectId,
+        long extractionId,
+        InsightExtractionProgressCombinedDto progressDto);
+
     Task MarkExtractionFailed(long extractionId, long organizationId, long projectId, string? errorMessage = null);
 
     Task<ExtractionStagingResponseDto> GetExtractionStaging(long extractionId);

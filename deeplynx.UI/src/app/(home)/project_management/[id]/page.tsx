@@ -5,7 +5,6 @@ import { notFound, redirect } from "next/navigation";
 import ProjectManagementClient from "./ProjectManagementClient";
 
 import {
-  GroupResponseDto,
   PermissionResponseDto,
   ProjectMemberResponseDto,
   ProjectResponseDto,
@@ -92,16 +91,6 @@ export default async function ProjectManagementPage({ params }: Props) {
       console.error("getAllPermissionsServer failed: ", e);
     }
 
-    // Extract groups from projectMembers (groups have empty emails)
-    const projectGroups: GroupResponseDto[] = projectMembers
-      .filter((member) => member.email === "" && member.memberId !== undefined)
-      .map((member) => ({
-        id: member.memberId!,
-        name: member.name,
-        isArchived: false,
-        organizationId: organizationId,
-      }));
-
     // If project isn't found, mirror behavior of the other page
     if (!project) {
       return notFound();
@@ -111,7 +100,6 @@ export default async function ProjectManagementPage({ params }: Props) {
       <ProjectManagementClient
         project={project}
         projectMembers={projectMembers}
-        projectGroups={projectGroups}
         projectRoles={projectRoles}
         projectPermissions={projectPermissions}
       />

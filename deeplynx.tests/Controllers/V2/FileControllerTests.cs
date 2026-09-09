@@ -1142,7 +1142,7 @@ public class FileControllerTests : IDisposable
         };
 
         // Act
-        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, UserId, DataSourceId, ObjectStorageId);
+        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, DataSourceId, ObjectStorageId);
 
         // Assert
         var result = Assert.IsType<StatusCodeResult>(actionResult);
@@ -1163,7 +1163,7 @@ public class FileControllerTests : IDisposable
         };
 
         // Act
-        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, UserId, DataSourceId, ObjectStorageId);
+        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, DataSourceId, ObjectStorageId);
 
         // Assert
         var result = Assert.IsType<StatusCodeResult>(actionResult);
@@ -1183,7 +1183,7 @@ public class FileControllerTests : IDisposable
         };
 
         // Act
-        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, UserId, DataSourceId, ObjectStorageId);
+        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, DataSourceId, ObjectStorageId);
 
         // Assert
         var result = Assert.IsType<BadRequestObjectResult>(actionResult);
@@ -1204,7 +1204,7 @@ public class FileControllerTests : IDisposable
         };
 
         // Act
-        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, UserId, DataSourceId, ObjectStorageId);
+        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, DataSourceId, ObjectStorageId);
 
         // Assert
         var result = Assert.IsType<BadRequestObjectResult>(actionResult);
@@ -1226,7 +1226,7 @@ public class FileControllerTests : IDisposable
         };
 
         // Act
-        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, UserId, DataSourceId, ObjectStorageId);
+        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, DataSourceId, ObjectStorageId);
 
         // Assert
         var result = Assert.IsType<BadRequestObjectResult>(actionResult);
@@ -1259,7 +1259,7 @@ public class FileControllerTests : IDisposable
             .ReturnsAsync(uploadSession);
 
         // Act
-        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, UserId, DataSourceId, ObjectStorageId);
+        var actionResult = await _fileController.CreateUploadTus(OrgId, ProjectId, DataSourceId, ObjectStorageId);
 
         // Assert
         var result = Assert.IsType<StatusCodeResult>(actionResult);
@@ -1293,7 +1293,7 @@ public class FileControllerTests : IDisposable
             .ThrowsAsync(new Exception("tus create error"));
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => _fileController.CreateUploadTus(OrgId, ProjectId, UserId, DataSourceId, ObjectStorageId));
+        await Assert.ThrowsAsync<Exception>(() => _fileController.CreateUploadTus(OrgId, ProjectId, DataSourceId, ObjectStorageId));
     }
 
     [Fact]
@@ -1411,7 +1411,7 @@ public class FileControllerTests : IDisposable
 
         // Act
         var actionResult = await _fileController.UploadPartTus(
-            OrgId, ProjectId, UploadId, UserId, DataSourceId, ObjectStorageId);
+            OrgId, ProjectId, UploadId, DataSourceId, ObjectStorageId);
 
         // Assert
         var result = Assert.IsType<StatusCodeResult>(actionResult);
@@ -1432,7 +1432,7 @@ public class FileControllerTests : IDisposable
 
         // Act
         var actionResult = await _fileController.UploadPartTus(
-            OrgId, ProjectId, UploadId, UserId, DataSourceId, ObjectStorageId);
+            OrgId, ProjectId, UploadId, DataSourceId, ObjectStorageId);
 
         // Assert
         var result = Assert.IsType<BadRequestObjectResult>(actionResult);
@@ -1455,7 +1455,7 @@ public class FileControllerTests : IDisposable
 
         // Act
         var actionResult = await _fileController.UploadPartTus(
-            OrgId, ProjectId, UploadId, UserId, DataSourceId, ObjectStorageId);
+            OrgId, ProjectId, UploadId, DataSourceId, ObjectStorageId);
 
         // Assert
         var result = Assert.IsType<StatusCodeResult>(actionResult);
@@ -1486,7 +1486,7 @@ public class FileControllerTests : IDisposable
 
         // Act
         var actionResult = await _fileController.UploadPartTus(
-            OrgId, ProjectId, UploadId, UserId, DataSourceId, ObjectStorageId);
+            OrgId, ProjectId, UploadId, DataSourceId, ObjectStorageId);
 
         // Assert
         Assert.IsType<NoContentResult>(actionResult);
@@ -1517,7 +1517,7 @@ public class FileControllerTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<Exception>(() => _fileController.UploadPartTus(
-            OrgId, ProjectId, UploadId, UserId, DataSourceId, ObjectStorageId));
+            OrgId, ProjectId, UploadId, DataSourceId, ObjectStorageId));
     }
 
     [Fact]
@@ -1525,7 +1525,7 @@ public class FileControllerTests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(FileController.UploadPartTus),
-            "organizationId", "projectId", "uploadId", "userId", "dataSourceId", "objectStorageId");
+            "organizationId", "projectId", "uploadId", "dataSourceId", "objectStorageId");
 
         AssertHasHttpAttribute(method, nameof(HttpPatchAttribute));
     }
