@@ -345,58 +345,58 @@ public class TagBusiness : ITagBusiness
     /// <param name="tags">The tag request data transfer object containing tag details.</param>
     /// <returns>The created tag response DTO with saved details.</returns>
     public async Task<List<TagResponseDto>> BulkCreateTags(
-        long organizationId,
-        long currentUserId,
-        long? projectId,
-        List<CreateTagRequestDto> tags)
+    long organizationId,
+    long currentUserId,
+    long? projectId,
+    List<CreateTagRequestDto> tags)
     {
         if (tags == null || tags.Count == 0)
         {
             return new List<TagResponseDto>();
         }
 
-        // Bulk insert into classes; if there is a name collision, update the description and uuid if present
+        // Deduplicate tags to prevent ON CONFLICT errors
+        var distinctTags = tags
+            .GroupBy(tag => new { tag.Name, ProjectId = projectId, OrganizationId = organizationId })
+            .Select(group => group.First())
+            .ToList();
+
         var sql = projectId.HasValue
             ? @"
-            INSERT INTO deeplynx.tags (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
-                VALUES {0}
-                ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
-                DO UPDATE SET
-                    last_updated_at = @now,
-                    last_updated_by = @lastUpdatedBy
-                RETURNING id, project_id, organization_id, name, last_updated_at, is_archived, last_updated_by;"
+        INSERT INTO deeplynx.tags (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
+            VALUES {0}
+            ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
+            DO UPDATE SET
+                last_updated_at = @now,
+                last_updated_by = @lastUpdatedBy
+            RETURNING id, project_id, organization_id, name, last_updated_at, is_archived, last_updated_by;"
             : @"
-            INSERT INTO deeplynx.tags (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
-                VALUES {0}
-                ON CONFLICT (organization_id, name) WHERE project_id IS NULL
-                DO UPDATE SET
-                    last_updated_at = @now,
-                    last_updated_by = @lastUpdatedBy
-            RETURNING id, project_id, organization_id, name, last_updated_at, is_archived, last_updated_by;";
+        INSERT INTO deeplynx.tags (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
+            VALUES {0}
+            ON CONFLICT (organization_id, name) WHERE project_id IS NULL
+            DO UPDATE SET
+                last_updated_at = @now,
+                last_updated_by = @lastUpdatedBy
+        RETURNING id, project_id, organization_id, name, last_updated_at, is_archived, last_updated_by;";
 
-        // establish "constant" parameters
         var parameters = new List<NpgsqlParameter>
-        {
-            new NpgsqlParameter("@projectId", projectId.HasValue ? (object)projectId.Value : DBNull.Value),
-            new NpgsqlParameter("@organizationId", organizationId),
-            new NpgsqlParameter("@now", DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)),
-            new NpgsqlParameter("@lastUpdatedBy", currentUserId)
-        };
+    {
+        new NpgsqlParameter("@projectId", projectId.HasValue ? (object)projectId.Value : DBNull.Value),
+        new NpgsqlParameter("@organizationId", organizationId),
+        new NpgsqlParameter("@now", DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)),
+        new NpgsqlParameter("@lastUpdatedBy", currentUserId)
+    };
 
-        // establish "dynamic" parameters (new for each dto in the list)
-        parameters.AddRange(tags.SelectMany((dto, i) => new[]
+        parameters.AddRange(distinctTags.SelectMany((dto, i) => new[]
         {
-            new NpgsqlParameter($"@p{i}_name", dto.Name)
-        }));
+        new NpgsqlParameter($"@p{i}_name", dto.Name)
+    }));
 
-        // stringify the params and comma separate them
-        var valueTuples = string.Join(", ", tags.Select((dto, i) =>
+        var valueTuples = string.Join(", ", distinctTags.Select((dto, i) =>
             $"(@projectId, @organizationId, @p{i}_name, @now, false, @lastUpdatedBy)"));
 
-        // put everything together and execute the query
         sql = string.Format(sql, valueTuples);
 
-        // returns the resulting upserted classes
         var result = await _context.Database
             .SqlQueryRaw<TagResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
