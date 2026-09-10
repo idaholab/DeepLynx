@@ -1301,7 +1301,7 @@ public class FileControllerTests : IDisposable
     {
         var method = GetControllerMethod(
             nameof(FileController.CreateUploadTus),
-            "organizationId", "projectId", "dataSourceId", "objectStorageId");
+            "organizationId", "projectId", "userId", "dataSourceId", "objectStorageId");
 
         AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
     }
