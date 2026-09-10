@@ -12,4 +12,6 @@ public interface IProvenanceBusiness
     Task<ProvenanceHistoryResponseDto> GetProvenanceHistory(long recordId);
     Task<PaginatedResponse<ProvenanceRecordResponseDto>> GetProjectProvenanceHistory(
         long projectId, PaginatedRequestDto paginatedRequestDto);
+    Task<ProvenanceChainVerificationResponseDto> VerifyProvenanceChain(
+        long recordId, long? checkpointRecordId = null);
 }

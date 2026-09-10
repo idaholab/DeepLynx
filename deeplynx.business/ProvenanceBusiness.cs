@@ -1,6 +1,7 @@
 using System.Text.Json;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.exceptions;
 using deeplynx.interfaces;
 using deeplynx.models;
 using deeplynx.models.ResponseDTOs;
@@ -193,6 +194,82 @@ public class ProvenanceBusiness : IProvenanceBusiness
                 CreatedAt = p.CreatedAt
             })
             .ToPaginatedAsync(paginatedRequestDto);
+    }
+
+    /// <summary>
+    ///     Recompute the hash chain for a record's provenance history and compare it against
+    ///     what's stored, to detect tampering. No external calls, no keys — a local, synchronous
+    ///     recomputation using <see cref="ProvenanceChainEnvelope" />.
+    /// </summary>
+    /// <param name="recordId">The ID of the record whose provenance chain is being verified</param>
+    /// <param name="checkpointRecordId">
+    ///     (Optional) A previously-verified provenance record ID to resume verification from,
+    ///     instead of walking the whole chain from genesis. Its stored chain hash is trusted as
+    ///     the starting previous-hash; only later records in the same record's chain are checked.
+    /// </param>
+    /// <returns>A report describing whether the chain (or the portion after the checkpoint) is intact</returns>
+    /// <exception cref="KeyNotFoundException">Thrown if no matching record is found</exception>
+    /// <exception cref="InvalidRequestException">
+    ///     Thrown if <paramref name="checkpointRecordId" /> doesn't reference a chained provenance
+    ///     record belonging to <paramref name="recordId" />
+    /// </exception>
+    public async Task<ProvenanceChainVerificationResponseDto> VerifyProvenanceChain(
+        long recordId, long? checkpointRecordId = null)
+    {
+        var recordExists = await _context.Records.AnyAsync(r => r.Id == recordId);
+        if (!recordExists)
+            throw new KeyNotFoundException($"Record with id {recordId} not found");
+
+        var previousHash = ProvenanceChainEnvelope.GenesisHash;
+        var query = _context.ProvenanceRecords
+            .Where(p => p.RecordId == recordId && p.ChainHash != null);
+
+        if (checkpointRecordId is not null)
+        {
+            var checkpoint = await _context.ProvenanceRecords
+                .FirstOrDefaultAsync(p => p.Id == checkpointRecordId);
+
+            if (checkpoint is null || checkpoint.RecordId != recordId || checkpoint.ChainHash is null)
+                throw new InvalidRequestException(
+                    $"Checkpoint provenance record {checkpointRecordId} is not a chained record for record {recordId}");
+
+            previousHash = checkpoint.ChainHash;
+            query = query.Where(p => p.Id > checkpoint.Id);
+        }
+
+        var chain = await query.OrderBy(p => p.Id).ToListAsync();
+
+        var response = new ProvenanceChainVerificationResponseDto
+        {
+            RecordId = recordId,
+            CheckpointRecordId = checkpointRecordId,
+            IsValid = true
+        };
+
+        foreach (var row in chain)
+        {
+            var expectedChainHash = ProvenanceChainEnvelope.HashBase64(row, previousHash);
+
+            if (row.PreviousHash != previousHash || expectedChainHash != row.ChainHash)
+            {
+                response.IsValid = false;
+                response.FirstInvalidProvenanceRecordId = row.Id;
+                response.ExpectedChainHash = expectedChainHash;
+                response.ActualChainHash = row.ChainHash;
+                response.Message =
+                    $"Chain verification failed at provenance record {row.Id}: stored hash does not " +
+                    "match the recomputed value";
+                return response;
+            }
+
+            previousHash = row.ChainHash!;
+            response.RecordsVerified++;
+        }
+
+        response.Message = response.RecordsVerified == 0
+            ? $"No chained provenance records exist for record {recordId}"
+            : $"Chain verified: {response.RecordsVerified} record(s), no tampering detected";
+        return response;
     }
 
     /// <summary>
