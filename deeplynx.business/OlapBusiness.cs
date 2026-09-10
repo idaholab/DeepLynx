@@ -1089,6 +1089,17 @@ public class OlapBusiness : IOlapBusiness
                 await cmd.ExecuteNonQueryAsync();
             }
 
+            // The default Azure SDK transport adapter doesn't reliably pick up this
+            // container's CA trust store, causing TLS failures behind our intercepting
+            // proxy even though the same certs work fine for the regular Azure SDK
+            // client. The curl adapter searches standard cert bundle paths and honors
+            // CURL_CA_INFO/CURL_CA_PATH (set in the Dockerfiles).
+            await using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SET azure_transport_option_type = 'curl';";
+                await cmd.ExecuteNonQueryAsync();
+            }
+
             // Create a secret for Azure authentication
             var secretName = $"azure_secret_{Guid.NewGuid():N}";
 
