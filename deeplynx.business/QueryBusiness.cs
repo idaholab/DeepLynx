@@ -190,7 +190,7 @@ public class QueryBusiness : IQueryBusiness
                     }
                     else if (query.Operator == "=")
                     {
-                        condition = $"qr.{query.Filter} = @{paramName}";
+                        condition = $"qr.{query.Filter}::text = @{paramName}";
                         parameters.Add(new NpgsqlParameter(paramName, query.Value));
                     }
                     else if (query.Operator == ">")
