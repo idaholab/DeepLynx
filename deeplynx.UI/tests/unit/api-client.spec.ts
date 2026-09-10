@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { AxiosError } from "axios";
+import { AxiosError, type AxiosAdapter } from "axios";
 import api from "@/app/lib/client_service/api";
 
 const originalAuthDisabled =
@@ -46,7 +46,7 @@ test("adds the session token and deduplicates concurrent session requests", asyn
   };
 
   const authorizationHeaders: Array<string | undefined> = [];
-  const adapter = async (config: Parameters<NonNullable<typeof api.defaults.adapter>>[0]) => {
+  const adapter: AxiosAdapter = async (config) => {
     authorizationHeaders.push(config.headers.get("Authorization")?.toString());
     return {
       data: null,
