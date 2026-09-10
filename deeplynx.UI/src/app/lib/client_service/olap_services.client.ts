@@ -1,7 +1,7 @@
 // src/app/lib/client_service/olap_services.client.ts
 "use client";
 
-import { OlapPlotData, OlapPlotResponse } from "@/app/(home)/types/olap_types";
+import { OlapPlotData } from "@/app/(home)/types/olap_types";
 import { HistoricalRecordResponseDto, PaginatedResponse } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
@@ -27,11 +27,11 @@ export async function getPlotData(
         searchParams.append("limit", limit.toString());
         searchParams.append("rowStride", rowStride.toString());
 
-        const res = await api.get<OlapPlotResponse>(
+        const res = await api.get(
             `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/olap/plot?${searchParams.toString()}`
         );
 
-        return res.data.plotData;
+        return res.data;
     } catch (error) {
         console.error("Error fetching plot data:", error);
         throw error;
