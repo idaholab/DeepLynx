@@ -78,6 +78,8 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<SensitivityLabel> SensitivityLabels { get; set; }
 
     public virtual DbSet<SensitivityLabelPermission> SensitivityLabelPermissions { get; set; }
+    
+    public virtual DbSet<SensitivityLabelPermissionAction> SensitivityLabelPermissionActions { get; set; }
 
     public virtual DbSet<UserSensitivityLabel> UserSensitivityLabels { get; set; }
 
@@ -1387,6 +1389,14 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.Label).WithMany(p => p.SensitivityLabelPermissions)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("sensitivity_label_permissions_label_id_fkey");
+        });
+
+        modelBuilder.Entity<SensitivityLabelPermissionAction>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("sensitivity_label_permission_actions_pkey");
+            
+            entity.HasIndex(e => e.Id)
+                .HasDatabaseName("idx_sensitivity_label_permission_actions_id");
         });
 
         modelBuilder.Entity<UserSensitivityLabel>(entity =>
