@@ -22,6 +22,7 @@ public class SensitivityLabelProjectControllerTests : IDisposable
 {
     private readonly Mock<ISensitivityLabelBusiness> _mockSensitivityLabelBusiness;
     private readonly Mock<IUserSensitivityLabelBusiness> _mockUserSensitivityLabelBusiness;
+    private readonly Mock<IGroupSensitivityLabelBusiness> _mockGroupSensitivityLabelBusiness;
     private readonly Mock<ILogger<SensitivityLabelProjectController>> _mockLogger;
     private readonly SensitivityLabelProjectController _sensitivityLabelProjectController;
 
@@ -34,11 +35,13 @@ public class SensitivityLabelProjectControllerTests : IDisposable
     {
         _mockSensitivityLabelBusiness = new Mock<ISensitivityLabelBusiness>();
         _mockUserSensitivityLabelBusiness = new Mock<IUserSensitivityLabelBusiness>();
+        _mockGroupSensitivityLabelBusiness = new Mock<IGroupSensitivityLabelBusiness>();
         _mockLogger = new Mock<ILogger<SensitivityLabelProjectController>>();
 
         _sensitivityLabelProjectController = new SensitivityLabelProjectController(
             _mockSensitivityLabelBusiness.Object,
             _mockUserSensitivityLabelBusiness.Object,
+            _mockGroupSensitivityLabelBusiness.Object,
             _mockLogger.Object);
 
         UserContextStorage.UserId = UserId;

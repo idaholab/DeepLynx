@@ -521,7 +521,6 @@ public class FileController : ControllerBase
     public async Task<IActionResult> CreateUploadTus(
         long organizationId,
         long projectId,
-        long userId,
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId)
     {
@@ -535,7 +534,11 @@ public class FileController : ControllerBase
             !long.TryParse(uploadLengthHeader, out var uploadLength))
             return BadRequest("Missing or invalid Upload-Length header");
 
-        if (!Request.Headers.TryGetValue("Upload-Metadata", out var uploadMetadata))
+        if (!Request.Headers.TryGetValue("Upload-Metadata", out var uploadMetadataHeader))
+            return BadRequest("Missing Upload-Metadata header");
+
+        var uploadMetadata = uploadMetadataHeader.ToString();
+        if (string.IsNullOrWhiteSpace(uploadMetadata))
             return BadRequest("Missing Upload-Metadata header");
 
         var fileName = ParseMetadataValue(uploadMetadata, "filename");
@@ -613,7 +616,6 @@ public class FileController : ControllerBase
         long organizationId,
         long projectId,
         string uploadId,
-        long userId,
         [FromQuery] long? dataSourceId,
         [FromQuery] long? objectStorageId)
     {
@@ -631,8 +633,9 @@ public class FileController : ControllerBase
             contentType != "application/offset+octet-stream")
             return StatusCode(415);
 
+        var currentUserId = UserContextStorage.UserId;
         var newOffset = await _fileBusiness.UploadPartTus(
-            organizationId, projectId, dataSourceId, objectStorageId, uploadId, uploadOffset, userId, Request.Body, null, null, false, null, null);
+            organizationId, projectId, dataSourceId, objectStorageId, uploadId, uploadOffset, currentUserId, Request.Body, null, null, false, null, null);
 
         Response.Headers["Tus-Resumable"] = "1.0.0";
         Response.Headers["Upload-Offset"] = newOffset.ToString();
@@ -644,7 +647,7 @@ public class FileController : ControllerBase
     /// <summary>
     /// Cancel Resumable Upload
     /// </summary>
-    /// <remarks>Cancels a resumable upload with tus protocol reponse.</remarks>
+    /// <remarks>Cancels a resumable upload with tus protocol response.</remarks>
     /// <param name="organizationId"></param>
     /// <param name="projectId"></param>
     /// <param name="uploadId"></param>
@@ -675,7 +678,7 @@ public class FileController : ControllerBase
     }
 
     //Private helper
-    private string ParseMetadataValue(string uploadMetadata, string key)
+    private static string? ParseMetadataValue(string uploadMetadata, string key)
     {
         foreach (var pair in uploadMetadata.Split(','))
         {

@@ -68,7 +68,7 @@ public class LatticeExtractionControllerTests : IDisposable
             .Setup(b => b.ListExtractionsByProjectPaginated(ProjectId, It.IsAny<PaginatedRequestDto>()))
             .ReturnsAsync(expected);
 
-        var actionResult = await _controller.ListExtractions(OrgId, ProjectId);
+        var actionResult = await _controller.ListExtractions(ProjectId);
 
         var result = Assert.IsType<OkObjectResult>(actionResult);
         Assert.Same(expected, result.Value);
@@ -212,7 +212,7 @@ public class LatticeExtractionControllerTests : IDisposable
             .ThrowsAsync(new Exception("database unavailable"));
 
         await Assert.ThrowsAsync<Exception>(
-            () => _controller.ListExtractions(OrgId, ProjectId));
+            () => _controller.ListExtractions(ProjectId));
     }
 
     [Fact]

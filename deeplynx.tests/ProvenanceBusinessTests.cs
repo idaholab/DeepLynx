@@ -1,9 +1,11 @@
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers.exceptions;
 using deeplynx.models;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using Pgvector.EntityFrameworkCore;
 using Pgvector.Npgsql;
 
@@ -427,6 +429,161 @@ public class ProvenanceBusinessTests : IntegrationTestBase
 
         Assert.Equal(2, history.Items.Count);
         Assert.Equal(2, history.TotalCount);
+    }
+
+    #endregion
+
+    // =========================================================================
+    // VerifyProvenanceChain Tests
+    // =========================================================================
+
+    #region VerifyProvenanceChain Tests
+
+    /// <summary>
+    ///     provenance_records is append-only (block_provenance_mutation_trigger). Bypassing it
+    ///     with session_replication_role, exactly like IntegrationTestBase.CleanDatabaseAsync and
+    ///     ProvenanceImmutabilityTests do, is the only way to simulate tampering for these tests.
+    ///     The column name is only ever a hardcoded literal from a call site below (never user
+    ///     input), so it's safe to splice directly; the new value is passed as a real parameter.
+    /// </summary>
+    private async Task TamperProvenanceRecordAsync(long provenanceRecordId, string column, string newValue)
+    {
+        await using var transaction = await Context.Database.BeginTransactionAsync();
+        await Context.Database.ExecuteSqlRawAsync("SET session_replication_role = replica;");
+        await Context.Database.ExecuteSqlRawAsync(
+            $"UPDATE deeplynx.provenance_records SET {column} = @newValue WHERE id = @id",
+            new NpgsqlParameter("@newValue", newValue),
+            new NpgsqlParameter("@id", provenanceRecordId));
+        await Context.Database.ExecuteSqlRawAsync("SET session_replication_role = DEFAULT;");
+        await transaction.CommitAsync();
+        Context.ChangeTracker.Clear();
+    }
+
+    [Fact]
+    public async Task VerifyProvenanceChain_Throws_WhenRecordNotFound()
+    {
+        var ex = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _provenanceBusiness.VerifyProvenanceChain(999999L));
+
+        Assert.Contains("Record with id 999999 not found", ex.Message);
+    }
+
+    [Fact]
+    public async Task VerifyProvenanceChain_ReturnsValid_WithNoChainedHistory()
+    {
+        var result = await _provenanceBusiness.VerifyProvenanceChain(rid);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(0, result.RecordsVerified);
+        Assert.Contains($"No chained provenance records exist for record {rid}", result.Message);
+    }
+
+    [Fact]
+    public async Task VerifyProvenanceChain_ReturnsValid_ForUntamperedChain()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "update-record", uid, null);
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "update-record", uid, null);
+
+        var result = await _provenanceBusiness.VerifyProvenanceChain(rid);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(3, result.RecordsVerified);
+        Assert.Null(result.FirstInvalidProvenanceRecordId);
+    }
+
+    [Fact]
+    public async Task VerifyProvenanceChain_VerifiesFromGenesis_ForFirstRecord()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        var first = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid);
+
+        Assert.Equal(ProvenanceChainEnvelope.GenesisHash, first.PreviousHash);
+
+        var result = await _provenanceBusiness.VerifyProvenanceChain(rid);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(1, result.RecordsVerified);
+    }
+
+    [Fact]
+    public async Task VerifyProvenanceChain_DetectsTampering_WhenChainHashAltered()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "update-record", uid, null);
+        var records = await Context.ProvenanceRecords.OrderBy(p => p.Id).ToListAsync();
+        var target = records[0];
+        var originalChainHash = target.ChainHash!;
+
+        await TamperProvenanceRecordAsync(target.Id, "chain_hash", "tampered-chain-hash");
+
+        var result = await _provenanceBusiness.VerifyProvenanceChain(rid);
+
+        Assert.False(result.IsValid);
+        Assert.Equal(target.Id, result.FirstInvalidProvenanceRecordId);
+        Assert.Equal("tampered-chain-hash", result.ActualChainHash);
+        Assert.Equal(originalChainHash, result.ExpectedChainHash);
+    }
+
+    [Fact]
+    public async Task VerifyProvenanceChain_DetectsTampering_WhenEnvelopeContentAltered()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        var target = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid);
+
+        await TamperProvenanceRecordAsync(target.Id, "file_content_hash", "tampered-file-hash");
+
+        var result = await _provenanceBusiness.VerifyProvenanceChain(rid);
+
+        Assert.False(result.IsValid);
+        Assert.Equal(target.Id, result.FirstInvalidProvenanceRecordId);
+        Assert.Equal(target.ChainHash, result.ActualChainHash);
+        Assert.NotEqual(result.ActualChainHash, result.ExpectedChainHash);
+    }
+
+    [Fact]
+    public async Task VerifyProvenanceChain_ResumesFromCheckpoint_SkippingEarlierRecords()
+    {
+        for (var i = 0; i < 4; i++)
+            await _provenanceBusiness.CreateProvenanceRecord(rid, "update-record", uid, null);
+
+        var records = await Context.ProvenanceRecords.OrderBy(p => p.Id).ToListAsync();
+        var checkpoint = records[1];
+
+        var result = await _provenanceBusiness.VerifyProvenanceChain(rid, checkpoint.Id);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(2, result.RecordsVerified);
+        Assert.Equal(checkpoint.Id, result.CheckpointRecordId);
+    }
+
+    [Fact]
+    public async Task VerifyProvenanceChain_Throws_WhenCheckpointBelongsToDifferentRecord()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        await _provenanceBusiness.CreateProvenanceRecord(rid2, "create-record", uid, null);
+        var otherChainRecord = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid2);
+
+        var ex = await Assert.ThrowsAsync<InvalidRequestException>(() =>
+            _provenanceBusiness.VerifyProvenanceChain(rid, otherChainRecord.Id));
+
+        Assert.Contains($"Checkpoint provenance record {otherChainRecord.Id}", ex.Message);
+    }
+
+    [Fact]
+    public async Task VerifyProvenanceChain_IgnoresOtherRecordsChain()
+    {
+        await _provenanceBusiness.CreateProvenanceRecord(rid, "create-record", uid, null);
+        await _provenanceBusiness.CreateProvenanceRecord(rid2, "create-record", uid, null);
+        var ridRecord = await Context.ProvenanceRecords.FirstAsync(p => p.RecordId == rid);
+
+        await TamperProvenanceRecordAsync(ridRecord.Id, "chain_hash", "tampered-chain-hash");
+
+        var ridResult = await _provenanceBusiness.VerifyProvenanceChain(rid);
+        var rid2Result = await _provenanceBusiness.VerifyProvenanceChain(rid2);
+
+        Assert.False(ridResult.IsValid);
+        Assert.True(rid2Result.IsValid);
     }
 
     #endregion

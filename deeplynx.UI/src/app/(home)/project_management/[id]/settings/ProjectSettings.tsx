@@ -43,7 +43,7 @@ import RemoveLogoModal from "./components/RemoveLogoModal";
 import { useLanguage } from "@/app/contexts/Language";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { isInsightHidden } from "@/app/lib/feature_flags";
-import { uuidv4 } from "zod";
+import { v4 as uuidv4 } from 'uuid';
 
 interface ProjectSettingsProps {
   project: ProjectResponseDto | null;

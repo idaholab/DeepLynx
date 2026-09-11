@@ -1089,6 +1089,14 @@ public class OlapBusiness : IOlapBusiness
                 await cmd.ExecuteNonQueryAsync();
             }
 
+            // The default DuckDB Azure SDK transport has trouble using our SSL certs, need to switch to curl
+            // to allow connection to our blob storage. See https://duckdb.org/docs/current/core_extensions/azure
+            await using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SET azure_transport_option_type = 'curl';";
+                await cmd.ExecuteNonQueryAsync();
+            }
+
             // Create a secret for Azure authentication
             var secretName = $"azure_secret_{Guid.NewGuid():N}";
 

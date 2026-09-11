@@ -6322,4 +6322,371 @@ public class RecordBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region Record Count Cache Invalidation Tests
+
+    private static async Task SeedRecordCountCacheSentinels(long organizationId, long projectId)
+    {
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectRecordCount(projectId, true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectRecordCount(projectId, false), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationRecordCount(organizationId, true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationRecordCount(organizationId, false), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.SystemRecordCount(true), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.SystemRecordCount(false), 999, (TimeSpan?)null);
+    }
+
+    private static async Task AssertAllRecordCountCacheKeysCleared(long organizationId, long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectRecordCount(projectId, true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectRecordCount(projectId, false)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationRecordCount(organizationId, true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationRecordCount(organizationId, false)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.SystemRecordCount(true)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.SystemRecordCount(false)));
+    }
+
+    [Fact]
+    public async Task CreateRecord_InvalidatesRecordCountCache()
+    {
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Cache Invalidation Test Record",
+            Description = "Verifies record count cache invalidation on create",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "cache-invalidation-create"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        await AssertAllRecordCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_InvalidatesRecordCountCache()
+    {
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Cache Invalidation 1",
+                Description = "Bulk create cache invalidation test",
+                OriginalId = "bulk-cache-invalidation-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "Bulk Cache Invalidation 2",
+                Description = "Bulk create cache invalidation test",
+                OriginalId = "bulk-cache-invalidation-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+
+        await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+
+        await AssertAllRecordCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task DeleteRecord_InvalidatesRecordCountCache()
+    {
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid);
+
+        await AssertAllRecordCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_InvalidatesRecordCountCache()
+    {
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+
+        await AssertAllRecordCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task UnarchiveRecord_InvalidatesRecordCountCache()
+    {
+        var record = await Context.Records.FindAsync(rid);
+        record!.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        await _recordBusiness.UnarchiveRecord(uid, organizationId, pid, rid);
+
+        await AssertAllRecordCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task CreateRecord_DoesNotInvalidateUnrelatedProjectsCache()
+    {
+        var pid2Key = CacheKeys.ProjectRecordCount(pid2, true);
+        await CacheService.Instance.SetAsync(pid2Key, 999, (TimeSpan?)null);
+        await SeedRecordCountCacheSentinels(organizationId, pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Scoped Invalidation Test",
+            Description = "Only pid's project cache should clear, not pid2's",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "scoped-invalidation-test"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // pid's own project-scope key is cleared
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectRecordCount(pid, true)));
+        
+        Assert.Equal(999, await CacheService.Instance.GetAsync<int?>(pid2Key));
+    }
+
+    #endregion
+    
+    #region Data Modality Count Cache Invalidation Tests
+
+    private static async Task SeedModalityCountCacheSentinels(long organizationId, long projectId)
+    {
+        await CacheService.Instance.SetAsync(CacheKeys.ProjectModalityCount(projectId), 999, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(CacheKeys.OrganizationModalityCount(organizationId), 999, (TimeSpan?)null);
+    }
+
+    private static async Task AssertAllModalityCountCacheKeysCleared(long organizationId, long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectModalityCount(projectId)));
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.OrganizationModalityCount(organizationId)));
+    }
+
+    [Fact]
+    public async Task CreateRecord_InvalidatesModalityCountCache()
+    {
+        await SeedModalityCountCacheSentinels(organizationId, pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Modality Cache Invalidation Test Record",
+            Description = "Verifies modality count cache invalidation on create",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "modality-cache-invalidation-create",
+            FileType = "png"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        await AssertAllModalityCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_InvalidatesModalityCountCache()
+    {
+        await SeedModalityCountCacheSentinels(organizationId, pid);
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Modality Cache Invalidation 1",
+                Description = "Bulk create modality cache invalidation test",
+                OriginalId = "bulk-modality-cache-invalidation-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!,
+                FileType = "csv"
+            },
+            new()
+            {
+                Name = "Bulk Modality Cache Invalidation 2",
+                Description = "Bulk create modality cache invalidation test",
+                OriginalId = "bulk-modality-cache-invalidation-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!,
+                FileType = "json"
+            }
+        };
+
+        await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+
+        await AssertAllModalityCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task UpdateRecord_InvalidatesModalityCountCache_WhenFileTypeChanges()
+    {
+        await SeedModalityCountCacheSentinels(organizationId, pid);
+
+        var dto = new UpdateRecordRequestDto
+        {
+            FileType = "webp"
+        };
+
+        await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
+
+        await AssertAllModalityCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task DeleteRecord_InvalidatesModalityCountCache()
+    {
+        await SeedModalityCountCacheSentinels(organizationId, pid);
+
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid);
+
+        await AssertAllModalityCountCacheKeysCleared(organizationId, pid);
+    }
+
+    [Fact]
+    public async Task CreateRecord_DoesNotInvalidateUnrelatedProjectsModalityCache()
+    {
+        var pid2Key = CacheKeys.ProjectModalityCount(pid2);
+        await CacheService.Instance.SetAsync(pid2Key, 999, (TimeSpan?)null);
+        await SeedModalityCountCacheSentinels(organizationId, pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Scoped Modality Invalidation Test",
+            Description = "Only pid's project cache should clear, not pid2's",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "scoped-modality-invalidation-test",
+            FileType = "png"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // pid's own project-scope key is cleared
+        Assert.Null(await CacheService.Instance.GetAsync<int?>(CacheKeys.ProjectModalityCount(pid)));
+
+        // pid2's key is untouched — the invalidation is scoped to the mutated project only
+        Assert.Equal(999, await CacheService.Instance.GetAsync<int?>(pid2Key));
+    }
+
+    #endregion
+    
+    #region Project Stats Cache Invalidation Tests
+
+    private static async Task SeedProjectStatsCacheSentinel(long projectId)
+    {
+        await CacheService.Instance.SetAsync(
+            CacheKeys.ProjectStats(projectId),
+            new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 },
+            (TimeSpan?)null);
+    }
+
+    private static async Task AssertProjectStatsCacheCleared(long projectId)
+    {
+        Assert.Null(await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(CacheKeys.ProjectStats(projectId)));
+    }
+
+    [Fact]
+    public async Task CreateRecord_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Project Stats Cache Invalidation Test Record",
+            Description = "Verifies project stats cache invalidation on create",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "project-stats-cache-invalidation-create"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task BulkCreateRecords_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var records = new List<CreateRecordRequestDto>
+        {
+            new()
+            {
+                Name = "Bulk Project Stats Cache Invalidation 1",
+                Description = "Bulk create project stats cache invalidation test",
+                OriginalId = "bulk-project-stats-cache-invalidation-1",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value1" }))!
+            },
+            new()
+            {
+                Name = "Bulk Project Stats Cache Invalidation 2",
+                Description = "Bulk create project stats cache invalidation test",
+                OriginalId = "bulk-project-stats-cache-invalidation-2",
+                Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value2" }))!
+            }
+        };
+
+        await _recordBusiness.BulkCreateRecords(uid, organizationId, pid, did, records);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task ArchiveRecord_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task UnarchiveRecord_InvalidatesProjectStatsCache()
+    {
+        var record = await Context.Records.FindAsync(rid);
+        record!.IsArchived = true;
+        await Context.SaveChangesAsync();
+
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _recordBusiness.UnarchiveRecord(uid, organizationId, pid, rid);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task DeleteRecord_InvalidatesProjectStatsCache()
+    {
+        await SeedProjectStatsCacheSentinel(pid);
+
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid);
+
+        await AssertProjectStatsCacheCleared(pid);
+    }
+
+    [Fact]
+    public async Task CreateRecord_DoesNotInvalidateUnrelatedProjectsStatsCache()
+    {
+        var pid2Key = CacheKeys.ProjectStats(pid2);
+        var pid2Sentinel = new ProjectStatResponseDto { classes = 999, records = 999, datasources = 999 };
+        await CacheService.Instance.SetAsync(pid2Key, pid2Sentinel, (TimeSpan?)null);
+        await SeedProjectStatsCacheSentinel(pid);
+
+        var dto = new CreateRecordRequestDto
+        {
+            Name = "Scoped Project Stats Invalidation Test",
+            Description = "Only pid's stats cache should clear, not pid2's",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { TestProp = "Value" }))!,
+            OriginalId = "scoped-project-stats-invalidation-test"
+        };
+
+        await _recordBusiness.CreateRecord(uid, organizationId, pid, did, dto);
+
+        // pid's own stats cache is cleared
+        await AssertProjectStatsCacheCleared(pid);
+
+        // pid2's cache is untouched — invalidation is scoped to the mutated project only
+        var pid2Cached = await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(pid2Key);
+        Assert.NotNull(pid2Cached);
+        Assert.Equal(999, pid2Cached.classes);
+    }
+
+    #endregion
+
 }

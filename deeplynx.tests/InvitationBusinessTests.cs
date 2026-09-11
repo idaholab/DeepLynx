@@ -642,16 +642,18 @@ public class InvitationBusinessTests : IntegrationTestBase
         var result = await _invitationBusiness.CreateAndAddServiceAccountToProject(oid, pid, "My Service Account", rid);
 
         // Assert
-        Assert.True(result);
+        Assert.NotNull(result);
+        Assert.Equal("My Service Account", result.Name);
+        Assert.Equal(AccountType.Service, result.AccountType);
+        Assert.StartsWith("service_", result.Email);
+        Assert.StartsWith("service_", result.Username);
 
         var serviceAccount = await Context.Users
-            .FirstOrDefaultAsync(u => u.Name == "My Service Account" && u.AccountType == AccountType.Service);
+            .FirstOrDefaultAsync(u => u.Id == result.Id);
         Assert.NotNull(serviceAccount);
-        Assert.StartsWith("service_", serviceAccount.Email);
-        Assert.StartsWith("service_", serviceAccount.Username);
 
         var projectMember = await Context.ProjectMembers
-            .FirstOrDefaultAsync(pm => pm.UserId == serviceAccount.Id && pm.ProjectId == pid);
+            .FirstOrDefaultAsync(pm => pm.UserId == result.Id && pm.ProjectId == pid);
         Assert.NotNull(projectMember);
         Assert.Equal(rid, projectMember.RoleId);
     }
@@ -664,14 +666,12 @@ public class InvitationBusinessTests : IntegrationTestBase
             oid, pid, "Admin Service Account", rid, makeProjectAdmin: true);
 
         // Assert
-        Assert.True(result);
-
-        var serviceAccount = await Context.Users
-            .FirstOrDefaultAsync(u => u.Name == "Admin Service Account" && u.AccountType == AccountType.Service);
-        Assert.NotNull(serviceAccount);
+        Assert.NotNull(result);
+        Assert.Equal("Admin Service Account", result.Name);
+        Assert.Equal(AccountType.Service, result.AccountType);
 
         var projectMember = await Context.ProjectMembers
-            .FirstOrDefaultAsync(pm => pm.UserId == serviceAccount.Id && pm.ProjectId == pid);
+            .FirstOrDefaultAsync(pm => pm.UserId == result.Id && pm.ProjectId == pid);
         Assert.NotNull(projectMember);
         Assert.True(projectMember.IsProjectAdmin);
     }

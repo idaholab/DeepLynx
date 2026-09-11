@@ -923,6 +923,54 @@ namespace deeplynx.datalayer.Migrations
                     b.ToTable("groups", "deeplynx");
                 });
 
+            modelBuilder.Entity("deeplynx.datalayer.Models.GroupSensitivityLabel", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("GrantedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("granted_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long?>("GrantedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("granted_by");
+
+                    b.Property<long>("GroupId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("group_id");
+
+                    b.Property<long>("LabelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("label_id");
+
+                    b.HasKey("Id")
+                        .HasName("group_sensitivity_labels_pkey");
+
+                    b.HasIndex("GrantedBy");
+
+                    b.HasIndex("GroupId")
+                        .HasDatabaseName("idx_group_sensitivity_labels_group_id");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("idx_group_sensitivity_labels_id");
+
+                    b.HasIndex("LabelId")
+                        .HasDatabaseName("idx_group_sensitivity_labels_label_id");
+
+                    b.HasIndex("GroupId", "LabelId")
+                        .IsUnique()
+                        .HasDatabaseName("unique_group_sensitivity_label");
+
+                    b.ToTable("group_sensitivity_labels", "deeplynx");
+                });
+
             modelBuilder.Entity("deeplynx.datalayer.Models.HistoricalEdge", b =>
                 {
                     b.Property<long>("Id")
@@ -3427,6 +3475,35 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("deeplynx.datalayer.Models.GroupSensitivityLabel", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.User", "GrantedByUser")
+                        .WithMany("GrantedGroupSensitivityLabels")
+                        .HasForeignKey("GrantedBy")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("group_sensitivity_labels_granted_by_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.Group", "Group")
+                        .WithMany("GroupSensitivityLabels")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("group_sensitivity_labels_group_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.SensitivityLabel", "Label")
+                        .WithMany("GroupSensitivityLabels")
+                        .HasForeignKey("LabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("group_sensitivity_labels_label_id_fkey");
+
+                    b.Navigation("GrantedByUser");
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Label");
+                });
+
             modelBuilder.Entity("deeplynx.datalayer.Models.HistoricalEdge", b =>
                 {
                     b.HasOne("deeplynx.datalayer.Models.Edge", "Edge")
@@ -4110,6 +4187,8 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.Group", b =>
                 {
+                    b.Navigation("GroupSensitivityLabels");
+
                     b.Navigation("ProjectMembers");
                 });
 
@@ -4236,6 +4315,8 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabel", b =>
                 {
+                    b.Navigation("GroupSensitivityLabels");
+
                     b.Navigation("SensitivityLabelPermissions");
 
                     b.Navigation("UserSensitivityLabels");
@@ -4246,6 +4327,8 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("ApiKeys");
 
                     b.Navigation("CreatedApiKeys");
+
+                    b.Navigation("GrantedGroupSensitivityLabels");
 
                     b.Navigation("GrantedUserSensitivityLabels");
 

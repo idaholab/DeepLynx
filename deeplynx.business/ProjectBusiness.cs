@@ -38,6 +38,7 @@ public class ProjectBusiness : IProjectBusiness
     private readonly INotificationBusiness _notificationBusiness;
     private readonly IOrganizationBusiness _organizationBusiness;
     private readonly IRoleBusiness _roleBusiness;
+    private readonly TimeSpan _projectStatsCacheTtl = TimeSpan.FromHours(1);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ProjectBusiness" /> class.
@@ -953,6 +954,24 @@ public class ProjectBusiness : IProjectBusiness
     /// <returns>A list of project stats</returns>
     public async Task<ProjectStatResponseDto> GetProjectStats(long organizationId, long projectId)
     {
+        // Check cache before querying db
+        string cacheKey = CacheKeys.ProjectStats(projectId);
+        ProjectStatResponseDto? cachedStats = null;
+
+        try
+        {
+            cachedStats = await CacheService.Instance.GetAsync<ProjectStatResponseDto?>(cacheKey);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Project stats cache read failed for project {ProjectId}", projectId);
+        }
+
+        if (cachedStats != null)
+        {
+            return cachedStats;
+        }
+
         var classes = await _context.Classes
             .Where(p => !p.IsArchived && p.ProjectId == projectId && p.OrganizationId == organizationId)
             .CountAsync();
@@ -965,12 +984,24 @@ public class ProjectBusiness : IProjectBusiness
             .Where(p => !p.IsArchived && p.ProjectId == projectId && p.OrganizationId == organizationId)
             .CountAsync();
 
-        return new ProjectStatResponseDto
+        var projectStats = new ProjectStatResponseDto
         {
             classes = classes,
             records = records,
             datasources = datasources
         };
+        
+        // Set the cache
+        try
+        {
+            await CacheService.Instance.SetAsync(cacheKey, projectStats, _projectStatsCacheTtl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Project stats cache write failed for project {ProjectId}", projectId);
+        }
+
+        return projectStats;
     }
 
 
@@ -1513,6 +1544,21 @@ public class ProjectBusiness : IProjectBusiness
                     _logger.LogWarning(ex, "Cache overwrite failed for user {UserId}, project {ProjectId}", memberId, projectId);
                 }
             }
+        }
+    }
+    
+    /// <summary>
+    ///     Used for invalidating the cached project stats on mutation.
+    /// </summary>
+    public static async Task InvalidateProjectStatsCache(long projectId, ILogger? logger)
+    {
+        try
+        {
+            await CacheService.Instance.DeleteAsync(CacheKeys.ProjectStats(projectId));
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Cache project stats invalidation failed for project {ProjectId}", projectId);
         }
     }
 }

@@ -20,7 +20,7 @@ export interface StagedRecordDTO {
   deeplynx_record_id: number | null;
   promoted_id: number | null;
   rejected: boolean;
-
+  extraction_class_id: number | null;
 }
 
 export interface StagedRelationshipDTO {
@@ -45,7 +45,8 @@ export interface StagedEdgeDTO {
   frequency: number;
   promoted_id: number | null;
   rejected: boolean;
-
+  origin_record_id: number | null;
+  destination_record_id: number | null;
 }
 
 export interface ExtractionListItemDTO {
@@ -61,6 +62,7 @@ export interface ExtractionStagingResponseDTO {
   id: number;
   status: string;
   mode: string | null;
+  properties: string | null
   failure_message: string | null;
   record_id: number | null;
   created_by: number | null;
