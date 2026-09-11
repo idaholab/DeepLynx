@@ -47,7 +47,7 @@ public class InsightBusiness : IInsightBusiness
     ///     Fires an upload request to Insight and returns immediately.
     ///     Insight manages its own RabbitMQ queue internally, so embedding progress
     ///     can be tracked via <see cref="FetchInsightIngestionStatus"/> without blocking the caller.
-    ///     Maps to POST /upload_document.
+    ///     Maps to POST /upload.
     /// </summary>
     /// <param name="currentUserId">The ID of the user making the request. Used to resolve model tokens when required.</param>
     /// <param name="organizationId">The ID of the organization. Used to scope model config resolution.</param>
@@ -60,6 +60,7 @@ public class InsightBusiness : IInsightBusiness
     /// </param>
     /// <param name="payload">Upload dto from the caller containing file IDs and URIs.</param>
     /// <param name="userJwt">The requesting user's JWT used for forwarding to Insight</param>
+    /// <param name="isAdmin">Determines if the requesting user is admin in the system, org, or project scope</param>
     /// <exception cref="InvalidOperationException">Thrown when Insight returns a non-success status, or when a required token is missing.</exception>
     /// <exception cref="KeyNotFoundException">Thrown when a specified or default model config cannot be found.</exception>
     public async Task QueueInsightUpload(
@@ -69,7 +70,8 @@ public class InsightBusiness : IInsightBusiness
         long? vlmModelConfigId,
         long? embeddingModelConfigId,
         InsightUploadApiRequestDto payload,
-        string? userJwt = null)
+        string? userJwt = null,
+        bool isAdmin = false)
     {
         if (payload.FileInfo.Count == 0)
             throw new InvalidOperationException("Select at least one document to queue for Insight indexing.");
@@ -78,9 +80,8 @@ public class InsightBusiness : IInsightBusiness
         var embeddingConfig = await ResolveModelConfig(currentUserId, organizationId, projectId, embeddingModelConfigId, "embedding");
 
         var recordIds = payload.FileInfo.Select(f => f.FileId).ToList();
-
         var authorizedIds = await _sensitivityLabelService
-            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context);
+            .FilterAuthorizedRecordIds(currentUserId, organizationId, projectId, recordIds, _context, isAdmin);
 
         var authorizedFileInfo = payload.FileInfo
             .Where(f => authorizedIds.Contains(f.FileId))
