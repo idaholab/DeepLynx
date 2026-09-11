@@ -15,4 +15,7 @@ public partial class SensitivityLabelPermissionAction
  
     [Column("description")]
     public string? Description { get; set; }
+    
+    [InverseProperty("LabelPermission")]
+    public virtual ICollection<UserSensitivityLabel> UserSensitivityLabels { get; set; } = new List<UserSensitivityLabel>();
 }

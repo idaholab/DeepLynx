@@ -15,13 +15,16 @@ public partial class UserSensitivityLabel
 
     [Column("label_id")]
     public long LabelId { get; set; }
+    
+    [Column("label_permission_id")]
+    public long? LabelPermissionId { get; set; }
 
     [Column("granted_by")]
     public long? GrantedBy { get; set; }
 
     [Column("granted_at", TypeName = "timestamp without time zone")]
     public DateTime GrantedAt { get; set; }
-
+    
     [ForeignKey("UserId")]
     [InverseProperty("UserSensitivityLabels")]
     public virtual User User { get; set; } = null!;
@@ -29,6 +32,10 @@ public partial class UserSensitivityLabel
     [ForeignKey("LabelId")]
     [InverseProperty("UserSensitivityLabels")]
     public virtual SensitivityLabel Label { get; set; } = null!;
+    
+    [ForeignKey("LabelPermissionId")]
+    [InverseProperty("UserSensitivityLabels")]
+    public virtual SensitivityLabelPermissionAction LabelPermission { get; set; } = null!;
 
     [ForeignKey("GrantedBy")]
     [InverseProperty("GrantedUserSensitivityLabels")]

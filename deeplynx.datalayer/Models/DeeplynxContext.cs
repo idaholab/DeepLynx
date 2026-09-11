@@ -1411,8 +1411,11 @@ public partial class DeeplynxContext : DbContext
 
             entity.HasIndex(e => e.LabelId)
                 .HasDatabaseName("idx_user_sensitivity_labels_label_id");
+            
+            entity.HasIndex(e => e.LabelPermissionId)
+                .HasDatabaseName("idx_user_sensitivity_label_permission_actions_label_permission_id");
 
-            entity.HasIndex(e => new { e.UserId, e.LabelId })
+            entity.HasIndex(e => new { e.UserId, e.LabelId, e.LabelPermissionId })
                 .HasDatabaseName("unique_user_sensitivity_label")
                 .IsUnique();
 
@@ -1425,6 +1428,11 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.Label).WithMany(p => p.UserSensitivityLabels)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("user_sensitivity_labels_label_id_fkey");
+            
+            entity.HasOne(d => d.LabelPermission).WithMany(p => p.UserSensitivityLabels)
+                .HasForeignKey(d => d.LabelPermissionId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("user_sensitivity_labels_label_permission_id_fkey");
 
             entity.HasOne(d => d.GrantedByUser).WithMany(p => p.GrantedUserSensitivityLabels)
                 .HasForeignKey(d => d.GrantedBy)
