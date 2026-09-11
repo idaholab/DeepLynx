@@ -227,7 +227,22 @@ public class QueryBusiness : IQueryBusiness
                         else
                         {
                             condition = $"qr.{query.Filter}::text = @{paramName}";
-                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+
+                            if (DateTime.TryParse(query.Value, out var dateVal))
+                            {
+                                // Date columns are timestamps, so an exact-value match almost never
+                                // hits; treat "=" as "within this day" instead.
+                                var startOfDay = dateVal.Date;
+                                var startOfNextDay = dateVal.Date.AddDays(1);
+                                var paramName2 = $"p{parameters.Count + 1}";
+                                condition = $"qr.{query.Filter} >= @{paramName} AND qr.{query.Filter} < @{paramName2}";
+                                parameters.Add(new NpgsqlParameter(paramName, startOfDay));
+                                parameters.Add(new NpgsqlParameter(paramName2, startOfNextDay));
+                            }
+                            else
+                            {
+                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                            }
                         }
                     }
                     else if (query.Operator == ">")
