@@ -522,6 +522,125 @@ public class SensitivityLabelProjectControllerTests : IDisposable
     #endregion
 
     // =========================================================================
+    // GetUserPermissionsForLabel Tests
+    // =========================================================================
+
+    #region GetUserPermissionsForLabel Tests
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_Returns200_WithPermissions_WhenUserIdSupplied()
+    {
+        const long suppliedUserId = 20L;
+        IEnumerable<UserSensitivityLabelPermissionResponseDto> expected =
+            new List<UserSensitivityLabelPermissionResponseDto>();
+
+        _mockUserSensitivityLabelBusiness
+            .Setup(b => b.GetUserPermissionsForLabel(LabelId, suppliedUserId, OrgId, ProjectId))
+            .ReturnsAsync(expected);
+
+        var result = (await _sensitivityLabelProjectController.GetUserPermissionsForLabel(
+            ProjectId, LabelId, suppliedUserId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_Returns200_WithEmptyList()
+    {
+        _mockUserSensitivityLabelBusiness
+            .Setup(b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId))
+            .ReturnsAsync([]);
+
+        var result = (await _sensitivityLabelProjectController.GetUserPermissionsForLabel(
+            ProjectId, LabelId, null)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.IsAssignableFrom<IEnumerable<UserSensitivityLabelPermissionResponseDto>>(result.Value);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_ThrowsException_WhenBusinessThrows()
+    {
+        _mockUserSensitivityLabelBusiness
+            .Setup(b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() => _sensitivityLabelProjectController.GetUserPermissionsForLabel(
+            ProjectId, LabelId, null));
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_UsesCurrentUserId_WhenUserIdNotSupplied()
+    {
+        IEnumerable<UserSensitivityLabelPermissionResponseDto> expected =
+            new List<UserSensitivityLabelPermissionResponseDto>();
+
+        _mockUserSensitivityLabelBusiness
+            .Setup(b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId))
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelProjectController.GetUserPermissionsForLabel(ProjectId, LabelId, null);
+
+        _mockUserSensitivityLabelBusiness.Verify(
+            b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_UsesSuppliedUserId_InsteadOfCurrentUser()
+    {
+        const long suppliedUserId = 20L;
+        IEnumerable<UserSensitivityLabelPermissionResponseDto> expected =
+            new List<UserSensitivityLabelPermissionResponseDto>();
+
+        _mockUserSensitivityLabelBusiness
+            .Setup(b => b.GetUserPermissionsForLabel(LabelId, suppliedUserId, OrgId, ProjectId))
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelProjectController.GetUserPermissionsForLabel(ProjectId, LabelId, suppliedUserId);
+
+        _mockUserSensitivityLabelBusiness.Verify(
+            b => b.GetUserPermissionsForLabel(LabelId, suppliedUserId, OrgId, ProjectId),
+            Times.Once);
+        _mockUserSensitivityLabelBusiness.Verify(
+            b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_PassesOrganizationIdFromContextAndProjectIdFromRoute()
+    {
+        IEnumerable<UserSensitivityLabelPermissionResponseDto> expected =
+            new List<UserSensitivityLabelPermissionResponseDto>();
+
+        _mockUserSensitivityLabelBusiness
+            .Setup(b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId))
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelProjectController.GetUserPermissionsForLabel(ProjectId, LabelId, null);
+
+        _mockUserSensitivityLabelBusiness.Verify(
+            b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetUserPermissionsForLabel_HasHttpGetAndReadSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelProjectController.GetUserPermissionsForLabel),
+            "projectId", "labelId", "userId");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+        AssertHasAuthAttribute(method, "read", "sensitivity_label");
+    }
+
+    #endregion
+    
+    // =========================================================================
     // Auth / Middleware Metadata Tests
     // =========================================================================
 

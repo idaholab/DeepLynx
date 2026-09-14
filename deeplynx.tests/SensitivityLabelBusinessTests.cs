@@ -1716,6 +1716,221 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
 
     #endregion
 
+    #region GetUserPermissionsForLabel Tests
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_ReturnsLabelPermission_ForUser()
+    {
+        // Arrange
+        var readAction = await Context.SensitivityLabelPermissionActions
+            .FirstAsync(a => a.Name == "read record");
+
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        {
+            UserId = uid2,
+            LabelId = lid,
+            LabelPermissionId = readAction.Id,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userLabelBusiness.GetUserPermissionsForLabel(lid, uid2, oid, pid);
+        var permission = Assert.Single(result);
+
+        // Assert
+        Assert.Equal(lid, permission.LabelId);
+        Assert.Equal(uid2, permission.UserId);
+        Assert.Equal(readAction.Id, permission.LabelPermissionId);
+        Assert.Equal("read record", permission.LabelPermissionName);
+        Assert.Equal("Permission to read records with the given label", permission.LabelPermissionDescription);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_ReturnsEmpty_WhenUserHasNoLabelPermissions()
+    {
+        // Act
+        var result = await _userLabelBusiness.GetUserPermissionsForLabel(lid, uid2, oid, pid);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_FiltersOutOtherUsersLabelPermissions()
+    {
+        // Arrange - grant only goes to uid, not uid2
+        var readAction = await Context.SensitivityLabelPermissionActions
+            .FirstAsync(a => a.Name == "read record");
+
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        {
+            UserId = uid,
+            LabelId = lid,
+            LabelPermissionId = readAction.Id,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userLabelBusiness.GetUserPermissionsForLabel(lid, uid2, oid, pid);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_FiltersOutOtherLabelsPermissions()
+    {
+        // Arrange - grant is for lid3, query is for lid
+        var readAction = await Context.SensitivityLabelPermissionActions
+            .FirstAsync(a => a.Name == "read record");
+
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        {
+            UserId = uid2,
+            LabelId = lid3,
+            LabelPermissionId = readAction.Id,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userLabelBusiness.GetUserPermissionsForLabel(lid, uid2, oid, pid);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_MapsGrantedAtAndGrantedByFromEntity()
+    {
+        // Arrange
+        var readAction = await Context.SensitivityLabelPermissionActions
+            .FirstAsync(a => a.Name == "read record");
+        var grantedAt = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-1), DateTimeKind.Unspecified);
+
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        {
+            UserId = uid2,
+            LabelId = lid,
+            LabelPermissionId = readAction.Id,
+            GrantedBy = uid,
+            GrantedAt = grantedAt
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userLabelBusiness.GetUserPermissionsForLabel(lid, uid2, oid, pid);
+        var permission = Assert.Single(result);
+
+        // Assert
+        Assert.Equal(grantedAt, permission.GrantedAt);
+        Assert.Equal(uid, permission.GrantedBy);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_ReturnsNullPermissionNameAndDescription_WhenLabelPermissionIdIsNull()
+    {
+        // Arrange
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        {
+            UserId = uid2,
+            LabelId = lid,
+            LabelPermissionId = null,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userLabelBusiness.GetUserPermissionsForLabel(lid, uid2, oid, pid);
+        var permission = Assert.Single(result);
+
+        // Assert
+        Assert.Null(permission.LabelPermissionName);
+        Assert.Null(permission.LabelPermissionDescription);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_ReturnsAllLabelPermissions_WhenUserHasMultiplePermissionsOnSameLabel()
+    {
+        // Arrange - grant two distinct actions from the fixed lookup table for the same label/user
+        var readAction = await Context.SensitivityLabelPermissionActions
+            .FirstAsync(a => a.Name == "read record");
+        var createAction = await Context.SensitivityLabelPermissionActions
+            .FirstAsync(a => a.Name == "create record");
+
+        Context.UserSensitivityLabels.AddRange(
+            new UserSensitivityLabel
+            {
+                UserId = uid2,
+                LabelId = lid,
+                LabelPermissionId = readAction.Id,
+                GrantedBy = uid,
+                GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            },
+            new UserSensitivityLabel
+            {
+                UserId = uid2,
+                LabelId = lid,
+                LabelPermissionId = createAction.Id,
+                GrantedBy = uid,
+                GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userLabelBusiness.GetUserPermissionsForLabel(lid, uid2, oid, pid);
+        var permissions = result.ToList();
+
+        // Assert
+        Assert.Equal(2, permissions.Count);
+        Assert.Contains(permissions, p => p.LabelPermissionName == "read record");
+        Assert.Contains(permissions, p => p.LabelPermissionName == "create record");
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_Fails_IfLabelNotFound()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _userLabelBusiness.GetUserPermissionsForLabel(99999, uid2, oid, pid));
+
+        Assert.Contains("Sensitivity label with id 99999 not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetUserPermissionsForLabel_Succeeds_ForOrganizationLevelLabel_WithNullProjectId()
+    {
+        // Arrange
+        var readAction = await Context.SensitivityLabelPermissionActions
+            .FirstAsync(a => a.Name == "read record");
+
+        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        {
+            UserId = uid2,
+            LabelId = lid3,
+            LabelPermissionId = readAction.Id,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _userLabelBusiness.GetUserPermissionsForLabel(lid3, uid2, oid, null);
+        var permission = Assert.Single(result);
+
+        // Assert
+        Assert.Equal(lid3, permission.LabelId);
+        Assert.Equal("read record", permission.LabelPermissionName);
+    }
+
+    #endregion
+
     #region Caching Tests
 
     [Fact]
