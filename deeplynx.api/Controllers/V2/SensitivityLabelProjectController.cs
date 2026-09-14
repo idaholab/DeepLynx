@@ -274,24 +274,28 @@ public class SensitivityLabelProjectController : ControllerBase
 
 
     /// <summary>
-    ///     List Permissions Governed by a Sensitivity Label
+    ///     List Sensitivity Label Permissions for a given User
     /// </summary>
     /// <param name="projectId">ID of the project to which the label belongs</param>
     /// <param name="labelId">ID of the sensitivity label</param>
+    /// <param name="userId">(optional) ID of the user. Uses the logged-in user by default</param>
     /// <returns>The list of actions governed by the label.</returns>
     [HttpGet("{labelId:long}/permissions", Name = "api_get_sensitivity_label_project_permissions")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "sensitivity_label")]
-    public async Task<ActionResult<IEnumerable<SensitivityLabelPermissionResponseDto>>> GetPermissionsForLabel(
+    public async Task<ActionResult<IEnumerable<SensitivityLabelPermissionResponseDto>>> GetUserPermissionsForLabel(
         long projectId,
-        long labelId)
+        long labelId,
+        long? userId)
     {
-            var organizationId = UserContextStorage.OrganizationId;
-            var permissions = await _userSensitivityLabelBusiness.GetPermissionsForLabel(labelId, organizationId, projectId);
-            return Ok(permissions);
+        // use the current logged in user if no user ID supplied
+        var labelUserId = userId ?? UserContextStorage.UserId;
+
+        var organizationId = UserContextStorage.OrganizationId;
+        var permissions = await _userSensitivityLabelBusiness.GetUserPermissionsForLabel(
+            labelId, labelUserId, organizationId, projectId);
+        return Ok(permissions);
     }
-
-
 
     /// <summary>
     ///     List Groups with Access to a Sensitivity Label

@@ -8,5 +8,5 @@ public interface IUserSensitivityLabelBusiness
     Task<UserSensitivityLabelResponseDto> GrantLabelAccess(long currentUserId, long labelId, long userId, long organizationId, long? projectId);
     Task<bool> RevokeLabelAccess(long labelId, long userId, long organizationId, long? projectId);
     Task<bool> SetUsersForLabel(long currentUserId, long labelId, long[] userIds, long organizationId, long? projectId);
-    Task<IEnumerable<SensitivityLabelPermissionResponseDto>> GetPermissionsForLabel(long labelId, long organizationId, long? projectId);
+    Task<IEnumerable<UserSensitivityLabelPermissionResponseDto>> GetUserPermissionsForLabel(long labelId, long userId, long organizationId, long? projectId);
 }
