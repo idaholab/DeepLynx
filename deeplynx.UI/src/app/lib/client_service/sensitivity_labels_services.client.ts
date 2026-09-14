@@ -157,28 +157,6 @@ export const archiveSensitivityLabelOrg = async (
     }
 }
 
-
-/**
- * Get the permissions governed by an organization-level Sensitivity Label
- * @param organizationId - The ID of the organization
- * @param labelId - The ID of the sensitivity label
- * @returns Promise with array of SensitivityLabelPermissionResponseDto
- */
-export const getPermissionsForLabelOrg = async (
-    organizationId: number,
-    labelId: number
-): Promise<SensitivityLabelPermissionResponseDto[]> => {
-    try {
-        const res = await api.get(
-            `/organizations/${organizationId}/labels/${labelId}/permissions`
-        );
-        return res.data;
-    } catch (error) {
-        console.error(`Error getting permissions for Sensitivity Label ${labelId}:`, error);
-        throw error;
-    }
-}
-
 /**
  * Get all users with access to an organization-level Sensitivity Label
  * @param organizationId - The ID of the organization
@@ -527,27 +505,6 @@ export const revokeSensitivityLabelAccessProject = async (
         return res.data;
     } catch (error) {
         console.error(`Error revoking user ${userId} access to Sensitivity Label ${labelId}:`, error);
-        throw error;
-    }
-}
-
-/**
- * Get the permissions governed by a project-level Sensitivity Label
- * @param projectId - The ID of the project
- * @param labelId - The ID of the sensitivity label
- * @returns Promise with array of SensitivityLabelPermissionResponseDto
- */
-export const getPermissionsForLabelProject = async (
-    projectId: number,
-    labelId: number
-): Promise<SensitivityLabelPermissionResponseDto[]> => {
-    try {
-        const res = await api.get(
-            `/projects/${projectId}/labels/${labelId}/permissions`
-        );
-        return res.data;
-    } catch (error) {
-        console.error(`Error getting permissions for Sensitivity Label ${labelId}:`, error);
         throw error;
     }
 }
