@@ -4279,5 +4279,117 @@ public class QueryBusinessTests : IntegrationTestBase
         Assert.NotNull(result);
         Assert.NotEmpty(result.Items);
     }
+
+    #endregion
+
+    #region QueryBuilderPaginated JSONB Tag Tests
+
+    private async Task<(Tag tagA, Tag tagCat, Tag tagDog, Record recA, Record recCat, Record recDog)> SeedTagRecordsAsync()
+    {
+        // Names use a "qbptag" token that won't collide with the shared fixture's own tags -
+        // a bare "a" or "cat" would also match pre-existing fixture records in this project.
+        var tagA = new Tag { Name = "qbptag", ProjectId = pid, OrganizationId = organizationId };
+        var tagCat = new Tag { Name = "qbptagcat", ProjectId = pid, OrganizationId = organizationId };
+        var tagDog = new Tag { Name = "unrelatedqxz", ProjectId = pid, OrganizationId = organizationId };
+        Context.Tags.AddRange(tagA, tagCat, tagDog);
+        await Context.SaveChangesAsync();
+
+        var recA = new Record
+        {
+            Name = "Record A",
+            Description = "Tag equality test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}",
+            Tags = new List<Tag> { tagA }
+        };
+        var recCat = new Record
+        {
+            Name = "Record Cat",
+            Description = "Tag equality test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}",
+            Tags = new List<Tag> { tagCat }
+        };
+        var recDog = new Record
+        {
+            Name = "Record Dog",
+            Description = "Tag equality test record",
+            OriginalId = Guid.NewGuid().ToString(),
+            ProjectId = pid,
+            DataSourceId = did,
+            OrganizationId = organizationId,
+            Properties = "{}",
+            Tags = new List<Tag> { tagDog }
+        };
+        Context.Records.AddRange(recA, recCat, recDog);
+        await Context.SaveChangesAsync();
+
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionInProject(uid, pid, "read", "record"))
+            .ReturnsAsync(true);
+
+        _projectRolePermissionServiceMock
+            .Setup(x => x.PermissionsInProjects(uid, It.Is<long[]>(p => p.SequenceEqual(new long[] { pid })), "read", "record"))
+            .ReturnsAsync([pid]);
+
+        _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService, _projectRolePermissionServiceMock.Object);
+
+        return (tagA, tagCat, tagDog, recA, recCat, recDog);
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_Success_FindsRecordsByPartialTagName()
+    {
+        await SeedTagRecordsAsync();
+
+        var dto = new CustomQueryDtos.CustomQueryRequestDto { Filter = "tags", Operator = "LIKE", Value = "qbptag" };
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var result = await _queryBusiness.QueryBuilderPaginated(uid, [dto], organizationId, [pid], paginated);
+
+        Assert.Equal(2, result.Items.Count);
+        Assert.All(result.Items, r => Assert.Contains(r.Name, new[] { "Record A", "Record Cat" }));
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_Success_TagLikeIsCaseInsensitive()
+    {
+        await SeedTagRecordsAsync();
+
+        var dto = new CustomQueryDtos.CustomQueryRequestDto { Filter = "tags", Operator = "LIKE", Value = "QBPTAGCAT" };
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var result = await _queryBusiness.QueryBuilderPaginated(uid, [dto], organizationId, [pid], paginated);
+
+        Assert.Single(result.Items);
+        Assert.Equal("Record Cat", result.Items.First().Name);
+    }
+
+    [Fact]
+    public async Task QueryBuilderPaginated_Success_TagEqualityDoesNotMatchPartialTags()
+    {
+        // Guards against the merge-conflict regression where "=" on tags fell back to the
+        // plain-column branch and either lost tag matching entirely or matched substrings.
+        await SeedTagRecordsAsync();
+        var paginated = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        var dtoA = new CustomQueryDtos.CustomQueryRequestDto { Filter = "tags", Operator = "=", Value = "qbptag" };
+        var resultA = await _queryBusiness.QueryBuilderPaginated(uid, [dtoA], organizationId, [pid], paginated);
+        Assert.Single(resultA.Items);
+        Assert.Equal("Record A", resultA.Items.First().Name);
+
+        // "qbptagc" is a prefix of the "qbptagcat" tag but not an exact tag name -
+        // if "=" ever regresses to a substring match, this would incorrectly return Record Cat.
+        var dtoD = new CustomQueryDtos.CustomQueryRequestDto { Filter = "tags", Operator = "=", Value = "qbptagc" };
+        var resultD = await _queryBusiness.QueryBuilderPaginated(uid, [dtoD], organizationId, [pid], paginated);
+        Assert.Empty(resultD.Items);
+    }
+
     #endregion
 }

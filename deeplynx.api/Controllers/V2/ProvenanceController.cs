@@ -121,4 +121,27 @@ public class ProvenanceController : ControllerBase
         var history = await _provenanceBusiness.GetProjectProvenanceHistory(projectId, paginatedRequestDto);
         return Ok(history);
     }
+
+    /// <summary>
+    ///     Verify a Record's Provenance Chain
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization to which the project belongs</param>
+    /// <param name="projectId">The ID of the project to which the record belongs</param>
+    /// <param name="recordId">The ID of the record whose provenance chain is being verified</param>
+    /// <param name="checkpointRecordId">
+    ///     (Optional) A previously-verified provenance record ID to resume verification from,
+    ///     instead of walking the whole chain from genesis
+    /// </param>
+    /// <returns>A report describing whether the chain (or the portion after the checkpoint) is intact</returns>
+    [HttpGet("{recordId:long}/verify", Name = "api_verify_provenance_chain")]
+    [Auth("read", "record")]
+    public async Task<ActionResult<ProvenanceChainVerificationResponseDto>> VerifyProvenanceChain(
+        long organizationId,
+        long projectId,
+        long recordId,
+        [FromQuery] long? checkpointRecordId = null)
+    {
+        var result = await _provenanceBusiness.VerifyProvenanceChain(recordId, checkpointRecordId);
+        return Ok(result);
+    }
 }

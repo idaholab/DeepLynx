@@ -185,13 +185,50 @@ public class QueryBusiness : IQueryBusiness
                     }
                     else if (query.Operator == "LIKE")
                     {
-                        condition = $"qr.{query.Filter} ILIKE @{paramName}";
+                        // Check if this is a JSONB column that needs special handling
+                        var jsonbColumns = new[] { "properties", "tags" };
+
+                        if (jsonbColumns.Contains(query.Filter.ToLower()))
+                        {
+                            if (query.Filter.ToLower() == "tags")
+                                // Tags are an array of objects - flatten and search only the name values
+                                condition =
+                                    $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' ILIKE @{paramName})";
+                            else
+                                // Properties is a flat object already - we can just search the values
+                                condition =
+                                    $"EXISTS (SELECT 1 FROM jsonb_each_text(qr.{query.Filter}) WHERE value ILIKE @{paramName})";
+                        }
+                        else
+                        {
+                            condition = $"qr.{query.Filter} ILIKE @{paramName}";
+                        }
+
                         parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
                     }
                     else if (query.Operator == "=")
                     {
-                        condition = $"qr.{query.Filter} = @{paramName}";
-                        parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                        // Check if this is a JSONB column that needs special handling
+                        var jsonbColumns = new[] { "properties", "tags" };
+
+                        if (jsonbColumns.Contains(query.Filter.ToLower()))
+                        {
+                            if (query.Filter.ToLower() == "tags")
+                            {
+                                condition = $"EXISTS (SELECT 1 FROM jsonb_array_elements(qr.{query.Filter}) elem WHERE elem->>'name' = @{paramName})";
+                                parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                            }
+                            else
+                            {
+                                condition = $"jsonb_pretty(qr.{query.Filter}) ILIKE @{paramName}";
+                                parameters.Add(new NpgsqlParameter(paramName, $"%{query.Value}%"));
+                            }
+                        }
+                        else
+                        {
+                            condition = $"qr.{query.Filter}::text = @{paramName}";
+                            parameters.Add(new NpgsqlParameter(paramName, query.Value));
+                        }
                     }
                     else if (query.Operator == ">")
                     {

@@ -56,6 +56,7 @@ public class InsightController : ControllerBase
     {
         var userId = UserContextStorage.UserId;
         var userJwt = UserContextStorage.Token;
+        var isAdmin = UserContextStorage.IsSysAdmin || UserContextStorage.IsOrgAdmin || UserContextStorage.IsProjectAdmin;
         await _insightBusiness.QueueInsightUpload(
             userId,
             organizationId,
@@ -63,7 +64,8 @@ public class InsightController : ControllerBase
             vlmModelConfigId,
             embeddingModelConfigId,
             dto,
-            userJwt);
+            userJwt,
+            isAdmin);
         return Accepted();
     }
 
