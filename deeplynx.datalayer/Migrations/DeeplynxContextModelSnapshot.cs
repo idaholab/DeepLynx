@@ -3076,7 +3076,7 @@ namespace deeplynx.datalayer.Migrations
                         .HasDatabaseName("idx_user_sensitivity_labels_label_id");
 
                     b.HasIndex("LabelPermissionId")
-                        .HasDatabaseName("idx_user_sensitivity_label_permission_actions_label_permission_id");
+                        .HasDatabaseName("idx_user_sensitivity_labels_label_permission_id");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("idx_user_sensitivity_labels_user_id");

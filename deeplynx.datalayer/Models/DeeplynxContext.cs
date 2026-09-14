@@ -1413,7 +1413,7 @@ public partial class DeeplynxContext : DbContext
                 .HasDatabaseName("idx_user_sensitivity_labels_label_id");
             
             entity.HasIndex(e => e.LabelPermissionId)
-                .HasDatabaseName("idx_user_sensitivity_label_permission_actions_label_permission_id");
+                .HasDatabaseName("idx_user_sensitivity_labels_label_permission_id");
 
             entity.HasIndex(e => new { e.UserId, e.LabelId, e.LabelPermissionId })
                 .HasDatabaseName("unique_user_sensitivity_label")

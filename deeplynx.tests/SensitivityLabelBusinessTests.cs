@@ -1861,8 +1861,8 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Arrange - grant two distinct actions from the fixed lookup table for the same label/user
         var readAction = await Context.SensitivityLabelPermissionActions
             .FirstAsync(a => a.Name == "read record");
-        var createAction = await Context.SensitivityLabelPermissionActions
-            .FirstAsync(a => a.Name == "create record");
+        var writeAction = await Context.SensitivityLabelPermissionActions
+            .FirstAsync(a => a.Name == "write record");
 
         Context.UserSensitivityLabels.AddRange(
             new UserSensitivityLabel
@@ -1877,7 +1877,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             {
                 UserId = uid2,
                 LabelId = lid,
-                LabelPermissionId = createAction.Id,
+                LabelPermissionId = writeAction.Id,
                 GrantedBy = uid,
                 GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
             });
@@ -1890,7 +1890,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Assert
         Assert.Equal(2, permissions.Count);
         Assert.Contains(permissions, p => p.LabelPermissionName == "read record");
-        Assert.Contains(permissions, p => p.LabelPermissionName == "create record");
+        Assert.Contains(permissions, p => p.LabelPermissionName == "write record");
     }
 
     [Fact]
