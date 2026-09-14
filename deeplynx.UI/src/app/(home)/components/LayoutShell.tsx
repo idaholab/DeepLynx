@@ -306,11 +306,13 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                   width={170}
                   className="rounded cursor-pointer w-full h-auto"
                   onClick={() =>
-                    window.open(process.env.NEXT_PUBLIC_BRIDGE_URL, "_blank")
+                    window.open(
+                      "https://github.inl.gov/Digital-Engineering/bridge/releases",
+                    )
                   }
                 />
               </li>
-              <li>
+              {/* <li>
                 <Image
                   src="/assets/visualize-light.png"
                   alt="Visualize logo"
@@ -321,7 +323,7 @@ const LayoutShell = ({ children }: { children: ReactNode }) => {
                     window.open(process.env.NEXT_PUBLIC_VISUALIZE_URL, "_blank")
                   }
                 />
-              </li>
+              </li> */}
             </ul>
           </div>
           <div className="shrink-0">
