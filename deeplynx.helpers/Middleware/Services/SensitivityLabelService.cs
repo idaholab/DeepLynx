@@ -109,10 +109,11 @@ public class SensitivityLabelService : ISensitivityLabelService
         // a group they belong to
         var grantedLabelIds = _context.UserSensitivityLabels
             .Where(u => u.UserId == currentUserId)
-            .Select(u => u.LabelId)
-            .Union(_context.GroupSensitivityLabels
-                .Where(g => g.Group.Users.Any(u => u.Id == currentUserId))
-                .Select(g => g.LabelId));
+            .Select(u => u.LabelId);
+            // TODO: fix
+            // .Union(_context.GroupSensitivityLabels
+            //     .Where(g => g.Group.Users.Any(u => u.Id == currentUserId))
+            //     .Select(g => g.LabelId));
 
         // A label is "authorized" for this action if it isn't gated for that action at all,
         // or the user has an explicit grant for it
