@@ -35,7 +35,7 @@ namespace deeplynx.datalayer.Migrations
             migrationBuilder.Sql(@"
                 INSERT INTO deeplynx.sensitivity_label_permission_actions(name, description)
                 VALUES  ('read record', 'Permission to read records with the given label'),
-                        ('create record', 'Permission to create records with the given label'),
+                        ('write record', 'Permission to create records with the given label'),
                         ('update record', 'Permission to update records with the given label'),
                         ('delete record', 'Permission to delete records with the given label'),
                         ('download file', 'Permission to download files with the given label'),

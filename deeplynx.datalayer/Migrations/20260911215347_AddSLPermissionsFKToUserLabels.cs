@@ -23,7 +23,7 @@ namespace deeplynx.datalayer.Migrations
                 nullable: true);
 
             migrationBuilder.CreateIndex(
-                name: "idx_user_sensitivity_label_permission_actions_label_permission_id",
+                name: "idx_user_sensitivity_labels_label_permission_id",
                 schema: "deeplynx",
                 table: "user_sensitivity_labels",
                 column: "label_permission_id");
@@ -88,7 +88,7 @@ namespace deeplynx.datalayer.Migrations
                 table: "user_sensitivity_labels");
 
             migrationBuilder.DropIndex(
-                name: "idx_user_sensitivity_label_permission_actions_label_permission_id",
+                name: "idx_user_sensitivity_labels_label_permission_id",
                 schema: "deeplynx",
                 table: "user_sensitivity_labels");
 

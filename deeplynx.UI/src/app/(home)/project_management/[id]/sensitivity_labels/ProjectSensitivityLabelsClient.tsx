@@ -13,7 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import type {
   SensitivityLabelsDto,
-  UserSensitivityLabelResponseDto,
+  SensitivityLabelGrantResponseDto,
   SensitivityLabelPermissionResponseDto,
   ProjectMemberResponseDto,
 } from "@/app/(home)/types/responseDTOs";
@@ -60,7 +60,7 @@ function AssignedUsersPanel({
   projectMembers: ProjectMemberResponseDto[];
 }) {
   const { t } = useLanguage();
-  const [assignedUsers, setAssignedUsers] = useState<UserSensitivityLabelResponseDto[]>([]);
+  const [assignedUsers, setAssignedUsers] = useState<SensitivityLabelGrantResponseDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [revokingUserId, setRevokingUserId] = useState<number | null>(null);
@@ -155,7 +155,7 @@ function AssignedUsersPanel({
       userId: number;
       userName: string;
       userEmail: string;
-      assigned: UserSensitivityLabelResponseDto | null;
+      assigned: SensitivityLabelGrantResponseDto | null;
     }[] = [];
     for (const member of projectMembers) {
       if (!member.memberId || !member.email || seen.has(member.memberId)) continue;
