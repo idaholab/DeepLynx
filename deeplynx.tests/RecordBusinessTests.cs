@@ -4392,7 +4392,7 @@ public class RecordBusinessTests : IntegrationTestBase
             IsArchived = false
         });
 
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = adminUser.Id,
             LabelId = label.Id,
@@ -4506,7 +4506,7 @@ public class RecordBusinessTests : IntegrationTestBase
                 IsArchived = false
             });
 
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = adminUser.Id,
             LabelId = label.Id,
@@ -4957,7 +4957,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
-        // Gate the requested actions on this label. Access is now per-user via UserSensitivityLabel
+        // Gate the requested actions on this label. Access is now per-user via SensitivityLabelGrant
         // (a single grant unlocks ALL actions on a label), so "read record" is deliberately left
         // ungoverned here — both users can read the record, only the gated actions differ.
         var labelPermissions = permissionActions.Select(action => new SensitivityLabelPermission
@@ -4973,7 +4973,7 @@ public class RecordBusinessTests : IntegrationTestBase
 
         Context.SensitivityLabelPermissions.AddRange(labelPermissions);
 
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = adminUser.Id,
             LabelId = label.Id,
