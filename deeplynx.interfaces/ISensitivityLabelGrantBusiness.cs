@@ -12,10 +12,9 @@ public interface ISensitivityLabelGrantBusiness
         long labelId, long organizationId, long? projectId);
 
     Task<IEnumerable<SensitivityLabelMemberAccessDto>> SetAccessForLabel(
-        long currentUserId, long labelId, 
-        long[] labelPermissionIds,
+        long currentUserId, long labelId,
         long organizationId, long? projectId,
-        long[]? userIds, long[]? groupIds);
+        GrantLabelAccessDto request);
 
     Task<bool> RevokeAccessForLabel(
         long labelId, long organizationId, long? projectId,

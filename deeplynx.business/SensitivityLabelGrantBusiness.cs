@@ -1,4 +1,3 @@
-using System.Security;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
@@ -100,22 +99,20 @@ public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
     /// </summary>
     /// <param name="currentUserId">ID of the user granting access</param>
     /// <param name="labelId">ID of the label to grant access to</param>
-    /// <param name="labelPermissionIds">Array of label permission IDs to grant to each member</param>
     /// <param name="organizationId">(Required) ID of the organization to which the label belongs</param>
     /// <param name="projectId">(Optional) ID of the project to which the label belongs</param>
-    /// <param name="userIds">Array of user IDs to grant access to</param>
-    /// <param name="groupIds">Array of group IDs to grant access to</param>
+    /// <param name="dto">The users/groups to grant and the permissions to give them</param>
     /// <returns>A list of members (users and groups) and their new permissions on the label</returns>
     /// <exception cref="ArgumentException">Returned if no members or no permissions are provided</exception>
     /// <exception cref="KeyNotFoundException">Returned if label, a member, or a permission is not found</exception>
     public async Task<IEnumerable<SensitivityLabelMemberAccessDto>> SetAccessForLabel(
         long currentUserId, long labelId, 
-        long[] labelPermissionIds,
         long organizationId, long? projectId,
-        long[]? userIds, long[]? groupIds)
+        GrantLabelAccessDto dto)
     {
-        userIds ??= Array.Empty<long>();
-        groupIds ??= Array.Empty<long>();
+        var userIds = dto.UserIds ?? Array.Empty<long>();
+        var groupIds = dto.GroupIds ?? Array.Empty<long>();
+        var labelPermissionIds = dto.LabelPermissionIds;
 
         if (userIds.Length == 0 && groupIds.Length == 0)
             throw new ArgumentException("At least one userId or groupId must be provided");
