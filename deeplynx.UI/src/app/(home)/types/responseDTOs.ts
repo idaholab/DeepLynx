@@ -269,7 +269,7 @@ export type SensitivityLabelsDto = {
   organizationId: number | null;
 };
 
-export type UserSensitivityLabelResponseDto = {
+export type SensitivityLabelGrantResponseDto = {
   id: number;
   userId: number;
   userName: string;

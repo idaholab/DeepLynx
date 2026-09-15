@@ -21,20 +21,20 @@ public class SensitivityLabelOrganizationController : ControllerBase
 {
     private readonly ILogger<SensitivityLabelOrganizationController> _logger;
     private readonly ISensitivityLabelBusiness _sensitivityLabelBusiness;
-    private readonly IUserSensitivityLabelBusiness _userSensitivityLabelBusiness;
+    private readonly ISensitivityLabelGrantBusiness _sensitivityLabelGrantBusiness;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="SensitivityLabelOrganizationController" /> class
     /// </summary>
     /// <param name="sensitivityLabelBusiness">The business logic interface for handling Sensitivity Label operations.</param>
-    /// <param name="userSensitivityLabelBusiness">The business logic interface for handling user access grants to Sensitivity Labels.</param>
+    /// <param name="sensitivityLabelGrantBusiness">The business logic interface for handling user access grants to Sensitivity Labels.</param>
     /// <param name="logger">Error/Info logging interface for database log table.</param>
     public SensitivityLabelOrganizationController(ISensitivityLabelBusiness sensitivityLabelBusiness,
-        IUserSensitivityLabelBusiness userSensitivityLabelBusiness,
+        ISensitivityLabelGrantBusiness sensitivityLabelGrantBusiness,
         ILogger<SensitivityLabelOrganizationController> logger)
     {
         _sensitivityLabelBusiness = sensitivityLabelBusiness;
-        _userSensitivityLabelBusiness = userSensitivityLabelBusiness;
+        _sensitivityLabelGrantBusiness = sensitivityLabelGrantBusiness;
         _logger = logger;
     }
 
@@ -188,11 +188,11 @@ public class SensitivityLabelOrganizationController : ControllerBase
     [HttpGet("{labelId:long}/users", Name = "api_get_sensitivity_label_organization_users")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("read", "sensitivity_label")]
-    public async Task<ActionResult<IEnumerable<UserSensitivityLabelResponseDto>>> GetUsersWithAccessToLabel(
+    public async Task<ActionResult<IEnumerable<SensitivityLabelGrantResponseDto>>> GetUsersWithAccessToLabel(
         long organizationId,
         long labelId)
     {
-            var users = await _userSensitivityLabelBusiness.GetUsersWithAccessToLabel(labelId, organizationId, null);
+            var users = await _sensitivityLabelGrantBusiness.GetUsersWithAccessToLabel(labelId, organizationId, null);
             return Ok(users);
     }
 
@@ -208,13 +208,13 @@ public class SensitivityLabelOrganizationController : ControllerBase
     [HttpPost("{labelId:long}/users/{userId:long}", Name = "api_grant_sensitivity_label_organization_user_access")]
     [Badge("V2", BadgePosition.Before, "#72e6a1")]
     [Auth("update", "sensitivity_label")]
-    public async Task<ActionResult<UserSensitivityLabelResponseDto>> GrantLabelAccess(
+    public async Task<ActionResult<SensitivityLabelGrantResponseDto>> GrantLabelAccess(
         long organizationId,
         long labelId,
         long userId)
     {
             var currentUserId = UserContextStorage.UserId;
-            var grant = await _userSensitivityLabelBusiness.GrantLabelAccess(currentUserId, labelId, userId, organizationId, null);
+            var grant = await _sensitivityLabelGrantBusiness.GrantLabelAccess(currentUserId, labelId, userId, organizationId, null);
             return Ok(grant);
     }
 
@@ -235,7 +235,7 @@ public class SensitivityLabelOrganizationController : ControllerBase
         long labelId,
         long userId)
     {
-            var response = await _userSensitivityLabelBusiness.RevokeLabelAccess(labelId, userId, organizationId, null);
+            var response = await _sensitivityLabelGrantBusiness.RevokeLabelAccess(labelId, userId, organizationId, null);
             return Ok(response);
     }
 
@@ -257,7 +257,7 @@ public class SensitivityLabelOrganizationController : ControllerBase
         [FromBody] long[] userIds)
     {
             var currentUserId = UserContextStorage.UserId;
-            var response = await _userSensitivityLabelBusiness.SetUsersForLabel(currentUserId, labelId, userIds, organizationId, null);
+            var response = await _sensitivityLabelGrantBusiness.SetUsersForLabel(currentUserId, labelId, userIds, organizationId, null);
             return Ok(response);
     }
 
@@ -281,7 +281,7 @@ public class SensitivityLabelOrganizationController : ControllerBase
         // use the current logged in user if no user ID supplied
         var labelUserId = userId ?? UserContextStorage.UserId;
 
-        var permissions = await _userSensitivityLabelBusiness.GetUserPermissionsForLabel(
+        var permissions = await _sensitivityLabelGrantBusiness.GetUserPermissionsForLabel(
             labelId, labelUserId, organizationId, null);
         return Ok(permissions);
     }

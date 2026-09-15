@@ -42,6 +42,6 @@ public partial class Group
     [InverseProperty("LastUpdatedGroups")]
     public virtual User? LastUpdatedByUser { get; set; }
 
-    // [InverseProperty("Group")]
-    // public virtual ICollection<SensitivityLabelGrant> SensitivityLabelGrants { get; set; } = new List<SensitivityLabelGrant>();
+    [InverseProperty("Group")]
+    public virtual ICollection<SensitivityLabelGrant> SensitivityLabelGrants { get; set; } = new List<SensitivityLabelGrant>();
 }

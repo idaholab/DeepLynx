@@ -12,7 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import type {
   SensitivityLabelsDto,
-  UserSensitivityLabelResponseDto,
+  SensitivityLabelGrantResponseDto,
   SensitivityLabelPermissionResponseDto,
   UserResponseDto,
 } from "@/app/(home)/types/responseDTOs";
@@ -53,7 +53,7 @@ function AssignedUsersPanel({
   members: UserResponseDto[];
 }) {
   const { t } = useLanguage();
-  const [assignedUsers, setAssignedUsers] = useState<UserSensitivityLabelResponseDto[]>([]);
+  const [assignedUsers, setAssignedUsers] = useState<SensitivityLabelGrantResponseDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [revokingUserId, setRevokingUserId] = useState<number | null>(null);

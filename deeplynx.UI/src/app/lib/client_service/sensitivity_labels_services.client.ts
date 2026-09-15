@@ -1,6 +1,6 @@
 import {
     SensitivityLabelsDto,
-    UserSensitivityLabelResponseDto,
+    SensitivityLabelGrantResponseDto,
     SensitivityLabelPermissionResponseDto,
     GroupSensitivityLabelResponseDto,
 } from "@/app/(home)/types/responseDTOs";
@@ -161,12 +161,12 @@ export const archiveSensitivityLabelOrg = async (
  * Get all users with access to an organization-level Sensitivity Label
  * @param organizationId - The ID of the organization
  * @param labelId - The ID of the sensitivity label
- * @returns Promise with array of UserSensitivityLabelResponseDto
+ * @returns Promise with array of SensitivityLabelGrantResponseDto
  */
 export const getUsersWithAccessToLabelOrg = async (
     organizationId: number,
     labelId: number
-): Promise<UserSensitivityLabelResponseDto[]> => {
+): Promise<SensitivityLabelGrantResponseDto[]> => {
     try {
         const res = await api.get(
             `/organizations/${organizationId}/labels/${labelId}/users`
@@ -183,13 +183,13 @@ export const getUsersWithAccessToLabelOrg = async (
  * @param organizationId - The ID of the organization
  * @param labelId - The ID of the sensitivity label
  * @param userId - The ID of the user to grant access to
- * @returns Promise with UserSensitivityLabelResponseDto
+ * @returns Promise with SensitivityLabelGrantResponseDto
  */
 export const grantSensitivityLabelAccessOrg = async (
     organizationId: number,
     labelId: number,
     userId: number
-): Promise<UserSensitivityLabelResponseDto> => {
+): Promise<SensitivityLabelGrantResponseDto> => {
     try {
         const res = await api.post(
             `/organizations/${organizationId}/labels/${labelId}/users/${userId}`
@@ -446,12 +446,12 @@ export const archiveSensitivityLabelProject = async (
  * Get all users with access to a project-level Sensitivity Label
  * @param projectId - The ID of the project
  * @param labelId - The ID of the sensitivity label
- * @returns Promise with array of UserSensitivityLabelResponseDto
+ * @returns Promise with array of SensitivityLabelGrantResponseDto
  */
 export const getUsersWithAccessToLabelProject = async (
     projectId: number,
     labelId: number
-): Promise<UserSensitivityLabelResponseDto[]> => {
+): Promise<SensitivityLabelGrantResponseDto[]> => {
     try {
         const res = await api.get(
             `/projects/${projectId}/labels/${labelId}/users`
@@ -468,13 +468,13 @@ export const getUsersWithAccessToLabelProject = async (
  * @param projectId - The ID of the project
  * @param labelId - The ID of the sensitivity label
  * @param userId - The ID of the user to grant access to
- * @returns Promise with UserSensitivityLabelResponseDto
+ * @returns Promise with SensitivityLabelGrantResponseDto
  */
 export const grantSensitivityLabelAccessProject = async (
     projectId: number,
     labelId: number,
     userId: number
-): Promise<UserSensitivityLabelResponseDto> => {
+): Promise<SensitivityLabelGrantResponseDto> => {
     try {
         const res = await api.post(
             `/projects/${projectId}/labels/${labelId}/users/${userId}`

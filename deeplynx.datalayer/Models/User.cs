@@ -111,10 +111,10 @@ public partial class User
     public virtual ICollection<SensitivityLabelPermission> LastUpdatedSensitivityLabelPermissions { get; set; } = new List<SensitivityLabelPermission>();
 
     [InverseProperty("User")]
-    public virtual ICollection<UserSensitivityLabel> UserSensitivityLabels { get; set; } = new List<UserSensitivityLabel>();
+    public virtual ICollection<SensitivityLabelGrant> SensitivityLabelGrants { get; set; } = new List<SensitivityLabelGrant>();
 
     [InverseProperty("GrantedByUser")]
-    public virtual ICollection<UserSensitivityLabel> GrantedUserSensitivityLabels { get; set; } = new List<UserSensitivityLabel>();
+    public virtual ICollection<SensitivityLabelGrant> GrantedSensitivityLabelGrants { get; set; } = new List<SensitivityLabelGrant>();
 
     [InverseProperty("LastUpdatedByUser")]
     public virtual ICollection<Tag> LastUpdatedTags { get; set; } = new List<Tag>();

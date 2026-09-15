@@ -3,15 +3,18 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace deeplynx.datalayer.Models;
 
-[Table("user_sensitivity_labels", Schema = "deeplynx")]
-public partial class UserSensitivityLabel
+[Table("sensitivity_label_grants", Schema = "deeplynx")]
+public partial class SensitivityLabelGrant
 {
     [Key]
     [Column("id")]
     public long Id { get; set; }
 
     [Column("user_id")]
-    public long UserId { get; set; }
+    public long? UserId { get; set; }
+
+    [Column("group_id")]
+    public long? GroupId { get; set; }
 
     [Column("label_id")]
     public long LabelId { get; set; }
@@ -26,18 +29,22 @@ public partial class UserSensitivityLabel
     public DateTime GrantedAt { get; set; }
     
     [ForeignKey("UserId")]
-    [InverseProperty("UserSensitivityLabels")]
-    public virtual User User { get; set; } = null!;
+    [InverseProperty("SensitivityLabelGrants")]
+    public virtual User? User { get; set; } = null!;
+
+    [ForeignKey("GroupId")]
+    [InverseProperty("SensitivityLabelGrants")]
+    public virtual Group? Group { get; set; } = null!;
 
     [ForeignKey("LabelId")]
-    [InverseProperty("UserSensitivityLabels")]
+    [InverseProperty("SensitivityLabelGrants")]
     public virtual SensitivityLabel Label { get; set; } = null!;
     
     [ForeignKey("LabelPermissionId")]
-    [InverseProperty("UserSensitivityLabels")]
+    [InverseProperty("SensitivityLabelGrants")]
     public virtual SensitivityLabelPermissionAction LabelPermission { get; set; } = null!;
 
     [ForeignKey("GrantedBy")]
-    [InverseProperty("GrantedUserSensitivityLabels")]
+    [InverseProperty("GrantedSensitivityLabelGrants")]
     public virtual User? GrantedByUser { get; set; }
 }
