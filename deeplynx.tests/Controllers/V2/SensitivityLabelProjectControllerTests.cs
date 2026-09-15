@@ -21,7 +21,7 @@ namespace deeplynx.tests.Controllers.V2;
 public class SensitivityLabelProjectControllerTests : IDisposable
 {
     private readonly Mock<ISensitivityLabelBusiness> _mockSensitivityLabelBusiness;
-    private readonly Mock<IUserSensitivityLabelBusiness> _mockUserSensitivityLabelBusiness;
+    private readonly Mock<ISensitivityLabelGrantBusiness> _mockSensitivityLabelGrantBusiness;
     private readonly Mock<ILogger<SensitivityLabelProjectController>> _mockLogger;
     private readonly SensitivityLabelProjectController _sensitivityLabelProjectController;
 
@@ -33,12 +33,12 @@ public class SensitivityLabelProjectControllerTests : IDisposable
     public SensitivityLabelProjectControllerTests()
     {
         _mockSensitivityLabelBusiness = new Mock<ISensitivityLabelBusiness>();
-        _mockUserSensitivityLabelBusiness = new Mock<IUserSensitivityLabelBusiness>();
+        _mockSensitivityLabelGrantBusiness = new Mock<ISensitivityLabelGrantBusiness>();
         _mockLogger = new Mock<ILogger<SensitivityLabelProjectController>>();
 
         _sensitivityLabelProjectController = new SensitivityLabelProjectController(
             _mockSensitivityLabelBusiness.Object,
-            _mockUserSensitivityLabelBusiness.Object,
+            _mockSensitivityLabelGrantBusiness.Object,
             _mockLogger.Object);
 
         UserContextStorage.UserId = UserId;
@@ -525,14 +525,14 @@ public class SensitivityLabelProjectControllerTests : IDisposable
     #region GetUserPermissionsForLabel Tests
 
     [Fact]
-    public async Task GetUserPermissionsForLabel_Returns200_WithPermissions_WhenUserIdSupplied()
+    public async Task GetUserPermissionsForLabel_Returns200_WithPermissions()
     {
         const long suppliedUserId = 20L;
-        IEnumerable<UserSensitivityLabelPermissionResponseDto> expected =
-            new List<UserSensitivityLabelPermissionResponseDto>();
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
 
-        _mockUserSensitivityLabelBusiness
-            .Setup(b => b.GetUserPermissionsForLabel(LabelId, suppliedUserId, OrgId, ProjectId))
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, ProjectId, suppliedUserId, null))
             .ReturnsAsync(expected);
 
         var result = (await _sensitivityLabelProjectController.GetUserPermissionsForLabel(
@@ -546,81 +546,48 @@ public class SensitivityLabelProjectControllerTests : IDisposable
     [Fact]
     public async Task GetUserPermissionsForLabel_Returns200_WithEmptyList()
     {
-        _mockUserSensitivityLabelBusiness
-            .Setup(b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId))
+        const long suppliedUserId = 20L;
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, ProjectId, suppliedUserId, null))
             .ReturnsAsync([]);
 
         var result = (await _sensitivityLabelProjectController.GetUserPermissionsForLabel(
-            ProjectId, LabelId, null)).Result as OkObjectResult;
+            ProjectId, LabelId, suppliedUserId)).Result as OkObjectResult;
 
         Assert.NotNull(result);
         Assert.Equal(200, result.StatusCode);
-        Assert.IsAssignableFrom<IEnumerable<UserSensitivityLabelPermissionResponseDto>>(result.Value);
+        Assert.IsAssignableFrom<IEnumerable<SensitivityLabelMemberAccessDto>>(result.Value);
     }
 
     [Fact]
     public async Task GetUserPermissionsForLabel_ThrowsException_WhenBusinessThrows()
     {
-        _mockUserSensitivityLabelBusiness
-            .Setup(b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId))
+        const long suppliedUserId = 20L;
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, ProjectId, suppliedUserId, null))
             .ThrowsAsync(new Exception("db error"));
 
         await Assert.ThrowsAsync<Exception>(() => _sensitivityLabelProjectController.GetUserPermissionsForLabel(
-            ProjectId, LabelId, null));
-    }
-
-    [Fact]
-    public async Task GetUserPermissionsForLabel_UsesCurrentUserId_WhenUserIdNotSupplied()
-    {
-        IEnumerable<UserSensitivityLabelPermissionResponseDto> expected =
-            new List<UserSensitivityLabelPermissionResponseDto>();
-
-        _mockUserSensitivityLabelBusiness
-            .Setup(b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId))
-            .ReturnsAsync(expected);
-
-        await _sensitivityLabelProjectController.GetUserPermissionsForLabel(ProjectId, LabelId, null);
-
-        _mockUserSensitivityLabelBusiness.Verify(
-            b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task GetUserPermissionsForLabel_UsesSuppliedUserId_InsteadOfCurrentUser()
-    {
-        const long suppliedUserId = 20L;
-        IEnumerable<UserSensitivityLabelPermissionResponseDto> expected =
-            new List<UserSensitivityLabelPermissionResponseDto>();
-
-        _mockUserSensitivityLabelBusiness
-            .Setup(b => b.GetUserPermissionsForLabel(LabelId, suppliedUserId, OrgId, ProjectId))
-            .ReturnsAsync(expected);
-
-        await _sensitivityLabelProjectController.GetUserPermissionsForLabel(ProjectId, LabelId, suppliedUserId);
-
-        _mockUserSensitivityLabelBusiness.Verify(
-            b => b.GetUserPermissionsForLabel(LabelId, suppliedUserId, OrgId, ProjectId),
-            Times.Once);
-        _mockUserSensitivityLabelBusiness.Verify(
-            b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId),
-            Times.Never);
+            ProjectId, LabelId, suppliedUserId));
     }
 
     [Fact]
     public async Task GetUserPermissionsForLabel_PassesOrganizationIdFromContextAndProjectIdFromRoute()
     {
-        IEnumerable<UserSensitivityLabelPermissionResponseDto> expected =
-            new List<UserSensitivityLabelPermissionResponseDto>();
+        const long suppliedUserId = 20L;
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
 
-        _mockUserSensitivityLabelBusiness
-            .Setup(b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId))
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, ProjectId, suppliedUserId, null))
             .ReturnsAsync(expected);
 
-        await _sensitivityLabelProjectController.GetUserPermissionsForLabel(ProjectId, LabelId, null);
+        await _sensitivityLabelProjectController.GetUserPermissionsForLabel(ProjectId, LabelId, suppliedUserId);
 
-        _mockUserSensitivityLabelBusiness.Verify(
-            b => b.GetUserPermissionsForLabel(LabelId, UserId, OrgId, ProjectId),
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.GetMemberPermissionsForLabel(LabelId, OrgId, ProjectId, suppliedUserId, null),
             Times.Once);
     }
 
