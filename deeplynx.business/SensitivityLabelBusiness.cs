@@ -768,6 +768,24 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             throw;
         }
     }
+
+    /// <summary>
+    ///     Get all possible sensitivity label permission actions.
+    /// </summary>
+    /// <returns>A list of permission actions</returns>
+    public async Task<List<SensitivityLabelPermissionActionResponseDto>> GetSensitivityLabelPermissionActions()
+    {
+        var permissionActions = await _context.SensitivityLabelPermissionActions
+            .Select(a => new SensitivityLabelPermissionActionResponseDto
+            {
+                Id = a.Id,
+                Name = a.Name,
+                Description = a.Description
+            })
+            .ToListAsync();
+
+        return permissionActions;
+    }
     
     /// <summary>
     ///     Builds a new SensitivityLabelPermission for the given flat action string (e.g. "read record"),

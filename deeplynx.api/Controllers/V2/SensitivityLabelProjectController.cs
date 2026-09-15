@@ -168,6 +168,21 @@ public class SensitivityLabelProjectController : ControllerBase
     }
 
     /// <summary>
+    ///     List Sensitivity Label Permission Actions
+    /// </summary>
+    /// <param name="organizationId">ID of the organization to which the labels belong</param>
+    /// <returns>A list of all possible sensitivity label permission actions.</returns>
+    [HttpGet("permission-actions", Name = "api_get_sensitivity_label_permission_actions_project")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "sensitivity_label")]
+    public async Task<ActionResult<List<SensitivityLabelPermissionActionResponseDto>>> GetSensitivityLabelPermissionActions(
+        long organizationId)
+    {
+        var permissionActions = await _sensitivityLabelBusiness.GetSensitivityLabelPermissionActions();
+        return Ok(permissionActions);
+    }
+
+    /// <summary>
     ///     List Users and Groups with Access to a Sensitivity Label
     /// </summary>
     /// <param name="projectId">ID of the project to which the label belongs</param>

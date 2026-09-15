@@ -1927,4 +1927,39 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region GetSensitivityLabelPermissionActions Tests
+
+    [Fact]
+    public async Task GetSensitivityLabelPermissionActions_ReturnsAllEightFixedActions()
+    {
+        // Act
+        var result = await _labelBusiness.GetSensitivityLabelPermissionActions();
+
+        // Assert — these actions are seeded by migration and fixed, not test data
+        Assert.Equal(8, result.Count);
+        Assert.Contains(result, a => a.Name == "read record");
+        Assert.Contains(result, a => a.Name == "write record");
+        Assert.Contains(result, a => a.Name == "update record");
+        Assert.Contains(result, a => a.Name == "delete record");
+        Assert.Contains(result, a => a.Name == "download file");
+        Assert.Contains(result, a => a.Name == "upload file");
+        Assert.Contains(result, a => a.Name == "update file");
+        Assert.Contains(result, a => a.Name == "delete file");
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelPermissionActions_MapsFieldsCorrectly()
+    {
+        // Act
+        var result = await _labelBusiness.GetSensitivityLabelPermissionActions();
+        var readRecord = result.FirstOrDefault(a => a.Name == "read record");
+
+        // Assert — description matches the fixed migration text exactly
+        Assert.NotNull(readRecord);
+        Assert.True(readRecord.Id > 0);
+        Assert.Equal("Permission to read records with the given label", readRecord.Description);
+    }
+
+    #endregion
 }

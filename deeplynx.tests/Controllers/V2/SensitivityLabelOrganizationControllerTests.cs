@@ -1329,6 +1329,68 @@ public class SensitivityLabelOrganizationControllerTests : IDisposable
 
     #endregion
 
+    #region GetSensitivityLabelPermissionActions Tests
+
+    [Fact]
+    public async Task GetSensitivityLabelPermissionActions_Returns200_WithActions()
+    {
+        var expected = new List<SensitivityLabelPermissionActionResponseDto>
+        {
+            new SensitivityLabelPermissionActionResponseDto { Id = 1, Name = "read record", Description = "desc" }
+        };
+
+        _mockSensitivityLabelBusiness
+            .Setup(b => b.GetSensitivityLabelPermissionActions())
+            .ReturnsAsync(expected);
+
+        var result = (await _sensitivityLabelOrganizationController.GetSensitivityLabelPermissionActions(
+            OrgId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelPermissionActions_ThrowsException_WhenBusinessThrows()
+    {
+        _mockSensitivityLabelBusiness
+            .Setup(b => b.GetSensitivityLabelPermissionActions())
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() =>
+            _sensitivityLabelOrganizationController.GetSensitivityLabelPermissionActions(OrgId));
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelPermissionActions_CallsBusinessLayerOnce()
+    {
+        var expected = new List<SensitivityLabelPermissionActionResponseDto>();
+
+        _mockSensitivityLabelBusiness
+            .Setup(b => b.GetSensitivityLabelPermissionActions())
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelOrganizationController.GetSensitivityLabelPermissionActions(OrgId);
+
+        _mockSensitivityLabelBusiness.Verify(
+            b => b.GetSensitivityLabelPermissionActions(),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetSensitivityLabelPermissionActions_HasHttpGetAndReadSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.GetSensitivityLabelPermissionActions),
+            "organizationId");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+        AssertHasAuthAttribute(method, "read", "sensitivity_label");
+    }
+
+    #endregion
+
     // =========================================================================
     // Test Helpers
     // =========================================================================
