@@ -188,30 +188,35 @@ public class UserSensitivityLabelBusiness : IUserSensitivityLabelBusiness
     /// <summary>
     ///     List all actions governed by a given label
     /// </summary>
-    /// <param name="labelId">ID of the label to list governed actions for</param>
+    /// <param name="labelId">ID of the label for which to list available user permissions</param>
+    /// <param name="userId">ID of the user for which to list available label permissions</param>
     /// <param name="organizationId">(Required) ID of the organization to which the label belongs</param>
     /// <param name="projectId">(Optional) ID of the project to which the label belongs</param>
     /// <returns>A list of governed permissions</returns>
     /// <exception cref="KeyNotFoundException">Returned if label not found</exception>
-    public async Task<IEnumerable<SensitivityLabelPermissionResponseDto>> GetPermissionsForLabel(long labelId,
-        long organizationId, long? projectId)
+    public async Task<IEnumerable<UserSensitivityLabelPermissionResponseDto>> GetUserPermissionsForLabel(
+        long labelId,
+        long userId,
+        long organizationId, 
+        long? projectId)
     {
         await GetScopedLabel(labelId, organizationId, projectId);
 
-        var permissions = await _context.SensitivityLabelPermissions
-            .Where(p => p.LabelId == labelId)
+        var permissions = await _context.UserSensitivityLabels
+            .Where(p => p.LabelId == labelId && p.UserId == userId)
+            .Include(p => p.LabelPermission)
             .ToListAsync();
 
-        return permissions.Select(p => new SensitivityLabelPermissionResponseDto
+        return permissions.Select(p => new UserSensitivityLabelPermissionResponseDto
         {
             Id = p.Id,
             LabelId = p.LabelId,
-            Action = p.Action,
-            Name = p.Name,
-            Description = p.Description,
-            LastUpdatedAt = p.LastUpdatedAt,
-            LastUpdatedBy = p.LastUpdatedBy,
-            IsArchived = p.IsArchived
+            UserId = p.UserId,
+            LabelPermissionId = p.LabelPermissionId,
+            LabelPermissionName = p.LabelPermission?.Name,
+            LabelPermissionDescription = p.LabelPermission?.Description,
+            GrantedAt = p.GrantedAt,
+            GrantedBy = p.GrantedBy
         });
     }
     

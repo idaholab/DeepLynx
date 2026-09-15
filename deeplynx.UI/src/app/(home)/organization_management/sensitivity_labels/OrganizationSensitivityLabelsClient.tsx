@@ -23,7 +23,6 @@ import {
   getAllSensitivityLabelsOrg,
   getUsersWithAccessToLabelOrg,
   revokeSensitivityLabelAccessOrg,
-  getPermissionsForLabelOrg,
   getGroupsWithAccessToLabelOrg,
 } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import { getGroupMembers } from "@/app/lib/client_service/group_services.client";
@@ -42,89 +41,6 @@ type DetailTab = "permissions" | "assigned-users";
 interface Props {
   labels: SensitivityLabelsDto[];
   members: UserResponseDto[];
-}
-
-function LabelPermissionsPanel({
-  label,
-  organizationId,
-  refreshKey,
-}: {
-  label: SensitivityLabelsDto;
-  organizationId: number;
-  refreshKey: number;
-}) {
-  const { t } = useLanguage();
-  const [permissions, setPermissions] = useState<
-    SensitivityLabelPermissionResponseDto[]
-  >([]);
-  const [loading, setLoading] = useState(false);
-
-  const actionLabel = (action: string): string => {
-    const key = `PERMISSION_${action.toUpperCase().replace(" ", "_")}` as keyof typeof t.translations;
-    return (t.translations[key] as string | undefined) ?? action;
-  };
-
-  const loadPermissions = async () => {
-    try {
-      setLoading(true);
-      const perms = await getPermissionsForLabelOrg(organizationId, label.id);
-      setPermissions(perms.filter((p) => !p.isArchived));
-    } catch (error) {
-      console.error(`Failed to load permissions for label ${label.id}:`, error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadPermissions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [label.id, refreshKey]);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-10">
-        <span className="loading loading-spinner loading-md" />
-      </div>
-    );
-  }
-
-  const grantedActions = new Set(permissions.map((p) => p.action));
-
-  const permissionCategories = [
-    { id: "records", label: t.translations.RECORD_PERMISSIONS, actions: RECORD_ACTIONS },
-    { id: "files", label: t.translations.FILE_PERMISSIONS, actions: FILE_ACTIONS },
-  ];
-
-  return (
-    <div className="py-6">
-      <div className="space-y-4">
-        {permissionCategories.map((category) => (
-          <div key={category.id} className="card bg-base-200/25">
-            <div className="card-body p-4">
-              <h3 className="card-title mb-3 text-sm">{category.label}</h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {category.actions.map((action) => (
-                  <label
-                    key={action}
-                    className="label cursor-default justify-start gap-2"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={grantedActions.has(action)}
-                      disabled
-                      className="checkbox checkbox-primary checkbox-sm"
-                    />
-                    <span className="label-text">{actionLabel(action)}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 function AssignedUsersPanel({
@@ -461,16 +377,6 @@ const OrganizationSensitivityLabelsClient: React.FC<Props> = ({
     setIsLabelModalOpen(true);
     if (!orgId) return;
     setPermissionsLoading(true);
-    getPermissionsForLabelOrg(orgId, label.id)
-      .then((perms) => {
-        setSelectedActions(
-          new Set(perms.filter((p) => !p.isArchived).map((p) => p.action)),
-        );
-      })
-      .catch((error) => {
-        console.error(`Failed to load permissions for label ${label.id}:`, error);
-      })
-      .finally(() => setPermissionsLoading(false));
   };
 
   const closeLabelModal = () => {
@@ -641,23 +547,9 @@ const OrganizationSensitivityLabelsClient: React.FC<Props> = ({
             >
               {t.translations.ASSIGNED_USERS}
             </button>
-            <button
-              type="button"
-              role="tab"
-              onClick={() => setDetailTab("permissions")}
-              className={`tab ${detailTab === "permissions" ? "tab-active text-primary" : ""}`}
-            >
-              {t.translations.PERMISSIONS}
-            </button>
           </div>
 
-          {orgId && detailTab === "permissions" ? (
-            <LabelPermissionsPanel
-              label={selectedLabel}
-              organizationId={orgId}
-              refreshKey={permissionsRefreshKey}
-            />
-          ) : orgId ? (
+          {orgId ? (
             <AssignedUsersPanel
               label={selectedLabel}
               organizationId={orgId}

@@ -96,7 +96,7 @@ const LabelEditModal: React.FC<Props> = ({
             />
           </div>
 
-          <div className="form-control">
+          {/* <div className="form-control">
             <label className="label">
               <span className="label-text font-semibold">
                 {t.translations.PERMISSIONS}
@@ -151,7 +151,7 @@ const LabelEditModal: React.FC<Props> = ({
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         <div className="modal-action">
