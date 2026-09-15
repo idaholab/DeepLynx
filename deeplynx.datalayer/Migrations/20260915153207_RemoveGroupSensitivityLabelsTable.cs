@@ -12,6 +12,17 @@ namespace deeplynx.datalayer.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // backfill group permissions into the new grants table before dropping the source table
+            migrationBuilder.Sql(@"
+                INSERT INTO deeplynx.sensitivity_label_grants (group_id, label_id, granted_by, granted_at, label_permission_id)
+                SELECT DISTINCT gsl.group_id, gsl.label_id, gsl.granted_by, gsl.granted_at, spa.id AS ""spa_id""
+                    FROM deeplynx.group_sensitivity_labels gsl
+                    JOIN deeplynx.sensitivity_label_permissions slp
+                        ON slp.label_id = gsl.label_id
+                    JOIN deeplynx.sensitivity_label_permission_actions spa
+                        ON spa.name = slp.action;
+            ");
+
             migrationBuilder.DropTable(
                 name: "group_sensitivity_labels",
                 schema: "deeplynx");
@@ -88,6 +99,22 @@ namespace deeplynx.datalayer.Migrations
                 table: "group_sensitivity_labels",
                 columns: new[] { "group_id", "label_id" },
                 unique: true);
+
+            // move group grants back into the old table (collapsing back to one row per group/label,
+            // since the old table had no permission granularity)
+            migrationBuilder.Sql(@"
+                INSERT INTO deeplynx.group_sensitivity_labels (group_id, label_id, granted_by, granted_at)
+                SELECT DISTINCT ON (slg.group_id, slg.label_id)
+                    slg.group_id, slg.label_id, slg.granted_by, slg.granted_at
+                FROM deeplynx.sensitivity_label_grants slg
+                WHERE slg.group_id IS NOT NULL
+                ORDER BY slg.group_id, slg.label_id, slg.granted_at ASC;
+            ");
+
+            migrationBuilder.Sql(@"
+                DELETE FROM deeplynx.sensitivity_label_grants
+                WHERE group_id IS NOT NULL;
+            ");
         }
     }
 }

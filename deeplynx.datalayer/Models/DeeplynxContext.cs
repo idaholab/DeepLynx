@@ -1418,7 +1418,7 @@ public partial class DeeplynxContext : DbContext
                 .IsUnique();
 
             entity.HasIndex(e => new { e.GroupId, e.LabelId, e.LabelPermissionId })
-                .HasDatabaseName("unique_sensitivity_label_grant_user")
+                .HasDatabaseName("unique_sensitivity_label_grant_group")
                 .IsUnique();
 
             // Enforce UserId XOR GroupId at the DB level

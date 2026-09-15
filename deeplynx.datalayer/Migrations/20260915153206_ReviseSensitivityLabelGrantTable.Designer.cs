@@ -12,8 +12,8 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    [Migration("20260914202504_RemoveGroupSensitivityLabelsTable")]
-    partial class RemoveGroupSensitivityLabelsTable
+    [Migration("20260915153206_ReviseSensitivityLabelGrantTable")]
+    partial class ReviseSensitivityLabelGrantTable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -2613,6 +2613,72 @@ namespace deeplynx.datalayer.Migrations
                     b.ToTable("sensitivity_labels", "deeplynx");
                 });
 
+            modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelGrant", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("GrantedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("granted_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long?>("GrantedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("granted_by");
+
+                    b.Property<long?>("GroupId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("group_id");
+
+                    b.Property<long>("LabelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("label_id");
+
+                    b.Property<long?>("LabelPermissionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("label_permission_id");
+
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("sensitivity_label_grants_pkey");
+
+                    b.HasIndex("GrantedBy");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("idx_sensitivity_label_grants_id");
+
+                    b.HasIndex("LabelId")
+                        .HasDatabaseName("idx_sensitivity_label_grants_label_id");
+
+                    b.HasIndex("LabelPermissionId")
+                        .HasDatabaseName("idx_sensitivity_label_grants_label_permission_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_sensitivity_label_grants_user_id");
+
+                    b.HasIndex("GroupId", "LabelId", "LabelPermissionId")
+                        .IsUnique()
+                        .HasDatabaseName("unique_sensitivity_label_grant_group");
+
+                    b.HasIndex("UserId", "LabelId", "LabelPermissionId")
+                        .IsUnique()
+                        .HasDatabaseName("unique_sensitivity_label_grant_user");
+
+                    b.ToTable("sensitivity_label_grants", "deeplynx", t =>
+                        {
+                            t.HasCheckConstraint("chk_sensitivity_label_grants_user_xor_group", "(user_id IS NOT NULL AND group_id IS NULL) OR (user_id IS NULL AND group_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelPermission", b =>
                 {
                     b.Property<long>("Id")
@@ -2986,61 +3052,6 @@ namespace deeplynx.datalayer.Migrations
                         .HasDatabaseName("idx_user_model_tokens_user_id");
 
                     b.ToTable("user_model_tokens", "deeplynx");
-                });
-
-            modelBuilder.Entity("deeplynx.datalayer.Models.UserSensitivityLabel", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("GrantedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("granted_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<long?>("GrantedBy")
-                        .HasColumnType("bigint")
-                        .HasColumnName("granted_by");
-
-                    b.Property<long>("LabelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("label_id");
-
-                    b.Property<long?>("LabelPermissionId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("label_permission_id");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("user_sensitivity_labels_pkey");
-
-                    b.HasIndex("GrantedBy");
-
-                    b.HasIndex("Id")
-                        .HasDatabaseName("idx_user_sensitivity_labels_id");
-
-                    b.HasIndex("LabelId")
-                        .HasDatabaseName("idx_user_sensitivity_labels_label_id");
-
-                    b.HasIndex("LabelPermissionId")
-                        .HasDatabaseName("idx_user_sensitivity_labels_label_permission_id");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("idx_user_sensitivity_labels_user_id");
-
-                    b.HasIndex("UserId", "LabelId", "LabelPermissionId")
-                        .IsUnique()
-                        .HasDatabaseName("unique_user_sensitivity_label");
-
-                    b.ToTable("user_sensitivity_labels", "deeplynx");
                 });
 
             modelBuilder.Entity("GroupUser", b =>
@@ -3958,6 +3969,50 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelGrant", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.User", "GrantedByUser")
+                        .WithMany("GrantedSensitivityLabelGrants")
+                        .HasForeignKey("GrantedBy")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("sensitivity_label_grants_granted_by_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.Group", "Group")
+                        .WithMany("SensitivityLabelGrants")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("sensitivity_label_grants_group_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.SensitivityLabel", "Label")
+                        .WithMany("SensitivityLabelGrants")
+                        .HasForeignKey("LabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("sensitivity_label_grants_label_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.SensitivityLabelPermissionAction", "LabelPermission")
+                        .WithMany("SensitivityLabelGrants")
+                        .HasForeignKey("LabelPermissionId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("sensitivity_label_grants_label_permission_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.User", "User")
+                        .WithMany("SensitivityLabelGrants")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("sensitivity_label_grants_user_id_fkey");
+
+                    b.Navigation("GrantedByUser");
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Label");
+
+                    b.Navigation("LabelPermission");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelPermission", b =>
                 {
                     b.HasOne("deeplynx.datalayer.Models.SensitivityLabel", "Label")
@@ -4079,43 +4134,6 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("deeplynx.datalayer.Models.UserSensitivityLabel", b =>
-                {
-                    b.HasOne("deeplynx.datalayer.Models.User", "GrantedByUser")
-                        .WithMany("GrantedUserSensitivityLabels")
-                        .HasForeignKey("GrantedBy")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("user_sensitivity_labels_granted_by_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.SensitivityLabel", "Label")
-                        .WithMany("UserSensitivityLabels")
-                        .HasForeignKey("LabelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("user_sensitivity_labels_label_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.SensitivityLabelPermissionAction", "LabelPermission")
-                        .WithMany("UserSensitivityLabels")
-                        .HasForeignKey("LabelPermissionId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("user_sensitivity_labels_label_permission_id_fkey");
-
-                    b.HasOne("deeplynx.datalayer.Models.User", "User")
-                        .WithMany("UserSensitivityLabels")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("user_sensitivity_labels_user_id_fkey");
-
-                    b.Navigation("GrantedByUser");
-
-                    b.Navigation("Label");
-
-                    b.Navigation("LabelPermission");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("deeplynx.datalayer.Models.Action", b =>
                 {
                     b.Navigation("Subscriptions");
@@ -4156,6 +4174,8 @@ namespace deeplynx.datalayer.Migrations
             modelBuilder.Entity("deeplynx.datalayer.Models.Group", b =>
                 {
                     b.Navigation("ProjectMembers");
+
+                    b.Navigation("SensitivityLabelGrants");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.OauthApplication", b =>
@@ -4281,14 +4301,14 @@ namespace deeplynx.datalayer.Migrations
 
             modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabel", b =>
                 {
-                    b.Navigation("SensitivityLabelPermissions");
+                    b.Navigation("SensitivityLabelGrants");
 
-                    b.Navigation("UserSensitivityLabels");
+                    b.Navigation("SensitivityLabelPermissions");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelPermissionAction", b =>
                 {
-                    b.Navigation("UserSensitivityLabels");
+                    b.Navigation("SensitivityLabelGrants");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.User", b =>
@@ -4297,7 +4317,7 @@ namespace deeplynx.datalayer.Migrations
 
                     b.Navigation("CreatedApiKeys");
 
-                    b.Navigation("GrantedUserSensitivityLabels");
+                    b.Navigation("GrantedSensitivityLabelGrants");
 
                     b.Navigation("LastUpdatedActions");
 
@@ -4351,13 +4371,13 @@ namespace deeplynx.datalayer.Migrations
 
                     b.Navigation("SavedSearches");
 
+                    b.Navigation("SensitivityLabelGrants");
+
                     b.Navigation("Subscriptions");
 
                     b.Navigation("UpdatedOauthApplications");
 
                     b.Navigation("UserModelTokens");
-
-                    b.Navigation("UserSensitivityLabels");
                 });
 #pragma warning restore 612, 618
         }
