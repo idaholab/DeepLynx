@@ -194,29 +194,36 @@ public class SensitivityLabelService : ISensitivityLabelService
     }
     
     public async Task<HashSet<long>> FilterAuthorizedRecordIds(
-    long currentUserId,
-    long organizationId,
-    long projectId,
-    ICollection<long> recordIds,
-    DeeplynxContext context)
-    {
-        if (recordIds.Count == 0)
-            return [];
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        ICollection<long> recordIds,
+        DeeplynxContext context,
+        bool isAdmin = false)
+        {
+            if (recordIds.Count == 0)
+                return [];
 
-        var authorizedLabels = await GetAuthorizedSensitivityLabels(
-            currentUserId, organizationId, projectId, "read record");
+            var query = context.Records
+                .Where(r => r.ProjectId == projectId
+                        && r.OrganizationId == organizationId
+                        && recordIds.Contains(r.Id));
 
-        var ids = await context.Records
-            .Where(r => r.ProjectId == projectId
-                    && r.OrganizationId == organizationId
-                    && recordIds.Contains(r.Id)
-                    && (r.Labels.Count == 0
-                        || r.Labels.All(l => authorizedLabels.Contains(l.Id))))
-            .Select(r => r.Id)
-            .ToListAsync();
+            if (!isAdmin)
+            {
+                var authorizedLabels = await GetAuthorizedSensitivityLabels(
+                    currentUserId, organizationId, projectId, "read record");
 
-        return [.. ids];
-    }
+                query = query.Where(r => r.Labels.Count == 0
+                            || r.Labels.All(l => authorizedLabels.Contains(l.Id)));
+            }
+
+            var ids = await query
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            return [.. ids];
+        }
 
     /// <summary>
     /// Invalidates the authorized-labels cache  across every project the label is visible in 
