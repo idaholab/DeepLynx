@@ -9,14 +9,19 @@ namespace deeplynx.business;
 public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
 {
     private readonly DeeplynxContext _context;
+    private readonly ISensitivityLabelService _sensitivityLabelService;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="SensitivityLabelGrantBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for user and group sensitivity label operations</param>
-    public SensitivityLabelGrantBusiness(DeeplynxContext context)
+    /// <param name="sensitivityLabelService">Used for sensitivity label record authorization.</param>
+    public SensitivityLabelGrantBusiness(
+        DeeplynxContext context,
+        ISensitivityLabelService sensitivityLabelService)
     {
         _context = context;
+        _sensitivityLabelService = sensitivityLabelService;
     }
     
     /// <summary>
@@ -76,6 +81,7 @@ public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
         await GetScopedLabel(labelId, organizationId, projectId);
 
         var query = _context.SensitivityLabelGrants
+            .AsNoTracking()
             .Where(g => g.LabelId == labelId)
             .Include(g => g.LabelPermission)
             .Include(g => g.GrantedByUser)
@@ -137,13 +143,12 @@ public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
         // to avoid failures somewhere in the batch, wrap everything in a transaction to ensure completeness
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        // replace only grants belonging to members and labels being set
-        var existingGrants = await _context.SensitivityLabelGrants
+        // remove only grants belonging to members and labels being set
+        var deletedCount = await _context.SensitivityLabelGrants
             .Where(g => g.LabelId == labelId &&
                     ((g.UserId != null && userIds.Contains(g.UserId.Value)) ||
                     (g.GroupId != null && groupIds.Contains(g.GroupId.Value))))
-            .ToListAsync();
-        _context.SensitivityLabelGrants.RemoveRange(existingGrants);
+            .ExecuteDeleteAsync();
 
         var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         var newGrants = new List<SensitivityLabelGrant>();
@@ -227,20 +232,16 @@ public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
 
         await GetScopedLabel(labelId, organizationId, projectId);
 
-        var grants = await _context.SensitivityLabelGrants
+        var deletedCount = await _context.SensitivityLabelGrants
             .Where(g => g.LabelId == labelId &&
                         ((g.UserId != null && userIds.Contains(g.UserId.Value)) ||
-                         (g.GroupId != null && groupIds.Contains(g.GroupId.Value))))
-            .ToListAsync();
+                        (g.GroupId != null && groupIds.Contains(g.GroupId.Value))))
+            .ExecuteDeleteAsync();
 
-        if (grants.Count == 0)
+        if (deletedCount == 0)
             throw new KeyNotFoundException("No matching grants found to revoke");
 
-        _context.SensitivityLabelGrants.RemoveRange(grants);
-        await _context.SaveChangesAsync();
-
         await InvalidateForMembers(labelId, userIds, groupIds);
-
         return true;
     }
 
@@ -286,9 +287,8 @@ public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
         }
 
         // for each affected user, invalidate the cache
-        var service = new SensitivityLabelService(_context);
         foreach (var uid in affectedUserIds)
-            await service.InvalidateAuthorizedLabelsCache(labelId, uid);
+            await _sensitivityLabelService.InvalidateAuthorizedLabelsCache(labelId, uid);
     }
 
     // builds a list of a member's grant rows. All grants must belong to the same user or the same group.
@@ -326,6 +326,7 @@ public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
     private async Task<SensitivityLabel> GetScopedLabel(long labelId, long organizationId, long? projectId)
     {
         var query = _context.SensitivityLabels
+            .AsNoTracking()
             .Where(l => l.Id == labelId && l.OrganizationId == organizationId);
 
         if (projectId.HasValue)
