@@ -28,6 +28,7 @@ public class SensitivityLabelOrganizationControllerTests : IDisposable
     private const long OrgId = 1L;
     private const long UserId = 10L;
     private const long LabelId = 8L;
+    private const long GroupId = 15L;
     private static readonly long[] ProjectIds = { 11L, 13L };
 
     public SensitivityLabelOrganizationControllerTests()
@@ -597,7 +598,715 @@ public class SensitivityLabelOrganizationControllerTests : IDisposable
     }
 
     #endregion
-    
+
+    // =========================================================================
+    // GetMembersWithAccessToLabel Tests
+    // =========================================================================
+
+    #region GetMembersWithAccessToLabel Tests
+
+    [Fact]
+    public async Task GetMembersWithAccessToLabel_Returns200_WithMembers()
+    {
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMembersWithLabelAccess(LabelId, OrgId, null))
+            .ReturnsAsync(expected);
+
+        var result = (await _sensitivityLabelOrganizationController.GetMembersWithAccessToLabel(
+            OrgId, LabelId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetMembersWithAccessToLabel_Returns200_WithEmptyList()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMembersWithLabelAccess(LabelId, OrgId, null))
+            .ReturnsAsync([]);
+
+        var result = (await _sensitivityLabelOrganizationController.GetMembersWithAccessToLabel(
+            OrgId, LabelId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.IsAssignableFrom<IEnumerable<SensitivityLabelMemberAccessDto>>(result.Value);
+    }
+
+    [Fact]
+    public async Task GetMembersWithAccessToLabel_ThrowsException_WhenBusinessThrows()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMembersWithLabelAccess(LabelId, OrgId, null))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() => _sensitivityLabelOrganizationController.GetMembersWithAccessToLabel(
+            OrgId, LabelId));
+    }
+
+    [Fact]
+    public async Task GetMembersWithAccessToLabel_PassesNullProjectIdToBusinessLayer()
+    {
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMembersWithLabelAccess(LabelId, OrgId, null))
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelOrganizationController.GetMembersWithAccessToLabel(OrgId, LabelId);
+
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.GetMembersWithLabelAccess(LabelId, OrgId, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetMembersWithAccessToLabel_HasHttpGetAndReadSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.GetMembersWithAccessToLabel),
+            "organizationId", "labelId");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+        AssertHasAuthAttribute(method, "read", "sensitivity_label");
+    }
+
+    #endregion
+
+    // =========================================================================
+    // GetCurrentUserPermissionsForLabel Tests
+    // =========================================================================
+
+    #region GetCurrentUserPermissionsForLabel Tests
+
+    [Fact]
+    public async Task GetCurrentUserPermissionsForLabel_Returns200_WithPermissions()
+    {
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, null, UserId, null))
+            .ReturnsAsync(expected);
+
+        var result = (await _sensitivityLabelOrganizationController.GetCurrentUserPermissionsForLabel(
+            OrgId, LabelId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetCurrentUserPermissionsForLabel_Returns200_WithEmptyList()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, null, UserId, null))
+            .ReturnsAsync([]);
+
+        var result = (await _sensitivityLabelOrganizationController.GetCurrentUserPermissionsForLabel(
+            OrgId, LabelId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.IsAssignableFrom<IEnumerable<SensitivityLabelMemberAccessDto>>(result.Value);
+    }
+
+    [Fact]
+    public async Task GetCurrentUserPermissionsForLabel_ThrowsException_WhenBusinessThrows()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, null, UserId, null))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() =>
+            _sensitivityLabelOrganizationController.GetCurrentUserPermissionsForLabel(OrgId, LabelId));
+    }
+
+    [Fact]
+    public async Task GetCurrentUserPermissionsForLabel_UsesCurrentUserIdFromContext()
+    {
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, null, UserId, null))
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelOrganizationController.GetCurrentUserPermissionsForLabel(OrgId, LabelId);
+
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.GetMemberPermissionsForLabel(LabelId, OrgId, null, UserId, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetCurrentUserPermissionsForLabel_HasHttpGetAndReadSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.GetCurrentUserPermissionsForLabel),
+            "organizationId", "labelId");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+        AssertHasAuthAttribute(method, "read", "sensitivity_label");
+    }
+
+    #endregion
+
+    // =========================================================================
+    // GetGroupPermissionsForLabel Tests
+    // =========================================================================
+
+    #region GetGroupPermissionsForLabel Tests
+
+    [Fact]
+    public async Task GetGroupPermissionsForLabel_Returns200_WithPermissions()
+    {
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, null, null, GroupId))
+            .ReturnsAsync(expected);
+
+        var result = (await _sensitivityLabelOrganizationController.GetGroupPermissionsForLabel(
+            OrgId, LabelId, GroupId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GetGroupPermissionsForLabel_Returns200_WithEmptyList()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, null, null, GroupId))
+            .ReturnsAsync([]);
+
+        var result = (await _sensitivityLabelOrganizationController.GetGroupPermissionsForLabel(
+            OrgId, LabelId, GroupId)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.IsAssignableFrom<IEnumerable<SensitivityLabelMemberAccessDto>>(result.Value);
+    }
+
+    [Fact]
+    public async Task GetGroupPermissionsForLabel_ThrowsException_WhenBusinessThrows()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, null, null, GroupId))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() =>
+            _sensitivityLabelOrganizationController.GetGroupPermissionsForLabel(OrgId, LabelId, GroupId));
+    }
+
+    [Fact]
+    public async Task GetGroupPermissionsForLabel_PassesNullUserIdAndNullProjectIdToBusinessLayer()
+    {
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.GetMemberPermissionsForLabel(LabelId, OrgId, null, null, GroupId))
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelOrganizationController.GetGroupPermissionsForLabel(OrgId, LabelId, GroupId);
+
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.GetMemberPermissionsForLabel(LabelId, OrgId, null, null, GroupId),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GetGroupPermissionsForLabel_HasHttpGetAndReadSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.GetGroupPermissionsForLabel),
+            "organizationId", "labelId", "groupId");
+
+        AssertHasHttpAttribute(method, nameof(HttpGetAttribute));
+        AssertHasAuthAttribute(method, "read", "sensitivity_label");
+    }
+
+    #endregion
+
+    // =========================================================================
+    // GrantUserLabelAccess Tests
+    // =========================================================================
+
+    #region GrantUserLabelAccess Tests
+
+    [Fact]
+    public async Task GrantUserLabelAccess_Returns200_WithMemberAccess()
+    {
+        var input = new GrantLabelAccessDto();
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null,
+                It.Is<GrantLabelAccessDto>(dto => dto.UserIds.SequenceEqual(new[] { UserId }))))
+            .ReturnsAsync(expected);
+
+        var result = (await _sensitivityLabelOrganizationController.GrantUserLabelAccess(
+            OrgId, LabelId, UserId, input)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GrantUserLabelAccess_ThrowsException_WhenBusinessThrows()
+    {
+        var input = new GrantLabelAccessDto();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, It.IsAny<GrantLabelAccessDto>()))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() =>
+            _sensitivityLabelOrganizationController.GrantUserLabelAccess(OrgId, LabelId, UserId, input));
+    }
+
+    [Fact]
+    public async Task GrantUserLabelAccess_OverwritesUserIdsOnDto_WithRouteUserId()
+    {
+        var input = new GrantLabelAccessDto { UserIds = [999L] };
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, It.IsAny<GrantLabelAccessDto>()))
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelOrganizationController.GrantUserLabelAccess(OrgId, LabelId, UserId, input);
+
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.SetAccessForLabel(UserId, LabelId, OrgId, null,
+                It.Is<GrantLabelAccessDto>(dto => dto.UserIds.SequenceEqual(new[] { UserId }))),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GrantUserLabelAccess_HasHttpPostAndUpdateSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.GrantUserLabelAccess),
+            "organizationId", "labelId", "userId", "dto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+        AssertHasAuthAttribute(method, "update", "sensitivity_label");
+    }
+
+    #endregion
+
+    // =========================================================================
+    // GrantUsersLabelAccess Tests
+    // =========================================================================
+
+    #region GrantUsersLabelAccess Tests
+
+    [Fact]
+    public async Task GrantUsersLabelAccess_Returns200_WithBooleanResult()
+    {
+        var input = new GrantLabelAccessDto { UserIds = [UserId, 21L] };
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input))
+            .ReturnsAsync([]);
+
+        var result = (await _sensitivityLabelOrganizationController.GrantUsersLabelAccess(
+            OrgId, LabelId, input)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task GrantUsersLabelAccess_ThrowsException_WhenBusinessThrows()
+    {
+        var input = new GrantLabelAccessDto { UserIds = [UserId] };
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() =>
+            _sensitivityLabelOrganizationController.GrantUsersLabelAccess(OrgId, LabelId, input));
+    }
+
+    [Fact]
+    public async Task GrantUsersLabelAccess_PassesCurrentUserIdAndNullProjectIdToBusinessLayer()
+    {
+        var input = new GrantLabelAccessDto { UserIds = [UserId] };
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input))
+            .ReturnsAsync([]);
+
+        await _sensitivityLabelOrganizationController.GrantUsersLabelAccess(OrgId, LabelId, input);
+
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GrantUsersLabelAccess_HasHttpPostAndUpdateSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.GrantUsersLabelAccess),
+            "organizationId", "labelId", "dto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+        AssertHasAuthAttribute(method, "update", "sensitivity_label");
+    }
+
+    #endregion
+
+    // =========================================================================
+    // GrantGroupLabelAccess Tests
+    // =========================================================================
+
+    #region GrantGroupLabelAccess Tests
+
+    [Fact]
+    public async Task GrantGroupLabelAccess_Returns200_WithMemberAccess()
+    {
+        var input = new GrantLabelAccessDto();
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null,
+                It.Is<GrantLabelAccessDto>(dto => dto.GroupIds.SequenceEqual(new[] { GroupId }))))
+            .ReturnsAsync(expected);
+
+        var result = (await _sensitivityLabelOrganizationController.GrantGroupLabelAccess(
+            OrgId, LabelId, GroupId, input)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GrantGroupLabelAccess_ThrowsException_WhenBusinessThrows()
+    {
+        var input = new GrantLabelAccessDto();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, It.IsAny<GrantLabelAccessDto>()))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() =>
+            _sensitivityLabelOrganizationController.GrantGroupLabelAccess(OrgId, LabelId, GroupId, input));
+    }
+
+    [Fact]
+    public async Task GrantGroupLabelAccess_OverwritesGroupIdsOnDto_WithRouteGroupId()
+    {
+        var input = new GrantLabelAccessDto { GroupIds = [999L] };
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, It.IsAny<GrantLabelAccessDto>()))
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelOrganizationController.GrantGroupLabelAccess(OrgId, LabelId, GroupId, input);
+
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.SetAccessForLabel(UserId, LabelId, OrgId, null,
+                It.Is<GrantLabelAccessDto>(dto => dto.GroupIds.SequenceEqual(new[] { GroupId }))),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GrantGroupLabelAccess_HasHttpPostAndUpdateSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.GrantGroupLabelAccess),
+            "organizationId", "labelId", "groupId", "dto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+        AssertHasAuthAttribute(method, "update", "sensitivity_label");
+    }
+
+    #endregion
+
+    // =========================================================================
+    // GrantGroupsLabelAccess Tests
+    // =========================================================================
+
+    #region GrantGroupsLabelAccess Tests
+
+    [Fact]
+    public async Task GrantGroupsLabelAccess_Returns200_WithMemberAccess()
+    {
+        var input = new GrantLabelAccessDto { GroupIds = [GroupId, 16L] };
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input))
+            .ReturnsAsync(expected);
+
+        var result = (await _sensitivityLabelOrganizationController.GrantGroupsLabelAccess(
+            OrgId, LabelId, input)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GrantGroupsLabelAccess_ThrowsException_WhenBusinessThrows()
+    {
+        var input = new GrantLabelAccessDto { GroupIds = [GroupId] };
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() =>
+            _sensitivityLabelOrganizationController.GrantGroupsLabelAccess(OrgId, LabelId, input));
+    }
+
+    [Fact]
+    public async Task GrantGroupsLabelAccess_PassesCurrentUserIdAndNullProjectIdToBusinessLayer()
+    {
+        var input = new GrantLabelAccessDto { GroupIds = [GroupId] };
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input))
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelOrganizationController.GrantGroupsLabelAccess(OrgId, LabelId, input);
+
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GrantGroupsLabelAccess_HasHttpPostAndUpdateSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.GrantGroupsLabelAccess),
+            "organizationId", "labelId", "dto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+        AssertHasAuthAttribute(method, "update", "sensitivity_label");
+    }
+
+    #endregion
+
+    // =========================================================================
+    // GrantLabelAccess Tests
+    // =========================================================================
+
+    #region GrantLabelAccess Tests
+
+    [Fact]
+    public async Task GrantLabelAccess_Returns200_WithMemberAccess()
+    {
+        var input = new GrantLabelAccessDto { UserIds = [UserId], GroupIds = [GroupId] };
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input))
+            .ReturnsAsync(expected);
+
+        var result = (await _sensitivityLabelOrganizationController.GrantLabelAccess(
+            OrgId, LabelId, input)).Result as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public async Task GrantLabelAccess_ThrowsException_WhenBusinessThrows()
+    {
+        var input = new GrantLabelAccessDto { UserIds = [UserId] };
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() =>
+            _sensitivityLabelOrganizationController.GrantLabelAccess(OrgId, LabelId, input));
+    }
+
+    [Fact]
+    public async Task GrantLabelAccess_PassesCurrentUserIdAndNullProjectIdToBusinessLayer()
+    {
+        var input = new GrantLabelAccessDto { UserIds = [UserId], GroupIds = [GroupId] };
+        IEnumerable<SensitivityLabelMemberAccessDto> expected =
+            new List<SensitivityLabelMemberAccessDto>();
+
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input))
+            .ReturnsAsync(expected);
+
+        await _sensitivityLabelOrganizationController.GrantLabelAccess(OrgId, LabelId, input);
+
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.SetAccessForLabel(UserId, LabelId, OrgId, null, input),
+            Times.Once);
+    }
+
+    [Fact]
+    public void GrantLabelAccess_HasHttpPostAndUpdateSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.GrantLabelAccess),
+            "organizationId", "labelId", "dto");
+
+        AssertHasHttpAttribute(method, nameof(HttpPostAttribute));
+        AssertHasAuthAttribute(method, "update", "sensitivity_label");
+    }
+
+    #endregion
+
+    // =========================================================================
+    // RevokeLabelAccessFromUser Tests
+    // =========================================================================
+
+    #region RevokeLabelAccessFromUser Tests
+
+    [Fact]
+    public async Task RevokeLabelAccessFromUser_Returns200_WithBooleanResult()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.RevokeAccessForLabel(LabelId, OrgId, null,
+                It.Is<long[]>(ids => ids.SequenceEqual(new[] { UserId })), null))
+            .ReturnsAsync(true);
+
+        var actionResult = await _sensitivityLabelOrganizationController.RevokeLabelAccessFromUser(
+            OrgId, LabelId, UserId);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(true, result.Value);
+    }
+
+    [Fact]
+    public async Task RevokeLabelAccessFromUser_ThrowsException_WhenBusinessThrows()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.RevokeAccessForLabel(LabelId, OrgId, null, It.IsAny<long[]>(), null))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() =>
+            _sensitivityLabelOrganizationController.RevokeLabelAccessFromUser(OrgId, LabelId, UserId));
+    }
+
+    [Fact]
+    public async Task RevokeLabelAccessFromUser_PassesNullGroupIdsAndNullProjectIdToBusinessLayer()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.RevokeAccessForLabel(LabelId, OrgId, null,
+                It.Is<long[]>(ids => ids.SequenceEqual(new[] { UserId })), null))
+            .ReturnsAsync(true);
+
+        await _sensitivityLabelOrganizationController.RevokeLabelAccessFromUser(OrgId, LabelId, UserId);
+
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.RevokeAccessForLabel(LabelId, OrgId, null,
+                It.Is<long[]>(ids => ids.SequenceEqual(new[] { UserId })), null),
+            Times.Once);
+    }
+
+    [Fact]
+    public void RevokeLabelAccessFromUser_HasHttpDeleteAndUpdateSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.RevokeLabelAccessFromUser),
+            "organizationId", "labelId", "userId");
+
+        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
+        AssertHasAuthAttribute(method, "update", "sensitivity_label");
+    }
+
+    #endregion
+
+    // =========================================================================
+    // RevokeLabelAccessFromGroup Tests
+    // =========================================================================
+
+    #region RevokeLabelAccessFromGroup Tests
+
+    [Fact]
+    public async Task RevokeLabelAccessFromGroup_Returns200_WithBooleanResult()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.RevokeAccessForLabel(LabelId, OrgId, null, null,
+                It.Is<long[]>(ids => ids.SequenceEqual(new[] { GroupId }))))
+            .ReturnsAsync(true);
+
+        var actionResult = await _sensitivityLabelOrganizationController.RevokeLabelAccessFromGroup(
+            OrgId, LabelId, GroupId);
+
+        var result = Assert.IsType<OkObjectResult>(actionResult.Result);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(true, result.Value);
+    }
+
+    [Fact]
+    public async Task RevokeLabelAccessFromGroup_ThrowsException_WhenBusinessThrows()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.RevokeAccessForLabel(LabelId, OrgId, null, null, It.IsAny<long[]>()))
+            .ThrowsAsync(new Exception("db error"));
+
+        await Assert.ThrowsAsync<Exception>(() =>
+            _sensitivityLabelOrganizationController.RevokeLabelAccessFromGroup(OrgId, LabelId, GroupId));
+    }
+
+    [Fact]
+    public async Task RevokeLabelAccessFromGroup_PassesNullUserIdsAndNullProjectIdToBusinessLayer()
+    {
+        _mockSensitivityLabelGrantBusiness
+            .Setup(b => b.RevokeAccessForLabel(LabelId, OrgId, null, null,
+                It.Is<long[]>(ids => ids.SequenceEqual(new[] { GroupId }))))
+            .ReturnsAsync(true);
+
+        await _sensitivityLabelOrganizationController.RevokeLabelAccessFromGroup(OrgId, LabelId, GroupId);
+
+        _mockSensitivityLabelGrantBusiness.Verify(
+            b => b.RevokeAccessForLabel(LabelId, OrgId, null, null,
+                It.Is<long[]>(ids => ids.SequenceEqual(new[] { GroupId }))),
+            Times.Once);
+    }
+
+    [Fact]
+    public void RevokeLabelAccessFromGroup_HasHttpDeleteAndUpdateSensitivityLabelAuthorization()
+    {
+        var method = GetControllerMethod(
+            nameof(SensitivityLabelOrganizationController.RevokeLabelAccessFromGroup),
+            "organizationId", "labelId", "groupId");
+
+        AssertHasHttpAttribute(method, nameof(HttpDeleteAttribute));
+        AssertHasAuthAttribute(method, "update", "sensitivity_label");
+    }
+
+    #endregion
+
     // =========================================================================
     // Auth / Middleware Metadata Tests
     // =========================================================================
