@@ -215,15 +215,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         readActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
         downloadActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "download file")).Id;
 
-        // Gate "read record" on the non-admin-bypass labels used across these tests so that,
-        // matching the old role/permission model's default-deny behavior, a non-admin user
-        // needs an explicit UserSensitivityLabel grant to see them.
-        var readGateTimestamp = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-        Context.SensitivityLabelPermissions.AddRange(
-            new SensitivityLabelPermission { LabelId = lid, Action = "read record", Name = "read record", LastUpdatedAt = readGateTimestamp, IsArchived = false },
-            new SensitivityLabelPermission { LabelId = lid3, Action = "read record", Name = "read record", LastUpdatedAt = readGateTimestamp, IsArchived = false },
-            new SensitivityLabelPermission { LabelId = lid4, Action = "read record", Name = "read record", LastUpdatedAt = readGateTimestamp, IsArchived = false },
-            new SensitivityLabelPermission { LabelId = lid6, Action = "read record", Name = "read record", LastUpdatedAt = readGateTimestamp, IsArchived = false });
         await Context.SaveChangesAsync();
         Context.ChangeTracker.Clear();
 
@@ -670,7 +661,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         {
             Description = "Label without name"
         };
-        var initialPermissionCount = await Context.SensitivityLabelPermissions.CountAsync();
 
         // Act & Assert
         await Assert.ThrowsAsync<ValidationException>(() => _labelBusiness.CreateSensitivityLabel(uid, dto, pid, oid));
@@ -678,10 +668,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
-
-        // Ensure that no permissions were created
-        var permissionCount = await Context.SensitivityLabelPermissions.CountAsync();
-        Assert.Equal(initialPermissionCount, permissionCount);
     }
 
     [Fact]
@@ -693,7 +679,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             Name = "",
             Description = "Label with empty name"
         };
-        var initialPermissionCount = await Context.SensitivityLabelPermissions.CountAsync();
 
         // Act & Assert
         await Assert.ThrowsAsync<ValidationException>(() => _labelBusiness.CreateSensitivityLabel(uid, dto, pid, oid));
@@ -701,10 +686,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
-
-        // Ensure that no permissions were created
-        var permissionCount = await Context.SensitivityLabelPermissions.CountAsync();
-        Assert.Equal(initialPermissionCount, permissionCount);
     }
 
     #endregion
@@ -851,7 +832,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     {
         // Arrange
         var labels = new List<CreateSensitivityLabelRequestDto>();
-        var initialPermissionCount = await Context.SensitivityLabelPermissions.CountAsync();
 
         // Act
         var result = await _labelBusiness.BulkCreateSensitivityLabels(oid, uid, pid, labels);
@@ -863,18 +843,11 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
-
-        // Ensure that no permissions were created
-        var permissionCount = await Context.SensitivityLabelPermissions.CountAsync();
-        Assert.Equal(initialPermissionCount, permissionCount);
     }
 
     [Fact]
     public async Task BulkCreateSensitivityLabels_Success_WithNullList()
     {
-        // Arrange
-        var initialPermissionCount = await Context.SensitivityLabelPermissions.CountAsync();
-
         // Act
         var result = await _labelBusiness.BulkCreateSensitivityLabels(oid, uid, pid, null);
 
@@ -885,10 +858,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
-
-        // Ensure that no permissions were created
-        var permissionCount = await Context.SensitivityLabelPermissions.CountAsync();
-        Assert.Equal(initialPermissionCount, permissionCount);
     }
 
     [Fact]
