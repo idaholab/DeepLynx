@@ -4381,17 +4381,6 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
-        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
-        {
-            Name = $"Download File Permission {Guid.NewGuid()}",
-            Description = "Governs file download for this label",
-            Action = "download file",
-            LabelId = label.Id,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false
-        });
-
         var downloadActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "download file")).Id;
         Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
@@ -4485,28 +4474,6 @@ public class RecordBusinessTests : IntegrationTestBase
 
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
-
-        Context.SensitivityLabelPermissions.AddRange(
-            new SensitivityLabelPermission
-            {
-                Name = $"Upload File Permission {Guid.NewGuid()}",
-                Description = "Governs file upload for this label",
-                Action = "update file",
-                LabelId = label.Id,
-                LastUpdatedBy = adminUser.Id,
-                LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-                IsArchived = false
-            },
-            new SensitivityLabelPermission
-            {
-                Name = $"Download File Permission {Guid.NewGuid()}",
-                Description = "Governs file download for this label",
-                Action = "download file",
-                LabelId = label.Id,
-                LastUpdatedBy = adminUser.Id,
-                LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-                IsArchived = false
-            });
 
         var updateFileActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "update file")).Id;
         var downloadFileActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "download file")).Id;
@@ -4971,24 +4938,11 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
-        // Gate the requested actions on this label. Grants are per-action under the new model
-        // (one SensitivityLabelGrant row per action, not a single row that unlocks everything),
-        // and read visibility for a non-admin user requires its own explicit "read record" grant —
-        // there's no default-allow. So both users get "read record" below; only the gated
-        // actions passed in (e.g. "download file"/"upload file") differ between them.
-        var labelPermissions = permissionActions.Select(action => new SensitivityLabelPermission
-        {
-            Name = $"{action} Permission {Guid.NewGuid()}",
-            Description = $"Governs {action} for this label",
-            Action = action,
-            LabelId = label.Id,
-            LastUpdatedBy = adminUser.Id,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
-            IsArchived = false
-        }).ToList();
-
-        Context.SensitivityLabelPermissions.AddRange(labelPermissions);
-
+        // Grants are per-action under the new model (one SensitivityLabelGrant row per action,
+        // not a single row that unlocks everything), and read visibility for a non-admin user
+        // requires its own explicit "read record" grant — there's no default-allow. So both
+        // users get "read record" below; only the gated actions passed in (e.g. "download
+        // file"/"upload file") differ between them.
         var readActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
 
         // Both users need "read record" just to see the record at all.
@@ -5395,17 +5349,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.Records.Add(restrictedRecord);
         await Context.SaveChangesAsync();
 
-        // Gate "read record" on the label with no UserSensitivityLabel grant to otherUser,
-        // so the label is not open-by-default under the new access model.
-        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
-        {
-            LabelId = restrictedLabel.Id,
-            Action = "read record",
-            Name = "read record",
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        });
-        await Context.SaveChangesAsync();
+        // No SensitivityLabelGrant for otherUser, so the label is ungranted and access is denied by default.
 
         // Act
         var result = await _recordBusiness.GetAllRecords(
@@ -5900,17 +5844,7 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.Records.Add(restrictedRecord);
         await Context.SaveChangesAsync();
 
-        // Gate "read record" on the label with no UserSensitivityLabel grant to otherUser,
-        // so the label is not open-by-default under the new access model.
-        Context.SensitivityLabelPermissions.Add(new SensitivityLabelPermission
-        {
-            LabelId = restrictedLabel.Id,
-            Action = "read record",
-            Name = "read record",
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        });
-        await Context.SaveChangesAsync();
+        // No SensitivityLabelGrant for otherUser, so the label is ungranted and access is denied by default.
 
         // Act
         var result = await _recordBusiness.SearchPaginated(
