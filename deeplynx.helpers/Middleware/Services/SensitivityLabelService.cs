@@ -44,17 +44,13 @@ public class SensitivityLabelService : ISensitivityLabelService
         long[] projectIds,
         string userAction)
     {
-        var validActions = new List<string>
-        {
-            "write record", "upload file",
-            "read record", "download file",
-            "update record", "update file",
-            "delete record", "delete file"
-        };
+        var sensitivityLabelPermissionAction = await _context.SensitivityLabelPermissionActions
+            .FirstOrDefaultAsync(sla => sla.Name == userAction);
 
-        // if user action does not contain read, write, update, delete, upload, download, + file
-        if (!validActions.Contains(userAction))
+        if (sensitivityLabelPermissionAction is null)
+        {
             throw new ArgumentException("User action must be read, write, update, delete, upload, or download");
+        }
 
         if (projectIds == null || projectIds.Length == 0)
             return new List<long>();
@@ -84,7 +80,7 @@ public class SensitivityLabelService : ISensitivityLabelService
             }
 
             uncachedProjectIds.Add(projectId);
-            }
+        }
 
         if (uncachedProjectIds.Count == 0)
         {
@@ -98,23 +94,18 @@ public class SensitivityLabelService : ISensitivityLabelService
             .Select(l => new { l.Id, l.ProjectId })
             .ToListAsync();
 
-        // Labels for which this action is actually gated (non-archived definition present)
-        var governedLabelIds = (await _context.SensitivityLabelPermissions
-            .Where(p => p.Action == userAction && !p.IsArchived)
-            .Select(p => p.LabelId)
-            .ToListAsync())
-            .ToHashSet();
+        // Labels this user has been explicitly granted access to for this specific action,
+        // either directly or through a group they belong to.
+        var grantedLabelIds = await _context.SensitivityLabelGrants
+            .Where(slg => (slg.UserId == currentUserId
+                           || (slg.Group != null && slg.Group.Users.Any(u => u.Id == currentUserId)))
+                          && slg.LabelPermission.Id == sensitivityLabelPermissionAction.Id)
+            .Select(g => g.LabelId)
+            .ToHashSetAsync();
 
-        // Labels this user has been explicitly granted access to, 
-        // either directly or through a group they belong to
-        var grantedLabelIds = _context.SensitivityLabelGrants
-            .Where(g => g.UserId == currentUserId
-                || g.Group.Users.Any(u => u.Id == currentUserId))
-            .Select(g => g.LabelId);
-
-        // A label is "authorized" for this action if it isn't gated for that action at all,
-        // or the user has an explicit grant for it
-        bool IsAuthorized(long labelId) => !governedLabelIds.Contains(labelId) || grantedLabelIds.Contains(labelId);
+        // A label is "authorized" for this action if the user has an explicit grant for it
+        // (materialized as a HashSet above so this is an in-memory lookup, not a DB round trip)
+        bool IsAuthorized(long labelId) => grantedLabelIds.Contains(labelId);
 
         var orgLevelAuthorized = relevantLabels
             .Where(l => l.ProjectId == null && IsAuthorized(l.Id))
@@ -128,7 +119,7 @@ public class SensitivityLabelService : ISensitivityLabelService
 
             authorizedLabelIds.UnionWith(projectAuthorized);
 
-            // Update the cache 
+            // Update the cache
             string cacheKey = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId, currentUserId, userAction);
             try
             {

@@ -59,6 +59,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
     public long lid; // sensitivity label ID
     public long uid;
     public long roleId;
+    public long readActionId;
 
     public JsonObject validDepthJson =
         (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new
@@ -80,6 +81,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
     {
         _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
+        readActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
         _provenanceBusiness = new Mock<IProvenanceBusiness>();
         _mockRecordLogger = new Mock<ILogger<RecordBusiness>>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
@@ -154,6 +156,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -198,6 +201,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label1.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -238,6 +242,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
             {
                 UserId = uid,
                 LabelId = label1.Id,
+                LabelPermissionId = readActionId,
                 GrantedBy = uid,
                 GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
             },
@@ -245,6 +250,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
             {
                 UserId = uid,
                 LabelId = label2.Id,
+                LabelPermissionId = readActionId,
                 GrantedBy = uid,
                 GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
             });
@@ -294,6 +300,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label1.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -338,6 +345,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = publicLabel.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -384,6 +392,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = publicLabel.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -462,6 +471,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -570,6 +580,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = accessibleLabel.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -643,6 +654,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label1.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -654,6 +666,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label2.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -727,6 +740,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label1.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -865,6 +879,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = accessibleLabel.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -939,6 +954,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1047,6 +1063,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = accessibleLabel.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1121,6 +1138,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
             {
                 UserId = uid,
                 LabelId = label1.Id,
+                LabelPermissionId = readActionId,
                 GrantedBy = uid,
                 GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
             },
@@ -1128,6 +1146,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
             {
                 UserId = uid,
                 LabelId = label2.Id,
+                LabelPermissionId = readActionId,
                 GrantedBy = uid,
                 GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
             });
@@ -1201,6 +1220,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label1.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1340,6 +1360,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = accessibleLabel.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1482,6 +1503,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1602,6 +1624,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label1.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1613,6 +1636,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label2.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1699,6 +1723,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = label1.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1792,6 +1817,7 @@ public class RecordBusinessAuthTests : IntegrationTestBase
         {
             UserId = uid,
             LabelId = accessibleLabel.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });

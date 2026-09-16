@@ -262,18 +262,13 @@ public class PermissionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetAllPermissions_FiltersOnLabelId()
     {
-        // Act - v1's labelId filter now sources from SensitivityLabelPermissions, scoped to the label's organization
+        // Act - label-scoped V1 permissions are deprecated; GetAllPermissions now hardcodes
+        // an empty list whenever labelId is supplied.
         var result = await _permissionBusiness.GetAllPermissions(lid, null, oid);
         var permissions = result.ToList();
 
-        // Assert - should return only non-archived label permissions for lid
-        Assert.Equal(3, permissions.Count);
-        Assert.All(permissions, p => Assert.False(p.IsArchived));
-        Assert.Contains(permissions, p => p.Id == lpid1);
-        Assert.Contains(permissions, p => p.Id == lpid3);
-        Assert.Contains(permissions, p => p.Id == lpid4);
-        Assert.DoesNotContain(permissions, p => p.Id == lpid2); // archived
-        Assert.DoesNotContain(permissions, p => p.Id == lpid5); // different label
+        // Assert
+        Assert.Empty(permissions);
     }
 
 
@@ -298,17 +293,13 @@ public class PermissionBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetAllPermissions_FiltersOnMultiple()
     {
-        // Act - filter by label and project; lid is an org-wide label (no ProjectId), so it
-        // matches regardless of the project filter supplied
+        // Act - filter by label and project; label-scoped V1 permissions are deprecated, so
+        // supplying labelId hardcodes an empty result regardless of the project filter.
         var result = await _permissionBusiness.GetAllPermissions(lid, pid, oid);
         var permissions = result.ToList();
 
-        // Assert - should return the same non-archived label permissions for lid
-        Assert.Equal(3, permissions.Count);
-        Assert.All(permissions, p => Assert.False(p.IsArchived));
-        Assert.Contains(permissions, p => p.Id == lpid1);
-        Assert.Contains(permissions, p => p.Id == lpid3);
-        Assert.Contains(permissions, p => p.Id == lpid4);
+        // Assert
+        Assert.Empty(permissions);
     }
 
     [Fact]

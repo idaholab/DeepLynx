@@ -4392,10 +4392,12 @@ public class RecordBusinessTests : IntegrationTestBase
             IsArchived = false
         });
 
+        var downloadActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "download file")).Id;
         Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = adminUser.Id,
             LabelId = label.Id,
+            LabelPermissionId = downloadActionId,
             GrantedBy = adminUser.Id,
             GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
         });
@@ -4506,13 +4508,25 @@ public class RecordBusinessTests : IntegrationTestBase
                 IsArchived = false
             });
 
-        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
-        {
-            UserId = adminUser.Id,
-            LabelId = label.Id,
-            GrantedBy = adminUser.Id,
-            GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
-        });
+        var updateFileActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "update file")).Id;
+        var downloadFileActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "download file")).Id;
+        Context.SensitivityLabelGrants.AddRange(
+            new SensitivityLabelGrant
+            {
+                UserId = adminUser.Id,
+                LabelId = label.Id,
+                LabelPermissionId = updateFileActionId,
+                GrantedBy = adminUser.Id,
+                GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
+            },
+            new SensitivityLabelGrant
+            {
+                UserId = adminUser.Id,
+                LabelId = label.Id,
+                LabelPermissionId = downloadFileActionId,
+                GrantedBy = adminUser.Id,
+                GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
+            });
 
         await Context.SaveChangesAsync();
 
@@ -4957,9 +4971,11 @@ public class RecordBusinessTests : IntegrationTestBase
         Context.SensitivityLabels.Add(label);
         await Context.SaveChangesAsync();
 
-        // Gate the requested actions on this label. Access is now per-user via SensitivityLabelGrant
-        // (a single grant unlocks ALL actions on a label), so "read record" is deliberately left
-        // ungoverned here — both users can read the record, only the gated actions differ.
+        // Gate the requested actions on this label. Grants are per-action under the new model
+        // (one SensitivityLabelGrant row per action, not a single row that unlocks everything),
+        // and read visibility for a non-admin user requires its own explicit "read record" grant —
+        // there's no default-allow. So both users get "read record" below; only the gated
+        // actions passed in (e.g. "download file"/"upload file") differ between them.
         var labelPermissions = permissionActions.Select(action => new SensitivityLabelPermission
         {
             Name = $"{action} Permission {Guid.NewGuid()}",
@@ -4973,13 +4989,42 @@ public class RecordBusinessTests : IntegrationTestBase
 
         Context.SensitivityLabelPermissions.AddRange(labelPermissions);
 
-        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        var readActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
+
+        // Both users need "read record" just to see the record at all.
+        Context.SensitivityLabelGrants.AddRange(
+            new SensitivityLabelGrant
+            {
+                UserId = adminUser.Id,
+                LabelId = label.Id,
+                LabelPermissionId = readActionId,
+                GrantedBy = adminUser.Id,
+                GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
+            },
+            new SensitivityLabelGrant
+            {
+                UserId = restrictedUser.Id,
+                LabelId = label.Id,
+                LabelPermissionId = readActionId,
+                GrantedBy = adminUser.Id,
+                GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
+            });
+
+        // Grants are per-action under the new model (one SensitivityLabelGrant row per action),
+        // so grant the admin user each requested action individually rather than relying on a
+        // single grant to unlock everything. The restricted user gets read-only access above.
+        foreach (var action in permissionActions)
         {
-            UserId = adminUser.Id,
-            LabelId = label.Id,
-            GrantedBy = adminUser.Id,
-            GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
-        });
+            var actionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == action)).Id;
+            Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+            {
+                UserId = adminUser.Id,
+                LabelId = label.Id,
+                LabelPermissionId = actionId,
+                GrantedBy = adminUser.Id,
+                GrantedAt = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)
+            });
+        }
 
         await Context.SaveChangesAsync();
 
