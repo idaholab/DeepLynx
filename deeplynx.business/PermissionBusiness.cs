@@ -52,28 +52,8 @@ public class PermissionBusiness : IPermissionBusiness
     {
         if (labelId.HasValue)
         {
-            var labelPermissionQuery = _context.SensitivityLabelPermissions.Where(p =>
-                p.LabelId == labelId.Value &&
-                p.Label.OrganizationId == organizationId &&
-                (!projectId.HasValue || p.Label.ProjectId == projectId || p.Label.ProjectId == null));
-
-            if (hideArchived)
-                labelPermissionQuery = labelPermissionQuery.Where(p => !p.IsArchived);
-
-            return await labelPermissionQuery.Select(p => new PermissionResponseDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                Action = p.Action,
-                LastUpdatedAt = p.LastUpdatedAt,
-                LastUpdatedBy = p.LastUpdatedBy,
-                IsArchived = p.IsArchived,
-                ProjectId = p.Label.ProjectId,
-                OrganizationId = p.Label.OrganizationId,
-                IsDefault = false
-            })
-                .ToListAsync();
+            //permissions are not attached to SLs anymore, return nothing for now.
+            return new List<PermissionResponseDto>();
         }
 
         // Always returns default permissions alongside those from the supplied org ID or project ID
