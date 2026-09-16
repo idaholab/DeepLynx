@@ -15,6 +15,7 @@ import type {
   SensitivityLabelsDto,
   SensitivityLabelGrantResponseDto,
   SensitivityLabelPermissionResponseDto,
+  SensitivityLabelMemberAccessDto,
   ProjectMemberResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import {
@@ -26,6 +27,9 @@ import {
   getUsersWithAccessToLabelOrg,
   revokeSensitivityLabelAccessOrg,
   getGroupsWithAccessToLabelOrg,
+  getUserPermissionsForLabelProject,
+  getAvailablePermissionActionsForProject,
+  grantSensitivityLabelAccessProject,
 } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import { getGroupMembers } from "@/app/lib/client_service/group_services.client";
 import LabelEditModal, {
@@ -65,6 +69,18 @@ function AssignedUsersPanel({
   const [search, setSearch] = useState("");
   const [revokingUserId, setRevokingUserId] = useState<number | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedUserPermissions, setSelectedUserPermissions] =
+    useState<SensitivityLabelMemberAccessDto | null>(null);
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
+  const [permissionsEditing, setPermissionsEditing] = useState(false);
+  const [editedPermissionIds, setEditedPermissionIds] = useState<Set<number>>(
+    new Set(),
+  );
+  const [savingPermissions, setSavingPermissions] = useState(false);
+  const [availablePermissions, setAvailablePermissions] = useState<
+    { id: number; name: string; description: string | null }[]
+  >([]);
   const [groupAccessByUser, setGroupAccessByUser] = useState<
     Map<number, string[]>
   >(new Map());
@@ -88,6 +104,89 @@ function AssignedUsersPanel({
     loadAssignedUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [label.id, label.projectId]);
+
+  useEffect(() => {
+    if (isOrgLabel) {
+      setAvailablePermissions([]);
+      return;
+    }
+
+    getAvailablePermissionActionsForProject(projectId)
+      .then(setAvailablePermissions)
+      .catch((error) => {
+        console.error("Failed to load available label permissions:", error);
+        setAvailablePermissions([]);
+      });
+  }, [isOrgLabel, label.id, projectId]);
+
+  useEffect(() => {
+    if (!selectedUserId || isOrgLabel) {
+      setSelectedUserPermissions(null);
+      setPermissionsEditing(false);
+      return;
+    }
+
+    setPermissionsLoading(true);
+    setPermissionsEditing(false);
+    getUserPermissionsForLabelProject(projectId, label.id, selectedUserId)
+      .then((permissions) => {
+        setSelectedUserPermissions(permissions);
+        setEditedPermissionIds(
+          new Set(
+            permissions?.permissions
+              .map((grant) => grant.labelPermissionId)
+              .filter((id): id is number => id !== null) ?? [],
+          ),
+        );
+      })
+      .catch((error) => {
+        console.error("Failed to load user label permissions:", error);
+        setSelectedUserPermissions(null);
+      })
+      .finally(() => setPermissionsLoading(false));
+  }, [isOrgLabel, label.id, projectId, selectedUserId]);
+
+  const toggleEditedPermission = (permissionId: number) => {
+    setEditedPermissionIds((current) => {
+      const next = new Set(current);
+      if (next.has(permissionId)) next.delete(permissionId);
+      else next.add(permissionId);
+      return next;
+    });
+  };
+
+  const saveUserPermissions = async () => {
+    if (!selectedUserId) return;
+    try {
+      setSavingPermissions(true);
+      if (editedPermissionIds.size === 0) {
+        await revokeSensitivityLabelAccessProject(projectId, label.id, selectedUserId);
+        setSelectedUserPermissions((current) =>
+          current ? { ...current, permissions: [] } : current,
+        );
+      } else {
+        const updatedGrants = await grantSensitivityLabelAccessProject(
+          projectId,
+          label.id,
+          selectedUserId,
+          Array.from(editedPermissionIds),
+        );
+        setSelectedUserPermissions((current) =>
+          current
+            ? { ...current, permissions: updatedGrants[0]?.permissions ?? current.permissions }
+            : current,
+        );
+      }
+      await loadAssignedUsers();
+      setPermissionsEditing(false);
+      toast.success(t.translations.SUCCESSFULLY);
+    } catch (error) {
+      console.error("Failed to update user label permissions:", error);
+      toast.error(t.translations.FAILED_TO_UPDATE_SENSITIVITY_LABELS);
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOrgLabel) {
@@ -136,6 +235,7 @@ function AssignedUsersPanel({
         await revokeSensitivityLabelAccessProject(projectId, label.id, userId);
       }
       setAssignedUsers((current) => current.filter((u) => u.userId !== userId));
+      if (selectedUserId === userId) setSelectedUserId(null);
     } catch (error) {
       console.error(`Failed to revoke access for user ${userId}:`, error);
       toast.error(t.translations.FAILED_TO_REVOKE_ACCESS);
@@ -200,6 +300,24 @@ function AssignedUsersPanel({
       )
     : usersView;
 
+  const permissionGroups = useMemo(
+    () => [
+      {
+        name: t.translations.RECORD,
+        permissions: availablePermissions.filter((permission) =>
+          permission.name.toLowerCase().includes("record"),
+        ),
+      },
+      {
+        name: t.translations.FILE,
+        permissions: availablePermissions.filter((permission) =>
+          permission.name.toLowerCase().includes("file"),
+        ),
+      },
+    ].filter((group) => group.permissions.length > 0),
+    [availablePermissions, t],
+  );
+
   return (
     <div className="py-6">
       {isOrgLabel && (
@@ -236,7 +354,8 @@ function AssignedUsersPanel({
           {t.translations.NO_ASSIGNED_USERS}
         </p>
       ) : (
-        <div className="overflow-hidden rounded-box border border-base-200">
+        <div className="grid h-[480px] gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.1fr)]">
+          <div className="h-full overflow-y-auto rounded-box border border-base-200">
           {filteredUsers.map((u) => {
             const hasGroupAccess = groupAccessByUser.has(u.userId);
             const isAssigned = !!u.assigned || hasGroupAccess;
@@ -244,34 +363,24 @@ function AssignedUsersPanel({
               <div
                 key={u.userId}
                 className={`flex items-center gap-3 border-b border-base-200 px-4 py-4 last:border-b-0 ${
-                  isOrgLabel ? "opacity-50" : isAssigned ? "" : "opacity-50"
+                  selectedUserId === u.userId
+                    ? "border-l-4 border-l-primary bg-primary/10 pl-3"
+                    : isOrgLabel ? "opacity-50" : isAssigned ? "" : "opacity-50"
                 }`}
               >
-                <AvatarCell name={u.userName} size={9} containerClassName="space-x-0" />
-                <span className="min-w-0 flex-1">
-                  <strong className="block">{u.userName}</strong>
-                  <span className="block text-sm text-base-content/60">
-                    {u.userEmail}
-                    {u.assigned?.grantedByName && (
-                      <>
-                        {" · "}
-                        {t.translations.GRANTED_BY_ON.replace(
-                          "{name}",
-                          u.assigned.grantedByName,
-                        ).replace(
-                          "{date}",
-                          new Date(u.assigned.grantedAt).toLocaleDateString(),
-                        )}
-                      </>
-                    )}
+                <button type="button" className={`flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-left ${selectedUserId === u.userId ? "font-semibold" : ""}`} onClick={() => setSelectedUserId(u.userId)}>
+                  <AvatarCell name={u.userName} size={9} containerClassName="space-x-0" />
+                  <span className="min-w-0 flex-1">
+                    <strong className="block truncate">{u.userName}</strong>
+                    <span className="block truncate text-sm text-base-content/60">{u.userEmail}</span>
                   </span>
-                </span>
+                </button>
                 {!isAssigned && !isOrgLabel && (
                   <span className="badge badge-ghost">{t.translations.UNASSIGNED}</span>
                 )}
                 {hasGroupAccess && (
                   <span
-                    className="badge badge-secondary gap-1"
+                    className="badge badge-secondary shrink-0 gap-1"
                     title={t.translations.ALSO_GRANTED_VIA_GROUPS.replace(
                       "{groups}",
                       groupAccessByUser.get(u.userId)!.join(", "),
@@ -284,7 +393,7 @@ function AssignedUsersPanel({
                 {isAssigned && !isOrgLabel && (
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm text-error"
+                    className="btn btn-ghost btn-sm shrink-0 text-error"
                     onClick={() => handleRevoke(u.userId)}
                     disabled={revokingUserId === u.userId}
                     aria-label={t.translations.REMOVE_ACCESS}
@@ -296,6 +405,87 @@ function AssignedUsersPanel({
               </div>
             );
           })}
+          </div>
+          <div className="h-full overflow-y-auto rounded-box border border-base-200 p-5">
+            {selectedUserId === null ? (
+              <p className="text-sm text-base-content/60">{t.translations.SELECT_A_USER}</p>
+            ) : permissionsLoading ? (
+              <span className="loading loading-spinner loading-sm" />
+            ) : availablePermissions.length ? (
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="font-semibold">{t.translations.PERMISSIONS}</h4>
+                  {permissionsEditing ? (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setPermissionsEditing(false)}
+                        disabled={savingPermissions}
+                      >
+                        {t.translations.CANCEL}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={saveUserPermissions}
+                        disabled={savingPermissions}
+                      >
+                        {savingPermissions && <span className="loading loading-spinner loading-xs" />}
+                        {t.translations.SAVE}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => setPermissionsEditing(true)}
+                    >
+                      {t.translations.EDIT}
+                    </button>
+                  )}
+                </div>
+                <div
+                  className={`mt-3 space-y-4 ${
+                    permissionsEditing ? "" : "opacity-60"
+                  }`}
+                >
+                  {permissionGroups.map((group) => (
+                    <div key={group.name}>
+                      <p className="text-xs font-semibold text-base-content/60">
+                        {group.name}
+                      </p>
+                      <div className="mt-1 space-y-1">
+                        {group.permissions.map((permission) => {
+                          const isGranted = permissionsEditing
+                            ? editedPermissionIds.has(permission.id)
+                            : selectedUserPermissions?.permissions.some(
+                                (grant) => grant.labelPermissionId === permission.id,
+                              );
+                          return (
+                            <label key={permission.id} className="flex items-center gap-1.5 rounded-box px-1.5 py-0.5">
+                              <input
+                                type="checkbox"
+                              className={`checkbox checkbox-primary checkbox-sm ${
+                                permissionsEditing ? "" : "opacity-40"
+                              }`}
+                              checked={isGranted}
+                              disabled={!permissionsEditing}
+                              onChange={() => toggleEditedPermission(permission.id)}
+                              />
+                              <span className="text-sm">{permission.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-base-content/60">{t.translations.NO_PERMISSIONS_AVAILABLE}</p>
+            )}
+          </div>
         </div>
       )}
 

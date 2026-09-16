@@ -280,6 +280,53 @@ export type SensitivityLabelGrantResponseDto = {
   grantedAt: string;
 };
 
+export type SensitivityLabelMemberAccessDto = {
+  userId: number | null;
+  userName: string | null;
+  userEmail: string | null;
+  groupId: number | null;
+  groupName: string | null;
+  groupMembers: {
+    userId: number;
+    userName: string;
+    userEmail: string;
+  }[] | null;
+  permissions: {
+    grantId: number;
+    labelPermissionId: number | null;
+    labelPermissionName: string | null;
+    labelPermissionDescription: string | null;
+    grantedAt: string;
+    grantedBy: number | null;
+  }[];
+};
+
+export type SensitivityLabelPermissionFlagDto = {
+  permissionId: number;
+  permissionName: string;
+  hasPermission: boolean;
+};
+
+export type SensitivityLabelGroupPermissionFlagsDto = {
+  groupId: number;
+  groupName: string;
+  permissions: SensitivityLabelPermissionFlagDto[];
+};
+
+export type SensitivityLabelUserAccessDto = {
+  userId: number;
+  labelId: number;
+  totalPermissions: SensitivityLabelPermissionFlagDto[];
+  userPermissions: SensitivityLabelPermissionFlagDto[];
+  groupPermissions: SensitivityLabelGroupPermissionFlagsDto[];
+};
+
+export type SensitivityLabelPermissionActionResponseDto = {
+  id: number;
+  name: string;
+  description: string | null;
+};
+
 export type GroupSensitivityLabelResponseDto = {
   id: number;
   groupId: number;

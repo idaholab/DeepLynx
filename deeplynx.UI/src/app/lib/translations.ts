@@ -1914,6 +1914,7 @@ export const translations = {
       SECURITY_LABELS_LOCKED_BY_ORGANIZATION:
         "Sensitivity labels are locked by the organization",
       SEE_MORE: "See more",
+      APPLY_PERMISSIONS_TO_ALL: "Apply permissions to all selected users",
       SELECT_A_DATA_SOURCE: "Select a data source...",
       SELECT_A_GROUP: "Select a group",
       SEARCH_USERS: "Search users...",
@@ -4373,6 +4374,7 @@ export const translations = {
         "Las etiquetas de sensitividad están bloqueadas por la organización",
       SEE_MORE: "Ver más",
       SELECT_A_DATA_SOURCE: "Selecciona una fuente de datos...",
+      APPLY_PERMISSIONS_TO_ALL: "Aplicar permisos a todos los usuarios seleccionados",
       SELECT_A_GROUP: "Selecciona un grupo",
       SELECT_A_MEMBER: "Seleccione un miembro",
       SELECT_A_PROJECT_AND_AT_LEAST_ONE_FILE:

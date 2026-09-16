@@ -1,11 +1,53 @@
 import {
     SensitivityLabelsDto,
     SensitivityLabelGrantResponseDto,
+    SensitivityLabelMemberAccessDto,
+    SensitivityLabelUserAccessDto,
+    SensitivityLabelPermissionActionResponseDto,
     SensitivityLabelPermissionResponseDto,
     GroupSensitivityLabelResponseDto,
 } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 import { CreateSensitivityLabelDto, UpdateSensitivityLabelDto } from "@/app/(home)/types/requestDTOs";
+
+const toUserSensitivityLabelGrants = (
+    members: SensitivityLabelMemberAccessDto[],
+    labelId: number,
+): SensitivityLabelGrantResponseDto[] =>
+    members
+        .filter((member) => member.userId !== null)
+        .map((member) => {
+            const firstPermission = member.permissions[0];
+            return {
+                id: firstPermission?.grantId ?? 0,
+                userId: member.userId!,
+                userName: member.userName ?? "",
+                userEmail: member.userEmail ?? "",
+                labelId,
+                grantedBy: firstPermission?.grantedBy ?? null,
+                grantedByName: null,
+                grantedAt: firstPermission?.grantedAt ?? "",
+            };
+        });
+
+const toGroupSensitivityLabelGrants = (
+    members: SensitivityLabelMemberAccessDto[],
+    labelId: number,
+): GroupSensitivityLabelResponseDto[] =>
+    members
+        .filter((member) => member.groupId !== null)
+        .map((member) => {
+            const firstPermission = member.permissions[0];
+            return {
+                id: firstPermission?.grantId ?? 0,
+                groupId: member.groupId!,
+                groupName: member.groupName ?? "",
+                labelId,
+                grantedBy: firstPermission?.grantedBy ?? null,
+                grantedByName: null,
+                grantedAt: firstPermission?.grantedAt ?? "",
+            };
+        });
 
 
 // ============================================================================
@@ -169,9 +211,9 @@ export const getUsersWithAccessToLabelOrg = async (
 ): Promise<SensitivityLabelGrantResponseDto[]> => {
     try {
         const res = await api.get(
-            `/organizations/${organizationId}/labels/${labelId}/users`
+            `/organizations/${organizationId}/labels/${labelId}/members`
         );
-        return res.data;
+        return toUserSensitivityLabelGrants(res.data, labelId);
     } catch (error) {
         console.error(`Error getting users with access to Sensitivity Label ${labelId}:`, error);
         throw error;
@@ -188,17 +230,100 @@ export const getUsersWithAccessToLabelOrg = async (
 export const grantSensitivityLabelAccessOrg = async (
     organizationId: number,
     labelId: number,
-    userId: number
-): Promise<SensitivityLabelGrantResponseDto> => {
+    userId: number,
+    labelPermissionIds: number[]
+): Promise<SensitivityLabelMemberAccessDto[]> => {
     try {
         const res = await api.post(
-            `/organizations/${organizationId}/labels/${labelId}/users/${userId}`
+            `/organizations/${organizationId}/labels/${labelId}/users/${userId}`,
+            { labelPermissionIds }
         );
         return res.data;
     } catch (error) {
         console.error(`Error granting user ${userId} access to Sensitivity Label ${labelId}:`, error);
         throw error;
     }
+}
+
+export const getAvailablePermissionActionsForOrg = async (
+    organizationId: number
+): Promise<SensitivityLabelPermissionActionResponseDto[]> => {
+    const res = await api.get(
+        `/organizations/${organizationId}/labels/permission-actions`
+    );
+    return res.data;
+}
+
+export const getUserPermissionsForLabelOrg = async (
+    organizationId: number,
+    labelId: number,
+    userId: number,
+): Promise<SensitivityLabelMemberAccessDto | null> => {
+    const res = await api.get(
+        `/organizations/${organizationId}/labels/${labelId}/permissions/user/${userId}`,
+        {
+            headers: { "Cache-Control": "no-cache" },
+            params: { _: Date.now() },
+        },
+    );
+    return (res.data as SensitivityLabelMemberAccessDto[])[0] ?? null;
+}
+
+export const getUserPermissionsMatrixForLabelOrg = async (
+    organizationId: number,
+    labelId: number,
+    userId: number,
+): Promise<SensitivityLabelUserAccessDto> => {
+    const res = await api.get(
+        `/organizations/${organizationId}/labels/${labelId}/permissions/user/${userId}/matrix`,
+        {
+            headers: { "Cache-Control": "no-cache" },
+            params: { _: Date.now() },
+        },
+    );
+    const response = res.data as Record<string, unknown>;
+    const matrix = (response.data ?? response) as Record<string, unknown>;
+    const flags = (value: unknown) =>
+        (Array.isArray(value) ? value : []).map((flag) => {
+            const item = flag as Record<string, unknown>;
+            return {
+                permissionId: Number(item.permissionId ?? item.PermissionId),
+                permissionName: String(item.permissionName ?? item.PermissionName ?? ""),
+                hasPermission: Boolean(item.hasPermission ?? item.HasPermission),
+            };
+        });
+    const groups = (value: unknown) =>
+        (Array.isArray(value) ? value : []).map((group) => {
+            const item = group as Record<string, unknown>;
+            return {
+                groupId: Number(item.groupId ?? item.GroupId),
+                groupName: String(item.groupName ?? item.GroupName ?? ""),
+                permissions: flags(item.permissions ?? item.Permissions),
+            };
+        });
+
+    return {
+        userId: Number(matrix.userId ?? matrix.UserId),
+        labelId: Number(matrix.labelId ?? matrix.LabelId),
+        totalPermissions: flags(matrix.totalPermissions ?? matrix.TotalPermissions),
+        userPermissions: flags(matrix.userPermissions ?? matrix.UserPermissions),
+        groupPermissions: groups(matrix.groupPermissions ?? matrix.GroupPermissions),
+    };
+}
+
+export const getGroupPermissionsForLabelOrg = async (
+    organizationId: number,
+    labelId: number,
+    groupId: number,
+): Promise<SensitivityLabelMemberAccessDto | null> => {
+    const res = await api.get(
+        `/organizations/${organizationId}/labels/${labelId}/permissions/group/${groupId}`,
+        {
+            headers: { "Cache-Control": "no-cache" },
+            params: { _: Date.now() },
+        },
+    );
+    return (res.data as SensitivityLabelMemberAccessDto[])[0] ?? null;
 }
 
 /**
@@ -236,9 +361,9 @@ export const getGroupsWithAccessToLabelOrg = async (
 ): Promise<GroupSensitivityLabelResponseDto[]> => {
     try {
         const res = await api.get(
-            `/organizations/${organizationId}/labels/${labelId}/groups`
+            `/organizations/${organizationId}/labels/${labelId}/members`
         );
-        return res.data;
+        return toGroupSensitivityLabelGrants(res.data, labelId);
     } catch (error) {
         console.error(`Error getting groups with access to Sensitivity Label ${labelId}:`, error);
         throw error;
@@ -250,16 +375,19 @@ export const getGroupsWithAccessToLabelOrg = async (
  * @param organizationId - The ID of the organization
  * @param labelId - The ID of the sensitivity label
  * @param groupId - The ID of the group to grant access to
- * @returns Promise with GroupSensitivityLabelResponseDto
+ * @param labelPermissionIds - Permission actions to grant to the group
+ * @returns Promise with the group's resulting label access grants
  */
 export const grantSensitivityLabelAccessToGroupOrg = async (
     organizationId: number,
     labelId: number,
-    groupId: number
-): Promise<GroupSensitivityLabelResponseDto> => {
+    groupId: number,
+    labelPermissionIds: number[]
+): Promise<SensitivityLabelMemberAccessDto[]> => {
     try {
         const res = await api.post(
-            `/organizations/${organizationId}/labels/${labelId}/groups/${groupId}`
+            `/organizations/${organizationId}/labels/${labelId}/groups/${groupId}`,
+            { labelPermissionIds }
         );
         return res.data;
     } catch (error) {
@@ -454,9 +582,13 @@ export const getUsersWithAccessToLabelProject = async (
 ): Promise<SensitivityLabelGrantResponseDto[]> => {
     try {
         const res = await api.get(
-            `/projects/${projectId}/labels/${labelId}/users`
+            `/projects/${projectId}/labels/${labelId}/members`
         );
-        return res.data;
+        const members: SensitivityLabelMemberAccessDto[] = res.data;
+
+        // The API returns a combined list of user and group grants. This
+        // caller powers the individual-users panel, so retain direct users.
+        return toUserSensitivityLabelGrants(members, labelId);
     } catch (error) {
         console.error(`Error getting users with access to Sensitivity Label ${labelId}:`, error);
         throw error;
@@ -473,17 +605,43 @@ export const getUsersWithAccessToLabelProject = async (
 export const grantSensitivityLabelAccessProject = async (
     projectId: number,
     labelId: number,
-    userId: number
-): Promise<SensitivityLabelGrantResponseDto> => {
+    userId: number,
+    labelPermissionIds: number[]
+): Promise<SensitivityLabelMemberAccessDto[]> => {
     try {
         const res = await api.post(
-            `/projects/${projectId}/labels/${labelId}/users/${userId}`
+            `/projects/${projectId}/labels/${labelId}/users/${userId}`,
+            { labelPermissionIds }
         );
         return res.data;
     } catch (error) {
         console.error(`Error granting user ${userId} access to Sensitivity Label ${labelId}:`, error);
         throw error;
     }
+}
+
+export const getAvailablePermissionActionsForProject = async (
+    projectId: number
+): Promise<SensitivityLabelPermissionActionResponseDto[]> => {
+    const res = await api.get(
+        `/projects/${projectId}/labels/permission-actions`
+    );
+    return res.data;
+}
+
+export const getUserPermissionsForLabelProject = async (
+    projectId: number,
+    labelId: number,
+    userId: number
+): Promise<SensitivityLabelMemberAccessDto | null> => {
+    const res = await api.get(
+        `/projects/${projectId}/labels/${labelId}/permissions/user/${userId}`,
+        {
+            headers: { "Cache-Control": "no-cache" },
+            params: { _: Date.now() },
+        },
+    );
+    return (res.data as SensitivityLabelMemberAccessDto[])[0] ?? null;
 }
 
 /**
