@@ -4,6 +4,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -533,6 +534,8 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                 throw new Exception(
                     $"Cannot archive. Sensitivity label with id {labelId} is used on {recordCount} records.");
             }
+
+            await _context.SensitivityLabelGrants.Where(slg => slg.LabelId == label.Id).ExecuteDeleteAsync();
 
             // Archive label by ID
             label.IsArchived = true;

@@ -1144,6 +1144,32 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task ArchiveSensitivityLabel_Succeeds_DeletesAssociatedGrants()
+    {
+        // Arrange
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid2,
+            LabelId = lid,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _labelBusiness.ArchiveSensitivityLabel(uid, lid, pid, oid);
+
+        // Assert
+        Assert.True(result);
+
+        var remainingGrants = await Context.SensitivityLabelGrants
+            .Where(slg => slg.LabelId == lid)
+            .ToListAsync();
+        Assert.Empty(remainingGrants);
+    }
+
+    [Fact]
     public async Task ArchiveSensitivityLabel_Fails_IfArchived()
     {
         // Act & Assert
