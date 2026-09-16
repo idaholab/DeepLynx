@@ -4,6 +4,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -534,13 +535,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                     $"Cannot archive. Sensitivity label with id {labelId} is used on {recordCount} records.");
             }
 
-            // Archive permissions for this sensitivity label
-            await _context.SensitivityLabelPermissions
-                .Where(p => p.LabelId == labelId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(p => p.IsArchived, true)
-                    .SetProperty(p => p.LastUpdatedAt, DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified))
-                    .SetProperty(p => p.LastUpdatedBy, currentUserId));
+            await _context.SensitivityLabelGrants.Where(slg => slg.LabelId == label.Id).ExecuteDeleteAsync();
 
             // Archive label by ID
             label.IsArchived = true;
@@ -623,14 +618,6 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             label.IsArchived = false;
             label.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
             label.LastUpdatedBy = currentUserId;
-
-            // Unarchive Permissions associated with the label
-            await _context.SensitivityLabelPermissions
-                .Where(p => p.LabelId == labelId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(p => p.IsArchived, false)
-                    .SetProperty(p => p.LastUpdatedAt, DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified))
-                    .SetProperty(p => p.LastUpdatedBy, currentUserId));
 
             await _context.SaveChangesAsync();
 
