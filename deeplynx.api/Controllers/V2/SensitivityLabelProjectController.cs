@@ -244,6 +244,31 @@ public class SensitivityLabelProjectController : ControllerBase
     }
 
     /// <summary>
+    ///     List the Full Permissions Matrix a given User has on a Sensitivity Label
+    /// </summary>
+    /// <param name="projectId">ID of the project to which the label belongs</param>
+    /// <param name="labelId">ID of the sensitivity label</param>
+    /// <param name="userId">ID of the user.</param>
+    /// <returns>
+    ///     A permissions matrix showing every permission action, whether the user has it individually,
+    ///     whether each of their groups has it, and the aggregate (total) across all sources.
+    /// </returns>
+    [HttpGet("{labelId:long}/permissions/user/{userId:long}/matrix", Name = "api_get_label_permissions_matrix_project")]
+    [Badge("V2", BadgePosition.Before, "#72e6a1")]
+    [Auth("read", "sensitivity_label")]
+    public async Task<ActionResult<SensitivityLabelUserAccessDto>> GetUserPermissionsMatrixForLabel(
+        long projectId,
+        long labelId,
+        long userId)
+    {
+        var organizationId = UserContextStorage.OrganizationId;
+
+        var matrix = await _sensitivityLabelGrantBusiness.GetUserPermissionsMatrixForLabel(
+            labelId, organizationId, projectId, userId);
+        return Ok(matrix);
+    }
+
+    /// <summary>
     ///     List Permissions a given group has on the given label
     /// </summary>
     /// <param name="projectId">ID of the project to which the label belongs</param>

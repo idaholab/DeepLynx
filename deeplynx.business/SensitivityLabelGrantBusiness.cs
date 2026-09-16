@@ -43,7 +43,6 @@ public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
             .Include(g => g.User)
             .Include(g => g.Group).ThenInclude(gr => gr.Users)
             .Include(g => g.LabelPermission)
-            .Include(g => g.GrantedByUser)
             .ToListAsync();
 
         // group by user and group for readability when listing
@@ -84,7 +83,6 @@ public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
             .AsNoTracking()
             .Where(g => g.LabelId == labelId)
             .Include(g => g.LabelPermission)
-            .Include(g => g.GrantedByUser)
             .AsQueryable();
 
         query = userId.HasValue
@@ -96,6 +94,72 @@ public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
             return Enumerable.Empty<SensitivityLabelMemberAccessDto>();
 
         return new[] { ToMemberAccessDto(grants) };
+    }
+
+    /// <summary>
+    ///     List all permissions a user possesses on a given label, both individually
+    ///     and via group membership, along with the union (aggregate) of all of them.
+    /// </summary>
+    /// <param name="labelId">ID of the label for which to list available permissions</param>
+    /// <param name="organizationId">(Required) ID of the organization to which the label belongs</param>
+    /// <param name="projectId">(Optional) ID of the project to which the label belongs</param>
+    /// <param name="userId">ID of the user whose permissions (individual + group-derived) should be listed</param>
+    /// <returns>
+    ///     A breakdown containing the user's own permissions, each group's permissions
+    ///     (for groups the user belongs to that have grants on this label), and the aggregate union of all of them.
+    /// </returns>
+    /// <exception cref="KeyNotFoundException">Returned if label not found</exception>
+    public async Task<SensitivityLabelUserAccessDto> GetUserPermissionsMatrixForLabel(
+        long labelId, long organizationId, long? projectId, long userId)
+    {
+        await GetScopedLabel(labelId, organizationId, projectId);
+
+        // get the group IDs for groups the user has membership in
+        var groups = await _context.Groups
+            .AsNoTracking()
+            .Where(g => g.Users.Any(u => u.Id == userId))
+            .Select(g => new { g.Id, g.Name })
+            .ToListAsync();
+        var groupIds = groups.Select(g => g.Id).ToList();
+
+        // find all grants held by the user, either individually or as part of a group
+        var allGrants = await _context.SensitivityLabelGrants
+            .AsNoTracking()
+            .Where(gr => gr.LabelId == labelId &&
+                        (gr.UserId == userId || (gr.GroupId.HasValue && groupIds.Contains(gr.GroupId.Value))))
+            .Include(g => g.LabelPermission)
+            .Include(g => g.User)
+            .Include(g => g.Group)
+            .ToListAsync();
+
+        var userGrants = allGrants.Where(g => g.UserId == userId).ToList();
+        var groupGrants = allGrants.Where(g => g.GroupId.HasValue).ToList();
+
+        // all possible permission actions to show as rows in the table
+        var allPermissionActions = await _context.SensitivityLabelPermissionActions
+            .AsNoTracking()
+            .ToListAsync();
+
+        // consolidate permissions per group
+        var groupPermissions = groups
+            .Select(g => new SensitivityLabelGroupPermissionFlagsDto
+            {
+                GroupId = g.Id,
+                GroupName = g.Name,
+                Permissions = BuildPermissionsFromGrants(groupGrants.Where(gr => gr.GroupId == g.Id), allPermissionActions)
+            })
+            .ToList();
+        var userPermissions = BuildPermissionsFromGrants(userGrants, allPermissionActions);
+        var totalPermissions = BuildPermissionsFromGrants(allGrants, allPermissionActions);
+
+        return new SensitivityLabelUserAccessDto
+        {
+            UserId = userId,
+            LabelId = labelId,
+            TotalPermissions = totalPermissions,
+            UserPermissions = userPermissions,
+            GroupPermissions = groupPermissions
+        };
     }
 
     /// <summary>
@@ -321,6 +385,27 @@ public class SensitivityLabelGrantBusiness : ISensitivityLabelGrantBusiness
                 GrantedBy = g.GrantedBy
             }).ToList()
         };
+    }
+
+    // builds a bool flag per permission action, given a set of grants
+    private List<SensitivityLabelPermissionFlagDto> BuildPermissionsFromGrants(
+        IEnumerable<SensitivityLabelGrant> grants,
+        IEnumerable<SensitivityLabelPermissionAction> allPermissionActions)
+    {
+        // the ids granted to the user or group
+        var grantedIds = grants
+            .Select(g => g.LabelPermissionId!.Value)
+            .ToHashSet();
+
+        // HasPermission returns true if user/group has permission
+        return allPermissionActions
+            .Select(p => new SensitivityLabelPermissionFlagDto
+            {
+                PermissionId = p.Id,
+                PermissionName = p.Name,
+                HasPermission = grantedIds.Contains(p.Id)
+            })
+            .ToList();
     }
     
     private async Task<SensitivityLabel> GetScopedLabel(long labelId, long organizationId, long? projectId)

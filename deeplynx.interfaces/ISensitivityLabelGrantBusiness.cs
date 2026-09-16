@@ -8,6 +8,9 @@ public interface ISensitivityLabelGrantBusiness
         long labelId, long organizationId, long? projectId, 
         long? userId = null, long? groupId = null);
 
+    Task<SensitivityLabelUserAccessDto> GetUserPermissionsMatrixForLabel(
+        long labelId, long organizationId, long? projectId, long userId);
+
     Task<IEnumerable<SensitivityLabelMemberAccessDto>> GetMembersWithLabelAccess(
         long labelId, long organizationId, long? projectId);
 
