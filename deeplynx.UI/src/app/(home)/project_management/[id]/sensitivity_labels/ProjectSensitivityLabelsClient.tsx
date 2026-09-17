@@ -537,6 +537,8 @@ function AssignedGroupsPanel({
   const [groupsToAdd, setGroupsToAdd] = useState<Set<number>>(new Set());
   const [newGroupPermissionIds, setNewGroupPermissionIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const actionGroups = useMemo(
     () => [
@@ -577,6 +579,7 @@ function AssignedGroupsPanel({
   useEffect(() => {
     if (!selectedGroupId) {
       setPermissionIds(new Set());
+      setEditing(false);
       return;
     }
     getGroupPermissionsForLabelProject(projectId, label.id, selectedGroupId)
@@ -590,22 +593,27 @@ function AssignedGroupsPanel({
         ),
       )
       .catch(() => setPermissionIds(new Set()));
+    setEditing(false);
   }, [label.id, projectId, selectedGroupId]);
 
   const save = async () => {
     if (!selectedGroupId || permissionIds.size === 0) return;
     try {
+      setSaving(true);
       await grantSensitivityLabelAccessToGroupProject(
         projectId,
         label.id,
         selectedGroupId,
         Array.from(permissionIds),
       );
+      setEditing(false);
       await load();
       toast.success(t.translations.SUCCESSFULLY);
     } catch (error) {
       console.error("Failed to update group label permissions:", error);
       toast.error(t.translations.FAILED_TO_UPDATE_SENSITIVITY_LABELS);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -714,8 +722,23 @@ function AssignedGroupsPanel({
               <>
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold">{t.translations.PERMISSIONS}</h4>
+                  {editing ? (
+                    <div className="flex gap-2">
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(false)} disabled={saving}>
+                        {t.translations.CANCEL}
+                      </button>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>
+                        {saving && <span className="loading loading-spinner loading-xs" />}
+                        {t.translations.SAVE}
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditing(true)}>
+                      {t.translations.EDIT}
+                    </button>
+                  )}
                 </div>
-                <div className="mt-4 space-y-4 opacity-60">
+                <div className={`mt-4 space-y-4 ${editing ? "" : "opacity-60"}`}>
                   {actionGroups.map((group) => (
                     <div key={group.name}>
                       <p className="text-xs font-semibold text-base-content/60">{group.name}</p>
@@ -726,7 +749,15 @@ function AssignedGroupsPanel({
                               type="checkbox"
                               className="checkbox checkbox-primary checkbox-sm"
                               checked={permissionIds.has(action.id)}
-                              disabled
+                              disabled={!editing}
+                              onChange={() =>
+                                setPermissionIds((current) => {
+                                  const next = new Set(current);
+                                  if (next.has(action.id)) next.delete(action.id);
+                                  else next.add(action.id);
+                                  return next;
+                                })
+                              }
                             />
                             <span className="text-sm">{action.name}</span>
                           </label>
