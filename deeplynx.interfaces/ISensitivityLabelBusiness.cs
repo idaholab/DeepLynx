@@ -23,4 +23,6 @@ public interface ISensitivityLabelBusiness
 
     Task<SensitivityLabelResponseDto> GetSensitivityLabel(long labelId, long? projectId, long organizationId,
         bool hideArchived = true);
+
+    Task<List<SensitivityLabelPermissionActionResponseDto>> GetSensitivityLabelPermissionActions();
 }

@@ -83,6 +83,7 @@ const OrganizationManagementClient = ({
         <OrganizationSensitivityLabelsClient
           labels={labels}
           members={members}
+          groups={initialGroups}
         />
       ),
     },
@@ -105,7 +106,7 @@ const OrganizationManagementClient = ({
   };
 
   return (
-    <main className="min-h-screen bg-base-200/30">
+    <main className="flex min-h-[calc(100vh-6.5rem)] flex-col bg-base-200/30">
       <section className="border-b border-base-300 bg-base-100">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-3 py-5 sm:px-6 lg:px-8">
           <div>
@@ -119,7 +120,7 @@ const OrganizationManagementClient = ({
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+      <section className="mx-auto w-full max-w-7xl flex-1 px-3 py-5 sm:px-6 lg:px-8">
         <Tabs
           tabs={tabData}
           className="mx-0"

@@ -40,6 +40,7 @@ const TeamMembersWidget: React.FC = () => {
     name: user.name,
     email: user.email,
     role: user.isProjectAdmin ? "Admin" : user.role ?? t.translations.NOT_AVAILABLE,
+    type: 'user'
   }));
 
   const teamMemberColumns: Column<ProjectMemberResponseDto>[] = [

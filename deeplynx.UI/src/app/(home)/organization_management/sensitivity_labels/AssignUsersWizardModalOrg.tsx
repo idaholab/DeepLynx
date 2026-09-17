@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
   MagnifyingGlassIcon,
   CheckIcon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
-import type { UserResponseDto } from "@/app/(home)/types/responseDTOs";
-import { grantSensitivityLabelAccessOrg } from "@/app/lib/client_service/sensitivity_labels_services.client";
+import type { SensitivityLabelPermissionActionResponseDto, UserResponseDto } from "@/app/(home)/types/responseDTOs";
+import { getAvailablePermissionActionsForOrg, grantSensitivityLabelAccessOrg } from "@/app/lib/client_service/sensitivity_labels_services.client";
 import AvatarCell from "@/app/(home)/components/Avatar";
 import { useLanguage } from "@/app/contexts/Language";
 
@@ -44,6 +44,9 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
   const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(new Set());
+  const [permissionActions, setPermissionActions] = useState<SensitivityLabelPermissionActionResponseDto[]>([]);
+  const [permissionsByUserId, setPermissionsByUserId] = useState<Map<number, Set<number>>>(new Map());
+  const [loadingPermissions, setLoadingPermissions] = useState(false);
   const [assigning, setAssigning] = useState(false);
 
   const individualUsers: NormalizedUser[] = useMemo(
@@ -51,10 +54,41 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
     [members],
   );
 
+  const permissionGroups = useMemo(
+    () => [
+      {
+        name: t.translations.RECORD,
+        permissions: permissionActions.filter((permission) =>
+          permission.name.toLowerCase().includes("record"),
+        ),
+      },
+      {
+        name: t.translations.FILE,
+        permissions: permissionActions.filter((permission) =>
+          permission.name.toLowerCase().includes("file"),
+        ),
+      },
+    ].filter((group) => group.permissions.length > 0),
+    [permissionActions, t],
+  );
+
   const resetState = () => {
     setSearch("");
     setSelectedUserIds(new Set());
+    setPermissionsByUserId(new Map());
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLoadingPermissions(true);
+    getAvailablePermissionActionsForOrg(organizationId)
+      .then(setPermissionActions)
+      .catch((error) => {
+        console.error("Failed to load organization label permission actions:", error);
+        toast.error(t.translations.NO_PERMISSIONS_AVAILABLE);
+      })
+      .finally(() => setLoadingPermissions(false));
+  }, [isOpen, organizationId, t]);
 
   const handleClose = () => {
     resetState();
@@ -66,8 +100,32 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
 
     setSelectedUserIds((current) => {
       const next = new Set(current);
-      if (next.has(userId)) next.delete(userId);
-      else next.add(userId);
+      if (next.has(userId)) {
+        next.delete(userId);
+        setPermissionsByUserId((permissions) => {
+          const updated = new Map(permissions);
+          updated.delete(userId);
+          return updated;
+        });
+      } else {
+        next.add(userId);
+        setPermissionsByUserId((permissions) => {
+          const updated = new Map(permissions);
+          updated.set(userId, new Set(permissionActions.map((action) => action.id)));
+          return updated;
+        });
+      }
+      return next;
+    });
+  };
+
+  const togglePermission = (userId: number, permissionId: number) => {
+    setPermissionsByUserId((current) => {
+      const next = new Map(current);
+      const selected = new Set(next.get(userId));
+      if (selected.has(permissionId)) selected.delete(permissionId);
+      else selected.add(permissionId);
+      next.set(userId, selected);
       return next;
     });
   };
@@ -81,12 +139,14 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
       (userId) => !assignedUserIds.has(userId),
     );
 
-    if (idsToGrant.length === 0) return;
+    if (idsToGrant.length === 0 || idsToGrant.some((id) => !permissionsByUserId.get(id)?.size)) return;
 
     setAssigning(true);
     try {
       const results = await Promise.allSettled(
-        idsToGrant.map((userId) => grantSensitivityLabelAccessOrg(organizationId, labelId, userId)),
+        idsToGrant.map((userId) => grantSensitivityLabelAccessOrg(
+          organizationId, labelId, userId, Array.from(permissionsByUserId.get(userId)!),
+        )),
       );
       const succeeded = results.filter((r) => r.status === "fulfilled").length;
       const failed = results.length - succeeded;
@@ -118,8 +178,8 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
 
   return (
     <div className="modal modal-open">
-      <div className="modal-box max-w-5xl border border-base-300 p-0">
-        <header className="flex items-start justify-between gap-4 border-b border-base-200 px-6 py-5">
+      <div className="modal-box flex h-[min(620px,calc(100vh-4rem))] w-[min(90vw,64rem)] max-w-none flex-col overflow-hidden border border-base-300 p-0">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-base-200 px-6 py-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-base-content/55">
               {labelName}
@@ -128,8 +188,8 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
           </div>
         </header>
 
-        <div className="grid min-h-[470px] grid-cols-1 lg:grid-cols-[1.35fr_.65fr]">
-            <section className="border-b border-base-200 p-6 lg:border-b-0 lg:border-r">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[1.35fr_.65fr]">
+            <section className="min-h-0 overflow-y-auto border-b border-base-200 p-6 lg:border-b-0 lg:border-r">
               <label className="input input-bordered flex w-full items-center gap-2 bg-base-100">
                 <MagnifyingGlassIcon className="h-4 w-4 text-base-content/50" />
                 <input
@@ -161,7 +221,7 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
                         type="checkbox"
                         className="checkbox checkbox-primary checkbox-sm"
                         checked={alreadyAssigned || selectedUserIds.has(user.id)}
-                        disabled={alreadyAssigned}
+                        disabled={alreadyAssigned || loadingPermissions || permissionActions.length === 0}
                         onChange={() => toggleUser(user.id)}
                       />
                       <AvatarCell name={user.name} size={9} containerClassName="space-x-0" />
@@ -193,23 +253,41 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
               </div>
             </section>
 
-            <aside className="bg-base-200/35 p-6">
+            <aside className="min-h-0 overflow-y-auto bg-base-100 p-6">
               <h3 className="font-bold">{t.translations.CURRENT_SELECTION}</h3>
               <div className="mt-5 space-y-5">
                 <div>
                   <p className="mb-2 text-xs font-bold uppercase tracking-wide text-base-content/55">
                     {t.translations.INDIVIDUAL_USERS}
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col">
                     {selectedUserIds.size === 0 && (
                       <span className="text-sm text-base-content/50">{t.translations.NONE_SELECTED}</span>
                     )}
                     {individualUsers
                       .filter((u) => selectedUserIds.has(u.id))
                       .map((u) => (
-                        <span key={u.id} className="badge badge-outline badge-primary">
-                          {u.name}
-                        </span>
+                        <div key={u.id} className="w-full border-b border-base-200 py-3 last:border-b-0">
+                          <strong className="text-sm">{u.name}</strong>
+                          <p className="mt-2 text-xs font-bold uppercase tracking-wide text-base-content/55">{t.translations.PERMISSIONS}</p>
+                          <div className="mt-1 space-y-3">
+                            {permissionGroups.map((group) => (
+                              <div key={group.name}>
+                                <p className="text-xs font-semibold text-base-content/60">{group.name}</p>
+                                <div className="mt-1 space-y-1">
+                                  {group.permissions.map((permission) => (
+                                    <label key={permission.id} className="flex cursor-pointer items-center gap-1.5 px-1.5 py-0.5 text-sm">
+                                      <input type="checkbox" className="checkbox checkbox-primary checkbox-sm"
+                                        checked={permissionsByUserId.get(u.id)?.has(permission.id) ?? false}
+                                        onChange={() => togglePermission(u.id, permission.id)} />
+                                      <span>{permission.name}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       ))}
                   </div>
                 </div>
@@ -217,7 +295,7 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
             </aside>
         </div>
 
-        <footer className="flex justify-end gap-3 border-t border-base-200 px-6 py-4">
+        <footer className="flex shrink-0 justify-end gap-3 border-t border-base-200 px-6 py-4">
           <div className="flex gap-3">
             <button type="button" className="btn btn-ghost" onClick={handleClose}>
               {t.translations.CANCEL}
@@ -226,7 +304,7 @@ const AssignUsersWizardModalOrg: React.FC<Props> = ({
               type="button"
               className="btn btn-primary"
               onClick={handleConfirm}
-              disabled={newAssignmentCount === 0 || assigning}
+              disabled={newAssignmentCount === 0 || assigning || loadingPermissions || permissionActions.length === 0 || Array.from(selectedUserIds).some((id) => !permissionsByUserId.get(id)?.size)}
             >
               {assigning
                 ? t.translations.SAVING

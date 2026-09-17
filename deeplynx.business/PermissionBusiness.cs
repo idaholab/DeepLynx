@@ -38,9 +38,7 @@ public class PermissionBusiness : IPermissionBusiness
     ///     List all permissions
     /// </summary>
     /// <param name="labelId">
-    ///     (Optional, v1-only) ID of a sensitivity label to filter by. Sourced from
-    ///     <see cref="deeplynx.datalayer.Models.SensitivityLabelPermission" /> rather than the
-    ///     <see cref="deeplynx.datalayer.Models.Permission" /> table, which no longer carries label data.
+    ///     (Optional, v1-only) ID of a sensitivity label to filter by.
     /// </param>
     /// <param name="projectId">(Optional)ID of a project to filter by</param>
     /// <param name="organizationId">(Optional)ID of an organization to filter by</param>
@@ -52,28 +50,8 @@ public class PermissionBusiness : IPermissionBusiness
     {
         if (labelId.HasValue)
         {
-            var labelPermissionQuery = _context.SensitivityLabelPermissions.Where(p =>
-                p.LabelId == labelId.Value &&
-                p.Label.OrganizationId == organizationId &&
-                (!projectId.HasValue || p.Label.ProjectId == projectId || p.Label.ProjectId == null));
-
-            if (hideArchived)
-                labelPermissionQuery = labelPermissionQuery.Where(p => !p.IsArchived);
-
-            return await labelPermissionQuery.Select(p => new PermissionResponseDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                Action = p.Action,
-                LastUpdatedAt = p.LastUpdatedAt,
-                LastUpdatedBy = p.LastUpdatedBy,
-                IsArchived = p.IsArchived,
-                ProjectId = p.Label.ProjectId,
-                OrganizationId = p.Label.OrganizationId,
-                IsDefault = false
-            })
-                .ToListAsync();
+            //permissions are not attached to SLs anymore, return nothing for now.
+            return new List<PermissionResponseDto>();
         }
 
         // Always returns default permissions alongside those from the supplied org ID or project ID

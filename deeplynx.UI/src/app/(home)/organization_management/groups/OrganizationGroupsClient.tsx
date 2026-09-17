@@ -1,7 +1,7 @@
 // src/app/(home)/organization_management/groups/OrganizationGroupsClient.tsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   MagnifyingGlassIcon,
@@ -30,6 +30,7 @@ import {
 } from "@/app/lib/client_service/group_services.client";
 import {
   getAllSensitivityLabelsOrg,
+  getAvailablePermissionActionsForOrg,
   getGroupsWithAccessToLabelOrg,
   grantSensitivityLabelAccessToGroupOrg,
   revokeSensitivityLabelAccessFromGroupOrg,
@@ -489,10 +490,14 @@ function GroupLabelsPanel({
     const labelId = pendingGrantLabel.id;
     try {
       setGrantSaving(true);
+      const permissionActions = await getAvailablePermissionActionsForOrg(
+        organizationId,
+      );
       await grantSensitivityLabelAccessToGroupOrg(
         organizationId,
         labelId,
         group.id as number,
+        permissionActions.map((permission) => permission.id),
       );
       onGranted(labelId);
       toast.success(t.translations.GROUP_LABEL_GRANTED);
@@ -610,6 +615,7 @@ const OrganizationGroupsClient: React.FC<Props> = ({
 
   const [grantedLabelIds, setGrantedLabelIds] = useState<Set<number>>(new Set());
   const [grantsLoading, setGrantsLoading] = useState(false);
+  const grantedLabelsRequestRef = useRef(0);
 
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupResponseDto | null>(null);
@@ -691,6 +697,7 @@ const OrganizationGroupsClient: React.FC<Props> = ({
     localGroups.find((g) => g.id === selectedGroupId) ?? localGroups[0] ?? null;
 
   const loadGrantedLabels = async (groupId: number | string) => {
+    const requestId = ++grantedLabelsRequestRef.current;
     if (!orgId || localLabels.length === 0) {
       setGrantedLabelIds(new Set());
       return;
@@ -708,11 +715,15 @@ const OrganizationGroupsClient: React.FC<Props> = ({
       results.forEach(({ labelId, grants }) => {
         if (grants.some((g) => g.groupId === groupId)) granted.add(labelId);
       });
-      setGrantedLabelIds(granted);
+      if (requestId === grantedLabelsRequestRef.current) {
+        setGrantedLabelIds(granted);
+      }
     } catch (error) {
       console.error("Failed to load group label grants:", error);
     } finally {
-      setGrantsLoading(false);
+      if (requestId === grantedLabelsRequestRef.current) {
+        setGrantsLoading(false);
+      }
     }
   };
 
@@ -893,7 +904,7 @@ const OrganizationGroupsClient: React.FC<Props> = ({
                   {grantedLabels.map((label) => (
                     <span
                       key={label.id}
-                      className="badge badge-secondary gap-1"
+                      className="badge badge-secondary badge-sm gap-1"
                       title={label.description ?? undefined}
                     >
                       <ShieldCheckIcon className="h-3 w-3" />
@@ -929,55 +940,15 @@ const OrganizationGroupsClient: React.FC<Props> = ({
             </div>
           </div>
 
-          <div role="tablist" className="tabs tabs-border mt-6 border-b border-base-200">
-            <button
-              type="button"
-              role="tab"
-              onClick={() => setDetailTab("members")}
-              className={`tab ${detailTab === "members" ? "tab-active text-primary" : ""}`}
-            >
-              {t.translations.CURRENT_MEMBERS}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              onClick={() => setDetailTab("labels")}
-              className={`tab ${detailTab === "labels" ? "tab-active text-primary" : ""}`}
-            >
-              {t.translations.SENSITIVITY_LABELS}
-            </button>
-          </div>
-
           {orgId ? (
-            detailTab === "labels" ? (
-              <GroupLabelsPanel
-                key={`${selectedGroup.id}-labels`}
-                group={selectedGroup}
-                organizationId={orgId}
-                labels={localLabels}
-                grantedLabelIds={grantedLabelIds}
-                grantsLoading={grantsLoading}
-                onGranted={(labelId) =>
-                  setGrantedLabelIds((prev) => new Set(prev).add(labelId))
-                }
-                onRevoked={(labelId) =>
-                  setGrantedLabelIds((prev) => {
-                    const next = new Set(prev);
-                    next.delete(labelId);
-                    return next;
-                  })
-                }
-              />
-            ) : (
-              <GroupMembersPanel
-                key={selectedGroup.id}
-                group={selectedGroup}
-                organizationId={orgId}
-                availableUsers={members}
-                groupLabels={grantedLabels}
-                onMemberCountChange={handleMemberCountChange}
-              />
-            )
+            <GroupMembersPanel
+              key={selectedGroup.id}
+              group={selectedGroup}
+              organizationId={orgId}
+              availableUsers={members}
+              groupLabels={grantedLabels}
+              onMemberCountChange={handleMemberCountChange}
+            />
           ) : null}
         </section>
       ) : (

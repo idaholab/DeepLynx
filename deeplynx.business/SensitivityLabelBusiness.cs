@@ -4,6 +4,7 @@ using deeplynx.datalayer.Models;
 using deeplynx.helpers;
 using deeplynx.interfaces;
 using deeplynx.models;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -28,18 +29,6 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
         _userBusiness = userBusiness;
     }
 
-    private static readonly (string Action, string DescriptionTemplate)[] DefaultPermissionActions =
-    {
-        ("read record", "Permission to read {0} labeled records"),
-        ("write record", "Permission to add records with label {0}"),
-        ("update record", "Permission to update {0} labeled records"),
-        ("delete record", "Permission to delete {0} labeled records"),
-        ("download file", "Permission to download {0} labeled files"),
-        ("upload file", "Permission to upload {0} labeled files"),
-        ("update file", "Permission to update {0} labeled files"),
-        ("delete file", "Permission to delete {0} labeled files")
-    };
-    
      /// <summary>
     ///     Get all sensitivity labels for a given project and/or organization
     /// </summary>
@@ -179,18 +168,6 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             _context.SensitivityLabels.Add(label);
             await _context.SaveChangesAsync();
 
-            var actions = dto.PermissionActions is { Count: > 0 }
-                ? dto.PermissionActions
-                : DefaultPermissionActions.Select(p => p.Action).ToList();
-
-            var permissions = actions
-                .Select(a => BuildPermission(a, dto.Name, label.Id, currentUserId, now))
-                .ToList();
-
-            await _context.AddRangeAsync(permissions);
-            
-            await _context.SaveChangesAsync();
-
             // Invalidate cached sensitivity labels
             await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
 
@@ -308,24 +285,6 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                 .SqlQueryRaw<SensitivityLabelResponseDto>(sql, parameters.ToArray())
                 .ToListAsync();
 
-            var permissionActionsByName = labels
-                .Where(dto => dto.PermissionActions is { Count: > 0 })
-                .GroupBy(dto => dto.Name)
-                .ToDictionary(g => g.Key, g => g.Last().PermissionActions!);
-
-            foreach (var label in result)
-            {
-                var actions = permissionActionsByName.TryGetValue(label.Name, out var overrideActions)
-                    ? overrideActions
-                    : DefaultPermissionActions.Select(p => p.Action).ToList();
-
-                var permissions = actions
-                    .Select(a => BuildPermission(a, label.Name, label.Id, currentUserId, now))
-                    .ToList();
-
-                await _context.AddRangeAsync(permissions);
-            }
-
             await _context.SaveChangesAsync();
 
             // Invalidate cached sensitivity labels
@@ -398,64 +357,9 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             label.LastUpdatedBy = currentUserId;
 
             _context.SensitivityLabels.Update(label);
-
-            // Update Permissions Associated with Label
-            var permissions = await _context.SensitivityLabelPermissions
-                .Where(p => p.LabelId == labelId)
-                .ToListAsync();
-
-            if (dto.PermissionActions != null)
-            {
-                var desired = dto.PermissionActions.Select(a => a.Trim()).ToHashSet();
-                var toRemove = permissions.Where(p => !desired.Contains(p.Action)).ToList();
-                var kept = permissions.Except(toRemove).ToList();
-
-                _context.SensitivityLabelPermissions.RemoveRange(toRemove);
-
-                var keptActions = kept.Select(p => p.Action).ToHashSet();
-                var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-                var toAdd = desired.Except(keptActions)
-                    .Select(a => BuildPermission(a, label.Name, label.Id, currentUserId, now))
-                    .ToList();
-
-                await _context.SensitivityLabelPermissions.AddRangeAsync(toAdd);
-
-                foreach (var permission in kept)
-                {
-                    permission.Name = dto.Name ?? permission.Name;
-                    permission.LastUpdatedAt = now;
-                    permission.LastUpdatedBy = currentUserId;
-                }
-
-                _context.SensitivityLabelPermissions.UpdateRange(kept);
-
-                // Invalidate cached sensitivity labels
-                await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
-            }
-            else
-            {
-                foreach (var permission in permissions)
-                {
-                    permission.Name = dto.Name ?? permission.Name;
-
-                    if (dto.Description != null)
-                    {
-                        // Update description based on action type
-                        permission.Description = permission.Action switch
-                        {
-                            "read" => "Permission to read " + dto.Name + " labeled records",
-                            "write" => "Permission to modify " + dto.Name + " labeled records",
-                            _ => permission.Description // fallback
-                        };
-                    }
-
-                    permission.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-                    permission.LastUpdatedBy = currentUserId;
-                }
-
-                _context.SensitivityLabelPermissions.UpdateRange(permissions);
-            }
-
+            
+            // Invalidate cached sensitivity labels
+            await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
             // Log update SensitivityLabel event
             var eventLog = new CreateEventRequestDto
             {
@@ -546,11 +450,6 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                     $"Cannot delete. Sensitivity label with id {labelId} is used on {recordCount} records.");
             }
 
-            // Remove the permissions associated with the label
-            await _context.SensitivityLabelPermissions
-                .Where(p => p.LabelId == labelId)
-                .ExecuteDeleteAsync();
-
             // Invalidate cached sensitivity labels
             await new SensitivityLabelService(_context).InvalidateAuthorizedLabelsCache(label.Id);
 
@@ -636,13 +535,7 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
                     $"Cannot archive. Sensitivity label with id {labelId} is used on {recordCount} records.");
             }
 
-            // Archive permissions for this sensitivity label
-            await _context.SensitivityLabelPermissions
-                .Where(p => p.LabelId == labelId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(p => p.IsArchived, true)
-                    .SetProperty(p => p.LastUpdatedAt, DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified))
-                    .SetProperty(p => p.LastUpdatedBy, currentUserId));
+            await _context.SensitivityLabelGrants.Where(slg => slg.LabelId == label.Id).ExecuteDeleteAsync();
 
             // Archive label by ID
             label.IsArchived = true;
@@ -726,14 +619,6 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             label.LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
             label.LastUpdatedBy = currentUserId;
 
-            // Unarchive Permissions associated with the label
-            await _context.SensitivityLabelPermissions
-                .Where(p => p.LabelId == labelId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(p => p.IsArchived, false)
-                    .SetProperty(p => p.LastUpdatedAt, DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified))
-                    .SetProperty(p => p.LastUpdatedBy, currentUserId));
-
             await _context.SaveChangesAsync();
 
             // Invalidate cached sensitivity labels
@@ -768,32 +653,22 @@ public class SensitivityLabelBusiness : ISensitivityLabelBusiness
             throw;
         }
     }
-    
+
     /// <summary>
-    ///     Builds a new SensitivityLabelPermission for the given flat action string (e.g. "read record"),
-    ///     using the known description template if it's one of the default actions, or a generic
-    ///     generated description otherwise.
+    ///     Get all possible sensitivity label permission actions.
     /// </summary>
-    private static SensitivityLabelPermission BuildPermission(string action, string labelName,
-        long labelId, long currentUserId, DateTime now)
+    /// <returns>A list of permission actions</returns>
+    public async Task<List<SensitivityLabelPermissionActionResponseDto>> GetSensitivityLabelPermissionActions()
     {
-        var trimmed = action.Trim();
-        var parts = trimmed.Split(' ', 2);
-        var verb = parts[0];
-        var resource = parts.Length > 1 ? parts[1] : "";
+        var permissionActions = await _context.SensitivityLabelPermissionActions
+            .Select(a => new SensitivityLabelPermissionActionResponseDto
+            {
+                Id = a.Id,
+                Name = a.Name,
+                Description = a.Description
+            })
+            .ToListAsync();
 
-        var template = DefaultPermissionActions
-                           .FirstOrDefault(p => p.Action == trimmed).DescriptionTemplate
-                       ?? $"Permission to {verb} {{0}} labeled {resource}(s)";
-
-        return new SensitivityLabelPermission
-        {
-            Name = labelName,
-            Description = string.Format(template, labelName),
-            Action = trimmed,
-            LabelId = labelId,
-            LastUpdatedAt = now,
-            LastUpdatedBy = currentUserId
-        };
+        return permissionActions;
     }
 }

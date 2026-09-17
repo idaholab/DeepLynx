@@ -52,10 +52,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     public long roleId;
     protected long defaultLabelId;
     protected long defaultLabelId2;
-    protected long readPermissionId;
-    protected long writePermissionId;
-    protected long readPermissionId2;
-    protected long writePermissionId2;
+    protected long readActionId;
+    protected long downloadActionId;
 
     public HistoricalRecordBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -104,6 +102,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     protected override async Task SeedTestDataAsync()
     {
         await base.SeedTestDataAsync();
+
+        readActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
+        downloadActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "download file")).Id;
 
         var testUser = new User
         {
@@ -337,48 +338,6 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         defaultLabelId = defaultLabel.Id;
 
-        // Gate read/write/update actions on the label (access is granted per-user, not per-role)
-        var readPermission = new SensitivityLabelPermission
-        {
-            Name = "Read Default Label",
-            Description = "Read permission for default test label",
-            Action = "read record",
-            LabelId = defaultLabelId,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        var writePermission = new SensitivityLabelPermission
-        {
-            Name = "Write Default Label",
-            Description = "Write permission for default test label",
-            Action = "write record",
-            LabelId = defaultLabelId,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        var updatePermission = new SensitivityLabelPermission
-        {
-            Name = "Update Default Label",
-            Description = "update permission for default test label",
-            Action = "update record",
-            LabelId = defaultLabelId,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        Context.SensitivityLabelPermissions.Add(readPermission);
-        Context.SensitivityLabelPermissions.Add(writePermission);
-        Context.SensitivityLabelPermissions.Add(updatePermission);
-        await Context.SaveChangesAsync();
-
-        readPermissionId = readPermission.Id;
-        writePermissionId = writePermission.Id;
-
         // Create second default sensitivity label
         var defaultLabel2 = new SensitivityLabel
         {
@@ -394,59 +353,36 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         defaultLabelId2 = defaultLabel2.Id;
 
-        var readPermission2 = new SensitivityLabelPermission
-        {
-            Name = "Read Default Label 2",
-            Description = "Read permission for second default test label",
-            Action = "read record",
-            LabelId = defaultLabelId2,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        var writePermission2 = new SensitivityLabelPermission
-        {
-            Name = "Write Default Label 2",
-            Description = "Write permission for second default test label",
-            Action = "write record",
-            LabelId = defaultLabelId2,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        var updatePermission2 = new SensitivityLabelPermission
-        {
-            Name = "update Default Label 2",
-            Description = "Update permission for second default test label",
-            Action = "update record",
-            LabelId = defaultLabelId2,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        Context.SensitivityLabelPermissions.Add(readPermission2);
-        Context.SensitivityLabelPermissions.Add(writePermission2);
-        Context.SensitivityLabelPermissions.Add(updatePermission2);
-        await Context.SaveChangesAsync();
-
-        readPermissionId2 = readPermission2.Id;
-        writePermissionId2 = writePermission2.Id;
-
         // Grant the test user explicit access to both labels (access is now per-user, not per-role)
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = defaultLabelId,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid,
+            LabelId = defaultLabelId,
+            LabelPermissionId = downloadActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = defaultLabelId2,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid,
+            LabelId = defaultLabelId2,
+            LabelPermissionId = downloadActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -837,11 +773,12 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // Revoke the user's access grant for defaultLabelId2
         Context.ChangeTracker.Clear();
 
-        var grantToRemove = await Context.UserSensitivityLabels
-            .FirstOrDefaultAsync(g => g.UserId == uid && g.LabelId == defaultLabelId2);
-        if (grantToRemove != null)
+        var grantsToRemove = await Context.SensitivityLabelGrants
+            .Where(g => g.UserId == uid && g.LabelId == defaultLabelId2)
+            .ToListAsync();
+        if (grantsToRemove.Count > 0)
         {
-            Context.UserSensitivityLabels.Remove(grantToRemove);
+            Context.SensitivityLabelGrants.RemoveRange(grantsToRemove);
             await Context.SaveChangesAsync();
         }
 
@@ -878,11 +815,12 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // Revoke the user's access grant for defaultLabelId2
         Context.ChangeTracker.Clear();
 
-        var grantToRemove = await Context.UserSensitivityLabels
-            .FirstOrDefaultAsync(g => g.UserId == uid && g.LabelId == defaultLabelId2);
-        if (grantToRemove != null)
+        var grantsToRemove = await Context.SensitivityLabelGrants
+            .Where(g => g.UserId == uid && g.LabelId == defaultLabelId2)
+            .ToListAsync();
+        if (grantsToRemove.Count > 0)
         {
-            Context.UserSensitivityLabels.Remove(grantToRemove);
+            Context.SensitivityLabelGrants.RemoveRange(grantsToRemove);
             await Context.SaveChangesAsync();
         }
 
@@ -924,11 +862,12 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // Revoke the user's access grant for defaultLabelId2
         Context.ChangeTracker.Clear();
 
-        var grantToRemove = await Context.UserSensitivityLabels
-            .FirstOrDefaultAsync(g => g.UserId == uid && g.LabelId == defaultLabelId2);
-        if (grantToRemove != null)
+        var grantsToRemove = await Context.SensitivityLabelGrants
+            .Where(g => g.UserId == uid && g.LabelId == defaultLabelId2)
+            .ToListAsync();
+        if (grantsToRemove.Count > 0)
         {
-            Context.UserSensitivityLabels.Remove(grantToRemove);
+            Context.SensitivityLabelGrants.RemoveRange(grantsToRemove);
             await Context.SaveChangesAsync();
         }
 
@@ -951,11 +890,12 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // Revoke the user's access grant for defaultLabelId2
         Context.ChangeTracker.Clear();
 
-        var grantToRemove = await Context.UserSensitivityLabels
-            .FirstOrDefaultAsync(g => g.UserId == uid && g.LabelId == defaultLabelId2);
-        if (grantToRemove != null)
+        var grantsToRemove = await Context.SensitivityLabelGrants
+            .Where(g => g.UserId == uid && g.LabelId == defaultLabelId2)
+            .ToListAsync();
+        if (grantsToRemove.Count > 0)
         {
-            Context.UserSensitivityLabels.Remove(grantToRemove);
+            Context.SensitivityLabelGrants.RemoveRange(grantsToRemove);
             await Context.SaveChangesAsync();
         }
 

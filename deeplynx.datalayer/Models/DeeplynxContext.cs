@@ -76,12 +76,10 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<SavedSearch> SavedSearches { get; set; }
 
     public virtual DbSet<SensitivityLabel> SensitivityLabels { get; set; }
+    
+    public virtual DbSet<SensitivityLabelPermissionAction> SensitivityLabelPermissionActions { get; set; }
 
-    public virtual DbSet<SensitivityLabelPermission> SensitivityLabelPermissions { get; set; }
-
-    public virtual DbSet<UserSensitivityLabel> UserSensitivityLabels { get; set; }
-
-    public virtual DbSet<GroupSensitivityLabel> GroupSensitivityLabels { get; set; }
+    public virtual DbSet<SensitivityLabelGrant> SensitivityLabelGrants { get; set; }
 
     public virtual DbSet<Subscription> Subscriptions { get; set; }
 
@@ -1355,104 +1353,67 @@ public partial class DeeplynxContext : DbContext
                 .HasConstraintName("sensitivity_label_project_id_fkey");
         });
 
-        modelBuilder.Entity<SensitivityLabelPermission>(entity =>
+        modelBuilder.Entity<SensitivityLabelPermissionAction>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("sensitivity_label_permissions_pkey");
-
+            entity.HasKey(e => e.Id).HasName("sensitivity_label_permission_actions_pkey");
+            
             entity.HasIndex(e => e.Id)
-                .HasDatabaseName("idx_sensitivity_label_permissions_id");
-
-            entity.HasIndex(e => e.LabelId)
-                .HasDatabaseName("idx_sensitivity_label_permissions_label_id");
-
-            entity.HasIndex(e => e.Action)
-                .HasDatabaseName("idx_sensitivity_label_permissions_action");
-
-            entity.HasIndex(e => new { e.LabelId, e.Action })
-                .HasDatabaseName("unique_sensitivity_label_permission_label_action")
-                .IsUnique();
-
-            entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-            entity.Property(e => e.IsArchived).HasDefaultValue(false);
-
-            entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_sensitivity_label_permissions_last_updated_by");
-
-            entity.HasOne(d => d.LastUpdatedByUser)
-                .WithMany(p => p.LastUpdatedSensitivityLabelPermissions)
-                .HasForeignKey(d => d.LastUpdatedBy)
-                .OnDelete(DeleteBehavior.NoAction)
-                .HasConstraintName(null);
-
-            entity.HasOne(d => d.Label).WithMany(p => p.SensitivityLabelPermissions)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("sensitivity_label_permissions_label_id_fkey");
+                .HasDatabaseName("idx_sensitivity_label_permission_actions_id");
         });
 
-        modelBuilder.Entity<UserSensitivityLabel>(entity =>
+        modelBuilder.Entity<SensitivityLabelGrant>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("user_sensitivity_labels_pkey");
+            entity.HasKey(e => e.Id).HasName("sensitivity_label_grants_pkey");
 
             entity.HasIndex(e => e.Id)
-                .HasDatabaseName("idx_user_sensitivity_labels_id");
+                .HasDatabaseName("idx_sensitivity_label_grants_id");
 
             entity.HasIndex(e => e.UserId)
-                .HasDatabaseName("idx_user_sensitivity_labels_user_id");
+                .HasDatabaseName("idx_sensitivity_label_grants_user_id");
 
             entity.HasIndex(e => e.LabelId)
-                .HasDatabaseName("idx_user_sensitivity_labels_label_id");
+                .HasDatabaseName("idx_sensitivity_label_grants_label_id");
+            
+            entity.HasIndex(e => e.LabelPermissionId)
+                .HasDatabaseName("idx_sensitivity_label_grants_label_permission_id");
 
-            entity.HasIndex(e => new { e.UserId, e.LabelId })
-                .HasDatabaseName("unique_user_sensitivity_label")
+            entity.HasIndex(e => new { e.UserId, e.LabelId, e.LabelPermissionId })
+                .HasDatabaseName("unique_sensitivity_label_grant_user")
                 .IsUnique();
+
+            entity.HasIndex(e => new { e.GroupId, e.LabelId, e.LabelPermissionId })
+                .HasDatabaseName("unique_sensitivity_label_grant_group")
+                .IsUnique();
+
+            // Enforce UserId XOR GroupId at the DB level
+            entity.ToTable(t => t.HasCheckConstraint(
+                "chk_sensitivity_label_grants_user_xor_group",
+                "(user_id IS NOT NULL AND group_id IS NULL) OR (user_id IS NULL AND group_id IS NOT NULL)"
+            ));
 
             entity.Property(e => e.GrantedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            entity.HasOne(d => d.User).WithMany(p => p.UserSensitivityLabels)
+            entity.HasOne(d => d.User).WithMany(p => p.SensitivityLabelGrants)
                 .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("user_sensitivity_labels_user_id_fkey");
+                .HasConstraintName("sensitivity_label_grants_user_id_fkey");
 
-            entity.HasOne(d => d.Label).WithMany(p => p.UserSensitivityLabels)
+            entity.HasOne(d => d.Group).WithMany(p => p.SensitivityLabelGrants)
                 .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("user_sensitivity_labels_label_id_fkey");
+                .HasConstraintName("sensitivity_label_grants_group_id_fkey");
 
-            entity.HasOne(d => d.GrantedByUser).WithMany(p => p.GrantedUserSensitivityLabels)
+            entity.HasOne(d => d.Label).WithMany(p => p.SensitivityLabelGrants)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("sensitivity_label_grants_label_id_fkey");
+            
+            entity.HasOne(d => d.LabelPermission).WithMany(p => p.SensitivityLabelGrants)
+                .HasForeignKey(d => d.LabelPermissionId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("sensitivity_label_grants_label_permission_id_fkey");
+
+            entity.HasOne(d => d.GrantedByUser).WithMany(p => p.GrantedSensitivityLabelGrants)
                 .HasForeignKey(d => d.GrantedBy)
                 .OnDelete(DeleteBehavior.SetNull)
-                .HasConstraintName("user_sensitivity_labels_granted_by_fkey");
-        });
-
-        modelBuilder.Entity<GroupSensitivityLabel>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("group_sensitivity_labels_pkey");
-
-            entity.HasIndex(e => e.Id)
-                .HasDatabaseName("idx_group_sensitivity_labels_id");
-
-            entity.HasIndex(e => e.GroupId)
-                .HasDatabaseName("idx_group_sensitivity_labels_group_id");
-
-            entity.HasIndex(e => e.LabelId)
-                .HasDatabaseName("idx_group_sensitivity_labels_label_id");
-
-            entity.HasIndex(e => new { e.GroupId, e.LabelId })
-                .HasDatabaseName("unique_group_sensitivity_label")
-                .IsUnique();
-
-            entity.Property(e => e.GrantedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-            entity.HasOne(d => d.Group).WithMany(p => p.GroupSensitivityLabels)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("group_sensitivity_labels_group_id_fkey");
-
-            entity.HasOne(d => d.Label).WithMany(p => p.GroupSensitivityLabels)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("group_sensitivity_labels_label_id_fkey");
-
-            entity.HasOne(d => d.GrantedByUser).WithMany(p => p.GrantedGroupSensitivityLabels)
-                .HasForeignKey(d => d.GrantedBy)
-                .OnDelete(DeleteBehavior.SetNull)
-                .HasConstraintName("group_sensitivity_labels_granted_by_fkey");
+                .HasConstraintName("sensitivity_label_grants_granted_by_fkey");
         });
 
         modelBuilder.Entity<Subscription>(entity =>

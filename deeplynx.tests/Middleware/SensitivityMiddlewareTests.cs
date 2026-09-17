@@ -5,6 +5,7 @@ using deeplynx.helpers.Cache;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -36,10 +37,10 @@ public class SensitivityMiddlewareTests : IntegrationTestBase
     public long recordId2; // Has labelId2
     public long recordId3; // Has both labels
     public long recordId4; // No labels
-
-    public long cacheLabelOrgLevel;     // ProjectId == null, governed for "read record", userId1 granted
-    public long cacheLabelProject1Only; // ProjectId == projectId1, governed for "read record", userId1 NOT granted
-    public long cacheLabelProject2Only; // ProjectId == projectId2, ungoverned for "read record" (open to everyone)
+    
+    public long cacheLabelOrgLevel;     // ProjectId == null, userId1 granted "read record"
+    public long cacheLabelProject1Only; // ProjectId == projectId1, userId1 NOT granted "read record"
+    public long cacheLabelProject2Only; // ProjectId == projectId2, userId1 granted "read record"
 
     public SensitivityMiddlewareTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -261,32 +262,22 @@ public class SensitivityMiddlewareTests : IntegrationTestBase
         cacheLabelProject1Only = project1OnlyLabel.Id;
         cacheLabelProject2Only = project2OnlyLabel.Id;
 
-        // Gate the org-level and project1-only labels for "read record"; project2-only stays ungoverned.
-        Context.Set<SensitivityLabelPermission>().AddRange(
-            new SensitivityLabelPermission
-            {
-                LabelId = cacheLabelOrgLevel,
-                Action = "read record",
-                Name = "Cache Test - Org Level Read Gate",
-                IsArchived = false,
-                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
-            },
-            new SensitivityLabelPermission
-            {
-                LabelId = cacheLabelProject1Only,
-                Action = "read record",
-                Name = "Cache Test - Project1 Only Read Gate",
-                IsArchived = false,
-                LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
-            });
-        await Context.SaveChangesAsync();
-
-        // userId1 is granted the org-level label only — explicitly NOT project1-only.
-        Context.Set<UserSensitivityLabel>().Add(
-            new UserSensitivityLabel
+        // userId1 is granted the org-level label and the project2-only label — explicitly NOT
+        // project1-only, so tests can distinguish "granted" from "not granted".
+        var cacheTestReadActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
+        Context.Set<SensitivityLabelGrant>().AddRange(
+            new SensitivityLabelGrant
             {
                 UserId = userId1,
                 LabelId = cacheLabelOrgLevel,
+                LabelPermissionId = cacheTestReadActionId,
+                GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            },
+            new SensitivityLabelGrant
+            {
+                UserId = userId1,
+                LabelId = cacheLabelProject2Only,
+                LabelPermissionId = cacheTestReadActionId,
                 GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
             });
 
@@ -1686,7 +1677,7 @@ public class SensitivityMiddlewareTests : IntegrationTestBase
             // Act
             var result = await service.GetAuthorizedSensitivityLabels(userId1, organizationId1, new[] { projectId1 }, "read record");
 
-            // Assert - org-level label (granted) is authorized; project1-only label (governed, not granted) is not
+            // Assert - org-level label (granted) is authorized; project1-only label (not granted) is not
             Assert.Contains(cacheLabelOrgLevel, result);
             Assert.DoesNotContain(cacheLabelProject1Only, result);
 
@@ -1783,7 +1774,7 @@ public class SensitivityMiddlewareTests : IntegrationTestBase
             // computed value for project2
             Assert.Contains(cacheLabelProject1Only, result); // came from the pre-seeded cache entry, trusted as-is
             Assert.Contains(cacheLabelOrgLevel, result);
-            Assert.Contains(cacheLabelProject2Only, result); // ungoverned label on project2, computed fresh
+            Assert.Contains(cacheLabelProject2Only, result); // granted label on project2, computed fresh
 
             // project1's cache entry is untouched (still the pre-seeded value, not overwritten)
             var stillCachedProject1 = await CacheService.Instance.GetAsync<List<long>>(cacheKey1);

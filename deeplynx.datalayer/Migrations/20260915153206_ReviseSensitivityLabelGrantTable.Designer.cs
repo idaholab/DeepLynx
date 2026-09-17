@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using deeplynx.datalayer.Models;
@@ -11,9 +12,11 @@ using deeplynx.datalayer.Models;
 namespace deeplynx.datalayer.Migrations
 {
     [DbContext(typeof(DeeplynxContext))]
-    partial class DeeplynxContextModelSnapshot : ModelSnapshot
+    [Migration("20260915153206_ReviseSensitivityLabelGrantTable")]
+    partial class ReviseSensitivityLabelGrantTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2676,6 +2679,71 @@ namespace deeplynx.datalayer.Migrations
                         });
                 });
 
+            modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelPermission", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_archived");
+
+                    b.Property<long>("LabelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("label_id");
+
+                    b.Property<DateTime>("LastUpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("last_updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long?>("LastUpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_updated_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id")
+                        .HasName("sensitivity_label_permissions_pkey");
+
+                    b.HasIndex("Action")
+                        .HasDatabaseName("idx_sensitivity_label_permissions_action");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("idx_sensitivity_label_permissions_id");
+
+                    b.HasIndex("LabelId")
+                        .HasDatabaseName("idx_sensitivity_label_permissions_label_id");
+
+                    b.HasIndex("LastUpdatedBy")
+                        .HasDatabaseName("idx_sensitivity_label_permissions_last_updated_by");
+
+                    b.HasIndex("LabelId", "Action")
+                        .IsUnique()
+                        .HasDatabaseName("unique_sensitivity_label_permission_label_action");
+
+                    b.ToTable("sensitivity_label_permissions", "deeplynx");
+                });
+
             modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelPermissionAction", b =>
                 {
                     b.Property<long>("Id")
@@ -3945,6 +4013,25 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelPermission", b =>
+                {
+                    b.HasOne("deeplynx.datalayer.Models.SensitivityLabel", "Label")
+                        .WithMany("SensitivityLabelPermissions")
+                        .HasForeignKey("LabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("sensitivity_label_permissions_label_id_fkey");
+
+                    b.HasOne("deeplynx.datalayer.Models.User", "LastUpdatedByUser")
+                        .WithMany("LastUpdatedSensitivityLabelPermissions")
+                        .HasForeignKey("LastUpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Label");
+
+                    b.Navigation("LastUpdatedByUser");
+                });
+
             modelBuilder.Entity("deeplynx.datalayer.Models.Subscription", b =>
                 {
                     b.HasOne("deeplynx.datalayer.Models.Action", "Action")
@@ -4215,6 +4302,8 @@ namespace deeplynx.datalayer.Migrations
             modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabel", b =>
                 {
                     b.Navigation("SensitivityLabelGrants");
+
+                    b.Navigation("SensitivityLabelPermissions");
                 });
 
             modelBuilder.Entity("deeplynx.datalayer.Models.SensitivityLabelPermissionAction", b =>
@@ -4261,6 +4350,8 @@ namespace deeplynx.datalayer.Migrations
                     b.Navigation("LastUpdatedRelationships");
 
                     b.Navigation("LastUpdatedRoles");
+
+                    b.Navigation("LastUpdatedSensitivityLabelPermissions");
 
                     b.Navigation("LastUpdatedSensitivityLabels");
 

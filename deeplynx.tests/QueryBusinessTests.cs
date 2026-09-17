@@ -50,6 +50,8 @@ public class QueryBusinessTests : IntegrationTestBase
     private long rid; // record ID
     public long roleId;
     private long uid;
+    private long readActionId;
+    private long downloadActionId;
 
     public QueryBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -89,6 +91,8 @@ public class QueryBusinessTests : IntegrationTestBase
             _provenanceBusiness.Object,
             _mockRecordLogger.Object, _objectStorageBusiness, _fileBusinessFactory.Object);
         _queryBusiness = new QueryBusiness(Context, _sensitivityLabelService);
+        readActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
+        downloadActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "download file")).Id;
     }
 
     protected override async Task SeedTestDataAsync()
@@ -841,10 +845,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Grant the user access to the label (access is now per-user, not per-role)
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -889,10 +894,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -938,17 +944,19 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label2.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1749,10 +1757,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission to attach the label
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1793,10 +1802,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -1837,17 +1847,19 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label2.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -2766,10 +2778,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -2832,10 +2845,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user read and write permission to attach and retrieve label
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -2899,17 +2913,19 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Grant the user access to both labels (access is now per-user, not per-role)
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label2.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -3271,10 +3287,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission to attach the label
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -3355,10 +3372,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission for label1
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label1.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -3372,10 +3390,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Grant the user access to label2
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label2.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -3497,10 +3516,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Give user write permission for accessible label
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = accessibleLabel.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -3761,10 +3781,11 @@ public class QueryBusinessTests : IntegrationTestBase
         var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -3795,10 +3816,11 @@ public class QueryBusinessTests : IntegrationTestBase
         Context.ChangeTracker.Clear();
 
         // Grant the user access to label only (intentionally omit label2)
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -3829,17 +3851,19 @@ public class QueryBusinessTests : IntegrationTestBase
             new CreateSensitivityLabelRequestDto { Name = "Label B", Description = "B" }, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label2.Id,
+            LabelPermissionId = readActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
@@ -4060,13 +4084,16 @@ public class QueryBusinessTests : IntegrationTestBase
         var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        // A UserSensitivityLabel grant unlocks every action on a label, so it cannot express
-        // "read yes, download no" for this user. Instead leave "read record" ungated (open by
-        // default under the new access model) while "download file" stays gated by the
-        // permission CreateSensitivityLabel auto-created, and grant nothing to the user.
-        var readGate = await Context.SensitivityLabelPermissions
-            .FirstAsync(p => p.LabelId == label.Id && p.Action == "read record");
-        Context.SensitivityLabelPermissions.Remove(readGate);
+        // Grant read access only (no "download file" grant), so the record is visible but
+        // its URI is hidden under the new grant model, which is per-action.
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
         await Context.SaveChangesAsync();
 
         Context.ChangeTracker.Clear();
@@ -4097,10 +4124,19 @@ public class QueryBusinessTests : IntegrationTestBase
         var label = await _sensitivityLabelBusiness.CreateSensitivityLabel(uid, labelDto, pid, organizationId);
         Context.ChangeTracker.Clear();
 
-        Context.UserSensitivityLabels.Add(new UserSensitivityLabel
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
             UserId = uid,
             LabelId = label.Id,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid,
+            LabelId = label.Id,
+            LabelPermissionId = downloadActionId,
             GrantedBy = uid,
             GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
         });
