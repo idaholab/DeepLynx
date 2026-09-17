@@ -359,6 +359,7 @@ export type UserResponseDto = {
   isActive: boolean;
   lastLogin?: string | null;
   role?: string;
+  type: "user";
 };
 
 export type UserActivityCountsDto = {
