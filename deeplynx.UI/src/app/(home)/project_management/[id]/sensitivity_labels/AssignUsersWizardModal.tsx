@@ -51,7 +51,7 @@ const AssignUsersWizardModal: React.FC<Props> = ({
     const seen = new Set<number>();
     const result: NormalizedUser[] = [];
     for (const member of projectMembers) {
-      if (!member.memberId || seen.has(member.memberId)) continue;
+      if (member.type === "group" || !member.memberId || seen.has(member.memberId)) continue;
       seen.add(member.memberId);
       result.push({ id: member.memberId, name: member.name, email: member.email });
     }

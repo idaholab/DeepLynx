@@ -486,6 +486,7 @@ export type ProjectMemberResponseDto = {
   email: string;
   role?: string;
   roleId?: number;
+  type: string;
   isProjectAdmin?: boolean;
 };
 

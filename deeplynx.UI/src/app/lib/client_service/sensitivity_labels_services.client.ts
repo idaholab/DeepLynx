@@ -667,6 +667,145 @@ export const revokeSensitivityLabelAccessProject = async (
     }
 }
 
+/**
+ * Get all groups with access to a project-level Sensitivity Label.
+ * The /members endpoint returns a combined user+group list, so this just
+ * filters the group entries out of the same response (mirrors the org
+ * version's use of toGroupSensitivityLabelGrants).
+ * @param projectId - The ID of the project
+ * @param labelId - The ID of the sensitivity label
+ * @returns Promise with array of GroupSensitivityLabelResponseDto
+ */
+export const getGroupsWithAccessToLabelProject = async (
+    projectId: number,
+    labelId: number
+): Promise<GroupSensitivityLabelResponseDto[]> => {
+    try {
+        const res = await api.get(
+            `/projects/${projectId}/labels/${labelId}/members`
+        );
+        const members: SensitivityLabelMemberAccessDto[] = res.data;
+        return toGroupSensitivityLabelGrants(members, labelId);
+    } catch (error) {
+        console.error(`Error getting groups with access to Sensitivity Label ${labelId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Grant a group access to a project-level Sensitivity Label
+ * @param projectId - The ID of the project
+ * @param labelId - The ID of the sensitivity label
+ * @param groupId - The ID of the group to grant access to
+ * @param labelPermissionIds - Permission actions to grant to the group
+ * @returns Promise with the group's resulting label access grants
+ */
+export const grantSensitivityLabelAccessToGroupProject = async (
+    projectId: number,
+    labelId: number,
+    groupId: number,
+    labelPermissionIds: number[]
+): Promise<SensitivityLabelMemberAccessDto[]> => {
+    try {
+        const res = await api.post(
+            `/projects/${projectId}/labels/${labelId}/groups/${groupId}`,
+            { labelPermissionIds }
+        );
+        return res.data;
+    } catch (error) {
+        console.error(`Error granting group ${groupId} access to Sensitivity Label ${labelId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Revoke a group's access to a project-level Sensitivity Label
+ * @param projectId - The ID of the project
+ * @param labelId - The ID of the sensitivity label
+ * @param groupId - The ID of the group to revoke access from
+ * @returns Promise with a boolean success flag
+ */
+export const revokeSensitivityLabelAccessFromGroupProject = async (
+    projectId: number,
+    labelId: number,
+    groupId: number
+): Promise<boolean> => {
+    try {
+        const res = await api.delete(
+            `/projects/${projectId}/labels/${labelId}/groups/${groupId}`
+        );
+        return res.data;
+    } catch (error) {
+        console.error(`Error revoking group ${groupId} access to Sensitivity Label ${labelId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Get the permission actions granted to a specific group on a
+ * project-level Sensitivity Label
+ * @param projectId - The ID of the project
+ * @param labelId - The ID of the sensitivity label
+ * @param groupId - The ID of the group
+ * @returns Promise with the group's SensitivityLabelMemberAccessDto, or null
+ */
+export const getGroupPermissionsForLabelProject = async (
+    projectId: number,
+    labelId: number,
+    groupId: number,
+): Promise<SensitivityLabelMemberAccessDto | null> => {
+    const res = await api.get(
+        `/projects/${projectId}/labels/${labelId}/permissions/group/${groupId}`,
+        {
+            headers: { "Cache-Control": "no-cache" },
+            params: { _: Date.now() },
+        },
+    );
+    return (res.data as SensitivityLabelMemberAccessDto[])[0] ?? null;
+}
+
+export const getUserPermissionsMatrixForLabelProject = async (
+    projectId: number,
+    labelId: number,
+    userId: number,
+): Promise<SensitivityLabelUserAccessDto> => {
+    const res = await api.get(
+        `/projects/${projectId}/labels/${labelId}/permissions/user/${userId}/matrix`,
+        {
+            headers: { "Cache-Control": "no-cache" },
+            params: { _: Date.now() },
+        },
+    );
+    const response = res.data as Record<string, unknown>;
+    const matrix = (response.data ?? response) as Record<string, unknown>;
+    const flags = (value: unknown) =>
+        (Array.isArray(value) ? value : []).map((flag) => {
+            const item = flag as Record<string, unknown>;
+            return {
+                permissionId: Number(item.permissionId ?? item.PermissionId),
+                permissionName: String(item.permissionName ?? item.PermissionName ?? ""),
+                hasPermission: Boolean(item.hasPermission ?? item.HasPermission),
+            };
+        });
+    const groups = (value: unknown) =>
+        (Array.isArray(value) ? value : []).map((group) => {
+            const item = group as Record<string, unknown>;
+            return {
+                groupId: Number(item.groupId ?? item.GroupId),
+                groupName: String(item.groupName ?? item.GroupName ?? ""),
+                permissions: flags(item.permissions ?? item.Permissions),
+            };
+        });
+
+    return {
+        userId: Number(matrix.userId ?? matrix.UserId),
+        labelId: Number(matrix.labelId ?? matrix.LabelId),
+        totalPermissions: flags(matrix.totalPermissions ?? matrix.TotalPermissions),
+        userPermissions: flags(matrix.userPermissions ?? matrix.UserPermissions),
+        groupPermissions: groups(matrix.groupPermissions ?? matrix.GroupPermissions),
+    };
+}
+
 // ============================================================================
 // RECORD LEVEL API CALLS
 // ============================================================================
