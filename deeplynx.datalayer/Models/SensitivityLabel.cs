@@ -36,9 +36,6 @@ public partial class SensitivityLabel
     public virtual Organization Organization { get; set; } = null!;
 
     [InverseProperty("Label")]
-    public virtual ICollection<SensitivityLabelPermission> SensitivityLabelPermissions { get; set; } = new List<SensitivityLabelPermission>();
-
-    [InverseProperty("Label")]
     public virtual ICollection<SensitivityLabelGrant> SensitivityLabelGrants { get; set; } = new List<SensitivityLabelGrant>();
 
     [ForeignKey("ProjectId")]

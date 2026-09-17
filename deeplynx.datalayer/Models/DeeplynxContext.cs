@@ -76,8 +76,6 @@ public partial class DeeplynxContext : DbContext
     public virtual DbSet<SavedSearch> SavedSearches { get; set; }
 
     public virtual DbSet<SensitivityLabel> SensitivityLabels { get; set; }
-
-    public virtual DbSet<SensitivityLabelPermission> SensitivityLabelPermissions { get; set; }
     
     public virtual DbSet<SensitivityLabelPermissionAction> SensitivityLabelPermissionActions { get; set; }
 
@@ -1353,40 +1351,6 @@ public partial class DeeplynxContext : DbContext
             entity.HasOne(d => d.Project).WithMany(p => p.SensitivityLabels)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("sensitivity_label_project_id_fkey");
-        });
-
-        modelBuilder.Entity<SensitivityLabelPermission>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("sensitivity_label_permissions_pkey");
-
-            entity.HasIndex(e => e.Id)
-                .HasDatabaseName("idx_sensitivity_label_permissions_id");
-
-            entity.HasIndex(e => e.LabelId)
-                .HasDatabaseName("idx_sensitivity_label_permissions_label_id");
-
-            entity.HasIndex(e => e.Action)
-                .HasDatabaseName("idx_sensitivity_label_permissions_action");
-
-            entity.HasIndex(e => new { e.LabelId, e.Action })
-                .HasDatabaseName("unique_sensitivity_label_permission_label_action")
-                .IsUnique();
-
-            entity.Property(e => e.LastUpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-            entity.Property(e => e.IsArchived).HasDefaultValue(false);
-
-            entity.HasIndex(e => e.LastUpdatedBy).HasDatabaseName("idx_sensitivity_label_permissions_last_updated_by");
-
-            entity.HasOne(d => d.LastUpdatedByUser)
-                .WithMany(p => p.LastUpdatedSensitivityLabelPermissions)
-                .HasForeignKey(d => d.LastUpdatedBy)
-                .OnDelete(DeleteBehavior.NoAction)
-                .HasConstraintName(null);
-
-            entity.HasOne(d => d.Label).WithMany(p => p.SensitivityLabelPermissions)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("sensitivity_label_permissions_label_id_fkey");
         });
 
         modelBuilder.Entity<SensitivityLabelPermissionAction>(entity =>

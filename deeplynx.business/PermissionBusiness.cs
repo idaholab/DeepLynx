@@ -38,9 +38,7 @@ public class PermissionBusiness : IPermissionBusiness
     ///     List all permissions
     /// </summary>
     /// <param name="labelId">
-    ///     (Optional, v1-only) ID of a sensitivity label to filter by. Sourced from
-    ///     <see cref="deeplynx.datalayer.Models.SensitivityLabelPermission" /> rather than the
-    ///     <see cref="deeplynx.datalayer.Models.Permission" /> table, which no longer carries label data.
+    ///     (Optional, v1-only) ID of a sensitivity label to filter by.
     /// </param>
     /// <param name="projectId">(Optional)ID of a project to filter by</param>
     /// <param name="organizationId">(Optional)ID of an organization to filter by</param>
