@@ -12,10 +12,6 @@ namespace deeplynx.datalayer.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "user_sensitivity_labels",
-                schema: "deeplynx");
-
             migrationBuilder.CreateTable(
                 name: "sensitivity_label_grants",
                 schema: "deeplynx",
@@ -71,6 +67,19 @@ namespace deeplynx.datalayer.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            // copy data before dropping old table
+            migrationBuilder.Sql(@"
+                INSERT INTO deeplynx.sensitivity_label_grants
+                    (user_id, group_id, label_id, label_permission_id, granted_by, granted_at)
+                SELECT
+                    user_id, NULL, label_id, label_permission_id, granted_by, granted_at
+                FROM deeplynx.user_sensitivity_labels;
+            ");
+            
+            migrationBuilder.DropTable(
+                name: "user_sensitivity_labels",
+                schema: "deeplynx");
+
             migrationBuilder.CreateIndex(
                 name: "idx_sensitivity_label_grants_id",
                 schema: "deeplynx",
@@ -119,10 +128,6 @@ namespace deeplynx.datalayer.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "sensitivity_label_grants",
-                schema: "deeplynx");
-
             migrationBuilder.CreateTable(
                 name: "user_sensitivity_labels",
                 schema: "deeplynx",
@@ -168,6 +173,19 @@ namespace deeplynx.datalayer.Migrations
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                 });
+
+            // copy data before dropping old table
+            migrationBuilder.Sql(@"
+                INSERT INTO deeplynx.user_sensitivity_labels
+                    (user_id, label_id, label_permission_id, granted_by, granted_at)
+                SELECT
+                    user_id, label_id, label_permission_id, granted_by, granted_at
+                FROM deeplynx.sensitivity_label_grants;
+            ");
+
+            migrationBuilder.DropTable(
+                name: "sensitivity_label_grants",
+                schema: "deeplynx");
 
             migrationBuilder.CreateIndex(
                 name: "idx_user_sensitivity_labels_id",
