@@ -610,8 +610,8 @@ public class FileBusiness : IFileControllerBusiness
         var uri = await fileBusiness.CompleteUpload(organizationId, projectId, realDataSourceId,
             objectStorage.Config, request, guid);
         
-        //TODO: Add the file content hash calculation back when we have a background job runner that will reliably do
-        // this for large files (50gb+)
+        //TODO: (https://nstinl.atlassian-us-gov-mod.net/browse/DL-3230) Add the file content hash calculation back
+        // when we have a background job runner that will reliably do this for large files (50gb+)
 
         var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
@@ -706,8 +706,8 @@ public class FileBusiness : IFileControllerBusiness
         var uri = await fileBusiness.CompleteUpload(organizationId, projectId, record.DataSourceId,
             objectStorage.Config, request, guid);
         
-        //TODO: Add the file content hash calculation back when we have a background job runner that will reliably do
-        // this for large files (50gb+)
+        //TODO: (https://nstinl.atlassian-us-gov-mod.net/browse/DL-3230) Add the file content hash calculation back
+        // when we have a background job runner that will reliably do this for large files (50gb+)
 
         var fileSize = await fileBusiness.GetFileSize(uri, objectStorage.Config);
         var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
@@ -1095,8 +1095,8 @@ public class FileBusiness : IFileControllerBusiness
             var uri = await fileBusiness.CompleteUploadTus(organizationId, projectId, realDataSourceId,
                 objectStorage.Config, uploadId, guid, fileName);
 
-            //TODO: Add the file content hash calculation back when we have a background job runner that will reliably do
-            // this for large files (50gb+)
+            //TODO: (https://nstinl.atlassian-us-gov-mod.net/browse/DL-3230) Add the file content hash calculation back
+            // when we have a background job runner that will reliably do this for large files (50gb+)
 
             var fileExtension = Path.GetExtension(fileName).TrimStart('.').ToLower();
             var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
