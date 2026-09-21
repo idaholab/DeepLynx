@@ -2721,6 +2721,32 @@ public class FileBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CompleteUpload_DoesNotCalculateFileContentHash()
+    {
+        // Arrange: chunked uploads skip hash calculation to avoid timeouts on large files
+        // (see TODO in FileBusiness.CompleteUpload: hash calc is deferred until a background job runner exists)
+        var fileName = "no-hash.txt";
+        var session = await _fileBusiness.StartUpload(
+            oid, pid, did, osid, new FileUploadInitRequestDto { FileName = fileName, FileSize = 4 });
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("data"), session.UploadId, 0);
+
+        var completeRequest = new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = fileName,
+            TotalChunks = 1
+        };
+
+        // Act
+        var result = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, completeRequest);
+
+        // Assert
+        Assert.Null(result.FileContentHash);
+        var storedRecord = await Context.Records.FindAsync(result.Id);
+        Assert.Null(storedRecord!.FileContentHash);
+    }
+
+    [Fact]
     public async Task CompleteUpdateUpload_ReplacesChunkUploadedFileContent()
     {
         var initialContent = "original content";
@@ -2777,6 +2803,42 @@ public class FileBusinessTests : IntegrationTestBase
         Assert.Equal(updatedContent, await File.ReadAllTextAsync(updatedRecord.Uri));
         Assert.Equal(updatedContent, downloadedContent);
         Assert.False(File.Exists(originalUri));
+    }
+
+    [Fact]
+    public async Task CompleteUpdateUpload_ReplacesExistingFileContentHashWithNull()
+    {
+        // Arrange: an existing record with a stale hash from before this file was replaced
+        var initialSession = await _fileBusiness.StartUpload(
+            oid, pid, did, osid, new FileUploadInitRequestDto { FileName = "original.txt", FileSize = 7 });
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("original"), initialSession.UploadId, 0);
+
+        var initialRecord = await _fileBusiness.CompleteUpload(uid, oid, pid, did, osid, new FileUploadCompleteRequestDto
+        {
+            UploadId = initialSession.UploadId,
+            FileName = "original.txt",
+            TotalChunks = 1
+        });
+
+        var storedRecord = await Context.Records.FindAsync(initialRecord.Id);
+        storedRecord!.FileContentHash = new string('a', 64);
+        await Context.SaveChangesAsync();
+
+        var session = await _fileBusiness.StartUpdateUpload(
+            uid, oid, pid, initialRecord.Id, new FileUploadInitRequestDto { FileName = "updated.txt", FileSize = 7 });
+        await _fileBusiness.UploadChunk(oid, pid, did, osid, CreateFormFile("updated"), session.UploadId, 0);
+
+        // Act: replacing the file's content should clear the now-stale hash, not leave it in place
+        var updatedRecord = await _fileBusiness.CompleteUpdateUpload(uid, oid, pid, initialRecord.Id, new FileUploadCompleteRequestDto
+        {
+            UploadId = session.UploadId,
+            FileName = "updated.txt",
+            TotalChunks = 1
+        });
+
+        // Assert
+        Assert.Null(updatedRecord.FileContentHash);
+        Assert.Null((await Context.Records.FindAsync(initialRecord.Id))!.FileContentHash);
     }
 
     [Fact]
@@ -5549,6 +5611,83 @@ public class FileBusinessTests : IntegrationTestBase
             uploadId,
             It.IsAny<Guid>(),
             fileName), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadPart_WhenUploadCompletes_DoesNotCalculateFileContentHash()
+    {
+        // Arrange
+        const string uploadId = "test-tus-upload-complete-no-hash";
+        const long uploadOffset = 25;
+        const long uploadLength = 50;
+        const long expectedNewOffset = 50;
+        const string fileName = "tus-no-hash.txt";
+
+        using var uploadBody = new MemoryStream(Encoding.UTF8.GetBytes("final chunk"));
+        var innerFileBusiness = new Mock<IFileBusiness>();
+
+        var completedFilePath = Path.Combine(_testDirectory, "completed-tus-no-hash.txt");
+        await File.WriteAllTextAsync(completedFilePath, "final file contents");
+
+        _fileBusinessFactory
+            .Setup(x => x.CreateFileBusiness("filesystem"))
+            .Returns(innerFileBusiness.Object);
+
+        innerFileBusiness
+            .Setup(x => x.UploadPartTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                uploadOffset,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadBody))
+            .ReturnsAsync(expectedNewOffset);
+
+        innerFileBusiness
+            .Setup(x => x.GetUploadLength(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()))
+            .ReturnsAsync(uploadLength);
+
+        innerFileBusiness
+            .Setup(x => x.GetFileNameTus(
+                oid,
+                pid,
+                did,
+                uploadId,
+                It.IsAny<ObjectStorageConfigDto>()))
+            .ReturnsAsync(fileName);
+
+        innerFileBusiness
+            .Setup(x => x.CompleteUploadTus(
+                oid,
+                pid,
+                did,
+                It.IsAny<ObjectStorageConfigDto>(),
+                uploadId,
+                It.IsAny<Guid>(),
+                fileName))
+            .ReturnsAsync(completedFilePath);
+
+        // Act: this Tus branch reaches the same deferred-hash TODO as the chunked upload paths
+        var result = await _fileBusiness.UploadPartTus(
+            oid,
+            pid,
+            did,
+            osid,
+            uploadId,
+            uploadOffset,
+            uid,
+            uploadBody);
+
+        // Assert
+        Assert.Equal(expectedNewOffset, result);
+        var createdRecord = Context.Records.Single(r => r.Name == fileName);
+        Assert.Null(createdRecord.FileContentHash);
     }
 
     [Fact]
