@@ -609,7 +609,9 @@ public class FileBusiness : IFileControllerBusiness
 
         var uri = await fileBusiness.CompleteUpload(organizationId, projectId, realDataSourceId,
             objectStorage.Config, request, guid);
-        var fileContentHash = await fileBusiness.CalculateStoredFileContentHash(uri, objectStorage.Config);
+        
+        //TODO: (https://nstinl.atlassian-us-gov-mod.net/browse/DL-3230) Add the file content hash calculation back
+        // when we have a background job runner that will reliably do this for large files (50gb+)
 
         var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
         var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
@@ -647,7 +649,6 @@ public class FileBusiness : IFileControllerBusiness
             ClassName = resolvedClass.Name,
             FileType = fileExtension,
             FileSize = fileSize,
-            FileContentHash = fileContentHash,
             Tags = metadata?.Tags
         };
 
@@ -704,7 +705,10 @@ public class FileBusiness : IFileControllerBusiness
 
         var uri = await fileBusiness.CompleteUpload(organizationId, projectId, record.DataSourceId,
             objectStorage.Config, request, guid);
-        var fileContentHash = await fileBusiness.CalculateStoredFileContentHash(uri, objectStorage.Config);
+        
+        //TODO: (https://nstinl.atlassian-us-gov-mod.net/browse/DL-3230) Add the file content hash calculation back
+        // when we have a background job runner that will reliably do this for large files (50gb+)
+
         var fileSize = await fileBusiness.GetFileSize(uri, objectStorage.Config);
         var fileExtension = Path.GetExtension(request.FileName).TrimStart('.').ToLower();
 
@@ -749,7 +753,6 @@ public class FileBusiness : IFileControllerBusiness
             Uri = uri,
             FileType = fileExtension,
             FileSize = fileSize,
-            FileContentHash = fileContentHash,
             ReplaceFileContentHash = true,
             Tags = updatedTags
         };
@@ -1091,7 +1094,9 @@ public class FileBusiness : IFileControllerBusiness
             var fileName = await fileBusiness.GetFileNameTus(organizationId, projectId, realDataSourceId, uploadId, objectStorage.Config);
             var uri = await fileBusiness.CompleteUploadTus(organizationId, projectId, realDataSourceId,
                 objectStorage.Config, uploadId, guid, fileName);
-            var fileContentHash = await fileBusiness.CalculateStoredFileContentHash(uri, objectStorage.Config);
+
+            //TODO: (https://nstinl.atlassian-us-gov-mod.net/browse/DL-3230) Add the file content hash calculation back
+            // when we have a background job runner that will reliably do this for large files (50gb+)
 
             var fileExtension = Path.GetExtension(fileName).TrimStart('.').ToLower();
             var fileClass = await _classBusiness.GetOrCreateClass(currentUserId, organizationId, projectId, "File");
@@ -1129,7 +1134,6 @@ public class FileBusiness : IFileControllerBusiness
                 ClassName = resolvedClass.Name,
                 FileType = fileExtension,
                 FileSize = fileSize,
-                FileContentHash = fileContentHash
             };
 
             var createdRecord = await _recordBusiness.CreateRecord(currentUserId, organizationId, projectId,
