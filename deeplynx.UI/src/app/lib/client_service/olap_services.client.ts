@@ -1,8 +1,8 @@
 // src/app/lib/client_service/olap_services.client.ts
 "use client";
 
-import { OlapPlotData, OlapPlotResponse } from "@/app/(home)/types/olap_types";
-import { HistoricalRecordResponseDto } from "@/app/(home)/types/responseDTOs";
+import { OlapPlotData } from "@/app/(home)/types/olap_types";
+import { HistoricalRecordResponseDto, PaginatedResponse } from "@/app/(home)/types/responseDTOs";
 import api from "./api";
 
 
@@ -27,11 +27,11 @@ export async function getPlotData(
         searchParams.append("limit", limit.toString());
         searchParams.append("rowStride", rowStride.toString());
 
-        const res = await api.get<OlapPlotResponse>(
+        const res = await api.get(
             `/organizations/${organizationId}/projects/${projectId}/records/${recordId}/olap/plot?${searchParams.toString()}`
         );
 
-        return res.data.plotData;
+        return res.data;
     } catch (error) {
         console.error("Error fetching plot data:", error);
         throw error;
@@ -42,15 +42,24 @@ export async function getPlotData(
  * Get all timeseries files for a project
  * @param organizationId - ID of the organization
  * @param projectId - ID of the project
- * @returns Promise with array of RecordResponseDto
+ * @param pageNumber - Page number to fetch; omit to use the API default
+ * @param pageSize - Page size; omit to use the API default, or pass -1 for all matching records
+ * @returns Promise with paginated HistoricalRecordResponseDto
  */
 export async function getTimeseriesFiles(
     organizationId: number,
-    projectId: number
-): Promise<HistoricalRecordResponseDto[]> {
+    projectId: number,
+    pageNumber?: number,
+    pageSize?: number
+): Promise<PaginatedResponse<HistoricalRecordResponseDto>> {
     try {
-        const res = await api.post<HistoricalRecordResponseDto[]>(
-            `/organizations/${organizationId}/query/records/advanced?projectIds=${projectId}`,
+        const params = new URLSearchParams();
+        params.append("projectIds", String(projectId));
+        if (pageNumber !== undefined) params.append("pageNumber", String(pageNumber));
+        if (pageSize !== undefined) params.append("pageSize", String(pageSize));
+
+        const res = await api.post<PaginatedResponse<HistoricalRecordResponseDto>>(
+            `/organizations/${organizationId}/query/records/advanced?${params.toString()}`,
             [{ filter: "class_name", operator: "=", value: "Timeseries" }]
         );
 

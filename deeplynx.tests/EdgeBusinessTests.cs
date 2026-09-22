@@ -27,12 +27,15 @@ public class EdgeBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private Mock<IObjectStorageBusiness> _mockObjectStorageBusiness = null!;
     private Mock<IOrganizationBusiness> _mockOrganizationBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private Mock<IRecordBusiness> _mockRecordBusiness = null!;
     private Mock<IRelationshipBusiness> _mockRelationshipBusiness = null!;
     private Mock<IRoleBusiness> _mockRoleBusiness = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private ProjectBusiness _projectBusiness = null!;
     private BulkCopyUpsertExecutor _mockBulkCopyExecutor = null!;
+    private Mock<IProjectRolePermissionService> _mockPermissionService = null!;
+    private Mock<IAdminService> _mockAdminService = null!;
     private ISensitivityLabelService _sensitivityLabelService = null!;
     public long destinationRecordId;
     public long destinationRecordId2;
@@ -61,27 +64,30 @@ public class EdgeBusinessTests : IntegrationTestBase
         _mockObjectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _mockRoleBusiness = new Mock<IRoleBusiness>();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
+        _mockAdminService = new Mock<IAdminService>();
+        _mockPermissionService = new Mock<IProjectRolePermissionService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyExecutor);
         _mockOrganizationBusiness = new Mock<IOrganizationBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
         _sensitivityLabelService = new SensitivityLabelService(Context);
 
-        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _sensitivityLabelService);
+        _edgeBusiness = new EdgeBusiness(Context, _eventBusiness, _mockBulkCopyExecutor, _sensitivityLabelService, _mockPermissionService.Object);
         _dataSourceBusiness = new DataSourceBusiness(Context, _edgeBusiness, _mockRecordBusiness.Object,
-            _eventBusiness);
+            _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _classBusiness = new ClassBusiness(
             Context, _mockRecordBusiness.Object,
-            _mockRelationshipBusiness.Object, _eventBusiness);
-        _notificationBusiness =
-            new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
+            _mockRelationshipBusiness.Object, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
+
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
+
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object, _classBusiness,
             _mockRoleBusiness.Object, _dataSourceBusiness,
-            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _mockObjectStorageBusiness.Object, _eventBusiness, _mockOrganizationBusiness.Object, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -276,6 +282,84 @@ public class EdgeBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateNullRelatipnshipIdEdge_Success_ReturnsCorrectValues()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        var dto = new CreateEdgeRequestDto
+        {
+            OriginId = (int)originRecordId,
+            DestinationId = (int)destinationRecordId,
+            RelationshipId = null,
+            RelationshipName = "Relationship 1"
+        };
+
+        // Act
+        var result = await _edgeBusiness.CreateEdge(uid1, oid, pid, dsid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(relationshipId, result.RelationshipId);
+        Assert.Equal(relationshipId, result.RelationshipId);
+        Assert.Equal(originRecordId, result.OriginId);
+        Assert.Equal(destinationRecordId, result.DestinationId);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.Equal(dsid, result.DataSourceId);
+        Assert.Equal(uid1, result.LastUpdatedBy);
+
+        // Ensure that edge create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.Single(eventList);
+
+        var actualEvent = eventList[0];
+
+        Assert.Equal(pid, actualEvent.ProjectId);
+        Assert.Equal("create", actualEvent.Operation);
+        Assert.Equal("edge", actualEvent.EntityType);
+        Assert.Equal(result.Id, actualEvent.EntityId);
+    }
+
+    [Fact]
+    public async Task CreateEdgeUnarchiveEdgeCreateEdge_Success_ReturnsCorrectValues()
+    {
+        // Arrange
+        var now = DateTime.UtcNow;
+        var dto = new CreateEdgeRequestDto
+        {
+            OriginId = (int)originRecordId,
+            DestinationId = (int)destinationRecordId,
+            RelationshipId = (int)relationshipId
+        };
+
+        // Act
+        await _edgeBusiness.CreateEdge(uid1, oid, pid, dsid, dto);
+        await _edgeBusiness.ArchiveEdge(uid1, oid, pid, null, dto.OriginId, dto.DestinationId);
+        var result = await _edgeBusiness.CreateEdge(uid1, oid, pid, dsid, dto);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.True(result.LastUpdatedAt >= now);
+        Assert.Equal(relationshipId, result.RelationshipId);
+        Assert.Equal(originRecordId, result.OriginId);
+        Assert.Equal(destinationRecordId, result.DestinationId);
+        Assert.Equal(pid, result.ProjectId);
+        Assert.Equal(dsid, result.DataSourceId);
+        Assert.Equal(uid1, result.LastUpdatedBy);
+
+        // Ensure that edge create event was logged
+        var eventList = await Context.Events.ToListAsync();
+        Assert.NotEmpty(eventList);
+
+        var actualEvent = eventList[0];
+
+        Assert.Equal(pid, actualEvent.ProjectId);
+        Assert.Equal("create", actualEvent.Operation);
+        Assert.Equal("edge", actualEvent.EntityType);
+        Assert.Equal(result.Id, actualEvent.EntityId);
+    }
+
+    [Fact]
     public async Task CreateEdge_Fails_IfNoOriginId()
     {
         // Arrange
@@ -415,7 +499,7 @@ public class EdgeBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region GetAllEdges Tests
+    #region GetAllEdges (V1 / Legacy) Tests
 
     [Fact]
     public async Task GetAllEdges_ReturnsOnlyForProject()
@@ -470,6 +554,839 @@ public class EdgeBusinessTests : IntegrationTestBase
         // Assert
         Assert.Contains(listWithArchived, e => e.Id == archivedEdge.Id);
         Assert.DoesNotContain(listWithoutArchived, e => e.Id == archivedEdge.Id);
+    }
+
+    [Fact]
+    public async Task GetAllEdges_NoProjectIds_ReturnsEmptyList_WhenUnauthorized()
+    {
+        // Act - passing a project ID array with no authorized projects
+        var result = await _edgeBusiness.GetAllEdges(uid1, oid, 999, null, false);
+
+        // Assert - old method returns a plain empty list, not a wrapper object
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    #endregion
+
+    #region GetAllEdgesPaginated Tests
+
+    private static PaginatedRequestDto DefaultPagination(int pageNumber = 1, int pageSize = 100)
+    {
+        return new PaginatedRequestDto
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_ReturnsOnlyForProjects()
+    {
+        // Act - Get edges for pid only
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var result = await _edgeBusiness.GetAllEdgesPaginated(uid1, oid, pid, DefaultPagination(), null, true, true, true);
+
+        // Assert - Should get edge1 and edge5 (not edge2 which is archived, not edge4 which is in pid2)
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, e => e.Id == edge1.Id);
+        Assert.DoesNotContain(result.Items, e => e.Id == edge2.Id);
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_ExcludesSoftDeleted()
+    {
+        // Act
+
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var result = await _edgeBusiness.GetAllEdgesPaginated(uid1, oid, pid, DefaultPagination(), null, true, true, true);
+
+        // Assert - edge2 is archived, should not be returned
+        Assert.DoesNotContain(result.Items, e => e.Id == edge2.Id);
+        Assert.All(result.Items, e => Assert.False(e.IsArchived));
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_HideArchivedFalse_ReturnsArchivedEdges()
+    {
+        // Act
+
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var result = await _edgeBusiness.GetAllEdgesPaginated(uid1, oid, pid, DefaultPagination(), null, false, true, true);
+
+        // Assert - Should include archived edge2
+        Assert.Contains(result.Items, e => e.Id == edge2.Id && e.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_HideArchivedTrue_ExcludesArchivedEdges()
+    {
+        // Act
+
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var result = await _edgeBusiness.GetAllEdgesPaginated(uid1, oid, pid, DefaultPagination(), null, true, true, true);
+
+        // Assert
+        Assert.DoesNotContain(result.Items, e => e.Id == edge2.Id);
+        Assert.All(result.Items, e => Assert.False(e.IsArchived));
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_ReturnsAllProperties_Correctly()
+    {
+        // Act
+
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var result = await _edgeBusiness.GetAllEdgesPaginated(uid1, oid, pid, DefaultPagination(), null, false, true, true);
+        var edge1Dto = result.Items.First(e => e.Id == edge1.Id);
+
+        // Assert
+        Assert.Equal(edge1.Id, edge1Dto.Id);
+        Assert.Equal(pid, edge1Dto.ProjectId);
+        Assert.Equal(oid, edge1Dto.OrganizationId);
+        Assert.Equal(uid1, edge1Dto.LastUpdatedBy);
+        Assert.False(edge1Dto.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_Paginates_Correctly()
+    {
+        // Arrange - pid has edge1, edge3, edge5 unarchived (3 total)
+
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var pageOne = DefaultPagination(pageNumber: 1, pageSize: 2);
+        var pageTwo = DefaultPagination(pageNumber: 2, pageSize: 2);
+
+        // Act
+        var firstPage = await _edgeBusiness.GetAllEdgesPaginated(uid1, oid, pid, pageOne, null, true, true, true);
+        var secondPage = await _edgeBusiness.GetAllEdgesPaginated(uid1, oid, pid, pageTwo, null, true, true, true);
+
+        // Assert
+        Assert.Equal(2, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.Equal(2, secondPage.TotalCount);
+
+        // No overlap between pages
+        var firstPageIds = firstPage.Items.Select(e => e.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(e => e.Id).ToHashSet();
+        Assert.Empty(firstPageIds.Intersect(secondPageIds));
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_PageSizeNegativeOne_ReturnsAllEdges_IgnoringPageNumber()
+    {
+        // Arrange - pid has 3 unarchived edges total; ask for a page far beyond that range
+
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var sentinel = DefaultPagination(pageNumber: 5, pageSize: -1);
+
+        // Act
+        var result = await _edgeBusiness.GetAllEdgesPaginated(uid1, oid, pid, sentinel, null, true, true, true);
+
+        // Assert - PageNumber is ignored entirely, every matching edge comes back on "page 1"
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(2, result.PageSize);
+        Assert.Contains(result.Items, e => e.Id == edge1.Id);
+        Assert.DoesNotContain(result.Items, e => e.Id == edge2.Id);
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_PageSizeNegativeOne_RespectsHideArchivedAndProjectFilters()
+    {
+        // Act - request everything, but with hideArchived = false so edge2 should be included
+
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var result = await _edgeBusiness.GetAllEdgesPaginated(
+            uid1, oid, pid, DefaultPagination(pageSize: -1), null, false, true, true);
+
+        // Assert - "return all" still applies the same filters as the paginated path
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(3, result.Items.Count);
+        Assert.Contains(result.Items, e => e.Id == edge2.Id && e.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_PageSizeNegativeOne_NoAuthorizedProjects_ReturnsEmptyPaginatedResponse()
+    {
+        // Act - unauthorized project short-circuit should take priority over the "return all" sentinel
+
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var result = await _edgeBusiness.GetAllEdgesPaginated(
+            uid1, oid, 752652938659, DefaultPagination(pageSize: -1), null, false, false, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(-1, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+    {
+        // Arrange - pid has 3 unarchived edges total
+
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var zeroSize = DefaultPagination(pageNumber: 1, pageSize: 0);
+
+        // Act
+        var result = await _edgeBusiness.GetAllEdgesPaginated(uid1, oid, pid, zeroSize, null, true, true, true);
+
+        // Assert - Items is empty, but TotalCount still reflects the full matching set
+        Assert.Empty(result.Items);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllEdgesPaginated_PageSizeZero_OnAnyPageNumber_StillReturnsEmptyItems()
+    {
+        // Arrange - Skip(N * 0) is always Skip(0), so any page number should behave identically
+
+        var edge1 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge1);
+
+        var edge2 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId2,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = true,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge2);
+
+        var edge3 = new Edge
+        {
+            OriginId = originRecordId2,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid2,
+            DataSourceId = dsid2,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge3);
+
+        var edge4 = new Edge
+        {
+            OriginId = originRecordId,
+            DestinationId = destinationRecordId3,
+            RelationshipId = relationshipId,
+            ProjectId = pid,
+            DataSourceId = dsid,
+            OrganizationId = oid,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid1
+        };
+        Context.Edges.Add(edge4);
+
+        await Context.SaveChangesAsync();
+
+        var zeroSizePageThree = DefaultPagination(pageNumber: 3, pageSize: 0);
+
+        // Act
+        var result = await _edgeBusiness.GetAllEdgesPaginated(
+            uid1, oid, pid, zeroSizePageThree, null, true, true, true);
+
+        // Assert
+        Assert.Empty(result.Items);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(3, result.PageNumber);
+        Assert.Equal(0, result.PageSize);
     }
 
     #endregion

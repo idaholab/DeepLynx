@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using deeplynx.interfaces;
 using deeplynx.models;
 using Microsoft.AspNetCore.Http;
@@ -65,7 +66,7 @@ public class FileS3Business : IFileBusiness
     }
 
     public async Task<string> GenerateDownloadUrl(RecordResponseDto record, ObjectStorageConfigDto objectStorageConfig,
-        int expirationHours = 1)
+        int expirationHours = 1, string? directUrl = null)
     {
         throw new NotImplementedException("Generate download urls is not implemented for filesystem");
     }

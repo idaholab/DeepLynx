@@ -54,8 +54,8 @@
   --color-base-200: oklch(29% 0.01 258);
   --color-base-300: oklch(35% 0.012 256);
   --color-base-content: oklch(92% 0.004 260);
-  --color-primary: oklch(30% 0.17 254.3);
-  --color-primary-content: oklch(95% 0.004 251);
+  --color-primary: oklch(50% 0.15 254.3);
+  --color-primary-content: oklch(98% 0.005 251);
   --color-secondary: oklch(45% 0.14 255.19);
   --color-secondary-content: oklch(94% 0.004 255);
   --color-accent: oklch(100% 0.02 70);
@@ -285,19 +285,19 @@
   prefersdark: true;
   color-scheme: "dark";
   --color-base-100: oklch(27.69% 0.033 260.03);
-  --color-base-200: oklch(23.76% 0.026 260.28);
+  --color-base-200: oklch(15.76% 0.026 260.28);
   --color-base-300: oklch(20.32% 0.021 260.39);
   --color-base-content: oklch(86.78% 0.014 263.48);
   --color-primary: oklch(69.65% 0.059 248.69);
   --color-primary-content: oklch(86.78% 0.014 263.48);
-  --color-secondary: oklch(77.46% 0.062 217.47);
+  --color-secondary: oklch(50.46% 0.062 217.47);
   --color-secondary-content: oklch(86.78% 0.014 263.48);
   --color-accent: oklch(76.83% 0.074 131.06);
   --color-accent-content: oklch(20.32% 0.021 260.39);
   --color-neutral: oklch(45.23% 0.035 264.13);
   --color-neutral-content: oklch(89.93% 0.016 262.75);
   --color-info: oklch(69.21% 0.062 332.66);
-  --color-info-content: oklch(20.32% 0.021 260.39);
+  --color-info-content: oklch(50.32% 0.021 260.39);
   --color-success: oklch(76.83% 0.074 131.06);
   --color-success-content: oklch(20.32% 0.021 260.39);
   --color-warning: oklch(85.49% 0.089 84.09);
@@ -452,28 +452,22 @@ html {
 }
 
 .app-header {
-  background: linear-gradient(
-    180deg,
-    var(--header-gradient-start),
-    var(--header-gradient-end)
-  );
+  background: linear-gradient(180deg,
+      var(--header-gradient-start),
+      var(--header-gradient-end));
 }
 
 .app-header-inverted {
-  background: linear-gradient(
-    180deg,
-    var(--header-gradient-end),
-    var(--header-gradient-start)
-  );
+  background: linear-gradient(180deg,
+      var(--header-gradient-end),
+      var(--header-gradient-start));
 }
 
 .login {
   background: #152230;
-  background: linear-gradient(
-    180deg,
-    rgba(34, 41, 51, 1) 0%,
-    rgba(57, 82, 108, 1) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(34, 41, 51, 1) 0%,
+      rgba(57, 82, 108, 1) 100%);
 }
 
 .grayed-out {
@@ -532,4 +526,108 @@ html {
 
 .id-tooltip:hover [role="tooltip"] {
   pointer-events: auto;
+}
+
+.insight-markdown-message {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.insight-markdown-message>*:first-child {
+  margin-top: 0;
+}
+
+.insight-markdown-message>*:last-child {
+  margin-bottom: 0;
+}
+
+.insight-markdown-message p {
+  margin: 0.5rem 0;
+}
+
+.insight-markdown-message h1,
+.insight-markdown-message h2,
+.insight-markdown-message h3 {
+  margin: 0.75rem 0 0.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.insight-markdown-message h1 {
+  font-size: 1.25rem;
+}
+
+.insight-markdown-message h2 {
+  font-size: 1.125rem;
+}
+
+.insight-markdown-message h3 {
+  font-size: 1rem;
+}
+
+.insight-markdown-message ul,
+.insight-markdown-message ol {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+.insight-markdown-message ul {
+  list-style: disc;
+}
+
+.insight-markdown-message ol {
+  list-style: decimal;
+}
+
+.insight-markdown-message li {
+  margin: 0.25rem 0;
+}
+
+.insight-markdown-message blockquote {
+  margin: 0.75rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid currentColor;
+  opacity: 0.8;
+}
+
+.insight-markdown-message code {
+  border-radius: 0.375rem;
+  background: color-mix(in oklch, currentColor 10%, transparent);
+  padding: 0.125rem 0.25rem;
+  font-size: 0.85em;
+}
+
+.insight-markdown-message pre {
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, currentColor 8%, transparent);
+  padding: 0.75rem;
+}
+
+.insight-markdown-message pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.insight-markdown-message table {
+  margin: 0.75rem 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.insight-markdown-message th,
+.insight-markdown-message td {
+  border: 1px solid currentColor;
+  padding: 0.4rem 0.5rem;
+}
+
+.insight-markdown-message th {
+  font-weight: 700;
+}
+
+.insight-markdown-message a {
+  text-decoration: underline;
 }

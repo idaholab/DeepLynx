@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -23,6 +24,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
+    private SensitivityLabelService _labelService = null!;
     public long lid; // label ID
     public long lid2; // archived label ID
     public long lid3;
@@ -47,6 +49,8 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     public long mid3;
     public long mid4;
     public long mid5;
+    public long readActionId;
+    public long downloadActionId;
 
     public SensitivityLabelBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -64,6 +68,7 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         _userBusiness = new UserBusiness(Context);
         _labelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _roleBusiness = new RoleBusiness(Context, _eventBusiness);
+        _labelService = new SensitivityLabelService(Context);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -207,6 +212,12 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         lid5 = label3.Id;
         lid6 = proj2Label.Id;
 
+        readActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
+        downloadActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "download file")).Id;
+
+        await Context.SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
         // Create user roles
         var projAdmin = new Role { Name = "Admin", OrganizationId = oid, ProjectId = pid };
         var projUser = new Role { Name = "User", OrganizationId = oid, ProjectId = pid };
@@ -319,24 +330,14 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     public async Task GetAllSensitivityLabels_OneLabelVisible_ReturnsSingleLabel()
     {
         // Arrange
-        var permission1 = new Permission
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            Name = "Read Permission",
-            Action = "read record",
+            UserId = uid2,
             LabelId = lid,
-            OrganizationId = oid,
-            ProjectId = pid
-        };
-        Context.Permissions.Add(permission1);
-        await Context.SaveChangesAsync();
-        long permid = permission1.Id;
-
-        await _roleBusiness.AddPermissionToRole(rid2, permid, oid, pid);
-
-        var role1perms = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstAsync(r => r.Id == rid2);
-        role1perms.Permissions.Add(permission1);
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
         await Context.SaveChangesAsync();
 
         // Act
@@ -362,18 +363,15 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         long orgLabelId = orgLabel.Id;
 
-        var orgPermission = new Permission
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            Name = "Read Permission",
-            Action = "read record",
+            UserId = uid4,
             LabelId = orgLabelId,
-            OrganizationId = oid
-        };
-        Context.Permissions.Add(orgPermission);
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
         await Context.SaveChangesAsync();
-        long permid = orgPermission.Id;
-
-        await _roleBusiness.AddPermissionToRole(rid5, permid, oid, null);
 
         // Act
         var result = await _labelBusiness.GetAllSensitivityLabels(uid4, [pid], oid);
@@ -413,29 +411,11 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     {
         // Arrange
         //Give user access to lid6 from proj 2 and lid
-        var permission1 = new Permission
-        {
-            Name = "Read Permission",
-            Action = "read record",
-            LabelId = lid,
-            OrganizationId = oid,
-            ProjectId = pid
-        };
-        var permission2 = new Permission
-        {
-            Name = "Read Permission",
-            Action = "read record",
-            LabelId = lid6,
-            OrganizationId = oid,
-            ProjectId = pid2
-        };
-        Context.Permissions.AddRange(permission1, permission2);
+        var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        Context.SensitivityLabelGrants.AddRange(
+            new SensitivityLabelGrant { UserId = uid2, LabelId = lid, LabelPermissionId = readActionId, GrantedBy = uid, GrantedAt = now },
+            new SensitivityLabelGrant { UserId = uid2, LabelId = lid6, LabelPermissionId = readActionId, GrantedBy = uid, GrantedAt = now });
         await Context.SaveChangesAsync();
-        long permid = permission1.Id;
-        long permid2 = permission2.Id;
-
-        await _roleBusiness.AddPermissionToRole(rid2, permid, oid, pid);
-        await _roleBusiness.AddPermissionToRole(rid3, permid2, oid, pid2);
 
         // Act
         var result = await _labelBusiness.GetAllSensitivityLabels(uid2, [pid, pid2], oid);
@@ -451,19 +431,15 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
     public async Task GetAllSensitivityLabels_MultipleProjectsAdminAndUser_SeesLabelsFromBoth()
     {
         // Arrange
-        var permission = new Permission
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            Name = "Read Permission",
-            Action = "read record",
+            UserId = uid,
             LabelId = lid6,
-            OrganizationId = oid,
-            ProjectId = pid2
-        };
-        Context.Permissions.Add(permission);
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
         await Context.SaveChangesAsync();
-        long permid = permission.Id;
-
-        await _roleBusiness.AddPermissionToRole(rid3, permid, oid, pid2);
 
         // Act
         var result = await _labelBusiness.GetAllSensitivityLabels(uid, [pid, pid2], oid);
@@ -600,10 +576,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(createdLabel);
         Assert.Equal(dto.Name, createdLabel.Name);
 
-        // Verify permissions were created
-        var permissions = await Context.Permissions.Where(p => p.LabelId == result.Id).ToListAsync();
-        Assert.Equal(8, permissions.Count);
-
         // Ensure that the SensitivityLabel create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
@@ -641,20 +613,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(createdLabel);
         Assert.Equal(dto.Name, createdLabel.Name);
 
-        // Verify both read and write permissions were created
-        var permissions = await Context.Permissions
-            .Where(p => p.LabelId == result.Id)
-            .ToListAsync();
-        Assert.Equal(8, permissions.Count);
-
-        Assert.Contains(permissions, p => p.Action == "read record");
-        Assert.Contains(permissions, p => p.Action == "write record");
-        Assert.Contains(permissions, p => p.Action == "update record");
-        Assert.Contains(permissions, p => p.Action == "delete record");
-        Assert.Contains(permissions, p => p.Action == "download file");
-        Assert.Contains(permissions, p => p.Action == "upload file");
-        Assert.Contains(permissions, p => p.Action == "update file");
-        Assert.Contains(permissions, p => p.Action == "delete file");
         // Ensure that the SensitivityLabel create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
@@ -683,39 +641,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(result);
         Assert.Equal("Event Test Label", result.Name);
 
-        // Verify all permissions were created
-        var readRecordPermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "read record");
-        Assert.NotNull(readRecordPermission);
-
-        var writeRecordPermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "write record");
-        Assert.NotNull(writeRecordPermission);
-
-        var updateRecordPermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "update record");
-        Assert.NotNull(updateRecordPermission);
-
-        var deleteRecordPermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "delete record");
-        Assert.NotNull(deleteRecordPermission);
-
-        var downloadFilePermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "download file");
-        Assert.NotNull(downloadFilePermission);
-
-        var uploadFilePermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "upload file");
-        Assert.NotNull(uploadFilePermission);
-
-        var updateFilePermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "update file");
-        Assert.NotNull(updateFilePermission);
-
-        var deleteFilePermission = await Context.Permissions
-            .FirstOrDefaultAsync(p => p.LabelId == result.Id && p.Action == "delete file");
-        Assert.NotNull(deleteFilePermission);
-
         // Ensure that the SensitivityLabel create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
@@ -743,10 +668,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
-
-        // Ensure that no permissions were created
-        var permissions = await Context.Permissions.ToListAsync();
-        Assert.Empty(permissions);
     }
 
     [Fact]
@@ -765,61 +686,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
-
-        // Ensure that no permissions were created
-        var permissions = await Context.Permissions.ToListAsync();
-        Assert.Empty(permissions);
-    }
-
-    [Fact]
-    public async Task CreateSensitivityLabel_Success_CreatesCorrectPermissionStructure()
-    {
-        // Arrange
-        var dto = new CreateSensitivityLabelRequestDto
-        {
-            Name = "Permission Structure Test",
-            Description = "Testing permission structure"
-        };
-
-        // Act
-        var result = await _labelBusiness.CreateSensitivityLabel(uid, dto, pid, oid);
-
-        // Assert
-        var permissions = await Context.Permissions
-            .Where(p => p.LabelId == result.Id)
-            .ToListAsync();
-
-        // Verify exactly 8 permissions were created
-        Assert.Equal(8, permissions.Count);
-
-        // Verify read record permission details
-        var readRecordPermission = permissions.FirstOrDefault(p => p.Action == "read record");
-        Assert.NotNull(readRecordPermission);
-        Assert.Equal("Permission Structure Test", readRecordPermission.Name);
-        Assert.Contains("read", readRecordPermission.Description.ToLower());
-        Assert.Equal(result.Id, readRecordPermission.LabelId);
-        Assert.False(readRecordPermission.IsDefault);
-
-        // Verify write record permission details
-        var writeRecordPermission = permissions.FirstOrDefault(p => p.Action == "write record");
-        Assert.NotNull(writeRecordPermission);
-        Assert.Equal("Permission Structure Test", writeRecordPermission.Name);
-        Assert.Contains("Permission to add records with label", writeRecordPermission.Description);
-        Assert.Equal(result.Id, writeRecordPermission.LabelId);
-        Assert.False(writeRecordPermission.IsDefault);
-
-        var updateRecordPermission = permissions.FirstOrDefault(p => p.Action == "update record");
-        Assert.NotNull(updateRecordPermission);
-        var deleteRecordPermission = permissions.FirstOrDefault(p => p.Action == "delete record");
-        Assert.NotNull(deleteRecordPermission);
-        var downloadFilePermission = permissions.FirstOrDefault(p => p.Action == "download file");
-        Assert.NotNull(downloadFilePermission);
-        var uploadFilePermission = permissions.FirstOrDefault(p => p.Action == "upload file");
-        Assert.NotNull(uploadFilePermission);
-        var updateFilePermission = permissions.FirstOrDefault(p => p.Action == "update file");
-        Assert.NotNull(updateFilePermission);
-        var deleteFilePermission = permissions.FirstOrDefault(p => p.Action == "delete file");
-        Assert.NotNull(deleteFilePermission);
     }
 
     #endregion
@@ -870,10 +736,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             var createdLabel = await Context.SensitivityLabels.FindAsync(result[i].Id);
             Assert.NotNull(createdLabel);
             Assert.Equal(labels[i].Name, createdLabel.Name);
-
-            // Verify 8 permissions were created per label
-            var permissions = await Context.Permissions.Where(p => p.LabelId == result[i].Id).ToListAsync();
-            Assert.Equal(8, permissions.Count);
         }
 
         // Ensure that the bulk create event was logged with correct count
@@ -919,21 +781,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
             // Verify label was actually created in database
             var createdLabel = await Context.SensitivityLabels.FindAsync(label.Id);
             Assert.NotNull(createdLabel);
-
-            // Verify all 8 permissions were created
-            var permissions = await Context.Permissions
-                .Where(p => p.LabelId == label.Id)
-                .ToListAsync();
-            Assert.Equal(8, permissions.Count);
-
-            Assert.Contains(permissions, p => p.Action == "read record");
-            Assert.Contains(permissions, p => p.Action == "write record");
-            Assert.Contains(permissions, p => p.Action == "update record");
-            Assert.Contains(permissions, p => p.Action == "delete record");
-            Assert.Contains(permissions, p => p.Action == "download file");
-            Assert.Contains(permissions, p => p.Action == "upload file");
-            Assert.Contains(permissions, p => p.Action == "update file");
-            Assert.Contains(permissions, p => p.Action == "delete file");
         }
 
         // Ensure that the bulk create event was logged
@@ -970,42 +817,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(result);
         Assert.Equal(2, result.Count);
 
-        // Verify all permissions were created for each label
-        foreach (var label in result)
-        {
-            var readRecordPermission = await Context.Permissions
-                .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "read record");
-            Assert.NotNull(readRecordPermission);
-
-            var writeRecordPermission = await Context.Permissions
-                .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "write record");
-            Assert.NotNull(writeRecordPermission);
-
-            var updateRecordPermission = await Context.Permissions
-                .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "update record");
-            Assert.NotNull(updateRecordPermission);
-
-            var deleteRecordPermission = await Context.Permissions
-                .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "delete record");
-            Assert.NotNull(deleteRecordPermission);
-
-            var downloadFilePermission = await Context.Permissions
-                .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "download file");
-            Assert.NotNull(downloadFilePermission);
-
-            var uploadFilePermission = await Context.Permissions
-                .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "upload file");
-            Assert.NotNull(uploadFilePermission);
-
-            var updateFilePermission = await Context.Permissions
-                .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "update file");
-            Assert.NotNull(updateFilePermission);
-
-            var deleteFilePermission = await Context.Permissions
-                .FirstOrDefaultAsync(p => p.LabelId == label.Id && p.Action == "delete file");
-            Assert.NotNull(deleteFilePermission);
-        }
-
         // Ensure that the bulk create event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
@@ -1032,10 +843,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
-
-        // Ensure that no permissions were created
-        var permissions = await Context.Permissions.ToListAsync();
-        Assert.Empty(permissions);
     }
 
     [Fact]
@@ -1051,72 +858,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         // Ensure that no event was logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
-
-        // Ensure that no permissions were created
-        var permissions = await Context.Permissions.ToListAsync();
-        Assert.Empty(permissions);
-    }
-
-    [Fact]
-    public async Task BulkCreateSensitivityLabels_Success_CreatesCorrectPermissionStructure()
-    {
-        // Arrange
-        var labels = new List<CreateSensitivityLabelRequestDto>
-        {
-            new CreateSensitivityLabelRequestDto
-            {
-                Name = "Permission Structure Bulk Test 1",
-                Description = "Testing bulk permission structure"
-            },
-            new CreateSensitivityLabelRequestDto
-            {
-                Name = "Permission Structure Bulk Test 2",
-                Description = "Testing bulk permission structure again"
-            }
-        };
-
-        // Act
-        var result = await _labelBusiness.BulkCreateSensitivityLabels(oid, uid, pid, labels);
-
-        // Assert
-        foreach (var label in result)
-        {
-            var permissions = await Context.Permissions
-                .Where(p => p.LabelId == label.Id)
-                .ToListAsync();
-
-            // Verify exactly 8 permissions were created
-            Assert.Equal(8, permissions.Count);
-
-            // Verify read record permission details
-            var readRecordPermission = permissions.FirstOrDefault(p => p.Action == "read record");
-            Assert.NotNull(readRecordPermission);
-            Assert.Equal(label.Name, readRecordPermission.Name);
-            Assert.Contains("read", readRecordPermission.Description.ToLower());
-            Assert.Equal(label.Id, readRecordPermission.LabelId);
-            Assert.False(readRecordPermission.IsDefault);
-
-            // Verify write record permission details
-            var writeRecordPermission = permissions.FirstOrDefault(p => p.Action == "write record");
-            Assert.NotNull(writeRecordPermission);
-            Assert.Equal(label.Name, writeRecordPermission.Name);
-            Assert.Contains("Permission to add records with label", writeRecordPermission.Description);
-            Assert.Equal(label.Id, writeRecordPermission.LabelId);
-            Assert.False(writeRecordPermission.IsDefault);
-
-            var updateRecordPermission = permissions.FirstOrDefault(p => p.Action == "update record");
-            Assert.NotNull(updateRecordPermission);
-            var deleteRecordPermission = permissions.FirstOrDefault(p => p.Action == "delete record");
-            Assert.NotNull(deleteRecordPermission);
-            var downloadFilePermission = permissions.FirstOrDefault(p => p.Action == "download file");
-            Assert.NotNull(downloadFilePermission);
-            var uploadFilePermission = permissions.FirstOrDefault(p => p.Action == "upload file");
-            Assert.NotNull(uploadFilePermission);
-            var updateFilePermission = permissions.FirstOrDefault(p => p.Action == "update file");
-            Assert.NotNull(updateFilePermission);
-            var deleteFilePermission = permissions.FirstOrDefault(p => p.Action == "delete file");
-            Assert.NotNull(deleteFilePermission);
-        }
     }
 
     [Fact]
@@ -1191,10 +932,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.Single(result);
         Assert.Equal("Single Bulk Label", result[0].Name);
 
-        // Verify permissions
-        var permissions = await Context.Permissions.Where(p => p.LabelId == result[0].Id).ToListAsync();
-        Assert.Equal(8, permissions.Count);
-
         // Verify event
         var eventList = await Context.Events.ToListAsync();
         Assert.Single(eventList);
@@ -1219,7 +956,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
 
         // Get initial count
         var initialLabelCount = await Context.SensitivityLabels.CountAsync();
-        var initialPermissionCount = await Context.Permissions.CountAsync();
 
         // This test would need to be enhanced to actually trigger a rollback scenario
         // For now, we verify successful transaction
@@ -1229,7 +965,6 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(result);
         Assert.Single(result);
         Assert.True(await Context.SensitivityLabels.CountAsync() > initialLabelCount);
-        Assert.True(await Context.Permissions.CountAsync() > initialPermissionCount);
     }
 
     #endregion
@@ -1406,6 +1141,32 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.Equal("archive", actualEvent.Operation);
         Assert.Equal("sensitivity_label", actualEvent.EntityType);
         Assert.Equal(lid, actualEvent.EntityId);
+    }
+
+    [Fact]
+    public async Task ArchiveSensitivityLabel_Succeeds_DeletesAssociatedGrants()
+    {
+        // Arrange
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid2,
+            LabelId = lid,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _labelBusiness.ArchiveSensitivityLabel(uid, lid, pid, oid);
+
+        // Assert
+        Assert.True(result);
+
+        var remainingGrants = await Context.SensitivityLabelGrants
+            .Where(slg => slg.LabelId == lid)
+            .ToListAsync();
+        Assert.Empty(remainingGrants);
     }
 
     [Fact]
@@ -1731,6 +1492,238 @@ public class SensitivityLabelBusinessTests : IntegrationTestBase
         Assert.NotNull(updatedLabel.LastUpdatedByUser);
         Assert.Equal("Test User", updatedLabel.LastUpdatedByUser.Name);
         Assert.Equal("Updated Label Name", updatedLabel.Name);
+    }
+
+    #endregion
+
+    #region Caching Tests
+
+    [Fact]
+    public async Task GetAuthorizedSensitivityLabels_PopulatesCache_ForRequestedProjectUserAction()
+    {
+        // Arrange
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid2,
+            LabelId = lid,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        string cacheKey = CacheKeys.ProjectAuthorizedSensitivityLabels(pid, uid2, "read record");
+
+        // Act
+        var authorized = await _labelService.GetAuthorizedSensitivityLabels(uid2, oid, new[] { pid }, "read record");
+
+        // Assert
+        Assert.Contains(lid, authorized);
+
+        var cached = await CacheService.Instance.GetAsync<List<long>>(cacheKey);
+        Assert.NotNull(cached);
+        Assert.Contains(lid, cached);
+    }
+
+    [Fact]
+    public async Task GetAuthorizedSensitivityLabels_ServesCachedValue_WithoutRecomputing()
+    {
+        // Arrange — seed a sentinel value that does NOT match what the DB would actually compute,
+        // so a hit proves the cache short-circuited the query rather than happening to agree with it.
+        string cacheKey = CacheKeys.ProjectAuthorizedSensitivityLabels(pid, uid2, "read record");
+        var sentinel = new List<long> { -999 };
+        await CacheService.Instance.SetAsync(cacheKey, sentinel, (TimeSpan?)null);
+
+        // Act
+        var authorized = await _labelService.GetAuthorizedSensitivityLabels(uid2, oid, new[] { pid }, "read record");
+
+        // Assert
+        Assert.Single(authorized);
+        Assert.Contains(-999, authorized);
+        Assert.DoesNotContain(lid, authorized);
+    }
+
+    [Fact]
+    public async Task GetAuthorizedSensitivityLabels_CachesSeparately_PerAction()
+    {
+        // Arrange — seed "write record" with a sentinel, leave "read record" untouched
+        string writeKey = CacheKeys.ProjectAuthorizedSensitivityLabels(pid, uid2, "write record");
+        await CacheService.Instance.SetAsync(writeKey, new List<long> { -999 }, (TimeSpan?)null);
+
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid2,
+            LabelId = lid,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var readResult = await _labelService.GetAuthorizedSensitivityLabels(uid2, oid, new[] { pid }, "read record");
+        var writeResult = await _labelService.GetAuthorizedSensitivityLabels(uid2, oid, new[] { pid }, "write record");
+
+        // Assert
+        Assert.Contains(lid, readResult);            // computed fresh, not poisoned by the write-record sentinel
+        Assert.Contains(-999, writeResult);           // still reflects the sentinel — separate cache key
+    }
+
+    [Fact]
+    public async Task GetAuthorizedSensitivityLabels_CachesSeparately_PerProject()
+    {
+        // Arrange — seed pid2's cache with a sentinel, leave pid untouched
+        string pid2Key = CacheKeys.ProjectAuthorizedSensitivityLabels(pid2, uid2, "read record");
+        await CacheService.Instance.SetAsync(pid2Key, new List<long> { -999 }, (TimeSpan?)null);
+
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid2,
+            LabelId = lid,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        await Context.SaveChangesAsync();
+
+        // Act
+        var pidResult = await _labelService.GetAuthorizedSensitivityLabels(uid2, oid, new[] { pid }, "read record");
+        var pid2Result = await _labelService.GetAuthorizedSensitivityLabels(uid2, oid, new[] { pid2 }, "read record");
+
+        // Assert
+        Assert.Contains(lid, pidResult);
+        Assert.Contains(-999, pid2Result);
+    }
+
+    [Fact]
+    public async Task UpdateSensitivityLabel_WithPermissionActionsChange_InvalidatesCache_ForAllUsersInScope()
+    {
+        // Arrange — two different users each have a cached answer for this project/label's action
+        string uidKey = CacheKeys.ProjectAuthorizedSensitivityLabels(pid, uid, "read record");
+        string uid2Key = CacheKeys.ProjectAuthorizedSensitivityLabels(pid, uid2, "read record");
+        await CacheService.Instance.SetAsync(uidKey, new List<long> { lid }, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(uid2Key, new List<long>(), (TimeSpan?)null);
+
+        var dto = new UpdateSensitivityLabelRequestDto
+        {
+            Name = "Updated Label",
+            PermissionActions = new List<string> { "read record", "write record" }
+        };
+
+        // Act
+        await _labelBusiness.UpdateSensitivityLabel(uid, lid, pid, oid, dto);
+
+        // Assert — a governed-action change can flip the answer for anyone in scope, not just
+        // users with an explicit grant, so both entries should be gone
+        Assert.Null(await CacheService.Instance.GetAsync<List<long>>(uidKey));
+        Assert.Null(await CacheService.Instance.GetAsync<List<long>>(uid2Key));
+    }
+
+    // NOTE: UpdateSensitivityLabel_WithoutPermissionActionsChange_DoesNotTouchUnrelatedLabelCache was
+    // removed. It asserted a "narrow" invalidation design (only invalidate the cache when
+    // PermissionActions changes) that UpdateSensitivityLabel does not implement: it calls
+    // InvalidateAuthorizedLabelsCache(label.Id) unconditionally on every update, which clears the
+    // cache by project prefix for all users in scope, regardless of what changed. The test's own
+    // comment called for exactly this: delete rather than "fix" once that turned out to be the
+    // deliberate behavior.
+
+    [Fact]
+    public async Task ArchiveSensitivityLabel_InvalidatesCache_ForAllUsersInScope()
+    {
+        // Arrange
+        string uidKey = CacheKeys.ProjectAuthorizedSensitivityLabels(pid, uid, "read record");
+        await CacheService.Instance.SetAsync(uidKey, new List<long> { lid }, (TimeSpan?)null);
+
+        // Act
+        await _labelBusiness.ArchiveSensitivityLabel(uid, lid, pid, oid);
+
+        // Assert
+        Assert.Null(await CacheService.Instance.GetAsync<List<long>>(uidKey));
+    }
+
+    [Fact]
+    public async Task UnarchiveSensitivityLabel_InvalidatesCache_ForAllUsersInScope()
+    {
+        // Arrange
+        string uidKey = CacheKeys.ProjectAuthorizedSensitivityLabels(pid, uid, "read record");
+        await CacheService.Instance.SetAsync(uidKey, new List<long>(), (TimeSpan?)null);
+
+        // Act
+        await _labelBusiness.UnarchiveSensitivityLabel(uid, lid2, pid, oid);
+
+        // Assert
+        Assert.Null(await CacheService.Instance.GetAsync<List<long>>(uidKey));
+    }
+
+    [Fact]
+    public async Task DeleteSensitivityLabel_InvalidatesCache_ForAllUsersInScope()
+    {
+        // Arrange 
+        string uidKey = CacheKeys.ProjectAuthorizedSensitivityLabels(pid, uid, "read record");
+        await CacheService.Instance.SetAsync(uidKey, new List<long> { lid }, (TimeSpan?)null);
+
+        // Act
+        await _labelBusiness.DeleteSensitivityLabel(uid, lid, pid, oid);
+
+        // Assert
+        Assert.Null(await CacheService.Instance.GetAsync<List<long>>(uidKey));
+
+        // Sanity check the label really is gone, per the existing delete test in this file
+        Assert.Null(await Context.SensitivityLabels.FindAsync(lid));
+    }
+
+    [Fact]
+    public async Task ArchiveSensitivityLabel_OrgLevelLabel_InvalidatesCache_AcrossAllProjectsInOrg()
+    {
+        // Arrange — lid3 is an org-level label (ProjectId == null), visible in both pid and pid2
+        string pidKey = CacheKeys.ProjectAuthorizedSensitivityLabels(pid, uid2, "read record");
+        string pid2Key = CacheKeys.ProjectAuthorizedSensitivityLabels(pid2, uid2, "read record");
+        await CacheService.Instance.SetAsync(pidKey, new List<long> { lid3 }, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(pid2Key, new List<long> { lid3 }, (TimeSpan?)null);
+
+        // Act — org-level labels can't be archived from a project context (see existing
+        // ArchiveSensitivityLabel_Fails_IfOrganizationLabel test), so call without a projectId
+        await _labelBusiness.ArchiveSensitivityLabel(uid3, lid3, null, oid);
+
+        // Assert — an org-level label's governed-action change should ripple to every project
+        // in the org, not just one
+        Assert.Null(await CacheService.Instance.GetAsync<List<long>>(pidKey));
+        Assert.Null(await CacheService.Instance.GetAsync<List<long>>(pid2Key));
+    }
+
+    #endregion
+
+    #region GetSensitivityLabelPermissionActions Tests
+
+    [Fact]
+    public async Task GetSensitivityLabelPermissionActions_ReturnsAllEightFixedActions()
+    {
+        // Act
+        var result = await _labelBusiness.GetSensitivityLabelPermissionActions();
+
+        // Assert — these actions are seeded by migration and fixed, not test data
+        Assert.Equal(8, result.Count);
+        Assert.Contains(result, a => a.Name == "read record");
+        Assert.Contains(result, a => a.Name == "write record");
+        Assert.Contains(result, a => a.Name == "update record");
+        Assert.Contains(result, a => a.Name == "delete record");
+        Assert.Contains(result, a => a.Name == "download file");
+        Assert.Contains(result, a => a.Name == "upload file");
+        Assert.Contains(result, a => a.Name == "update file");
+        Assert.Contains(result, a => a.Name == "delete file");
+    }
+
+    [Fact]
+    public async Task GetSensitivityLabelPermissionActions_MapsFieldsCorrectly()
+    {
+        // Act
+        var result = await _labelBusiness.GetSensitivityLabelPermissionActions();
+        var readRecord = result.FirstOrDefault(a => a.Name == "read record");
+
+        // Assert — description matches the fixed migration text exactly
+        Assert.NotNull(readRecord);
+        Assert.True(readRecord.Id > 0);
+        Assert.Equal("Permission to read records with the given label", readRecord.Description);
     }
 
     #endregion

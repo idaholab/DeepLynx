@@ -1,9 +1,9 @@
 // src/app/(home)/components/SearchBar.tsx
 "use client";
 
-import { translations } from "@/app/lib/translations";
 import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import React, { useRef, useState } from "react";
+import { useLanguage } from "@/app/contexts/Language";
 
 interface Filter {
   id: number;
@@ -53,8 +53,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   showResultsMessage,
   aditionalFilters = true,
 }) => {
-  const locale = "en";
-  const t = translations[locale];
+  const { t } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Handle controlled/uncontrolled input

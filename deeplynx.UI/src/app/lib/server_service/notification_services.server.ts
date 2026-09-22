@@ -1,6 +1,8 @@
 import "server-only";
 import { SendEmailResponse } from "../../(home)/types/types";
-const BASE = process.env.BACKEND_BASE_URL!;
+import { apiErrorFromResponse } from "../api-error";
+import { backendApiUrl } from "./backend-api-url.server";
+
 const SERVICE_TOKEN = process.env.SERVICE_TOKEN || "";
 
 function authHeaders(): HeadersInit {
@@ -10,20 +12,20 @@ function authHeaders(): HeadersInit {
 }
 
 async function asJson<T>(res: Response): Promise<T> {
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+  if (!res.ok) throw await apiErrorFromResponse(res);
   return (await res.json()) as T;
 }
-
-
-
 /** ---- Server-safe calls (no browser cookies; safe in prerender/SSR) ---- */
 
 export async function sendEmailServer(email: string): Promise<SendEmailResponse> {
   const qs = new URLSearchParams({ email });
-  const res = await fetch(`${BASE}/notification/SendEmail?${qs.toString()}`, {
-    method: "POST",
-    headers: authHeaders(),
-    cache: "no-store",
-  });
+  const res = await fetch(
+    backendApiUrl(`notification/SendEmail?${qs.toString()}`),
+    {
+      method: "POST",
+      headers: authHeaders(),
+      cache: "no-store",
+    },
+  );
   return asJson<SendEmailResponse>(res);
 }

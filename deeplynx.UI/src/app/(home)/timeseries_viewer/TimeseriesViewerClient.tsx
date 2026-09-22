@@ -62,8 +62,8 @@ export default function TimeseriesViewerClient({
 
   const fetchTimeseriesFiles = async () => {
     try {
-      const result = await getTimeseriesFiles(organizationId, projectId);
-      setAvailableTimeseriesFiles(result);
+      const result = await getTimeseriesFiles(organizationId, projectId, undefined, -1);
+      setAvailableTimeseriesFiles(result.items);
     } catch (err) {
       console.error("Failed to grab timeseries files:", err);
     }
@@ -266,19 +266,19 @@ export default function TimeseriesViewerClient({
               {availableTimeseriesFiles.map((file, index) => (
                 <div
                   key={index}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                    activeFile?.id === file.id
-                      ? "border-primary bg-primary/10"
-                      : "border-base-300/50 hover:border-primary/50 hover:bg-base-200"
-                  }`}
+                  className={`p-3 rounded-lg border cursor-pointer transition-all ${activeFile?.id === file.id
+                    ? "border-primary bg-primary/10"
+                    : "border-base-300/50 hover:border-primary/50 hover:bg-base-200"
+                    }`}
                   onClick={() => setActiveFile(file)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`text-sm font-medium truncate ${
-                          activeFile?.id === file.id ? "text-primary" : ""
-                        }`}
+                        className={`text-sm font-medium truncate ${activeFile?.id === file.id ? "text-primary" : ""
+                          }`}
+                        role='link'
+                        aria-label={file.name ?? "Unnamed file"}
                       >
                         {file.name}
                       </p>

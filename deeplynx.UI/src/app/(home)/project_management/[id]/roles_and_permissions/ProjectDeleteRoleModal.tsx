@@ -78,10 +78,7 @@ const ProjectDeleteRoleModal = ({
           </p>
           <ul className="list-disc list-inside text-sm text-base-content/70 space-y-1">
             <li>
-                {t.translations.ROLE_DELETED}
-            </li>
-            <li>
-                {t.translations.HIDE_ROLE}
+              {t.translations.HIDE_ROLE}
             </li>
             <li>
               {t.translations.PRESERVE_PERMISSIONS}

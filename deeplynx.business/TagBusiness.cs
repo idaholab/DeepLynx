@@ -13,53 +13,208 @@ public class TagBusiness : ITagBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly IEventBusiness _eventBusiness;
+    private readonly IProjectRolePermissionService _projectRolePermissionService;
+    private readonly IAdminService _adminService;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="TagBusiness" /> class.
     /// </summary>
     /// <param name="context">The database context to be used for tag operations.</param>
     /// <param name="eventBusiness">Used to access event operations</param>
-    public TagBusiness(DeeplynxContext context, IEventBusiness eventBusiness)
+    /// <param name="projectRolePermissionService">Used to get permissions allowed for a user</param>
+    /// <param name="adminService">Used to check level the user is</param>
+    public TagBusiness(DeeplynxContext context, IEventBusiness eventBusiness, IProjectRolePermissionService projectRolePermissionService,
+        IAdminService adminService)
     {
         _context = context;
         _eventBusiness = eventBusiness;
+        _projectRolePermissionService = projectRolePermissionService;
+        _adminService = adminService;
+
     }
 
     /// <summary>
-    ///     Retrieves all tags for a specified project.
+    ///     [DEPRECATED - V1 ONLY] Retrieves all tags without pagination.
+    ///     Superseded by <see cref="GetAllTagsPaginated"/>. Do not call this from new controller versions;
+    ///     it exists solely to back the deprecated v1 tags controllers and should be deleted once
+    ///     those v1 endpoints are sunset.
     /// </summary>
+    /// <param name="currentUserId">The ID of the current user for which the data source belongs to</param>
     /// <param name="projectIds">The IDs of the project whose tags are to be retrieved.</param>
     /// <param name="organizationId">The ID of the organization whose tags are to be retrieved.</param>
     /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result</param>
+    /// <param name="isSysAdmin">Flag indicating whether you are a system admin or not</param>
+    /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin or not</param>
     /// <returns>A list of tags belonging to the project.</returns>
-    public async Task<List<TagResponseDto>> GetAllTags(long organizationId, long[]? projectIds, bool hideArchived)
+    [Obsolete("V1-only. Used by deprecated v1 tag endpoints. Superseded by GetAllTagsPaginated. " +
+              "Remove once v1 tag endpoints are sunset.", error: false)]
+    public async Task<List<TagResponseDto>> GetAllTags(
+        long currentUserId,
+        long organizationId,
+        long[]? projectIds,
+        bool hideArchived,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false)
     {
-        var tagQuery = _context.Tags
-            .Where(t => t.OrganizationId == organizationId
-                        && (!hideArchived || !t.IsArchived));
+        var userProjectAdminStatus = new Dictionary<long, bool>();
 
-        // Filter by projectIds if provided and not empty
-        if (projectIds is { Length: > 0 })
+        if (projectIds?.Length > 0)
         {
-            //grab project tags and inherit org tags
-            tagQuery = tagQuery.Where(c =>
-                (c.ProjectId.HasValue && projectIds.Contains(c.ProjectId.Value)) || c.ProjectId == null);
+            var adminProjectIds = await _context.ProjectMembers
+                .Where(pm =>
+                    pm.IsProjectAdmin &&
+                    projectIds.Contains(pm.ProjectId) &&
+                    (
+                    (
+                        (pm.UserId != null && pm.UserId == currentUserId) ||
+                        pm.Group!.Users.Any(u => u.Id == currentUserId)
+                    )
+                    ))
+                    .Select(pm => pm.ProjectId)
+                    .Distinct()
+                    .ToHashSetAsync();
+
+            foreach (var projectId in projectIds)
+            {
+                userProjectAdminStatus[projectId] = adminProjectIds.Contains(projectId);
+            }
+        }
+
+        var authorizedProjectIds = new List<long>();
+        foreach (var projectId in projectIds ?? [])
+        {
+            if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId, false))
+            {
+                authorizedProjectIds.Add(projectId);
+                continue;
+            }
+
+            var hasPermission = await _projectRolePermissionService.PermissionInProject(
+                currentUserId, projectId, "read", "tag");
+
+            if (hasPermission)
+            {
+                authorizedProjectIds.Add(projectId);
+            }
+        }
+
+        if (projectIds != null && authorizedProjectIds.Count == 0)
+        {
+            return [];
+        }
+
+        var tagQuery = _context.Tags
+            .Where(t => t.OrganizationId == organizationId && (!hideArchived || !t.IsArchived));
+
+        if (authorizedProjectIds.Count > 0)
+        {
+            tagQuery = tagQuery.Where(t =>
+                (t.ProjectId.HasValue && authorizedProjectIds.Contains(t.ProjectId.Value)) || t.ProjectId == null);
         }
         else
-        {   // only return org level tags
-            tagQuery = tagQuery.Where(c => c.ProjectId == null);
+        {
+            tagQuery = tagQuery.Where(t => t.ProjectId == null);
         }
 
         return await tagQuery.Select(t => new TagResponseDto
+        {
+            Id = t.Id,
+            Name = t.Name,
+            ProjectId = t.ProjectId,
+            LastUpdatedBy = t.LastUpdatedBy,
+            LastUpdatedAt = t.LastUpdatedAt,
+            OrganizationId = t.OrganizationId,
+            IsArchived = t.IsArchived
+        }).ToListAsync();
+    }
+
+    /// <summary>
+    ///     Retrieves all tags for a specified project with pagination
+    /// </summary>
+    /// <param name="currentUserId">The ID of the current user for which the data source belongs to</param>
+    /// <param name="paginatedRequestDto">Pagination parameters; if PageSize == -1, returns all matching organizations</param>
+    /// <param name="projectIds">The IDs of the project whose tags are to be retrieved.</param>
+    /// <param name="organizationId">The ID of the organization whose tags are to be retrieved.</param>
+    /// <param name="hideArchived">Flag indicating whether to hide archived tags from the result</param>
+    /// <param name="isSysAdmin">Flag indicating whether you are a system admin or not</param>
+    /// <param name="isOrgAdmin">Flag indicating whether you are an organization admin or not</param>
+    /// <returns>A paginated list of organizations</returns>
+    public async Task<PaginatedResponse<TagResponseDto>> GetAllTagsPaginated(
+        long currentUserId,
+        long organizationId,
+        long[]? projectIds,
+        PaginatedRequestDto paginatedRequestDto,
+        bool hideArchived = true,
+        bool isSysAdmin = false,
+        bool isOrgAdmin = false)
+    {
+        var userProjectAdminStatus = new Dictionary<long, bool>();
+
+        if (projectIds?.Length > 0)
+        {
+            var adminProjectIds = await _context.ProjectMembers
+                .Where(pm =>
+                    pm.IsProjectAdmin &&
+                    projectIds.Contains(pm.ProjectId) &&
+                    (
+                        (pm.UserId != null && pm.UserId == currentUserId) ||
+                        pm.Group!.Users.Any(u => u.Id == currentUserId)
+                    ))
+                .Select(pm => pm.ProjectId)
+                .Distinct()
+                .ToHashSetAsync();
+
+            foreach (var projectId in projectIds)
             {
-                Id = t.Id,
-                Name = t.Name,
-                ProjectId = t.ProjectId,
-                LastUpdatedBy = t.LastUpdatedBy,
-                LastUpdatedAt = t.LastUpdatedAt,
-                OrganizationId = t.OrganizationId,
-            })
-            .ToListAsync();
+                userProjectAdminStatus[projectId] = adminProjectIds.Contains(projectId);
+            }
+        }
+
+        var authorizedProjectIds = new List<long>();
+        foreach (var projectId in projectIds ?? [])
+        {
+            if (isSysAdmin || isOrgAdmin || userProjectAdminStatus.GetValueOrDefault(projectId, false))
+            {
+                authorizedProjectIds.Add(projectId);
+                continue;
+            }
+
+            var hasPermission = await _projectRolePermissionService.PermissionInProject(
+                currentUserId, projectId, "read", "tag");
+
+            if (hasPermission)
+            {
+                authorizedProjectIds.Add(projectId);
+            }
+        }
+
+        if (projectIds != null && projectIds.Length > 0 && authorizedProjectIds.Count == 0)
+        {
+            return new PaginatedResponse<TagResponseDto>
+            {
+                Items = [],
+                PageNumber = paginatedRequestDto.PageNumber,
+                PageSize = paginatedRequestDto.PageSize,
+                TotalCount = 0
+            };
+        }
+
+        var tagQuery = _context.Tags
+            .Where(t => t.OrganizationId == organizationId && (!hideArchived || !t.IsArchived));
+
+        if (authorizedProjectIds.Count > 0)
+        {
+            tagQuery = tagQuery.Where(t =>
+                (t.ProjectId.HasValue && authorizedProjectIds.Contains(t.ProjectId.Value)) || t.ProjectId == null);
+        }
+        else
+        {
+            tagQuery = tagQuery.Where(t => t.ProjectId == null);
+        }
+
+        tagQuery = tagQuery.OrderBy(t => t.Id);
+
+        return await tagQuery.Select(g => TagsToResponse(g)).ToPaginatedAsync(paginatedRequestDto);
     }
 
     /// <summary>
@@ -87,9 +242,9 @@ public class TagBusiness : ITagBusiness
         }
 
         var tag = await tagQuery.FirstOrDefaultAsync();
-        
+
         if (tag == null) throw new KeyNotFoundException($"Tag with id {tagId} not found");
-        
+
         if (hideArchived && tag.IsArchived)
             throw new KeyNotFoundException($"Tag with id {tagId} is archived");
 
@@ -190,58 +345,58 @@ public class TagBusiness : ITagBusiness
     /// <param name="tags">The tag request data transfer object containing tag details.</param>
     /// <returns>The created tag response DTO with saved details.</returns>
     public async Task<List<TagResponseDto>> BulkCreateTags(
-        long organizationId,
-        long currentUserId,
-        long? projectId,
-        List<CreateTagRequestDto> tags)
+    long organizationId,
+    long currentUserId,
+    long? projectId,
+    List<CreateTagRequestDto> tags)
     {
         if (tags == null || tags.Count == 0)
         {
             return new List<TagResponseDto>();
         }
 
-        // Bulk insert into classes; if there is a name collision, update the description and uuid if present
+        // Deduplicate tags to prevent ON CONFLICT errors
+        var distinctTags = tags
+            .GroupBy(tag => new { tag.Name, ProjectId = projectId, OrganizationId = organizationId })
+            .Select(group => group.First())
+            .ToList();
+
         var sql = projectId.HasValue
             ? @"
-            INSERT INTO deeplynx.tags (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
-                VALUES {0}
-                ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
-                DO UPDATE SET
-                    last_updated_at = @now,
-                    last_updated_by = @lastUpdatedBy
-                RETURNING id, project_id, organization_id, name, last_updated_at, is_archived, last_updated_by;"
+        INSERT INTO deeplynx.tags (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
+            VALUES {0}
+            ON CONFLICT (organization_id, project_id, name) WHERE project_id IS NOT NULL
+            DO UPDATE SET
+                last_updated_at = @now,
+                last_updated_by = @lastUpdatedBy
+            RETURNING id, project_id, organization_id, name, last_updated_at, is_archived, last_updated_by;"
             : @"
-            INSERT INTO deeplynx.tags (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
-                VALUES {0}
-                ON CONFLICT (organization_id, name) WHERE project_id IS NULL
-                DO UPDATE SET
-                    last_updated_at = @now,
-                    last_updated_by = @lastUpdatedBy
-            RETURNING id, project_id, organization_id, name, last_updated_at, is_archived, last_updated_by;";
+        INSERT INTO deeplynx.tags (project_id, organization_id, name, last_updated_at, is_archived, last_updated_by)
+            VALUES {0}
+            ON CONFLICT (organization_id, name) WHERE project_id IS NULL
+            DO UPDATE SET
+                last_updated_at = @now,
+                last_updated_by = @lastUpdatedBy
+        RETURNING id, project_id, organization_id, name, last_updated_at, is_archived, last_updated_by;";
 
-        // establish "constant" parameters
         var parameters = new List<NpgsqlParameter>
-        {
-            new NpgsqlParameter("@projectId", projectId.HasValue ? (object)projectId.Value : DBNull.Value),
-            new NpgsqlParameter("@organizationId", organizationId),
-            new NpgsqlParameter("@now", DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)),
-            new NpgsqlParameter("@lastUpdatedBy", currentUserId)
-        };
+    {
+        new NpgsqlParameter("@projectId", projectId.HasValue ? (object)projectId.Value : DBNull.Value),
+        new NpgsqlParameter("@organizationId", organizationId),
+        new NpgsqlParameter("@now", DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)),
+        new NpgsqlParameter("@lastUpdatedBy", currentUserId)
+    };
 
-        // establish "dynamic" parameters (new for each dto in the list)
-        parameters.AddRange(tags.SelectMany((dto, i) => new[]
+        parameters.AddRange(distinctTags.SelectMany((dto, i) => new[]
         {
-            new NpgsqlParameter($"@p{i}_name", dto.Name)
-        }));
+        new NpgsqlParameter($"@p{i}_name", dto.Name)
+    }));
 
-        // stringify the params and comma separate them
-        var valueTuples = string.Join(", ", tags.Select((dto, i) =>
+        var valueTuples = string.Join(", ", distinctTags.Select((dto, i) =>
             $"(@projectId, @organizationId, @p{i}_name, @now, false, @lastUpdatedBy)"));
 
-        // put everything together and execute the query
         sql = string.Format(sql, valueTuples);
 
-        // returns the resulting upserted classes
         var result = await _context.Database
             .SqlQueryRaw<TagResponseDto>(sql, parameters.ToArray())
             .ToListAsync();
@@ -276,10 +431,10 @@ public class TagBusiness : ITagBusiness
             .Where(t => t.Id == tagId
                         && t.OrganizationId == organizationId
                         && !t.IsArchived);
-        
+
         if (projectId.HasValue)
         {
-            tagQuery = tagQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            tagQuery = tagQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
@@ -287,17 +442,17 @@ public class TagBusiness : ITagBusiness
         }
 
         var tag = await tagQuery.FirstOrDefaultAsync();
-        
+
         if (tag == null)
             throw new KeyNotFoundException(
                 $"Tag with id {tagId} not found or does not belong to the specified organization/project context");
-        
+
         // Organization roles cannot be updated from a project level
         if (projectId.HasValue && tag.ProjectId == null)
         {
             throw new InvalidOperationException("Organization tags cannot be updated from the child projects.");
         }
-        
+
         // Validate 'Name' field
         if (string.IsNullOrWhiteSpace(tagRequestDto.Name))
             throw new ArgumentException("Name is required and cannot be empty.");
@@ -360,7 +515,7 @@ public class TagBusiness : ITagBusiness
             .Where(t => t.Id == tagId
                         && t.OrganizationId == organizationId
                         && !t.IsArchived);
-        
+
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
@@ -376,7 +531,7 @@ public class TagBusiness : ITagBusiness
         if (tag == null)
             throw new KeyNotFoundException(
                 $"Tag with id {tagId} not found or does not belong to the specified organization/project context");
-        
+
         // Organization tags cannot be updated from a project level
         if (projectId.HasValue && tag.ProjectId == null)
         {
@@ -403,15 +558,15 @@ public class TagBusiness : ITagBusiness
             .Where(t => t.Id == tagId
                         && t.OrganizationId == organizationId
                         && !t.IsArchived);
-        
+
         //if project id supplied, inherit org level tags 
         if (projectId.HasValue)
         {
-            tagQuery = tagQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            tagQuery = tagQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
-            tagQuery = tagQuery.Where( r => r.ProjectId == null);
+            tagQuery = tagQuery.Where(r => r.ProjectId == null);
         }
 
         var tag = await tagQuery.FirstOrDefaultAsync();
@@ -419,7 +574,7 @@ public class TagBusiness : ITagBusiness
         if (tag == null)
             throw new KeyNotFoundException(
                 $"Tag with id {tagId} not found or does not belong to the specified organization/project context");
-        
+
         // Organization tags cannot be updated from a project level
         if (projectId.HasValue && tag.ProjectId == null)
         {
@@ -462,23 +617,23 @@ public class TagBusiness : ITagBusiness
         var tagQuery = _context.Tags
             .Where(t => t.Id == tagId
                         && t.OrganizationId == organizationId
-                        && t.IsArchived); 
+                        && t.IsArchived);
         //if project id supplied, inherit org level roles 
         if (projectId.HasValue)
         {
-            tagQuery = tagQuery.Where( r => r.ProjectId == projectId.Value || r.ProjectId == null);
+            tagQuery = tagQuery.Where(r => r.ProjectId == projectId.Value || r.ProjectId == null);
         }
         else
         {
-            tagQuery = tagQuery.Where( r => r.ProjectId == null);
+            tagQuery = tagQuery.Where(r => r.ProjectId == null);
         }
 
         var tag = await tagQuery.FirstOrDefaultAsync();
-        
+
         if (tag == null)
             throw new KeyNotFoundException(
                 $"Tag with id {tagId} not found or does not belong to the specified organization/project context");
-        
+
         // Organization tags cannot be updated from a project level
         if (projectId.HasValue && tag.ProjectId == null)
         {
@@ -559,5 +714,19 @@ public class TagBusiness : ITagBusiness
             IsArchived = t.IsArchived,
             OrganizationId = organizationId,
         }).ToList();
+    }
+
+    private static TagResponseDto TagsToResponse(Tag t)
+    {
+        return new TagResponseDto
+        {
+            Id = t.Id,
+            Name = t.Name,
+            ProjectId = t.ProjectId,
+            LastUpdatedBy = t.LastUpdatedBy,
+            LastUpdatedAt = t.LastUpdatedAt,
+            IsArchived = t.IsArchived,
+            OrganizationId = t.OrganizationId,
+        };
     }
 }

@@ -35,6 +35,7 @@ public class InvitationBusinessTests : IntegrationTestBase
     private INotificationBusiness _notificationBusiness = null!;
     private Mock<IRelationshipBusiness> _relationshipBusiness = null!;
     private Mock<IRoleBusiness> _roleBusiness = null!;
+    private Mock<IFileBusinessFactory> _mockFileBusinessFactory = null!;
     private UserBusiness _userBusiness = null!;
     private Mock<ILogger<InvitationBusiness>> _mockInvitationLogger = null!;
     public long gid; // group ID
@@ -74,19 +75,22 @@ public class InvitationBusinessTests : IntegrationTestBase
         _eventBusiness = new EventBusiness(Context, _mockNotificationBusiness.Object, _bulkCopyUpsertExecutor);
         _objectStorageBusiness = new Mock<IObjectStorageBusiness>();
         _roleBusiness = new Mock<IRoleBusiness>();
+        _mockFileBusinessFactory = new Mock<IFileBusinessFactory>();
         _organizationBusiness = new OrganizationBusiness(
             Context, _eventBusiness, _roleBusiness.Object, _mockOrgLogger.Object, _objectStorageBusiness.Object);
 
         _classBusiness = new ClassBusiness(
             Context, _recordBusiness.Object,
-            _relationshipBusiness.Object, _eventBusiness);
+            _relationshipBusiness.Object, _eventBusiness,
+            _mockPermissionService.Object,
+            _mockAdminService.Object);
 
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
 
         _projectBusiness = new ProjectBusiness(
             Context, _mockLogger.Object,
             _classBusiness, _roleBusiness.Object, _dataSourceBusiness.Object,
-            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness, _mockFileAzureBusiness.Object);
+            _objectStorageBusiness.Object, _eventBusiness, _organizationBusiness, _notificationBusiness, _mockFileAzureBusiness.Object, _mockFileBusinessFactory.Object);
 
         _invitationBusiness = new InvitationBusiness(
             Context,
@@ -638,16 +642,18 @@ public class InvitationBusinessTests : IntegrationTestBase
         var result = await _invitationBusiness.CreateAndAddServiceAccountToProject(oid, pid, "My Service Account", rid);
 
         // Assert
-        Assert.True(result);
+        Assert.NotNull(result);
+        Assert.Equal("My Service Account", result.Name);
+        Assert.Equal(AccountType.Service, result.AccountType);
+        Assert.StartsWith("service_", result.Email);
+        Assert.StartsWith("service_", result.Username);
 
         var serviceAccount = await Context.Users
-            .FirstOrDefaultAsync(u => u.Name == "My Service Account" && u.AccountType == AccountType.Service);
+            .FirstOrDefaultAsync(u => u.Id == result.Id);
         Assert.NotNull(serviceAccount);
-        Assert.StartsWith("service_", serviceAccount.Email);
-        Assert.StartsWith("service_", serviceAccount.Username);
 
         var projectMember = await Context.ProjectMembers
-            .FirstOrDefaultAsync(pm => pm.UserId == serviceAccount.Id && pm.ProjectId == pid);
+            .FirstOrDefaultAsync(pm => pm.UserId == result.Id && pm.ProjectId == pid);
         Assert.NotNull(projectMember);
         Assert.Equal(rid, projectMember.RoleId);
     }
@@ -660,14 +666,12 @@ public class InvitationBusinessTests : IntegrationTestBase
             oid, pid, "Admin Service Account", rid, makeProjectAdmin: true);
 
         // Assert
-        Assert.True(result);
-
-        var serviceAccount = await Context.Users
-            .FirstOrDefaultAsync(u => u.Name == "Admin Service Account" && u.AccountType == AccountType.Service);
-        Assert.NotNull(serviceAccount);
+        Assert.NotNull(result);
+        Assert.Equal("Admin Service Account", result.Name);
+        Assert.Equal(AccountType.Service, result.AccountType);
 
         var projectMember = await Context.ProjectMembers
-            .FirstOrDefaultAsync(pm => pm.UserId == serviceAccount.Id && pm.ProjectId == pid);
+            .FirstOrDefaultAsync(pm => pm.UserId == result.Id && pm.ProjectId == pid);
         Assert.NotNull(projectMember);
         Assert.True(projectMember.IsProjectAdmin);
     }

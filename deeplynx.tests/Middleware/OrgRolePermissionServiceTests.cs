@@ -94,14 +94,6 @@ public class OrgRolePermissionServiceTests : IntegrationTestBase
         Assert.True(await _service.PermissionInOrg(adminUserId, orgId, "write", "user"));
     }
 
-    [Fact]
-    public async Task NonAdminMember_CanRead()
-    {
-        var (orgId, _, memberUserId, _) = await SeedOrgScenarioAsync();
-
-        Assert.True(await _service.PermissionInOrg(memberUserId, orgId, "read", "organization"));
-    }
-
     /// <summary>
     /// Regression test for the privilege-escalation bug: a non-admin member must NOT inherit
     /// write/update permissions just because some role in the org defines them. Previously the

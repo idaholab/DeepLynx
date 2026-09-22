@@ -35,16 +35,35 @@ ATTRIBUTE EXTRACTION RULES:
    commander).
 5. Omit uncertain attributes entirely.
 6. Keep values short and literal (no long paraphrases).
+7. In addition to other attributes, extract any tags from the document text associated with each entity.
+8. Represent tags as a list of strings under the attribute key "tags".
+9. Example: "attributes": { ..., "tags": ["high-priority", "classified"] }
+
+SOURCE PAGE RULES:
+
+1. Each chunk in the DOCUMENT TEXT below is tagged with `[record_id: N, page: P]` for single-page chunks
+   or `[record_id: N, pages: P-Q]` for chunks that span a range of pages.
+2. Every extracted class and relationship MUST include a "source_page" attribute inside its "attributes" object.
+3. The value of "source_page" MUST be copied verbatim from the chunk tag it was extracted from:
+   - Single page: "source_page": "5"
+   - Page range: "source_page": "5-7"
+4. If an entity appears across multiple chunks, use the page (or range) from the chunk where it is most clearly defined
+   — the same chunk you used to determine its record_id.
+5. Do NOT invent, infer, or guess a page number. Only copy what is present in the chunk tag.
+6. If a chunk tag is missing page information for any reason, omit "source_page" for entities from that chunk rather
+   than fabricating a value.
 
 OUTPUT FORMAT: Return ONLY valid JSON (no markdown, no explanations), exactly this shape:
 {
 "classes": [
-{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "record_id": 1, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing"}},
-{"class": "100th Air Refueling Wing", "class_type": "Military Organization", "confidence": 0.92, "record_id": 1, "attributes": {"role": "air refueling", "commander": "Col. Johnny Galbert"}}
+{"class": "RAF Mildenhall", "class_type": "Air Force Base", "confidence": 0.95, "record_id": 1, "attributes": {"location": "United Kingdom", "unit": "100th Air Refueling Wing", "source_page": "3", "tags": ["strategic", "critical infrastructure"]}},
+{"class": "Tactical Operations Center", "class_type": "CommandControlFacility", "confidence": 0.72, "record_id": 1, "attributes": {"role": "command and control", "location": "operations center", "source_page": "4-5"}}
 ],
 "relationships": [
 {"subject": "100th Air Refueling Wing", "subject_type": "Military Organization",
-"relationship_type": "located at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90, "record_id": 1}
+"relationship_type": "stationed at", "object": "RAF Mildenhall", "object_type": "Air Force Base", "confidence": 0.90, "record_id": 1, "attributes": {"source_page": "3"}},
+{"subject": "Tactical Operations Center", "subject_type": "CommandControlFacility",
+"relationship_type": "coordinates", "object": "100th Air Refueling Wing", "object_type": "Military Organization", "confidence": 0.75, "record_id": 1, "attributes": {"source_page": "4-5"}}
 ]
 }
 

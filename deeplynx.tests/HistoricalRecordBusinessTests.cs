@@ -52,10 +52,8 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     public long roleId;
     protected long defaultLabelId;
     protected long defaultLabelId2;
-    protected long readPermissionId;
-    protected long writePermissionId;
-    protected long readPermissionId2;
-    protected long writePermissionId2;
+    protected long readActionId;
+    protected long downloadActionId;
 
     public HistoricalRecordBusinessTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -66,16 +64,23 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         _encryptionHelper = new EncryptionHelper();
         await base.InitializeAsync();
         _sensitivityLabelService = new SensitivityLabelService(Context);
-        _historicalRecordBusiness = new HistoricalRecordBusiness(Context, _sensitivityLabelService);
-        _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockPermissionService = new Mock<IProjectRolePermissionService>();
+        _mockPermissionService
+            .Setup(s => s.PermissionInProject(It.IsAny<long>(), It.IsAny<long>(), "read", "class"))
+            .ReturnsAsync(true);
+        _mockPermissionService
+            .Setup(s => s.PermissionInProject(It.IsAny<long>(), It.IsAny<long>(), "read", "tag"))
+            .ReturnsAsync(true);
+        _historicalRecordBusiness = new HistoricalRecordBusiness(
+            Context, _sensitivityLabelService, _mockPermissionService.Object);
+        _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockAdminService = new Mock<IAdminService>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _bulkCopyUpsertExecutor = new BulkCopyUpsertExecutor();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _bulkCopyUpsertExecutor);
-        _tagBusiness = new TagBusiness(Context, _eventBusiness);
+        _tagBusiness = new TagBusiness(Context, _eventBusiness, _mockPermissionService.Object, _mockAdminService.Object);
         _userBusiness = new UserBusiness(Context);
         _sensitivityLabelBusiness = new SensitivityLabelBusiness(Context, _eventBusiness, _userBusiness);
         _mockFileAzureBusiness = new Mock<IFileBusiness>();
@@ -97,6 +102,9 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     protected override async Task SeedTestDataAsync()
     {
         await base.SeedTestDataAsync();
+
+        readActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
+        downloadActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "download file")).Id;
 
         var testUser = new User
         {
@@ -330,58 +338,6 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         defaultLabelId = defaultLabel.Id;
 
-        // Create read permission for the label
-        var readPermission = new Permission
-        {
-            Name = "Read Default Label",
-            Description = "Read permission for default test label",
-            Action = "read record",
-            IsDefault = false,
-            LabelId = defaultLabelId,
-            ProjectId = pid,
-            OrganizationId = organizationId,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        // Create write permission for the label
-        var writePermission = new Permission
-        {
-            Name = "Write Default Label",
-            Description = "Write permission for default test label",
-            Action = "write record",
-            IsDefault = false,
-            LabelId = defaultLabelId,
-            ProjectId = pid,
-            OrganizationId = organizationId,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        var updatePermission = new Permission
-        {
-            Name = "Update Default Label",
-            Description = "update permission for default test label",
-            Action = "update record",
-            IsDefault = false,
-            LabelId = defaultLabelId,
-            ProjectId = pid,
-            OrganizationId = organizationId,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        Context.Permissions.Add(readPermission);
-        Context.Permissions.Add(writePermission);
-        Context.Permissions.Add(updatePermission);
-        await Context.SaveChangesAsync();
-
-        readPermissionId = readPermission.Id;
-        writePermissionId = writePermission.Id;
-
         // Create second default sensitivity label
         var defaultLabel2 = new SensitivityLabel
         {
@@ -397,79 +353,264 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         await Context.SaveChangesAsync();
         defaultLabelId2 = defaultLabel2.Id;
 
-        // Create read permission for the second label
-        var readPermission2 = new Permission
+        // Grant the test user explicit access to both labels (access is now per-user, not per-role)
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            Name = "Read Default Label 2",
-            Description = "Read permission for second default test label",
-            Action = "read record",
-            Resource = "sensitivity_label",
-            IsDefault = false,
-            LabelId = defaultLabelId2,
-            ProjectId = pid,
-            OrganizationId = organizationId,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        // Create write permission for the second label
-        var writePermission2 = new Permission
+            UserId = uid,
+            LabelId = defaultLabelId,
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            Name = "Write Default Label 2",
-            Description = "Write permission for second default test label",
-            Action = "write record",
-            Resource = "sensitivity_label",
-            IsDefault = false,
-            LabelId = defaultLabelId2,
-            ProjectId = pid,
-            OrganizationId = organizationId,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        var updatePermission2 = new Permission
+            UserId = uid,
+            LabelId = defaultLabelId,
+            LabelPermissionId = downloadActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
         {
-            Name = "update Default Label 2",
-            Description = "Update permission for second default test label",
-            Action = "update record",
-            Resource = "sensitivity_label",
-            IsDefault = false,
+            UserId = uid,
             LabelId = defaultLabelId2,
-            ProjectId = pid,
-            OrganizationId = organizationId,
-            LastUpdatedBy = uid,
-            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
-            IsArchived = false
-        };
-
-        Context.Permissions.Add(readPermission2);
-        Context.Permissions.Add(writePermission2);
-        Context.Permissions.Add(updatePermission2);
+            LabelPermissionId = readActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
+        Context.SensitivityLabelGrants.Add(new SensitivityLabelGrant
+        {
+            UserId = uid,
+            LabelId = defaultLabelId2,
+            LabelPermissionId = downloadActionId,
+            GrantedBy = uid,
+            GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        });
         await Context.SaveChangesAsync();
-
-        readPermissionId2 = readPermission2.Id;
-        writePermissionId2 = writePermission2.Id;
-
-        // Attach all permissions to the test role
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        if (role != null)
-        {
-            role.Permissions.Add(readPermission);
-            role.Permissions.Add(writePermission);
-            role.Permissions.Add(updatePermission);
-            role.Permissions.Add(readPermission2);
-            role.Permissions.Add(writePermission2);
-            role.Permissions.Add(updatePermission2);
-            await Context.SaveChangesAsync();
-        }
     }
 
-    #region GetHistoricalRecords Tests
+    #region GetAllHistoricalRecordsPaginated Tests
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_ReturnsListOfCurrentHistoricalRecordsForProject()
+    {
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal("Test Record", result.Items.First().Name);
+        Assert.Equal("Test Record 2", result.Items.Last().Name);
+        Assert.DoesNotContain(result.Items, x => x.Name == "Test Record 3");
+        Assert.DoesNotContain(result.Items, x => x.Name == "Test Record 4");
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_ReturnsListOfUpdatedHistoricalRecords()
+    {
+        // Arrange
+        var dto = new UpdateRecordRequestDto
+        {
+            Name = "Updated Test Record",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { UpdatedProp = "UpdatedValue" }))!,
+            Uri = "updated://uri",
+            OriginalId = "updated-123",
+            Description = "Updated Description",
+            ClassId = cid
+        };
+
+        var dto2 = new UpdateRecordRequestDto
+        {
+            Name = "Updated Test Record 2",
+            Properties = (JsonObject)JsonNode.Parse(JsonSerializer.Serialize(new { UpdatedProp = "UpdatedValue 2" }))!,
+            Uri = "updated2://uri",
+            OriginalId = "updated2-123",
+            Description = "Updated 2 Description",
+            ClassId = cid
+        };
+
+        await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid, dto);
+        await _recordBusiness.UpdateRecord(uid, organizationId, pid, rid2, dto2);
+
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal("Updated Test Record", result.Items.First().Name);
+        Assert.Equal("Updated Test Record 2", result.Items.Last().Name);
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Arrange
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 },
+            null, null, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, x => x.Name == "Test Record");
+        Assert.Contains(result.Items, x => x.Name == "Test Record 2");
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_ExcludesArchived()
+    {
+        // Arrange
+        var initial = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        Assert.NotNull(initial);
+        Assert.Equal(2, initial.TotalCount);
+
+        // Act
+        await _recordBusiness.ArchiveRecord(uid, organizationId, pid, rid);
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.DoesNotContain(result.Items, x => x.Name == "Test Record");
+        Assert.Contains(result.Items, x => x.Name == "Test Record 2");
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_NoMatches_ReturnsEmptyPaginatedResponse()
+    {
+        // Arrange
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid);
+        await _recordBusiness.DeleteRecord(uid, organizationId, pid, rid2);
+
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = 25 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(25, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_FiltersByDataSource()
+    {
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid2, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 }, did2);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Contains(result.Items, x => x.Name == "Test Record 3");
+        Assert.DoesNotContain(result.Items, x => x.Name == "Test Record 4");
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_FiltersByTime()
+    {
+        // Arrange
+        var pointInTime = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+        var testRecordLate = new Record
+        {
+            Name = "Test Record Late",
+            Description = "Test record late for unit tests",
+            OriginalId = "og_idlate",
+            Properties = JsonSerializer.Serialize(new { TestProperty = "TestValue late" }),
+            ProjectId = pid,
+            DataSourceId = did,
+            ClassId = cid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            Uri = "localhost:8090",
+            OrganizationId = organizationId
+        };
+
+        Context.Records.Add(testRecordLate);
+        await Context.SaveChangesAsync();
+
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = -1 },
+            null, pointInTime, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, x => x.Name == "Test Record");
+        Assert.Contains(result.Items, x => x.Name == "Test Record 2");
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_Paginates_Correctly()
+    {
+        // Act - two-page split over the 2 seeded records
+        var page1 = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = 1 });
+        var page2 = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 2, PageSize = 1 });
+
+        // Assert
+        Assert.NotNull(page1);
+        Assert.NotNull(page2);
+        Assert.Single(page1.Items);
+        Assert.Single(page2.Items);
+        Assert.Equal(2, page1.TotalCount);
+        Assert.Equal(2, page2.TotalCount);
+
+        var page1Ids = page1.Items.Select(r => r.Id).ToHashSet();
+        var page2Ids = page2.Items.Select(r => r.Id).ToHashSet();
+        Assert.Empty(page1Ids.Intersect(page2Ids));
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_PageSizeNegativeOne_ReturnsAll_IgnoringPageNumber()
+    {
+        // Act - PageNumber deliberately set to something other than 1 to confirm it's ignored
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 5, PageSize = -1 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.Items.Count, result.PageSize);
+    }
+
+    [Fact]
+    public async Task GetAllHistoricalRecordsPaginated_PageSizeZero_ReturnsEmptyItems_ButAccurateTotalCount()
+    {
+        // Act
+        var result = await _historicalRecordBusiness.GetAllHistoricalRecordsPaginated(
+            uid, pid, organizationId, new PaginatedRequestDto { PageNumber = 1, PageSize = 0 });
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    #endregion
+
+    #region GetHistoricalRecords (V1 / Legacy) Tests
 
     [Fact]
     public async Task GetHistoricalRecords_ReturnsListOfCurrentHistoricalRecordsForProject()
@@ -629,17 +770,15 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetHistoricalRecords_FilterOutUnauthorizedRecordsBySensitivityLabels_ReturnsFilteredRecords()
     {
-        // Remove read permission for defaultLabelId2 from the role
+        // Revoke the user's access grant for defaultLabelId2
         Context.ChangeTracker.Clear();
 
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId2);
-        if (permissionToRemove != null)
+        var grantsToRemove = await Context.SensitivityLabelGrants
+            .Where(g => g.UserId == uid && g.LabelId == defaultLabelId2)
+            .ToListAsync();
+        if (grantsToRemove.Count > 0)
         {
-            role!.Permissions.Remove(permissionToRemove);
+            Context.SensitivityLabelGrants.RemoveRange(grantsToRemove);
             await Context.SaveChangesAsync();
         }
 
@@ -673,17 +812,15 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
         // Record 1: No labels (should be returned) - using the seeded record
         var record1Id = rid;
 
-        // Remove read permission for defaultLabelId2 from the role
+        // Revoke the user's access grant for defaultLabelId2
         Context.ChangeTracker.Clear();
 
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId2);
-        if (permissionToRemove != null)
+        var grantsToRemove = await Context.SensitivityLabelGrants
+            .Where(g => g.UserId == uid && g.LabelId == defaultLabelId2)
+            .ToListAsync();
+        if (grantsToRemove.Count > 0)
         {
-            role!.Permissions.Remove(permissionToRemove);
+            Context.SensitivityLabelGrants.RemoveRange(grantsToRemove);
             await Context.SaveChangesAsync();
         }
 
@@ -722,17 +859,15 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetHistoricalRecords_RecordWithMultipleLabels_UserMissingOne_FiltersRecord()
     {
-        // Remove read permission for defaultLabelId2 from the role
+        // Revoke the user's access grant for defaultLabelId2
         Context.ChangeTracker.Clear();
 
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId2);
-        if (permissionToRemove != null)
+        var grantsToRemove = await Context.SensitivityLabelGrants
+            .Where(g => g.UserId == uid && g.LabelId == defaultLabelId2)
+            .ToListAsync();
+        if (grantsToRemove.Count > 0)
         {
-            role!.Permissions.Remove(permissionToRemove);
+            Context.SensitivityLabelGrants.RemoveRange(grantsToRemove);
             await Context.SaveChangesAsync();
         }
 
@@ -752,17 +887,15 @@ public class HistoricalRecordBusinessTests : IntegrationTestBase
     [Fact]
     public async Task GetHistoricalRecords_WithDataSourceFilter_AndLabelAuth_ReturnsBothFiltered()
     {
-        // Remove read permission for defaultLabelId2 from the role
+        // Revoke the user's access grant for defaultLabelId2
         Context.ChangeTracker.Clear();
 
-        var role = await Context.Roles
-            .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == roleId);
-
-        var permissionToRemove = role?.Permissions.FirstOrDefault(p => p.Id == readPermissionId2);
-        if (permissionToRemove != null)
+        var grantsToRemove = await Context.SensitivityLabelGrants
+            .Where(g => g.UserId == uid && g.LabelId == defaultLabelId2)
+            .ToListAsync();
+        if (grantsToRemove.Count > 0)
         {
-            role!.Permissions.Remove(permissionToRemove);
+            Context.SensitivityLabelGrants.RemoveRange(grantsToRemove);
             await Context.SaveChangesAsync();
         }
 

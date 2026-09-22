@@ -51,23 +51,14 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
 }) => {
   const { t } = useLanguage();
   const hasEditableRoles = roles.some((role) => !isSeededUserRole(role));
-  const matrixPermissionCategories = React.useMemo(() => {
-    // Matrix view intentionally excludes sensitivity-label permissions.
-    return permissionCategories
-      .map((category) => ({
-        ...category,
-        permissions: category.permissions.filter((perm) => perm.labelId == null),
-      }))
-      .filter((category) => category.permissions.length > 0);
-  }, [permissionCategories]);
 
   const editMatrixDisabledReason = !hasEditableRoles
     ? t.translations.MATRIX_EDIT_REQUIRES_CUSTOM_ORG_ROLES
     : rolesLocked
-    ? t.translations.ROLES_ARE_LOCKED
-    : isLoadingPermissions
-    ? t.translations.PERMISSIONS_STILL_LOADING
-    : "";
+      ? t.translations.ROLES_ARE_LOCKED
+      : isLoadingPermissions
+        ? t.translations.PERMISSIONS_STILL_LOADING
+        : "";
 
   return (
     <div style={{ height: "calc(100vh - 28rem)" }}>
@@ -168,7 +159,7 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {matrixPermissionCategories.map((category) => (
+                {permissionCategories.map((category) => (
                   <React.Fragment key={category.id}>
                     {/* Category Row */}
                     <tr className="bg-base-200">
@@ -217,45 +208,41 @@ const MatrixViewLayout: React.FC<MatrixViewLayoutProps> = ({
                                     );
                                   }
                                 }}
-                                className={`inline-block ${
-                                  isEditingMatrix && !seededUser
-                                    ? "cursor-pointer hover:scale-110 transition-transform"
-                                    : "cursor-default"
-                                } ${
-                                  seededUser && isEditingMatrix
+                                className={`inline-block ${isEditingMatrix && !seededUser
+                                  ? "cursor-pointer hover:scale-110 transition-transform"
+                                  : "cursor-default"
+                                  } ${seededUser && isEditingMatrix
                                     ? "opacity-60 ring-2 ring-warning rounded-lg p-1"
                                     : ""
-                                }`}
+                                  }`}
                                 title={
                                   seededUser && isEditingMatrix
                                     ? t.translations
-                                        .SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
+                                      .SEEDED_USER_ROLE_PERMISSIONS_CANNOT_BE_MODIFIED
                                     : isEditingMatrix
-                                    ? t.translations.CLICK_TO_TOGGLE
-                                    : hasPermission
-                                    ? t.translations.HAS_PERMISSION
-                                    : t.translations.NO_PERMISSION
+                                      ? t.translations.CLICK_TO_TOGGLE
+                                      : hasPermission
+                                        ? t.translations.HAS_PERMISSION
+                                        : t.translations.NO_PERMISSION
                                 }
                               >
                                 {hasPermission ? (
                                   <CheckIcon
-                                    className={`size-8 mx-auto ${
-                                      isEditingMatrix && !seededUser
-                                        ? "text-success hover:text-success/70"
-                                        : seededUser && isEditingMatrix
+                                    className={`size-8 mx-auto ${isEditingMatrix && !seededUser
+                                      ? "text-success hover:text-success/70"
+                                      : seededUser && isEditingMatrix
                                         ? "text-warning"
                                         : "text-success"
-                                    }`}
+                                      }`}
                                   />
                                 ) : (
                                   <XMarkIcon
-                                    className={`size-8 mx-auto ${
-                                      isEditingMatrix && !seededUser
-                                        ? "text-base-300 hover:text-success/50"
+                                    className={`size-8 mx-auto ${isEditingMatrix && !seededUser
+                                        ? "text-red-500 hover:text-red-600"
                                         : seededUser && isEditingMatrix
-                                        ? "text-warning/50"
-                                        : "text-base-300"
-                                    }`}
+                                          ? "text-red-400 hover:text-red-500"
+                                          : "text-red-300 hover:text-red-400"
+                                      }`}
                                   />
                                 )}
                               </div>

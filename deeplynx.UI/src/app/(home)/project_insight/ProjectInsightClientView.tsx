@@ -15,6 +15,9 @@ import { getAllDataSources } from "@/app/lib/client_service/data_source_services
 import {
   fetchInsightIngestionStatus,
   queueInsightUpload,
+  fetchInsightEndpointHealth,
+  type InsightEndpointHealthByRole,
+  type InsightModelHealthState,
 } from "@/app/lib/client_service/insight_services.client";
 import { getAllTags } from "@/app/lib/client_service/tag_services.client";
 import {
@@ -44,10 +47,22 @@ import {
 } from "./components/projectInsight.view-utils";
 import { useProjectInsightTabState } from "./hooks/useProjectInsightTabState";
 import { BetaBadge } from "@/app/(home)/components/BetaBadge";
-import { useRecordSearchPaginated, useRecordSearch } from "./hooks/useRecordSearch";
+import { useRecordSearchHybrid } from "./hooks/useRecordSearch";
 import PaginationControls from "../components/PaginationControls";
 
 const STATUS_POLL_INTERVAL_MS = 5000;
+
+const EMPTY_HEALTH_STATE: InsightModelHealthState = {
+  isChecking: false,
+  response: null,
+  error: null,
+};
+
+const EMPTY_ENDPOINT_HEALTH: InsightEndpointHealthByRole = {
+  query: { ...EMPTY_HEALTH_STATE },
+  upload: { ...EMPTY_HEALTH_STATE },
+  embedding: { ...EMPTY_HEALTH_STATE },
+};
 
 export default function ProjectInsightClientView() {
   // Session context
@@ -69,22 +84,36 @@ export default function ProjectInsightClientView() {
   const [statusMap, setStatusMap] = useState<
     Record<number, ProjectInsightStatus>
   >({});
-  const [isQueryModelUnavailable, setIsQueryModelUnavailable] = useState(false);
-  const [isUploadModelUnavailable, setIsUploadModelUnavailable] = useState(false);
-  const [isEmbeddingModelUnavailable, setIsEmbeddingModelUnavailable] = useState(false);
+  const [endpointHealth, setEndpointHealth] =
+    useState<InsightEndpointHealthByRole>(EMPTY_ENDPOINT_HEALTH);
+  const isQueryModelUnavailable =
+    endpointHealth.query.response !== null
+      ? !endpointHealth.query.response.reachable ||
+      !endpointHealth.query.response.model_available
+      : Boolean(endpointHealth.query.error);
+  const isUploadModelUnavailable =
+    endpointHealth.upload.response !== null
+      ? !endpointHealth.upload.response.reachable ||
+      !endpointHealth.upload.response.model_available
+      : Boolean(endpointHealth.upload.error);
+  const isEmbeddingModelUnavailable =
+    endpointHealth.embedding.response !== null
+      ? !endpointHealth.embedding.response.reachable ||
+      !endpointHealth.embedding.response.model_available
+      : Boolean(endpointHealth.embedding.error);
   const isChatUnavailable = isQueryModelUnavailable || isEmbeddingModelUnavailable;
-  const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;  
+  const isIngestionUnavailable = isUploadModelUnavailable || isEmbeddingModelUnavailable;
   const pollingKey = useMemo(
-      () =>
-          Object.entries(statusMap)
-              .filter(
-                  ([, status]) =>
-                      status.state === "queued" || status.state === "processing",
-              )
-              .map(([recordId]) => Number(recordId))
-              .sort((a, b) => a - b)
-              .join(","),
-      [statusMap],
+    () =>
+      Object.entries(statusMap)
+        .filter(
+          ([, status]) =>
+            status.state === "queued" || status.state === "processing",
+        )
+        .map(([recordId]) => Number(recordId))
+        .sort((a, b) => a - b)
+        .join(","),
+    [statusMap],
   );
   const [isLoadingRecords, setIsLoadingRecords] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
@@ -93,9 +122,119 @@ export default function ProjectInsightClientView() {
   );
   const [selectedPendingIds, setSelectedPendingIds] = useState<Map<number, string>>(new Map());
   const [isQueueing, setIsQueueing] = useState(false);
-  const [isLibrarySearchLoading, setIsLibrarySearchLoading] = useState(false);
+  const [draftSearchQuery, setDraftSearchQuery] = useState("");
   const { selectedInsightModels, setSelectedInsightModels } =
     useInsightModelSelection(organizationId, projectId);
+
+  useEffect(() => {
+    if (
+      !hasProjectLoaded ||
+      !hasOrganizationLoaded ||
+      !organizationId ||
+      !projectId
+    ) {
+      setEndpointHealth(EMPTY_ENDPOINT_HEALTH);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function checkEndpointHealth() {
+      setEndpointHealth({
+        query: { ...EMPTY_HEALTH_STATE, isChecking: true },
+        upload: { ...EMPTY_HEALTH_STATE, isChecking: true },
+        embedding: { ...EMPTY_HEALTH_STATE, isChecking: true },
+      });
+
+      const [queryHealth, uploadHealth, embeddingHealth] =
+        await Promise.allSettled([
+          fetchInsightEndpointHealth({
+            organizationId: organizationId!,
+            projectId: projectId!,
+            modelConfigId: selectedInsightModels.queryModelConfigId,
+            modelType: "llm",
+          }),
+          fetchInsightEndpointHealth({
+            organizationId: organizationId!,
+            projectId: projectId!,
+            modelConfigId: selectedInsightModels.uploadModelConfigId,
+            modelType: "vlm",
+          }),
+          fetchInsightEndpointHealth({
+            organizationId: organizationId!,
+            projectId: projectId!,
+            modelConfigId: selectedInsightModels.embeddingModelConfigId,
+            modelType: "embedding",
+          }),
+        ]);
+
+      if (cancelled) return;
+
+      setEndpointHealth({
+        query:
+          queryHealth.status === "fulfilled"
+            ? {
+              isChecking: false,
+              response: queryHealth.value,
+              error: null,
+            }
+            : {
+              isChecking: false,
+              response: null,
+              error:
+                queryHealth.reason instanceof Error
+                  ? queryHealth.reason.message
+                  : "Query model health check failed",
+            },
+
+        upload:
+          uploadHealth.status === "fulfilled"
+            ? {
+              isChecking: false,
+              response: uploadHealth.value,
+              error: null,
+            }
+            : {
+              isChecking: false,
+              response: null,
+              error:
+                uploadHealth.reason instanceof Error
+                  ? uploadHealth.reason.message
+                  : "Upload/OCR model health check failed",
+            },
+
+        embedding:
+          embeddingHealth.status === "fulfilled"
+            ? {
+              isChecking: false,
+              response: embeddingHealth.value,
+              error: null,
+            }
+            : {
+              isChecking: false,
+              response: null,
+              error:
+                embeddingHealth.reason instanceof Error
+                  ? embeddingHealth.reason.message
+                  : "Embedding model health check failed",
+            },
+      });
+    }
+
+    void checkEndpointHealth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hasOrganizationLoaded,
+    hasProjectLoaded,
+    organizationId,
+    projectId,
+    selectedInsightModels.queryModelConfigId,
+    selectedInsightModels.uploadModelConfigId,
+    selectedInsightModels.embeddingModelConfigId,
+  ]);
 
   const selectedPendingIdsLength = selectedPendingIds.size;
 
@@ -103,6 +242,7 @@ export default function ProjectInsightClientView() {
   useEffect(() => {
     setSelectedPendingIds(new Map());
     setActiveTabKey("library");
+    setEndpointHealth(EMPTY_ENDPOINT_HEALTH);
   }, [projectId]);
 
   const [classes, setClasses] = useState<ClassResponseDto[] | null>(null);
@@ -111,18 +251,19 @@ export default function ProjectInsightClientView() {
   const loadRecordMeta = useCallback(async () => {
     if (!projectId) return;
 
-    const [classDtos, dataSourceDtos, tagDtos] =
+    const [classesResponse, dataSourceDtos, tagDtos] =
       await Promise.all([
         getAllClasses(projectId, true),
         getAllDataSources(projectId, true),
         getAllTags(projectId, true),
       ]);
 
+    const classDtos = classesResponse.items;
     setClasses(classDtos);
     setSources(dataSourceDtos);
 
     setClassOptions(sortNamedOptions(classDtos as ClassResponseDto[]));
-    setTagOptions(sortNamedOptions(tagDtos as TagResponseDto[]));
+    setTagOptions(sortNamedOptions(tagDtos.items as TagResponseDto[]));
   }, [projectId]);
 
   useEffect(() => {
@@ -132,6 +273,11 @@ export default function ProjectInsightClientView() {
   const pageSize = 10;
 
   const {
+    page: libraryPage,
+    setPage: setLibraryPage,
+    pageSize: libraryPageSize,
+    setPageSize: setLibraryPageSize,
+    totalPages: libraryTotalPages,
     filters: libraryState,
     setFilters: setLibraryState,
     records: embedded,
@@ -139,7 +285,8 @@ export default function ProjectInsightClientView() {
     total: embeddedTotal,
     found: embeddedFound,
     error: embeddedError,
-  } = useRecordSearch("embedded", classes, sources);
+    isLoading: isLibrarySearchLoading,
+  } = useRecordSearchHybrid(pageSize, "embedded", classes, sources);
 
   const {
     page: pendingPage,
@@ -154,10 +301,11 @@ export default function ProjectInsightClientView() {
     total: pendingTotal,
     found: pendingFound,
     error: pendingError,
-  } = useRecordSearchPaginated(pageSize, "pending", classes, sources);
+    isLoading: isPendingSearchLoading,
+  } = useRecordSearchHybrid(pageSize, "pending", classes, sources);
 
   useEffect(() => {
-    setStatusMap({...embeddedStatus, ...pendingStatus});
+    setStatusMap({ ...embeddedStatus, ...pendingStatus });
   }, [embeddedStatus, pendingStatus]);
 
   // Tab state helpers
@@ -174,8 +322,8 @@ export default function ProjectInsightClientView() {
 
   function retryRecordSearch() {
     // Hacky solution that refreshes the search because the filters have "changed"
-    setLibraryState((state) => ({...state}));
-    setPendingState((state) => ({...state}));
+    setLibraryState((state) => ({ ...state }));
+    setPendingState((state) => ({ ...state }));
   }
 
   useEffect(() => {
@@ -198,10 +346,10 @@ export default function ProjectInsightClientView() {
               recordId,
               ingestionStatus.indexed
                 ? {
-                    state: "embedded",
-                    chunkCount: ingestionStatus.chunk_count,
-                    pageCount: ingestionStatus.page_count,
-                  }
+                  state: "embedded",
+                  chunkCount: ingestionStatus.chunk_count,
+                  pageCount: ingestionStatus.page_count,
+                }
                 : { state: "processing" },
             ] as const;
           } catch (error) {
@@ -219,9 +367,9 @@ export default function ProjectInsightClientView() {
           const oldStatus = current[recordId];
 
           const changed =
-              oldStatus?.state !== newStatus.state ||
-              oldStatus?.chunkCount !== newStatus.chunkCount ||
-              oldStatus?.pageCount !== newStatus.pageCount;
+            oldStatus?.state !== newStatus.state ||
+            oldStatus?.chunkCount !== newStatus.chunkCount ||
+            oldStatus?.pageCount !== newStatus.pageCount;
 
           if (!changed) continue;
 
@@ -234,7 +382,7 @@ export default function ProjectInsightClientView() {
 
         return next ?? current;
       });
-        
+
     };
 
     void pollStatuses();
@@ -285,12 +433,22 @@ export default function ProjectInsightClientView() {
     activeTabKey === "library"
       ? libraryState.searchQuery
       : pendingState.searchQuery;
+
+  // The search box shows what the user is typing (draftSearchQuery), which is
+  // only committed to the actual filter — and only then triggers a search —
+  // on Enter. Keep the draft in sync with whichever tab is active.
+  useEffect(() => {
+    setDraftSearchQuery(activeSearchQuery);
+  }, [activeTabKey, activeSearchQuery]);
+
   const activeSearchPlaceholder =
     activeTabKey === "library"
       ? t.translations.PROJECT_INSIGHT_SEARCH_PLACEHOLDER
       : t.translations.PROJECT_INSIGHT_PENDING_SEARCH_PLACEHOLDER;
   const activeSearchError =
     activeTabKey === "library" ? embeddedError : pendingError;
+  const activeIsLoading =
+    activeTabKey === "library" ? isLibrarySearchLoading : isPendingSearchLoading;
   const activeFilterCount =
     activeFilters.classIds.length + activeFilters.tagIds.length;
   const activeFilterPills = buildActiveFilterPills(
@@ -345,6 +503,12 @@ export default function ProjectInsightClientView() {
       );
     } catch (error) {
       console.error("Failed to queue project Insight uploads:", error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : t.translations.INSIGHT_ERROR_PREFIX;
+
       setStatusMap((current) => ({
         ...current,
         ...Object.fromEntries(
@@ -352,19 +516,13 @@ export default function ProjectInsightClientView() {
             file.fileId,
             {
               state: "error",
-              error:
-                error instanceof Error
-                  ? error.message
-                  : t.translations.INSIGHT_ERROR_PREFIX,
+              error: message,
             },
           ]),
         ),
       }));
-      toast.error(
-        withTokens(t.translations.PROJECT_INSIGHT_FAILED_SUMMARY, {
-          count: uploadFileInfo.length,
-        }),
-      );
+
+      toast.error(message);
     } finally {
       setSelectedPendingIds(new Map());
       setIsQueueing(false);
@@ -377,15 +535,17 @@ export default function ProjectInsightClientView() {
       ? t.translations.PROJECT_INSIGHT_SEARCHING
       : embeddedTotal
         ? withTokens(t.translations.PROJECT_INSIGHT_SEARCH_RESULTS, {
-            count: embeddedTotal,
-            query: libraryState.searchQuery.trim(),
-          })
+          count: embeddedTotal,
+          query: libraryState.searchQuery.trim(),
+        })
         : withTokens(t.translations.PROJECT_INSIGHT_SEARCH_RESULTS_EMPTY, {
-            query: libraryState.searchQuery.trim(),
-          })
+          query: libraryState.searchQuery.trim(),
+        })
     : t.translations.PROJECT_INSIGHT_LIBRARY_DESCRIPTION;
   const pendingSearchSummary = normalizedPendingSearchQuery
-    ? withTokens(t.translations.PROJECT_INSIGHT_PENDING_SEARCH_RESULTS, {
+    ? isPendingSearchLoading
+      ? t.translations.PROJECT_INSIGHT_SEARCHING
+      : withTokens(t.translations.PROJECT_INSIGHT_PENDING_SEARCH_RESULTS, {
         count: pendingTotal,
       })
     : t.translations.PROJECT_INSIGHT_PENDING_DESCRIPTION;
@@ -530,19 +690,19 @@ export default function ProjectInsightClientView() {
                 </h1>
                 <BetaBadge size="sm" />
                 {isQueryModelUnavailable && (
-                    <span className="badge badge-warning badge-sm">
-                      Query model unavailable
-                    </span>
+                  <span className="badge badge-warning badge-sm">
+                    Query model unavailable
+                  </span>
                 )}
                 {isUploadModelUnavailable && (
-                    <span className="badge badge-warning badge-sm">
-                      Upload/OCR model unavailable
-                    </span>
+                  <span className="badge badge-warning badge-sm">
+                    Upload/OCR model unavailable
+                  </span>
                 )}
                 {isEmbeddingModelUnavailable && (
-                    <span className="badge badge-warning badge-sm">
-                      Embedding model unavailable
-                    </span>
+                  <span className="badge badge-warning badge-sm">
+                    Embedding model unavailable
+                  </span>
                 )}
               </div>
               <p className="mt-3 text-base-content/70">
@@ -568,6 +728,7 @@ export default function ProjectInsightClientView() {
                 (record) => record.id,
               )}
               isChatUnavailable={isChatUnavailable}
+              endpointHealth={endpointHealth}
             />
           </section>
 
@@ -594,11 +755,10 @@ export default function ProjectInsightClientView() {
               <div className="inline-flex w-fit rounded-full border border-base-300/60 bg-base-200/60 p-1">
                 <button
                   type="button"
-                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                    activeTabKey === "library"
-                      ? "bg-base-100 text-base-content shadow-sm"
-                      : "text-base-content/70 hover:text-base-content"
-                  }`}
+                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${activeTabKey === "library"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70 hover:text-base-content"
+                    }`}
                   onClick={() => setActiveTabKey("library")}
                 >
                   {tabLabels.library}
@@ -608,11 +768,10 @@ export default function ProjectInsightClientView() {
                 </button>
                 <button
                   type="button"
-                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                    activeTabKey === "pending"
-                      ? "bg-base-100 text-base-content shadow-sm"
-                      : "text-base-content/70 hover:text-base-content"
-                  }`}
+                  className={`flex gap-3 items-center rounded-full px-4 py-1.5 text-sm font-medium transition ${activeTabKey === "pending"
+                    ? "bg-base-100 text-base-content shadow-sm"
+                    : "text-base-content/70 hover:text-base-content"
+                    }`}
                   onClick={() => setActiveTabKey("pending")}
                 >
                   {tabLabels.pending}
@@ -627,13 +786,24 @@ export default function ProjectInsightClientView() {
                   <div className="flex flex-wrap items-center gap-3">
                     <SearchBar
                       className="flex-1 min-w-[160px]"
-                      value={activeSearchQuery}
-                      onChange={(event) => updateActiveSearchQuery(event.target.value)}
+                      value={draftSearchQuery}
+                      onChange={(event) => setDraftSearchQuery(event.target.value)}
                       onEnter={updateActiveSearchQuery}
-                      onClearAll={clearActiveSearchQuery}
+                      onClearAll={() => {
+                        setDraftSearchQuery("");
+                        clearActiveSearchQuery();
+                      }}
                       placeholder={activeSearchPlaceholder}
                       aditionalFilters={false}
                     />
+
+                    {activeIsLoading && (
+                      <span
+                        className="loading loading-spinner loading-sm shrink-0 text-primary"
+                        role="status"
+                        aria-label={t.translations.PROJECT_INSIGHT_SEARCHING}
+                      />
+                    )}
 
                     <button
                       type="button"
@@ -651,43 +821,52 @@ export default function ProjectInsightClientView() {
                   </div>
 
                   {(activeFilterPills.length !== 0 || activeSearchError) &&
-                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-3">
                       {activeFilterPills.length === 0 ?
-                      null : (
-                        <div className="flex flex-wrap items-center gap-2">
-                          {activeFilterPills.map((pill) => (
-                            <button
-                              key={pill.id}
-                              type="button"
-                              className="btn btn-xs btn-outline gap-1"
-                              onClick={() => removeActiveFilterPill(pill)}
-                            >
-                              {pill.label}
-                              <XMarkIcon className="size-3.5" />
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                        null : (
+                          <div className="flex flex-wrap items-center gap-2">
+                            {activeFilterPills.map((pill) => (
+                              <button
+                                key={pill.id}
+                                type="button"
+                                className="btn btn-xs btn-outline gap-1"
+                                onClick={() => removeActiveFilterPill(pill)}
+                              >
+                                {pill.label}
+                                <XMarkIcon className="size-3.5" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
 
-                    {activeSearchError && (
-                      <span className="text-sm text-warning">
-                        {activeSearchError}
-                      </span>
-                    )}
-                  </div>}
+                      {activeSearchError && (
+                        <span className="text-sm text-warning">
+                          {activeSearchError}
+                        </span>
+                      )}
+                    </div>}
                 </div>
               </div>
 
               {activeTabKey === "library" ? libraryContent : pendingContent}
 
-              {(activeTabKey !== "library") &&
+              {activeTabKey === "library" ? (
+                <PaginationControls
+                  currentPage={libraryPage}
+                  pageSize={libraryPageSize}
+                  totalPages={libraryTotalPages}
+                  onPageChange={setLibraryPage}
+                  onPageSizeChange={setLibraryPageSize}
+                />
+              ) : (
                 <PaginationControls
                   currentPage={pendingPage}
                   pageSize={pendingPageSize}
                   totalPages={pendingTotalPages}
                   onPageChange={setPendingPage}
                   onPageSizeChange={setPendingPageSize}
-                />}
+                />
+              )}
             </div>
           </aside>
         </div>

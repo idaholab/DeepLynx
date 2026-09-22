@@ -7,6 +7,7 @@ import {
 } from "@/app/(home)/types/requestDTOs";
 import {
   PaginatedRecordCollectionsResponseDto,
+  PaginatedResponse,
   RecordCollectionResponseDto,
   RecordResponseDto,
 } from "@/app/(home)/types/responseDTOs";
@@ -191,10 +192,12 @@ export const getRecordsInRecordCollection = async (
   projectId: number,
   recordCollectionId: number,
   hideArchived: boolean = true,
-): Promise<RecordResponseDto[]> => {
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<RecordResponseDto>> => {
   const res = await api.get(
     `${recordCollectionsPath(organizationId, projectId)}/${recordCollectionId}/records`,
-    { params: { hideArchived } },
+    { params: { hideArchived, pageNumber, pageSize } },
   );
   return res.data;
 };

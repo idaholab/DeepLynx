@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using deeplynx.datalayer.Models;
 using deeplynx.helpers;
+using deeplynx.helpers.Cache;
 using deeplynx.helpers.Context;
 using deeplynx.interfaces;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -35,6 +37,10 @@ public class SensitivityMiddlewareTests : IntegrationTestBase
     public long recordId2; // Has labelId2
     public long recordId3; // Has both labels
     public long recordId4; // No labels
+    
+    public long cacheLabelOrgLevel;     // ProjectId == null, userId1 granted "read record"
+    public long cacheLabelProject1Only; // ProjectId == projectId1, userId1 NOT granted "read record"
+    public long cacheLabelProject2Only; // ProjectId == projectId2, userId1 granted "read record"
 
     public SensitivityMiddlewareTests(TestSuiteFixture fixture) : base(fixture)
     {
@@ -225,6 +231,57 @@ public class SensitivityMiddlewareTests : IntegrationTestBase
         recordId2 = 2;
         recordId3 = 3;
         recordId4 = 4;
+
+        var orgLevelLabel = new SensitivityLabel
+        {
+            Name = "Cache Test - Org Level Label",
+            OrganizationId = organizationId1,
+            ProjectId = null,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        };
+        var project1OnlyLabel = new SensitivityLabel
+        {
+            Name = "Cache Test - Project1 Only Label",
+            OrganizationId = organizationId1,
+            ProjectId = projectId1,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        };
+        var project2OnlyLabel = new SensitivityLabel
+        {
+            Name = "Cache Test - Project2 Only Label",
+            OrganizationId = organizationId1,
+            ProjectId = projectId2,
+            IsArchived = false,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+        };
+        Context.Set<SensitivityLabel>().AddRange(orgLevelLabel, project1OnlyLabel, project2OnlyLabel);
+        await Context.SaveChangesAsync();
+        cacheLabelOrgLevel = orgLevelLabel.Id;
+        cacheLabelProject1Only = project1OnlyLabel.Id;
+        cacheLabelProject2Only = project2OnlyLabel.Id;
+
+        // userId1 is granted the org-level label and the project2-only label — explicitly NOT
+        // project1-only, so tests can distinguish "granted" from "not granted".
+        var cacheTestReadActionId = (await Context.SensitivityLabelPermissionActions.FirstAsync(a => a.Name == "read record")).Id;
+        Context.Set<SensitivityLabelGrant>().AddRange(
+            new SensitivityLabelGrant
+            {
+                UserId = userId1,
+                LabelId = cacheLabelOrgLevel,
+                LabelPermissionId = cacheTestReadActionId,
+                GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            },
+            new SensitivityLabelGrant
+            {
+                UserId = userId1,
+                LabelId = cacheLabelProject2Only,
+                LabelPermissionId = cacheTestReadActionId,
+                GrantedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            });
+
+        await Context.SaveChangesAsync();
     }
 
     #region Middleware Tests - No Sensitivity Attributes
@@ -1600,6 +1657,246 @@ public class SensitivityMiddlewareTests : IntegrationTestBase
     
         // Assert
         Assert.NotNull(result);
+    }
+
+    #endregion
+
+    #region Sensitivity Label Service - Caching Tests
+
+    [Fact]
+    public async Task GetAuthorizedLabels_CacheMiss_PopulatesCache()
+    {
+        // Arrange
+        var cacheKey = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId1, userId1, "read record");
+        await CacheService.Instance.DeleteAsync(cacheKey);
+
+        try
+        {
+            var service = new SensitivityLabelService(Context);
+
+            // Act
+            var result = await service.GetAuthorizedSensitivityLabels(userId1, organizationId1, new[] { projectId1 }, "read record");
+
+            // Assert - org-level label (granted) is authorized; project1-only label (not granted) is not
+            Assert.Contains(cacheLabelOrgLevel, result);
+            Assert.DoesNotContain(cacheLabelProject1Only, result);
+
+            var cached = await CacheService.Instance.GetAsync<List<long>>(cacheKey);
+            Assert.NotNull(cached);
+            Assert.Contains(cacheLabelOrgLevel, cached);
+            Assert.DoesNotContain(cacheLabelProject1Only, cached);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetAuthorizedLabels_CacheHit_ReturnsCachedValue_WithoutRecomputing()
+    {
+        // Arrange - seed a cache entry that could NOT have come from the real DB state
+        // (cacheLabelProject1Only is not actually authorized for userId1), so if it's
+        // returned we know the cache hit short-circuited computation.
+        var cacheKey = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId1, userId1, "read record");
+        await CacheService.Instance.SetAsync(cacheKey, new List<long> { cacheLabelProject1Only }, TimeSpan.FromMinutes(2));
+
+        try
+        {
+            var service = new SensitivityLabelService(Context);
+
+            // Act
+            var result = await service.GetAuthorizedSensitivityLabels(userId1, organizationId1, new[] { projectId1 }, "read record");
+
+            // Assert - the stale/planted value is returned as-is; the real DB computation
+            // (which would exclude cacheLabelProject1Only) is never consulted
+            Assert.Contains(cacheLabelProject1Only, result);
+            Assert.DoesNotContain(cacheLabelOrgLevel, result);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetAuthorizedLabels_DoesNotLeakLabelsAcrossProjects_WhenCachingMultipleProjects()
+    {
+        var cacheKey1 = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId1, userId1, "read record");
+        var cacheKey2 = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId2, userId1, "read record");
+        await CacheService.Instance.DeleteAsync(cacheKey1);
+        await CacheService.Instance.DeleteAsync(cacheKey2);
+
+        try
+        {
+            var service = new SensitivityLabelService(Context);
+
+            // Act
+            await service.GetAuthorizedSensitivityLabels(userId1, organizationId1, new[] { projectId1, projectId2 }, "read record");
+
+            // Assert
+            var cachedForProject1 = await CacheService.Instance.GetAsync<List<long>>(cacheKey1);
+            var cachedForProject2 = await CacheService.Instance.GetAsync<List<long>>(cacheKey2);
+
+            Assert.NotNull(cachedForProject1);
+            Assert.NotNull(cachedForProject2);
+            Assert.DoesNotContain(cacheLabelProject2Only, cachedForProject1);
+            Assert.DoesNotContain(cacheLabelProject1Only, cachedForProject2);
+
+            // Org-level label applies everywhere, so it belongs in both entries
+            Assert.Contains(cacheLabelOrgLevel, cachedForProject1);
+            Assert.Contains(cacheLabelOrgLevel, cachedForProject2);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey1);
+            await CacheService.Instance.DeleteAsync(cacheKey2);
+        }
+    }
+
+    [Fact]
+    public async Task GetAuthorizedLabels_PartialCacheHit_OnlyRefreshesUncachedProject()
+    {
+        // Arrange - project1 already cached, project2 is a genuine miss.
+        var cacheKey1 = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId1, userId1, "read record");
+        var cacheKey2 = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId2, userId1, "read record");
+        await CacheService.Instance.SetAsync(cacheKey1, new List<long> { cacheLabelOrgLevel, cacheLabelProject1Only }, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.DeleteAsync(cacheKey2);
+
+        try
+        {
+            var service = new SensitivityLabelService(Context);
+
+            // Act
+            var result = await service.GetAuthorizedSensitivityLabels(userId1, organizationId1, new[] { projectId1, projectId2 }, "read record");
+
+            // Assert - result merges the trusted cached value for project1 with the freshly
+            // computed value for project2
+            Assert.Contains(cacheLabelProject1Only, result); // came from the pre-seeded cache entry, trusted as-is
+            Assert.Contains(cacheLabelOrgLevel, result);
+            Assert.Contains(cacheLabelProject2Only, result); // granted label on project2, computed fresh
+
+            // project1's cache entry is untouched (still the pre-seeded value, not overwritten)
+            var stillCachedProject1 = await CacheService.Instance.GetAsync<List<long>>(cacheKey1);
+            Assert.NotNull(stillCachedProject1);
+            Assert.Contains(cacheLabelProject1Only, stillCachedProject1);
+
+            // project2's cache entry now exists, populated from the fresh computation
+            var newlyCachedProject2 = await CacheService.Instance.GetAsync<List<long>>(cacheKey2);
+            Assert.NotNull(newlyCachedProject2);
+            Assert.Contains(cacheLabelProject2Only, newlyCachedProject2);
+            Assert.DoesNotContain(cacheLabelProject1Only, newlyCachedProject2);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey1);
+            await CacheService.Instance.DeleteAsync(cacheKey2);
+        }
+    }
+
+    [Fact]
+    public async Task GetAuthorizedLabels_DifferentActions_CachedUnderDistinctKeys()
+    {
+        // Arrange
+        var readKey = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId1, userId1, "read record");
+        var writeKey = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId1, userId1, "write record");
+        await CacheService.Instance.DeleteAsync(readKey);
+        await CacheService.Instance.DeleteAsync(writeKey);
+
+        try
+        {
+            var service = new SensitivityLabelService(Context);
+
+            // Act
+            await service.GetAuthorizedSensitivityLabels(userId1, organizationId1, new[] { projectId1 }, "read record");
+            await service.GetAuthorizedSensitivityLabels(userId1, organizationId1, new[] { projectId1 }, "write record");
+
+            // Assert - both actions got their own independently populated cache entry
+            Assert.NotNull(await CacheService.Instance.GetAsync<List<long>>(readKey));
+            Assert.NotNull(await CacheService.Instance.GetAsync<List<long>>(writeKey));
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(readKey);
+            await CacheService.Instance.DeleteAsync(writeKey);
+        }
+    }
+
+    [Fact]
+    public async Task GetAuthorizedLabels_DifferentUsers_CachedUnderDistinctKeys()
+    {
+        // Arrange
+        var user2 = new User
+        {
+            Name = "Cache Test User 2",
+            Email = $"{Guid.NewGuid()}@test.com",
+            Username = Guid.NewGuid().ToString(),
+            IsActive = true,
+            IsArchived = false
+        };
+        Context.Users.Add(user2);
+        await Context.SaveChangesAsync();
+
+        var keyForUser1 = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId1, userId1, "read record");
+        var keyForUser2 = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId1, user2.Id, "read record");
+        await CacheService.Instance.DeleteAsync(keyForUser1);
+        await CacheService.Instance.DeleteAsync(keyForUser2);
+
+        try
+        {
+            var service = new SensitivityLabelService(Context);
+
+            // Act
+            await service.GetAuthorizedSensitivityLabels(userId1, organizationId1, new[] { projectId1 }, "read record");
+            await service.GetAuthorizedSensitivityLabels(user2.Id, organizationId1, new[] { projectId1 }, "read record");
+
+            // Assert - userId1 (granted the org-level label) sees it cached; user2 (no grants) does not
+            var cachedForUser1 = await CacheService.Instance.GetAsync<List<long>>(keyForUser1);
+            var cachedForUser2 = await CacheService.Instance.GetAsync<List<long>>(keyForUser2);
+
+            Assert.NotNull(cachedForUser1);
+            Assert.NotNull(cachedForUser2);
+            Assert.Contains(cacheLabelOrgLevel, cachedForUser1);
+            Assert.DoesNotContain(cacheLabelOrgLevel, cachedForUser2);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(keyForUser1);
+            await CacheService.Instance.DeleteAsync(keyForUser2);
+        }
+    }
+
+    [Fact]
+    public async Task GetAuthorizedLabels_AllProjectsCached_ReturnsCachedUnion_WithoutOverwritingEntries()
+    {
+        // Arrange - pre-seed both project cache entries with distinguishable values
+        var cacheKey1 = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId1, userId1, "read record");
+        var cacheKey2 = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId2, userId1, "read record");
+        await CacheService.Instance.SetAsync(cacheKey1, new List<long> { cacheLabelOrgLevel }, TimeSpan.FromMinutes(2));
+        await CacheService.Instance.SetAsync(cacheKey2, new List<long> { cacheLabelOrgLevel, cacheLabelProject2Only }, TimeSpan.FromMinutes(2));
+
+        try
+        {
+            var service = new SensitivityLabelService(Context);
+
+            // Act
+            var result = await service.GetAuthorizedSensitivityLabels(userId1, organizationId1, new[] { projectId1, projectId2 }, "read record");
+
+            // Assert - result is the union of both cached entries
+            Assert.Contains(cacheLabelOrgLevel, result);
+            Assert.Contains(cacheLabelProject2Only, result);
+
+            // Neither entry was overwritten - both cache hits, no DB fallback needed
+            var stillCached1 = await CacheService.Instance.GetAsync<List<long>>(cacheKey1);
+            var stillCached2 = await CacheService.Instance.GetAsync<List<long>>(cacheKey2);
+            Assert.Single(stillCached1);
+            Assert.Equal(2, stillCached2.Count);
+        }
+        finally
+        {
+            await CacheService.Instance.DeleteAsync(cacheKey1);
+            await CacheService.Instance.DeleteAsync(cacheKey2);
+        }
     }
 
     #endregion

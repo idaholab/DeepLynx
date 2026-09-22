@@ -1,5 +1,5 @@
 import api from './api';
-import { PermissionResponseDto, RoleResponseDto } from '../../(home)/types/responseDTOs';
+import { PaginatedResponse, PermissionResponseDto, RoleResponseDto } from '../../(home)/types/responseDTOs';
 import { CreateRoleRequestDto, UpdateRoleRequestDto } from '../../(home)/types/requestDTOs';
 
 // ============================================================================
@@ -13,17 +13,21 @@ import { CreateRoleRequestDto, UpdateRoleRequestDto } from '../../(home)/types/r
  * @param organizationId - The ID of the organization
  * @param projectId - The ID of the project
  * @param hideArchived - Flag to hide archived roles (default: true)
- * @returns Promise with array of RoleResponseDto
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all roles (default: -1)
+ * @returns Promise with paginated list of RoleResponseDto
  */
 export async function getAllRoles(
   organizationId: number,
   projectId?: number,
-  hideArchived: boolean = true
-): Promise<RoleResponseDto[]> {
+  hideArchived: boolean = true,
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<RoleResponseDto>> {
   try {
     const res = await api.get(
       `/organizations/${organizationId}/projects/${projectId}/roles`,
-      { params: { hideArchived } }
+      { params: { hideArchived, pageNumber, pageSize } }
     );
     return res.data;
   } catch (error) {
@@ -245,16 +249,19 @@ export async function removePermissionFromRole(
  */
 export async function setPermissionsForRole(
   organizationId: number,
-  projectId: number,
+  projectId: number | null,
   roleId: number,
-  permissionIds: number[]
+  permissionIds: number[],
+  isOrgRole: boolean
 ): Promise<{ message: string }> {
   try {
-    const res = await api.put(
-      `/organizations/${organizationId}/projects/${projectId}/roles/${roleId}/permissions`,
-      permissionIds,
-      { headers: { "Content-Type": "application/json" } }
-    );
+    const url = isOrgRole
+      ? `/organizations/${organizationId}/roles/${roleId}/permissions`
+      : `/organizations/${organizationId}/projects/${projectId}/roles/${roleId}/permissions`;
+
+    const res = await api.put(url, permissionIds, {
+      headers: { "Content-Type": "application/json" },
+    });
     return res.data;
   } catch (error) {
     console.error(`Error setting permissions for role ${roleId}:`, error);
@@ -272,16 +279,20 @@ export async function setPermissionsForRole(
  * Get all roles for an org
  * @param organizationId - The ID of the organization
  * @param hideArchived - Flag to hide archived roles (default: true)
- * @returns Promise with array of RoleResponseDto
+ * @param pageNumber - Page number to fetch (default: 1)
+ * @param pageSize - Page size; -1 fetches all roles (default: -1)
+ * @returns Promise with paginated list of RoleResponseDto
  */
 export async function getAllOrgRoles(
   organizationId: number,
   hideArchived: boolean = true,
-): Promise<RoleResponseDto[]> {
+  pageNumber: number = 1,
+  pageSize: number = -1
+): Promise<PaginatedResponse<RoleResponseDto>> {
   try {
     const res = await api.get(
       `/organizations/${organizationId}/roles`,
-      { params: { hideArchived } }
+      { params: { hideArchived, pageNumber, pageSize } }
     );
     return res.data;
   } catch (error) {

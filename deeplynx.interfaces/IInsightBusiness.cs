@@ -12,7 +12,8 @@ public interface IInsightBusiness
         long? vlmModelConfigId,
         long? embeddingModelConfigId,
         InsightUploadApiRequestDto payload,
-        string? userJwt = null);
+        string? userJwt = null,
+        bool isAdmin = false);
 
     IAsyncEnumerable<string> StreamInsightQuery(
         long currentUserId,
@@ -25,6 +26,12 @@ public interface IInsightBusiness
 
     Task<InsightIngestionStatusResponseDto> FetchInsightIngestionStatus(long recordId);
 
+    Task<InsightPipelineStatusResponseDto> FetchInsightPipelineStatus(
+        long currentUserId,
+        long organizationId,
+        long projectId,
+        long recordId);
+    
     Task<InsightEndpointHealthResponseDto> CheckEndpointHealth(
         long currentUserId,
         long organizationId,

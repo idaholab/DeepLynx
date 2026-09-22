@@ -2,7 +2,10 @@ import React from "react";
 import SelectOrgClient from "./SelectOrgClient";
 import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
+import { getAllUsersServer } from "@/app/lib/server_service/user_services.server";
+import { getAllOrganizationsForUserServer } from "@/app/lib/server_service/organization_services.server";
 import type { Session } from "next-auth";
+import { UserResponseDto } from "@/app/(home)/types/responseDTOs";
 
 const page = async () => {
   const isAuthDisabled =
@@ -18,7 +21,15 @@ const page = async () => {
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
 
-    return <SelectOrgClient session={mockSession} />;
+    const { items: organizations } = await getAllOrganizationsForUserServer(true);
+
+    const usersByOrg: Record<number, UserResponseDto[]> = {};
+    for (const org of organizations) {
+      const users = await getAllUsersServer(undefined, org.id as number);
+      usersByOrg[Number(org.id)] = users;
+    }
+
+    return <SelectOrgClient session={mockSession} organizations={organizations} initialUsersByOrg={usersByOrg} />;
   }
 
   const session = await auth();
@@ -27,7 +38,15 @@ const page = async () => {
     redirect("/login/signin");
   }
 
-  return <SelectOrgClient session={session} />;
+  const { items: organizations } = await getAllOrganizationsForUserServer(true);
+
+  const usersByOrg: Record<number, UserResponseDto[]> = {};
+  for (const org of organizations) {
+    const users = await getAllUsersServer(undefined, org.id as number);
+    usersByOrg[Number(org.id)] = users;
+  }
+
+  return <SelectOrgClient session={session} organizations={organizations} initialUsersByOrg={usersByOrg} />;
 };
 
 export default page;

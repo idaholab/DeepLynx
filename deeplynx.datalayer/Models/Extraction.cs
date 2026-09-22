@@ -23,7 +23,13 @@ public class Extraction
     public string? Mode { get; set; }
 
     [Column("project_id")]
-    public long? ProjectId { get; set; }
+    public long ProjectId { get; set; }
+
+    [Column("source_record_id")]
+    public long? SourceRecordId { get; set; }
+
+    [ForeignKey("SourceRecordId")]
+    public virtual Record? SourceRecord { get; set; }
 
     [ForeignKey("CreatedBy")]
     public virtual User? CreatedByUser { get; set; }

@@ -869,7 +869,262 @@ public class SavedSearchBusinessTests : IntegrationTestBase
 
     #endregion
 
-    #region ExecuteSavedSearch Tests
+    #region ExecuteSavedSearchPaginated Tests
+
+    [Fact]
+    public async Task ExecuteSavedSearchPaginated_InvalidId_ThrowsKeyNotFoundException()
+    {
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearchPaginated(
+                99999, uid1, pid, [pid], new PaginatedRequestDto(), isSysAdmin: false, isOrgAdmin: false));
+
+        Assert.Contains("Saved Search does not exist", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearchPaginated_WrongUser_ThrowsKeyNotFoundException()
+    {
+        // Arrange - Save a search under uid1
+        var filters = new[]
+        {
+            new CustomQueryDtos.CustomQueryRequestDto
+            {
+                Connector = "AND",
+                Filter = "name",
+                Operator = "LIKE",
+                Value = "test"
+            }
+        };
+        await _savedSearchBusiness.SaveSearch(uid1, "User Search", "test", filters);
+
+        var savedSearch = await Context.SavedSearches
+            .FirstAsync(s => s.UserId == uid1 && s.Name == "User Search");
+
+        // Act & Assert - anotherUserId attempts to execute uid1's saved search
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearchPaginated(
+                savedSearch.Id, uid2, pid, [pid], new PaginatedRequestDto(), isSysAdmin: false, isOrgAdmin: false));
+
+        Assert.Contains("Saved Search does not exist", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteSavedSearchPaginated_CorruptedSearchJson_ThrowsArgumentException()
+    {
+        // Arrange - Manually insert a saved search with invalid/empty filter JSON
+        var badSearch = new SavedSearch
+        {
+            UserId = uid1,
+            Name = "Bad Search",
+            Search = JsonSerializer.Serialize(new { TextSearch = "test", Filter = (object)null })
+        };
+        Context.SavedSearches.Add(badSearch);
+        await Context.SaveChangesAsync();
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _savedSearchBusiness.ExecuteSavedSearchPaginated(
+                badSearch.Id, uid1, pid, [pid], new PaginatedRequestDto(), isSysAdmin: false, isOrgAdmin: false));
+
+        Assert.Contains("invalid or empty query", exception.Message);
+    }
+
+    [Fact]
+public async Task GetSavedSearches_NoFilters_ReturnsAllSearchesForUser()
+{
+    // Arrange
+    var search1 = new SavedSearch
+    {
+        UserId = uid1,
+        Name = "First Search",
+        Search = "{\"textSearch\":\"budget\",\"filter\":[]}",
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+    };
+    var search2 = new SavedSearch
+    {
+        UserId = uid1,
+        Name = "Second Search",
+        Search = "{\"textSearch\":\"forecast\",\"filter\":[]}",
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddMinutes(-5)
+    };
+    Context.SavedSearches.AddRange(search1, search2);
+    await Context.SaveChangesAsync();
+
+    // Act
+    var result = await _savedSearchBusiness.GetSavedSearches(uid1);
+
+    // Assert
+    Assert.Equal(2, result.TotalCount);
+    Assert.Equal(2, result.Items.Count);
+}
+
+[Fact]
+public async Task GetSavedSearches_TextSearchMatchesSubset_TotalCountMatchesActualMatches()
+{
+    // Arrange — 3 searches total, only 2 contain "budget" in textSearch
+    var matching1 = new SavedSearch
+    {
+        UserId = uid1,
+        Name = "Budget Search 1",
+        Search = "{\"textSearch\":\"budget review\",\"filter\":[]}",
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+    };
+    var matching2 = new SavedSearch
+    {
+        UserId = uid1,
+        Name = "Budget Search 2",
+        Search = "{\"textSearch\":\"annual budget\",\"filter\":[]}",
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddMinutes(-5)
+    };
+    var nonMatching = new SavedSearch
+    {
+        UserId = uid1,
+        Name = "Unrelated Search",
+        Search = "{\"textSearch\":\"forecast\",\"filter\":[]}",
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddMinutes(-10)
+    };
+    Context.SavedSearches.AddRange(matching1, matching2, nonMatching);
+    await Context.SaveChangesAsync();
+
+    // Act
+    var result = await _savedSearchBusiness.GetSavedSearches(uid1,
+        new SavedSearchRequestDtos.FilterSavedQueryRequestDto { TextSearch = "budget" });
+
+    // Assert — this is the core bug check: TotalCount must reflect only TextSearch matches, not all rows
+    Assert.Equal(2, result.TotalCount);
+    Assert.Equal(2, result.Items.Count);
+    Assert.All(result.Items, s => Assert.Contains("budget", s.Query.TextSearch, StringComparison.OrdinalIgnoreCase));
+}
+
+[Fact]
+public async Task GetSavedSearches_TextSearchWithSmallPageSize_PagesOnlyMatchingResults()
+{
+    // Arrange — 5 total searches, 3 match "quarterly", page size smaller than the match count
+    var matches = new List<SavedSearch>();
+    for (var i = 0; i < 3; i++)
+    {
+        matches.Add(new SavedSearch
+        {
+            UserId = uid1,
+            Name = $"Quarterly Search {i}",
+            Search = "{\"textSearch\":\"quarterly report\",\"filter\":[]}",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddMinutes(-i)
+        });
+    }
+    var nonMatches = new List<SavedSearch>
+    {
+        new() {
+            UserId = uid1,
+            Name = "Other Search 1",
+            Search = "{\"textSearch\":\"monthly\",\"filter\":[]}",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddMinutes(-10)
+        },
+        new() {
+            UserId = uid1,
+            Name = "Other Search 2",
+            Search = "{\"textSearch\":\"weekly\",\"filter\":[]}",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddMinutes(-11)
+        }
+    };
+    Context.SavedSearches.AddRange(matches.Concat(nonMatches));
+    await Context.SaveChangesAsync();
+
+    // Act — page size of 2, smaller than the 3 actual matches
+    var result = await _savedSearchBusiness.GetSavedSearches(uid1,
+        new SavedSearchRequestDtos.FilterSavedQueryRequestDto
+        {
+            TextSearch = "quarterly",
+            PageNumber = 1,
+            PageSize = 2
+        });
+
+    // Assert — total should reflect all 3 matches, even though only 2 are returned on this page
+    Assert.Equal(3, result.TotalCount);
+    Assert.Equal(2, result.Items.Count);
+
+    // Act — fetch page 2, should contain the remaining match
+    var page2 = await _savedSearchBusiness.GetSavedSearches(uid1,
+        new SavedSearchRequestDtos.FilterSavedQueryRequestDto
+        {
+            TextSearch = "quarterly",
+            PageNumber = 2,
+            PageSize = 2
+        });
+
+    // Assert — the third match should be reachable on page 2, proving no matches are lost
+    Assert.Equal(3, page2.TotalCount);
+    Assert.Single(page2.Items);
+}
+
+[Fact]
+public async Task GetSavedSearches_TextSearchNoMatches_ReturnsEmptyWithZeroCount()
+{
+    // Arrange
+    var search = new SavedSearch
+    {
+        UserId = uid1,
+        Name = "Some Search",
+        Search = "{\"textSearch\":\"forecast\",\"filter\":[]}",
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+    };
+    Context.SavedSearches.Add(search);
+    await Context.SaveChangesAsync();
+
+    // Act
+    var result = await _savedSearchBusiness.GetSavedSearches(uid1,
+        new SavedSearchRequestDtos.FilterSavedQueryRequestDto { TextSearch = "nonexistentterm" });
+
+    // Assert
+    Assert.Equal(0, result.TotalCount);
+    Assert.Empty(result.Items);
+}
+
+[Fact]
+public async Task GetSavedSearches_TextSearchCombinedWithNameFilter_AppliesBothFiltersTogether()
+{
+    // Arrange
+    var matchesBoth = new SavedSearch
+    {
+        UserId = uid1,
+        Name = "Finance Report",
+        Search = "{\"textSearch\":\"budget\",\"filter\":[]}",
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+    };
+    var matchesTextOnly = new SavedSearch
+    {
+        UserId = uid1,
+        Name = "Marketing Plan",
+        Search = "{\"textSearch\":\"budget\",\"filter\":[]}",
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddMinutes(-5)
+    };
+    var matchesNameOnly = new SavedSearch
+    {
+        UserId = uid1,
+        Name = "Finance Overview",
+        Search = "{\"textSearch\":\"forecast\",\"filter\":[]}",
+        LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified).AddMinutes(-10)
+    };
+    Context.SavedSearches.AddRange(matchesBoth, matchesTextOnly, matchesNameOnly);
+    await Context.SaveChangesAsync();
+
+    // Act — combine TextSearch and Name filters; only matchesBoth should satisfy both
+    var result = await _savedSearchBusiness.GetSavedSearches(uid1,
+        new SavedSearchRequestDtos.FilterSavedQueryRequestDto
+        {
+            TextSearch = "budget",
+            Name = "Finance"
+        });
+
+    // Assert
+    Assert.Equal(1, result.TotalCount);
+    var onlyResult = Assert.Single(result.Items);
+    Assert.Equal("Finance Report", onlyResult.Name);
+}
+
+    #endregion
+
+    #region ExecuteSavedSearch (V1/Legacy) Tests
 
     [Fact]
     public async Task ExecuteSavedSearch_InvalidId_ThrowsKeyNotFoundException()

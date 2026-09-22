@@ -107,6 +107,12 @@ public partial class User
     [InverseProperty("LastUpdatedByUser")]
     public virtual ICollection<SensitivityLabel> LastUpdatedSensitivityLabels { get; set; } = new List<SensitivityLabel>();
 
+    [InverseProperty("User")]
+    public virtual ICollection<SensitivityLabelGrant> SensitivityLabelGrants { get; set; } = new List<SensitivityLabelGrant>();
+
+    [InverseProperty("GrantedByUser")]
+    public virtual ICollection<SensitivityLabelGrant> GrantedSensitivityLabelGrants { get; set; } = new List<SensitivityLabelGrant>();
+
     [InverseProperty("LastUpdatedByUser")]
     public virtual ICollection<Tag> LastUpdatedTags { get; set; } = new List<Tag>();
 
@@ -118,6 +124,12 @@ public partial class User
 
     [InverseProperty("User")]
     public virtual ICollection<OauthToken> OauthTokens { get; set; } = new List<OauthToken>();
+
+    [InverseProperty("User")]
+    public virtual ICollection<OauthDeviceAuthorizationRequest> OauthDeviceAuthorizationRequests { get; set; } = new List<OauthDeviceAuthorizationRequest>();
+
+    [InverseProperty("User")]
+    public virtual ICollection<OauthRefreshToken> OauthRefreshTokens { get; set; } = new List<OauthRefreshToken>();
 
     [InverseProperty("LastUpdatedByUser")]
     public virtual ICollection<OauthApplication> UpdatedOauthApplications { get; set; } = new List<OauthApplication>();

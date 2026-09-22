@@ -38,10 +38,18 @@ public partial class Organization
     [Column("theme")]
     [MaxLength(50)]
     public string Theme { get; set; } = "default";
+
     [Column("create_container_per_project")]
     public bool CreateContainerPerProject { get; set; } = false;
+
     [Column("disable_file_transfer")]
     public bool DisableFileTransfer { get; set; } = false;
+
+    [Column("default_object_storage_id")]
+    public long DefaultObjectStorageId { get; set; }
+
+    [Column("logo_object_storage_id")]
+    public int? LogoObjectStorageId { get; set; } = null;
 
     [InverseProperty("Organization")]
     public virtual ICollection<Group> Groups { get; set; } = new List<Group>();
@@ -105,7 +113,4 @@ public partial class Organization
 
     [InverseProperty("Organization")]
     public virtual ICollection<AiModelConfig> AiModelConfigs { get; set; } = new List<AiModelConfig>();
-
-    [InverseProperty("Organization")]
-    public virtual ICollection<ProvenanceRecord> ProvenanceRecords { get; set; } = new List<ProvenanceRecord>();
 }

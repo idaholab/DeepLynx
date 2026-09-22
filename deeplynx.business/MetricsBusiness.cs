@@ -12,6 +12,10 @@ public class MetricsBusiness : IMetricsBusiness
 {
     private readonly DeeplynxContext _context;
     private readonly TimeSpan _storageSizeCacheTtl = TimeSpan.FromHours(1);
+    private readonly TimeSpan _dataSourceCountCacheTtl = TimeSpan.FromHours(1);
+    private readonly TimeSpan _recordCountCacheTtl = TimeSpan.FromHours(1);
+    private readonly TimeSpan _fileCountCacheTtl = TimeSpan.FromHours(1);
+    private readonly TimeSpan _modalityCountCacheTtl = TimeSpan.FromHours(1);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="MetricsBusiness" /> class.
@@ -27,33 +31,6 @@ public class MetricsBusiness : IMetricsBusiness
     // Storage Metrics
     // -------------------------------------------------------------------------
 
-    private async Task<long> BuildProjectStorageSizeFromDb(long projectId)
-    {
-        return await _context.Records
-            .Where(r =>
-                r.ProjectId == projectId &&
-                !r.IsArchived &&
-                r.FileSize != null)
-            .SumAsync(r => r.FileSize ?? 0);
-    }
-
-    private async Task<long> GetProjectStorageSizeBytes(long projectId)
-    {
-        var cacheKey = CacheKeys.ProjectStorageSize(projectId);
-
-        var cachedSize = await CacheService.Instance.GetAsync<long?>(cacheKey);
-        if (cachedSize.HasValue)
-        {
-            return cachedSize.Value;
-        }
-        
-        var totalSize = await BuildProjectStorageSizeFromDb(projectId);
-        
-        await CacheService.Instance.SetAsync(cacheKey, totalSize, _storageSizeCacheTtl);
-
-        return totalSize;
-    }
-    
     /// <summary>
     ///     Gets total bytes for a specific object storage within an optional project scope
     /// </summary>
@@ -80,8 +57,8 @@ public class MetricsBusiness : IMetricsBusiness
         }
 
         var totalBytes = await query.SumAsync(r => r.FileSize ?? 0);
-        
-        return new StorageSizeDto{ Bytes = totalBytes };
+
+        return new StorageSizeDto { Bytes = totalBytes };
     }
 
     /// <summary>
@@ -91,19 +68,19 @@ public class MetricsBusiness : IMetricsBusiness
     /// <param name="projectId">ID of the project from which to get the total bytes</param>
     /// <returns>Dictionary of objectStorageId -> total bytes</returns>
     public async Task<StorageSizeDto> GetProjectStorageSize(
-        long organizationId, 
+        long organizationId,
         long projectId)
     {
         // validate org and project exist and match
         await ExistenceHelper.EnsureOrganizationExistsAsync(_context, organizationId);
-        var project = await ExistenceHelper.EnsureProjectExistsAsync(_context, projectId);
-        
+        var project = await ExistenceHelper.GetProjectExistsAsync(_context, projectId);
+
         if (project.OrganizationId != organizationId)
             throw new InvalidOperationException($"Project {projectId} does not belong to organization {organizationId}");
-        
+
         var totalBytes = await GetProjectStorageSizeBytes(projectId);
-        
-        return new StorageSizeDto{ Bytes = totalBytes };
+
+        return new StorageSizeDto { Bytes = totalBytes };
     }
 
     /// <summary>
@@ -127,8 +104,8 @@ public class MetricsBusiness : IMetricsBusiness
         {
             totalBytes += await GetProjectStorageSizeBytes(projectId);
         }
-        
-        return new StorageSizeDto{ Bytes = totalBytes };
+
+        return new StorageSizeDto { Bytes = totalBytes };
     }
 
     /// <summary>
@@ -141,15 +118,15 @@ public class MetricsBusiness : IMetricsBusiness
             .Where(p => !p.IsArchived)
             .Select(p => p.Id)
             .ToListAsync();
-        
+
         long totalBytes = 0;
 
         foreach (var projectId in projectIds)
         {
             totalBytes += await GetProjectStorageSizeBytes(projectId);
         }
-        
-        return new StorageSizeDto{ Bytes = totalBytes };
+
+        return new StorageSizeDto { Bytes = totalBytes };
     }
 
     /// <summary>
@@ -160,16 +137,26 @@ public class MetricsBusiness : IMetricsBusiness
     /// <returns>Quantity of data sources system-wide</returns>
     public async Task<int> GetProjectDataSourceCount(long projectId, bool hideArchived = true)
     {
+        var cacheKey = CacheKeys.ProjectDataSourceCount(projectId, hideArchived);
+
+        var cachedCount = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        if (cachedCount.HasValue)
+            return cachedCount.Value;
+
         var dsQuery = _context.DataSources
             .AsQueryable();
 
-        dsQuery = dsQuery.Where(d => d.ProjectId == projectId);    
+        dsQuery = dsQuery.Where(d => d.ProjectId == projectId);
 
         // hide archived data sources
         if (hideArchived)
             dsQuery = dsQuery.Where(d => !d.IsArchived);
 
-        return await dsQuery.CountAsync();
+        var count = await dsQuery.CountAsync();
+
+        await CacheService.Instance.SetAsync(cacheKey, count, _dataSourceCountCacheTtl);
+
+        return count;
     }
 
     /// <summary>
@@ -180,28 +167,52 @@ public class MetricsBusiness : IMetricsBusiness
     /// <param name="hideArchived">Flag indicating whether to hide archived data sources from the result (Default true)</param>
     /// <returns>Quantity of data sources system-wide</returns>
     public async Task<int> GetOrganizationDataSourceCount(
-        long organizationId, 
-        long[]? projectIds, 
+        long organizationId,
+        long[]? projectIds,
         bool hideArchived = true
         )
     {
-        var dsQuery = _context.DataSources
+        // Only cache the unfiltered (org-total) case; arbitrary projectIds filters go straight to the DB.
+        if (projectIds is not { Length: > 0 })
+        {
+            var cacheKey = CacheKeys.OrganizationDataSourceCount(organizationId, hideArchived);
+
+            var cachedCount = await CacheService.Instance.GetAsync<int?>(cacheKey);
+            if (cachedCount.HasValue)
+                return cachedCount.Value;
+
+            var dsQuery = _context.DataSources
+                .AsQueryable();
+
+            dsQuery = dsQuery.Where(d => d.OrganizationId == organizationId);
+
+            // hide archived data sources
+            if (hideArchived)
+                dsQuery = dsQuery.Where(d => !d.IsArchived);
+
+            var count = await dsQuery.CountAsync();
+
+            await CacheService.Instance.SetAsync(cacheKey, count, _dataSourceCountCacheTtl);
+
+            return count;
+        }
+
+        var filteredQuery = _context.DataSources
             .AsQueryable();
 
-        dsQuery = dsQuery.Where(d => d.OrganizationId == organizationId);
+        filteredQuery = filteredQuery.Where(d => d.OrganizationId == organizationId);
 
-        // If project ids supplied, inherit org level data sources too 
-        if (projectIds is { Length: > 0 })
-            dsQuery = dsQuery.Where(d =>
-                (d.ProjectId.HasValue && projectIds.Contains(d.ProjectId.Value)) || d.ProjectId == null);
+        // ensures project and org level datasources are included
+        filteredQuery = filteredQuery.Where(d =>
+            (d.ProjectId.HasValue && projectIds.Contains(d.ProjectId.Value)) || d.ProjectId == null);
 
         // hide archived data sources
         if (hideArchived)
-            dsQuery = dsQuery.Where(d => !d.IsArchived);
+            filteredQuery = filteredQuery.Where(d => !d.IsArchived);
 
-        return await dsQuery.CountAsync();
+        return await filteredQuery.CountAsync();
     }
-    
+
     /// <summary>
     /// Gets the number of unique data modalities in the organization's records
     /// </summary>
@@ -212,15 +223,37 @@ public class MetricsBusiness : IMetricsBusiness
         long organizationId,
         long? projectId)
     {
-        return await _context.Records
+        // Check cache before querying db
+        var cacheKey = projectId.HasValue 
+            ? CacheKeys.ProjectModalityCount(projectId.Value) 
+            : CacheKeys.OrganizationModalityCount(organizationId);
+        
+        if (cacheKey != null)
+        {
+            var cachedCount = await CacheService.Instance.GetAsync<int?>(cacheKey);
+            if (cachedCount.HasValue)
+            {
+                return cachedCount.Value;
+            }
+        }
+
+        var count = await _context.Records
             .Where(r => r.FileType != null)
+            .Where(r => !r.IsArchived)
             .Where(r => r.OrganizationId == organizationId &&
                         (projectId == null || r.ProjectId == projectId))
             .Select(r => r.FileType)
             .Distinct()
             .CountAsync();
-    }
 
+        // Update the cache
+        if (cacheKey != null)
+        {
+            await CacheService.Instance.SetAsync(cacheKey, count, _modalityCountCacheTtl);
+        }
+
+        return count;
+    }
 
     /// <summary>
     ///     Gets datasource count system-wide
@@ -229,6 +262,12 @@ public class MetricsBusiness : IMetricsBusiness
     /// <returns>Quantity of data sources system-wide</returns>
     public async Task<int> GetSystemDataSourceCount(bool hideArchived = true)
     {
+        var cacheKey = CacheKeys.SystemDataSourceCount(hideArchived);
+
+        var cachedCount = await CacheService.Instance.GetAsync<int?>(cacheKey);
+        if (cachedCount.HasValue)
+            return cachedCount.Value;
+
         var dsQuery = _context.DataSources
             .AsQueryable();
 
@@ -236,9 +275,13 @@ public class MetricsBusiness : IMetricsBusiness
         if (hideArchived)
             dsQuery = dsQuery.Where(d => !d.IsArchived);
 
-        return await dsQuery.CountAsync();
+        var count = await dsQuery.CountAsync();
+
+        await CacheService.Instance.SetAsync(cacheKey, count, _dataSourceCountCacheTtl);
+
+        return count;
     }
-    
+
     /// <summary>
     ///     Get record count for a scope
     /// </summary>
@@ -251,7 +294,7 @@ public class MetricsBusiness : IMetricsBusiness
         var projectIds = projectId.HasValue ? new[] { projectId.Value } : null;
         return await GetRecordCount(organizationId, projectIds, hideArchived);
     }
-    
+
     /// <summary>
     ///     Get record count for a scope
     /// </summary>
@@ -261,16 +304,44 @@ public class MetricsBusiness : IMetricsBusiness
     /// <returns>The record count for the given scope</returns>
     public async Task<int> GetRecordCount(long? organizationId, long[]? projectIds, bool hideArchived)
     {
+        var hasProjectFilter = projectIds is { Length: > 0 };
+
+        // Check the cache before querying the db
+        string? cacheKey = (organizationId, hasProjectFilter) switch
+        {
+            (null, false) => CacheKeys.SystemRecordCount(hideArchived),
+            (not null, false) => CacheKeys.OrganizationRecordCount(organizationId!.Value, hideArchived),
+            (_, true) when projectIds!.Length == 1 => CacheKeys.ProjectRecordCount(projectIds[0], hideArchived),
+            _ => null
+        };
+
+        if (cacheKey != null)
+        {
+            var cachedCount = await CacheService.Instance.GetAsync<int?>(cacheKey);
+            if (cachedCount.HasValue)
+            {
+                return cachedCount.Value;
+            }
+        }
+
         var recordQuery = _context.Records.AsQueryable();
-        
+
         if (organizationId != null) recordQuery = recordQuery.Where(r => r.OrganizationId == organizationId);
 
-        if (projectIds is { Length: > 0 })
+        if (hasProjectFilter)
             recordQuery = recordQuery.Where(r => projectIds.Contains(r.ProjectId));
-        
+
         if (hideArchived) recordQuery = recordQuery.Where(r => !r.IsArchived);
-        
-        return await recordQuery.CountAsync();
+
+        var count = await recordQuery.CountAsync();
+
+        // Update the cache
+        if (cacheKey != null)
+        {
+            await CacheService.Instance.SetAsync(cacheKey, count, _recordCountCacheTtl);
+        }
+
+        return count;
     }
 
     /// <summary>
@@ -285,7 +356,7 @@ public class MetricsBusiness : IMetricsBusiness
         var projectIds = projectId.HasValue ? new[] { projectId.Value } : null;
         return await GetFileCount(organizationId, projectIds, hideArchived);
     }
-    
+
     /// <summary>
     ///     Get Files Count
     /// </summary>
@@ -295,17 +366,83 @@ public class MetricsBusiness : IMetricsBusiness
     /// <returns>The record count for the given scope</returns>
     public async Task<int> GetFileCount(long? organizationId, long[]? projectIds, bool hideArchived)
     {
+        var hasProjectFilter = projectIds is { Length: > 0 };
+
+        // Check the cache before querying the db
+        string? cacheKey = (organizationId, hasProjectFilter) switch
+        {
+            (null, false) => CacheKeys.SystemFileCount(hideArchived),
+            (not null, false) => CacheKeys.OrganizationFileCount(organizationId!.Value, hideArchived),
+            (_, true) when projectIds!.Length == 1 => CacheKeys.ProjectFileCount(projectIds[0], hideArchived),
+            _ => null
+        };
+
+        if (cacheKey != null)
+        {
+            var cachedCount = await CacheService.Instance.GetAsync<int?>(cacheKey);
+            if (cachedCount.HasValue)
+            {
+                return cachedCount.Value;
+            }
+        }
+
         var fileQuery = _context.Records
             .Where(r => r.Uri != null)
             .AsQueryable();
-        
+
         if (organizationId != null) fileQuery = fileQuery.Where(r => r.OrganizationId == organizationId);
 
-        if (projectIds is { Length: > 0 })
+        if (hasProjectFilter)
             fileQuery = fileQuery.Where(r => projectIds.Contains(r.ProjectId));
-        
+
         if (hideArchived) fileQuery = fileQuery.Where(r => !r.IsArchived);
-        
-        return await fileQuery.CountAsync();
+
+        var count = await fileQuery.CountAsync();
+
+        // Update the cache
+        if (cacheKey != null)
+        {
+            await CacheService.Instance.SetAsync(cacheKey, count, _fileCountCacheTtl);
+        }
+
+        return count;
+    }
+
+    private async Task<long> GetProjectStorageSizeBytes(long projectId)
+    {
+        var cacheKey = CacheKeys.ProjectStorageSize(projectId);
+
+        var cachedSize = await CacheService.Instance.GetAsync<long?>(cacheKey);
+        if (cachedSize.HasValue)
+        {
+            return cachedSize.Value;
+        }
+
+        var totalSize = await _context.Records
+            .Where(r =>
+                r.ProjectId == projectId &&
+                !r.IsArchived &&
+                r.FileSize != null)
+            .SumAsync(r => r.FileSize ?? 0);
+
+        await CacheService.Instance.SetAsync(cacheKey, totalSize, _storageSizeCacheTtl);
+
+        return totalSize;
+    }
+
+    /// <summary>
+    ///     Used for invalidating the cached modality count values on mutation.
+    /// </summary>
+    /// <param name="organizationId">The ID of the organization the modalities belong to</param>
+    /// <param name="projectId">The ID of the project the modalities belong to</param>
+    public static Task InvalidateModalityCountCaches(long organizationId, long projectId)
+    {
+        var keys = new List<string>
+        {
+            CacheKeys.OrganizationModalityCount(organizationId),
+            CacheKeys.ProjectModalityCount(projectId)
+        };
+
+        return Task.WhenAll(keys.Select(CacheService.Instance.DeleteAsync));
     }
 }

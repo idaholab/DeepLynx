@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using deeplynx.business;
 using deeplynx.datalayer.Models;
+using deeplynx.helpers;
 using deeplynx.helpers.Hubs;
 using deeplynx.interfaces;
 using deeplynx.models;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Record = deeplynx.datalayer.Models.Record;
 
 namespace deeplynx.tests;
 
@@ -18,6 +20,10 @@ public class TagBusinessTests : IntegrationTestBase
     private EventBusiness _eventBusiness;
     private Mock<IBulkCopyUpsertExecutor> _mockBulkCopyUpsertExecutor = null!;
     private Mock<IHubContext<EventNotificationHub>> _mockHubContext = null!;
+    private Mock<ILogger<ProjectRolePermissionService>> _projectServiceLogger;
+    private Mock<ILogger<AdminService>> _adminServiceLogger;
+    private IProjectRolePermissionService _permissionService = null!;
+    private IAdminService _adminService = null!;
     private Mock<ILogger<NotificationBusiness>> _mockNotificationLogger = null!;
     private INotificationBusiness _notificationBusiness = null!;
     private TagBusiness _tagBusiness;
@@ -42,13 +48,19 @@ public class TagBusinessTests : IntegrationTestBase
         await base.InitializeAsync();
         _mockHubContext = new Mock<IHubContext<EventNotificationHub>>();
         _mockNotificationLogger = new Mock<ILogger<NotificationBusiness>>();
+        _projectServiceLogger = new Mock<ILogger<ProjectRolePermissionService>>();
+        _adminServiceLogger = new Mock<ILogger<AdminService>>();
+        _permissionService = new ProjectRolePermissionService(Context, _projectServiceLogger.Object);
+        _adminService = new AdminService(Context, _adminServiceLogger.Object);
         _notificationBusiness =
             new NotificationBusiness(Context, _mockNotificationLogger.Object, _mockHubContext.Object);
         _mockBulkCopyUpsertExecutor = new Mock<IBulkCopyUpsertExecutor>();
         _eventBusiness = new EventBusiness(Context, _notificationBusiness, _mockBulkCopyUpsertExecutor.Object);
         _tagBusiness = new TagBusiness(
             Context,
-            _eventBusiness);
+            _eventBusiness,
+            _permissionService,
+            _adminService);
     }
 
     protected override async Task SeedTestDataAsync()
@@ -170,7 +182,7 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task GetAllTags_ValidProjectId_ReturnsActiveProjectAndOrgTags()
     {
         // Act
-        var result = await _tagBusiness.GetAllTags(oid, [pid], true);
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], true, true);
         var tags = result.ToList();
 
         // Assert
@@ -185,10 +197,29 @@ public class TagBusinessTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetAllTags_ValidProjectId_ReturnsActiveProjectAndOrgTagsWithArchivedTags()
+    {
+        // Act
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], false, true);
+        var tags = result.ToList();
+
+
+        // Assert
+        Assert.Equal(4, tags.Count);
+        Assert.All(tags, t => Assert.Equal(oid, t.OrganizationId));
+        Assert.True(tags[2].IsArchived, "The third tag should be archived.");
+        Assert.Contains(tags, t => t.Id == tid);
+        Assert.Contains(tags, t => t.Id == tid2);
+        Assert.Contains(tags, t => t.Id == tid5);
+        Assert.DoesNotContain(tags, t => t.Id == tid4);
+    }
+
+
+    [Fact]
     public async Task GetAllTags_ProjectWithNoTags_ReturnsOrgInheritedTag()
     {
         // Act
-        var result = await _tagBusiness.GetAllTags(oid, [pid3], true);
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid3], true, true);
         var tags = result.ToList();
 
         // Assert
@@ -199,7 +230,7 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task GetAllTags_DifferentProject_ReturnsOrgInheritedTags()
     {
         // Act
-        var result = await _tagBusiness.GetAllTags(oid, [pid], true);
+        var result = await _tagBusiness.GetAllTags(uid, oid, [pid], true, true);
         var tags = result.ToList();
 
         // Assert
@@ -208,6 +239,124 @@ public class TagBusinessTests : IntegrationTestBase
     }
 
     #endregion
+
+    #region GetAllTagsPaginated Tests
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ValidProjectId_ReturnsActiveProjectAndOrgTags()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Items, t => Assert.Equal(oid, t.OrganizationId));
+        Assert.All(result.Items, t => Assert.False(t.IsArchived));
+        Assert.Equal(3, result.TotalCount);
+        Assert.Contains(result.Items, t => t.Id == tid);
+        Assert.Contains(result.Items, t => t.Id == tid2);
+        Assert.Contains(result.Items, t => t.Id == tid5);
+        Assert.DoesNotContain(result.Items, t => t.Id == tid3);
+        Assert.DoesNotContain(result.Items, t => t.Id == tid4);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ValidProjectId_IncludesArchived_WhenHideArchivedFalse()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: false, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Items, t => Assert.Equal(oid, t.OrganizationId));
+        Assert.Equal(4, result.TotalCount);
+        Assert.Contains(result.Items, t => t.IsArchived);
+        Assert.Contains(result.Items, t => t.Id == tid);
+        Assert.Contains(result.Items, t => t.Id == tid2);
+        Assert.Contains(result.Items, t => t.Id == tid5);
+        Assert.DoesNotContain(result.Items, t => t.Id == tid4);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ProjectWithNoTags_ReturnsOrgInheritedTag()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid3], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_DifferentProject_ReturnsOrgInheritedTags()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = 10 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(3, result.TotalCount);
+        Assert.All(result.Items, t => Assert.Equal(oid, t.OrganizationId));
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_ReturnsAll_WhenPageSizeIsMinusOne()
+    {
+        // Arrange
+        var paginatedRequest = new PaginatedRequestDto { PageNumber = 5, PageSize = -1 };
+
+        // Act
+        var result = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], paginatedRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(1, result.PageNumber);
+        Assert.Equal(result.TotalCount, result.PageSize);
+        Assert.Equal(result.TotalCount, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetAllTagsPaginated_PaginatesCorrectly()
+    {
+        // Arrange
+        var pageSize = 2;
+        var firstPageRequest = new PaginatedRequestDto { PageNumber = 1, PageSize = pageSize };
+        var secondPageRequest = new PaginatedRequestDto { PageNumber = 2, PageSize = pageSize };
+
+        // Act
+        var firstPage = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], firstPageRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+        var secondPage = await _tagBusiness.GetAllTagsPaginated(uid, oid, [pid], secondPageRequest, hideArchived: true, isSysAdmin: true, isOrgAdmin: true);
+
+        // Assert
+        Assert.NotNull(firstPage);
+        Assert.NotNull(secondPage);
+
+        Assert.Equal(firstPage.TotalCount, secondPage.TotalCount);
+
+        Assert.Equal(pageSize, firstPage.Items.Count);
+        Assert.True(secondPage.Items.Count <= pageSize);
+
+        var firstPageIds = firstPage.Items.Select(t => t.Id).ToHashSet();
+        var secondPageIds = secondPage.Items.Select(t => t.Id).ToHashSet();
+
+        Assert.Empty(firstPageIds.Intersect(secondPageIds)); // no overlap
+    }
+
+    #endregion
+
 
     #region GetTag Tests
 
@@ -292,7 +441,7 @@ public class TagBusinessTests : IntegrationTestBase
         Assert.Equal(oid, result[0].OrganizationId);
         Assert.Equal("Org Tag By Name", result[0].Name);
     }
-    
+
     [Fact]
     public async Task GetTagsByName_Success_WithProjectId()
     {
@@ -843,11 +992,11 @@ public class TagBusinessTests : IntegrationTestBase
     public async Task ArchiveTag_ArchivedTagNotReturnedInGetAll()
     {
         // Arrange
-        var initialCount = (await _tagBusiness.GetAllTags(oid, [pid], true)).Count;
+        var initialCount = (await _tagBusiness.GetAllTags(uid, oid, [pid], true, true)).Count;
 
         // Act
         await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
-        var finalCount = (await _tagBusiness.GetAllTags(oid, [pid], true)).Count;
+        var finalCount = (await _tagBusiness.GetAllTags(uid, oid, [pid], true, true)).Count;
 
         // Assert
         Assert.Equal(initialCount - 1, finalCount);
@@ -871,6 +1020,272 @@ public class TagBusinessTests : IntegrationTestBase
         // Ensure that the update tag event was not logged
         var eventList = await Context.Events.ToListAsync();
         Assert.Empty(eventList);
+    }
+
+    #endregion
+
+    #region ArchiveTag Cascade Tests
+
+    [Fact]
+    public async Task ArchiveTag_RemovesAssociationFromRecordTags()
+    {
+        // Arrange - attach the tag (tid) to a record via the many-to-many navigation property
+        var dataSource = new DataSource
+        {
+            Name = "Cascade Test DS",
+            OrganizationId = oid,
+            ProjectId = pid,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+
+        var tagEntity = await Context.Tags.FindAsync(tid);
+
+        var record = new Record
+        {
+            Name = "Cascade Test Record",
+            Description = "record used to verify tag unlink cascade",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = oid,
+            DataSourceId = dataSource.Id,
+            IsArchived = false,
+            Uri = "localhost:8090/cascade-test",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tagEntity! }
+        };
+        Context.Records.Add(record);
+        await Context.SaveChangesAsync();
+
+        // Sanity check the link exists before archiving
+        var recordBeforeArchive = await Context.Records
+            .Include(r => r.Tags)
+            .FirstAsync(r => r.Id == record.Id);
+        Assert.Contains(recordBeforeArchive.Tags, t => t.Id == tid);
+
+        // Act
+        await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
+
+        Context.ChangeTracker.Clear();
+
+        // Assert - the tag should no longer be associated with the record
+        var recordAfterArchive = await Context.Records
+            .Include(r => r.Tags)
+            .FirstAsync(r => r.Id == record.Id);
+        Assert.DoesNotContain(recordAfterArchive.Tags, t => t.Id == tid);
+    }
+
+    [Fact]
+    public async Task ArchiveTag_RemovesAssociationFromRecordCollectionTags()
+    {
+        // Arrange - attach the tag (tid) to a record collection via the many-to-many navigation property
+        var tagEntity = await Context.Tags.FindAsync(tid);
+
+        var collection = new RecordCollection
+        {
+            Name = "Cascade Test Collection",
+            Description = "collection used to verify tag unlink cascade",
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = oid,
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tagEntity! }
+        };
+        Context.RecordCollections.Add(collection);
+        await Context.SaveChangesAsync();
+
+        // Sanity check the link exists before archiving
+        var collectionBeforeArchive = await Context.RecordCollections
+            .Include(rc => rc.Tags)
+            .FirstAsync(rc => rc.Id == collection.Id);
+        Assert.Contains(collectionBeforeArchive.Tags, t => t.Id == tid);
+
+        // Act
+        await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
+
+        Context.ChangeTracker.Clear();
+
+        // Assert - the tag should no longer be associated with the collection
+        var collectionAfterArchive = await Context.RecordCollections
+            .Include(rc => rc.Tags)
+            .FirstAsync(rc => rc.Id == collection.Id);
+        Assert.DoesNotContain(collectionAfterArchive.Tags, t => t.Id == tid);
+    }
+
+    [Fact]
+public async Task ArchiveTag_RemovesTagFromHistoricalRecordDenormalizedTagList()
+{
+    // Arrange
+    var dataSource = new DataSource
+    {
+        Name = "Historical Cascade Test DS",
+        OrganizationId = oid,
+        ProjectId = pid,
+        IsArchived = false
+    };
+
+    Context.DataSources.Add(dataSource);
+    await Context.SaveChangesAsync();
+
+    var tagEntity = await Context.Tags.FindAsync(tid);
+    Assert.NotNull(tagEntity);
+
+    // Create the record first. Its initial historical snapshot will not contain
+    // the tag because the record_tags association does not exist yet.
+    var record = new Record
+    {
+        Name = "Historical Cascade Test Record",
+        Description = "record used to verify historical tag removal",
+        OriginalId = Guid.NewGuid().ToString(),
+        Properties = "{}",
+        ProjectId = pid,
+        OrganizationId = oid,
+        DataSourceId = dataSource.Id,
+        IsArchived = false,
+        Uri = "localhost:8090/historical-cascade-test",
+        LastUpdatedAt = DateTime.SpecifyKind(
+            DateTime.UtcNow,
+            DateTimeKind.Unspecified),
+        LastUpdatedBy = uid,
+        Tags = new List<Tag>()
+    };
+
+    Context.Records.Add(record);
+    await Context.SaveChangesAsync();
+
+    var recordId = record.Id;
+
+    // Create the record_tags association after the record exists.
+    record.Tags.Add(tagEntity);
+    await Context.SaveChangesAsync();
+
+    // Updating the record after the association exists causes the historical
+    // record trigger to create a snapshot that includes the tag.
+    record.LastUpdatedAt = record.LastUpdatedAt.AddSeconds(1);
+    await Context.SaveChangesAsync();
+
+    Context.ChangeTracker.Clear();
+
+    // Verify the tag exists on the current record.
+    var recordBeforeArchive = await Context.Records
+        .AsNoTracking()
+        .Include(r => r.Tags)
+        .FirstAsync(r => r.Id == recordId);
+
+    Assert.Contains(recordBeforeArchive.Tags, tag => tag.Id == tid);
+
+    // Verify the latest historical snapshot contains the tag.
+    var historicalBeforeArchive = await Context.HistoricalRecords
+        .AsNoTracking()
+        .Where(hr => hr.RecordId == recordId)
+        .OrderByDescending(hr => hr.LastUpdatedAt)
+        .FirstOrDefaultAsync();
+
+    Assert.NotNull(historicalBeforeArchive);
+    Assert.Contains(
+        "Analytics",
+        historicalBeforeArchive.Tags ?? string.Empty);
+
+    // Act
+    await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
+
+    Context.ChangeTracker.Clear();
+
+    // Assert
+    var historicalAfterArchive = await Context.HistoricalRecords
+        .AsNoTracking()
+        .Where(hr => hr.RecordId == recordId)
+        .OrderByDescending(hr => hr.LastUpdatedAt)
+        .FirstOrDefaultAsync();
+
+    Assert.NotNull(historicalAfterArchive);
+    Assert.DoesNotContain(
+        "Analytics",
+        historicalAfterArchive.Tags ?? string.Empty);
+}
+
+    [Fact]
+    public async Task ArchiveTag_AttachedToMultipleRecords_UnlinksAndUpdatesHistoryForAllOfThem()
+    {
+        // Arrange - attach the same tag (tid) to two different records
+        var dataSource = new DataSource
+        {
+            Name = "Multi Record Cascade Test DS",
+            OrganizationId = oid,
+            ProjectId = pid,
+            IsArchived = false
+        };
+        Context.DataSources.Add(dataSource);
+        await Context.SaveChangesAsync();
+
+        var tagEntity = await Context.Tags.FindAsync(tid);
+
+        var record1 = new Record
+        {
+            Name = "Multi Cascade Record 1",
+            Description = "first record sharing the archived tag",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = oid,
+            DataSourceId = dataSource.Id,
+            IsArchived = false,
+            Uri = "localhost:8090/multi-cascade-1",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tagEntity! }
+        };
+        var record2 = new Record
+        {
+            Name = "Multi Cascade Record 2",
+            Description = "second record sharing the archived tag",
+            OriginalId = Guid.NewGuid().ToString(),
+            Properties = "{}",
+            ProjectId = pid,
+            OrganizationId = oid,
+            DataSourceId = dataSource.Id,
+            IsArchived = false,
+            Uri = "localhost:8090/multi-cascade-2",
+            LastUpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            LastUpdatedBy = uid,
+            Tags = new List<Tag> { tagEntity! }
+        };
+        Context.Records.AddRange(record1, record2);
+        await Context.SaveChangesAsync();
+
+        // Act
+        await _tagBusiness.ArchiveTag(oid, uid, pid, tid);
+
+        Context.ChangeTracker.Clear();
+
+        // Assert - neither record should still be associated with the tag
+        var record1AfterArchive = await Context.Records
+            .Include(r => r.Tags)
+            .FirstAsync(r => r.Id == record1.Id);
+        var record2AfterArchive = await Context.Records
+            .Include(r => r.Tags)
+            .FirstAsync(r => r.Id == record2.Id);
+        Assert.DoesNotContain(record1AfterArchive.Tags, t => t.Id == tid);
+        Assert.DoesNotContain(record2AfterArchive.Tags, t => t.Id == tid);
+
+        // Assert - both records' newest historical snapshots should no longer list the tag
+        var latestHistory1 = await Context.HistoricalRecords
+            .Where(hr => hr.RecordId == record1.Id)
+            .OrderByDescending(hr => hr.LastUpdatedAt)
+            .FirstOrDefaultAsync();
+        var latestHistory2 = await Context.HistoricalRecords
+            .Where(hr => hr.RecordId == record2.Id)
+            .OrderByDescending(hr => hr.LastUpdatedAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(latestHistory1);
+        Assert.NotNull(latestHistory2);
+        Assert.DoesNotContain("Analytics", latestHistory1.Tags ?? string.Empty);
+        Assert.DoesNotContain("Analytics", latestHistory2.Tags ?? string.Empty);
     }
 
     #endregion
