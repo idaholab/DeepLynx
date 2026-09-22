@@ -1,0 +1,5 @@
+The `src->data_access_layer->migrations` folder in the DeepLynx data structure contains the database migration files to build out the DeepLynx database. These files follow the naming convention of `###-name.sql` and contain raw SQL to build out database tables, views, and functions. The migrations do not contain CRUD (create, read, update, and delete) statements specific to data- those are handled by [data mappers](Data-Mapper-Pattern). These files are solely responsible for building out the database infrastructure of DeepLynx.
+
+The migration files run on application boot in alphanumeric order. The commands contained within the files are delimited my semicolon and run a command at a time. If you add a new migration, please use the next number up from the most recent migration. Many migrations depend on the execution of previous migrations to work properly, such as those which alter existing tables. Also please ensure that each SQL statement ends with a semicolon.
+
+To see how migrations work together with Mappers and Repositories in DeepLynx, check out [this article](Adding-New-Data-Structures-and-Storage).

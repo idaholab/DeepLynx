@@ -1,0 +1,1 @@
+Specific instructions on querying DeepLynx through GraphQL can be found at [this link](https://gitlab.software.inl.gov/b650/Deep-Lynx/-/wikis/Querying-Data-with-GraphQL).
