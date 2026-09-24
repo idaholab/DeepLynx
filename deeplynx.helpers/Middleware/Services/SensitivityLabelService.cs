@@ -12,6 +12,11 @@ public class SensitivityLabelService : ISensitivityLabelService
     private readonly DeeplynxContext _context;
     private readonly ILogger<SensitivityLabelService>? _logger;
 
+    // Mutations that affect authorization (grants, label create/delete) already call
+    // InvalidateAuthorizedLabelsCache explicitly, so this TTL is a safety net against
+    // missed invalidations and unbounded cache growth, not the primary invalidation path.
+    private static readonly TimeSpan AuthorizedLabelsCacheTtl = TimeSpan.FromHours(1);
+
     public SensitivityLabelService(DeeplynxContext context, ILogger<SensitivityLabelService>? logger = null)
     {
         _context = context;
@@ -123,7 +128,7 @@ public class SensitivityLabelService : ISensitivityLabelService
             string cacheKey = CacheKeys.ProjectAuthorizedSensitivityLabels(projectId, currentUserId, userAction);
             try
             {
-                await CacheService.Instance.SetAsync(cacheKey, projectAuthorized.ToList(), (TimeSpan?)null);
+                await CacheService.Instance.SetAsync(cacheKey, projectAuthorized.ToList(), AuthorizedLabelsCacheTtl);
             }
             catch (Exception ex)
             {

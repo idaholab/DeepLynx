@@ -19,6 +19,11 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
     private readonly DeeplynxContext _dbContext;
     private readonly ILogger<ProjectRolePermissionService> _logger;
 
+    // Mutations that affect permissions already invalidate the relevant keys explicitly
+    // (see PermissionCachingHelper and its callers), so this TTL is a safety net against
+    // missed invalidations and unbounded cache growth, not the primary invalidation path.
+    private static readonly TimeSpan PermissionCacheTtl = TimeSpan.FromHours(1);
+
     public ProjectRolePermissionService(
         DeeplynxContext dbContext,
         ILogger<ProjectRolePermissionService> logger)
@@ -71,7 +76,7 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
                     .FirstOrDefault();
 
             // Populate cache on miss
-            await CacheService.Instance.SetAsync(cacheKey, hasPermission, (TimeSpan?)null);
+            await CacheService.Instance.SetAsync(cacheKey, hasPermission, PermissionCacheTtl);
         }
 
         if (hasPermission)
@@ -164,7 +169,7 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
             await CacheService.Instance.SetAsync(
                 CacheKeys.ProjectPermission(userId, projectId, action, resource),
                 isAuthorized,
-                (TimeSpan?)null);
+                PermissionCacheTtl);
 
             if (isAuthorized)
             {
@@ -208,7 +213,7 @@ public class ProjectRolePermissionService : IProjectRolePermissionService
             .ToListAsync();
 
         // Populate cache on miss
-        await CacheService.Instance.SetAsync(cacheKey, permittedProjectIds, (TimeSpan?)null);
+        await CacheService.Instance.SetAsync(cacheKey, permittedProjectIds, PermissionCacheTtl);
 
         return permittedProjectIds;
     }
